@@ -290,7 +290,7 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  *   `decide` never reads it: what was said to a session is a fact for whoever reviews the work, not a judgement on it.
  * - `input`: a person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the
  *   words its next turn is told, continuing the session that signed, and what that turn's configuration gives for itself
- *   when they gave any — its spend cap. Read by `decide`: an input starts a turn. Refused by the facade unless the task
+ *   when they gave any — its spend cap. Read by `decide`: an input starts a turn. Refused by `answer` unless the task
  *   waits for one.
  * - `closed`: a person's word that a task held open is finished with: it settles once no attempt of it runs. Read by
  *   `decide`.

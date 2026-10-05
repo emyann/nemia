@@ -22,11 +22,57 @@ export const FACTORY_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
  */
 export type Hires = Readonly<Record<string, string>>;
 
+/** The file a factory's instruction is read from when its file names none: in the factory's first folder. */
+export const DEFAULT_INSTRUCTION = 'NEMIA.md';
+
+/**
+ * Where a factory's file says its instruction is kept: a file in the factory's first folder, by its path relative to it, or the store.
+ */
+export type InstructionAt = { path: string } | { store: true };
+
 /**
  * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
- * attached to it, each by its folder's name, and its hires; none of either when the file names none.
+ * attached to it, each by its folder's name, and its hires; none of either when the file names none. `instruction`: where its instruction
+ * is kept, when the file says (`instructionAt`).
  */
-export type Factory = { name: string; repos: readonly string[]; workflows: readonly string[]; hires: Hires };
+export type Factory = {
+  name: string;
+  repos: readonly string[];
+  workflows: readonly string[];
+  hires: Hires;
+  instruction?: InstructionAt;
+};
+
+/**
+ * Where a factory's instruction is read: a file in its first folder (`folder`, `path` its path there), or the store's file for it.
+ */
+export type InstructionPlace = { in: 'folder'; folder: string; path: string; file: string } | { in: 'store'; file: string };
+
+/**
+ * Where the instruction of `factory` is read: the store's file `storeFile` when its file says the store; else the path it names, or
+ * `NEMIA.md` when it names none, in its first folder, the first of `repos` as filed.
+ */
+export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction'>, storeFile: string): InstructionPlace {
+  const at = factory.instruction;
+  if (at !== undefined && 'store' in at) return { in: 'store', file: storeFile };
+  const folder = factory.repos[0];
+  const relative = at?.path ?? DEFAULT_INSTRUCTION;
+  return { in: 'folder', folder, path: relative, file: path.join(folder, relative) };
+}
+
+/**
+ * Why `p` cannot name a factory's instruction in its first folder, or undefined: a path is relative to the folder and stays in it, so an
+ * empty one, an absolute one, the folder itself and one that climbs out of it are refused.
+ */
+export function instructionPathRefusal(p: string): string | undefined {
+  const fix = 'Name a file inside the folder by its path from it — NEMIA.md or docs/NEMIA.md, say — or keep the instruction in the store.';
+  if (!p.trim()) return `A factory's instruction is a file in its first folder, and this path is empty. ${fix}`;
+  if (path.isAbsolute(p)) return `\`${p}\` is absolute, and a factory's instruction is named by its path from its first folder. ${fix}`;
+  const normal = path.normalize(p);
+  if (normal === '.' || normal === `.${path.sep}`) return `\`${p}\` names the folder itself, not a file in it. ${fix}`;
+  if (normal === '..' || normal.startsWith(`..${path.sep}`)) return `\`${p}\` climbs out of the factory's first folder. ${fix}`;
+  return undefined;
+}
 
 /** A factory as `nemia factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
 export type FactoryListing = (Factory & { file: string }) | { name: string; file: string; error: string };
@@ -41,7 +87,7 @@ export function factoryNameRefusal(name: string): string | undefined {
 }
 
 /** A verb of `nemia factory` that writes a factory's file. */
-export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire';
+export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire' | 'instruction' | 'instruct';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -51,6 +97,8 @@ const INSTEAD: Record<FactoryWrite, string> = {
   detach: 'It offers every workflow found, and none can be taken from it: detach from a factory nemia factory ls lists.',
   hire: "In it, a step that names no agent runs as a plain session: hire into a factory nemia factory ls lists, or write the step's agent: line.",
   fire: 'It hires no one: fire in a factory nemia factory ls lists.',
+  instruction: 'It keeps no instruction: give one to a factory nemia factory ls lists.',
+  instruct: 'It keeps no instruction: write one for a factory nemia factory ls lists.',
 };
 
 /** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
@@ -326,6 +374,10 @@ const hireLines = (hires: Hires, width: number): string[] =>
 const workflowLine = (workflows: readonly string[], width: number): string[] =>
   workflows.length ? [`${' '.repeat(width)}  workflows: ${[...workflows].sort().join(', ')}`] : [];
 
+/** Where a factory's instruction is kept, as `nemia factory ls` lists it under its line, when its file says: a path, or the store. */
+const instructionLine = (at: InstructionAt | undefined, width: number): string[] =>
+  at === undefined ? [] : [`${' '.repeat(width)}  instruction: ${'store' in at ? 'kept in the store' : at.path}`];
+
 /** What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
 export function factoryLines(listing: readonly FactoryListing[]): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
@@ -334,7 +386,9 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
     `${DEFAULT_FACTORY.padEnd(width)}  every run and card that names no factory — read, never written`,
     ...sorted.flatMap((l) => [
       `${l.name.padEnd(width)}  ${'error' in l ? `${l.file} ${l.error}` : l.repos.join(', ')}`,
-      ...('error' in l ? [] : [...workflowLine(l.workflows, width), ...hireLines(l.hires, width)]),
+      ...('error' in l
+        ? []
+        : [...workflowLine(l.workflows, width), ...hireLines(l.hires, width), ...instructionLine(l.instruction, width)]),
     ]),
   ];
 }

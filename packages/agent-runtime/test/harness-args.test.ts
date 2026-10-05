@@ -2,7 +2,7 @@
  * The checks every harness shares of a task's `config`, in their own file (`src/harness/args.ts`), and asked through the
  * `Runner` — each made to refuse, at shipped defaults.
  *
- * `test/refusal.test.ts` holds their words at both doors. A harness argument filed beside `config` is refused naming where
+ * `test/refusal.test.ts` holds their words. A harness argument filed beside `config` is refused naming where
  * it goes, and a `config` that is not an object, or holds a key that is no harness argument, is refused rather than
  * carried to a runner that would drop it.
  */

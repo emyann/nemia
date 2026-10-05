@@ -14,9 +14,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PromiseRunner, PromiseSighting } from 'agent-runtime';
+import type { Sighting } from 'agent-runtime';
+import { asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import { Effect } from 'effect';
-import { Engine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -44,9 +45,9 @@ fs.writeFileSync(path.join(ONE, 'work.md'), '---\nharness: codex\n---\nwork it\n
  * what they are said.
  */
 const engine = () => {
-  const sessions = new Map<string, PromiseSighting>();
+  const sessions = new Map<string, Sighting>();
   let n = 0;
-  const runner: PromiseRunner = {
+  const runner: AsyncRunner = {
     async spawn(r) {
       n++;
       sessions.set(r.name, { sessionId: `s-${n}`, nativeId: `native-${n}`, state: 'working', busy: true });
@@ -61,14 +62,14 @@ const engine = () => {
     async say() {},
   };
   const e = plainEngine(
-    Engine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), harnesses: { codex: runner }, defaultHarness: 'codex' }),
+    Engine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), harnesses: { codex: asyncOps(runner) }, defaultHarness: 'codex' }),
   );
   const signAll = (keep: readonly Run[]) => {
     for (const [name, s] of sessions)
       if (s.state === 'working' && !keep.some((r) => name.startsWith(`ae/${r.id}-`)))
         sessions.set(name, {
           ...s,
-          state: 'done',
+          state: 'completed',
           busy: false,
           closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: Date.now() },
         });

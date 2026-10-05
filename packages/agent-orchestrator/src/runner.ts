@@ -205,7 +205,7 @@ export {
   unattachedRefusal,
   unfilledRefusal,
 } from './factory/factory.ts';
-export type { Factory, FactoryListing, Hires } from './factory/factory.ts';
+export type { Factory, FactoryListing, Hires, InstructionAt } from './factory/factory.ts';
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine, FeedPublished } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
@@ -351,6 +351,7 @@ export {
   readFactories,
   readFactory,
   removeFactory,
+  setInstruction,
   startFactory,
 } from './factory/factory.store.ts';
 export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from './runtime-client.ts';
@@ -418,6 +419,8 @@ export { LOGS, STATS } from './command/reads.verb.ts';
 export { START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
+export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
+export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';

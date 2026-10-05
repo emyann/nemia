@@ -8,7 +8,7 @@ broken. This page says what the tests hold; the tests are the rules.
 
 | Layer | Owns | Public contract |
 |---|---|---|
-| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words and what their fence words reach (`fenceReach`), pure. `decide` is exported by none. |
+| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words and what their fence words reach (`fenceReach`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
@@ -44,6 +44,10 @@ holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. Th
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
 next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
+
+**A journal's bodies** are the runtime's storage: each long text of a line kept once, under the sha256 of its text, resolved on every
+read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's
+(`briefParts`, `src/brief/parts.ts`), filed beside the whole brief as a hint the runtime refuses unless the parts join into it.
 
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
@@ -99,7 +103,7 @@ both for an app; `wf stats` and `wf ls` keep none, and the api's tests read ever
 ## The rules
 
 **1. Between packages, only the public contract.** Code outside packages/agent-runtime reaches it through
-`agent-runtime` and `agent-runtime/effect`, and its vocabulary through `agent-runtime/vocabulary`, alone. That rules out its src/ by any route: a subpath not in its `exports`,
+`agent-runtime`, and its vocabulary through `agent-runtime/vocabulary`, alone. That rules out its src/ by any route: a subpath not in its `exports`,
 a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by neither entry. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`,
 and `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk, and the
@@ -107,8 +111,8 @@ refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),
 which the board draws. The packages' entries are Effect, and the api is the system's public interface: a controller is a program its
-caller runs over the engine with `runWith`, and `ae` runs each verb of `Engine.layer(…)` as an Effect. The runtime's Promise door
-(`agent-runtime`, `src/facade.ts`) is left to the runtime's own tests until it goes.
+caller runs over the engine with `runWith`, and `ae` runs each verb of `Engine.layer(…)` as an Effect. No entry of the runtime exports
+a function that answers a Promise (`packages/agent-runtime/test/plain-faces.test.ts`).
 
 Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
 source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the api's imports the orchestrator
@@ -158,7 +162,7 @@ outside through its face — its `index.ts`, or its one pure file.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the
-runtime's `Engine` service from `agent-runtime/effect`, built once, each verb an Effect a controller's program reads with `asked`
+runtime's `Engine` service from `agent-runtime`, built once, each verb an Effect a controller's program reads with `asked`
 (`engineOf`, which a test hands a layer of its own); a caller runs a program over it with `runWith`. It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
 through a controller it imports, and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through
 its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes, per key (`HARNESS_CHOICES`), and `fenceReach`, with no Effect and no
@@ -166,12 +170,12 @@ I/O, held by `packages/agent-runtime/test/vocabulary-door.test.ts`), which any f
 (`VOCABULARY` in test/boundary.test.ts).
 
 **Inside the runtime, folders by feature**, held by path in `packages/agent-runtime/test/layout.test.ts`. The entries,
-`src/facade.ts`, `src/index.ts` and the vocabulary door `src/vocabulary.ts`, are the only files flat in `src/`; each re-exports by name. `core/` is the judgement
+`src/index.ts` and the vocabulary door `src/vocabulary.ts`, are the only files flat in `src/`; each re-exports by name. `core/` is the judgement
 (`domain.ts`, `session.ts`, `lifecycle.ts`) and `core/engine/` its shell (the engine, filing, the journal, the memo, the tally);
 `harness/` is the seam (`seam.ts`, `args.ts`) and each harness's driver beneath it (`claude/`, `codex/`, `detached/`); `a2a/` is
-the one place the A2A SDK is imported; `service/` is the engine as an Effect service, `facade/` the Promise door over it behind
-`src/facade.ts`, and `cli/` the `ae` command. The core imports of the harnesses only `seam.ts`, `args.ts` and the harness face;
-neither the core nor a harness imports `a2a/`, `service/`, `facade/` or `cli/`; `cli/` reaches the runtime through `src/facade.ts` alone; and no two files import each other's values,
+the one place the A2A SDK is imported; `service/` is the engine as an Effect service, and `cli/` the `ae`
+command. The core imports of the harnesses only `seam.ts`, `args.ts` and the harness face;
+neither the core nor a harness imports `a2a/`, `service/` or `cli/`; `cli/` reaches the runtime through `src/index.ts` alone; and no two files import each other's values,
 directly or around a loop. A folder another folder reads has a face, `index.ts`.
 
 **The api's kinds and folders.** The api is routes over readers, and has two kinds of file, held by `apps/api/test/kinds.test.ts`:

@@ -203,7 +203,7 @@ const insides = async () => {
 test("neither of the runtime's entries exports XState, the machine, or what decide reads", async () => {
   const inside = await insides();
   assert.ok(inside.names.has('setup') && inside.names.has('transition') && inside.names.has('createActor'), 'XState was read');
-  for (const entry of ['agent-runtime', 'agent-runtime/effect']) {
+  for (const entry of ['agent-runtime', 'agent-runtime/vocabulary']) {
     assert.deepEqual(exportBreaches(entry, { ...(await import(entry)) }, inside), [], entry);
   }
 });
@@ -213,10 +213,10 @@ test('REFUSED: an entry that exports an XState name, the machine or its move ren
   const { setup } = await import(XSTATE);
   const lifecycle = await import('../src/core/lifecycle.ts');
   const { lifecycleOf } = await import('../src/core/domain.ts');
-  const effect = { ...(await import('agent-runtime/effect')) };
+  const root = { ...(await import('agent-runtime')) };
   const says = (entry: string, name: string) =>
     `${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`;
-  assert.deepEqual(exportBreaches('agent-runtime/effect', { ...effect, setup }, inside), [says('agent-runtime/effect', 'setup')]);
+  assert.deepEqual(exportBreaches('agent-runtime', { ...root, setup }, inside), [says('agent-runtime', 'setup')]);
   assert.deepEqual(exportBreaches('agent-runtime', { taskMachine: lifecycle.MACHINE, move: lifecycle.transition }, inside), [
     says('agent-runtime', 'taskMachine'),
     says('agent-runtime', 'move'),

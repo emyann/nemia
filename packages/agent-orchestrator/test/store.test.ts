@@ -14,9 +14,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type PromiseJournal, type PromiseRunner, type Sighting, type TaskSpec, type TaskView } from 'agent-runtime';
+import { nameFor, type Sighting, type TaskSpec, type TaskView, Engine as RuntimeEngine, StopRefused } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import { Engine as RuntimeEngine, StopRefused } from 'agent-runtime/effect';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
@@ -2608,9 +2608,9 @@ test("a run's first steps are every step that waits on nothing: two roots with n
 });
 
 /** The engine's store, in memory, as its own tests keep one. */
-const memoryJournal = (): PromiseJournal => {
-  const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
-  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+const memoryJournal = (): AsyncJournal => {
+  const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
+  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
@@ -2629,7 +2629,7 @@ const memoryJournal = (): PromiseJournal => {
 };
 
 /** A harness that starts whatever it is asked to, and remembers the order: every session at work. */
-const startsInOrder = (sessions: Map<string, Sighting>): PromiseRunner => ({
+const startsInOrder = (sessions: Map<string, Sighting>): AsyncRunner => ({
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
   },
@@ -2661,8 +2661,8 @@ test("REFUSED without the momentum: at a ceiling of one, the runtime admits a ru
     const sessions = new Map<string, Sighting>();
     const e = plainEngine(
       RuntimeEngine.layer({
-        journal: memoryJournal(),
-        harnesses: { claude: startsInOrder(sessions) },
+        journal: asyncStore(memoryJournal()),
+        harnesses: { claude: asyncOps(startsInOrder(sessions)) },
         defaultHarness: 'claude',
         maxConcurrent: 1,
       }),

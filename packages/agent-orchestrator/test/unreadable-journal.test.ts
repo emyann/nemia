@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
-import { Engine } from 'agent-runtime/effect';
+import { nameFor, Engine, type Sighting } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
@@ -52,13 +52,13 @@ const MISWRITTEN = { kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, u
 const tasks = new Map<string, unknown[]>();
 /** When the journal says each attempt began, in milliseconds, by its session's name: a closeout counts only when made after it. */
 const starts = new Map<string, number>();
-const journal: PromiseJournal = {
+const journal: AsyncJournal = {
   async append(taskId, event) {
     tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
     if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
   },
   async read(taskId) {
-    return [...(tasks.get(taskId) ?? [])] as Awaited<ReturnType<PromiseJournal['read']>>;
+    return [...(tasks.get(taskId) ?? [])] as Awaited<ReturnType<AsyncJournal['read']>>;
   },
   async list() {
     return [...tasks.keys()].sort();
@@ -68,8 +68,8 @@ const journal: PromiseJournal = {
   },
 };
 
-const sessions = new Map<string, PromiseSighting>();
-const runner: PromiseRunner = {
+const sessions = new Map<string, Sighting>();
+const runner: AsyncRunner = {
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, nativeId: `n-${sessions.size + 1}`, state: 'working', busy: true });
   },
@@ -84,8 +84,8 @@ const runner: PromiseRunner = {
 const e = plainEngine(
   Engine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal,
-    harnesses: { claude: runner, codex: runner, check: runner },
+    journal: asyncStore(journal),
+    harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
     defaultHarness: 'claude',
   }),
 );
@@ -94,7 +94,7 @@ const signAll = () => {
     if (s.state === 'working')
       sessions.set(name, {
         ...s,
-        state: 'done',
+        state: 'completed',
         busy: false,
         closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: starts.get(name)! + 1 },
       });

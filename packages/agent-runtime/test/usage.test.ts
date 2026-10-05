@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/harness/claude/transcript.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
-import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli/main.ts';
+import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli/lines.ts';
 import { fold, type Event } from '../src/core/domain.ts';
 import { codexStream, completed, item, THREAD, TURN, USED } from './reader-streams.ts';
 

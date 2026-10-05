@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
-import { Engine } from 'agent-runtime/effect';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
+import { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
 
@@ -67,12 +67,12 @@ const signedOff = (taskId: string) =>
   ]);
 const spoil = (taskId: string) => tasks.get(taskId)!.push(MISWRITTEN);
 
-const journal: PromiseJournal = {
+const journal: AsyncJournal = {
   async append(taskId, event) {
     tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
   },
   async read(taskId) {
-    return [...(tasks.get(taskId) ?? [])] as Awaited<ReturnType<PromiseJournal['read']>>;
+    return [...(tasks.get(taskId) ?? [])] as Awaited<ReturnType<AsyncJournal['read']>>;
   },
   async list() {
     return [...tasks.keys()].sort();
@@ -81,7 +81,7 @@ const journal: PromiseJournal = {
     return { entries: [], cursor: 0 };
   },
 };
-const runner: PromiseRunner = {
+const runner: AsyncRunner = {
   async spawn() {},
   async observe() {
     return new Map();
@@ -94,8 +94,8 @@ const runner: PromiseRunner = {
 const e = plainEngine(
   Engine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal,
-    harnesses: { claude: runner, codex: runner, check: runner },
+    journal: asyncStore(journal),
+    harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
     defaultHarness: 'claude',
   }),
 );

@@ -22,6 +22,8 @@ import {
 } from '../event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
 import { countRead } from './tally.ts';
+import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
+import { removeBody, sweep } from './sweep.ts';
 
 /**
  * One entry of the board-wide feed: an event, and which task it happened to.
@@ -58,8 +60,13 @@ export class JournalError extends Schema.TaggedError<JournalError>()('JournalErr
  * An application that already has a database implements this and keeps ONE store. Nothing in the
  * engine knows what is behind it: no SQL, no ORM, no migration ever reaches this package, and the
  * dependency runs one way only — the implementor imports the engine, never the reverse.
+ *
+ * A store keeps whole events (`PlainJournalOps`), or keeps each long text once beside its journals (`BodiedJournalOps`).
  */
-export type JournalOps = {
+export type JournalOps = PlainJournalOps | BodiedJournalOps;
+
+/** A store that keeps each event whole, as it is appended. */
+export type PlainJournalOps = {
   /**
    * Write `event` to the task's record, and to the feed: every append, by every writer. An engine's pass skips a settled
    * task it has folded until the feed names it (`core/engine/memo.ts`), so an entry that reaches the record and not the feed is
@@ -82,17 +89,50 @@ export type JournalOps = {
    * Missing a signal costs latency and nothing else.
    */
   readonly subscribe?: (onChange: () => void) => () => void;
+  readonly bodies?: undefined;
+};
+
+/**
+ * A store that keeps each long text once (`core/engine/bodies.ts`): `Journal.layer` puts each body in `bodies` before it appends
+ * the entry that names it, so `append` is handed the entry as the store holds it, and `read` and `feed` give back what the store
+ * holds, parsed, for the layer to read back.
+ */
+export type BodiedJournalOps = Omit<PlainJournalOps, 'append' | 'read' | 'feed' | 'bodies'> & {
+  readonly bodies: BodyOps;
+  /**
+   * Write `entry` to the task's record, and to the feed, as `PlainJournalOps.append` does an event: an event with each body it
+   * names in a reference's place (`split`), or one that names none.
+   */
+  readonly append: (taskId: string, entry: Event | StoredEvent) => Effect.Effect<void, JournalError>;
+  readonly read: (taskId: string) => Effect.Effect<readonly unknown[], JournalError>;
+  readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor }, JournalError>;
+  /** Optional: where the store keeps a task's journal and the feed, named in the words of an entry no runtime wrote. */
+  readonly located?: { readonly journal: (taskId: string) => string; readonly feed: string };
 };
 
 /**
  * A store as the runtime reads it: what `read` and `feed` give back is whatever the store holds, parsed, and is an event
  * only once `Journal.layer` has decoded it. A `JournalOps` is one; the files store is one that never says its lines are events.
  */
-export type StoreOps = Omit<JournalOps, 'read' | 'feed'> & {
-  readonly read: (taskId: string) => Effect.Effect<readonly unknown[], JournalError>;
-  readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor }, JournalError>;
-  /** Optional: where the store keeps a task's journal and the feed, named in the words of an entry no runtime wrote. */
-  readonly located?: { readonly journal: (taskId: string) => string; readonly feed: string };
+export type StoreOps = BodiedJournalOps | (Omit<PlainJournalOps, 'read' | 'feed'> & Pick<BodiedJournalOps, 'read' | 'feed' | 'located'>);
+
+/**
+ * What `sweep` found: the bodies it may remove and their bytes, the bodies it keeps, and those it removed and their bytes — fewer
+ * than it may remove when a body was put again since it was listed.
+ */
+export type SweepReport = { removable: number; bytes: number; kept: number; removed: number; removedBytes: number };
+
+/** The journal as the engine reads and writes it: whole events, whatever the store keeps (`Journal.layer`). */
+export type JournalShape = Omit<PlainJournalOps, 'append' | 'bodies'> & {
+  /** Write `event` to the task's record and the feed; a store that keeps bodies keeps a brief's text cut at `briefParts`. */
+  readonly append: (taskId: string, event: Event, briefParts?: readonly string[]) => Effect.Effect<void, JournalError>;
+  /**
+   * The bodies no journal and no feed entry names, put before the grace (`BODY_GRACE_MS`): counted, and removed with `yes`. A
+   * store that keeps no bodies has none.
+   */
+  readonly sweep: (options?: { yes?: boolean }) => Effect.Effect<SweepReport, JournalError>;
+  /** Remove one body: refused (`BodyRefused`) while a journal or the feed names it, within the grace, or when there is none. */
+  readonly removeBody: (ref: BodyRef) => Effect.Effect<void, JournalError | BodyRefused>;
 };
 
 const isEvent = Schema.is(StoredEventSchema);
@@ -117,36 +157,67 @@ const decodeEvents = (taskId: string, raw: readonly unknown[], located: StoreOps
   return Effect.fail(new JournalError({ taskId, message }));
 };
 
+/** Reads a stored entry back (`resolver` in `bodies.ts`), a failure said in the words of where the entry is. */
+type Resolve = ReturnType<typeof resolver>;
+
+/** Why the feed entry `entry`, at `where`, is no runtime's, and the task it names when it names one. */
+const feedRefusalOf = (where: string, entry: unknown): FeedRefusal => {
+  const error = refusalOf(StoredFeedEntrySchema, entry);
+  const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
+  return {
+    ...(typeof taskId === 'string' ? { taskId } : {}),
+    why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
+  };
+};
+
 /**
  * A store's feed entries, those no runtime wrote left out: each is skipped with why (`FeedRefusal`), and the cursor is past it all the
  * same, so one entry nobody can read stops no reader and no pass. The task it names, when it names one, is still named: its journal is
- * read again, and says for itself whether it reads.
+ * read again, and says for itself whether it reads. An entry naming a body that does not read back is skipped the same way.
  */
-const decodeFeed = (raw: readonly unknown[], after: Cursor, located: StoreOps['located']) => {
+const decodeFeed = Effect.fn('decodeFeed')(function* (
+  raw: readonly unknown[],
+  after: Cursor,
+  located: StoreOps['located'],
+  bodies: Resolve,
+) {
   const entries: FeedEntry[] = [];
   const refused: FeedRefusal[] = [];
-  raw.forEach((entry, index) => {
-    if (isFeedEntry(entry)) {
-      entries.push({ taskId: entry.taskId, event: upgrade(entry.event) });
-      return;
-    }
+  for (const [index, entry] of raw.entries()) {
     const where = `the feed${located ? ` (${located.feed})` : ''}, entry ${index + 1} read from cursor ${after}`;
-    const error = refusalOf(StoredFeedEntrySchema, entry);
-    const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
-    refused.push({
-      ...(typeof taskId === 'string' ? { taskId } : {}),
-      why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
-    });
-  });
+    if (isFeedEntry(entry)) {
+      const read = yield* Effect.result(bodies.resolve(entry.event));
+      if (Result.isSuccess(read)) entries.push({ taskId: entry.taskId, event: upgrade(read.success) });
+      else refused.push({ taskId: entry.taskId, why: `${where} ${read.failure.message}` });
+      continue;
+    }
+    refused.push(feedRefusalOf(where, entry));
+  }
   return { entries, refused };
-};
+});
+
+/** A task's stored entries read back, a failure naming the task's journal, the entry and what to do. */
+const resolveEvents = (taskId: string, stored: readonly StoredEvent[], located: StoreOps['located'], bodies: Resolve) =>
+  bodies.needed(stored)
+    ? Effect.forEach(stored, (entry, index) =>
+        bodies.resolve(entry).pipe(
+          Effect.mapError(
+            (error) =>
+              new JournalError({
+                taskId,
+                message: `${taskId}'s journal${located ? ` (${located.journal(taskId)})` : ''}, entry ${index + 1}, ${error.message}`,
+              }),
+          ),
+        ),
+      )
+    : Effect.succeed(stored as readonly Resolved[]);
 
 /** Harness arguments `upgrade` put together from ones already read as such: the same object, typed. */
 const argsOf = (config: Record<string, unknown>): HarnessArgs =>
   Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
 
 /** A stored `filed` event with its `priority` kept only when it is a whole number. */
-const weighed = (event: Extract<StoredEvent, { kind: 'filed' }>) => {
+const weighed = (event: Extract<Resolved, { kind: 'filed' }>) => {
   const { priority, ...unweighed } = event;
   return Number.isInteger(priority) ? { ...unweighed, priority: priority! } : unweighed;
 };
@@ -171,7 +242,7 @@ const weighed = (event: Extract<StoredEvent, { kind: 'filed' }>) => {
  * - A `filed` event's `priority` that is not a whole number — `null`, as JSON writes a `NaN` an older runtime took: left out,
  *   so the task waits at 0.
  */
-export const upgrade = (event: StoredEvent): Event => {
+export const upgrade = (event: Resolved): Event => {
   if (event.kind === 'input') {
     const { budgetUsd, ...rest } = event;
     if (budgetUsd === undefined) return rest;
@@ -266,6 +337,22 @@ const journalReader = () => {
   };
 };
 
+/** A refusal of a store's bodies as the journal's: a failing store said in its words. */
+const asJournal = (error: { _tag: string; message: string }) => new JournalError({ taskId: '*', message: error.message });
+
+/** Puts the bodies `event` names, then appends the entry naming them: a line never names a body not yet kept. */
+const appendSplit = (ops: BodiedJournalOps, taskId: string, event: Event, briefParts?: readonly string[]) => {
+  const { entry, bodies } = split(event, briefParts);
+  return Effect.forEach(bodies, ([ref, text]) => ops.bodies.put(ref, text), { discard: true }).pipe(
+    Effect.mapError((error) => new JournalError({ taskId, message: error.message })),
+    Effect.andThen(ops.append(taskId, entry)),
+  );
+};
+
+/** The answer to a store that keeps no bodies, asked to remove one. */
+const noBodies = (ref: unknown) =>
+  Effect.fail(new BodyRefused({ message: `This store keeps no bodies, so there is no body ${String(ref)} to remove.` }));
+
 /** What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one. */
 export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
   task: taskId,
@@ -274,44 +361,61 @@ export const appendFields = (taskId: string, event: Event): { task: string; kind
 });
 
 /**
- * `append` of `ops`, in a span of its own, `append`, under the verb that wrote it, annotated with `appendFields`; once written, it is
+ * `append`, in a span of its own, `append`, under the verb that wrote it, annotated with `appendFields`; once written, it is
  * said at `Debug`, the event's kind, annotated the same. The runtime's journal at `Debug` is its log.
  */
-const appendSaid = (ops: StoreOps) =>
-  Effect.fn('append')(function* (taskId: string, event: Event) {
+const appendSaid = (append: JournalShape['append']) =>
+  Effect.fn('append')(function* (taskId: string, event: Event, briefParts?: readonly string[]) {
     const fields = appendFields(taskId, event);
     yield* Effect.annotateCurrentSpan(fields);
-    yield* ops.append(taskId, event);
+    yield* append(taskId, event, briefParts);
     yield* Effect.logDebug(event.kind).pipe(Effect.annotateLogs(fields));
   });
 
-export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
+export class Journal extends Context.Service<Journal, JournalShape>()('engine/Journal') {
   /**
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
    * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
-   * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; and
+   * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; where a store that keeps bodies
+   * has each named body put before the entry naming it, and each entry read back as the event appended (`bodies.ts`); and
    * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is; and where every
    * append is traced and logged (`appendSaid`).
    */
-  static layer = (ops: StoreOps) =>
-    Layer.succeed(Journal)(
+  static layer = (ops: StoreOps) => {
+    const bodied = ops.bodies ? ops : undefined;
+    const bodies = resolver(bodied?.bodies);
+    return Layer.succeed(Journal)(
       Journal.of({
-        ...ops,
-        append: appendSaid(ops),
+        list: ops.list,
+        ...(ops.subscribe ? { subscribe: ops.subscribe } : {}),
+        append: appendSaid((taskId, event, briefParts) =>
+          bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event),
+        ),
         read: (taskId) =>
           ops.read(taskId).pipe(
             Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),
+            Effect.flatMap((stored) => resolveEvents(taskId, stored, ops.located, bodies)),
             Effect.map((events) => events.map(upgrade)),
           ),
         feed: (after) =>
           ops.feed(after).pipe(
-            Effect.map(({ entries, cursor }) => {
-              const { entries: read, refused } = decodeFeed(entries, after, ops.located);
-              return { entries: read, cursor, ...(refused.length ? { refused } : {}) };
-            }),
+            Effect.flatMap(({ entries, cursor }) =>
+              Effect.map(decodeFeed(entries, after, ops.located, bodies), ({ entries: read, refused }) => ({
+                entries: read,
+                cursor,
+                ...(refused.length ? { refused } : {}),
+              })),
+            ),
           ),
+        sweep: (options) =>
+          bodied
+            ? sweep(bodied, options).pipe(Effect.mapError(asJournal))
+            : Effect.succeed({ removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 }),
+        removeBody: (ref) =>
+          bodied ? removeBody(bodied, ref).pipe(Effect.catchTag('BodyError', (error) => Effect.fail(asJournal(error)))) : noBodies(ref),
       }),
     );
+  };
 
   /** Files under `root` (default `~/.agent-engine`). The default, and the standalone one. */
   static files = (root?: string) => Journal.layer(Journal.filesOps(root));
@@ -321,7 +425,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
    * or as its text where it is none — a write cut short — for the decoder to refuse by place. A task's journal is read through
    * one `journalReader` for the value's life, so a read costs a `stat` and the bytes appended since this value last read it.
    */
-  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): StoreOps => {
+  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): BodiedJournalOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
@@ -330,6 +434,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
     const journals = journalReader();
 
     return {
+      bodies: filesBodies(root),
       located: { journal: file, feed: feedFile },
       /**
        * The task's journal, then the feed, in the one call every writer makes, so no writer can forget the feed. The task
@@ -401,20 +506,25 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
     };
   };
 
-  /** In memory, for tests. */
-  static test = () => {
-    const store = new Map<string, Event[]>();
-    const feed: FeedEntry[] = [];
-    return Journal.layer({
-      append: (taskId, event) =>
-        Effect.sync(() => {
-          store.set(taskId, [...(store.get(taskId) ?? []), event]);
-          feed.push({ taskId, event });
-        }),
-      read: (taskId) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
+  /**
+   * In memory, for tests: a store that keeps bodies, or, given `bodies: false`, one that keeps each event whole, as an
+   * implementor's plain store does.
+   */
+  static test = ({ bodies = true }: { bodies?: boolean } = {}) => {
+    const store = new Map<string, unknown[]>();
+    const feed: { taskId: string; event: unknown }[] = [];
+    const kept: BodyOps = memoryBodies();
+    const append = (taskId: string, event: unknown) =>
+      Effect.sync(() => {
+        store.set(taskId, [...(store.get(taskId) ?? []), event]);
+        feed.push({ taskId, event });
+      });
+    const reads = {
+      read: (taskId: string) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
       list: Effect.sync(() => [...store.keys()].sort()),
       /** The cursor is an index into the feed rather than a byte offset: the same contract. */
-      feed: (after) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
-    });
+      feed: (after: Cursor) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
+    };
+    return Journal.layer(bodies ? { ...reads, append, bodies: kept } : { ...reads, append });
   };
 }

@@ -25,6 +25,7 @@ const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps, claudeJob } = await import('../src/harness/claude/code.ts');
+const { asyncOps } = await import('./promise-runner.ts');
 const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg.ts');
 const { quietFileOf, sightingOf } = await import('../src/harness/claude/quiet.ts');
 const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
@@ -704,8 +705,9 @@ test('a task with no mounts is given the argv it was given before mounts existed
 });
 
 test('REFUSED at shipped defaults: a mount whose path a permission rule cannot name, read-only or writable, on a job, on a background session and on claude-detached', async () => {
-  const { Engine, promiseEngine } = await import('../src/index.ts');
-  const e = promiseEngine(Engine.layer({ root: tmp('root') }));
+  const { Engine } = await import('../src/index.ts');
+  const { builtEngine } = await import('./engine.ts');
+  const e = builtEngine(Engine.layer({ root: tmp('root') }));
   for (const at of ['/srv/my notes', '/srv/a,b', '/srv/(x)', '/srv/*']) {
     for (const [harness, background] of [
       ['claude', false],
@@ -713,13 +715,13 @@ test('REFUSED at shipped defaults: a mount whose path a permission rule cannot n
       ['claude-detached', false],
     ] as const) {
       const config = { background: background || undefined, mounts: [{ path: at, readOnly: true }] };
-      const says = await e.file({ brief: 'b', cwd: tmp('cwd'), harness, config }).then(
+      const says = await Effect.runPromise(e.file({ brief: 'b', cwd: tmp('cwd'), harness, config })).then(
         () => 'filed',
         (err: Error) => err.message,
       );
       assert.equal(
         says,
-        `file: \`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`,
+        `\`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`,
         `${harness}${background ? ' --bg' : ''}: ${at}`,
       );
     }
@@ -868,21 +870,25 @@ test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, 
 });
 
 test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not Claude Code — codex, and any spec that does not say it is — at the engine's door and codex's own", async () => {
-  const { codex } = await import('../src/facade.ts');
-  const { Engine, promiseEngine } = await import('../src/index.ts');
+  const { codex } = await import('../src/index.ts');
+  const { Engine } = await import('../src/index.ts');
+  const { builtEngine } = await import('./engine.ts');
   const other = { name: 'other', command: () => ({ cmd: 'true', args: [] }) };
-  const e = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } }));
+  const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } }));
   const claude = { appendSystemPromptFile: '/a/prompt.md' };
   for (const harness of ['codex', 'other']) {
-    await assert.rejects(e.file({ brief: 'b', cwd: '/r', harness, config: { claude } }), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.exitCode, 2);
-      assert.ok(
-        err.message.startsWith(`file: \`claude\` gives Claude Code flags of its own, and the \`${harness}\` harness is not Claude Code`),
-        err.message,
-      );
-      assert.ok(err.message.includes('File the task on `claude`'), err.message);
-      return true;
-    });
+    await assert.rejects(
+      Effect.runPromise(e.file({ brief: 'b', cwd: '/r', harness, config: { claude } })),
+      (err: Error & { _tag?: string }) => {
+        assert.equal(err._tag, 'FileRefused', err.message);
+        assert.ok(
+          err.message.startsWith(`\`claude\` gives Claude Code flags of its own, and the \`${harness}\` harness is not Claude Code`),
+          err.message,
+        );
+        assert.ok(err.message.includes('File the task on `claude`'), err.message);
+        return true;
+      },
+    );
   }
   assert.match(
     codex.refuses!({ brief: 'b', cwd: '/r', config: { claude } }) ?? '',
@@ -890,7 +896,7 @@ test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not 
   );
   assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined);
   await assert.rejects(
-    e.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { codex: { x: 1 } } as never }),
+    Effect.runPromise(e.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { codex: { x: 1 } } as never })),
     /`codex\.x` is not one of Codex's arguments/,
     "Codex's bag holds its own arguments, and a key that is none of them is refused",
   );
@@ -913,19 +919,24 @@ test("a flag Claude Code does not have fails the attempt as the CLI fails it —
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    const { Engine, promiseEngine } = await import('../src/index.ts');
-    const e = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
-    const id = await e.file({ brief: 'b', cwd: dir, config: { claude: { frobnicate: true } } });
+    const { Engine } = await import('../src/index.ts');
+    const { builtEngine } = await import('./engine.ts');
+    const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
+    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, config: { claude: { frobnicate: true } } }));
     const until = Date.now() + 20_000;
-    while (!(await e.view(id)).state.settled) {
+    while (!(await Effect.runPromise(e.view(id))).state.settled) {
       assert.ok(Date.now() < until, 'settled');
-      await e.tick();
+      await Effect.runPromise(e.tick());
       await new Promise((r) => setTimeout(r, 50));
     }
-    const v = await e.view(id);
+    const v = await Effect.runPromise(e.view(id));
     assert.equal(v.phase, 'failed', 'an ordinary failed end');
     assert.equal(v.state.attempts[0]?.exitCode, 1, 'with the exit code the CLI gave');
-    assert.match(await e.logs(id), /error: unknown option '--frobnicate'/, "and the CLI's words, where a person reads why");
+    assert.match(
+      await Effect.runPromise(e.logs(id)),
+      /error: unknown option '--frobnicate'/,
+      "and the CLI's words, where a person reads why",
+    );
   } finally {
     process.env.PATH = prev;
   }
@@ -1182,7 +1193,8 @@ test('with no record, or one that does not read, a statement keeps its time for 
 const settledResumed = async (said: (startedAt: number) => Statement) => {
   const f = fake();
   try {
-    const { Engine, promiseEngine } = await import('../src/index.ts');
+    const { Engine } = await import('../src/index.ts');
+    const { builtEngine } = await import('./engine.ts');
     const root = tmp('root');
     let startedAt = 0;
     const ops = claudeOps({
@@ -1198,19 +1210,21 @@ const settledResumed = async (said: (startedAt: number) => Statement) => {
       stop: (id: string) => Effect.runPromise(ops.stop(id)),
       logs: async () => '',
     };
-    const e = promiseEngine(Engine.layer({ root, harnesses: { bg: runner } }));
-    const id = await e.file({ brief: 'b', cwd: f.dir, harness: 'bg', resumeFrom: PARENT_ID, closeoutSchema: { type: 'object' } });
+    const e = builtEngine(Engine.layer({ root, harnesses: { bg: asyncOps(runner) } }));
+    const id = await Effect.runPromise(
+      e.file({ brief: 'b', cwd: f.dir, harness: 'bg', resumeFrom: PARENT_ID, closeoutSchema: { type: 'object' } }),
+    );
     const until = Date.now() + 20_000;
-    while (!(await e.view(id)).state.settled) {
+    while (!(await Effect.runPromise(e.view(id))).state.settled) {
       assert.ok(Date.now() < until, 'settled');
-      await e.tick();
+      await Effect.runPromise(e.tick());
       const name = f.read('bg-args')?.[2];
       if (name && !startedAt) {
         startedAt = Date.now();
         fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([bgRow(name, 'done', 'idle', startedAt)]));
       }
     }
-    return (await e.view(id)).state.attempts[0];
+    return (await Effect.runPromise(e.view(id))).state.attempts[0];
   } finally {
     f.restore();
   }

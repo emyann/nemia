@@ -1,9 +1,9 @@
 /**
  * A task held open: an attempt that signs leaves the task `input-required` with nothing
- * running; an answer is a new attempt that continues the session; a close settles it. Walked through both doors — the
- * facade and the Effect door — and each refusal of `answer` and `close` made to refuse, with nothing journalled.
+ * running; an answer is a new attempt that continues the session; a close settles it. Walked through the engine, over a store in
+ * memory and over the Effect layers, and each refusal of `answer` and `close` made to refuse, with nothing journalled.
  *
- * The Effect door's harness lets a session go as `claude-bg`'s does: a session released is not listed. A process there is the
+ * The Effect layers' harness lets a session go as `claude-bg`'s does: a session released is not listed. A process there is the
  * file store under a root and that harness, and a restart is a new one on the same two, reading only the store.
  *
  * `decide`'s half is in `decide.test.ts` (HELD OPEN); the words it journals are pinned in `journal-words.test.ts`.
@@ -23,17 +23,18 @@ import {
   Journal,
   Runner,
   testOps,
-  promiseEngine,
   tick,
   view,
   type Event,
   type Sighting,
   type SpawnRequest,
 } from '../src/index.ts';
-import type { PromiseJournal, PromiseRunner } from '../src/facade.ts';
 import { fold } from '../src/core/domain.ts';
-import { parseBrief, taskLine } from '../src/cli/main.ts';
+import { parseBrief } from '../src/cli/main.ts';
+import { taskLine } from '../src/cli/lines.ts';
 import { scratch } from './scratch.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 /** Sign the session `name` off: done, with a closeout given a moment after its attempt started (`began`, as journalled). */
 const signed = (sessions: Map<string, Sighting>, name: string, summary: string, began: string) =>
@@ -114,7 +115,7 @@ test('the Effect door: signed, it waits with its session released; answered afte
   }
 });
 
-test("the Effect door refuses as the facade does: InputRefused, and nothing journalled — a budget its harness would not keep refused by the harness, and a turn's configuration other than its spend cap", async () => {
+test("the engine over the Effect layers refuses: InputRefused, and nothing journalled — a budget its harness would not keep refused by the harness, and a turn's configuration other than its spend cap", async () => {
   const journal = Journal.test();
   const layer = Layer.mergeAll(
     journal,
@@ -174,12 +175,12 @@ const signedJournal = (): Event[] => [
 ];
 
 /**
- * The facade over a store in memory a test may write to by hand, and a harness the test moves. Its `write` writes a task's
+ * The engine over a store in memory a test may write to by hand, and a harness the test moves. Its `write` writes a task's
  * journal by hand: the filing, held open unless said, then `events`.
  */
-const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
+const board = (harnesses?: Record<string, 'claude-bg'>) => {
   const tasks = new Map<string, Event[]>();
-  const journal: PromiseJournal = {
+  const journal: AsyncJournal = {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
     },
@@ -195,7 +196,7 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
   };
   const sessions = new Map<string, Sighting>();
   let n = 0;
-  const fake: PromiseRunner = {
+  const fake: AsyncRunner = {
     async spawn(r) {
       const id = `s-${++n}`;
       sessions.set(r.name, { sessionId: id, state: 'working', busy: true, nativeId: id });
@@ -210,7 +211,7 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
       return '';
     },
   };
-  const engine = promiseEngine(Engine.layer({ journal, harnesses: harnesses ?? { fake } }));
+  const engine = builtEngine(Engine.layer({ journal: asyncStore(journal), harnesses: harnesses ?? { fake: asyncOps(fake) } }));
   const write = (id: string, events: Event[], filed: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
     tasks.set(id, [
       { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', holdOpen: true, harness: 'fake', ...filed },
@@ -219,77 +220,77 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
   return { engine, sessions, tasks, write };
 };
 
-/** `fn` rejects with exit code 2 and a message matching `pattern`, and `id`'s journal is as long as it was. */
+/** `fn` rejects with `InputRefused` or `FileRefused` and a message matching `pattern`, and `id`'s journal is as long as it was. */
 const refuses = async (b: ReturnType<typeof board>, id: string, fn: () => Promise<unknown>, pattern: RegExp) => {
   const before = b.tasks.get(id)?.length ?? 0;
-  await assert.rejects(fn, (e: Error & { exitCode?: number }) => {
-    assert.equal(e.exitCode, 2, e.message);
+  await assert.rejects(fn, (e: Error & { _tag?: string }) => {
+    assert.ok(e._tag === 'InputRefused' || e._tag === 'FileRefused', e.message);
     assert.match(e.message, pattern);
     return true;
   });
   assert.equal(b.tasks.get(id)?.length ?? 0, before, 'nothing journalled');
 };
 
-test('the facade: signed, it waits; answered, it resumes; a stop settles it stopped, waiting', async () => {
+test('over a store in memory: signed, it waits; answered, it resumes; a stop settles it stopped, waiting', async () => {
   const b = board();
-  const id = await b.engine.file({ brief: 'draft', cwd: '/r', harness: 'fake', holdOpen: true });
-  await b.engine.tick();
-  signed(b.sessions, `ae/${id}/1`, 'drafted', (await b.engine.view(id)).state.attempts[0].startedAt);
-  await b.engine.tick();
-  const v = await b.engine.view(id);
+  const id = await Effect.runPromise(b.engine.file({ brief: 'draft', cwd: '/r', harness: 'fake', holdOpen: true }));
+  await Effect.runPromise(b.engine.tick());
+  signed(b.sessions, `ae/${id}/1`, 'drafted', (await Effect.runPromise(b.engine.view(id))).state.attempts[0].startedAt);
+  await Effect.runPromise(b.engine.tick());
+  const v = await Effect.runPromise(b.engine.view(id));
   assert.equal(v.phase, 'input-required');
   assert.equal(v.state.settled, null);
-  const said = await b.engine.answer(id, 'again');
+  const said = await Effect.runPromise(b.engine.answer(id, 'again'));
   assert.deepEqual(Object.keys(said), ['at', 'text'], 'no configuration given, none journalled');
-  assert.deepEqual((await b.engine.view(id)).state.inputs, [said]);
-  await b.engine.tick();
-  assert.equal((await b.engine.view(id)).phase, 'running (working)');
-  signed(b.sessions, `ae/${id}/2`, 'again', (await b.engine.view(id)).state.attempts[1].startedAt);
-  await b.engine.tick();
-  assert.equal((await b.engine.view(id)).phase, 'input-required');
-  await b.engine.stop(id);
-  await b.engine.tick();
-  assert.equal((await b.engine.view(id)).phase, 'stopped');
+  assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.inputs, [said]);
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'running (working)');
+  signed(b.sessions, `ae/${id}/2`, 'again', (await Effect.runPromise(b.engine.view(id))).state.attempts[1].startedAt);
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'input-required');
+  await Effect.runPromise(b.engine.stop(id));
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'stopped');
 });
 
 test("answer refuses what is no answer: empty words, a budget that is not dollars, one its harness would not keep, one beside config, and any other key of a turn's", async () => {
   const b = board();
   b.write('t-w', signedJournal());
-  await refuses(b, 't-w', () => b.engine.answer('t-w', ''), /^answer: `text` is empty\. Give the words/);
-  await refuses(b, 't-w', () => b.engine.answer('t-w', '  \n'), /^answer: `text` is empty/);
+  await refuses(b, 't-w', () => Effect.runPromise(b.engine.answer('t-w', '')), /^`text` is empty\. Give the words/);
+  await refuses(b, 't-w', () => Effect.runPromise(b.engine.answer('t-w', '  \n')), /^`text` is empty/);
   for (const budgetUsd of [0, -1, Number.NaN, Infinity, '5' as unknown as number]) {
     await refuses(
       b,
       't-w',
-      () => b.engine.answer('t-w', 'go', { config: { budgetUsd } }),
-      /^answer: `budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/,
+      () => Effect.runPromise(b.engine.answer('t-w', 'go', { config: { budgetUsd } })),
+      /^`budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/,
     );
   }
   await refuses(
     b,
     't-w',
-    () => b.engine.answer('t-w', 'go', { budgetUsd: 1 } as never),
-    /^answer: `budgetUsd` is the harness's configuration: give it under `config`, as `answer\(id, text, \{ config: \{ budgetUsd: … \} \}\)`\.$/,
+    () => Effect.runPromise(b.engine.answer('t-w', 'go', { budgetUsd: 1 } as never)),
+    /^`budgetUsd` is the harness's configuration: give it under `config`, as `answer\(id, text, \{ config: \{ budgetUsd: … \} \}\)`\.$/,
   );
   await refuses(
     b,
     't-w',
-    () => b.engine.answer('t-w', 'go', { config: { model: 'opus' } }),
-    /^answer: `config\.model` cannot be given to one turn/,
+    () => Effect.runPromise(b.engine.answer('t-w', 'go', { config: { model: 'opus' } })),
+    /^`config\.model` cannot be given to one turn/,
   );
   await refuses(
     b,
     't-w',
-    () => b.engine.answer('t-w', 'go', { config: 'cheap' as never }),
-    /^answer: `config: "cheap"` is not a turn's configuration/,
+    () => Effect.runPromise(b.engine.answer('t-w', 'go', { config: 'cheap' as never })),
+    /^`config: "cheap"` is not a turn's configuration/,
   );
   const bg = board({ bg: 'claude-bg' });
   bg.write('t-bg', signedJournal(), { harness: 'bg' });
   await refuses(
     bg,
     't-bg',
-    () => bg.engine.answer('t-bg', 'go', { config: { budgetUsd: 1 } }),
-    /^answer: `budgetUsd: 1` is a spend cap, and a `claude --bg` session does not keep one/,
+    () => Effect.runPromise(bg.engine.answer('t-bg', 'go', { config: { budgetUsd: 1 } })),
+    /^`budgetUsd: 1` is a spend cap, and a `claude --bg` session does not keep one/,
   );
 });
 
@@ -360,24 +361,24 @@ test('answer and close refuse a task that is not waiting for one, each saying wh
   ];
   for (const [id, events, filed, answering, closing] of cases) {
     b.write(id, events, filed);
-    await refuses(b, id, () => b.engine.answer(id, 'go'), new RegExp(`^answer: \`${id}\`.*${answering.source}`));
-    await refuses(b, id, () => b.engine.close(id), new RegExp(`^close: \`${id}\`.*${closing.source}`));
+    await refuses(b, id, () => Effect.runPromise(b.engine.answer(id, 'go')), new RegExp(`^\`${id}\`.*${answering.source}`));
+    await refuses(b, id, () => Effect.runPromise(b.engine.close(id)), new RegExp(`^\`${id}\`.*${closing.source}`));
   }
   const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
   b.write('t-unrecorded', unrecorded);
   await refuses(
     b,
     't-unrecorded',
-    () => b.engine.answer('t-unrecorded', 'go'),
-    /^answer: `t-unrecorded`'s attempt 1 signed, but its harness recorded no session for it, so there is no conversation for an answer to continue\. `close` it/,
+    () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
+    /^`t-unrecorded`'s attempt 1 signed, but its harness recorded no session for it, so there is no conversation for an answer to continue\. `close` it/,
   );
-  assert.equal((await b.engine.view('t-unrecorded')).phase, 'input-required');
-  await b.engine.close('t-unrecorded');
+  assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
+  await Effect.runPromise(b.engine.close('t-unrecorded'));
   assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
-  await refuses(b, 't-nope', () => b.engine.answer('t-nope', 'go'), /^answer: `t-nope` is not a task on this board/);
-  await refuses(b, 't-nope', () => b.engine.close('t-nope'), /^close: `t-nope` is not a task on this board/);
+  await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task on this board/);
+  await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task on this board/);
   b.write('t-waits', signedJournal());
-  await b.engine.close('t-waits');
+  await Effect.runPromise(b.engine.close('t-waits'));
   assert.equal(b.tasks.get('t-waits')!.at(-1)!.kind, 'closed', 'the control: the same board closes a task that waits');
 });
 
@@ -385,10 +386,10 @@ test('file refuses a holdOpen that is not true', async () => {
   const b = board();
   for (const holdOpen of [false, 'yes', 1]) {
     await assert.rejects(
-      b.engine.file({ brief: 'b', cwd: '/r', harness: 'fake', holdOpen: holdOpen as true }),
-      (e: Error & { exitCode?: number }) => {
-        assert.equal(e.exitCode, 2);
-        assert.match(e.message, /^file: `holdOpen: .*` is not a yes\. Give true/);
+      Effect.runPromise(b.engine.file({ brief: 'b', cwd: '/r', harness: 'fake', holdOpen: holdOpen as true })),
+      (e: Error & { _tag?: string }) => {
+        assert.equal(e._tag, 'FileRefused', e.message);
+        assert.match(e.message, /^`holdOpen: .*` is not a yes\. Give true/);
         return true;
       },
     );
@@ -401,9 +402,9 @@ const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 test('ae answer prints the line it journalled, the words being everything after the id but --budget; ae close; each refusal exits 2', async () => {
   const root = scratch('ae-hold-open-cli-');
   try {
-    const engine = promiseEngine(Engine.layer({ root }));
+    const engine = builtEngine(Engine.layer({ root }));
     const waiting = async () => {
-      const id = await engine.file({ brief: 'b', cwd: root, holdOpen: true });
+      const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, holdOpen: true }));
       await Effect.runPromise(
         Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(id, e))).pipe(Effect.provide(Journal.files(root))),
       );

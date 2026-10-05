@@ -12,10 +12,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
-import { Engine as RuntimeEngine } from 'agent-runtime/effect';
+import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
+import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 
 const ROOT = scratch('wf-telemetry-nesting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -39,8 +39,8 @@ execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q'
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
 
-const tasks = new Map<string, Awaited<ReturnType<PromiseJournal['read']>>>();
-const journal: PromiseJournal = {
+const tasks = new Map<string, Event[]>();
+const journal: AsyncJournal = {
   async append(taskId, event) {
     tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
   },
@@ -55,8 +55,8 @@ const journal: PromiseJournal = {
   },
 };
 
-const sessions = new Map<string, PromiseSighting>();
-const runner: PromiseRunner = {
+const sessions = new Map<string, Sighting>();
+const runner: AsyncRunner = {
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, nativeId: `n-${sessions.size + 1}`, state: 'working', busy: true });
   },
@@ -71,8 +71,8 @@ const runner: PromiseRunner = {
 const e = engineOf(
   RuntimeEngine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal,
-    harnesses: { claude: runner, codex: runner, check: runner },
+    journal: asyncStore(journal),
+    harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
     defaultHarness: 'claude',
   }),
 );

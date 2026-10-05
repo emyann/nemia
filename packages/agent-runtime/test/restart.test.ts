@@ -11,9 +11,11 @@ import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
 import { clientOf } from '../src/a2a/client.ts';
 import { sightingOf } from '../src/a2a/map.ts';
-import type { Event, PromiseJournal, PromiseRunner, Sighting, SpawnRequest } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import type { Event, Sighting, SpawnRequest } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import type { RunnerOps } from '../src/harness/seam.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 /**
  * A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. With
@@ -24,7 +26,7 @@ import type { RunnerOps } from '../src/harness/seam.ts';
  */
 const world = (o: { spawnHangs?: boolean } = {}) => {
   const tasks = new Map<string, Event[]>();
-  const journal: PromiseJournal = {
+  const journal: AsyncJournal = {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
     },
@@ -59,8 +61,8 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
     async logs() {
       return '';
     },
-  } satisfies PromiseRunner;
-  const runtime = () => promiseEngine(Engine.layer({ journal, harnesses: { fake } }));
+  } satisfies AsyncRunner;
+  const runtime = () => builtEngine(Engine.layer({ journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }));
   const ops: RunnerOps = {
     spawn: (r) => Effect.promise(() => fake.spawn(r)),
     observe: Effect.promise(() => fake.observe()),
@@ -87,8 +89,8 @@ const listing = {
 test('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', async () => {
   const w = world();
   const a = w.runtime();
-  const id = await a.file(filing);
-  await a.tick();
+  const id = await Effect.runPromise(a.file(filing));
+  await Effect.runPromise(a.tick());
   assert.deepEqual(w.sessions.get('ae/t-r/1'), { sessionId: 's-1', state: 'working', busy: true, nativeId: 's-1' });
 
   const b = w.runtime();
@@ -106,9 +108,9 @@ test('a restarted runtime answers for a session it never started, then stops it 
     [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]],
   );
 
-  await b.stop(id);
+  await Effect.runPromise(b.stop(id));
   w.asked.length = 0;
-  await b.tick();
+  await Effect.runPromise(b.tick());
   assert.deepEqual(
     w.asked,
     [
@@ -119,8 +121,8 @@ test('a restarted runtime answers for a session it never started, then stops it 
     "the second runtime's pass observes; then its agent, asked to cancel, observes to find the session and stops it on the harness",
   );
   assert.equal(w.sessions.get('ae/t-r/1')!.state, 'canceled');
-  await b.tick();
-  assert.equal((await b.view(id)).phase, 'stopped');
+  await Effect.runPromise(b.tick());
+  assert.equal((await Effect.runPromise(b.view(id))).phase, 'stopped');
 
   w.sessions.delete('ae/t-r/1');
   const after = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
@@ -131,8 +133,8 @@ test('a restarted runtime answers for a session it never started, then stops it 
 test('a spawn the runtime died inside is adopted by the next one by name, never started twice', async () => {
   const w = world({ spawnHangs: true });
   const a = w.runtime();
-  const id = await a.file(filing);
-  void a.tick();
+  const id = await Effect.runPromise(a.file(filing));
+  void Effect.runPromise(a.tick());
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(
     w.asked.filter(([verb]) => verb === 'spawn'),
@@ -147,15 +149,15 @@ test('a spawn the runtime died inside is adopted by the next one by name, never 
   const b = w.runtime();
   const task = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
   assert.equal(task.status!.state, TaskState.TASK_STATE_WORKING, 'the agent answers off the harness before any tick');
-  await b.tick();
+  await Effect.runPromise(b.tick());
   assert.deepEqual(
     w.asked.filter(([verb]) => verb === 'spawn'),
     [['spawn', 'ae/t-r/1']],
     'adopted, not spawned again',
   );
-  assert.equal((await b.view(id)).phase, 'running (working)');
+  assert.equal((await Effect.runPromise(b.view(id))).phase, 'running (working)');
 
   w.sessions.set('ae/t-r/1', { ...w.sessions.get('ae/t-r/1')!, state: 'completed', busy: false });
-  await b.tick();
-  assert.equal((await b.view(id)).phase, 'succeeded');
+  await Effect.runPromise(b.tick());
+  assert.equal((await Effect.runPromise(b.view(id))).phase, 'succeeded');
 });

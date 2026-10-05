@@ -14,6 +14,8 @@ import {
   factoryRepo,
   fillsOf,
   hireRefusal,
+  instructionAt,
+  instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
   outsideRefusal,
@@ -283,4 +285,56 @@ test('REFUSED: a start that names the default factory, which holds history only,
     defaultStartRefusal('--factory <name>', ['pipao']),
     '`default` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — --factory <name>, one of pipao. Nothing was started.',
   );
+});
+
+test("a factory's instruction resolves in its first folder as filed, to NEMIA.md or the path its file names, or to the store's file", () => {
+  const store = '/s/factories/pipao/NEMIA.md';
+  assert.deepEqual(instructionAt({ repos: ['/b', '/a'] }, store), {
+    in: 'folder',
+    folder: '/b',
+    path: 'NEMIA.md',
+    file: '/b/NEMIA.md',
+  });
+  assert.deepEqual(instructionAt({ repos: ['/b', '/a'], instruction: { path: 'docs/X.md' } }, store), {
+    in: 'folder',
+    folder: '/b',
+    path: 'docs/X.md',
+    file: '/b/docs/X.md',
+  });
+  assert.deepEqual(instructionAt({ repos: ['/b', '/a'], instruction: { store: true } }, store), { in: 'store', file: store });
+});
+
+test("REFUSED: an instruction's path that is empty, absolute, the folder itself, or climbs out of it — each naming the fix", () => {
+  for (const p of ['', '  ', '/etc/x', '../x', 'docs/../../x', '.', './', '..']) {
+    const why = instructionPathRefusal(p);
+    assert.ok(why, `refused: ${JSON.stringify(p)}`);
+    assert.match(why, /Name a file inside the folder by its path from it .* or keep the instruction in the store\.$/);
+  }
+  assert.match(instructionPathRefusal('/etc/x')!, /^`\/etc\/x` is absolute/);
+  assert.match(instructionPathRefusal('docs/../../x')!, /climbs out of the factory's first folder/);
+  for (const p of ['CLAUDE.md', 'docs/../NEMIA.md', 'docs/NEMIA.md', '..x/a.md'])
+    assert.equal(instructionPathRefusal(p), undefined, `allowed: ${p}`);
+});
+
+test("nemia factory ls: where a factory's instruction is kept, under its line, when its file says", () => {
+  const base = { file: '/s/f.json', repos: ['/code/a'], workflows: [], hires: {} };
+  assert.deepEqual(
+    factoryLines([
+      { ...base, name: 'aa', instruction: { path: 'docs/X.md' } },
+      { ...base, name: 'bb', instruction: { store: true } },
+      { ...base, name: 'cc' },
+    ]).slice(1),
+    [
+      'aa       /code/a',
+      '         instruction: docs/X.md',
+      'bb       /code/a',
+      '         instruction: kept in the store',
+      'cc       /code/a',
+    ],
+  );
+});
+
+test('the default factory keeps no instruction: both verbs refuse it, saying what to do instead', () => {
+  assert.match(defaultFactoryRefusal('instruction'), /nemia factory instruction does not take it\. It keeps no instruction/);
+  assert.match(defaultFactoryRefusal('instruct'), /nemia factory instruct does not take it\. It keeps no instruction/);
 });

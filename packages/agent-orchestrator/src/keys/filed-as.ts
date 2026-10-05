@@ -27,8 +27,9 @@ export type FiledStep = Pick<
 export type FiledFlags = { model?: string; budget?: number };
 
 /**
- * The step key each field of a filed config is written as, and its value as a step's line says it. A field not here — the harness's own
- * arguments, which the step's agent and its run give — has no line of the step's.
+ * The step key each field of a filed config is written as, and its value as a step's line says it; `mounts`, which both `writable:` and
+ * `reads:` give, names each the step has. A field not here — the harness's own arguments, which the step's agent and its run give — has
+ * no line of the step's.
  */
 export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | undefined>> = {
   model: (s) => s.model && `model: ${s.model}`,
@@ -41,7 +42,9 @@ export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | und
   background: (s) => (s.background === undefined ? undefined : `background: ${s.background}`),
   budgetUsd: (s) => (s.budget === undefined ? undefined : `budget: ${s.budget}`),
   claude: (s) => (s.remote ? 'remote: true' : undefined),
-  mounts: (s) => (s.writable ? `writable: ${s.writable.join(', ')}` : s.reads && `reads: ${s.reads.join(', ')}`),
+  mounts: (s) =>
+    [s.writable && `writable: ${s.writable.join(', ')}`, s.reads && `reads: ${s.reads.join(', ')}`].filter(Boolean).join('` and `') ||
+    undefined,
 };
 
 /** The flag a retry typed for a field it chose, before the step's own line: `--model <m>`, `--budget <amount>`. */

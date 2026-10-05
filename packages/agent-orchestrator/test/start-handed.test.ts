@@ -17,7 +17,7 @@ const ROOT = path.join(scratch('wf-start-handed-'), 'First Last');
 fs.mkdirSync(ROOT);
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { start } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, start } = await import('../src/runner.ts');
 const { artifactsDir } = await import('../src/record/record.store.ts');
 
 /** A git repository with one commit on `main`, under the store. */
@@ -73,5 +73,24 @@ test("REFUSED at shipped defaults: a store no permission rule can name refuses a
   const inbox = path.join(ROOT, 'inbox');
   assert.match(message, /^argus: `reads: inbox` \(filed as `mounts`\): /, message);
   assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(inbox)} read-only, and Claude Code holds a folder`), message);
+  assert.deepEqual(runs(), before, 'nothing was written');
+});
+
+test('REFUSED at shipped defaults: a step with both `writable:` and `reads: inbox`, refused its mounts at start, quotes both lines', () => {
+  const repos = [aRepo(), aRepo()].sort();
+  addFactory({ name: 'both', repos });
+  const web = path.basename(repos[1]);
+  fs.mkdirSync(path.join(ROOT, 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'agents', 'reader.md'), '---\nharness: claude\n---\nRead what you are asked.\n');
+  const workflowDir = folderOf({ argus: `agent: reader\nwritable: ${web}\nreads: inbox` });
+  attachWorkflow({ factory: 'both', workflow: path.basename(workflowDir) });
+  const before = runs();
+  let message = '';
+  try {
+    start({ brief: 'read it', repo: repos[0], workflowDir, isolate: false, factory: 'both' });
+  } catch (err) {
+    message = (err as Error).message;
+  }
+  assert.ok(message.startsWith(`argus: \`writable: ${web}\` and \`reads: inbox\` (filed as \`mounts\`): `), message);
   assert.deepEqual(runs(), before, 'nothing was written');
 });

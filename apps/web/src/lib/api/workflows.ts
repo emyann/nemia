@@ -152,7 +152,8 @@ export type Hiring = { refused: string | null; agents: Array<{ name: string; des
  * Mirrors `WorkflowStepPage` in apps/api/src/step/step.ts: one step of a workflow — its body, its file as written, and every key a step
  * may set, in the package's order, with its value as the loader read it; and, read now in the request's factory (`factory`, null for the
  * default), what a run of it would be told (`layers`), the agent the factory hires into it (`hired`), the factories that hire into it when
- * none is named (`hiredIn`), whether one can be hired into it and whom (`hiring`), where each skill of its layers is found (`skillsFrom`) and its newest runs (`recentRuns`).
+ * none is named (`hiredIn`), whether one can be hired into it and whom (`hiring`), where each skill of its layers is found (`skillsFrom`)
+ * and its newest runs (`recentRuns`).
  */
 export type WorkflowStepPage = {
   workflow: string;

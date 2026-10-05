@@ -24,10 +24,10 @@ export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
 });
 
 /**
- * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), hired and fired there
- * (`StepHire`), with what that agent says it can do (`skills:`), a description of the work that fences nothing; what a run of it will be told, read now, each layer beside where
- * it is edited; its newest runs; then its file's own words and keys (`StepWritten`). It edits and starts nothing: each layer's home and its
- * workflow's page do.
+ * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), with what that agent says
+ * it can do (`skills:`), a description of the work that fences nothing; hired and fired there (`StepHire`); what a run of it will be
+ * told, read now, each layer beside where it is edited; its newest runs; then its file's own words and keys (`StepWritten`). It edits and
+ * starts nothing: each layer's home and its workflow's page do; a hire and a fire are the factory's.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
@@ -56,8 +56,8 @@ function StepPage() {
           </span>
         </div>
         <StepAgent page={page} />
-        <StepHire from={from} workflow={workflow} step={step} place={place} where="page" />
         <Skills skills={page.agentSkills} className="pl-3" />
+        <StepHire from={from} workflow={workflow} step={step} place={place} where="page" />
       </header>
 
       <StepTold page={page} place={place} />

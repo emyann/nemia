@@ -71,6 +71,12 @@ export type InboxQueueAnswer = {
   of: number | null;
 };
 
+/**
+ * What `PUT` and `DELETE /api/inbox/:name/from` answer: what `nemia inbox from` did — the card, its file, the runs its `from:` names now
+ * (none once taken off) and those it named before.
+ */
+export type InboxFromAnswer = { name: string; file: string; from: string[]; was: string[] };
+
 /** One card read for its page (`inbox card`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
 const CARD = COMMANDS.find((c) => c.name === 'inbox card')!;
 
@@ -181,8 +187,9 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
  *   not an absolute path to a directory, an `after:` in the idea's own frontmatter. Anything else is the store's, 500: the inbox could not
  *   be written.
  *
- * A card dropped (`DELETE /api/inbox/:name`) and queued or taken off the queue (`POST` and `DELETE /api/inbox/:name/queue`) are routes the
- * package's command table generates (commands/routes.ts), each from its entry, `nemia inbox rm`'s and `nemia inbox queue`'s.
+ * A card dropped (`DELETE /api/inbox/:name`), queued or taken off the queue (`POST` and `DELETE /api/inbox/:name/queue`), and its `from:`
+ * set or taken off (`PUT` and `DELETE /api/inbox/:name/from`) are routes the package's command table generates (commands/routes.ts), each
+ * from its entry, `nemia inbox rm`'s, `nemia inbox queue`'s and `nemia inbox from`'s.
  */
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
@@ -202,7 +209,7 @@ export const inbox = new Hono<ApiEnv>()
         entry.error === null
           ? INBOX_KEYS.map((key) => ({
               key,
-              value: key === 'queued' ? (entry.queued?.at ?? null) : (entry[key] ?? null),
+              value: key === 'queued' ? (entry.queued?.at ?? null) : key === 'from' ? entry.from.join(', ') || null : (entry[key] ?? null),
               meaning: INBOX_KEY_MEANINGS[key],
             }))
           : null;

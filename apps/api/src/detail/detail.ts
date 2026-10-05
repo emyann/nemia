@@ -83,7 +83,7 @@ import {
   triesOf,
   unreadableIn,
 } from './tries.ts';
-import { toldOf } from './told.ts';
+import { type TaskPart, toldOf } from './told.ts';
 import { decideLine, stepCommands, type StepCommands } from './commands.ts';
 import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
@@ -250,6 +250,8 @@ export type RunDetail = {
   onDisk: { worktrees: boolean; files: boolean };
   /** As on `RunSummary`. */
   after: string[];
+  /** As on `RunSummary`. */
+  context: string[];
   /** The inbox card the run was started from, as its record carries it (`Run.from`); absent for a run started without one. */
   from?: { inbox: string };
   /** Where it came from, as `nemia decide` says it under the run's line (`fromNote`): absent with `from`. */
@@ -303,6 +305,8 @@ export type RunDetail = {
      * read from the folder.
      */
     layers: ToldLayers | null;
+    /** The task by part (`TaskPart`): its own text and each run it was handed, with how; null where nothing was told. */
+    taskParts: TaskPart[] | null;
     taskId: string | null;
     workspace: string | null;
     /**
@@ -551,8 +555,7 @@ async function lastLineOf(e: Engine['Service'], view: TaskView, said: LastSaid):
  */
 function filesOf(run: Run, step: string): { files: StepArtifact[]; filesError: string | null } {
   const dir = workFolderOf(run, step);
-  if (!dir) return { files: [], filesError: null };
-  const { files, error } = folderFiles(run, step, dir);
+  const { files, error } = dir ? folderFiles(run, step, dir) : { files: [], error: null };
   return { files, filesError: error };
 }
 
@@ -581,6 +584,9 @@ const specOf = (step: Workflow): StepSpec => ({
  * files from and `judgedSteps` judges by; the folder only for a record that froze none. Null when neither reads.
  */
 const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
+
+/** The runs a run waits on (`after`) and is handed as context (`context`), as its page shows them: none where it names none. */
+const handedRuns = (run: Run): Pick<RunDetail, 'after' | 'context'> => ({ after: run.after ?? [], context: run.context ?? [] });
 
 /** What `nemia prune` took of a run, as the page shows it: when, each worktree and what it held, and its artifacts; null for none. */
 const prunedOf = (run: Run): RunDetail['pruned'] =>
@@ -638,7 +644,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
     cancelledAt: run.cancelledAt ?? null,
     pruned: prunedOf(run),
     onDisk: onDiskOf(run, home),
-    after: run.after ?? [],
+    ...handedRuns(run),
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
     heldUntil: judged.holding ? run.hold!.until : [],

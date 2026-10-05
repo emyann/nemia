@@ -463,7 +463,7 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
 test("REFUSED at shipped defaults: a start's `workflow` that is not a name, and a `from` that is neither place, are 400s in the api's words, word for word — and nothing is written", async () => {
   const before = runFiles();
   const shape =
-    '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
+    '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, `"context": ["<runId>", …]` for the runs it reads as context, and `"card": "<name>"` for an inbox card it starts';
   for (const workflow of ['', 7, null]) {
     const res = await post({ workflow, brief: 'Do it.' });
     assert.equal(res.status, 400, JSON.stringify(workflow));
@@ -698,6 +698,38 @@ test("REFUSED at shipped defaults: a run `nemia start --after` will not wait on 
   assert.equal(
     await refusedBy(['p-running', 'p-running']),
     '--after p-running is given twice, and a run waits on another once. Give each run one --after.',
+  );
+  assert.deepEqual(runFiles(), before);
+  assert.deepEqual(filedTasks(), []);
+});
+
+test('POST /api/runs takes `context` and passes it to `start()`, which freezes it on the record as `nemia start --from` does, and files at once: it waits on none', async () => {
+  parents();
+  const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['p-running'] });
+  assert.equal(res.status, 201, await res.clone().text());
+  const { id } = (await res.json()) as { id: string };
+  assert.deepEqual([runStore.runs.read(id).context, runStore.runs.read(id).after], [['p-running'], undefined]);
+  const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+  assert.deepEqual([detail.context, detail.after, detail.waiting], [['p-running'], [], null]);
+});
+
+test('REFUSED at shipped defaults: `context` with a blank run id is a 422 naming the key, and one the store does not have a 404 in `nemia start --from` words — and nothing is written', async () => {
+  parents();
+  const before = runFiles();
+  for (const context of [[''], ['p-running', '  ']]) {
+    const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context });
+    assert.equal(res.status, 422, JSON.stringify(context));
+    const { error } = (await res.json()) as { error: string };
+    assert.ok(
+      error.startsWith('`context` is the runs this one is handed as context, by id, as `nemia start --from <runId>` takes each'),
+      error,
+    );
+  }
+  const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['no-such-run'] });
+  assert.equal(missing.status, 404);
+  assert.equal(
+    ((await missing.json()) as { error: string }).error,
+    '--from no-such-run: the store has no run no-such-run. --from takes a run by its id — nemia ls lists them.',
   );
   assert.deepEqual(runFiles(), before);
   assert.deepEqual(filedTasks(), []);

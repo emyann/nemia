@@ -225,6 +225,7 @@ test('runs are read from the workflow store and summarized, with what each step 
       pruned: null,
       /** Started without `--after`: it waits on no run. */
       after: [],
+      context: [],
       waiting: null,
       heldUntil: [],
       holding: null,
@@ -380,6 +381,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       pruned: null,
       onDisk: { worktrees: false, files: false },
       after: [],
+      context: [],
       waiting: null,
       heldUntil: [],
       holding: null,
@@ -435,6 +437,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     /** What the engine was filed with, not the brief recomposed from today's folder and record. */
     told: filedBrief('t-2'),
     layers: null,
+    taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
     workspace: '/code/app/.wt/r-2/implement',
     branch: 'wf/r-2/implement',
     /** A git run's step works on a branch: it lists no files, whatever its worktree holds. */
@@ -482,8 +485,9 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     unreadable: null,
     attempts: { count: 0, latest: null },
   };
+  assert.ok(review.taskParts?.length && review.taskParts.every((part) => part.kind === 'text'), 'composed: its task by part, none handed');
   assert.deepEqual(
-    { ...review, told: undefined },
+    { ...review, told: undefined, taskParts: undefined },
     {
       name: 'review',
       spec: {
@@ -506,6 +510,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       body: 'Review what implement did.',
       told: undefined,
       layers: null,
+      taskParts: undefined,
       workspace: null,
       branch: null,
       files: [],
@@ -620,6 +625,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
       body: null,
       told: filedBrief('t-2'),
       layers: null,
+      taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
       workspace: '/code/app/.wt/r-2/implement',
       branch: 'wf/r-2/implement',
       files: [],
@@ -662,6 +668,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
       body: null,
       told: null,
       layers: null,
+      taskParts: null,
       workspace: null,
       branch: null,
       files: [],
@@ -742,6 +749,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     body: null,
     told: filedBrief('t-6'),
     layers: null,
+    taskParts: [{ kind: 'text', text: filedBrief('t-6') }],
     workspace: '/code/app/.wt/r-6/original',
     branch: 'wf/r-6/original',
     files: [],

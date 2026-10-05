@@ -13,9 +13,12 @@ const RUNS = COMMANDS.find((c) => c.name === 'runs')!;
 /** One run read for its page (`run`), an entry of the package's table the api serves alone: on `GET /api/runs/:id`. */
 const RUN = COMMANDS.find((c) => c.name === 'run')!;
 
+/** What a run would hand a run started with it as context (`concluded`), an entry of the package's table: on `GET …/concluded`. */
+const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
+
 /**
- * The runs' routes: the list, one run in full, and what `nemia decide` shows of it. The board's writes on a run — its removal and its prune
- * among them — are the command table's routes (`commands`, commands/routes.ts).
+ * The runs' routes: the list, one run in full, what `nemia decide` shows of it, and what it would hand as context. The board's writes on a
+ * run — its removal and its prune among them — are the command table's routes (`commands`, commands/routes.ts).
  *
  * - `GET /api/runs` — every run's summary (`RunSummary`), in the store's order: the package's entry (`runs`), handed the app's memo of runs
  *   at rest and its feed's filing times. One request costs, however many runs there are, one harness observation (one listing of the
@@ -32,6 +35,9 @@ const RUN = COMMANDS.find((c) => c.name === 'run')!;
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
  *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
+ * - `GET /api/runs/:runId/concluded` — what a run started now with `--from <runId>` would be handed of it (`nemia concluded`): the run,
+ *   whether it has shipped and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
+ *   `Missing`, answered by `app.onError`.
  */
 
 export const runs = new Hono<ApiEnv>()
@@ -60,4 +66,7 @@ export const runs = new Hono<ApiEnv>()
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
       return c.json(read.judged);
     }),
+  )
+  .get('/api/runs/:runId/concluded', (c) =>
+    served(c, async ({ e }) => c.json(await CONCLUDED.handler(e, { runId: c.req.param('runId') }))),
   );

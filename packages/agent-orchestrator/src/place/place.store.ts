@@ -330,8 +330,8 @@ export const SHIPPED_PLACE = path.join(import.meta.dirname, '..', '..', 'place',
 
 /**
  * Whether each `{ onto, branch }` of `trials` merges in `repo`, as the place in `skillDir` answers its `trial` verb: each base's commit
- * now, and each trial in the order asked. Asks nothing for no trial. A refusal or an unread outcome is never a verdict: every trial is
- * then `{ unknown }` in the place's words, and every base's commit null.
+ * now, and each trial in the order asked. Asks nothing for no trial. A refusal, an unread outcome, or an answer with another count of
+ * trials than asked is never a verdict: every trial is then `{ unknown }` in words that say why, and every base's commit null.
  */
 export function trialMerges(
   repo: string,
@@ -340,8 +340,13 @@ export function trialMerges(
 ): Trials {
   if (!trials.length) return { at: {}, trials: [] };
   const outcome = runPlaceVerb(skillDir, 'trial', { repo, trials });
-  if ('answer' in outcome) return outcome.answer;
-  const unknown = 'refused' in outcome ? outcome.refused : `the trial merge was not heard: ${outcome.unread.said}`;
+  if ('answer' in outcome && outcome.answer.trials.length === trials.length) return outcome.answer;
+  const unknown =
+    'refused' in outcome
+      ? outcome.refused
+      : 'unread' in outcome
+        ? `the trial merge was not heard: ${outcome.unread.said}`
+        : `the place answered ${outcome.answer.trials.length} trial${outcome.answer.trials.length === 1 ? '' : 's'} for the ${trials.length} asked`;
   return {
     at: Object.fromEntries(trials.map((t) => [t.onto, null])),
     trials: trials.map(() => ({ unknown })),

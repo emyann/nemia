@@ -32,7 +32,14 @@ const REQUESTS: PlaceRequests = {
   handoff: { workspace: '/w', step: 'a', why: '' },
   report: { repo: '/r', baseRef: 'b', onto: 'main', branches: ['wf/x/a'], diffOf: [], present: [], atBase: [] },
   standing: { repo: '/r', branches: [{ branch: 'wf/x/a', baseRef: 'b' }], base: 'main' },
-  trial: { repo: '/r', trials: [{ onto: 'main', branch: 'wf/x/a' }] },
+  trial: {
+    repo: '/r',
+    trials: [
+      { onto: 'main', branch: 'wf/x/a' },
+      { onto: 'main', branch: 'wf/x/b' },
+      { onto: 'gone', branch: 'wf/x/a' },
+    ],
+  },
   status: { checkout: '/r', tips: {} },
   land: { checkout: '/r', act: 'abort' },
   inventory: { repo: '/r', under: '/w', prefix: 'wf/x/' },
@@ -240,7 +247,7 @@ test('trialMerges answers what the trial verb answers, and asks nothing for no t
   assert.ok(fs.existsSync(path.join(SHIPPED_PLACE, 'scripts', 'trial.ts')), `the shipped place is ${SHIPPED_PLACE}`);
 });
 
-test('REFUSED: a trial unread or refused is no verdict: every trial is unknown in its words, and every base null', () => {
+test('REFUSED: a trial unread or refused, or an answer short of the trials asked, is no verdict: every trial is unknown in its words, and every base null', () => {
   const pairs = [
     { onto: 'main', branch: 'wf/x/a' },
     { onto: 'wf/y/b', branch: 'wf/x/a' },
@@ -252,6 +259,11 @@ test('REFUSED: a trial unread or refused is no verdict: every trial is unknown i
   });
   const refused = trialMerges('/r', pairs, planted('trial', printing({ refused: '/r is not a directory' })));
   assert.deepEqual(refused.trials, [{ unknown: '/r is not a directory' }, { unknown: '/r is not a directory' }]);
+  const short = trialMerges('/r', pairs, planted('trial', printing({ at: { main: 'a'.repeat(40) }, trials: [{ clean: true }] })));
+  assert.deepEqual(short, {
+    at: { main: null, 'wf/y/b': null },
+    trials: [{ unknown: 'the place answered 1 trial for the 2 asked' }, { unknown: 'the place answered 1 trial for the 2 asked' }],
+  });
   const unshaped = trialMerges('/r', pairs, planted('trial', printing({ at: {} })));
   assert.ok(
     unshaped.trials.every((t) => 'unknown' in t && /`trials` is missing/.test(t.unknown)),

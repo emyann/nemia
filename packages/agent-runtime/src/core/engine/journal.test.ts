@@ -837,10 +837,7 @@ test('a journal gone and made again as the same file, longer, is read whole', as
   assert.deepEqual([gone.entries, gone.bytes], [[], 0]);
   const ats = ['2026-01-02T00:00:00Z', '2026-01-02T00:00:01Z', '2026-01-02T00:00:02Z', '2026-01-02T00:00:03Z', '2026-01-02T00:00:04Z'];
   const { ino } = fs.statSync(aside);
-  fs.writeFileSync(
-    aside,
-    [filedAt(ats[0]!), ...ats.slice(1).map((at) => ev('starting', at))].map((e) => JSON.stringify(e) + '\n').join(''),
-  );
+  fs.writeFileSync(aside, [filedAt(ats[0]), ...ats.slice(1).map((at) => ev('starting', at))].map((e) => JSON.stringify(e) + '\n').join(''));
   fs.renameSync(aside, file);
   assert.equal(fs.statSync(file).ino, ino, 'the same file as the one read before it went');
   const again = await cost();

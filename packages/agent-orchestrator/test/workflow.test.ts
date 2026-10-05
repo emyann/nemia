@@ -36,6 +36,7 @@ import {
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { readsMounts } from '../src/filed/filed.ts';
+import { FILED_AS } from '../src/keys/filed-as.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
 
@@ -2821,7 +2822,7 @@ const readsSaid = (lines: string): string => {
   }
 };
 
-test('`reads:` is read as the store folders it names, written back as written, and a step without the line has none', () => {
+test('`reads:` is read as what of the store it names, written back as written, and a step without the line has none', () => {
   const step = fm('review', 'reads: inbox');
   assert.deepEqual(step.reads, ['inbox']);
   assert.match(renderStep(step), /^reads: inbox$/m);
@@ -2834,6 +2835,13 @@ test('`reads:` is read as the store folders it names, written back as written, a
     [],
     '`costs` is said in the brief, and mounts nothing',
   );
+});
+
+test("a filing's `mounts` quotes of `reads:` only the names that mount a folder, and none of a step whose names mount none", () => {
+  const mounts = (more: string) => FILED_AS.mounts(fm('review', more));
+  assert.equal(mounts('reads: inbox, costs'), 'reads: inbox');
+  assert.equal(mounts('reads: costs'), undefined, '`costs` gives no mount');
+  assert.equal(mounts('writable: web\nreads: costs'), 'writable: web');
 });
 
 test('REFUSED at load: a `reads:` name off the store list, one given twice, none, and the key on a remote A2A agent', () => {

@@ -717,6 +717,12 @@ test("REFUSED at shipped defaults: an ending in the checkout reads its run's art
     !allows(`${id}-implement`).some((r) => r.startsWith('Read(')),
     `a step in a worktree is filed with its own rules only: ${allows(`${id}-implement`).join(', ')}`,
   );
+  const mounts = (task: string) => (tasks.get(task)!.spec.config as { mounts?: unknown }).mounts;
+  assert.deepEqual(
+    mounts(`${id}-ship`),
+    [{ path: artifactsDir({ id }, 'implement'), readOnly: true }],
+    'and the ending is filed the folder of the step it comes after, read-only, beside its allow, and not its own',
+  );
 });
 
 /** `npm`, offline, in a directory: a workspace-only tree needs no registry, and a test never reaches one. */

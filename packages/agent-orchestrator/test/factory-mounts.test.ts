@@ -21,7 +21,7 @@ const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactory, advance, attachWorkflow, hireAgent, retry, start } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 /** A git repository with one commit on `main`, in a folder named from `prefix`. */
@@ -178,6 +178,11 @@ test('a run in the default factory, or in a factory of one repository, mounts no
     const filing = b.filed.get(`${run.id}-implement`)!;
     assert.equal(Object.hasOwn(filing.config!, 'mounts'), false, `${String(factory)}: the config as it was before mounts`);
     assert.doesNotMatch(filing.brief, /mounted read-only/, String(factory));
+    b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+    await advance(b.e, readRun(run.id));
+    const review = b.filed.get(`${run.id}-review`)!;
+    assert.deepEqual(review.config?.mounts, readOnly(artifactsDir(run, 'implement')), `${String(factory)}: implement's folder alone`);
+    assert.doesNotMatch(review.brief, /mounted read-only/, `${String(factory)}: no factory folder said`);
   }
 });
 
@@ -217,7 +222,14 @@ test("the frozen mounts are filed with a local step's first filing, a try and a 
   assert.deepEqual(b.filed.get(tried)?.config?.mounts, frozen, 'a try');
   b.settle(tried, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
-  assert.deepEqual(b.filed.get(`${run.id}-review`)?.config?.mounts, frozen, 'the step after it');
+  const handed = { path: artifactsDir(run, 'implement'), readOnly: true };
+  assert.deepEqual(b.filed.get(`${run.id}-review`)?.config?.mounts, [...frozen, handed], "the step after it, and implement's folder");
+  assert.ok(fs.statSync(handed.path).isDirectory(), "implement's folder is there when the step after it is filed");
+  assert.doesNotMatch(
+    b.filed.get(`${run.id}-review`)!.brief,
+    /Folders of this factory[^\n]*artifacts/,
+    'no handed folder said as a factory folder',
+  );
   b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
   await advance(b.e, readRun(run.id));
   const round = readRun(run.id).steps.implement.taskId!;
@@ -354,7 +366,11 @@ test("a step's `writable:` folder is filed writable for that step alone, on its 
   b.settle(tried, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
   const review = b.filed.get(`${run.id}-review`)!;
-  assert.deepEqual(review.config?.mounts, readOnly(repos[1], repos[2]), 'every other step reads it');
+  assert.deepEqual(
+    review.config?.mounts,
+    [...readOnly(repos[1], repos[2]), ...readOnly(artifactsDir(run, 'implement'))],
+    "every other step reads it, and the step after it implement's folder",
+  );
   assert.doesNotMatch(review.brief, /you may write/);
   b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
   await advance(b.e, readRun(run.id));

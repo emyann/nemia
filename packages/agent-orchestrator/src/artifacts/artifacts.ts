@@ -1,9 +1,13 @@
 /**
  * Files a step leaves for the steps after it and for the person who decides: what its brief says of them (`artifactsContract`), where a
- * file it names is found (`artifactPlace`), and the lines that list them (`artifactLines`). Pure: `artifacts.store.ts` copies them.
+ * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), and the lines that list them
+ * (`artifactLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
-import { filesPrunedWords, type Pruned } from '../record/record.ts';
+import { filesPrunedWords, type Mount, type Pruned } from '../record/record.ts';
+import { sandboxed, upstreamOf } from '../workflow/index.ts';
+import type { Workflow } from '../step/step.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 
 /**
  * Where a step's files go, told on its brief beside the closeout contract.
@@ -159,3 +163,16 @@ export const sizeOf = (bytes: number): string =>
       : bytes < 1024 ** 3
         ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
         : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+
+/**
+ * The folders of the run's artifacts (`runArtifacts`, one folder per step under it) a step is filed with, each read-only: the folder of
+ * every step of `steps` it comes after, through `after:` and on (`upstreamOf`), in `steps`' order. It reads what they handed over and
+ * writes none of it, whatever its fence. Its own folder is left out, writable as its workspace's mode makes it, and so is every step it
+ * does not come after: a sibling, a step after it. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
+ * agent, filed no local field.
+ */
+export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: readonly Workflow[], runArtifacts: string): Mount[] => {
+  if (isRemoteHarness(step.harness) || sandboxed(step.harness ?? DEFAULT_HARNESS)) return [];
+  const upstream = upstreamOf(steps, step.name);
+  return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
+};

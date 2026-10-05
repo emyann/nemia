@@ -45,6 +45,7 @@ import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { mergeDue, mergeDueNote, mergeNote, mergeSpent, mergeWaits } from '../merge/merge.ts';
+import type { LandingSaid } from '../check/check.ts';
 
 /**
  * The rounds due now. Pure, and blind to cancellation on purpose, as `retriesDue` is: `assess` answers for a cancelled run, and `advance`
@@ -151,14 +152,14 @@ export const roundFiledNote = (r: Round, looping: Workflow): string =>
 
 /**
  * What a round filed tells its target of itself (`RoundBriefing`): its loop, its number, the loop's `rounds:`, on whose word, and what it
- * merges.
+ * merges — with what the ending's check said of the merged tree, where a merge is asked on its refusal (`landing`).
  */
-export const roundBriefed = (r: Round, looping: Workflow) => ({
+export const roundBriefed = (r: Round, looping: Workflow, landing?: LandingSaid) => ({
   loop: r.step,
   round: r.round,
   rounds: capOf(looping),
   by: r.by,
-  ...(r.merge ? { merge: { onto: r.merge.onto, sha: r.merge.sha } } : {}),
+  ...(r.merge ? { merge: { onto: r.merge.onto, sha: r.merge.sha, ...(landing ? { landing } : {}) } } : {}),
 });
 
 /** The round asks a record already answers — each names a round its loop has reached. The tick consumes these. */

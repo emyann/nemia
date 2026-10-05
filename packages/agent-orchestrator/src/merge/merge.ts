@@ -11,7 +11,19 @@ import { outputFields, type Workflow } from '../step/step.ts';
 import { dataBlock, isGitRun, satisfiesAfter, stopsFollowers, tryOf, type Run, type StepStatus } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
 import { loopSpan } from '../workflow/index.ts';
-import { approvalOf, approvedFirst, capOf, loopOf, roundOf, roundWord, type MergeOf, type Round, type RoundAsk } from '../status/status.ts';
+import {
+  approvalOf,
+  approvedFirst,
+  capOf,
+  loopOf,
+  roundOf,
+  roundWord,
+  type MergeLanding,
+  type MergeOf,
+  type Round,
+  type RoundAsk,
+} from '../status/status.ts';
+import { landingSaidSection, type LandingSaid } from '../check/check.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 import type { Offer } from '../decide/decide.ts';
 
@@ -97,12 +109,20 @@ export function mergeDue(
  */
 export function mergeOffer(run: Run, ask: MergeAsk): Offer {
   const command = `nemia merge ${run.id} ${ask.step}`;
+  const { target, onto, landing } = ask.merge;
+  const conflict = landing
+    ? `${target}'s work merges cleanly onto ${onto}, but ${semantic(ask.merge, landing)}. Merge ${onto} into it and fix what broke`
+    : `${target}'s work conflicts with ${onto}. Merge ${onto} into it`;
   return {
     step: ask.step,
     command,
-    said: `${ask.step}: ${ask.merge.target}'s work conflicts with ${ask.merge.onto}. Merge ${ask.merge.onto} into it — ${ask.merge.target} continued, then a new ${ask.step}, on round ${ask.round}, which the merge does not spend:  ${command}`,
+    said: `${ask.step}: ${conflict} — ${target} continued, then a new ${ask.step}, on round ${ask.round}, which the merge does not spend:  ${command}`,
   };
 }
+
+/** A conflict that is no text's, as a merge's words say it: the ending whose check refused the merged tree, and the commit. */
+const semantic = (merge: MergeOf, landing: MergeLanding): string =>
+  `${landing.step}'s check refused the merged tree at ${merge.sha.slice(0, 7)}: the conflict is semantic`;
 
 /** A merge filed, as the tick's feed says it: the base, the commit its target merges, and the round it leaves as it is. */
 export const mergeNote = (r: Round): string =>
@@ -114,7 +134,7 @@ export const mergeDueNote = (r: Round): string =>
 
 /** What `nemia merge` says once its ask is written. */
 export const mergeAskedLine = (a: MergeAsk, looping: Workflow): string =>
-  `asked: merge ${a.merge.onto} at ${a.merge.sha.slice(0, 7)} into ${a.merge.target}'s work — the next tick files it, once; ${roundWord(a.round, capOf(looping))} unchanged`;
+  `asked: merge ${a.merge.onto} at ${a.merge.sha.slice(0, 7)} into ${a.merge.target}'s work${a.merge.landing ? `, where ${semantic(a.merge, a.merge.landing)}` : ''} — the next tick files it, once; ${roundWord(a.round, capOf(looping))} unchanged`;
 
 /**
  * What `nemia merge` asks — the loop's target merges the base branch at `sha`, on the round the loop is on — or why it will not, in words
@@ -125,6 +145,10 @@ export const mergeAskedLine = (a: MergeAsk, looping: Workflow): string =>
  * pointed to `nemia retry` of the step its ending waits on; a merge or a round already asked; a loop that goes round itself, whose round is
  * still running, or whose step stopped; a step waiting on the loop that runs, landed or is approved; and a trial merge (`trial`) of the
  * target's branch that is clean — nothing to merge, so the landing is approved — or that git could not make.
+ *
+ * A clean trial merge is asked all the same where the ending's last landing check refused the merge staged on `base.sha`
+ * (`refusedLanding`): the conflict is semantic, and the ask carries that landing (`MergeOf.landing`). One refused on another commit of the
+ * base, or a check that did not finish, lets nothing through: the landing is tried again on the base as it is.
  */
 export function mergeAsk(
   steps: readonly Workflow[],
@@ -157,8 +181,10 @@ export function mergeAsk(
     return no(
       `whether ${branch} merges onto ${run.branch} is not known: ${tried.error}. Try again once git can say: nemia merge ${run.id} ${looping.name}.`,
     );
-  if (tried.clean) return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — ${cleanNext(steps, run, looping, reads)}.`);
-  const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base.sha };
+  const landing = tried.clean ? refusedLanding(steps, run, looping, base.sha) : undefined;
+  if (tried.clean && !landing)
+    return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — ${cleanNext(steps, run, looping, reads)}.`);
+  const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base.sha, ...(landing ? { landing } : {}) };
   return { ask: { step: looping.name, round: roundOf(run, looping.name), at: base.at, merge } };
 }
 
@@ -223,9 +249,25 @@ function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow
   return `${going.name} waits on ${looping.name} and is ${reads.standingOf(going).status}, so a merge would file the work again under a step that ran on it. See where the run stands: nemia decide ${run.id}.`;
 }
 
+/** The ending that waits on a loop: the step after it that a person approves before it is filed — or undefined. */
+const endingAfter = (steps: readonly Workflow[], run: Run, looping: Workflow): Workflow | undefined =>
+  steps.find((s) => s.after.includes(looping.name) && approvedFirst(s, run));
+
+/**
+ * The landing of the ending after `looping` that its check refused on `sha` (`MergeLanding`): its record says it aborted the merge staged
+ * on that commit of the base (`Landed`'s `refusedOn`), and names its check's task — or undefined.
+ */
+function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow, sha: string): MergeLanding | undefined {
+  const ending = endingAfter(steps, run, looping);
+  const record = ending ? run.steps[ending.name] : undefined;
+  const landed = record?.landed;
+  if (!ending || !landed || !('aborted' in landed) || landed.refusedOn !== sha || !record.check) return undefined;
+  return { step: ending.name, check: record.check.taskId };
+}
+
 /** What to do with a loop whose work merges cleanly: approve the ending at its gate, ship a stopped one again, or nothing. */
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
-  const ending = steps.find((s) => s.after.includes(looping.name) && approvedFirst(s, run));
+  const ending = endingAfter(steps, run, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;
   if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `ship it again: nemia retry ${run.id} ${ending.name}`;
   return `approve the landing: nemia approve ${run.id} ${ending.name}`;
@@ -233,31 +275,57 @@ function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, read
 
 /**
  * `## Merge <base>`, on a loop's target filed by a merge: the commit of the base to merge, that both meanings are kept in each conflict,
- * that the check runs and nothing else changes, and that no round is spent and no finding is owed an answer.
+ * that the check runs and nothing else changes, and that no round is spent and no finding is owed an answer. Where the work merged cleanly
+ * and the ending's check refused the merged tree (`landing`), the conflict is semantic: the merge is made without a commit, what broke is
+ * fixed inside it, and what that check said follows, as data (`landingSaidSection`).
  *
- * @param merge The base branch and the commit of it the person's trial merge read.
+ * @param merge The base branch, the commit of it the person's trial merge read, and what the refusing check said, where one did.
  * @param loop The looping step, which reads the merge once the target signs off.
  */
-export function mergeSection(step: Workflow, merge: { onto: string; sha: string }, loop: string, steps: readonly Workflow[]): string {
+export function mergeSection(
+  step: Workflow,
+  merge: { onto: string; sha: string; landing?: LandingSaid },
+  loop: string,
+  steps: readonly Workflow[],
+): string {
   const looping = steps.find((s) => s.name === loop);
   const between = looping ? loopSpan(steps, looping).filter((n) => n !== step.name && n !== loop) : [];
   return [
     '',
     `## Merge ${merge.onto}`,
     '',
-    `A person asked for this (\`nemia merge\`): the work no longer merges cleanly onto \`${merge.onto}\`, which moved since. Merge it in,`,
-    'at the commit their trial merge read:',
-    '',
-    `    git merge ${merge.sha}`,
-    '',
-    `- In each conflict, keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off`,
-    '  blocked and name the choice in `needs`.',
+    ...(merge.landing ? semanticMerge(merge, merge.landing) : textualMerge(merge)),
     `- Run the check${step.check ? ` (\`${step.check}\`)` : ''}, and fix what the merge broke — nothing else. Commit the merge.`,
     '- This is no review round: there are no findings to answer, and your `replies` are an empty list.',
     '',
     `When you have signed off, ${between.length ? `${between.join(', then ')}, then ` : ''}${loop} runs again and reads the merge. The round stays as it is.`,
+    ...(merge.landing ? [landingSaidSection(merge.landing)] : []),
   ].join('\n');
 }
+
+/** How a merge that conflicts as text is made: at the commit the trial merge read, both meanings kept in each conflict. */
+const textualMerge = (merge: { onto: string; sha: string }): string[] => [
+  `A person asked for this (\`nemia merge\`): the work no longer merges cleanly onto \`${merge.onto}\`, which moved since. Merge it in,`,
+  'at the commit their trial merge read:',
+  '',
+  `    git merge ${merge.sha}`,
+  '',
+  `- In each conflict, keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off`,
+  '  blocked and name the choice in `needs`.',
+];
+
+/** How a merge that conflicts in meaning is made: without a commit, what broke fixed inside it, so the merge commit shows the fix. */
+const semanticMerge = (merge: { onto: string; sha: string }, said: LandingSaid): string[] => [
+  `A person asked for this (\`nemia merge\`): the work merges cleanly onto \`${merge.onto}\` as text, but ${said.step}'s check refused the`,
+  `merged tree at \`${merge.sha}\`${'verdict' in said ? ` (exit ${said.verdict})` : ''}, so the conflict is semantic: this change and what \`${merge.onto}\``,
+  'changed each hold alone, and break together. Merge it in at that commit, without committing:',
+  '',
+  `    git merge --no-ff --no-commit ${merge.sha}`,
+  '',
+  `- Fix what broke inside the merge, before you commit it, so \`git show --remerge-diff\` shows the fix to whoever reads the merge.`,
+  `  Keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off blocked and name the`,
+  '  choice in `needs`.',
+];
 
 /**
  * `## A merge of <base>`, on a looping step filed after its target merged the base: no new round — the merge is what to read, as

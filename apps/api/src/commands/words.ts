@@ -3,7 +3,7 @@
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
 import { Schema } from 'effect';
-import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
+import { factoryNameRefusal, inboxNameRefusal, subscriptionNameRefusal } from 'agent-orchestrator';
 import { agentNameRefusal } from 'agent-orchestrator/workflow';
 import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
@@ -252,6 +252,53 @@ const RESUME: RouteWords = {
   }),
   issue: () => () => 'DELETE /api/pause takes no body: `{}`.',
   failed: (_at, said) => `DELETE /api/pause: the store was not resumed — ${said}. Resume it with \`nemia resume\`.`,
+};
+
+/** The body `POST /api/subscriptions/:name` takes: `nemia subscribe`'s task and flags, as JSON. */
+const SUBSCRIBE_SHAPE = '`{ "task": "<task>", "wake"?: ["<word>"], "digestEvery"?: <minutes> }`';
+
+/** What `issue` says of a key of `POST /api/subscriptions/:name`'s body sent wrong, `input` what the request sent. */
+const subscribeKeyWords = (key: unknown, input: unknown): string => {
+  const was = `This request's was ${JSON.stringify(input) ?? 'left out'}: ${SUBSCRIBE_SHAPE}.`;
+  if (key === 'task')
+    return `\`task\` names the engine's long-lived task the feed is said to, as \`nemia subscribe <name> <task>\` takes it. ${was}`;
+  if (key === 'wake')
+    return `\`wake\` is the words that wake the task, as \`nemia subscribe --wake <word>\` takes each: a list of text, or left out for the feed's words for a wait on a person. ${was}`;
+  if (key === 'digestEvery')
+    return `\`digestEvery\` is the minutes a digest waits for a wake, as \`nemia subscribe --digest-every <minutes>\` takes it: a JSON number, or left out for 60. ${was}`;
+  return `POST /api/subscriptions/:name takes a JSON object: ${SUBSCRIBE_SHAPE}.`;
+};
+
+/** A subscription to the feed, the guard's words of the route at `name`. */
+const subscriptionGuard = (name: string, off: boolean): Guarded => ({
+  route: `${off ? 'DELETE' : 'POST'} /api/subscriptions/${name}`,
+  does: off ? 'takes a subscription away' : 'gives a task a subscription to the feed',
+  forAnother: off ? 'take one away' : 'give one',
+  why: off
+    ? 'a subscription taken away leaves its task told nothing more of the feed, and where its deliverer was is lost'
+    : "a subscription says the feed's lines to a long-lived task's session, which acts on what it is told",
+  reach: off ? 'take it away with `nemia unsubscribe`' : 'give it with `nemia subscribe`',
+  instead: off ? `Take it away with \`nemia unsubscribe ${name}\`` : `Give it with \`nemia subscribe ${name} <task>\``,
+  shape: off ? '`{}`' : SUBSCRIBE_SHAPE,
+});
+
+/** A subscription given, as the guard's refusals word it, and its body; a name that names no file of its own is refused before it. */
+const SUBSCRIBE: RouteWords = {
+  shape: SUBSCRIBE_SHAPE,
+  guard: ({ name }) => subscriptionGuard(name, false),
+  issue:
+    () =>
+    ({ path: [key], input }) =>
+      subscribeKeyWords(key, input),
+  named: ({ name }) => subscriptionNameRefusal(name) ?? null,
+};
+
+/** A subscription taken away, as the guard's refusals word it; it takes no body. */
+const UNSUBSCRIBE: RouteWords = {
+  shape: '`{}`',
+  guard: ({ name }) => subscriptionGuard(name, true),
+  issue: () => () => 'DELETE /api/subscriptions/:name takes no body: `{}`.',
+  named: ({ name }) => subscriptionNameRefusal(name) ?? null,
 };
 
 /** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `nemia rm`. */
@@ -516,6 +563,8 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   hold: HOLD,
   pause: PAUSE,
   resume: RESUME,
+  subscribe: SUBSCRIBE,
+  unsubscribe: UNSUBSCRIBE,
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,

@@ -953,3 +953,23 @@ test("the daemon asks each harness's quota and hands its reading to the passes; 
   for (const windows of Object.values(quota)) assert.deepEqual(windows, { w: 12 });
   clear();
 });
+
+test('the daemon delivers the subscriptions: a wake line written to the feed is said to the subscribed task through the engine', async () => {
+  clear();
+  const { up } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const { dropSubscription, putSubscription } = await import('../subscription/subscription.store.ts');
+  const { feedFile, feedSize } = await import('../feed/feed.store.ts');
+  putSubscription('daemon', { task: 'nemia', wake: ['awaiting approval'], digestEvery: 60, from: feedSize() });
+  fs.appendFileSync(feedFile(), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
+  const told: string[] = [];
+  const e = engineOf((n) => {
+    if (told.length || n > 2000) throw STOP;
+  });
+  Object.assign(e, { say: (task: string, text: string) => Effect.sync(() => told.push(`${task}: ${text}`)) });
+  await assert.rejects(Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
+  assert.equal(told.length, 1, told.join('\n'));
+  assert.match(told[0], /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval$/);
+  dropSubscription('daemon');
+  clear();
+});

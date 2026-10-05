@@ -140,19 +140,19 @@ const usage = (message: string): never => {
   throw new Invalid({ message });
 };
 
-/** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
-export function amountOf(text: string | undefined, takes: string, form: string): number {
+/** An amount flag's value as a number (`dollarsOf`), or refused in `flag`'s words, saying what it takes: above zero, in digits. */
+export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget'): number {
   const amount = text === undefined ? undefined : dollarsOf(text);
   if (amount === undefined)
     usage(
-      `--budget takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`,
+      `${flag} takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`,
     );
   return amount!;
 }
 
 /** The value of `flag`, given `value` — joined with `=` or the argument after it — or refused in the flag's words. */
 function valueOf(spec: Spec, flag: Flag, value: string | undefined, joined: boolean): string | number {
-  if (flag.kind === 'amount') return amountOf(value, flag.takes ?? '', flag.form ?? '');
+  if (flag.kind === 'amount') return amountOf(value, flag.takes ?? '', flag.form ?? '', flag.flag);
   if (value === undefined || (flag.kind === 'name' && (!value || value.startsWith('--')))) return usage(flag.takes ?? '');
   if (!joined && spec.apart && spec.flags.some((f) => f.flag === value)) usage(spec.apart(value, flag.flag));
   return value;

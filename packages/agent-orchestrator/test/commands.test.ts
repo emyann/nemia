@@ -120,6 +120,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
       ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
       ['pause now', { method: 'GET', path: '/api/pause/now', status: 200 }],
+      ['subscribe', { method: 'POST', path: '/api/subscriptions/:name', status: 201 }],
+      ['unsubscribe', { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 }],
       [
         'workflows write',
         [

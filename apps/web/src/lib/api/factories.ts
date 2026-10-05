@@ -1,7 +1,10 @@
-/** The factories (`GET /api/factories`, apps/api/src/factories/factories.ts). */
+/**
+ * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts), and a factory's instruction (`GET`, `PUT` and `DELETE` on
+ * `/api/factories/<name>/instruction`, apps/api/src/factories/instruction.ts and the routes the api generates beside it).
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { get } from './read.ts';
+import { get, send } from './read.ts';
 
 /**
  * Mirrors `FactoryAnswer` in apps/api/src/factories/factories.ts: a factory's name, whether it is the default factory, the repositories it
@@ -38,3 +41,68 @@ export const factoriesQuery = queryOptions({
   queryKey: ['factories'],
   queryFn: () => get('/api/factories', Schema.mutable(Schema.Array(FactorySchema))),
 });
+
+/**
+ * Mirrors `FactoryInstruction` in the orchestrator, as apps/api/src/factories/instruction.ts answers it: the factory's `name`; `path`, the
+ * path in its first folder its file names, null where it names none or keeps the instruction in the store; `store`, whether the store
+ * keeps it; `file`, the file it is read from; `words`, null where there is no file; `error`, why a file there does not read, else null; and
+ * `stored`, whether the store holds text for it, read or not.
+ */
+export type FactoryInstruction = {
+  name: string;
+  path: string | null;
+  store: boolean;
+  file: string;
+  words: string | null;
+  error: string | null;
+  stored: boolean;
+};
+
+/** Decodes a `FactoryInstruction`. */
+const FactoryInstructionSchema = Schema.Struct({
+  name: Schema.String,
+  path: Schema.NullOr(Schema.String),
+  store: Schema.Boolean,
+  file: Schema.String,
+  words: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+  stored: Schema.Boolean,
+}) satisfies Schema.Schema<FactoryInstruction>;
+
+/** The route of the instruction of the factory `name`. */
+const instructionRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/instruction`;
+
+/** The instruction of the factory `name`, read where its file says it is kept, on each request. */
+export const factoryInstructionQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['factory-instruction', name],
+    queryFn: () => get(instructionRoute(name), FactoryInstructionSchema),
+  });
+
+/** What a write of a factory's instruction may have done, and what to look at before writing it again. */
+const INSTRUCTION_WRITTEN = "The instruction may be changed: read the factory's settings again before changing it again.";
+
+/** Where an instruction is to be kept: a file in the factory's first folder, by its path from it, or the store. */
+export type InstructionPlace = { path: string } | { store: true };
+
+/**
+ * Keep the instruction of the factory `name` at `place`: the instruction as it then reads. Rejects with a `WriteRefusal` in the package's
+ * words: no such factory (404), the default factory (409), a path that is not a file inside the folder (422).
+ */
+export const placeInstruction = (name: string, place: InstructionPlace): Promise<FactoryInstruction> =>
+  send('PUT', instructionRoute(name), FactoryInstructionSchema, { body: place, may: INSTRUCTION_WRITTEN });
+
+/** Read the instruction of the factory `name` from `NEMIA.md` in its first folder again: the instruction as it then reads. */
+export const resetInstructionPlace = (name: string): Promise<FactoryInstruction> =>
+  send('DELETE', instructionRoute(name), FactoryInstructionSchema, { body: {}, may: INSTRUCTION_WRITTEN });
+
+/**
+ * Write `words` as the instruction the store keeps for the factory `name`: the instruction as it then reads. Rejects with a `WriteRefusal`
+ * in the package's words: an instruction read from the factory's folder (409), blank words (422).
+ */
+export const writeInstruction = (name: string, words: string): Promise<FactoryInstruction> =>
+  send('PUT', `${instructionRoute(name)}/words`, FactoryInstructionSchema, { body: { words }, may: INSTRUCTION_WRITTEN });
+
+/** Remove the instruction the store keeps for the factory `name`: the instruction as it then reads. */
+export const clearInstruction = (name: string): Promise<FactoryInstruction> =>
+  send('DELETE', `${instructionRoute(name)}/words`, FactoryInstructionSchema, { body: {}, may: INSTRUCTION_WRITTEN });

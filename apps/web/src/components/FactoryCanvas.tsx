@@ -216,7 +216,7 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   card and leaves the cards they moved aside where they went. The effect that keeps the open runs is their one writer.
  * - The header counts runs in flight, finished, to decide as the CLI's `ls` says them, and waiting on you. A run waiting on you, or to
  *   decide,   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in
- *   both.   Beside the counts it draws the cap (`CapLine`), and the Show finished switch, named by a label beside it.
+ *   both.   Beside the counts it draws the cap (`CapLine`), and at its right the floor's options (`FloorOptions`).
  * - The floor fills the screen between the root's header and its bottom bar, its frame narrowed by what the bar covers of it
  *   (`useBarOver`), so the card inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives
  *   its room to the floor while the bar shows a run, a step, or what is the whole machine's: its gauges or the runs waiting on you. The
@@ -414,7 +414,6 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     setFits((n) => n + 1);
   };
   const collapseAll = () => setOpen([]);
-  const finishedSwitch = useId();
   const toggleFinished = (on: boolean) => {
     setShowFinished(on);
     setFits((n) => n + 1);
@@ -448,12 +447,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
           </p>
           <CapLine queued={queued.length} queueError={queue.error} />
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Switch id={finishedSwitch} isSelected={showFinished} onChange={toggleFinished} />
-          <label htmlFor={finishedSwitch} className="cursor-pointer">
-            Show finished
-          </label>
-        </div>
+        <FloorOptions factory={factory} showFinished={showFinished} onShowFinished={toggleFinished} />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -578,6 +572,35 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
 
 /** A button that is a link to a route: React Aria's link in the button's look, given the router's `to` and its preloading. */
 const RouterLinkButton = routeLink(LinkButton);
+
+/**
+ * The floor's options, at the header's right: the Show finished switch, named by a label beside it, and, but on the default factory, which
+ * has no file to keep settings in, a link to the factory's settings.
+ */
+function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onShowFinished: (on: boolean) => void }) {
+  const finishedSwitch = useId();
+  return (
+    <div className="flex items-center gap-4 text-sm">
+      <div className="flex items-center gap-2">
+        <Switch id={finishedSwitch} isSelected={props.showFinished} onChange={props.onShowFinished} />
+        <label htmlFor={finishedSwitch} className="cursor-pointer">
+          Show finished
+        </label>
+      </div>
+      {!props.factory.default && (
+        <RouterLinkButton
+          to="/factories/$factory/settings"
+          params={{ factory: props.factory.name }}
+          variant="outline"
+          size="sm"
+          data-factory-settings-link
+        >
+          Settings
+        </RouterLinkButton>
+      )}
+    </div>
+  );
+}
 
 /** Nothing on the floor: say so, where the runs are, and that the queue beside it starts on its own. */
 function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {

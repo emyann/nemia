@@ -95,8 +95,10 @@ test("the header names a page by its section first — Floor on a factory's floo
   assert.equal(sectionOf('/machinesx'), undefined);
 });
 
-test("the picked factory is read from the address alone: a floor's name, else a section page's ?factory=, else none", () => {
+test("the picked factory is read from the address alone: the name of a factory's floor or settings, else a section page's ?factory=, else none", () => {
   assert.equal(pickedOf('/factories/nemia', {}), 'nemia');
+  assert.equal(pickedOf('/factories/nemia/settings', {}), 'nemia', "a factory's settings pick it, as its floor does");
+  assert.equal(pickedOf('/factories/nemia/other', {}), undefined, "refused: no other page under a floor is the factory's own");
   assert.equal(pickedOf('/runs', { factory: 'hiring' }), 'hiring');
   assert.equal(pickedOf('/stats', { factory: 'hiring', period: '90d' }), 'hiring');
   assert.equal(pickedOf('/workflows', { factory: 'hiring' }), 'hiring');
@@ -125,13 +127,15 @@ test("a section's link carries the picked factory, and none under All factories;
   }
 });
 
-test("a pick on a section's page stays there, keeping its other keys; on a floor it opens the picked one's, or Home; elsewhere it opens the picked one's floor, or stays", () => {
+test("a pick on a section's page stays there, keeping its other keys; on a factory's floor or settings it opens the picked one's floor, or Home; elsewhere it opens the picked one's floor, or stays", () => {
   const search = { period: '90d', agent: 'ada', factory: 'hiring' };
   assert.deepEqual(pickTo('/stats', search, 'nemia'), { to: '/stats', search: { period: '90d', agent: 'ada', factory: 'nemia' } });
   assert.deepEqual(pickTo('/stats', search, undefined), { to: '/stats', search: { period: '90d', agent: 'ada' } });
   assert.deepEqual(pickTo('/runs', {}, 'nemia'), { to: '/runs', search: { factory: 'nemia' } });
   assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
   assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
+  assert.deepEqual(pickTo('/factories/nemia/settings', {}, undefined), { to: '/' }, "All factories leaves a factory's settings for Home");
+  assert.deepEqual(pickTo('/factories/nemia/settings', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
   assert.deepEqual(pickTo('/runs/r-1', {}, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
   assert.deepEqual(pickTo('/inbox/card', { factory: 'x' }, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
   assert.equal(pickTo('/runs/r-1', {}, undefined), null);

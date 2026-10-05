@@ -219,3 +219,33 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
   const last = recentPasses().at(-1)!;
   assert.deepEqual([last.at, last.quota], [pass.cost.at, { h: { w: 12 } }]);
 });
+
+test('a check filed by a pass is kept with its labels among the recent passes, and in the series as check.load', async () => {
+  const { keepSeries, seriesRead } = await import('../src/series/series.store.ts');
+  const { readRun } = await import('../src/record/record.store.ts');
+  const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
+  const folder = fs.mkdtempSync(path.join(ROOT, 'checked-'));
+  fs.writeFileSync(path.join(folder, 'work.md'), '---\nharness: codex\ncheck: node -e 0\n---\nwork it\n');
+  const run = await Effect.runPromise(startRun({ brief: 'a checked run', repo: REPO, workflowDir: folder }));
+  const before = recentPasses().length;
+  for (let k = 0; k < 8 && !readRun(run.id).steps.work?.check; k++) {
+    await runWith(e, tickRun({ repo: ROOT }));
+    signAll();
+  }
+  assert.ok(readRun(run.id).steps.work?.check, 'the pass filed the check');
+  const labels = { factory: DEFAULT_FACTORY, workflow: path.basename(readRun(run.id).workflowDir), step: 'work', agent: '' };
+  const kept = recentPasses().slice(before);
+  assert.deepEqual(
+    kept.flatMap((p) => p.checks ?? []),
+    [labels],
+    'the pass that filed it carries its labels',
+  );
+  const later = Date.now() + 120_000;
+  keepSeries(recentPasses(), later);
+  assert.deepEqual(
+    seriesRead('24h', undefined, later)
+      .series.filter((x) => x.s === 'check.load')
+      .map((x) => x.l),
+    [labels],
+  );
+});

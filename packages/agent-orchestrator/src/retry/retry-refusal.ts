@@ -60,10 +60,10 @@ type Judged = Asked &
  *
  * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
  * `auto` would run in `default` on (`autoDropped`, as the load refuses it on the step's own `model:`); a cancelled run, which files
- * nothing, so the ask would never be honoured; an ask for the same try already waiting, but one `wf pause --now` wrote that is void
- * (`pauseAskVoid`), which no tick files; a step whose last try is not over, or that let what waits on it run (`retryable`); `--recheck`
- * where no check failed, or on an ending that lands on its check, whose merge the run aborted; and a step the run is about to try again
- * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
+ * nothing, so the ask would never be honoured; an ask for the same try already waiting — one `wf pause --now` wrote that is void
+ * (`pauseAskVoid`) too, said as set aside by the next pass, which alone moves it; a step whose last try is not over, or that let what
+ * waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted;
+ * and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a person.
  *
  * An ending that stopped on the base branch (`endingStopped`) has two ways on that take the same try of it, so one waiting refuses the
  * other: shipping again would act on the work being changed, and a send-back would take back the try a person asked to ship again on.
@@ -170,7 +170,7 @@ function judged(asked: Asked, step: Workflow): Judged {
     ...retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, asked.harnessBlocked, spendOf, asked.verdictOf),
     step,
     next,
-    pending: asks.find((a) => a.step === name && a.try === next && !pauseAskVoid(step, run, a, phaseOf, spendOf)),
+    pending: asks.find((a) => a.step === name && a.try === next),
     stoppedAt,
     again,
   };
@@ -183,12 +183,22 @@ function stoppedWords(c: Judged, ending: Workflow): string {
   return `${ending.name} stopped on the base branch (${ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for`;
 }
 
+/** The ask `wf pause --now` wrote for this try: void, which the next pass sets aside; or still due, tried on the resume. */
+function pauseAskRefusal(c: Judged): string | undefined {
+  const { run, name, command, next, pending } = c;
+  if (pending?.interrupted === undefined) return undefined;
+  const ran = pending.mode === 'recheck' ? 'check' : 'session';
+  if (pauseAskVoid(c.step, run, pending, c.phaseOf, c.spendOf)) {
+    return `try ${next} of ${name} is held by the ask wf pause --now wrote (at ${pending.at}), void since its ${ran} ended on its own or another try replaced it: the next pass sets it aside, and no tick files it. Ask again once it has: ${command}.`;
+  }
+  return `try ${next} of ${name} is asked by wf pause --now (at ${pending.at}), which stopped its ${ran}: it is tried once the store is resumed (wf resume), or set aside if it ended on its own first. Wait for it: wf ls ${run.id}.`;
+}
+
 /** An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a ship again that takes the same try. */
 function pendingRefusal(c: Judged): string | undefined {
+  const paused = pauseAskRefusal(c);
+  if (paused !== undefined) return paused;
   const { run, name, command, asks, next, pending, status, raise, sendsBack, back, stoppedAt } = c;
-  if (pending?.interrupted !== undefined) {
-    return `try ${next} of ${name} is asked by wf pause --now (at ${pending.at}), which stopped its ${pending.mode === 'recheck' ? 'check' : 'session'}: it is tried once the store is resumed (wf resume), or set aside if it ended on its own first. Wait for it: wf ls ${run.id}.`;
-  }
   if (pending && !carries(pending, raise)) {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
   }

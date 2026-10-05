@@ -123,19 +123,21 @@ const refusalOver = (run: Run, phaseOf: (id: string) => TaskPhase, asks: readonl
     spendOf,
   );
 
-test('wf retry passes over a void pause ask of its try: the task ended on its own, or went over its budget', () => {
+test('wf retry refuses a void pause ask of its try as set aside by the next pass: ended on its own, or over its budget', () => {
   const ended = [
     { name: 'a session that failed on its own', run: runOn('t1'), p: phases({ t1: 'failed' }) },
     { name: 'a session that succeeded, its check refused', run: runOn('t1', 'c1'), p: phases({ t1: 'succeeded', c1: 'failed' }) },
   ];
+  const setAside =
+    /^try 2 of implement is held by the ask wf pause --now wrote .* the next pass sets it aside, and no tick files it\. Ask again once it has: wf retry r-1 implement/;
   for (const { name, run, p } of ended) {
     assert.equal(refusalOver(run, p, []), null, `the fixture: ${name} may be retried`);
-    assert.equal(refusalOver(run, p, [pauseAsk('t1')]), null, name);
+    assert.match(refusalOver(run, p, [pauseAsk('t1')]) ?? '', setAside, name);
   }
   const spent: SpendOf = (id) => (id === 't1' ? { usd: 2, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
   const stopped = phases({ t1: 'stopped' });
   assert.equal(refusalOver(runOn('t1'), stopped, [], 5, spent), null, 'the fixture: a stopped session over its budget, raised');
-  assert.equal(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')], 5, spent), null);
+  assert.match(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')], 5, spent) ?? '', setAside);
 });
 
 test('wf retry refuses a pause ask still due: its task is the current one, stopped, under its budget', () => {

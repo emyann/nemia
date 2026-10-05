@@ -13,7 +13,7 @@ import { filedConfig, tryModel } from '../filed/filed.ts';
 import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/status.ts';
 import { toldOf } from '../tick/file.verb.ts';
 import type { Workflow } from '../workflow.ts';
-import { pauseAsksVoid, retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
+import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
 import { artifactsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
@@ -31,8 +31,8 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  *
  * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on `--recheck`, a step
  * that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config its harness refuses
- * (`tryRefused`). An ask `wf pause --now` wrote for that try and that is void (`pauseAskVoid`) refuses nothing: it is set aside into
- * `done/`, as the tick would, before the person's is written in its place. Like a cancellation, the ask is the person's own file, and
+ * (`tryRefused`). An ask `wf pause --now` wrote for that try refuses it even once void (`pauseAskVoid`): the tick alone sets it aside,
+ * by its name, which a person's ask written there first would lose. Like a cancellation, the ask is the person's own file, and
  * the verb never writes the run's json, which the tick owns. What the person said goes in the ask, `message`, and nowhere else: the tick
  * carries it into the try's brief. An ask written by someone else between the look and the write is refused as the look would have
  * refused it, and a file at the ask's name that no pass reads as one is named (`strayAsk`).
@@ -69,14 +69,11 @@ export const retryRun = Effect.fn('retry')(function* (
       spendOf,
     );
 
-  const { asks } = yield* tried(() => runStore.asks.read(id));
-  const refused = refusal(asks);
+  const refused = refusal((yield* tried(() => runStore.asks.read(id))).asks);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const step = steps.find((s) => s.name === stepName)!;
   const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
-  const voided = pauseAsksVoid([step], run, asks, phaseOf, spendOf).filter((a) => a.try === tryOf(run, stepName) + 1);
-  if (voided.length > 0) yield* tried(() => runStore.asks.consume(run, [], [], voided));
   const ask: RetryAsk = {
     step: stepName,
     try: tryOf(run, stepName) + 1,

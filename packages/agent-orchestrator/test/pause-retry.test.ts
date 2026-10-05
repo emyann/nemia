@@ -1,7 +1,7 @@
 /**
- * `wf retry` over an ask `wf pause --now` wrote for the same try: a void one (its session failed on its own) refuses nothing, and is set
- * aside into `done/` before the person's ask is written in its place; one still due (its session stopped) is refused, and left as it is.
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
+ * `wf retry` over an ask `wf pause --now` wrote for the same try: a void one (its session failed on its own) is refused, left where the
+ * tick alone moves it by its name, and once a pass set it aside into `done/` the retry is written; one still due (its session stopped)
+ * is refused, and left as it is. `WF_ROOT` is set before the runner is imported, which reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,12 +46,18 @@ async function pausedThen(phase: 'failed' | 'stopped') {
   return { e, id: run.id, pauseAsk };
 }
 
-test('a retry over a void pause ask of its try sets that ask aside into done/ and writes its own', async () => {
+test('REFUSED: a retry over a void pause ask of its try, which the verb leaves for the tick; once a pass set it aside, the retry is written', async () => {
   const { e, id, pauseAsk } = await pausedThen('failed');
-  const { ask } = await retry(e, id, 'implement', { mode: 'fresh', message: 'start over' });
-  assert.deepEqual([ask.try, ask.mode, ask.message], [2, 'fresh', 'start over']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(askFile(id, 'implement', 2), 'utf8')), ask);
+  await assert.rejects(retry(e, id, 'implement', { mode: 'fresh', message: 'start over' }), (err: Error) => {
+    assert.match(err.message, /^try 2 of implement is held by the ask wf pause --now wrote .* the next pass sets it aside/);
+    return true;
+  });
+  assert.deepEqual(JSON.parse(fs.readFileSync(askFile(id, 'implement', 2), 'utf8')), pauseAsk);
+  assert.equal(fs.existsSync(path.join(asksDir(id), 'done')), false, 'the verb moves no file the tick reads');
+  await advance(e, readRun(id));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(asksDir(id), 'done', 'retry-implement-2'), 'utf8')), pauseAsk);
+  const { ask } = await retry(e, id, 'implement', { mode: 'fresh', message: 'start over' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(askFile(id, 'implement', 2), 'utf8')), ask);
 });
 
 test('REFUSED: a retry over a pause ask still due, its session stopped, and that ask left as it is', async () => {

@@ -522,6 +522,11 @@ test('mountsLine names each folder the steps before it handed over, by its path 
   ]);
   assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] }), [], 'a step handed none');
   assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [] }), [], 'a remote agent is filed none');
+  assert.deepEqual(
+    mountsLine({ harness: 'claude' }, { place: { kind: 'folder' } }, { handed, store: [] }),
+    [],
+    "a folder run's step is told only of its own folder, where it is given the steps' work before it",
+  );
 });
 
 /**

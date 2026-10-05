@@ -84,12 +84,15 @@ function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined):
   return { lines, said: failure };
 }
 
-/** What a pass did to each run, about that run: its notes, then the steps it filed, tried again, rounded again and is checking. */
+/**
+ * What a pass did to each run, about that run: its notes, then the steps it filed, tried again, rounded again and is checking, a line for
+ * each step, annotated with it.
+ */
 function advancedLines(advanced: Pass['runs']): PassLine[] {
   return advanced.flatMap((r) => {
     const run = r.run.id;
     const steps = (verb: string, names: readonly string[]): PassLine[] =>
-      names.length ? [{ text: `${run}  ${verb} ${names.join(', ')}`, run, step: names.join(', ') }] : [];
+      names.map((name) => ({ text: `${run}  ${verb} ${name}`, run, step: name }));
     return [
       ...r.notes.map((note) => ({ text: `${run}  ${note}`, run })),
       ...steps('filed', r.filed),

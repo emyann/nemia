@@ -31,7 +31,8 @@ import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
 import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
-import { feedFile, recordFeed } from '../feed/feed.store.ts';
+import { feedFile } from '../feed/feed.store.ts';
+import { emitFeed } from '../feed/feed.verb.ts';
 import { headsOf } from '../branches/branches.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
@@ -51,7 +52,7 @@ export type Pass = {
   runs: Advanced[];
   queue?: QueueStarted;
   /**
-   * Why the feed could not be written on this pass (`recordFeed`), when it could not: the pass itself went on, since nothing reads the feed
+   * Why the feed could not be written on this pass (`emitFeed`), when it could not: the pass itself went on, since nothing reads the feed
    * to decide.
    */
   feedError?: string;
@@ -214,7 +215,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
       ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
   return {
-    ...passOf(report, runs, judging, queue),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging)),
     ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []), ...(yield* heldRead(e, runs)) } } : {}),
   };
 });
@@ -275,24 +276,32 @@ const waitingJudged = Effect.fn('waitingJudged')(function* (
   return counted;
 });
 
-/** Why the feed could not be written with what the pass judged (`recordFeed`), or undefined once it was: never the pass's failure. */
-const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging): string | undefined => {
-  try {
-    recordFeed(new Map(runs.flatMap((run) => (done.has(run.id) ? [[run.id, done.get(run.id)!.feed] as const] : []))), {
+/** Why the feed could not be written with what the pass judged (`emitFeed`), or undefined once it was: never the pass's failure. */
+const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging): Effect.Effect<string | undefined> =>
+  Effect.exit(
+    emitFeed(new Map(runs.flatMap((run) => (done.has(run.id) ? [[run.id, done.get(run.id)!.feed] as const] : []))), {
       unjudged: new Set(unjudged.keys()),
-    });
-    return undefined;
-  } catch (err) {
-    return `the feed (${feedFile()}) was not written on this pass: ${(err as Error).message}`;
-  }
-};
+    }),
+  ).pipe(
+    Effect.map((written) =>
+      Exit.isSuccess(written)
+        ? undefined
+        : `the feed (${feedFile()}) was not written on this pass: ${(Cause.squash(written.cause) as Error).message}`,
+    ),
+  );
 
 /**
- * The pass as reported, the feed written first (`feedErrorOf`): each run judged in the store's order, the queue's card, and the runtime's
- * refused moves and unreadable journals — the runtime's line for a cause a run was left unjudged for said once, on the run's line.
+ * The pass as reported, with why the feed was not written (`feedErrorOf`): each run judged in the store's order, the queue's card, and
+ * the runtime's refused moves and unreadable journals — the runtime's line for a cause a run was left unjudged for said once, on the
+ * run's line.
  */
-const passOf = (report: TickReport, runs: readonly Run[], judging: Judging, queue: QueueStarted | undefined): Pass => {
-  const feedError = feedErrorOf(runs, judging);
+const passOf = (
+  report: TickReport,
+  runs: readonly Run[],
+  judging: Judging,
+  queue: QueueStarted | undefined,
+  feedError: string | undefined,
+): Pass => {
   const refused = report.refused ?? [];
   const causes = new Set(judging.unjudged.values());
   const unreadable = [

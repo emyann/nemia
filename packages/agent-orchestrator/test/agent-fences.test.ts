@@ -26,7 +26,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows, readSkillRules, RULES_FILE } from '../src/folder/folder.store.ts';
@@ -535,9 +534,19 @@ test('REFUSED: a work step that gives one of the three skills no more is named, 
   assert.deepEqual(workSkillsMissing(buildWith('design', '')), ['design: effect', 'design: shadcn', 'design: change-the-board']);
 });
 
-/** Every file of the checkout `repo`, as git tracks it. */
-const checkoutFiles = (repo: string): string[] =>
-  execFileSync('git', ['ls-files'], { cwd: repo, encoding: 'utf8' }).split('\n').filter(Boolean);
+/** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
+const NOT_CHECKOUT = new Set(['node_modules', '.git', 'dist', '.turbo']);
+
+/** Every file under the checkout `repo`, by its path from it, but under `NOT_CHECKOUT`. */
+function checkoutFiles(repo: string, under = ''): string[] {
+  return fs
+    .readdirSync(path.join(repo, under), { withFileTypes: true })
+    .filter((entry) => !NOT_CHECKOUT.has(entry.name))
+    .flatMap((entry) => {
+      const file = under ? `${under}/${entry.name}` : entry.name;
+      return entry.isDirectory() ? checkoutFiles(repo, file) : [file];
+    });
+}
 
 /** Each glob a skill of `skillsDir` applies to (`applies:`) that no file of the checkout `repo` matches, as `<skill>: <glob>`. */
 function appliesUnmatched(skillsDir: string, repo: string): string[] {

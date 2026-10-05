@@ -1,7 +1,7 @@
 /**
  * A person's merge of the base branch into a loop's work (`nemia merge`): the merge due now (`mergeDue`), what the verb asks or refuses
- * (`mergeAsk`), and its words (`mergeNote`, `mergeDueNote`, `mergeAskedLine`) — in the briefs too, the target's (`mergeSection`) and
- * the looping step's (`mergeReviewSection`). Pure.
+ * (`mergeAsk`), what it waits on (`mergeWaits`), and its words (`mergeNote`, `mergeDueNote`, `mergeAskedLine`, the offer `mergeOffer`) —
+ * in the briefs too, the target's (`mergeSection`) and the looping step's (`mergeReviewSection`). Pure.
  *
  * A merge files the loop again on the round it is on: its target merges the base at the commit a person's trial merge read, keeps both
  * meanings and runs its check, and the steps after it in the loop read the merge. No round is spent (`roundIn`), so a loop out of rounds
@@ -13,6 +13,7 @@ import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { approvalOf, approvedFirst, capOf, loopOf, roundOf, roundWord, type MergeOf, type Round, type RoundAsk } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import type { Offer } from '../decide/decide.ts';
 
 /**
  * What a merge reads of a run's steps: where each stands (`standing`), whether an ending stopped on the base branch without doing what it
@@ -36,6 +37,21 @@ export const mergePending = (run: Run, looping: Workflow, asks: readonly RoundAs
 
 /** The merge asks a record already answers — each names a try its target has reached. The tick consumes these. */
 export const mergeSpent = (run: Run, a: RoundAsk): boolean => Boolean(a.merge) && tryOf(run, a.merge!.target) >= a.merge!.try;
+
+/**
+ * Why a verb that ends or turns a loop waits on a merge a person asked of it (`mergePending`): the tick files the merge once, and a round
+ * or an acceptance written over it would drop it unsaid. `ended` says what the verb would do to the merge, `instead` the verb to ask once
+ * the merge is taken back. Undefined when no merge is pending.
+ */
+export function mergeWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[], ended: string, instead: string): string | undefined {
+  const pending = mergePending(run, looping, asks);
+  const merge = pending?.merge;
+  if (!merge) return undefined;
+  return (
+    `a merge of ${merge.onto} into ${merge.target}'s work is asked (at ${pending.at}), and the next tick files it once, on round ${roundOf(run, looping.name)}: ${ended}. ` +
+    `Wait for the merge and the review that reads it: nemia ls ${run.id}. To do it now instead, take the merge back first — merge-${merge.target}-${merge.try}, in the run's .asks directory — then: ${instead}.`
+  );
+}
 
 /** Whether a loop's round is over: its looping step satisfies what waits on it, or asked again with its rounds spent (`exhausted`). */
 const loopDone = (status: StepStatus): boolean => satisfiesAfter(status) || status === 'exhausted';
@@ -72,6 +88,19 @@ export function mergeDue(
     by: 'merge',
     merge,
     ...(back.length ? { back } : {}),
+  };
+}
+
+/**
+ * What `nemia decide` offers for a merge the verb would take now (`mergeAsk`): the sentence, written around the bare `nemia merge` it ends
+ * on (`Offer`).
+ */
+export function mergeOffer(run: Run, ask: MergeAsk): Offer {
+  const command = `nemia merge ${run.id} ${ask.step}`;
+  return {
+    step: ask.step,
+    command,
+    said: `${ask.step}: ${ask.merge.target}'s work conflicts with ${ask.merge.onto}. Merge ${ask.merge.onto} into it — ${ask.merge.target} continued, then a new ${ask.step}, on round ${ask.round}, which the merge does not spend:  ${command}`,
   };
 }
 

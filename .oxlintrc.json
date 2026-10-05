@@ -656,9 +656,9 @@
     {
       "files": ["packages/agent-orchestrator/src/round/round.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 147, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 54 }],
-        "sonarjs/cognitive-complexity": ["error", 68]
+        "max-lines-per-function": ["error", { "max": 139, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 50 }],
+        "sonarjs/cognitive-complexity": ["error", 65]
       }
     },
     {

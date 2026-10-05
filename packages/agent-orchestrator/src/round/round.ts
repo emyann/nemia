@@ -44,7 +44,7 @@ import type { EarlierTry } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
-import { mergeDue, mergeDueNote, mergeNote, mergeSpent } from '../merge/merge.ts';
+import { mergeDue, mergeDueNote, mergeNote, mergeSpent, mergeWaits } from '../merge/merge.ts';
 
 /**
  * The rounds due now. Pure, and blind to cancellation on purpose, as `retriesDue` is: `assess` answers for a cancelled run, and `advance`
@@ -175,6 +175,28 @@ export const roundBudgetRefusal = (id: string, budget?: number): string | null =
     : null;
 
 /**
+ * Why a round of `looping`'s loop waits on an ask already there: a round asked without the budget its loop over budget needs, a round
+ * the next tick files anyway, or a merge it would drop (`mergeWaits`). `over` is what each step of the loop over its budget has cost
+ * (`loopOver`). Undefined when none is.
+ */
+function roundWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[], over: ReturnType<typeof loopOver>): string | undefined {
+  const now = roundOf(run, looping.name);
+  const above = Math.max(0, ...over.map((o) => o.spent.usd));
+  const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
+  if (pending && over.length && !(pending.budget !== undefined && pending.budget > above))
+    return `round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Delete that ask — round-${looping.name}-${now + 1}, in the run's .asks directory — and ask again: nemia round ${run.id} ${looping.name} --budget <amount>.`;
+  if (pending)
+    return `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`;
+  return mergeWaits(
+    run,
+    looping,
+    asks,
+    'a round asked now would be filed over it, and the merge dropped',
+    `nemia round ${run.id} ${looping.name}`,
+  );
+}
+
+/**
  * What `nemia round` asks for — the looping step and the round — or why it will not, in words that say what to do instead. Pure.
  *
  * `name` may be left out when the workflow has one loop. Only a loop whose rounds are spent with `again` still true — `exhausted` — may go
@@ -247,16 +269,8 @@ export function roundAsk(
   }
   const over = loopOver(steps, looping, run, spendOf);
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
-  const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
-  if (pending && over.length && !(pending.budget !== undefined && pending.budget > above)) {
-    return no(
-      `round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Delete that ask — round-${looping.name}-${now + 1}, in the run's .asks directory — and ask again: nemia round ${run.id} ${looping.name} --budget <amount>.`,
-    );
-  }
-  if (pending)
-    return no(
-      `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`,
-    );
+  const waits = roundWaits(run, looping, asks, over);
+  if (waits) return no(waits);
 
   const step = (n: string) => steps.find((s) => s.name === n)!;
   const at = (n: string) => standing(step(n), run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
@@ -357,6 +371,28 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
       : null;
 
 /**
+ * Why an acceptance of `looping`'s work waits on an ask already there: a round about to be filed, or a merge that sends the work back
+ * (`mergeWaits`). Undefined when neither is.
+ */
+function acceptWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[]): string | undefined {
+  const now = roundOf(run, looping.name);
+  const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
+  if (pending) {
+    return (
+      `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick files it: accepting now would end a loop that is about to go round again. ` +
+      `To take the work as it stands instead, take that ask back first — round-${looping.name}-${now + 1}, in the run's .asks directory — then accept it: nemia accept ${run.id} ${looping.name} --message "<why>".`
+    );
+  }
+  return mergeWaits(
+    run,
+    looping,
+    asks,
+    'accepting now would end a loop whose work the merge sends back, and the merge would move the accepted try behind',
+    `nemia accept ${run.id} ${looping.name} --message "<why>"`,
+  );
+}
+
+/**
  * What `nemia accept` accepts — the looping step and the try — or why it will not, in words that say what to do instead. Pure.
  *
  * `name` may be left out when the workflow has one loop. Only a loop out of rounds with `again` still true — `exhausted`, where the one
@@ -419,13 +455,8 @@ export function acceptAsk(
       `try ${n} of ${looping.name} is already accepted, at ${given.at}: its loop is over on your word, and what waits on it is filed on the next tick, once. See where the run stands: nemia ls ${run.id}.`,
     );
   }
-  const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
-  if (pending) {
-    return no(
-      `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick files it: accepting now would end a loop that is about to go round again. ` +
-        `To take the work as it stands instead, take that ask back first — round-${looping.name}-${now + 1}, in the run's .asks directory — then accept it: nemia accept ${run.id} ${looping.name} --message "<why>".`,
-    );
-  }
+  const waits = acceptWaits(run, looping, asks);
+  if (waits) return no(waits);
   const at = (n: string) =>
     standing(
       steps.find((s) => s.name === n)!,

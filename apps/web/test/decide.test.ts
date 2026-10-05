@@ -243,6 +243,19 @@ test('the board presses `accept` on the step the api names beside it, never on o
   assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"', null)), null, 'names no step');
 });
 
+test('a merge `nemia decide` offers decodes as the api serves it, labelled merge, and the board only copies it: it presses accept alone', async () => {
+  const { Schema } = await import('effect');
+  const { DecideCommandSchema } = await import('../src/lib/api/decision.ts');
+  const merge = {
+    label: 'merge',
+    command: 'nemia merge r-1 review',
+    said: "review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia merge r-1 review",
+    step: 'review',
+  } as const;
+  assert.deepEqual(Schema.decodeUnknownSync(DecideCommandSchema)(merge), merge);
+  assert.equal(acceptStepOf(merge), null);
+});
+
 test('a decision is read again when a hold is written, lifted, or its runs ship — the hold is what the api answers for a held run', () => {
   const holding = (word: string) => ({ at: '2026-09-23T07:00:00.000Z', runs: [], word, advice: '', onYou: false });
   const unheld = decisionStamp(fanOut('running (working)'));

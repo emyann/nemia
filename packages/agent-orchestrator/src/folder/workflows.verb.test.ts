@@ -16,6 +16,7 @@ process.env.WF_ROOT = ROOT;
 const { WORKFLOWS_LIST, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
 const { engine } = await import('../runner.ts');
 const { runStore } = await import('../record/files.store.ts');
+const { queueInInbox } = await import('../inbox/inbox.store.ts');
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 
 const e = engine();
@@ -213,24 +214,33 @@ test('REFUSED: a run that froze no workflow reads it from the folder, and one th
   runStore.runs.forget('r-froze');
 });
 
-test('REFUSED: a card queued on the folder, and the same card not queued does not stop the removal', async () => {
+test('REFUSED: a card queued on the folder, freed by the commands its refusal names, and a card not queued does not stop the removal', async () => {
   const dir = folder('card-on', { 'only.md': 'Do it.\n' });
+  const other = folder('card-elsewhere', { 'only.md': 'Do it.\n' });
   cardOn('queued-idea', dir, true);
   await refused(
     dir,
     Conflict,
-    `${dir} is still needed: card queued-idea is queued to start on ${dir}: nemia inbox queue queued-idea --off takes it back, or --workflow <w> names another. Nothing was removed.`,
+    `${dir} is still needed: card queued-idea is queued to start on ${dir}: nemia inbox queue queued-idea --off takes it back, and nemia inbox queue queued-idea --workflow <w> then queues it on another. Nothing was removed.`,
   );
-  cardOn('queued-idea', dir, false);
+  assert.throws(() => queueInInbox('queued-idea', { workflow: other }), Conflict, 'a card still queued is not queued on another');
+  queueInInbox('queued-idea', { off: true });
+  queueInInbox('queued-idea', { workflow: other });
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
+  const idle = folder('card-idle', { 'only.md': 'Do it.\n' });
+  cardOn('idle-idea', idle, false);
+  await remove(idle);
+  assert.equal(fs.existsSync(idle), false);
   fs.rmSync(path.join(ROOT, 'inbox', 'queued-idea.md'));
+  fs.rmSync(path.join(ROOT, 'inbox', 'idle-idea.md'));
 });
 
-test('REFUSED: a factory offering the name with nothing else to give under it, and one whose repository has the workflow does not', async () => {
+test('REFUSED: a factory offering the name with nothing else to give under it, and neither one whose repository has the workflow nor one offering another name does', async () => {
   const dir = folder('offered', { 'review.md': 'Read it.\n' });
   const repo = scratch('wf-remove-factory-repo-');
   factoryOf('shop', [repo], ['offered'], { 'offered/review': 'reader', 'other/plan': 'planner' });
+  factoryOf('elsewhere', [scratch('wf-remove-elsewhere-repo-')], ['other'], { 'other/plan': 'planner' });
   await refused(
     dir,
     Conflict,
@@ -240,4 +250,5 @@ test('REFUSED: a factory offering the name with nothing else to give under it, a
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
   fs.rmSync(path.join(ROOT, 'factories', 'shop.json'));
+  fs.rmSync(path.join(ROOT, 'factories', 'elsewhere.json'));
 });

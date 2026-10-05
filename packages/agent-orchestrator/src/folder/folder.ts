@@ -61,7 +61,7 @@ export const stillNeeded = {
   run: (id: string, dir: string): string =>
     `run ${id} froze no workflow at its start and reads its steps from ${dir}: nemia rm ${id} forgets it.`,
   card: (name: string, dir: string): string =>
-    `card ${name} is queued to start on ${dir}: nemia inbox queue ${name} --off takes it back, or --workflow <w> names another.`,
+    `card ${name} is queued to start on ${dir}: nemia inbox queue ${name} --off takes it back, and nemia inbox queue ${name} --workflow <w> then queues it on another.`,
   factory: (factory: string, name: string, hires: readonly string[]): string =>
     `factory ${factory} offers ${name}, and none of its repositories has a workflow of that name: ${[
       ...hires.map((step) => `nemia factory fire ${factory} --step ${step}`),

@@ -148,7 +148,7 @@ test("REFUSED at shipped defaults: a folder a queued card still needs is the pac
   assert.equal(res.status, 409);
   assert.equal(
     await errorOf(res),
-    `${dir} is still needed: card needing is queued to start on ${dir}: nemia inbox queue needing --off takes it back, or --workflow <w> names another. Nothing was removed.`,
+    `${dir} is still needed: card needing is queued to start on ${dir}: nemia inbox queue needing --off takes it back, and nemia inbox queue needing --workflow <w> then queues it on another. Nothing was removed.`,
   );
   assert.deepEqual(snapshot(dir), before);
   fs.rmSync(card);

@@ -40,7 +40,7 @@ export default {
         section.getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      const sentence = `${dir} is still needed: card ${CARD} is queued to start on ${dir}: nemia inbox queue ${CARD} --off takes it back, or --workflow <w> names another. Nothing was removed.`;
+      const sentence = `${dir} is still needed: card ${CARD} is queued to start on ${dir}: nemia inbox queue ${CARD} --off takes it back, and nemia inbox queue ${CARD} --workflow <w> then queues it on another. Nothing was removed.`;
       if (answered.status() !== 409 || error !== sentence)
         throw new Refused(
           `the api refuses a folder a queued card needs, in the package's words — it answered ${answered.status()}: ${error}`,

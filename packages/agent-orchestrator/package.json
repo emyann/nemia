@@ -35,7 +35,6 @@
     ".": "./src/runner.ts",
     "./run": "./src/run.ts",
     "./workflow": "./src/workflow.ts",
-    "./effect": "./src/effect.ts",
     "./package.json": "./package.json"
   }
 }

@@ -3,7 +3,7 @@ import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { VERSION } from 'agent-orchestrator';
-import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
+import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';

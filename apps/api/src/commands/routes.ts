@@ -16,7 +16,7 @@ import {
   type Route,
   routeList,
 } from 'agent-orchestrator';
-import { isRefusal } from 'agent-orchestrator/effect';
+import { isRefusal } from 'agent-orchestrator';
 import { decodeBody, NotBlank } from '../body.ts';
 import { type Refusal, refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';

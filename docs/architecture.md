@@ -9,7 +9,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | Layer | Owns | Public contract |
 |---|---|---|
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words and what their fence words reach (`fenceReach`), pure. `decide` is exported by none. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command it shows is text the api answered. | Its pages. |
 
@@ -104,8 +104,8 @@ both for an app; `wf stats` and `wf ls` keep none, and the api's tests read ever
 `agent-runtime` and `agent-runtime/effect`, and its vocabulary through `agent-runtime/vocabulary`, alone. That rules out its src/ by any route: a subpath not in its `exports`,
 a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by neither entry. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`,
-`agent-orchestrator/workflow` and `agent-orchestrator/effect` alone. `./workflow` is the pure format, `./effect` the
-refusals by kind, and what reads a folder from disk is exported from `agent-orchestrator`. XState is a dependency
+and `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk, and the
+refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),
 which the board draws.

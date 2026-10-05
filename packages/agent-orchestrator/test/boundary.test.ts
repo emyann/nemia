@@ -39,7 +39,7 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 
 /** Judgement at the root of `src`: no runtime, no disk, no process, and no file of the other three kinds. */
-const PURE = ['effect', 'run', 'workflow'].map((f) => `src/${f}.ts`);
+const PURE = ['run', 'workflow'].map((f) => `src/${f}.ts`);
 
 /**
  * The I/O beneath the controllers at the root of `src`: none, as every store sits in a feature folder under a `.store.ts` name. A store
@@ -460,8 +460,8 @@ test('REFUSED: a file of no kind, a file of two, and a kind naming a file that i
   assert.deepEqual(unsorted({ ...packageSources(), 'src/x.ts': [] }), [
     'src/x.ts is of no kind: put it in a feature folder under a name that says its kind, or name it in PURE, STORE, CONTROLLER or CLIENT in test/boundary.test.ts',
   ]);
-  const { 'src/effect.ts': _, ...gone } = packageSources();
-  assert.deepEqual(unsorted(gone), ['PURE names src/effect.ts, which is not there']);
+  const { 'src/run.ts': _, ...gone } = packageSources();
+  assert.deepEqual(unsorted(gone), ['PURE names src/run.ts, which is not there']);
   const { [CLIENT]: __, ...clientGone } = packageSources();
   assert.deepEqual(unsorted(clientGone), ['CLIENT names src/runtime-client.ts, which is not there']);
   const named = [...PURE, ...STORE, ...CONTROLLER, CLIENT];

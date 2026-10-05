@@ -203,6 +203,7 @@ const PINNED: Record<string, string[]> = {
     'inputsDir',
     'inputsNote',
     'isGitRun',
+    'isRefusal',
     'isShipped',
     'lastCeilings',
     'lastPassCost',
@@ -656,7 +657,6 @@ const PINNED: Record<string, string[]> = {
     'validate',
     'withPreload',
   ],
-  'agent-orchestrator/effect': ['Conflict', 'Invalid', 'Missing', 'isRefusal'],
 };
 
 /** Where `exported` differs from `pinned`: each name dropped or added, worded with what to do. */

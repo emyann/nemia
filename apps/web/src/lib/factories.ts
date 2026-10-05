@@ -4,7 +4,7 @@
  * with, what the factory picked keeps, the factories a workflow is in and the workflows the factory picked offers. A run or a card belongs
  * to the factory it names, and one naming none to the default factory. Pure.
  */
-import type { Factory, InboxEntry, RunSummary, WorkflowListing } from './api.ts';
+import type { Factory, InboxEntry, PagePlace, RunSummary, WorkflowListing, WorkflowPageAddress } from './api.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
@@ -152,6 +152,21 @@ export const offeredIn =
     factory === undefined ||
     factory === DEFAULT_NAME ||
     (factories !== undefined && workflowFactories(workflow, factories).includes(factory));
+
+/**
+ * The place a workflow's page or a step's is read in, from its address: `?factory=` as `factorySearch` reads it, and `?repo=` where it
+ * names a repository by a string that is not empty.
+ */
+export const pagePlaceOf = (search: Record<string, unknown>): PagePlace => ({
+  ...factorySearch(search),
+  ...(typeof search.repo === 'string' && search.repo ? { repo: search.repo } : {}),
+});
+
+/** The place a run's workflow page is read in, from the address the api gave it: its factory and its repository where it names them. */
+export const placeOfAddress = ({ factory, repo }: WorkflowPageAddress): PagePlace => ({
+  ...(factory ? { factory } : {}),
+  ...(repo ? { repo } : {}),
+});
 
 /** The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string. */
 export const factorySearch = (search: Record<string, unknown>): { factory?: string } =>

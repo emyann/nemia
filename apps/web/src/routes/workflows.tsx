@@ -65,7 +65,7 @@ function WorkflowsPage() {
         </p>
       )}
       {workflows.map((workflow) => (
-        <WorkflowCard key={`${workflow.from}:${workflow.name}`} workflow={workflow} />
+        <WorkflowCard key={`${workflow.from}:${workflow.name}`} workflow={workflow} factory={factory} />
       ))}
       {all.length === 0 && (
         <p className="text-sm text-neutral-500">
@@ -81,9 +81,9 @@ function WorkflowsPage() {
  * A workflow's card, compact: its name, linked to its page, which holds the rest — its README, its graph, its steps and a start, and for
  * one of yours its builder; its star, which puts it under Favorites, shown for one that does not read too; where it is read from; the
  * factories it is in (`workflowFactories`), each linked to its floor — nothing while they are unread or for one in none; its step count
- * and its description; or, for one that does not read, a line saying so.
+ * and its description; or, for one that does not read, a line saying so. Its page is reached in `factory`, the one the list is narrowed to.
  */
-function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
+function WorkflowCard({ workflow, factory }: { workflow: WorkflowListing; factory: string | undefined }) {
   const { name, from, description, steps, error } = workflow;
   const { data: factories } = useQuery(factoriesQuery);
   return (
@@ -97,6 +97,7 @@ function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
           <RouteLink
             to="/workflows/$from/$workflow"
             params={{ from, workflow: name }}
+            search={factory ? { factory } : {}}
             className="rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-100"
           >
             {name}

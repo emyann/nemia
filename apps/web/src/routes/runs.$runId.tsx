@@ -6,6 +6,7 @@ import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
 import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, when } from '../components/Facts';
+import { StepPageLink } from '../components/StepParts';
 import { StepPolicy, Told } from '../components/Told';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
@@ -279,6 +280,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
       {step.body && <Markdown className="text-sm">{step.body}</Markdown>}
 
       <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />
+      <StepPageLink page={run.workflowPage} step={step.name} />
 
       <Facts
         rows={[

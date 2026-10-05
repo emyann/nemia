@@ -209,7 +209,7 @@ export default {
       page
         .locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) })
         .locator(`a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
-      `the row names the workflow the run was started from (${FAKE.workflow}), linked to the Workflows page`,
+      `the row names the workflow the run was started from (${FAKE.workflow}), a folder given by path, linked to the Workflows page`,
     );
     await expectCount(row.locator('a'), 0, "the run's link has no link inside it: a link inside a link is not HTML");
     await expectVisible(

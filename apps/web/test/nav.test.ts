@@ -95,7 +95,7 @@ test("the header names a page by its section first — Floor on a factory's floo
   assert.equal(sectionOf('/machinesx'), undefined);
 });
 
-test("the picked factory is read from the address alone: the name of a factory's floor or settings, else a section page's ?factory=, else none", () => {
+test("the picked factory is read from the address alone: the name of a factory's floor or settings, else the ?factory= of a section's page, a workflow's or a step's, else none", () => {
   assert.equal(pickedOf('/factories/nemia', {}), 'nemia');
   assert.equal(pickedOf('/factories/nemia/settings', {}), 'nemia', "a factory's settings pick it, as its floor does");
   assert.equal(pickedOf('/factories/nemia/other', {}), undefined, "refused: no other page under a floor is the factory's own");
@@ -107,6 +107,8 @@ test("the picked factory is read from the address alone: the name of a factory's
   assert.equal(pickedOf('/runs', { factory: '' }), undefined, 'an empty name picks none');
   assert.equal(pickedOf('/runs', { factory: 3 }), undefined, 'a name that is no string picks none');
   assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', 'on a floor the path wins over a stray ?factory=');
+  assert.equal(pickedOf('/workflows/repo/dev', { factory: 'hiring' }), 'hiring', "a workflow's page is read in the factory picked");
+  assert.equal(pickedOf('/workflows/yours/w/review', { factory: 'hiring' }), 'hiring', "and a step's page");
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev', '/workflows/repo/dev/review'])
     assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/'])
@@ -140,4 +142,18 @@ test("a pick on a section's page stays there, keeping its other keys; on a facto
   assert.deepEqual(pickTo('/inbox/card', { factory: 'x' }, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
   assert.equal(pickTo('/runs/r-1', {}, undefined), null);
   assert.equal(pickTo('/agents', {}, undefined), null);
+  assert.deepEqual(
+    pickTo('/workflows/yours/w/review', { factory: 'hiring', repo: '/code/app', bar: 'x' }, 'nemia'),
+    {
+      to: '/workflows/$from/$workflow/$step',
+      params: { from: 'yours', workflow: 'w', step: 'review' },
+      search: { bar: 'x', factory: 'nemia' },
+    },
+    "a step's page stays, read in the factory picked, the repository the last one named dropped",
+  );
+  assert.deepEqual(pickTo('/workflows/repo/dev', { factory: 'hiring', build: true }, undefined), {
+    to: '/workflows/$from/$workflow',
+    params: { from: 'repo', workflow: 'dev' },
+    search: { build: true },
+  });
 });

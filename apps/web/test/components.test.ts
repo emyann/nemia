@@ -129,6 +129,7 @@ function runWith(note: string | null): RunDetail {
     place: 'git',
     work: null,
     workflowDir: '/code/app/workflow',
+    workflowPage: null,
     try: null,
     baseRef: 'abc123',
     branch: 'main',
@@ -549,6 +550,7 @@ function summaryRun(): RunSummary {
     work: null,
     brief: 'Tile it',
     workflowDir: '/code/app/workflow',
+    workflowPage: null,
     createdAt: at,
     startedAt: at,
     cancelledAt: null,
@@ -4765,15 +4767,30 @@ test("REFUSED: an agent of yours the try's fence does not reach says why in plac
   assert.doesNotMatch(html, />Try it<\/button>|<textarea/, 'no brief and no button');
 });
 
-test("a try's run is tagged try and names the agent it tried, linked to its page; any other run names its workflow", async () => {
+test("a try's run is tagged try and names the agent it tried, linked to its page; any other run names its workflow, linked to its page in the run's place", async () => {
   const { StartedFrom } = await import('../src/components/TryTag.tsx');
-  const html = await routedWith(createElement(StartedFrom, { run: { workflowDir: '/store/tries/scribe', try: { agent: 'scribe' } } }));
+  const html = await routedWith(
+    createElement(StartedFrom, { run: { workflowDir: '/store/tries/scribe', workflowPage: null, try: { agent: 'scribe' } } }),
+  );
   assert.match(html, /data-try-tag="scribe"[^>]*>try</);
   assert.match(html, /href="\/agents\/yours\/scribe"/);
   assert.doesNotMatch(html, /data-workflow=/, 'its folder is on no page');
-  const other = await routedWith(createElement(StartedFrom, { run: { workflowDir: '/store/workflows/notes', try: null } }));
+  const other = await routedWith(
+    createElement(StartedFrom, { run: { workflowDir: '/store/workflows/notes', workflowPage: null, try: null } }),
+  );
   assert.match(other, /data-workflow="notes"/);
+  assert.match(other, /href="\/workflows"/, 'a workflow the board pages on no address: the Workflows page');
   assert.doesNotMatch(other, /data-try-tag/);
+  const paged = await routedWith(
+    createElement(StartedFrom, {
+      run: {
+        workflowDir: '/store/workflows/notes',
+        workflowPage: { from: 'yours', workflow: 'notes', factory: 'nemia', repo: '/code/app' },
+        try: null,
+      },
+    }),
+  );
+  assert.match(paged, /href="\/workflows\/yours\/notes\?factory=nemia&amp;repo=%2Fcode%2Fapp"/, paged);
 });
 
 test('REFUSED: the Debug panel is closed by default, and reads and draws nothing of the path while it is', async () => {
@@ -5875,6 +5892,126 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
   assert.match(whole, /<p[^>]*>Write the note\.<\/p>\s*<h6[^>]*>What was asked for<\/h6>/, 'the brief whole, as the markdown it is');
   assert.doesNotMatch(whole, /data-layer/);
   assert.equal(toldMarkup({ told: null, layers: null, filed: true }), '', 'nothing to fold, no fold');
+});
+
+/** A step of yours, `w/review`, read in the factory `hiring`, which hires `writer` into it: what its page draws. */
+const hiredPage = async (extra: Record<string, unknown> = {}) => {
+  const { stepPage } = await import('./library-fixtures.ts');
+  return stepPage({
+    workflow: 'w',
+    from: 'yours',
+    dir: '/store/workflows/w',
+    step: 'review',
+    factory: 'hiring',
+    layers: { ...LAYERS, task: null },
+    hired: 'writer',
+    skillsFrom: [
+      { name: 'alpha', from: 'yours' },
+      { name: 'gamma', from: null },
+    ],
+    ...extra,
+  });
+};
+
+test("on a step's page, what it will be told is drawn open, each layer beside where it is edited, the agent's words folded and the task left to the brief", async () => {
+  const { StepTold } = await import('../src/components/StepParts.tsx');
+  const html = await routedWith(createElement(StepTold, { page: await hiredPage(), place: { factory: 'hiring' } }));
+  assert.match(html, /<details open=""[^>]*data-will-be-told[^>]*><summary[^>]*>What it will be told<\/summary>/);
+  assert.match(html, /data-read-now[^>]*>Read now from the files, and frozen when a run starts/);
+  assert.match(html, /<details data-instructions-fold="true">[^]*You are the writer\./, "the agent's words folded, closed");
+  const home = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
+  assert.match(home('instructions'), /href="\/agents\/yours\/writer"/);
+  assert.match(home('custom'), /href="\/agents\/yours\/writer#custom-instructions"/);
+  assert.match(home('policy'), /href="\/workflows\/yours\/w\?factory=hiring&amp;build=true"/, 'one of yours: its builder, in the place');
+  assert.match(html, /data-skill="alpha"[^>]*><a[^>]*href="\/agents\/skills\/yours\/alpha"/, 'a skill found: linked to its page');
+  assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'a skill found nowhere: its name alone');
+  assert.match(html, /data-layer="task"[^>]*>Then the task: the brief a run is started with\./);
+  assert.doesNotMatch(html, /Not composed|What it was told|What it would be told now/);
+
+  const repo = await routedWith(
+    createElement(StepTold, { page: await hiredPage({ from: 'repo', dir: '/code/app/workflows/w' }), place: {} }),
+  );
+  assert.match(
+    repo,
+    /data-home="policy"[^>]*>lives in <code[^>]*>\/code\/app\/workflows\/w\/review\.md<\/code>/,
+    "the repository's: its file",
+  );
+  assert.doesNotMatch(repo, /build=true/);
+});
+
+test("a step's agent: the one the factory picked hires, marked hired; else its file's, and each factory that hires into it, linked to this page there", async () => {
+  const { StepAgent } = await import('../src/components/StepParts.tsx');
+  const hired = await routedWith(createElement(StepAgent, { page: await hiredPage() }));
+  assert.match(hired, /href="\/agents\/yours\/writer"/);
+  assert.match(hired, /data-hired="hiring"[^>]*>hired by hiring</);
+  assert.doesNotMatch(hired, /data-hired-in/);
+
+  const plain = await routedWith(
+    createElement(StepAgent, {
+      page: await hiredPage({
+        factory: null,
+        hired: null,
+        keys: [{ key: 'agent', value: 'scribe', meaning: 'The agent.' }],
+        hiredIn: [{ factory: 'hiring', agent: 'writer' }],
+      }),
+    }),
+  );
+  assert.match(plain, /href="\/agents\/yours\/scribe"[^]*named by its file/);
+  assert.doesNotMatch(plain, /data-hired=/);
+  assert.match(
+    plain,
+    /Hired into this step by:[^]*data-hired-in="hiring"[^>]*href="\/workflows\/yours\/w\/review\?factory=hiring"[^>]*>hiring</,
+  );
+  assert.match(
+    await routedWith(createElement(StepAgent, { page: await hiredPage({ factory: null, hired: null, keys: [] }) })),
+    /Its file names no agent\./,
+  );
+});
+
+test("a step's file draws its own words, never the agent's the loader fills its body with, and says the agent row is the hire's", async () => {
+  const { StepWritten } = await import('../src/components/StepParts.tsx');
+  const hired = await routedWith(
+    createElement(StepWritten, {
+      page: await hiredPage({ body: 'You are the writer.', keys: [{ key: 'agent', value: 'writer', meaning: 'The agent.' }] }),
+    }),
+  );
+  assert.match(hired, /<p[^>]*>Write the note\.<\/p>/, "the step's policy, as its file says it");
+  assert.doesNotMatch(hired, /You are the writer\./, "not the hire's instructions");
+  assert.match(hired, /data-hired-row[^>]*> In hiring, <code>agent<\/code> is its hire, not the file&#x27;s\./);
+  assert.doesNotMatch(
+    await routedWith(createElement(StepWritten, { page: await hiredPage({ factory: null, hired: null }) })),
+    /data-hired-row/,
+    'with no hire, the rows are the file’s',
+  );
+});
+
+test("a step's recent runs link to the step on each run's page, filed or not reached yet; none says so", async () => {
+  const { RecentRuns } = await import('../src/components/StepParts.tsx');
+  const recentRuns = [
+    { id: 'r-1', brief: '# Add a cache\n\nKeep it small.', createdAt: '2026-10-01T12:00:00Z', factory: 'hiring', filed: true },
+    { id: 'r-2', brief: 'Fix the bug', createdAt: '2026-10-02T12:00:00Z', factory: null, filed: false },
+  ];
+  const html = await routedWith(createElement(RecentRuns, { page: await hiredPage({ recentRuns }) }));
+  assert.match(
+    html,
+    /data-recent-run="r-1"[^]*href="\/runs\/r-1#step-review"[^>]*>Add a cache<[^]*data-factory-tag="hiring"[^]*What it was told/,
+  );
+  assert.match(html, /data-recent-run="r-2"[^]*href="\/runs\/r-2#step-review"[^>]*>Fix the bug<[^]*not reached yet/);
+  assert.match(await routedWith(createElement(RecentRuns, { page: await hiredPage() })), /No run holds this step yet in hiring\./);
+});
+
+test("a run's step links to the step's page in the run's place, and a run whose workflow the board pages on no address links none", async () => {
+  const { StepPageLink } = await import('../src/components/StepParts.tsx');
+  const html = await routedWith(
+    createElement(StepPageLink, { page: { from: 'yours', workflow: 'w', factory: 'hiring', repo: null }, step: 'review' }),
+  );
+  assert.match(html, /href="\/workflows\/yours\/w\/review\?factory=hiring"[^>]*>What it will be told now →</);
+  assert.equal(await routedWith(createElement(StepPageLink, { page: null, step: 'review' })), '');
+});
+
+test("an agent's custom instructions are anchored, so a step's page links to where they are written", async () => {
+  const { CustomInstructions } = await import('../src/components/CustomInstructions.tsx');
+  assert.match(await routedWith(createElement(CustomInstructions, { name: 'writer' })), /<section id="custom-instructions"/);
 });
 
 /** `StepPolicy` drawn as a server draws it. */

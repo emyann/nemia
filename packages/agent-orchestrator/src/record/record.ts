@@ -486,10 +486,11 @@ export type AskWritten = { written: true; where: string } | { written: false; wh
 
 /**
  * The run store, as a plain value of synchronous methods: a run's record, and the files a person keeps beside it, by run id and never by
- * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's
- * one touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
- * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks` and `holds`; and the inbox, `inbox`: a person's
- * cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
+ * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's one
+ * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
+ * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds` and `forgetting`, the tasks `nemia rm`
+ * has yet to see the engine forget; and the inbox, `inbox`: a person's cards, which their verbs write, and the tick's tries of a queued
+ * card's start, which the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {
@@ -563,6 +564,21 @@ export type RunStore = {
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
     readonly stands: (id: string) => boolean;
+  };
+  readonly forgetting: {
+    /**
+     * Write down the engine's tasks `nemia rm` forgets of the run, before anything of it is removed: `nemia rm`'s alone, whole over the
+     * marker there, through a hidden file renamed over it. Throws what the filesystem throws.
+     */
+    readonly write: (id: string, taskIds: readonly string[]) => void;
+    /** The task ids written down for the run, or undefined when no marker is there or it does not read as one. */
+    readonly read: (id: string) => string[] | undefined;
+    /** The runs a marker stands for, by id. None when there is none. */
+    readonly list: () => string[];
+    /** Take the run's marker away, there or not: `nemia rm` once its tasks are forgotten, or the tick once it forgot what had waited. */
+    readonly lift: (id: string) => void;
+    /** Where a person finds the run's marker: the path a message names for them to read or remove. */
+    readonly where: (id: string) => string;
   };
   readonly inbox: {
     /**

@@ -60,6 +60,7 @@ const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
 const { StepPolicy, Told } = await import('../src/components/Told.tsx');
+const { RunGone } = await import('../src/components/RunGone.tsx');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -103,6 +104,12 @@ test('a note under a chip is the note as `wf ls` prints it, and nothing at all f
   const html = renderToStaticMarkup(createElement(StepNote, { note: 'try 2, by retries: 1' }));
   assert.match(html, /^<p data-note="true"[^>]*>try 2, by retries: 1<\/p>$/);
   assert.equal(renderToStaticMarkup(createElement(StepNote, { note: null })), '');
+});
+
+test('a run visited by its address that the store does not have is said gone by its id, and where the runs are listed', () => {
+  const html = renderToStaticMarkup(createElement(RunGone, { id: 'r-9z8y' }));
+  assert.match(html, /^<p data-run-gone="r-9z8y" role="status"/);
+  assert.equal(html.replace(/<[^>]*>/g, ''), 'Run r-9z8y is not in this store: removed, or never was. Runs lists the runs the store has.');
 });
 
 const at = '2026-09-13T00:00:00.000Z';

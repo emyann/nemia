@@ -288,6 +288,52 @@ function putTry(name: string, tried: QueueTry): void {
   fs.writeFileSync(path.join(queueDir(), `${name}.json`), JSON.stringify(tried, null, 2));
 }
 
+/** Where `nemia rm` writes down the engine's tasks of the runs it forgets: beside `runs/`, since each `runs/<id>.*` goes with a record. */
+const forgettingDir = (): string => path.join(HOME, 'forgetting');
+
+/** The marker of the run `id`. */
+const forgettingFile = (id: string): string => path.join(forgettingDir(), `${id}.json`);
+
+/** A marker as `nemia rm` writes it; any key beside these is left unread. */
+const isForgetting = Schema.is(Schema.Struct({ run: Schema.String, taskIds: Schema.Array(Schema.String) }));
+
+/** The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first. */
+function writeForgetting(id: string, taskIds: readonly string[]): void {
+  fs.mkdirSync(forgettingDir(), { recursive: true });
+  const hidden = path.join(forgettingDir(), `.${id}.json.${process.pid}`);
+  fs.writeFileSync(hidden, JSON.stringify({ run: id, taskIds: [...taskIds] }, null, 2));
+  fs.renameSync(hidden, forgettingFile(id));
+}
+
+/** The task ids the marker of the run `id` lists, or undefined: none there, or one that does not read as a marker. */
+function readForgetting(id: string): string[] | undefined {
+  let text: string;
+  try {
+    text = fs.readFileSync(forgettingFile(id), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
+  try {
+    const marker: unknown = JSON.parse(text);
+    if (isForgetting(marker) && marker.run === id) return [...marker.taskIds];
+  } catch {}
+  return undefined;
+}
+
+/** The runs a marker stands for: each `<id>.json` of the folder, none when there is no folder. */
+function forgettingRuns(): string[] {
+  try {
+    return fs
+      .readdirSync(forgettingDir())
+      .filter((n) => n.endsWith('.json') && !n.startsWith('.'))
+      .map((n) => n.slice(0, -'.json'.length))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 /**
  * The run as it reads with the store's pause (`readPause`) composed onto it — the one given, read where none is — or without one while
  * none stands: a run the tick's memo kept is read with the pause as it stands now, so the pause is in no run's stamp (`restStamps`): a
@@ -303,7 +349,7 @@ function paused(run: Run, pause: Pause | null = readPause()): Run {
 
 /**
  * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's pause composed onto each run read
- * (`paused`); the inbox's cards and the tick's tries.
+ * (`paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`; the inbox's cards and the tick's tries.
  */
 export const filesStore: RunStore = {
   runs: {
@@ -324,6 +370,13 @@ export const filesStore: RunStore = {
   },
   asks: { read: readAllAsks, answers: readAnswers, consume: consumeAllAsks, write: writePersonAsk, where: askWhere },
   holds: { lift: removeHold, put: writeHold, stands: (id) => fs.existsSync(holdFile(id)) },
+  forgetting: {
+    write: writeForgetting,
+    read: readForgetting,
+    list: forgettingRuns,
+    lift: (id) => fs.rmSync(forgettingFile(id), { force: true }),
+    where: forgettingFile,
+  },
   inbox: {
     entries: inboxEntries,
     read: readInboxFile,

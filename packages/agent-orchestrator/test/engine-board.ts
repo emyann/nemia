@@ -1,10 +1,11 @@
 /**
  * An engine board a test settles by hand, as the runtime's `Engine` service in a layer (`layer`), which a test hands the client's
  * `engineOf` to get the engine the controllers take: what each task was filed with, every filing, each task stopped, and each task's own
- * session (`native-<id>`). A settled task carries the closeout it is given. A verb the board does not keep dies naming itself.
+ * session (`native-<id>`). A settled task carries the closeout it is given; `forget` takes settled tasks off the board, counted on
+ * `forgets` call by call, and refuses one not settled as the runtime does. A verb the board does not keep dies naming itself.
  */
 import { Effect, Layer } from 'effect';
-import { Engine, type TaskView } from 'agent-runtime';
+import { Engine, ForgetRefused, type TaskView } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 
 /** A task as it was filed: its id and brief, the closeout schema it asks for, its brief's parts, and every other field of its spec. */
@@ -43,6 +44,7 @@ export const board = () => {
   const filings: string[] = [];
   const specs: Filed[] = [];
   const stopped: string[] = [];
+  const forgets: { taskIds: string[]; yes: boolean }[] = [];
   const layer = Layer.succeed(Engine)(
     Engine.of({
       file: (spec) =>
@@ -75,10 +77,19 @@ export const board = () => {
       start: unkept('start'),
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),
-      forget: unkept('forget'),
+      forget: (taskIds, options) =>
+        Effect.gen(function* () {
+          const yes = options?.yes === true;
+          forgets.push({ taskIds: [...taskIds], yes });
+          for (const id of taskIds)
+            if (viewOf(id, tasks.get(id)).state.settled === null)
+              return yield* Effect.fail(new ForgetRefused({ taskId: id, message: `${id} has not settled: stop it first` }));
+          if (yes) for (const id of taskIds) tasks.delete(id);
+          return { forgotten: yes, tasks: taskIds.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })) };
+        }),
     }),
   );
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
-  return { layer, tasks, filings, specs, stopped, settle };
+  return { layer, tasks, filings, specs, stopped, forgets, settle };
 };

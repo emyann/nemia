@@ -194,6 +194,7 @@ const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unkno
   stop: ([id]) => [id],
   close: ([id]) => [id],
   say: ([id]) => [id],
+  forget: ([ids]) => (Array.isArray(ids) ? ids : []),
 };
 
 /**
@@ -601,12 +602,13 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
 /**
  * When each task was filed, off the engine's feed from `after`, added to `into`: the one record of a filing time, since a task's view
  * carries none — and the time between filing and a first attempt is the wait for a slot (`timeline`). A filing is written once and never
- * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. Never fails: the feed's refusal it dies of in the
+ * changes, so a reader that keeps `into` and the cursor reads on from where it stopped; `forgotten` counts the lines after `after` of
+ * tasks the engine has forgotten since (`nemia rm`), which are read as gone. Never fails: the feed's refusal it dies of in the
  * runtime's words (`asked`), and of anything else as it was thrown.
  */
 export const filingsRead = Effect.fn('readFilings')(function* (after = 0, into = new Map<string, string>()) {
   const e = yield* EngineService;
-  const { entries, cursor } = yield* asked('feed', e.feed(after));
+  const { entries, cursor, forgotten } = yield* asked('feed', e.feed(after));
   for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
-  return { filed: into, cursor };
+  return { filed: into, cursor, forgotten: forgotten ?? 0 };
 });

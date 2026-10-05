@@ -14,6 +14,7 @@ import {
   pruningBytes,
   RM,
   runStore,
+  runsForgetting,
   runWith,
   sizeOf,
   type Args,
@@ -100,6 +101,24 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
 }
 
 /**
+ * What `nemia rm` would forget of the engine's tasks of each run `nemia prune` found over or with nothing to prune (`runsForgetting`), put
+ * on its finding: one count over all of them, which reads the engine's feed once. A run it could not count, and a count that fails, are
+ * said, and cost only their lines.
+ */
+async function withEngine(e: Engine, found: Pruning[]): Promise<Pruning[]> {
+  const asked = found.filter((p) => p.kind === 'prunable' || p.kind === 'nothing').map((p) => p.id);
+  if (!asked.length) return found;
+  try {
+    const { counted, uncounted } = await runWith(e, runsForgetting(asked));
+    for (const { text } of uncounted) console.log(text);
+    return found.map((p) => (counted.has(p.id) ? { ...p, engine: counted.get(p.id)! } : p));
+  } catch (err) {
+    console.log(`what nemia rm would forget of the engine's tasks was not counted: ${(err as Error).message}`);
+    return found;
+  }
+}
+
+/**
  * What `nemia prune` found, a run's lines each. Of named runs, a refusal is tallied; of every run, a run with nothing to prune is not said
  * at all, and the runs not over are said in one line.
  */
@@ -152,7 +171,7 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   const artifacts = args.artifacts === true;
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const found = await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), args, tally);
+  const found = await withEngine(e, await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), args, tally));
   printFound(found, named, tally);
   const prunable = found.filter((p) => p.kind === 'prunable');
   if (!prunable.length) {

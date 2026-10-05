@@ -42,6 +42,7 @@ import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass }
 import { keepSeries } from '../series/series.store.ts';
 import { advancePass, type Advanced } from './advance.verb.ts';
 import { heldRead } from '../list/list.verb.ts';
+import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
 
 /**
@@ -74,6 +75,11 @@ export type Pass = {
    * line carries the runtime's words, said once. Absent when there were none. `nemia up` says each once while it lasts.
    */
   unreadable?: string[];
+  /**
+   * What the pass forgot of the tasks of runs `nemia rm` removed while one waited, or what refused it (`finishForgetting`): a line a run.
+   * Absent when there was nothing to say. `nemia up` says each once while it lasts.
+   */
+  forgetting?: ForgettingLine[];
   /**
    * The store's pause as the pass read it (`readPause`), while one stands; each task still finishing under it, read off the views the
    * runtime reported on this pass (`finishingOf`); and each check it holds, a landing with its merge staged among them (`heldRead`): the
@@ -190,6 +196,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *   their own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
  *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again.
+ * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in
@@ -214,8 +221,10 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
+  const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   return {
     ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging)),
+    ...(forgetting.length ? { forgetting } : {}),
     ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []), ...(yield* heldRead(e, runs)) } } : {}),
   };
 });

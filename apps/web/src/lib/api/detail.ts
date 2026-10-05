@@ -2,7 +2,7 @@
  * A run's detail, as its page reads it (`GET /api/runs/:id`, apps/api/src/detail/detail.ts): each step's spec, filing, gate, tries and
  * timeline. Each type has its schema beside it, which `get` decodes the api's answer with.
  */
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { pace } from '../feed.ts';
 import { ReadRefusal, get } from './read.ts';
@@ -553,3 +553,16 @@ export const runQuery = (id: string) =>
     refetchInterval: () => pace(5_000),
     retry: retryRun,
   });
+
+/**
+ * What a run's page loads before it draws: the run read into `client`'s cache (`runQuery`), and `gone` when the store has no such run
+ * (`runGone`), so the page says so in place of a failure; any other failure is thrown, for the route's error to say.
+ */
+export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean }> =>
+  client.ensureQueryData(runQuery(id)).then(
+    () => ({ gone: false }),
+    (error: unknown) => {
+      if (runGone(error)) return { gone: true };
+      throw error;
+    },
+  );

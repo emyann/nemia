@@ -6,7 +6,7 @@ import { DebugPanel } from '@/components/DebugPanel';
 import { PromptBox } from '@/components/conversation/PromptBox';
 import { RunGone } from '@/components/RunGone';
 import { StatusChip, StepNote } from '@/components/StatusChip';
-import { runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
+import { loadRun, runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
 import { isGate, stepState } from '@/lib/status';
@@ -18,7 +18,7 @@ import { useStepTranscript, type Following } from '@/lib/useStepTranscript';
  * for it.
  */
 export const Route = createFileRoute('/runs/$runId_/steps/$step')({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
+  loader: ({ context, params }) => loadRun(context.queryClient, params.runId),
   staticData: { fullBleed: true },
   component: SessionPage,
   errorComponent: ({ error }) => (
@@ -34,13 +34,31 @@ export const Route = createFileRoute('/runs/$runId_/steps/$step')({
 type Step = RunDetail['steps'][number];
 
 /**
- * One step's session, as a conversation: the whole of it, full height, followed while its task is live — with what a person said to it laid
- * in, and a box below to say something more while it runs. A run removed while the page is open is said to be gone, and its session is
- * neither followed nor offered words. The session is keyed by run and step, so one step's conversation never stands in for another's
- * while that one is read.
+ * The page of a step's session, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by the
+ * run's id: the address of a run removed, or of none.
  */
 function SessionPage() {
   const { runId, step: name } = Route.useParams();
+  if (Route.useLoaderData().gone) {
+    return (
+      <div className="space-y-3 p-4">
+        <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
+          ← Runs
+        </Link>
+        <RunGone id={runId} />
+      </div>
+    );
+  }
+  return <SessionRead runId={runId} name={name} />;
+}
+
+/**
+ * The session of the step `name` of the run `runId`, as a conversation: the whole of it, full height, followed while its task is live —
+ * with what a person said to it laid in, and a box below to say something more while it runs. A run removed while the page is open is
+ * said to be gone, and its session is neither followed nor offered words. The session is keyed by run and step, so one step's
+ * conversation never stands in for another's while that one is read.
+ */
+function SessionRead({ runId, name }: { runId: string; name: string }) {
   const { data: run, error } = useSuspenseQuery(runQuery(runId));
   if (runGone(error)) {
     return (

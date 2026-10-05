@@ -1,12 +1,12 @@
 /**
  * What a runtime store's journals cost:
- * `node --expose-gc tools/journal-bytes/report.ts <engine-root> [--refile <scratch>] [--json <file>]`, `<engine-root>` a copy of a
- * store such as `~/.agent-workflows/engine`, never the store itself. It prints a table of the journals' bytes by event kind, the
- * feed's and the bodies' bytes, the share of the journals that is text an earlier line already holds, exactly (a brief's parts as
- * `briefParts` cuts them, a schema an end is held to, a nudge, an input's text), and the heap used once every journal and the feed
- * are read and kept, after a collection; `--json` writes the same as JSON. Given `--refile`, it first files every journal of
- * `<engine-root>` again into `<scratch>`, an empty folder, through `Journal`, each brief cut by `briefParts`, and reports on
- * `<scratch>` in a fresh process. It runs no pass: nothing is spawned or observed.
+ * `node --expose-gc tools/journal-bytes/report.ts <engine-root> [--refile <scratch>] [--json <file>]`, `<engine-root>` a copy of a store
+ * such as `~/.agent-workflows/engine`, never the store itself. It prints a table of the journals' bytes by event kind, the feed's bytes,
+ * the head's and the sealed file's a rotation keeps, the bodies' bytes, the share of the journals that is text an earlier line already
+ * holds, exactly (a brief's parts as `briefParts` cuts them, a schema an end is held to, a nudge, an input's text), and the heap used once
+ * every journal and the feed are read and kept, after a collection; `--json` writes the same as JSON. Given `--refile`, it first files
+ * every journal of `<engine-root>` again into `<scratch>`, an empty folder, through `Journal`, each brief cut by `briefParts`, and reports
+ * on `<scratch>` in a fresh process. It runs no pass: nothing is spawned or observed.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +23,7 @@ export type JournalBytes = {
   journalBytes: number;
   byKind: Record<string, { lines: number; bytes: number }>;
   feedBytes: number;
+  sealedBytes: number;
   bodies: { count: number; bytes: number };
   textBytes: number;
   copyBytes: number;
@@ -126,11 +127,12 @@ async function heapOf(root: string): Promise<{ heapUsed: JournalBytes['heapUsed'
 export async function measure(root: string): Promise<JournalBytes> {
   const { heapUsed, unreadable } = await heapOf(root);
   const lines = linesOf(root);
-  const feed = path.join(root, 'feed.jsonl');
+  const bytes = (name: string) => (fs.existsSync(path.join(root, name)) ? fs.statSync(path.join(root, name)).size : 0);
   return {
     root,
     ...lines,
-    feedBytes: fs.existsSync(feed) ? fs.statSync(feed).size : 0,
+    feedBytes: bytes('feed.jsonl'),
+    sealedBytes: bytes('feed.sealed.jsonl'),
     bodies: sizeOf(path.join(root, 'bodies')),
     copyShare: lines.journalBytes ? lines.copyBytes / lines.journalBytes : 0,
     heapUsed,
@@ -165,6 +167,7 @@ export function rendered(report: JournalBytes): string {
     ...kinds.map(([kind, { lines, bytes }]) => `| ${kind} | ${lines} | ${mb(bytes)} |`),
     `| journals | | ${mb(report.journalBytes)} |`,
     `| feed | | ${mb(report.feedBytes)} |`,
+    `| feed, sealed | | ${mb(report.sealedBytes)} |`,
     `| bodies | ${report.bodies.count} | ${mb(report.bodies.bytes)} |`,
     '',
     `text the runtime may keep once: ${mb(report.textBytes)}, of which a copy: ${mb(report.copyBytes)}, ${(report.copyShare * 100).toFixed(1)}% of the journals`,

@@ -25,6 +25,7 @@ import { assess, type Assessment } from '../tick/assess.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
+import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 
 /**
  * How `nemia rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged
@@ -612,10 +613,18 @@ export type Forgot = {
   files: string[];
   /** For a record that froze no workflow, when its folder does not read: why. */
   unfrozen?: string;
+  /** What the engine did with the run's tasks once its record was removed (`forgetTasks`): absent while nothing was removed. */
+  engine?: EngineForgetting;
 };
 
-/** One line for one run `nemia rm` was given, saying what happened. Pure. */
+/** One line for one run `nemia rm` was given, saying what happened, and what the engine did with its tasks (`engineWords`). Pure. */
 export function forgetLine(f: Forgot): string {
+  const engine = f.engine ? engineWords(f.engine, { id: f.id }) : '';
+  return engine ? `${storeLine(f)}; ${engine}` : storeLine(f);
+}
+
+/** What `nemia rm` did with one run's worktrees, branches and files. */
+function storeLine(f: Forgot): string {
   const them = (n: number) => (n > 1 ? 'them' : 'it');
   if (f.kind === 'refused') return `${f.id}  not forgotten: ${f.refusal}`;
   const files = f.files.length ? `removed ${f.files.join(', ')}` : '';

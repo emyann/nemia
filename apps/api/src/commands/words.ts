@@ -335,7 +335,7 @@ const RM: RouteWords = {
     route: `DELETE /api/runs/${runId}`,
     does: 'removes a run',
     forAnother: 'remove one',
-    why: 'a run removed takes its record and every folder it worked in with it, and nothing brings them back',
+    why: "a run removed takes its record, every folder it worked in and the engine's journals and session files of its tasks with it, and nothing brings them back",
     reach: "remove it on the board's run page",
     instead: "Remove it on the board's run page, or with `nemia rm`",
     shape: '`{}`',

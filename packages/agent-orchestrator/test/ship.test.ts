@@ -149,6 +149,10 @@ const board = () => {
       return spec.id;
     },
     stop: async () => {},
+    forget: async (ids: string[]) => ({
+      forgotten: true,
+      tasks: ids.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })),
+    }),
     /** A check's verdict is its attempt's exit code (`exitVerdicts`); its log and streams say nothing of it. */
     logs: async () => '(no output yet)',
     output: async (id: string) => (typeof tasks.get(id)?.exitCode === 'number' ? '' : undefined),

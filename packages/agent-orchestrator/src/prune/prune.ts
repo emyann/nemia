@@ -6,6 +6,7 @@ import { andList, isGitRun, prunedWords, type Pruned, type Run } from '../record
 import { holdWord } from '../wait/wait.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import type { Decision } from '../decide/decide.ts';
+import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 
 /** What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>
@@ -169,6 +170,8 @@ export type Pruning = {
    * without it.
    */
   unmerged?: true;
+  /** What `nemia rm` would forget of the engine's tasks of the run (`runsForgetting`), as `nemia prune` lists it: never removed by it. */
+  engine?: EngineForgetting;
 };
 
 /** The bytes a list of worktrees holds, together. */
@@ -179,9 +182,16 @@ export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>): numbe
 
 /**
  * What `nemia prune` says of one run: a line, and under a run with worktrees, one line for each, and one for its files directory under
- * `--artifacts`. Pure. A prune of the worktrees alone says that the files are kept.
+ * `--artifacts`; and what `nemia rm` would forget of the engine's tasks (`engineWords`), which no prune touches. Pure. A prune of the
+ * worktrees alone says that the files are kept.
  */
 export function pruneLines(p: Pruning): string[] {
+  const engine = p.engine && p.kind !== 'refused' ? engineWords(p.engine, { id: p.id, dry: true }) : '';
+  return engine ? [...storeLines(p), `   ${engine}`] : storeLines(p);
+}
+
+/** What `nemia prune` says of one run's worktrees and files. */
+function storeLines(p: Pruning): string[] {
   const n = p.worktrees.length;
   const worktrees = `${n} worktree${n === 1 ? '' : 's'}`;
   const what = !p.artifacts ? worktrees : n ? `${worktrees} and its files` : 'its files';

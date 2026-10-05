@@ -50,6 +50,10 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
       return spec.id;
     },
     stop: async () => {},
+    forget: async (ids: string[]) => ({
+      forgotten: true,
+      tasks: ids.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })),
+    }),
   });
 
   const run = await Effect.runPromise(startRun({ brief: 'under a link', repo, workflowDir: folder }));

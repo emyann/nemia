@@ -8,7 +8,7 @@
  */
 
 /** The verbs a place may answer, in the order a run meets them. */
-export const PLACE_VERBS = ['open', 'make', 'handoff', 'report', 'standing', 'status', 'land', 'inventory', 'remove'] as const;
+export const PLACE_VERBS = ['open', 'make', 'handoff', 'report', 'standing', 'trial', 'status', 'land', 'inventory', 'remove'] as const;
 
 /** A verb a place may answer. */
 export type PlaceVerb = (typeof PLACE_VERBS)[number];
@@ -23,6 +23,7 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   handoff: 120_000,
   report: 120_000,
   standing: 120_000,
+  trial: 120_000,
   status: 120_000,
   land: 120_000,
   inventory: 120_000,
@@ -90,6 +91,9 @@ export type BranchStood = {
 /** What `standing` answers: every head of the repository by name, and each result branch asked of. */
 export type Standing = { readonly heads: Readonly<Record<string, string>>; readonly branches: readonly BranchStood[] };
 
+/** What `trial` answers: the commit each base asked of names now (null where the place has none), and each trial in the order asked. */
+export type Trials = { readonly at: Readonly<Record<string, string | null>>; readonly trials: readonly TrialMerge[] };
+
 /**
  * What `status` answers of a checkout an ending lands in: whose merge is in progress (`ours` when every commit it merges is one of the
  * run's tips), whether a path is unmerged, the result branches a commit now would leave out, and HEAD when there is one.
@@ -138,6 +142,7 @@ export type PlaceAnswers = {
   readonly handoff: HandedOff;
   readonly report: Changes;
   readonly standing: Standing;
+  readonly trial: Trials;
   readonly status: Status;
   readonly land: Landed;
   readonly inventory: Inventory;
@@ -169,6 +174,7 @@ export type PlaceRequests = {
     readonly branches: readonly { readonly branch: string; readonly tip?: string; readonly baseRef: string }[];
     readonly base: string;
   };
+  readonly trial: { readonly repo: string; readonly trials: readonly { readonly onto: string; readonly branch: string }[] };
   readonly status: { readonly checkout: string; readonly tips: Readonly<Record<string, string>> };
   readonly land:
     | { readonly checkout: string; readonly act: 'commit'; readonly message: string }

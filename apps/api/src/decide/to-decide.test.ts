@@ -237,7 +237,17 @@ test('whether the result still merges onto the base, as the base is now: clean, 
       [],
       'the list the Factory polls asks git no merge',
     );
+    const read = gitCount();
     const conflicted = await decidableOf(id);
+    assert.ok(
+      fs
+        .readFileSync(gitCalls, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .slice(read)
+        .some((call) => call.startsWith('merge-tree')),
+      "the decision's trial merge, run in the git place's own process, is counted: the list's none is no blind spot",
+    );
     assert.deepEqual(
       conflicted.standings.map((s) => s.merge),
       [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }],

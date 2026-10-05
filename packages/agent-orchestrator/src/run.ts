@@ -157,7 +157,7 @@ export {
   takesNoSlot,
 } from './cap/cap.ts';
 export type { CheckoutHold, InFlight, MainClaim, RunSlot } from './cap/cap.ts';
-export { resultSteps, tipBranches, tipsSeen, workChecks } from './branches/branches.ts';
+export { resultSteps, tipBranches, tipsSeen, workChecks } from './branches/index.ts';
 export { GIVEN, givenPlan, handOffDue, workspacePlan } from './workspace/workspace.ts';
 export type { Given, GivenFrom, WorkspacePlan } from './workspace/workspace.ts';
 export { saidLines, saidWord, sayRefusal } from './say/say.ts';

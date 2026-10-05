@@ -37,7 +37,10 @@ export type MergeReads = {
   goesRound: (looping: Workflow) => boolean;
 };
 
-/** A trial merge of a branch onto the base branch, as `mergesOnto` answers it: clean, conflicted, or not known, with git's words. */
+/**
+ * A trial merge of a branch onto the base branch, as `mergeWordOf` reads the place's (`trialMerges`): clean, conflicted, or not known,
+ * with git's words.
+ */
 export type Trial = { clean: boolean } | { error: string };
 
 /** A person's merge ask, whole: the looping step and the round it is on, when, and what merges (`MergeOf`). */

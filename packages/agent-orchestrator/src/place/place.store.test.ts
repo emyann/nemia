@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PLACE_DEADLINE_MS, PLACE_VERBS, type PlaceAnswers, type PlaceOutcome, type PlaceRequests, type PlaceVerb } from './place.ts';
-import { readPlaceJson, runPlaceVerb } from './place.store.ts';
+import { SHIPPED_PLACE, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { running } from '../../test/running.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -32,6 +32,7 @@ const REQUESTS: PlaceRequests = {
   handoff: { workspace: '/w', step: 'a', why: '' },
   report: { repo: '/r', baseRef: 'b', onto: 'main', branches: ['wf/x/a'], diffOf: [], present: [], atBase: [] },
   standing: { repo: '/r', branches: [{ branch: 'wf/x/a', baseRef: 'b' }], base: 'main' },
+  trial: { repo: '/r', trials: [{ onto: 'main', branch: 'wf/x/a' }] },
   status: { checkout: '/r', tips: {} },
   land: { checkout: '/r', act: 'abort' },
   inventory: { repo: '/r', under: '/w', prefix: 'wf/x/' },
@@ -62,6 +63,7 @@ const ANSWERS: PlaceAnswers = {
       { branch: 'wf/x/b', tip: 't', onBase: 'no', pastBase: true, ahead: 2 },
     ],
   },
+  trial: { at: { main: 'h', gone: null }, trials: [{ clean: true }, { clean: false, conflicts: ['a.ts'] }, { unknown: 'no ref' }] },
   status: { merging: 'ours', conflicted: false, missing: [], head: 'h' },
   land: { aborted: true },
   inventory: {
@@ -229,6 +231,32 @@ test('the deadline is two minutes a verb, ten for make, and it is the default th
   const body = `setTimeout(() => process.stdout.write(${JSON.stringify(JSON.stringify(ANSWERS.make))}), 1000);\n`;
   assert.deepEqual(runPlaceVerb(planted('make', body), 'make', REQUESTS.make), { answer: ANSWERS.make });
   assert.match(saidOf(runPlaceVerb(planted('make', body), 'make', REQUESTS.make, { deadlineMs: 200 }), 'make'), /within 0\.2 s/);
+});
+
+test('trialMerges answers what the trial verb answers, and asks nothing for no trial', () => {
+  const dir = planted('trial', printing(ANSWERS.trial));
+  assert.deepEqual(trialMerges('/r', REQUESTS.trial.trials, dir), ANSWERS.trial);
+  assert.deepEqual(trialMerges('/r', [], planted('trial', 'process.exitCode = 3;\n')), { at: {}, trials: [] });
+  assert.ok(fs.existsSync(path.join(SHIPPED_PLACE, 'scripts', 'trial.ts')), `the shipped place is ${SHIPPED_PLACE}`);
+});
+
+test('REFUSED: a trial unread or refused is no verdict: every trial is unknown in its words, and every base null', () => {
+  const pairs = [
+    { onto: 'main', branch: 'wf/x/a' },
+    { onto: 'wf/y/b', branch: 'wf/x/a' },
+  ];
+  const silent = trialMerges('/r', pairs, planted('trial', "process.stderr.write('git is gone');\nprocess.exitCode = 1;\n"));
+  assert.deepEqual(silent, {
+    at: { main: null, 'wf/y/b': null },
+    trials: [{ unknown: 'the trial merge was not heard: git is gone' }, { unknown: 'the trial merge was not heard: git is gone' }],
+  });
+  const refused = trialMerges('/r', pairs, planted('trial', printing({ refused: '/r is not a directory' })));
+  assert.deepEqual(refused.trials, [{ unknown: '/r is not a directory' }, { unknown: '/r is not a directory' }]);
+  const unshaped = trialMerges('/r', pairs, planted('trial', printing({ at: {} })));
+  assert.ok(
+    unshaped.trials.every((t) => 'unknown' in t && /`trials` is missing/.test(t.unknown)),
+    JSON.stringify(unshaped),
+  );
 });
 
 /** A skill folder with `declared` as its `place.json`, text as is or JSON, and a script for each verb in `scripts`. */

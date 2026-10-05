@@ -26,6 +26,7 @@ import {
   type Removed,
   type Standing,
   type Status,
+  type Trials,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
@@ -79,6 +80,11 @@ const StandingSchema = Schema.Struct({
   ),
 }) satisfies Schema.Schema<Standing>;
 
+const TrialsSchema = Schema.Struct({
+  at: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
+  trials: Schema.Array(TrialMergeSchema),
+}) satisfies Schema.Schema<Trials>;
+
 const StatusSchema = Schema.Struct({
   merging: Schema.Literals(['ours', 'other', 'none']),
   conflicted: Schema.Boolean,
@@ -122,6 +128,7 @@ const ANSWERS: { readonly [V in PlaceVerb]: Schema.Codec<PlaceAnswers[V], unknow
   handoff: HandedOffSchema,
   report: ChangesSchema,
   standing: StandingSchema,
+  trial: TrialsSchema,
   status: StatusSchema,
   land: LandedSchema,
   inventory: InventorySchema,
@@ -316,4 +323,27 @@ export function readPlaceJson(skillDir: string): PlaceDeclared {
       message: `${file} declares ${scriptless.join(', ')}, and scripts/ has no ${scriptless.map((v) => `${v}.ts`).join(', ')}: add the script, or take the verb off \`verbs\``,
     });
   return decoded.success;
+}
+
+/** The git place the package ships, run where a record names no place skill of its own. */
+export const SHIPPED_PLACE = path.join(import.meta.dirname, '..', '..', 'place', 'git');
+
+/**
+ * Whether each `{ onto, branch }` of `trials` merges in `repo`, as the place in `skillDir` answers its `trial` verb: each base's commit
+ * now, and each trial in the order asked. Asks nothing for no trial. A refusal or an unread outcome is never a verdict: every trial is
+ * then `{ unknown }` in the place's words, and every base's commit null.
+ */
+export function trialMerges(
+  repo: string,
+  trials: readonly { readonly onto: string; readonly branch: string }[],
+  skillDir: string = SHIPPED_PLACE,
+): Trials {
+  if (!trials.length) return { at: {}, trials: [] };
+  const outcome = runPlaceVerb(skillDir, 'trial', { repo, trials });
+  if ('answer' in outcome) return outcome.answer;
+  const unknown = 'refused' in outcome ? outcome.refused : `the trial merge was not heard: ${outcome.unread.said}`;
+  return {
+    at: Object.fromEntries(trials.map((t) => [t.onto, null])),
+    trials: trials.map(() => ({ unknown })),
+  };
 }

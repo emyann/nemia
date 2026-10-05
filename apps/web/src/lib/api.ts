@@ -23,6 +23,7 @@ export {
   createWorkflow,
   factoryWorkflowsQuery,
   placeQuery,
+  removeWorkflow,
   repositoryQuery,
   saveWorkflow,
   startRun,

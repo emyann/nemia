@@ -1,17 +1,22 @@
 /**
  * The board's workflow folders as entries of the command table, each served on the api alone: a folder written from its steps
- * (`WORKFLOWS_WRITE`, `writeWorkflow`), the folders it lists, each loaded (`WORKFLOWS_LIST`, `loadWorkflows`), and one step of a folder
- * (`WORKFLOWS_STEP`). The api resolves which folder a request names, and words the board's answer around what each entry answers.
+ * (`WORKFLOWS_WRITE`, `writeWorkflow`), a folder of yours removed (`WORKFLOWS_REMOVE`, `removeWorkflow`), the folders it lists, each loaded
+ * (`WORKFLOWS_LIST`, `loadWorkflows`), and one step of a folder (`WORKFLOWS_STEP`). The api resolves which folder a request names, and
+ * words the board's answer around what each entry answers.
  */
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { fillsOf } from '../factory/factory.ts';
-import { readFactory } from '../factory/factory.store.ts';
+import { readFactories, readFactory } from '../factory/factory.store.ts';
+import { readInbox } from '../inbox/inbox.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
+import { isDirectory } from '../record/record.store.ts';
 import type { Workflow } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
+import { stillNeeded } from './folder.ts';
 import { loadWorkflows, type Places } from './folder.store.ts';
-import { writeWorkflow, type WorkflowWritten } from './write.store.ts';
+import { removeWorkflow, writeWorkflow, type WorkflowRemoved, type WorkflowWritten } from './write.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -78,6 +83,60 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten> = {
   print: () => [],
 };
 
+/**
+ * What still needs the workflow folder `dir`, one sentence each (`stillNeeded`): every run that froze no steps at its start and reads them
+ * from the folder; every card queued to start on it, by its `workflow:` read from the inbox, but one a record says was started, which the
+ * tick never starts again; and every factory that attaches its name while none of its repositories has a workflow of that name, with its
+ * hires into it. A run that froze its steps, a card not queued and a factory with a repository's workflow of the name go on without it.
+ */
+function usersOf(dir: string): string[] {
+  const name = path.basename(dir);
+  const runs = runStore.runs
+    .list(() => {})
+    .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
+    .map((run) => stillNeeded.run(run.id, dir));
+  const cards = readInbox()
+    .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(), card.workflow) === dir)
+    .map((card) => stillNeeded.card(card.name, dir));
+  const factories = readFactories().flatMap((factory) => {
+    if ('error' in factory || !factory.workflows.includes(name)) return [];
+    if (factory.repos.some((repo) => isDirectory(path.join(repo, 'workflows', name)))) return [];
+    const hires = Object.keys(factory.hires).filter((step) => step.startsWith(`${name}/`));
+    return [stillNeeded.factory(factory.name, name, hires.sort())];
+  });
+  return [...runs, ...cards, ...factories];
+}
+
+/**
+ * A folder of yours removed whole (`removeWorkflow`): `dir`, the folder the api resolved. Refused, with nothing removed, while a run, a
+ * queued card or a factory still needs it (`usersOf`), each named with the command that frees it.
+ */
+export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
+  name: 'workflows remove',
+  usage: '<from> <name>',
+  help: ['a workflow folder of yours removed'],
+  spec: apiSpec(
+    [
+      { key: 'from', takes: 'required', kind: 'name' },
+      { key: 'name', takes: 'required', kind: 'name' },
+    ],
+    ['dir', 'repo'],
+  ),
+  writes: true,
+  route: {
+    method: 'DELETE',
+    path: '/api/workflows/:from/:name',
+    status: 200,
+    hand: 'the builder guards the removal, and refuses a folder changed since the board read it by its version',
+  },
+  only: { side: 'api', why: 'the board removes a workflow of yours; at the command line a person removes its folder' },
+  async handler(_e, args, _env, home) {
+    const dir = path.resolve(textOf(args, 'dir') ?? '');
+    return removeWorkflow(dir, { ...(home !== undefined && { home }), users: usersOf(dir) });
+  },
+  print: () => [],
+};
+
 /** A folder loaded (`steps`), or why it does not load (`error`, the loader's words). */
 export type FolderLoaded = { steps: Workflow[] } | { error: string };
 
@@ -139,4 +198,9 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
 };
 
 /** The board's workflow entries, in the order the table lists them. */
-export const WORKFLOW_ENTRIES: readonly Command[] = [WORKFLOWS_WRITE, WORKFLOWS_LIST, WORKFLOWS_STEP] as readonly Command[];
+export const WORKFLOW_ENTRIES: readonly Command[] = [
+  WORKFLOWS_WRITE,
+  WORKFLOWS_REMOVE,
+  WORKFLOWS_LIST,
+  WORKFLOWS_STEP,
+] as readonly Command[];

@@ -60,3 +60,8 @@ export function useFavorites(): { favorites: Favorite[]; starred: (favorite: Fav
   const favorites = favoritesOf(useSyncExternalStore(subscribeFavorites, favoritesText, favoritesText));
   return { favorites, starred: (favorite) => isStarred(favorites, favorite), toggle: toggleFavorite };
 }
+
+/** Takes `favorite` off where it is starred, as a workflow removed is, and leaves the favourites as they are where it is not. */
+export function forgetFavorite(favorite: Favorite): void {
+  if (isStarred(favoritesOf(favoritesText()), favorite)) toggleFavorite(favorite);
+}

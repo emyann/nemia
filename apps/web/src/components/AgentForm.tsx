@@ -345,7 +345,7 @@ const Hint = ({ children }: { children: ReactNode }) => (
   </Text>
 );
 
-/** A field written in markdown, read and not edited: its label, its words drawn as markdown on a read-only field's quiet ground, its hint. */
+/** A field written in markdown, read and not edited: its label, its words drawn as markdown on a read-only field's ground, its hint. */
 function MarkdownField({
   label,
   hint,

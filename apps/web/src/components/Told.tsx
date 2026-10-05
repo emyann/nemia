@@ -2,7 +2,8 @@
  * What a step was told, folded away: it is long, and it does not change while you look at the step. Where its run froze its layers,
  * each is drawn apart, as the run froze it when it started — the agent's instructions with its own skills, the person's custom
  * instructions, the step's policy with the skills its line adds and the fence lines it tightens, and the task; a run that froze none
- * shows its brief whole. Each is drawn as the markdown it is written in (`Words`). At a gate, the step's policy is drawn open on its own (`StepPolicy`), the layer a person judges the step by.
+ * shows its brief whole. Each is drawn as the markdown it is written in (`Words`). At a gate, the step's policy is drawn open on its
+ * own (`StepPolicy`), the layer a person judges the step by.
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';

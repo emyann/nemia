@@ -10,8 +10,8 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
   started `--after` the intake run: `nemia start "<brief>" --workflows build --factory nemia --after <intake run>`.
 - A small, settled change goes straight to `build`.
 - One coherent slice a card: a card cut too small slows the factory more than it saves.
-- Cards that change the command table (`src/runner.ts`, the api's routes) or the board's frame collide with each other: chain them, the
-  second started `--after` the first, never side by side.
+- Cards that change the command table (`packages/agent-orchestrator/src/command/`, the api's routes) or the board's frame collide with
+  each other: chain them, the second started `--after` the first, never side by side.
 - The store's names (`~/.agent-workflows`, `~/.agent-engine`) and the `wf/` prefix of a run's branches stay as they are: a card that
   renames them would orphan every record.
 
@@ -40,8 +40,9 @@ to the person as a gate.
 
 A landing that changed code under `packages/agent-runtime/src`, `packages/agent-orchestrator/src` or `apps/api/src` needs the daemon
 restarted before it runs; a doc, a skill, a test or the web alone does not. Recommend it to the person, paused: `nemia pause --why "…"`,
-the restart once no landing is checking on two looks in a row, then `nemia resume`. Several landings queued together share one restart,
-after the last. The restart is the person's: you run under the daemon.
+the restart once no landing's check runs — a check the pause holds is listed `waiting on the pause`, and waits for `nemia resume`, not
+for the restart — then `nemia resume`. Several landings queued together share one restart, after the last. The restart is the
+person's: you run under the daemon.
 
 ## Spend
 

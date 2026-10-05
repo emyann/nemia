@@ -265,10 +265,11 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
     serverAsk(repo, { name: 'silent', command: process.execPath, args }, { command: process.execPath, args, env }, 60_000),
     { signal: stop.signal },
   );
-  for (const bound = performance.now() + 5_000; startsIn(starts).length === 0 && performance.now() < bound;)
-    await new Promise((r) => setTimeout(r, 20));
+  const ended = exit.then(() => true);
+  let over = false;
+  while (startsIn(starts).length === 0 && !over) over = await Promise.race([ended, new Promise<boolean>((r) => setTimeout(r, 20, false))]);
   const [pid] = startsIn(starts);
-  assert.ok(pid, 'the server started');
+  assert.ok(pid, 'the server started before its ask ended');
   stop.abort();
   assert.ok(Exit.hasInterrupts(await exit), 'the ask was interrupted, not answered');
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');

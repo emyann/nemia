@@ -61,7 +61,7 @@ const StepRecordSchema = Schema.StructWithRest(
 /**
  * A run's record as any version of the tick writes it: `Run`, with the person's files it composes on read
  * (`approvals`, `acceptances`, `pruned`, `hold`) left to their own readers. Every key it does not name is kept, so a key a newer or an
- * older `wf` wrote survives `rewriteRun`.
+ * older `nemia` wrote survives `rewriteRun`.
  */
 const runBase = {
   id: Schema.String,
@@ -119,11 +119,11 @@ export function firstRefusal(value: unknown, error: Schema.SchemaError): { path:
   const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
-  const message = first?.message ?? 'is not what wf writes';
+  const message = first?.message ?? 'is not what nemia writes';
   const words =
     message === 'Missing key'
       ? 'is missing'
-      : `is ${shown(JSON.stringify(found) ?? 'undefined')}, where ${message.replace(/^Expected /, 'wf writes ').replace(/ \| undefined$/, '')}`;
+      : `is ${shown(JSON.stringify(found) ?? 'undefined')}, where ${message.replace(/^Expected /, 'nemia writes ').replace(/ \| undefined$/, '')}`;
   return { path, words };
 }
 
@@ -138,13 +138,13 @@ function recordRefusal(raw: unknown): string {
 }
 
 /**
- * A run record that is there and does not read as one: a person's or a program's edit, or a newer `wf`'s. Said by `readRun` with the fix,
+ * A run record that is there and does not read as one: a person's or a program's edit, or a newer `nemia`'s. Said by `readRun` with the fix,
  * and left out of `listRuns`, so one record nobody can read stops no other run.
  */
 export class UnreadableRecord extends Invalid {
   constructor(id: string, why: string) {
     super({
-      message: `run ${id}: its record, ${runFile(id)}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer wf wrote it, read this store with that wf.`,
+      message: `run ${id}: its record, ${runFile(id)}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer nemia wrote it, read this store with that nemia.`,
     });
   }
 }
@@ -190,7 +190,7 @@ export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
  * A cancellation, in a file of its own.
  *
  * The run's json has one writer that rewrites it constantly — a tick reads the record, spends
- * seconds observing sessions and cutting worktrees, then writes back what it filed. `wf cancel` is
+ * seconds observing sessions and cutting worktrees, then writes back what it filed. `nemia cancel` is
  * used while that daemon runs, and a second read-modify-write of the one file would lose an update:
  * a cancel landing mid-pass overwritten by the tick's stale copy, and the run filing steps on.
  * Re-reading before writing only narrows that window; it does not close it.
@@ -202,16 +202,16 @@ export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
 export const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`);
 
 /**
- * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its
+ * That `nemia prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its
  * files directory went and what that freed — a person's fact, in a file of its own
  * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
- * go files nothing more (`advance`), and composed onto the run on read (`readRun`) as `pruned`. `wf rm` removes it with the run.
+ * go files nothing more (`advance`), and composed onto the run on read (`readRun`) as `pruned`. `nemia rm` removes it with the run.
  */
 export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
 
 /**
  * The prune marker, read: undefined for a run never pruned. A marker that does not read as one still says the run is pruned, and each
- * field that does not read is empty. Its files (`wf prune --artifacts`) are pruned when the marker names them, at the time it says or none.
+ * field that does not read is empty. Its files (`nemia prune --artifacts`) are pruned when the marker names them, at the time it says or none.
  */
 function readPruned(id: string): Pruned | undefined {
   const marker = markerOf(pruneFile(id));
@@ -228,15 +228,15 @@ function readPruned(id: string): Pruned | undefined {
 }
 
 /**
- * That a person holds the run until other runs ship (`wf hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for the
- * reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `wf hold --off`, by the tick once every run it names has shipped
- * (`removeHold`), and by `wf rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within its cap.
+ * That a person holds the run until other runs ship (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for the
+ * reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has shipped
+ * (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within its cap.
  */
 export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
 
 /**
  * The hold, read: undefined for a run nobody holds. A file that does not read as a hold still holds the run, on no run named: the tick
- * never lifts a hold that names nothing, so only `wf hold --off` lifts it, and the run files nothing while the file is there (`advance`).
+ * never lifts a hold that names nothing, so only `nemia hold --off` lifts it, and the run files nothing while the file is there (`advance`).
  */
 function readHold(id: string): Hold | undefined {
   const marker = markerOf(holdFile(id));
@@ -287,12 +287,12 @@ export const removeHold = (id: string, at: string): boolean => {
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
- * `wf ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
+ * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
 export const readRun = (id: string): Run => within('records', () => readRecord(id));
 
 const readRecord = (id: string): Run => {
-  if (!fs.existsSync(runFile(id))) throw new Missing({ message: `no such run: ${id}  (try 'wf ls')` });
+  if (!fs.existsSync(runFile(id))) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   countRecord();
   let raw: unknown;
   try {
@@ -322,10 +322,10 @@ const readRecord = (id: string): Run => {
 };
 
 /**
- * The run's steps: the workflow it froze at `wf start`, in the order they run (`orderSteps`).
+ * The run's steps: the workflow it froze at `nemia start`, in the order they run (`orderSteps`).
  *
- * The folder is read only for a record that froze no workflow, never for a run `wf start` froze, so
- * nothing written into the folder after `wf start` reaches it. Ordered on the way out, so a record
+ * The folder is read only for a record that froze no workflow, never for a run `nemia start` froze, so
+ * nothing written into the folder after `nemia start` reaches it. Ordered on the way out, so a record
  * frozen in the folder's order, alphabetical, reads in the order its steps run.
  */
 export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? loadWorkflows(run.workflowDir));
@@ -348,21 +348,21 @@ export const markCancelled = (id: string): string => {
 };
 
 /**
- * A person's `wf retry`, in files of its own: `runs/<id>.asks/retry-<step>-<n>`, one per try asked for.
+ * A person's `nemia retry`, in files of its own: `runs/<id>.asks/retry-<step>-<n>`, one per try asked for.
  *
  * For the reason a cancellation has its own file: the run's json has one writer, the tick, and a verb typed
- * while `wf up` runs must not be a second. The verb creates the ask, whole and exclusively, and never touches
+ * while `nemia up` runs must not be a second. The verb creates the ask, whole and exclusively, and never touches
  * it again. Every pass reads the directory, and once the run's record holds the try an ask names, the tick
  * moves the file into `done/` — consumed, never edited. Naming the try is what makes an ask honoured once: a
  * pass that dies after filing the try and before consuming the ask files nothing more, because the next pass
  * finds the try on the board (`adoptTries`) or on the record (`spentAsks`).
  *
- * `wf round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`).
+ * `nemia round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`).
  *
- * `wf approve` too, in `approve-<step>-<n>`: the gated step, and the try it approves. It is never consumed while it opens the gate — the
+ * `nemia approve` too, in `approve-<step>-<n>`: the gated step, and the try it approves. It is never consumed while it opens the gate — the
  * record holds no approval, and every pass reads the file (`readRun`) — only once a later try of the step spent it (`spentApprovals`).
  *
- * And `wf accept`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
+ * And `nemia accept`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
  * spent exactly as an approval is (`readAcceptances`, `spentAcceptances`) — every pass reads the file, so the loop stays ended after a
  * restart, and a later try of the step takes it back.
  */
@@ -403,20 +403,20 @@ function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] 
     if (!approved) continue;
     const file = path.join(asksDir(id), name);
     const read = approvalIn(file, approved[1], Number(approved[2]));
-    if (typeof read === 'string') notes.push(`${file}: ${read}, so it opens no gate — remove it, and approve with wf approve`);
+    if (typeof read === 'string') notes.push(`${file}: ${read}, so it opens no gate — remove it, and approve with nemia approve`);
     else approvals.push(read);
   }
   return { approvals, notes };
 }
 
 /**
- * The ask files a person's verbs write (`wf approve`, `wf accept`, `wf round`, `wf retry`), each checked for what the verb refuses to
+ * The ask files a person's verbs write (`nemia approve`, `nemia accept`, `nemia round`, `nemia retry`), each checked for what the verb refuses to
  * write, in the order the verb checks it, so a file written by hand is held to the verb's word. `at` is read leniently where the tick never
- * reads it as a time (a round, a retry). A key none of them names is kept, as a newer `wf` may write one.
+ * reads it as a time (a round, a retry). A key none of them names is kept, as a newer `nemia` may write one.
  */
 const Said = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
-/** An amount an ask file may carry as its budget: dollars above zero, as `wf retry --budget` and `wf round --budget` write one. */
+/** An amount an ask file may carry as its budget: dollars above zero, as `nemia retry --budget` and `nemia round --budget` write one. */
 const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
@@ -466,7 +466,7 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
   if ('refused' in read) {
     if (read.refused === 'at') return 'it says no time it was given';
     if (read.refused === 'message') return messageWords(held.read);
-    return 'it is not an approval wf approve wrote';
+    return 'it is not an approval nemia approve wrote';
   }
   const { at, message } = read.read;
   return { step, try: n, at, ...(message === undefined ? {} : { message }) };
@@ -490,7 +490,7 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
     if (!took) continue;
     const file = path.join(asksDir(id), name);
     const read = acceptanceIn(file, took[1], Number(took[2]));
-    if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with wf accept`);
+    if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with nemia accept`);
     else acceptances.push(read);
   }
   return { acceptances, notes };
@@ -498,7 +498,7 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
 
 /**
  * One acceptance file, read: the looping step and the try from its name, when and what was said from what it holds — or why it cannot be
- * read. What `wf accept` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with no
+ * read. What `nemia accept` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with no
  * words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
@@ -507,7 +507,7 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
   const read = readAs(AcceptanceFileSchema, held.read);
   if ('refused' in read) {
     if (read.refused === 'at') return 'it says no time it was given';
-    if (read.refused !== 'message') return 'it is not an acceptance wf accept wrote';
+    if (read.refused !== 'message') return 'it is not an acceptance nemia accept wrote';
     return isText(fieldOf(held.read, 'message'))
       ? 'its message is empty, and an acceptance is nothing but its reason'
       : 'it says nothing of why the work is good enough with its findings open';
@@ -538,11 +538,11 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
     const file = path.join(asksDir(id), name);
     if (tried) {
       const ask = askIn(file, tried[1], Number(tried[2]));
-      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with wf retry`);
+      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
       else asks.push(ask);
     } else if (again) {
       const ask = roundAskIn(file, again[1], Number(again[2]));
-      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with wf round`);
+      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia round`);
       else rounds.push(ask);
     }
   }
@@ -554,7 +554,7 @@ export function roundAskIn(file: string, step: string, round: number): RoundAsk 
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(RoundAskFileSchema, held.read);
-  if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask wf round wrote';
+  if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask nemia round wrote';
   const { at, budget } = read.read;
   return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '' };
 }
@@ -565,14 +565,14 @@ function askRefusal(refused: string, held: unknown): string {
   if (refused === 'message') return messageWords(held);
   if (refused === 'budget') return BUDGET_WORDS;
   if (refused === 'interrupted') return 'the task it names as interrupted is not an id';
-  return `it asks for no mode wf retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
+  return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
 }
 
 /**
  * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.
- * A file with no message reads as an ask without one. What `wf retry` refuses to write is refused here too, so a file written by hand is
+ * A file with no message reads as an ask without one. What `nemia retry` refuses to write is refused here too, so a file written by hand is
  * held to the verb's word: a message that is not text or is empty, and a message on a recheck. A file that holds no object, or whose mode
- * is not one of the three, asks for no mode `wf retry` knows.
+ * is not one of the three, asks for no mode `nemia retry` knows.
  */
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
   const held = heldIn(file);
@@ -595,7 +595,7 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
 }
 
 /**
- * Every ask that carried a message — still waiting, or consumed into `done/` — for what `wf ls` and `wf decide` say of a try that was
+ * Every ask that carried a message — still waiting, or consumed into `done/` — for what `nemia ls` and `nemia decide` say of a try that was
  * answered (`answerOf`). Composed on read, as the ask itself is: the run's record keeps no message. A file that cannot be read as an ask
  * is left out; the tick's own read (`readAsks`) says why.
  */
@@ -637,10 +637,10 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
 }
 
 /**
- * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `wf pause --now` wrote that the pass found
+ * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `nemia pause --now` wrote that the pass found
  * void (`pauseAskVoid`) — and each approval a later try of its step spent (`spentApprovals`), and
  * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
- * run's asks directory, never the directory itself, which `wf rm` may remove mid-pass; an ask already moved by a pass beside this one, or
+ * run's asks directory, never the directory itself, which `nemia rm` may remove mid-pass; an ask already moved by a pass beside this one, or
  * removed with its run, is passed over.
  */
 export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []): void {
@@ -666,9 +666,9 @@ function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundA
 }
 
 /**
- * Every run in the store. A record `wf rm` removed after the directory was read is no run, and no reason to fail every other run's pass;
+ * Every run in the store. A record `nemia rm` removed after the directory was read is no run, and no reason to fail every other run's pass;
  * nor is a record that does not read as a run (`UnreadableRecord`), which is left out and said, once a process, on `said` — stderr unless
- * given — with its fix. `wf <verb> <that id>` refuses in the same words. A run `kept` answers for an id is listed as given, its record
+ * given — with its fix. `nemia <verb> <that id>` refuses in the same words. A run `kept` answers for an id is listed as given, its record
  * neither read nor counted; an id it answers nothing for is read.
  */
 export const listRuns = (said: (line: string) => void = sayOnce, kept?: (id: string) => Run | undefined): Run[] =>
@@ -747,7 +747,7 @@ export const writeRun = ({ pause: _, ...run }: Run) => {
 /**
  * Write back the record a pass read — only while it is still there, and false when it is not.
  *
- * A pass reads a run, spends seconds on the engine and git, and writes the run back. `wf rm` may remove the record in those seconds, and a
+ * A pass reads a run, spends seconds on the engine and git, and writes the run back. `nemia rm` may remove the record in those seconds, and a
  * pass that wrote a whole new file would put it back: a run nobody can forget, pointing at worktrees that are gone. So the record is opened
  * `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record removed
  * after it is opened takes the write with it.
@@ -786,7 +786,7 @@ const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, pa
 export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'artifacts', step);
 
 /**
- * The directory `wf start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
+ * The directory `nemia start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
  * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
  *
  * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run

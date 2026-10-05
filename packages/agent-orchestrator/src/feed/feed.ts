@@ -10,10 +10,10 @@
  * (`assess`), and a feed deleted by hand costs the history, not a decision.
  *
  * **What a pass compares against is the feed itself**, folded (`foldFeed`): not a copy of the last words kept in memory, which a
- * restarted daemon would not have, and not the run's record, which `wf show` prints and the tick would then rewrite on every change. A
+ * restarted daemon would not have, and not the run's record, which `nemia show` prints and the tick would then rewrite on every change. A
  * process keeps the fold it has read so far with the byte it read to (`FeedMemo`), so a pass reads only the lines written since —
  * its own and any other writer's — and a process with no fold reads the whole feed once. So a restart writes nothing for what did not
- * change, and a `wf tick` typed beside `wf up` is read by the daemon's next pass rather than said again.
+ * change, and a `nemia tick` typed beside `nemia up` is read by the daemon's next pass rather than said again.
  *
  * **The cursor is the engine's**: a byte offset of complete lines, 0 or one a read handed out, that never expires, since the feed only
  * grows. A read stops at the last newline, so it never passes a line half written. Unlike the engine's, a cursor that is not at the start
@@ -34,7 +34,7 @@ import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
  */
 export type FeedLine = { at: string; run: string; step?: string; word: string; note?: string };
 
-/** The word a run's line says once its record is gone from the store (`wf rm`): the fold forgets the run on reading it. */
+/** The word a run's line says once its record is gone from the store (`nemia rm`): the fold forgets the run on reading it. */
 export const REMOVED = 'removed';
 
 /** What the feed has said last of each run it has not said is removed, and of each of its steps: its lines, folded. */
@@ -97,7 +97,7 @@ export function feedChanges(
   return out;
 }
 
-/** One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `wf feed` and `wf watch`. */
+/** One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `nemia feed` and `nemia watch`. */
 export const feedLineWords = (l: FeedLine): string =>
   `${l.at.slice(11, 19)}  ${l.run}  ${l.step ?? '—'}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
 
@@ -120,17 +120,17 @@ export const feedPhase = (word: string): string =>
   word.startsWith('running (') || word === 'working (quiescent)' || word === 'starting' || word === 'between attempts' ? 'running' : word;
 
 /**
- * What the feed says of a run as a pass judged it: the listing `wf ls` prints (`listing`, handed the engine's words through `feedPhase`),
+ * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through `feedPhase`),
  * in the feed's words. Pure.
  *
- * Each step's word is its status as `wf ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the gate
+ * Each step's word is its status as `nemia ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the gate
  * and what answers it, how many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is
  * decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for
- * a run `failed` that nothing failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `wf decide` says it) — `(pruned)`
- * beside it as `wf ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until
+ * a run `failed` that nothing failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `nemia decide` says it) — `(pruned)`
+ * beside it as `nemia ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until
  * (`holdWord`), and nobody is waited on.
  *
- * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
+ * One more departure from `nemia ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
  * moves with every other run's start and end while nothing of this one does.
  *
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
@@ -160,21 +160,21 @@ export function feedWords(
 }
 
 /**
- * The longest `needs` the feed carries. A feed line is one line of `wf watch`, and a step's `needs` is the agent's, of any length: past
- * this it is clipped, and `wf decide` has it whole.
+ * The longest `needs` the feed carries. A feed line is one line of `nemia watch`, and a step's `needs` is the agent's, of any length: past
+ * this it is clipped, and `nemia decide` has it whole.
  */
 const NEEDS_CAP = 200;
 
 /**
  * What a step that signed off blocked needs, for its line in the feed: `needs: <its closeout's needs>`, one line (`oneLine`) — or nothing,
  * for a step that did not sign off blocked or said nothing it needs. Its word says `BLOCKED` already (`listing`); this is the question, so
- * a watcher does not have to run `wf decide` to read it. Pure.
+ * a watcher does not have to run `nemia decide` to read it. Pure.
  */
 const needsNote = (c: Closeout | { error: string } | undefined): string => {
   const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
   return needs ? `needs: ${needs}` : '';
 };
 
-/** The refusal of a cursor `wf feed` or `wf watch` does not take: a second, or anything but a whole number of bytes. */
+/** The refusal of a cursor `nemia feed` or `nemia watch` does not take: a second, or anything but a whole number of bytes. */
 export const cursorTakes = (verb: 'feed' | 'watch'): string =>
-  `wf ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: wf ${verb} [cursor]`;
+  `nemia ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: nemia ${verb} [cursor]`;

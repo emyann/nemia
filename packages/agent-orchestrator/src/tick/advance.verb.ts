@@ -244,13 +244,13 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * git a pass asks of a run at rest.
  *
  * The pass reads a person's asks afresh, adopts what a pass before it filed and never wrote down, and then, in this order:
- * - stops a cancelled run's tasks, on every pass and not only in `wf cancel`, which stops what it saw in flight: a step filed after it
+ * - stops a cancelled run's tasks, on every pass and not only in `nemia cancel`, which stops what it saw in flight: a step filed after it
  *   looked, and one a pass filed and died before writing down (`unrecordedSteps`), are stopped too. A task the engine already holds a
  *   stop request for is not asked again.
  * - hands off every finished step, failed and stopped too (`handOffOwed`): commits what it left uncommitted and collects what it named
  *   from its workspace root (`collectArtifacts`), before its check is filed and before a later step merges it or works in its workspace.
  *   A merge carries commits, not working trees, so the run commits what a step leaves, as every step is told (`closeoutContract`).
- *   Nothing is handed off for a run `wf rm` forgot after this pass read it: a `--no-worktree` run's workspace is a person's checkout. A
+ *   Nothing is handed off for a run `nemia rm` forgot after this pass read it: a `--no-worktree` run's workspace is a person's checkout. A
  *   hand-off is marked once for the try, unless git refused the commit, which the next pass tries again; a mark made is always written,
  *   or the next pass would commit a person's edits as the step's.
  * - lands or aborts an ending's staged merge (`landEnding`) before anything reads where the ending stands, so the pass that lands it
@@ -270,13 +270,13 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * - files the tries due, then the rounds, then the checks, then the ready steps, each under the id the run derives and looked up first,
  *   since filing an id the engine already holds would journal it twice. Before each filing it reads the store again (`mayFile`): a run
  *   called off, forgotten, pruned or held while the pass was at work — a worktree cut can take minutes — is filed nothing more on this
- *   pass, and a worktree cut for it stays for `wf rm` to find. A step's files directory is made before its brief names it, and again for
+ *   pass, and a worktree cut for it stays for `nemia rm` to find. A step's files directory is made before its brief names it, and again for
  *   its check, for a step filed without one.
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`isShipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
- *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `wf pause --now` wrote that is void
+ *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `nemia pause --now` wrote that is void
  *   on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
  *
  * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
@@ -578,14 +578,14 @@ function answerOf(
  * The steps a pass hands off now (`handOffDue`), where there is somewhere to hand one off from: none of a pruned run, which owed none when
  * its worktrees went (`pruneRefusal`), and no step whose workspace is not on disk — removed by hand, or with no record of the removal —
  * since what the step left went with it; a hand-off tried there would fail on every pass, keep the run out of the tick's memo of runs at
- * rest, and have `wf prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `wf prune` waits
+ * rest, and have `nemia prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `nemia prune` waits
  * for, read off this one function.
  */
 export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
   run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name].workspace!));
 
 /**
- * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `wf cancel`, `wf rm` — at once
+ * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `nemia cancel`, `nemia rm` — at once
  * rather than on the next pass. A close is no stop: nothing is running, and the engine settles the task as it signed. Only a step's current
  * task can wait: a try or a round filed as a task of its own closed the one before it. What the engine refuses is returned, worded, and a
  * cancelled run's next pass closes it again (the sweep in `advance`).

@@ -33,7 +33,7 @@ export const factoriesDir = (): string => path.join(HOME, 'factories');
 
 /**
  * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, and its hires, a
- * step's `<workflow>/<step>` to an agent's name, when it has any; a key a later `wf` writes beside them is kept, not refused.
+ * step's `<workflow>/<step>` to an agent's name, when it has any; a key a later `nemia` writes beside them is kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -59,18 +59,18 @@ function factoryFile(name: string): FileRead {
   const badName = factoryNameRefusal(name);
   if (badName) return { file, error: `${badName} Remove the file by hand.` };
   if (name === DEFAULT_FACTORY)
-    return { file, error: 'is no factory: the default factory is no file, and wf factory rm does not take it. Remove this file by hand.' };
+    return { file, error: 'is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.' };
   let raw: unknown;
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (err) {
-    return { file, error: `is not JSON (${(err as Error).message}): wf factory rm ${name}, then add it again.` };
+    return { file, error: `is not JSON (${(err as Error).message}): nemia factory rm ${name}, then add it again.` };
   }
   const decoded = Schema.decodeUnknownResult(FactoryFileSchema)(raw);
   if (Result.isSuccess(decoded)) return { file, content: decoded.success };
   const { path: where, words } = firstRefusal(raw, decoded.failure);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
-  return { file, error: `does not read as a factory: ${field} ${words}. wf factory rm ${name}, then add it again.` };
+  return { file, error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.` };
 }
 
 /** The factory `name` its file's `content` says: none attached and none hired when the file names none. */
@@ -81,7 +81,7 @@ const factoryOf = (name: string, content: FactoryFile): Factory => ({
   hires: content.hires ?? {},
 });
 
-/** One entry of the folder as `wf factory ls` lists it: the factory its file says, or why the file does not read as one. */
+/** One entry of the folder as `nemia factory ls` lists it: the factory its file says, or why the file does not read as one. */
 function factoryAt(file: string): FactoryListing {
   const name = file.slice(0, -'.json'.length);
   const read = factoryFile(name);
@@ -90,7 +90,7 @@ function factoryAt(file: string): FactoryListing {
 }
 
 /**
- * `wf factory ls`: every factory in the store, its `.json` files by name — a hidden file, such as one `addFactory` is writing, left out —
+ * `nemia factory ls`: every factory in the store, its `.json` files by name — a hidden file, such as one `addFactory` is writing, left out —
  * each read as a factory or listed with why, so one bad file hides no other. None when there is no folder yet.
  */
 export function readFactories(): FactoryListing[] {
@@ -107,13 +107,13 @@ export function readFactories(): FactoryListing[] {
 }
 
 /**
- * The repositories a factory is given, each resolved from where `wf` is typed, as `wf start --repo` records one, and named once. Refused,
+ * The repositories a factory is given, each resolved from where `nemia` is typed, as `nemia start --repo` records one, and named once. Refused,
  * `Invalid`: none given, and any that is not a directory, every one named. A directory is enough: git is never asked.
  */
 function factoryRepos(name: string, given: readonly string[]): string[] {
   if (!given.length)
     throw new Invalid({
-      message: `A factory names one repository at least, and none was given: wf factory add ${name} --repo <path> [--repo <path> ...]. Nothing was filed.`,
+      message: `A factory names one repository at least, and none was given: nemia factory add ${name} --repo <path> [--repo <path> ...]. Nothing was filed.`,
     });
   const repos = [...new Set(given.map((r) => path.resolve(r)))];
   const missing = repos.filter((r) => !isDirectory(r));
@@ -132,7 +132,7 @@ function refuseName(name: string, verb: FactoryWrite): void {
 }
 
 /**
- * `wf factory add`: a factory filed as `<name>.json`, written whole to a hidden file first and linked onto its name, which fails when the
+ * `nemia factory add`: a factory filed as `<name>.json`, written whole to a hidden file first and linked onto its name, which fails when the
  * name is taken: no reader sees half a file, and two adds of one name file one. Refused before anything is written: the name
  * (`refuseName`) and the repositories (`factoryRepos`); and, the file already there, `Conflict`, the file left as it was.
  */
@@ -148,7 +148,7 @@ export function addFactory(opts: { name: string; repos: readonly string[] }): { 
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     throw new Conflict({
-      message: `There is a factory ${opts.name} already, at ${file}, and it was left as it was. See it with wf factory ls; to name other repositories, wf factory rm ${opts.name}, then add it again.`,
+      message: `There is a factory ${opts.name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${opts.name}, then add it again.`,
     });
   } finally {
     fs.rmSync(hidden, { force: true });
@@ -166,7 +166,7 @@ const noFactory = (name: string, notDone: string): Missing =>
   });
 
 /**
- * `wf factory rm`: a factory's file removed, one that does not read included, since removing it is its fix. Refused: the name
+ * `nemia factory rm`: a factory's file removed, one that does not read included, since removing it is its fix. Refused: the name
  * (`refuseName`), and a name with no factory (`Missing`), naming those there are.
  */
 export function removeFactory(name: string): { file: string } {
@@ -178,7 +178,7 @@ export function removeFactory(name: string): { file: string } {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw noFactory(name, 'Nothing was removed.');
     throw Object.assign(
       new Error(
-        `wf factory rm: ${file} could not be removed — ${(err as Error).message}. Nothing was removed: remove the file by hand, or fix what stops it and remove it again.`,
+        `nemia factory rm: ${file} could not be removed — ${(err as Error).message}. Nothing was removed: remove the file by hand, or fix what stops it and remove it again.`,
       ),
       { exitCode: 1 },
     );
@@ -275,7 +275,7 @@ function writeWhole(file: string, content: FactoryFile): void {
 }
 
 /**
- * `wf factory hire`: the agent `agent` hired by the factory `factory` into the step `step`, `<workflow>/<step>` — the one agent of that
+ * `nemia factory hire`: the agent `agent` hired by the factory `factory` into the step `step`, `<workflow>/<step>` — the one agent of that
  * step, replacing an earlier hire, which is returned (`replaced`). Every other key of the file is kept. Refused before anything is written:
  * the factory (`fileToChange`), a step or an agent that is not one (`hireRefusal`, `Invalid`), and a step of a workflow the factory has
  * not attached (`Invalid`, naming the attach). Whether the workflow, its step and the
@@ -288,7 +288,7 @@ export function hireAgent(opts: { factory: string; agent: string; step: string }
   const workflow = opts.step.slice(0, opts.step.indexOf('/'));
   if (!content.workflows?.includes(workflow))
     throw new Invalid({
-      message: `${opts.factory} does not offer the workflow ${workflow}, so it hires no one into its steps. Attach it first — wf factory attach ${opts.factory} ${workflow} — then hire. Nothing was hired.`,
+      message: `${opts.factory} does not offer the workflow ${workflow}, so it hires no one into its steps. Attach it first — nemia factory attach ${opts.factory} ${workflow} — then hire. Nothing was hired.`,
     });
   const replaced = content.hires?.[opts.step];
   writeWhole(file, { ...content, hires: { ...content.hires, [opts.step]: opts.agent } });
@@ -296,7 +296,7 @@ export function hireAgent(opts: { factory: string; agent: string; step: string }
 }
 
 /**
- * `wf factory fire`: the hire of the factory `factory` into the step `step` taken back, every other key of the file kept; returns the agent
+ * `nemia factory fire`: the hire of the factory `factory` into the step `step` taken back, every other key of the file kept; returns the agent
  * it hired. Refused: the factory (`fileToChange`), and a step it hires no one into (`Missing`, naming its hires).
  */
 export function fireAgent(opts: { factory: string; step: string }): { file: string; fired: string } {
@@ -321,7 +321,7 @@ function refuseWorkflowName(workflow: string, verb: 'attach' | 'detach'): void {
 }
 
 /**
- * `wf factory attach`: the workflow whose folder is named `workflow` attached to the factory `factory`, which then offers it; the file's
+ * `nemia factory attach`: the workflow whose folder is named `workflow` attached to the factory `factory`, which then offers it; the file's
  * workflows kept sorted, each named once, and every other key kept. One already attached is not written again (`already`). Only the name
  * is stored: whether the workflow exists is judged when a run starts in the factory. Refused before anything is written: the name
  * (`workflowNameRefusal`, `Invalid`) and the factory (`fileToChange`).
@@ -336,7 +336,7 @@ export function attachWorkflow(opts: { factory: string; workflow: string }): { f
 }
 
 /**
- * `wf factory detach`: the workflow `workflow` taken from the factory `factory`, which then offers it no more; every other key kept.
+ * `nemia factory detach`: the workflow `workflow` taken from the factory `factory`, which then offers it no more; every other key kept.
  * Refused before anything is written: the name (`Invalid`), the factory (`fileToChange`), a workflow it has not attached (`Missing`, naming
  * those it has), and one it still hires into (`Invalid`, naming the fire of each hire), so no hire outlives its workflow in the file.
  */
@@ -353,7 +353,7 @@ export function detachWorkflow(opts: { factory: string; workflow: string }): { f
     .sort();
   if (hired.length)
     throw new Invalid({
-      message: `${opts.factory} hires into ${opts.workflow}'s steps: ${hired.join(', ')}. Fire each first — ${hired.map((step) => `wf factory fire ${opts.factory} --step ${step}`).join('; ')} — then detach it. Nothing was detached.`,
+      message: `${opts.factory} hires into ${opts.workflow}'s steps: ${hired.join(', ')}. Fire each first — ${hired.map((step) => `nemia factory fire ${opts.factory} --step ${step}`).join('; ')} — then detach it. Nothing was detached.`,
     });
   writeWhole(file, { ...content, workflows: workflows.filter((w) => w !== opts.workflow) });
   return { file };

@@ -1,5 +1,5 @@
 /**
- * `wf retry`: ask for another try of a step, by writing the person's ask and nothing else, refused before anything is written. A
+ * `nemia retry`: ask for another try of a step, by writing the person's ask and nothing else, refused before anything is written. A
  * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`retryRun`, over `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
  */
@@ -27,18 +27,18 @@ import { Conflict, Invalid } from '../refusal/refusal.ts';
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
 
 /**
- * Ask for another try of a step — `wf retry` — by writing the ask, and nothing else. The next tick honours it once.
+ * Ask for another try of a step — `nemia retry` — by writing the ask, and nothing else. The next tick honours it once.
  *
  * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on `--recheck`, a step
  * that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config its harness refuses
- * (`tryRefused`). An ask `wf pause --now` wrote for that try refuses it even once void (`pauseAskVoid`): the tick alone sets it aside,
+ * (`tryRefused`). An ask `nemia pause --now` wrote for that try refuses it even once void (`pauseAskVoid`): the tick alone sets it aside,
  * by its name, which a person's ask written there first would lose. Like a cancellation, the ask is the person's own file, and
  * the verb never writes the run's json, which the tick owns. What the person said goes in the ask, `message`, and nowhere else: the tick
  * carries it into the try's brief. An ask written by someone else between the look and the write is refused as the look would have
  * refused it, and a file at the ask's name that no pass reads as one is named (`strayAsk`).
  *
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
- * the tick stops that session before it files the try. `wf retry` passes it, and so does the board's `POST …/retry`. Left out, such a
+ * the tick stops that session before it files the try. `nemia retry` passes it, and so does the board's `POST …/retry`. Left out, such a
  * step is running and refused as one: a caller takes the harness's word on purpose, never by default. Fails with a refusal, the verb's or
  * one a read threw; dies of anything else (`tried`, `awaited`).
  */
@@ -90,8 +90,8 @@ export const retryRun = Effect.fn('retry')(function* (
     const why = yield* tried(
       () =>
         refusal(runStore.asks.read(id).asks) ??
-        strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`) ??
-        `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`,
+        strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `nemia retry ${id} ${stepName}`) ??
+        `try ${ask.try} of ${stepName} is already asked for. Wait for it: nemia ls ${id}.`,
     );
     return yield* Effect.fail(new Conflict({ message: why }));
   }
@@ -120,7 +120,7 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
 }
 
 /**
- * `wf retry` (`retryRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * `nemia retry` (`retryRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
  * with, or with whatever else it died of, as it was thrown.
  */
 export const retry = (e: Engine, id: string, stepName: string, how: RetryHow, blocked: { stopBlocked?: boolean } = {}): Promise<Asked> =>

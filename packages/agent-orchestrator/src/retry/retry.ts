@@ -1,7 +1,7 @@
 /**
- * A person's try of a step, from the run's side: what may be asked (`retryable`), the tries due now (`retriesDue`), and what `wf ls` and
- * `wf decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`). Pure; the ask itself, and the
- * record of a try, are `retry-ask.ts`'s, and what `wf retry` refuses (`retryRefusal`) is `retry-refusal.ts`'s.
+ * A person's try of a step, from the run's side: what may be asked (`retryable`), the tries due now (`retriesDue`), and what `nemia ls` and
+ * `nemia decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`). Pure; the ask itself, and the
+ * record of a try, are `retry-ask.ts`'s, and what `nemia retry` refuses (`retryRefusal`) is `retry-refusal.ts`'s.
  */
 import type { Workflow } from '../step/step.ts';
 import {
@@ -69,7 +69,7 @@ import { heldLater } from '../round/round.ts';
  * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
  * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
  * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
- * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `wf round`'s.
+ * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia round`'s.
  *
  * And a step whose work the run is parked on at an ending step's gate (`waitsAtGate`), with nothing after it filed: the ending has nothing
  * of its own to object to — it has not run — so a send-back there goes to the work, which is this step (`sendBackTo`).
@@ -162,7 +162,7 @@ export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | und
 /**
  * Whether a person's ask says what a send-back from a gate needs (`sendsBack`): words. One with none — written while the step's harness
  * blocked its session, which takes a wordless try, or by hand — tells a session it was sent back and gives it nothing to change, so no tick
- * files it for a step at its gate, as `wf retry` refuses to write one.
+ * files it for a step at its gate, as `nemia retry` refuses to write one.
  */
 export const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boolean => !sendsBack || a.message !== undefined;
 
@@ -171,7 +171,7 @@ const currentOf = (run: Run, a: RetryAsk): string | null | undefined =>
   a.mode === 'recheck' ? run.steps[a.step]?.check?.taskId : run.steps[a.step]?.taskId;
 
 /**
- * Whether an ask may be due on its task's standing: any ask of a person's own, and the ask `wf pause --now` wrote (`interrupted`) only
+ * Whether an ask may be due on its task's standing: any ask of a person's own, and the ask `nemia pause --now` wrote (`interrupted`) only
  * while the task it stopped is still the step's current one and the engine reads it settled `stopped`. So such an ask never stops a session
  * first, and never tries a step that ended on its own before its stop was taken.
  */
@@ -179,7 +179,7 @@ const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPha
   a.interrupted === undefined || (currentOf(run, a) === a.interrupted && phaseOf(a.interrupted) === 'stopped');
 
 /**
- * Whether the ask `wf pause --now` wrote for a task (`interrupted`) is void: never to be filed, and set aside by the tick, paused or not
+ * Whether the ask `nemia pause --now` wrote for a task (`interrupted`) is void: never to be filed, and set aside by the tick, paused or not
  * (`consumeAsks`). Void once the step's current task is another — a later try replaced it — or once that task settled other than
  * `stopped` — it succeeded or failed on its own, its check exited with a number — or settled `stopped` on a step over its budget, which
  * the ask, written with no `--budget`, does not carry (`carries`). Not void while the task has not settled: its stop may still be taken.
@@ -201,7 +201,7 @@ export function pauseAskVoid(
   return phase !== 'stopped' || !carries(a, overBudget(step, run, spendOf) ? raiseOf(step, run, spendOf) : undefined);
 }
 
-/** The asks among `asks` that `wf pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure. */
+/** The asks among `asks` that `nemia pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure. */
 export const pauseAsksVoid = (
   steps: readonly Workflow[],
   run: Run,
@@ -219,9 +219,9 @@ export const pauseAsksVoid = (
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
  * A person's ask for a step's next try, when the step may be tried again that way. For a step whose task has not settled, with
- * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `wf retry` takes for a session its harness
+ * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `nemia retry` takes for a session its harness
  * blocked (`retryable`), whether or not the harness still says so. An ask can only be written for such a step while its harness blocks
- * the session, and the session can work again before a tick stops it, told something by a peer with no `wf up` running. Left for its
+ * the session, and the session can work again before a tick stops it, told something by a peer with no `nemia up` running. Left for its
  * task to settle, such an ask would be neither due nor spent, and the step's next failure would file it at once, ahead of `retries:`. So
  * the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written; `runsOn`
  * marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has tries left:
@@ -315,7 +315,7 @@ export function retriesDue(
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
 
-/** Who asked for a try by its ask: `wf pause --now`, where the ask names the task it stopped, else a person. */
+/** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
 const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');
 
 /**
@@ -324,7 +324,7 @@ const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefin
 const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 
 /**
- * How a step's record reached the try it is on, for `wf ls` and `wf decide`: `try 2, by retries: 2` — and for a step of a loop past its
+ * How a step's record reached the try it is on, for `nemia ls` and `nemia decide`: `try 2, by retries: 2` — and for a step of a loop past its
  * first round, the round, before any try within it: `round 2 of 3`, `round 2 of 3, try 3, by retries: 1`. Empty on a first try.
  * A try a person asked for with a message says so, last: `try 2, nudged on your word, answered` — `answered` is the caller's
  * reading of the ask files (`answerOf`), since the record keeps no message. A cap a person raised is said beside the try it was raised
@@ -346,7 +346,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
 function howOf(step: Workflow, last: EarlierTry): string {
   if (last.then === 'retries') return `by retries: ${step.retries ?? 0}`;
   if (last.then === 'signoff') return 'nudged to sign off by the run';
-  if (last.paused) return `${last.then === 'recheck' ? 'rechecked' : 'continued'} after wf pause --now`;
+  if (last.paused) return `${last.then === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
   if (last.then === 'recheck') return 'rechecked on your word';
   if (last.then === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
   return last.then === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
@@ -402,13 +402,13 @@ const abortedWords = (
       ];
 
 /**
- * What `wf decide` offers for each step a person may try again: the command, and what it does. Pure.
+ * What `nemia decide` offers for each step a person may try again: the command, and what it does. Pure.
  *
  * A check that did not finish is said so, with `--recheck` first: the run spent no retry on it, and the work
- * may pass as it stands. For anything else, `wf retry` continues the step's session, told what happened.
+ * may pass as it stands. For anything else, `nemia retry` continues the step's session, told what happened.
  *
  * Each offer is its sentence and, beside it, the bare command it ends on (`Offer`), which the board offers (`choicesOf`): the sentence is
- * written around the command, `<step>: …:  wf retry <run> <step>  (--fresh…`, so the two cannot say different things. The answer to a
+ * written around the command, `<step>: …:  nemia retry <run> <step>  (--fresh…`, so the two cannot say different things. The answer to a
  * blocked step is `answerLines`', beside its question.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`), whose decision is `running` and says so. A step at its gate
@@ -449,7 +449,7 @@ export function retryOffers(
       spendOf,
       verdictOf,
     );
-    const command = `wf retry ${run.id} ${step.name}`;
+    const command = `nemia retry ${run.id} ${step.name}`;
     if (back) {
       offer(...backWords(command, step.name, back.join(', ')));
       continue;
@@ -502,7 +502,7 @@ export function retryOffers(
   return lines;
 }
 
-/** What `wf decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure. */
+/** What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure. */
 export const retryLines = (...args: Parameters<typeof retryOffers>): string[] => retryOffers(...args).map((o) => o.said);
 
 /**
@@ -513,7 +513,7 @@ const RULE_CAP = 240;
 
 /**
  * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allowedTools:` needs for a
- * new run (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a
+ * new run (`allowRuleOf`), since this run's is frozen at `nemia start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a
  * file written, by any tool, `Edit(…)`, and a path in the step's own directory written from it (`at`), since the next run's is another. A
  * call the step's own `disallowedTools:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would
  * allow nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are
@@ -532,19 +532,19 @@ export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'dis
   const own = fenced.length
     ? ` ${shownList(fenced.map((f) => f.call))} may be its own disallowedTools: at work (${shownList([...new Set(fenced.map((f) => f.rule))])}), which beats any allowedTools:, so no rule is offered for ${fenced.length === 1 ? 'it' : 'them'}.`
     : '';
-  return `denied — its harness denied its try ${calls.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add}${own} This run's allowedTools: is frozen at wf start, so a try of it is denied the same again.`;
+  return `denied — its harness denied its try ${calls.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add}${own} This run's allowedTools: is frozen at nemia start, so a try of it is denied the same again.`;
 }
 
 /** Rules or calls as `deniedOffer` names them: each one line, the first `DENIED_SHOWN`, then how many more. Pure. */
 function shownList(words: readonly string[]): string {
   const named = words.slice(0, DENIED_SHOWN).map((word) => oneLine(word, RULE_CAP));
   const more = words.length - named.length;
-  return `${named.join(', ')}${more ? ` and ${more} more (wf logs)` : ''}`;
+  return `${named.join(', ')}${more ? ` and ${more} more (nemia logs)` : ''}`;
 }
 
 /**
- * `wf decide`'s OVER BUDGET line, saying for each step why it is held. A step whose own tries cost its budget or more gives the amounts:
- * `implement ($4.25 of $3)`. A looping step held because its round would file such a step again names that step, as `wf ls` does:
+ * `nemia decide`'s OVER BUDGET line, saying for each step why it is held. A step whose own tries cost its budget or more gives the amounts:
+ * `implement ($4.25 of $3)`. A looping step held because its round would file such a step again names that step, as `nemia ls` does:
  * `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Pure. Undefined with no step over budget.
  * How each ended on its own work is on its own line — FAILED, UNSIGNED, FAILED CHECK (`decision`). On a pruned run it waits on nobody, and
  * says the run was pruned where it would say so: the raise it waits for, a try or a round, is refused (`prunedRefusal`), as `listing`
@@ -569,7 +569,7 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
 }
 
 /**
- * For each step that signed off blocked and may be tried again, the `wf retry` that answers its `needs`, as `wf decide` prints it under the
+ * For each step that signed off blocked and may be tried again, the `nemia retry` that answers its `needs`, as `nemia decide` prints it under the
  * question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not settled, which
  * a try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose question stays
  * with nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
@@ -589,10 +589,10 @@ export function answerLines(
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
-    if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  wf retry ${run.id} ${step.name} --message "<answer>"`;
+    if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} --message "<answer>"`;
     else if (raise && modes.length && closeoutOf(step.name)?.outcome === 'blocked') {
       lines[step.name] =
-        `to answer it, its cap raised above ${aboveWord(raise)}:  wf retry ${run.id} ${step.name} --budget <amount> --message "<answer>"`;
+        `to answer it, its cap raised above ${aboveWord(raise)}:  nemia retry ${run.id} ${step.name} --budget <amount> --message "<answer>"`;
     }
   }
   return lines;

@@ -1,6 +1,6 @@
 /**
  * Starting a workflow folder's run: the program `startRun`, beside `start`, its plain face. It refuses what it can before anything is
- * written, and writes the run's record; nothing is filed here — the tick files a run's first steps on its next pass. `wf plan` and the
+ * written, and writes the run's record; nothing is filed here — the tick files a run's first steps on its next pass. `nemia plan` and the
  * inbox start their runs through it. A controller whose program requires nothing: the runtime it reads, through the client
  * (`runtime-client.ts`), is its harnesses, which say which steps a session can be bridged for, and never the engine.
  */
@@ -220,7 +220,7 @@ export function refuseInclude(repo: string, isolate: boolean): void {
   }
 }
 
-/** What `wf start` is told: the brief, the repository and the workflow folder, and what `startRun` says of each of the rest. */
+/** What `nemia start` is told: the brief, the repository and the workflow folder, and what `startRun` says of each of the rest. */
 export type StartOptions = {
   brief: string;
   repo: string;
@@ -234,7 +234,7 @@ export type StartOptions = {
   factory?: string;
 };
 
-/** What a run is told at `wf start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
+/** What a run is told at `nemia start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
 type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts'>;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
@@ -242,7 +242,7 @@ const repoNamedRefusal = (repo: string): string =>
   `--repo ${repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
   `Start it without --repo, or start a workflow whose steps work on a repository.`;
 
-/** The files `wf start --input` names, each resolved from where it is typed, and what is there: a file, a directory, other or nothing. */
+/** The files `nemia start --input` names, each resolved from where it is typed, and what is there: a file, a directory, other or nothing. */
 function inputsOf(given: readonly string[]): InputFile[] {
   return given.map((g): InputFile => {
     const resolved = path.resolve(g);
@@ -285,7 +285,7 @@ function mountRefusal(
 }
 
 /**
- * The factory's folders `startRun` left out of `run`'s mounts, as `wf start` says them: each of its repositories but the run's own that
+ * The factory's folders `startRun` left out of `run`'s mounts, as `nemia start` says them: each of its repositories but the run's own that
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
  */
 export function leftOutMounts(run: Run): string[] {
@@ -398,7 +398,7 @@ const factoryNamed = (name: string | undefined): Factory | undefined =>
 
 /**
  * The repository a run started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository, else
- * `fallback`. What `wf start` resolves its workflow folder against, before `start` judges it. Refused as `start` refuses the factory: none
+ * `fallback`. What `nemia start` resolves its workflow folder against, before `start` judges it. Refused as `start` refuses the factory: none
  * by that name, or one whose file does not read (`readFactory`).
  */
 export const repoFor = (name: string | undefined, named: string | undefined, fallback: string): string =>
@@ -407,11 +407,11 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.
  *
- * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
+ * `after` names the runs this one waits on (`nemia start --after`): refused before anything is written when one could never ship onto
  * this run's base, or when the run is a folder run, which has no branch to wait for (`afterRefusal`), and frozen on the record. Left out,
  * the record has no `after`.
  *
- * `inputs` are files to hand every step (`wf start --input`), by path from where `wf start` is typed: refused before anything is written
+ * `inputs` are files to hand every step (`nemia start --input`), by path from where `nemia start` is typed: refused before anything is written
  * when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and their
  * names frozen on the record. Left out, no directory is made, and the record has no `inputs`.
  *
@@ -419,24 +419,24 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * none.
  *
  * `gates` are the steps whose closeout waits for a person before anything after them is filed, beside those the workflow gates itself
- * (`wf start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
+ * (`nemia start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  *
  * A team that says `workspace: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
  * run's own directory in the store is its workspace, each step's folder made beneath it when the step is filed (`folderPlace`).
  *
- * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `wf ls`, `wf decide` and the board list
+ * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `nemia ls`, `nemia decide` and the board list
  * them in. The inputs are copied and the steps' agents rendered (`writeAgentFiles`) before the record is written, so a record never names a
  * file that is not there: a copy or a render that fails removes the run's directory, and is an `Error` with exit 1.
  *
- * `factory` names the factory the run is started in (`wf start --factory`): its hires fill the workflow's steps (`stepsToStart`), read as
+ * `factory` names the factory the run is started in (`nemia start --factory`): its hires fill the workflow's steps (`stepsToStart`), read as
  * they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
  * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a git run, when
  * `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left out, or the
  * default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
  *
  * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
- * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `wf start`
+ * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `nemia start`
  * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). A step's
  * `writable:` names the folders it alone is filed writable (`stepMounts`), each refused unless one folder of the factory has the name and
  * is mounted or the run's own (`writableRefusal`), and on a harness that holds no writable mount (`writableMountRefusal`). The list
@@ -476,7 +476,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
 });
 
 /**
- * `wf start`'s plain face: `startRun`, run synchronously. Returns the run's record; throws the refusal the program failed with, or what it
+ * `nemia start`'s plain face: `startRun`, run synchronously. Returns the run's record; throws the refusal the program failed with, or what it
  * died of, as it was thrown.
  */
 export const start = (opts: StartOptions): Run => Effect.runSync(startRun(opts));

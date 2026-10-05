@@ -34,34 +34,34 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
-  /** The card's name, as `wf inbox` lists it. */
+  /** The card's name, as `nemia inbox` lists it. */
   name: string;
   /** What the run is asked to do, in place of the card's body: the note rewritten into work. The card's body when left out. */
   brief?: string;
   /** The workflow, over the card's `workflow:`: a folder — from `from` when relative — or a name under the repository's `workflows/`. */
   workflow?: string;
-  /** Where a relative `workflow` is read from: where `wf start` was typed. The current directory when left out. */
+  /** Where a relative `workflow` is read from: where `nemia start` was typed. The current directory when left out. */
   from?: string;
   /**
-   * The repository, over the card's `repo:`: named by a person at start (`wf start <card> --repo`), and refused as `start()` refuses it for
+   * The repository, over the card's `repo:`: named by a person at start (`nemia start <card> --repo`), and refused as `start()` refuses it for
    * a team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team
-   * takes it as it takes the directory `wf start` is typed in, and never looks at it.
+   * takes it as it takes the directory `nemia start` is typed in, and never looks at it.
    */
   repo?: string;
-  /** The repository when neither `repo`, the card nor its factory names one: `wf start`'s `.`, or the board's own. */
+  /** The repository when neither `repo`, the card nor its factory names one: `nemia start`'s `.`, or the board's own. */
   callerRepo: string;
-  /** The factory it is started in, over the card's `factory:` (`wf start <card> --factory`). */
+  /** The factory it is started in, over the card's `factory:` (`nemia start <card> --factory`). */
   factory?: string;
   /**
    * How the start names a factory, in its own words with `<name>` in them — `--factory <name>`, `?factory=<name>` — said in the refusal
    * of a card that names none. None for the queue's start, which has no such words.
    */
   fix?: string;
-  /** The runs it waits on (`wf start --after`): an inbox card has no `after:`, so it is said here, at start. */
+  /** The runs it waits on (`nemia start --after`): an inbox card has no `after:`, so it is said here, at start. */
   after?: readonly string[];
   isolate?: boolean;
   inputs?: readonly string[];
-  /** The steps its run is gated at (`wf start --gate`), beside the card's own `gate:`. */
+  /** The steps its run is gated at (`nemia start --gate`), beside the card's own `gate:`. */
   gates?: readonly string[];
 };
 
@@ -107,16 +107,16 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
 }
 
 /**
- * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }`
+ * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }`
  * on its record, then removed from the inbox.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
- * `wf plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
+ * `nemia plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
  * repository's workflows. The factory is `factory`, else the card's `factory:`. The repository is `repo`, else the
  * card's `repo:`, else the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()`
  * judges the factory. The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
  *
- * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card.
+ * The record is written first, so a removal that fails leaves a card `nemia inbox` lists as started — never a run with no trace of its card.
  * It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is
  * written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
  * that does not read, a card already started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix`
@@ -132,7 +132,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   const text = runStore.inbox.read(`${opts.name}.md`);
   if (text === null) {
     throw new Missing({
-      message: `${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${runStore.inbox.where('<name>.md')} — or park the idea first: wf inbox add "<idea>".`,
+      message: `${noCardLine(opts.name, inboxCards())} Start one of those — nemia start ${runStore.inbox.where('<name>.md')} — or park the idea first: nemia inbox add "<idea>".`,
     });
   }
   const card = parseInboxCard(`${opts.name}.md`, text, isDirectory);
@@ -205,7 +205,7 @@ const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the
  * repository `queueRepo` names — its `repo:`, else its factory's one repository, else `repo`, the daemon's — the same one its refusal is
  * remembered on, so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card
- * whose `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it: a tick's line
+ * whose `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `nemia start` says it: a tick's line
  * (`queueLine`) is the only place a daemon's start is read. The result names the repository (`on`) only when neither the card nor its
  * factory names one, and the start turns on where the daemon runs — never for a card that names no factory, which is refused wherever the
  * daemon runs (`unfactoredCardRefusal`, with no start's words), and lasts until the card names one.

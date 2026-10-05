@@ -1,5 +1,5 @@
 /**
- * The runners of the commands that start work from where they are typed — `wf start`, `wf plan`, `wf inbox add` and `wf inbox queue`:
+ * The runners of the commands that start work from where they are typed — `nemia start`, `nemia plan`, `nemia inbox add` and `nemia inbox queue`:
  * each reads the files and folders its command line names, hands its entry's handler what it found, and prints what the entry says of it.
  */
 import fs from 'node:fs';
@@ -41,7 +41,7 @@ function placeOfStart(args: Args): { factory?: string; repo: string } {
   return { ...(factory !== undefined ? { factory } : {}), repo: found.repo ?? repoFor(factory, named, path.resolve('.')) };
 }
 
-/** `wf start` of the inbox's card `card`: its body, or `--brief` in its place — a file's text, or the words. */
+/** `nemia start` of the inbox's card `card`: its body, or `--brief` in its place — a file's text, or the words. */
 function cardArgs(card: string, args: Args): Args {
   const instead = textOf(args, 'instead');
   const repo = textOf(args, 'repo');
@@ -63,7 +63,7 @@ function cardArgs(card: string, args: Args): Args {
 function briefArgs(arg: string, args: Args): Args {
   if (args.instead !== undefined)
     usage(
-      `wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`,
+      `nemia start takes --brief only for a card of the inbox, in place of its body: nemia start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: nemia start "<brief>".`,
     );
   const after = Array.isArray(args.after) ? args.after : [];
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
@@ -83,7 +83,7 @@ function briefArgs(arg: string, args: Args): Args {
   };
 }
 
-/** `wf start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it. */
+/** `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it. */
 export async function startRun(args: Args, e: Engine): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
   const card = inboxNameAt(arg);
@@ -93,7 +93,7 @@ export async function startRun(args: Args, e: Engine): Promise<void> {
 }
 
 /**
- * `wf plan`: a run per card of a plan folder, a line each, in the factory and on the repository a `wf start` typed here would be
+ * `nemia plan`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here would be
  * (`placeOfStart`); a card that did not start stops the rest, and fails with what it was told.
  */
 export function planRun(args: Args): void {
@@ -105,11 +105,11 @@ export function planRun(args: Args): void {
     const told = planStopped({ card: stopped.card, why: stopped.error.message, rest: stopped.rest }, started, { ...plan, folderOf });
     throw Object.assign(new Error(told), { exitCode: stopped.error.exitCode ?? 1 });
   }
-  console.log(`run 'wf tick' (or 'wf up') to start them`);
+  console.log(`run 'nemia tick' (or 'nemia up') to start them`);
 }
 
 /**
- * `wf inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is typed
+ * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is typed
  * (`workflowAt`); a directory is refused.
  */
 export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
@@ -117,7 +117,7 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
   const at = fs.statSync(idea, { throwIfNoEntry: false });
   if (at?.isDirectory())
     usage(
-      `${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`,
+      `${idea} is a directory, and nemia inbox add takes the idea as text or as one file: nemia inbox add "<idea>", or nemia inbox add ./idea.md.`,
     );
   const workflow = textOf(args, 'workflow');
   const repo = textOf(args, 'repo');
@@ -132,7 +132,7 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
-/** `wf inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`). */
+/** `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`). */
 export async function inboxQueueRun(args: Args, e: Engine): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };

@@ -1,17 +1,17 @@
 /**
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
- * same entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`wf start`, `START`, and
- * `wf plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`), a person's asks of a run —
- * `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), three reads the api
+ * same entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and
+ * `nemia plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`), a person's asks of a run —
+ * `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and their steps (`nemia ls`, `runsListed`), three reads the api
  * alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots (`slotsOf`), the agents of
- * both places (`wf agents`, `agentsRead`), one agent's card (`wf agents card`, `agentCardRead`) and its custom instructions
- * (`wf agents custom`, `AGENTS_CUSTOM`), a run's course (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's pause (`wf pause`,
- * `wf resume`, and its read the api alone serves): `runs.verb.ts`; the reads of the store (`wf show`, `wf logs`, `wf feed`,
- * `wf stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a
+ * both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its custom instructions
+ * (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`,
+ * `nemia resume`, and its read the api alone serves): `runs.verb.ts`; the reads of the store (`nemia show`, `nemia logs`, `nemia feed`,
+ * `nemia stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a
  * run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`)
  * and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with
- * no handler: `wf plan`, `wf tick`, `wf up` and `wf watch` (`RAN`).
+ * no handler: `nemia plan`, `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
  */
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
@@ -60,7 +60,7 @@ const amountIn = (args: Args, key: string): number | undefined => {
 /** The run's id and the step's name, as every route and command line names them. */
 const named = (args: Args): { runId: string; step: string } => ({ runId: textOf(args, 'runId') ?? '', step: textOf(args, 'step') ?? '' });
 
-/** `wf retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer and the cap. */
+/** `nemia retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer and the cap. */
 function howOf(args: Args): RetryHow {
   const mode = textOf(args, 'mode');
   const model = textOf(args, 'model');
@@ -74,19 +74,19 @@ function howOf(args: Args): RetryHow {
   };
 }
 
-/** The run's id and the step's name, as `wf retry`, `wf approve` and `wf say` take them first. */
+/** The run's id and the step's name, as `nemia retry`, `nemia approve` and `nemia say` take them first. */
 const RUN_STEP = [
   { key: 'runId', takes: 'required', kind: 'name' },
   { key: 'step', takes: 'required', kind: 'name' },
 ] as const;
 
-/** The run's id, and the step that closes the loop when the run has more than one, as `wf round` and `wf accept` take them. */
+/** The run's id, and the step that closes the loop when the run has more than one, as `nemia round` and `nemia accept` take them. */
 const RUN_LOOP = [
   { key: 'runId', takes: 'required', kind: 'name' },
   { key: 'step', takes: 'optional', kind: 'name' },
 ] as const;
 
-/** `wf retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
+/** `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
 const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   name: 'retry',
   usage: '<runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
@@ -115,30 +115,30 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
         key: 'model',
         sets: { mode: 'fresh' },
         way: true,
-        takes: '--model takes the model to run the new session on: wf retry <runId> <step> --model <m>',
+        takes: '--model takes the model to run the new session on: nemia retry <runId> <step> --model <m>',
       },
       {
         flag: '--message',
         kind: 'text',
         key: 'message',
-        takes: '--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"',
-        twice: 'wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".',
+        takes: '--message takes what to tell the step, quoted: nemia retry <runId> <step> --message "<answer>"',
+        twice: 'nemia retry takes --message once: put the whole answer in it, quoted — nemia retry <runId> <step> --message "<answer>".',
       },
       {
         flag: '--budget',
         kind: 'amount',
         key: 'budget',
         takes: "the most the step's tries may cost together, in dollars, above what they have cost",
-        form: 'wf retry <runId> <step> --budget <amount>',
-        twice: 'wf retry takes --budget once: the cap to raise the step to, in dollars — wf retry <runId> <step> --budget <amount>.',
+        form: 'nemia retry <runId> <step> --budget <amount>',
+        twice: 'nemia retry takes --budget once: the cap to raise the step to, in dollars — nemia retry <runId> <step> --budget <amount>.',
       },
     ],
     defaults: { mode: 'nudge' },
     unknown: (arg) =>
-      `wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`,
-    oneWay: 'wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
+      `nemia retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`,
+    oneWay: 'nemia retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
     apart: (flag) =>
-      `--message takes what to tell the step, and ${flag} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
+      `--message takes what to tell the step, and ${flag} is one of nemia retry's own flags, so the answer was left out: nemia retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
   },
   check: (args) => messageRefusal(howOf(args), commandLine(RETRY, args)) ?? budgetRefusal(howOf(args), commandLine(RETRY, args)),
   writes: true,
@@ -166,7 +166,7 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
 /** What the next tick files once a step is approved: the step itself, what waits on it, or nothing, so its run can be decided. */
 type Next = 'step' | 'waiting' | 'nothing';
 
-/** `wf approve`: a step's try approved at its gate, what the next tick files because of it, and the file the approval is written to. */
+/** `nemia approve`: a step's try approved at its gate, what the next tick files because of it, and the file the approval is written to. */
 const APPROVE: Command<{ try: number; at: string; message: string | null; file: string; next: Next }> = {
   name: 'approve',
   usage: '<runId> <step> [--message "<words>"]',
@@ -174,7 +174,7 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
     'let a step waiting at its gate hand on: what waits on it is filed on',
     'the next tick, and every step after the gate is handed your words',
     'under ## Approved. To send it back instead, with what to change:',
-    'wf retry <runId> <step> --message "<objection>"',
+    'nemia retry <runId> <step> --message "<objection>"',
   ],
   spec: {
     positionals: RUN_STEP,
@@ -183,12 +183,12 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
         flag: '--message',
         kind: 'text',
         key: 'message',
-        takes: '--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".',
-        twice: 'wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".',
+        takes: '--message takes the words that go with your approval, quoted: nemia approve <runId> <step> --message "<words>".',
+        twice: 'nemia approve takes --message once: put all your words in it, quoted — nemia approve <runId> <step> --message "<words>".',
       },
     ],
     unknown: (arg) =>
-      `wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`,
+      `nemia approve does not take ${arg}. It takes the run, the step, and --message "<words>": nemia approve <runId> <step> [--message "<words>"].`,
   },
   check: (args) => approvalWordsRefusal(textOf(args, 'message'), commandLine(APPROVE, args)),
   writes: true,
@@ -213,7 +213,7 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
   },
 };
 
-/** `wf round`: another round of a loop out of rounds asked for, its cap raised with `--budget`, and the file the ask is written to. */
+/** `nemia round`: another round of a loop out of rounds asked for, its cap raised with `--budget`, and the file the ask is written to. */
 const ROUND: Command<{ step: string; round: number; file: string; budget?: number }> = {
   name: 'round',
   usage: '<runId> [<step>] [--budget <amount>]',
@@ -230,13 +230,13 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
         kind: 'amount',
         key: 'budget',
         takes: 'the most a step of the loop may cost together, in dollars, above what it has cost',
-        form: 'wf round <runId> [<step>] --budget <amount>',
+        form: 'nemia round <runId> [<step>] --budget <amount>',
         twice:
-          'wf round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — wf round <runId> [<step>] --budget <amount>.',
+          'nemia round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — nemia round <runId> [<step>] --budget <amount>.',
       },
     ],
     unknown: () =>
-      'wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
+      'nemia round takes the run and, when the run has more than one loop, the step that closes the one to go round: nemia round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
   },
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
@@ -253,7 +253,7 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
   },
 };
 
-/** `wf accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to. */
+/** `nemia accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to. */
 const ACCEPT: Command<{ step: string; try: number; at: string; message: string; file: string; waited: boolean }> = {
   name: 'accept',
   usage: '<runId> [<step>] --message "<why>"',
@@ -262,7 +262,7 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
     'open. What waits on the looping step is filed on the next tick as',
     'if it had said again: false — a gated ending goes to its gate —',
     'and every step after the loop is handed your words and those',
-    'findings under ## Accepted. The other answer to wf round',
+    'findings under ## Accepted. The other answer to nemia round',
   ],
   spec: {
     positionals: RUN_LOOP,
@@ -271,12 +271,12 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
         flag: '--message',
         kind: 'text',
         key: 'message',
-        takes: '--message takes why the work is good enough with its findings open, quoted: wf accept <runId> [<step>] --message "<why>".',
-        twice: 'wf accept takes --message once: put all your words in it, quoted — wf accept <runId> [<step>] --message "<why>".',
+        takes: '--message takes why the work is good enough with its findings open, quoted: nemia accept <runId> [<step>] --message "<why>".',
+        twice: 'nemia accept takes --message once: put all your words in it, quoted — nemia accept <runId> [<step>] --message "<why>".',
       },
     ],
     unknown: () =>
-      'wf accept takes the run and, when the run has more than one loop, the step that closes the one to end: wf accept <runId> [<step>] --message "<why>".',
+      'nemia accept takes the run and, when the run has more than one loop, the step that closes the one to end: nemia accept <runId> [<step>] --message "<why>".',
   },
   check: (args) => acceptWordsRefusal(textOf(args, 'message'), commandLine(ACCEPT, args)),
   writes: true,
@@ -297,7 +297,7 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
 };
 
 /**
- * `wf say`: words to a step's session, journalled on its task, and printed as `wf decide` prints them. It takes every word after the step
+ * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them. It takes every word after the step
  * as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
  */
 const SAY: Command<{ at: string; attempt: number; text: string; try: number; taskId: string }> = {
@@ -305,14 +305,14 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   usage: '<runId> <step> "<words>"',
   help: [
     "tell a step's running session something, through its harness: the",
-    "engine journals the words on the step's task, wf ls notes the step",
-    'said to, and wf decide prints them under it. A try that continues',
+    "engine journals the words on the step's task, nemia ls notes the step",
+    'said to, and nemia decide prints them under it. A try that continues',
     'the session is handed them again, as ## Said to your session',
   ],
   spec: {
     positionals: [...RUN_STEP, { key: 'text', takes: 'rest', kind: 'text' }],
     flags: [],
-    unknown: (arg) => `wf say does not take ${arg}.`,
+    unknown: (arg) => `nemia say does not take ${arg}.`,
   },
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
@@ -326,7 +326,7 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   print({ at, attempt, text, try: tryNo, taskId }, args) {
     const { runId, step } = named(args);
     return [
-      `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: wf decide ${runId} prints it under the step`,
+      `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: nemia decide ${runId} prints it under the step`,
       ...saidLines([{ at, attempt, text, try: tryNo }])
         .slice(1)
         .flatMap((l) => l.split('\n'))
@@ -336,7 +336,7 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
 };
 
 /**
- * `wf ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs' summaries,
+ * `nemia ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs' summaries,
  * judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`).
  */
 const LS: Command<RunsListed> = {
@@ -346,7 +346,7 @@ const LS: Command<RunsListed> = {
     'runs and their steps — a run waiting on another says waiting on <run>,',
     'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
     "flight); what each step's tries and the run have cost, where measured;",
-    'last, whether a wf up ticks the store and when its last pass was;',
+    'last, whether a nemia up ticks the store and when its last pass was;',
     'first, while the store is paused, Pausing: N finishing and each',
     'session, check or landing at work, or Paused once none is, then each',
     'landing it holds with its merge staged in the checkout (MERGE_HEAD)',
@@ -354,7 +354,7 @@ const LS: Command<RunsListed> = {
   spec: {
     positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],
     flags: [],
-    unknown: (arg) => `wf ls takes one run's id, or none: not ${arg}.`,
+    unknown: (arg) => `nemia ls takes one run's id, or none: not ${arg}.`,
   },
   writes: false,
   only: {
@@ -372,13 +372,13 @@ const DECIDE: Command<Decided> = {
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
     flags: [],
-    unknown: (arg) => `wf decide does not take ${arg}.`,
+    unknown: (arg) => `nemia decide does not take ${arg}.`,
   },
   writes: false,
   route: { method: 'GET', path: '/api/runs/:runId/decision', status: 200 },
   only: {
     side: 'api',
-    why: "wf decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
+    why: "nemia decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
   },
   handler: (e, args, env) => decide(e, named(args).runId, env),
   print: () => [],
@@ -393,16 +393,16 @@ const CEILINGS: Command<Slots> = {
   route: { method: 'GET', path: '/api/ceilings', status: 200 },
   only: {
     side: 'api',
-    why: 'the board says the run slots over its Factory; at the command line, wf ls and wf decide say a run held for one beside the run',
+    why: 'the board says the run slots over its Factory; at the command line, nemia ls and nemia decide say a run held for one beside the run',
   },
   handler: (e, _args, env) => slotsOf(e, undefined, env),
   print: () => [],
 };
 
-/** The refusal of a value left out of each of `wf agents`' two flags, saying what it takes. */
+/** The refusal of a value left out of each of `nemia agents`' two flags, saying what it takes. */
 const AGENTS_TAKES = {
-  '--repo': '--repo takes the repository whose workflows/agents to read: wf agents --repo <r>',
-  '--from': '--from takes which place the agent is in: wf agents card <name> --from repo|yours',
+  '--repo': '--repo takes the repository whose workflows/agents to read: nemia agents --repo <r>',
+  '--from': '--from takes which place the agent is in: nemia agents card <name> --from repo|yours',
 } as const;
 
 /** `--repo <r>` once, and `--from repo|yours` once, which the listing takes and leaves unread. */
@@ -411,21 +411,21 @@ const AGENTS_FLAGS = (['--repo', '--from'] as const).map((flag): Flag => ({
   kind: 'text',
   key: flag.slice(2),
   takes: AGENTS_TAKES[flag],
-  twice: `wf agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
+  twice: `nemia agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
 }));
 
-/** `wf agents`' spec, after the name of the card it is asked for: its flags, and an argument it does not take in its own words. */
+/** `nemia agents`' spec, after the name of the card it is asked for: its flags, and an argument it does not take in its own words. */
 const agentsSpec = (positionals: CommandSpec['spec']['positionals']): CommandSpec['spec'] => ({
   positionals,
   flags: AGENTS_FLAGS,
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-      : `wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card ${arg}, or wf agents custom ${arg}.`,
+      ? `nemia agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
+      : `nemia agents takes no argument but card <name> or custom <name>: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
   apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
 });
 
-/** Refused of `wf agents`' flags: a value empty or starting `--`, which reads as the value left out, and a place but repo or yours. */
+/** Refused of `nemia agents`' flags: a value empty or starting `--`, which reads as the value left out, and a place but repo or yours. */
 function agentsRefusal(args: Args): string | null {
   for (const flag of ['--repo', '--from'] as const) {
     const value = textOf(args, flag.slice(2));
@@ -433,10 +433,10 @@ function agentsRefusal(args: Args): string | null {
   }
   const from = textOf(args, 'from');
   if (from === undefined || from === 'repo' || from === 'yours') return null;
-  return `wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`;
+  return `nemia agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`;
 }
 
-/** `wf agents`: every agent of both places, the repository's then yours, each read now from disk. */
+/** `nemia agents`: every agent of both places, the repository's then yours, each read now from disk. */
 const AGENTS: Command<AgentsRead> = {
   name: 'agents',
   usage: '[--repo .]',
@@ -453,7 +453,7 @@ const AGENTS: Command<AgentsRead> = {
   print: agentsLines,
 };
 
-/** `wf agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
+/** `nemia agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
 const AGENT_CARD: Command<CardRead> = {
   name: 'agents card',
   usage: '<name> [--repo .] [--from repo|yours]',
@@ -479,7 +479,7 @@ const AGENT_CARD: Command<CardRead> = {
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };
 
-/** Every command with a handler defined once, in the order `wf`'s help lists them: what the api may serve. */
+/** Every command with a handler defined once, in the order `nemia`'s help lists them: what the api may serve. */
 export const COMMANDS: readonly Command[] = [
   START,
   ...INBOXES,
@@ -512,7 +512,7 @@ export const COMMANDS: readonly Command[] = [
 ];
 
 /**
- * The whole table, in the order `wf`'s help lists them: `wf start` and `wf plan`, then every other command with a handler, then those the
+ * The whole table, in the order `nemia`'s help lists them: `nemia start` and `nemia plan`, then every other command with a handler, then those the
  * CLI runs itself (`RAN`).
  */
 export const TABLE: readonly (Command | Ran)[] = [COMMANDS[0], PLAN, ...COMMANDS.slice(1), ...RAN];

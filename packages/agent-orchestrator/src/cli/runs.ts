@@ -1,5 +1,5 @@
 /**
- * The runner of `wf agents custom`, which reads the words a file holds; and the runners of `wf rm` and `wf prune` (`RM`, `PRUNE`), which
+ * The runner of `nemia agents custom`, which reads the words a file holds; and the runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`), which
  * walk the many runs a command line names through the entry's handler, ask a person's yes, and tally what was not done into the exit code.
  */
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import { HELP, usage, confirmed, type Engine } from './flags.ts';
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
 
 /**
- * One run `wf rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that is
+ * One run `nemia rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that is
  * a failure other than a refusal.
  */
 async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
@@ -26,7 +26,7 @@ async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean
 }
 
 /**
- * `wf rm`: each run forgotten, judged on its own, a line each, a refusal included; once every run has had its say, it fails naming those
+ * `nemia rm`: each run forgotten, judged on its own, a line each, a refusal included; once every run has had its say, it fails naming those
  * not forgotten, exit 2, or 1 when one failed otherwise.
  */
 export async function rmVerb(args: Args, e: Engine): Promise<void> {
@@ -42,7 +42,7 @@ export async function rmVerb(args: Args, e: Engine): Promise<void> {
   if (notForgotten.length) {
     throw Object.assign(
       new Error(
-        `wf rm: ${notForgotten.join(', ')} not forgotten — ${notForgotten.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
+        `nemia rm: ${notForgotten.join(', ')} not forgotten — ${notForgotten.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
       ),
       { exitCode: failed ? 1 : 2 },
     );
@@ -50,29 +50,29 @@ export async function rmVerb(args: Args, e: Engine): Promise<void> {
   return;
 }
 
-/** The runs `wf prune` named and did not prune, and whether one failed otherwise than by a refusal, which makes its exit 1 and not 2. */
+/** The runs `nemia prune` named and did not prune, and whether one failed otherwise than by a refusal, which makes its exit 1 and not 2. */
 type PruneTally = { notPruned: string[]; failed: boolean };
 
-/** A run `wf prune` failed to judge or to prune: its line, and its place in the tally. */
+/** A run `nemia prune` failed to judge or to prune: its line, and its place in the tally. */
 function notPrunedLine(id: string, err: unknown, tally: PruneTally): void {
   console.log(`${id}  not pruned: ${(err as Error).message}`);
   tally.notPruned.push(id);
   if ((err as { exitCode?: number }).exitCode !== 2) tally.failed = true;
 }
 
-/** `wf prune`'s end: once every run has had its say, it fails naming each run not pruned, exit 2, or 1 when one failed otherwise. */
+/** `nemia prune`'s end: once every run has had its say, it fails naming each run not pruned, exit 2, or 1 when one failed otherwise. */
 function refusedNamed(tally: PruneTally): void {
   if (tally.notPruned.length) {
     throw Object.assign(
       new Error(
-        `wf prune: ${tally.notPruned.join(', ')} not pruned — ${tally.notPruned.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
+        `nemia prune: ${tally.notPruned.join(', ')} not pruned — ${tally.notPruned.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
       ),
       { exitCode: tally.failed ? 1 : 2 },
     );
   }
 }
 
-/** Each of `ids` judged for `wf prune`, removing nothing whatever `args` says; a run it cannot judge is said and tallied. */
+/** Each of `ids` judged for `nemia prune`, removing nothing whatever `args` says; a run it cannot judge is said and tallied. */
 async function judged(e: Engine, ids: readonly string[], args: Args, tally: PruneTally): Promise<Pruning[]> {
   const found: Pruning[] = [];
   for (const id of ids) {
@@ -86,7 +86,7 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
 }
 
 /**
- * What `wf prune` found, a run's lines each. Of named runs, a refusal is tallied; of every run, a run with nothing to prune is not said at
+ * What `nemia prune` found, a run's lines each. Of named runs, a refusal is tallied; of every run, a run with nothing to prune is not said at
  * all, and the runs not over are said in one line.
  */
 function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
@@ -100,7 +100,7 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
     console.log(`${running.length} run${running.length > 1 ? 's' : ''} not over, not pruned: ${running.map((p) => p.id).join(', ')}`);
 }
 
-/** The runs `wf prune` removes once a person has said yes, each judged again as it is pruned, never trusted from the listing. */
+/** The runs `nemia prune` removes once a person has said yes, each judged again as it is pruned, never trusted from the listing. */
 async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
   for (const p of prunable) {
     try {
@@ -114,7 +114,7 @@ async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: Prun
   }
 }
 
-/** Whether `wf prune` removes `prunable`: on `--yes`, or a person's y; else it says the command that would, and removes nothing. */
+/** Whether `nemia prune` removes `prunable`: on `--yes`, or a person's y; else it says the command that would, and removes nothing. */
 async function removing(
   prunable: Pruning[],
   named: boolean,
@@ -122,13 +122,13 @@ async function removing(
 ): Promise<boolean> {
   if (yes || (await confirmed('remove them? [y/N] '))) return true;
   console.log(
-    `nothing removed: wf prune ${[...(named ? prunable.map((p) => p.id) : []), ...(unmerged ? ['--unmerged'] : []), ...(artifacts ? ['--artifacts'] : []), '--yes'].join(' ')} removes them`,
+    `nothing removed: nemia prune ${[...(named ? prunable.map((p) => p.id) : []), ...(unmerged ? ['--unmerged'] : []), ...(artifacts ? ['--artifacts'] : []), '--yes'].join(' ')} removes them`,
   );
   return false;
 }
 
 /**
- * `wf prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each on
+ * `nemia prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each on
  * its own, a line each, a refusal included; with none, every run.
  */
 export async function pruneVerb(args: Args, e: Engine): Promise<void> {
@@ -159,13 +159,13 @@ function wordsFrom(file: string): string {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
   } catch (err) {
     return usage(
-      `wf agents custom cannot read ${file === '-' ? 'stdin' : path.resolve(file)}: ${(err as Error).message}. Name a file that is there.`,
+      `nemia agents custom cannot read ${file === '-' ? 'stdin' : path.resolve(file)}: ${(err as Error).message}. Name a file that is there.`,
     );
   }
 }
 
 /**
- * `wf agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its store,
+ * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its store,
  * and what the entry says of them printed.
  */
 export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {

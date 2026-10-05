@@ -1,5 +1,5 @@
 /**
- * `wf cancel`: call a run off. It stops what the run has in flight, then writes the person's own file, never the run's record, which the
+ * `nemia cancel`: call a run off. It stops what the run has in flight, then writes the person's own file, never the run's record, which the
  * tick owns. A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a
  * service (`cancelRun`, over `EngineService`), and `cancel`, its plain face in a Promise, over the engine it is handed. It adopts what a
  * pass filed and never wrote down as the tick does (`tick/advance.verb.ts`).
@@ -62,7 +62,7 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
 });
 
 /**
- * `wf cancel` (`cancelRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * `nemia cancel` (`cancelRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
  * with, or with whatever else it died of, as it was thrown.
  */
 export const cancel = (e: Engine, id: string): Promise<Cancelled> =>

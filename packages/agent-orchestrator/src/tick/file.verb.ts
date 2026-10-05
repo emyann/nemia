@@ -69,7 +69,7 @@ export const localFields = <T extends object>(step: Workflow, fields: () => T): 
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
- * `wf start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is
+ * `nemia start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is
  * filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
  * `renderedIn`) — gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its
  * start, so its brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to
@@ -104,7 +104,7 @@ export const ownOf = (step: Workflow, rendered: ClaudeFlags | undefined, repoOf:
 /**
  * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief,
  * and the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as
- * `wf decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
+ * `nemia decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
  *
  * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
  * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
@@ -232,18 +232,18 @@ async function stopFirst(f: Filing, r: Retry, taskId: string): Promise<void> {
   const asked = refused
     ? `but the engine did not take the stop (${refused}), and the try is filed once it has settled`
     : 'so the engine is asked to stop it, and the try is filed once it has';
-  f.notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${asked}`);
+  f.notes.push(`${r.step}: try ${r.try} — nemia retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${asked}`);
 }
 
-/** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `wf retry` and what it was typed with. */
+/** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
 const tryWord = (r: Retry, step: Workflow): string =>
   `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : askedWord(r)}`;
 
-/** A try asked for, as `tryWord` says it: by `wf pause --now`, which stopped its session or check, or by `wf retry` as it was typed. */
+/** A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed. */
 const askedWord = (r: Retry): string =>
   r.by === 'pause'
-    ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after wf pause --now`
-    : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`;
+    ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`
+    : `nemia retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`;
 
 /** Whether a try is a person's nudge that answers the step's task held open, in the session that signed, rather than a task of its own. */
 const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {
@@ -442,7 +442,7 @@ async function fileRound(f: Filing, r: Round, looped: string[]): Promise<void> {
   }
   looped.push(r.step);
   notes.push(
-    `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
+    `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `nemia round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
   );
   if (!(await e.view(taskId)).state.brief) await e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId));
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));

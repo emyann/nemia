@@ -74,8 +74,8 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
 }
 
 /**
- * The engine a command reads — `wf ls`, `wf decide` — whose `view` of a task is read once for the whole command: `wf ls` views a run's
- * tasks, and again each run another waits on, and `wf decide` its current tries and then every try. A view is the engine's word at the
+ * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a run's
+ * tasks, and again each run another waits on, and `nemia decide` its current tries and then every try. A view is the engine's word at the
  * moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of it,
  * as `reportedEngine` does, and a pass — a `tick` or a `start` — drops all of it, so a command that acts reads the engine's word after
  * its act. A view that failed is not kept: the next read asks the engine again.
@@ -185,7 +185,7 @@ export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
  * attempt ended without it (`unsignedEnd`), which the runtime reports and the orchestrator judges. What tells a step that ended
  * without one — `unsigned` — from a task that was never asked, and from one that failed. Exported, log-free, for a consumer that
- * words a step as `wf ls` does.
+ * words a step as `nemia ls` does.
  */
 export const closeoutAsked =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -198,7 +198,7 @@ export const closeoutAsked =
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What
  * tells a step waiting on a person with nothing signed, as on a login refresh the harness lost, from one still working (`retryable`).
- * Exported, log-free, for a consumer that asks `retry` for such a step as `wf retry` does.
+ * Exported, log-free, for a consumer that asks `retry` for such a step as `nemia retry` does.
  */
 export const harnessBlocked =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -210,7 +210,7 @@ export const harnessBlocked =
  * prompt`, as `claude agents --json` prints it. `undefined` for a task nobody is waiting on, and for a harness that says nothing: the
  * detached ones never do. Costs no observation of its own: the engine read it on the same pass it read the phase.
  *
- * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `waitingWords` and `harnessWaitLine` in
+ * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `waitingWords` and `harnessWaitLine` in
  * list/list.ts, which is the only place this repository turns the harness's word into a sentence.
  */
 export const waitingOf =
@@ -230,7 +230,7 @@ export const waitingOf =
  * says the current try's denials, and a try filed after them starts with none. A try that answers a task held open is a turn of that task
  * (`currentTurn`), and says the denials of its own attempts: what the turn it answered was denied was that try's.
  *
- * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `deniedWords` in list/list.ts.
+ * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `deniedWords` in list/list.ts.
  */
 export const deniedOf =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -240,9 +240,9 @@ export const deniedOf =
   };
 
 /**
- * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and
- * `wf decide` print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free,
- * for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
+ * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `nemia ls` and
+ * `nemia decide` print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free,
+ * for a consumer that words a step as `nemia ls` does. A task with no view read has no spend known.
  */
 export const spendReader =
   (views: ReadonlyMap<string, TaskView>): SpendOf =>
@@ -255,9 +255,9 @@ export const spendReader =
  * What each step's current check exited with, off the engine's record (`attemptVerdict`): the code its process gave, or `unfinished` when
  * it gave none — killed by a signal, stopped, or never started — or when the operator or its deadline cut it short, whatever code its
  * process died with; and `undefined` for a step with no check filed. What the tick tells a refusal from a check that did not finish by
- * (`refusedCheck`), and what `wf ls` words, without reading a stream: a run waiting on a person costs no more each pass.
+ * (`refusedCheck`), and what `nemia ls` words, without reading a stream: a run waiting on a person costs no more each pass.
  *
- * Exported for a consumer that words a check as `wf ls` does.
+ * Exported for a consumer that words a check as `nemia ls` does.
  */
 export const exitVerdicts =
   (views: ReadonlyMap<string, TaskView>, run: Run) =>
@@ -276,7 +276,7 @@ export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string):
 /**
  * A step's word on a run left unjudged because a task it reads does not (`unjudgedWords`): `unreadable` when any task the step has filed —
  * its own, its check's, an earlier try's or its check's (`stepTasks`) — is among `unreadable`; else `pending` with no task of its own
- * filed, and the engine's word for that task (`wordOfView`). What `wf ls` prints beside such a step, and the board's chip.
+ * filed, and the engine's word for that task (`wordOfView`). What `nemia ls` prints beside such a step, and the board's chip.
  */
 export const unjudgedWord =
   (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) =>
@@ -288,8 +288,8 @@ export const unjudgedWord =
         : wordOfView(views.get(step.taskId));
 
 /**
- * How many times a person said something to each step's current try while it ran (`wf say`): the engine's `said` on the try's task, off
- * views already read. Exported, log-free, for a consumer that words a step as `wf ls` does.
+ * How many times a person said something to each step's current try while it ran (`nemia say`): the engine's `said` on the try's task, off
+ * views already read. Exported, log-free, for a consumer that words a step as `nemia ls` does.
  */
 export const saidCount =
   (views: ReadonlyMap<string, TaskView>, run: Run) =>
@@ -298,7 +298,7 @@ export const saidCount =
     return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
   };
 
-/** What was said to a task's sessions while they ran (`wf say`), off its view: none for a task with no view, or a view with no `said`. */
+/** What was said to a task's sessions while they ran (`nemia say`), off its view: none for a task with no view, or a view with no `said`. */
 export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
 
 /**
@@ -440,7 +440,7 @@ function closeoutSaid(views: ReadonlyMap<string, TaskView>, taskId: string): Clo
   return said === undefined ? undefined : parseCloseout(said);
 }
 
-/** A task's closing statement (`closeoutSaid`), well-formed only: what `wf stats` reads a try's tallies off. */
+/** A task's closing statement (`closeoutSaid`), well-formed only: what `nemia stats` reads a try's tallies off. */
 export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | undefined {
   const c = closeoutSaid(views, taskId);
   return c && !('error' in c) ? c : undefined;
@@ -457,12 +457,12 @@ export const closeoutReader =
 /**
  * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
  *
- * Shipped is the run's own `wf decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
+ * Shipped is the run's own `nemia decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
  * not cancelled, and every result branch is on its base branch (`isShipped`), with work past its base or with every step succeeded. A child
- * starts when its parent's `wf decide` says shipped, and a child waits exactly while it does not. A result branch is cut at its run's base,
+ * starts when its parent's `nemia decide` says shipped, and a child waits exactly while it does not. A result branch is cut at its run's base,
  * which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent still running has not
  * shipped for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed off with nothing to
- * commit has, as its `wf decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
+ * commit has, as its `nemia decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
  *
  * Git first, which costs no harness observe: a result branch not on the base branch has not shipped, whatever the run's steps say. The
  * engine's view of the parent's tasks is read only once every one is.
@@ -538,7 +538,7 @@ export const parentsOf = (e: Engine, run: Run, git: BranchReader = oneByOne): Pr
 
 /**
  * What each step's current task consumed, summed over its attempts (`sumUsage`): the try whose closeout
- * and check `wf decide` prints beside it. A settled attempt's usage is on the engine's record, the one in
+ * and check `nemia decide` prints beside it. A settled attempt's usage is on the engine's record, the one in
  * flight on the view; an attempt that never started consumed nothing, and is left out.
  *
  * Off views already read, not a view of its own: each `e.view` is a harness observe, so `decide` reads

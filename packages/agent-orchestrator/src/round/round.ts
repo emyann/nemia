@@ -1,6 +1,6 @@
 /**
- * A loop's rounds: those due now (`roundsDue`) and the steps once one is filed (`roundFiled`), what `wf round` and `wf accept` ask and
- * refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`). Pure.
+ * A loop's rounds: those due now (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia round` and `nemia accept` ask and
+ * refuse (`roundAsk`, `acceptAsk`), and what `nemia ls` and `nemia decide` say of a loop (`roundDueNote`, `roundLines`). Pure.
  */
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
 import {
@@ -120,26 +120,26 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
 export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] => asks.filter((a) => a.round <= roundOf(run, a.step));
 
 /**
- * Why a `--budget` cannot ride on `wf round <id>`, in words that say what to do instead — or null. Pure, and asked before anything about
+ * Why a `--budget` cannot ride on `nemia round <id>`, in words that say what to do instead — or null. Pure, and asked before anything about
  * the run, by `roundAsk` and by a caller that answers it apart: an amount that is not dollars above zero.
  */
 export const roundBudgetRefusal = (id: string, budget?: number): string | null =>
   budget !== undefined && !(Number.isFinite(budget) && budget > 0)
-    ? `--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: wf round ${id} [<step>] --budget <amount>, like 5 or 2.50.`
+    ? `--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: nemia round ${id} [<step>] --budget <amount>, like 5 or 2.50.`
     : null;
 
 /**
- * What `wf round` asks for — the looping step and the round — or why it will not, in words that say what to do instead. Pure.
+ * What `nemia round` asks for — the looping step and the round — or why it will not, in words that say what to do instead. Pure.
  *
  * `name` may be left out when the workflow has one loop. Only a loop whose rounds are spent with `again` still true — `exhausted` — may go
  * round once more on a person's word. Refused: a cancelled run, which files nothing; a step that is not here or has no `loop:`, a workflow
- * with no loop, or several and none named; a round already asked for; a step of the loop that stopped in this round, which `wf retry` is
+ * with no loop, or several and none named; a round already asked for; a step of the loop that stopped in this round, which `nemia retry` is
  * for; a round the run files itself; a loop that ended without asking again; and a round still running.
  *
  * A round of a loop whose step is over its budget is a person's to ask for, at the cap or below it, and only with `budget` — `--budget`
  * above what each such step has cost — which is refused by name when it is not, and refused on a loop with no step over its budget.
  *
- * A loop a person ended themselves (`wf accept`) reads `verified` again: while nothing waiting on it is filed, the way back into the loop
+ * A loop a person ended themselves (`nemia accept`) reads `verified` again: while nothing waiting on it is filed, the way back into the loop
  * is to take the acceptance back; once something is, a round is refused, since it would file the loop's work again under a step that ran
  * on it and take none of that back. A step of the loop that stopped in the round, on its own status whatever its budget, is a try's to
  * take on; one over budget only because a round would file it again has not stopped. A step of the loop at its gate is moved by a
@@ -148,7 +148,7 @@ export const roundBudgetRefusal = (id: string, budget?: number): string | null =
  * the send-back of the looping step, whose `again: true` is the round, or the ending's ship again.
  *
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
- * @param budget The cap `wf round --budget` raises the loop's steps over their budget to.
+ * @param budget The cap `nemia round --budget` raises the loop's steps over their budget to.
  */
 export function roundAsk(
   steps: readonly Workflow[],
@@ -166,7 +166,7 @@ export function roundAsk(
   if (notAmount) return no(notAmount);
   if (run.cancelledAt) {
     return no(
-      `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a round would never be honoured. Start a new run for the work with wf start.`,
+      `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a round would never be honoured. Start a new run for the work with nemia start.`,
     );
   }
   const pruned = prunedRefusal(run, 'a round');
@@ -179,14 +179,14 @@ export function roundAsk(
     return no(`${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`);
   if (named && !named.loop) {
     return no(
-      `${name} has no \`loop:\`, so there is no round of it to run${loops.length ? ` — this run's loops close at ${loops.map((s) => s.name).join(', ')}` : ''}. To try ${name} again: wf retry ${run.id} ${name}.`,
+      `${name} has no \`loop:\`, so there is no round of it to run${loops.length ? ` — this run's loops close at ${loops.map((s) => s.name).join(', ')}` : ''}. To try ${name} again: nemia retry ${run.id} ${name}.`,
     );
   }
   if (!named && loops.length !== 1) {
     return no(
       loops.length
-        ? `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one to go round again — wf round ${run.id} <step>.`
-        : `no step of ${run.id} has \`loop:\`, so there is no round to run. To try a step again: wf retry ${run.id} <step>.`,
+        ? `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one to go round again — nemia round ${run.id} <step>.`
+        : `no step of ${run.id} has \`loop:\`, so there is no round to run. To try a step again: nemia retry ${run.id} <step>.`,
     );
   }
   const looping = named ?? loops[0];
@@ -195,8 +195,8 @@ export function roundAsk(
   const filed = steps.filter((s) => s.after.includes(looping.name)).find((s) => run.steps[s.name]?.taskId);
   if (accepted && !filed) {
     return no(
-      `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept): its loop is over on their word. ` +
-        `Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-${looping.name}-${tryOf(run, looping.name)}, in the run's .asks directory — then ask again: wf round ${run.id} ${looping.name}.`,
+      `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (nemia accept): its loop is over on their word. ` +
+        `Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-${looping.name}-${tryOf(run, looping.name)}, in the run's .asks directory — then ask again: nemia round ${run.id} ${looping.name}.`,
     );
   }
   const over = loopOver(steps, looping, run, spendOf);
@@ -204,12 +204,12 @@ export function roundAsk(
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
   if (pending && over.length && !(pending.budget !== undefined && pending.budget > above)) {
     return no(
-      `round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Delete that ask — round-${looping.name}-${now + 1}, in the run's .asks directory — and ask again: wf round ${run.id} ${looping.name} --budget <amount>.`,
+      `round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Delete that ask — round-${looping.name}-${now + 1}, in the run's .asks directory — and ask again: nemia round ${run.id} ${looping.name} --budget <amount>.`,
     );
   }
   if (pending)
     return no(
-      `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`,
+      `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`,
     );
 
   const step = (n: string) => steps.find((s) => s.name === n)!;
@@ -217,7 +217,7 @@ export function roundAsk(
   const stuck = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
   if (stuck) {
     return no(
-      `${stuck} is ${at(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: wf retry ${run.id} ${stuck} — or see why: wf decide ${run.id}.`,
+      `${stuck} is ${at(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: nemia retry ${run.id} ${stuck} — or see why: nemia decide ${run.id}.`,
     );
   }
   const gate = loopSpan(steps, looping).find((n) => at(n).status === 'awaiting approval');
@@ -227,7 +227,7 @@ export function roundAsk(
         ? `${gate} signed off without asking for another round (\`again: false\`), and waits at its gate`
         : `${gate} waits at its gate in round ${now} of ${looping.name}'s loop`;
     return no(
-      `${handedOn}: a person's word moves it, not a round. Approve it — wf approve ${run.id} ${gate} — or send it back: wf retry ${run.id} ${gate} --message "<objection>".`,
+      `${handedOn}: a person's word moves it, not a round. Approve it — nemia approve ${run.id} ${gate} — or send it back: nemia retry ${run.id} ${gate} --message "<objection>".`,
     );
   }
   const { status, own } = at(looping.name);
@@ -235,39 +235,39 @@ export function roundAsk(
     if (filed) {
       return no(
         `${filed.name} waits on ${looping.name} and has already been filed (${ownStatus(filed, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}), so a round would file ${looping.loop} again under a step that ran on its work, and take none of that back. ` +
-          `What ended this loop was a person accepting the work as it stands (wf accept); deleting that acceptance does not delete ${filed.name}. See where the run stands, and what there is to do: wf decide ${run.id}.`,
+          `What ended this loop was a person accepting the work as it stands (nemia accept); deleting that acceptance does not delete ${filed.name}. See where the run stands, and what there is to do: nemia decide ${run.id}.`,
       );
     }
     if (over.length && budget === undefined) {
       return no(
-        `${looping.name} asked for round ${now + 1}, and ${overWords(over)}: the run files nothing more for ${over.length > 1 ? 'them' : 'it'} until a person raises the cap. Raise it with the round, above ${dollars(above)}: wf round ${run.id} ${looping.name} --budget <amount>.`,
+        `${looping.name} asked for round ${now + 1}, and ${overWords(over)}: the run files nothing more for ${over.length > 1 ? 'them' : 'it'} until a person raises the cap. Raise it with the round, above ${dollars(above)}: nemia round ${run.id} ${looping.name} --budget <amount>.`,
       );
     }
     if (over.length && budget! <= above) {
       return no(
-        `--budget ${budget} is not above ${dollars(above)}, what ${over.map((o) => o.name).join(' and ')} ${over.length > 1 ? 'have' : 'has'} cost: the round would be held again as soon as it was asked for. Give more than ${dollars(above)}: wf round ${run.id} ${looping.name} --budget <amount>.`,
+        `--budget ${budget} is not above ${dollars(above)}, what ${over.map((o) => o.name).join(' and ')} ${over.length > 1 ? 'have' : 'has'} cost: the round would be held again as soon as it was asked for. Give more than ${dollars(above)}: nemia round ${run.id} ${looping.name} --budget <amount>.`,
       );
     }
     if (!over.length && budget !== undefined) {
       return no(
-        `--budget raises the cap of a step of the loop over its budget, and no step of ${looping.name}'s loop is. Once more without it: wf round ${run.id} ${looping.name}.`,
+        `--budget raises the cap of a step of the loop over its budget, and no step of ${looping.name}'s loop is. Once more without it: nemia round ${run.id} ${looping.name}.`,
       );
     }
     return { step: looping.name, round: now + 1, ...(over.length ? { budget } : {}) };
   }
   if (budget !== undefined) {
     return no(
-      `--budget raises the cap of a loop whose round waits on its budget, and ${looping.name}'s does not: ${roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, [], spendOf).some((r) => r.step === looping.name) ? 'the run goes round again itself' : satisfiesAfter(status) ? 'it signed off without asking for another round' : `round ${now} is still running`}. See it: wf ls ${run.id}.`,
+      `--budget raises the cap of a loop whose round waits on its budget, and ${looping.name}'s does not: ${roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, [], spendOf).some((r) => r.step === looping.name) ? 'the run goes round again itself' : satisfiesAfter(status) ? 'it signed off without asking for another round' : `round ${now} is still running`}. See it: nemia ls ${run.id}.`,
     );
   }
   if (roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, [], spendOf).some((r) => r.step === looping.name)) {
     return no(
-      `the run goes round again itself: ${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` has ${capOf(looping) - now} left, so the next tick files round ${now + 1}. Wait for it: wf ls ${run.id}.`,
+      `the run goes round again itself: ${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` has ${capOf(looping) - now} left, so the next tick files round ${now + 1}. Wait for it: nemia ls ${run.id}.`,
     );
   }
   if (satisfiesAfter(status)) {
     const ended = accepted
-      ? `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept)`
+      ? `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (nemia accept)`
       : `${looping.name} signed off without asking for another round (\`again: false\`)`;
     const overNow = `${ended}, so its loop is over${accepted ? ' on their word' : ''}`;
     const ending = steps.find(
@@ -275,11 +275,11 @@ export function roundAsk(
     );
     if (ending) {
       const back = sendBackTo(ending, run)
-        .map((n) => `wf retry ${run.id} ${n} --message "<objection>"`)
+        .map((n) => `nemia retry ${run.id} ${n} --message "<objection>"`)
         .join(' or ');
       return no(
         `${overNow}${filed ? '' : ' — and nothing waiting on it has been filed'}: the run is at ${ending.name}'s gate, ` +
-          `where nothing of ${ending.name} has run and your approval is what files it. Approve it: wf approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`,
+          `where nothing of ${ending.name} has run and your approval is what files it. Approve it: nemia approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`,
       );
     }
     const stopped = steps.find(
@@ -289,13 +289,13 @@ export function roundAsk(
       return no(
         `${ended}, and ${stopped.name} stopped on the base branch (${ownStatus(stopped, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for: ` +
           `a round would file the work again with nothing said of why. Send it back, with what to change — ${looping.name} is filed again with your objection and what ${stopped.name} said, and its \`again: true\` is the round: ` +
-          `wf retry ${run.id} ${looping.name} --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${run.id} ${stopped.name}.`,
+          `nemia retry ${run.id} ${looping.name} --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${stopped.name}.`,
       );
     }
-    return no(`${overNow} and there is nothing to go round again. What waits on it has been filed: wf ls ${run.id}.`);
+    return no(`${overNow} and there is nothing to go round again. What waits on it has been filed: nemia ls ${run.id}.`);
   }
   return no(
-    `round ${now} of ${looping.name}'s loop is still running, so there is nothing to go round again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,
+    `round ${now} of ${looping.name}'s loop is still running, so there is nothing to go round again until it ends. Wait for it: nemia ls ${run.id} (or stop the run: nemia cancel ${run.id}).`,
   );
 }
 
@@ -311,18 +311,18 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
       : null;
 
 /**
- * What `wf accept` accepts — the looping step and the try — or why it will not, in words that say what to do instead. Pure.
+ * What `nemia accept` accepts — the looping step and the try — or why it will not, in words that say what to do instead. Pure.
  *
  * `name` may be left out when the workflow has one loop. Only a loop out of rounds with `again` still true — `exhausted`, where the one
- * thing `wf decide` could offer was another paid round — may be ended on a person's word: what waits on the looping step is then filed as
+ * thing `nemia decide` could offer was another paid round — may be ended on a person's word: what waits on the looping step is then filed as
  * if it had said `again: false`, and its findings stay on the record and travel on the next step's brief (`acceptedSection`).
  *
  * Refused: words that are missing or empty; a cancelled run, which files nothing; a step that is not here or has no `loop:`, a workflow
  * with no loop, or several and none named; a try already accepted; a round already asked for, which the next tick files; a round the run
- * files itself, below the cap, and one held on a step's budget below the cap — each named with the `wf round` that is the way on; a loop
+ * files itself, below the cap, and one held on a step's budget below the cap — each named with the `nemia round` that is the way on; a loop
  * that ended `again: false`, which handed on by itself; and a round still running.
  *
- * @param asks What people asked for with `wf round`, and the run has not consumed yet: a round already asked for.
+ * @param asks What people asked for with `nemia round`, and the run has not consumed yet: a round already asked for.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  */
 export function acceptAsk(
@@ -337,11 +337,11 @@ export function acceptAsk(
   spendOf: SpendOf = () => undefined,
 ): { step: string; try: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
-  const words = acceptWordsRefusal(message, `wf accept ${run.id}${name === undefined ? ' [<step>]' : ` ${name}`}`);
+  const words = acceptWordsRefusal(message, `nemia accept ${run.id}${name === undefined ? ' [<step>]' : ` ${name}`}`);
   if (words) return no(words);
   if (run.cancelledAt) {
     return no(
-      `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so an acceptance would never be honoured: nothing after the loop can be filed for it to reach. Start a new run for the work with wf start.`,
+      `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so an acceptance would never be honoured: nothing after the loop can be filed for it to reach. Start a new run for the work with nemia start.`,
     );
   }
   const pruned = prunedRefusal(run, 'an acceptance');
@@ -354,14 +354,14 @@ export function acceptAsk(
     return no(`${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`);
   if (named && !named.loop) {
     return no(
-      `${name} has no \`loop:\`, so it closes no loop and there are no findings to accept${loops.length ? ` — this run's loops close at ${loops.map((s) => s.name).join(', ')}` : ''}. To approve a step at its gate: wf approve ${run.id} ${name}.`,
+      `${name} has no \`loop:\`, so it closes no loop and there are no findings to accept${loops.length ? ` — this run's loops close at ${loops.map((s) => s.name).join(', ')}` : ''}. To approve a step at its gate: nemia approve ${run.id} ${name}.`,
     );
   }
   if (!named && loops.length !== 1) {
     return no(
       loops.length
-        ? `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one to accept as it stands — wf accept ${run.id} <step> --message "<why>".`
-        : `no step of ${run.id} has \`loop:\`, so there is no loop to end. To approve a step at its gate: wf approve ${run.id} <step>.`,
+        ? `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one to accept as it stands — nemia accept ${run.id} <step> --message "<why>".`
+        : `no step of ${run.id} has \`loop:\`, so there is no loop to end. To approve a step at its gate: nemia approve ${run.id} <step>.`,
     );
   }
   const looping = named ?? loops[0];
@@ -370,14 +370,14 @@ export function acceptAsk(
   const given = acceptanceOf(run, looping.name);
   if (given) {
     return no(
-      `try ${n} of ${looping.name} is already accepted, at ${given.at}: its loop is over on your word, and what waits on it is filed on the next tick, once. See where the run stands: wf ls ${run.id}.`,
+      `try ${n} of ${looping.name} is already accepted, at ${given.at}: its loop is over on your word, and what waits on it is filed on the next tick, once. See where the run stands: nemia ls ${run.id}.`,
     );
   }
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
   if (pending) {
     return no(
       `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick files it: accepting now would end a loop that is about to go round again. ` +
-        `To take the work as it stands instead, take that ask back first — round-${looping.name}-${now + 1}, in the run's .asks directory — then accept it: wf accept ${run.id} ${looping.name} --message "<why>".`,
+        `To take the work as it stands instead, take that ask back first — round-${looping.name}-${now + 1}, in the run's .asks directory — then accept it: nemia accept ${run.id} ${looping.name} --message "<why>".`,
     );
   }
   const at = (n: string) =>
@@ -397,22 +397,22 @@ export function acceptAsk(
   if (status === 'over budget' && satisfiesAfter(own)) {
     return no(
       `${looping.name} asked for round ${now + 1}, and its loop waits on a budget, not on you: \`rounds: ${capOf(looping)}\` ${left === 1 ? 'has one round' : `has ${left} rounds`} left. ` +
-        `Raise the cap and go round — wf round ${run.id} ${looping.name} --budget <amount> — and accept the work as it stands once its rounds are spent.`,
+        `Raise the cap and go round — nemia round ${run.id} ${looping.name} --budget <amount> — and accept the work as it stands once its rounds are spent.`,
     );
   }
   if (roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, [], spendOf).some((r) => r.step === looping.name)) {
     return no(
       `${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` ${left === 1 ? 'has one' : `has ${left}`} left, so the next tick files round ${now + 1} itself: there is nothing for you to end yet. ` +
-        `Accept the work as it stands once its rounds are spent and it asks again — wf decide ${run.id} offers it there.`,
+        `Accept the work as it stands once its rounds are spent and it asks again — nemia decide ${run.id} offers it there.`,
     );
   }
   if (satisfiesAfter(status)) {
     return no(
-      `${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over on its own word and there is nothing left open to accept. What waits on it has been filed: wf ls ${run.id}.`,
+      `${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over on its own word and there is nothing left open to accept. What waits on it has been filed: nemia ls ${run.id}.`,
     );
   }
   return no(
-    `round ${now} of ${looping.name}'s loop is still running (${looping.name} is ${status}), so it has not asked for anything yet and there is nothing to accept. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,
+    `round ${now} of ${looping.name}'s loop is still running (${looping.name} is ${status}), so it has not asked for anything yet and there is nothing to accept. Wait for it: nemia ls ${run.id} (or stop the run: nemia cancel ${run.id}).`,
   );
 }
 
@@ -422,28 +422,28 @@ export function acceptAsk(
 export const acceptedNote = (step: Workflow, run: Run, a: Acceptance): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open`;
 
-/** A round due now, as `wf ls` and `wf decide` say it. */
+/** A round due now, as `nemia ls` and `nemia decide` say it. */
 export function roundDueNote(steps: readonly Workflow[], r: Round): string {
   const looping = steps.find((s) => s.name === r.step);
   return r.by === 'ask'
-    ? `round ${r.round} asked (wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}) — the next tick files ${r.target}`
+    ? `round ${r.round} asked (nemia round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}) — the next tick files ${r.target}`
     : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`;
 }
 
 /**
  * A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a
- * step's. On a pruned run, where it stands and why there is no more: `wf round` is refused there (`prunedRefusal`), and a note never offers
+ * step's. On a pruned run, where it stands and why there is no more: `nemia round` is refused there (`prunedRefusal`), and a note never offers
  * a refused verb.
  */
 export const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
 
 /**
  * A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the
  * round — or, pruned, why there is none.
  */
 export const heldNote = (step: Workflow, run: Run): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: wf round ${run.id} ${step.name} --budget <amount>`}`;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia round ${run.id} ${step.name} --budget <amount>`}`;
 
 const noMoreRounds = (pruned: Pruned): string => `no round more, since the run was ${prunedWords(pruned)}`;
 
@@ -463,11 +463,11 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
   over.map((o) => `${o.name} has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ');
 
 /**
- * What `wf decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `wf round` that takes it once
+ * What `nemia decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `nemia round` that takes it once
  * more, with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`). A loop over budget and not held for it, its own try stopped,
- * is `retryLines`' to offer. `wf accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a
+ * is `retryLines`' to offer. `nemia accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a
  * budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`), the sentence written
  * around the command.
  */
@@ -483,7 +483,7 @@ export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, s
       const raise = over.length ? `, and ${overWords(over)}` : '';
       const once = over.length ? `, its cap raised above ${dollars(Math.max(...over.map((o) => o.spent.usd)))}` : '';
       const why = exhausted ? `\`rounds: ${capOf(looping)}\` are spent${raise}` : overWords(over);
-      const round = `wf round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`;
+      const round = `nemia round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`;
       const offer = (command: string, before: string): Offer => ({ step: name, command, said: `${name}: ${before}:  ${command}` });
       const again = offer(
         round,
@@ -497,12 +497,12 @@ export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, s
       return [
         again,
         offer(
-          `wf accept ${run.id} ${name} --message "<why>"`,
+          `nemia accept ${run.id} ${name} --message "<why>"`,
           `enough — go on with what is there; its findings stay on the record, and ${then}`,
         ),
       ];
     });
 }
 
-/** What `wf decide` offers for each loop out of rounds, as its lines: each offer's sentence (`roundOffers`). Pure. */
+/** What `nemia decide` offers for each loop out of rounds, as its lines: each offer's sentence (`roundOffers`). Pure. */
 export const roundLines = (...args: Parameters<typeof roundOffers>): string[] => roundOffers(...args).map((o) => o.said);

@@ -264,7 +264,7 @@ export function branchReader(): BranchReader {
 
 /**
  * A run another waits on, as its record and git say it without the engine: the record, when the store has one, and the result branches
- * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `wf start --after` refuses an
+ * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `nemia start --after` refuses an
  * edge by (`afterRefusal`), and where `parentOf` starts. A record whose steps cannot be read — no frozen workflow, and its folder gone —
  * names no result branch.
  */

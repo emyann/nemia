@@ -1,5 +1,5 @@
 /**
- * A person's verbs a pass or `wf cancel` asks of the engine for a task it read — stop it (`stopAsked`), close it (`closeHeld`), answer it
+ * A person's verbs a pass or `nemia cancel` asks of the engine for a task it read — stop it (`stopAsked`), close it (`closeHeld`), answer it
  * (`answerHeld`) — each undefined once asked, and the engine's refusal in its words where it refused: the task moved since it was read,
  * so a refusal is a note, not a failure. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */

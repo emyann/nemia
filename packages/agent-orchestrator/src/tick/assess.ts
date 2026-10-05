@@ -26,9 +26,9 @@ export type Assessment = {
   ready: string[];
   /** Steps that signed off with a `check:` nobody has filed yet. File their checks. */
   check: string[];
-  /** Steps to try again, and how: a check `retries:` still covers, or a person's `wf retry`. File these. */
+  /** Steps to try again, and how: a check `retries:` still covers, or a person's `nemia retry`. File these. */
   retry: Retry[];
-  /** Loops to go round again: a looping step that said `again: true` with rounds left, or a person's `wf round`. File these. */
+  /** Loops to go round again: a looping step that said `again: true` with rounds left, or a person's `nemia round`. File these. */
   round: Round[];
   /** Steps that can never run, because something they wait on is final without satisfying them. */
   blocked: string[];
@@ -40,13 +40,13 @@ export type Assessment = {
   held: string[];
   status: 'running' | 'succeeded' | 'failed' | 'cancelled';
   /**
-   * A run `failed` that nothing failed in: what stopped it instead, as `wf decide` tells the two apart (`Decision`'s `outcome`). `awaiting
+   * A run `failed` that nothing failed in: what stopped it instead, as `nemia decide` tells the two apart (`Decision`'s `outcome`). `awaiting
    * approval` when every step that stops what follows it waits at its gate, and `blocked` when a person's word is what stops it otherwise —
    * a step that signed off blocked, or unsigned, a loop out of rounds, a cap reached. Absent where a step broke: its task failed or was
    * stopped, or its check refused it or did not finish — that run is `failed` in every word — and on a run that is not `failed`.
    *
-   * `status` stays `failed` for these, since everything that reads it (the cap on runs in flight, `wf cancel`, `toDecide`) reads a run
-   * that stopped. This word is for what a person reads of it, so that the feed does not say `failed` of a run `wf ls` and `wf decide` say
+   * `status` stays `failed` for these, since everything that reads it (the cap on runs in flight, `nemia cancel`, `toDecide`) reads a run
+   * that stopped. This word is for what a person reads of it, so that the feed does not say `failed` of a run `nemia ls` and `nemia decide` say
    * is awaiting approval.
    */
   stoppedOn?: 'awaiting approval' | 'blocked';
@@ -91,8 +91,8 @@ export type Assessment = {
  * @param askedCloseout Whether a task was asked for a closeout: the schema on the engine's record of its filing.
  * @param verdictOf What each step's current check exited with, read only for a check that did not pass (`refusedCheck`). Left out, no
  *   check has refused, so no try of `retries:` is due.
- * @param asks What people asked for with `wf retry`, and the run has not consumed yet.
- * @param roundAsks What people asked for with `wf round`, and the run has not consumed yet.
+ * @param asks What people asked for with `nemia retry`, and the run has not consumed yet.
+ * @param roundAsks What people asked for with `nemia round`, and the run has not consumed yet.
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to
  *   stop it first.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.

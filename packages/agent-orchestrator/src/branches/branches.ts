@@ -6,7 +6,7 @@
  * Data in, lines out. `branches.store.ts` asks git (`numstat`, `sensitiveDiff`), `cli/main.ts` prints, and nothing here reads a disk or
  * spawns a thing — so every line the screen shows a person can be tested as a string.
  *
- * The lists are written once, here, and `wf decide --help` prints them. A glob is a path from the
+ * The lists are written once, here, and `nemia decide --help` prints them. A glob is a path from the
  * repository root: `*` and `?` stay within a directory, `**` crosses any number of them — a leading
  * `**` and its slash cross none as well, so the root's `package.json` is in the list — and a trailing
  * `/` takes everything below.
@@ -41,7 +41,7 @@ export function workChecks(steps: readonly Workflow[]): string[] {
 
 /**
  * The branches whose tips this pass records (`tipsSeen`): a finished run's result branches — succeeded or failed, so neither running nor
- * cancelled — when it cut worktrees and did not work on its base branch itself. What `wf decide` offers to ship. None for any other run,
+ * cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to ship. None for any other run,
  * so git is not asked about it.
  */
 export function tipBranches(run: Run, steps: readonly Workflow[], status: Assessment['status']): string[] {

@@ -1,6 +1,6 @@
 /**
  * A factory: a named grouping in the one store, naming the repositories its work is on and the agents it hires into workflows' steps — its
- * name, the lines `wf factory` prints, and the words of its refusals. What is on disk is `factory.store.ts`'s; this is pure.
+ * name, the lines `nemia factory` prints, and the words of its refusals. What is on disk is `factory.store.ts`'s; this is pure.
  *
  * The default factory holds everything that names no factory. It is no file: it is listed first, and never added, removed or hired into.
  */
@@ -10,7 +10,7 @@ import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
 
-/** The one default factory's name: listed by `wf factory ls`, refused to `wf factory add` and `wf factory rm`. */
+/** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
 
 /** A factory's name: a lowercase slug of 1 to 40 characters, since it names a file in the store and, later, a record's field. */
@@ -28,34 +28,34 @@ export type Hires = Readonly<Record<string, string>>;
  */
 export type Factory = { name: string; repos: readonly string[]; workflows: readonly string[]; hires: Hires };
 
-/** A factory as `wf factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
+/** A factory as `nemia factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
 export type FactoryListing = (Factory & { file: string }) | { name: string; file: string; error: string };
 
 /** Why `name` cannot name a factory, or undefined: empty, or not a lowercase slug — the slug suggested when lowering its case makes one. */
 export function factoryNameRefusal(name: string): string | undefined {
-  if (!name) return 'A factory is named by a lowercase slug, and this name is empty. Give the name: wf factory ls lists them.';
+  if (!name) return 'A factory is named by a lowercase slug, and this name is empty. Give the name: nemia factory ls lists them.';
   if (FACTORY_NAME.test(name)) return undefined;
   const lower = name.toLowerCase();
   const suggested = FACTORY_NAME.test(lower) ? ` — ${lower}, say` : ' — pipao or nemia-2, say';
   return `\`${name}\` is not a factory's name: a name is lowercase letters, digits and dashes, starts with a letter or a digit, and is at most 40 characters long${suggested}.`;
 }
 
-/** A verb of `wf factory` that writes a factory's file. */
+/** A verb of `nemia factory` that writes a factory's file. */
 export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire';
 
-/** What to do in place of `wf factory <verb>` on the default factory. */
+/** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
   add: 'Give the factory another name.',
-  rm: 'Remove a factory wf factory ls lists under it.',
-  attach: 'It offers every workflow found already: attach to a factory wf factory ls lists.',
-  detach: 'It offers every workflow found, and none can be taken from it: detach from a factory wf factory ls lists.',
-  hire: "In it, a step that names no agent runs as a plain session: hire into a factory wf factory ls lists, or write the step's agent: line.",
-  fire: 'It hires no one: fire in a factory wf factory ls lists.',
+  rm: 'Remove a factory nemia factory ls lists under it.',
+  attach: 'It offers every workflow found already: attach to a factory nemia factory ls lists.',
+  detach: 'It offers every workflow found, and none can be taken from it: detach from a factory nemia factory ls lists.',
+  hire: "In it, a step that names no agent runs as a plain session: hire into a factory nemia factory ls lists, or write the step's agent: line.",
+  fire: 'It hires no one: fire in a factory nemia factory ls lists.',
 };
 
-/** The refusal of `wf factory <verb>` on the default factory, which is read, never written. */
+/** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
 export const defaultFactoryRefusal = (verb: FactoryWrite): string =>
-  `\`${DEFAULT_FACTORY}\` is the default factory: it holds every run and card that names no factory, and is read, never written, so wf factory ${verb} does not take it. ${INSTEAD[verb]}`;
+  `\`${DEFAULT_FACTORY}\` is the default factory: it holds every run and card that names no factory, and is read, never written, so nemia factory ${verb} does not take it. ${INSTEAD[verb]}`;
 
 /**
  * Why `workflow` cannot name a workflow, or undefined: a workflow is named by its folder, which is not empty, not hidden, holds no slash,
@@ -113,7 +113,7 @@ export function unfilledRefusal(
     unfilled.length === 1
       ? `the step ${unfilled[0]} names no agent, and ${factory} hires none into it`
       : `${unfilled.length} steps name no agent, and ${factory} hires none into them: ${unfilled.join(', ')}`;
-  const hires = unfilled.map((s) => `wf factory hire ${factory} <agent> --step ${workflow}/${s}`).join('; ');
+  const hires = unfilled.map((s) => `nemia factory hire ${factory} <agent> --step ${workflow}/${s}`).join('; ');
   return `${workflow}: in the factory ${factory}, ${which}. Hire an agent into ${unfilled.length === 1 ? 'it' : 'each'} — ${hires}. Nothing was started.`;
 }
 
@@ -124,12 +124,12 @@ export function unfilledRefusal(
 export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, workflow: string): string | undefined {
   if (factory.workflows.includes(workflow)) return undefined;
   const offers = factory.workflows.length ? `it offers: ${[...factory.workflows].sort().join(', ')}` : 'it offers none yet';
-  return `${workflow}: the factory ${factory.name} does not offer this workflow — ${offers}. Attach it: wf factory attach ${factory.name} ${workflow}. Nothing was started.`;
+  return `${workflow}: the factory ${factory.name} does not offer this workflow — ${offers}. Attach it: nemia factory attach ${factory.name} ${workflow}. Nothing was started.`;
 }
 
 /**
  * The repository a run in `factory` works on: `named` when a person named one, else the factory's repository when it has only one, else
- * `fallback` — where `wf start` is typed, or the daemon's repository for a queued card. With no factory — the default — `named`, else
+ * `fallback` — where `nemia start` is typed, or the daemon's repository for a queued card. With no factory — the default — `named`, else
  * `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.
  */
 export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: string | undefined, fallback: string): string {
@@ -140,14 +140,14 @@ export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: 
 
 /**
  * Why a git run on `repo` cannot start in `factory`, or undefined when `repo` is one of its repositories, each compared as `path.resolve`
- * spells it: the factory's list named, sorted, with the `--repo` that starts it in one, or the `wf factory add` that files a factory on
+ * spells it: the factory's list named, sorted, with the `--repo` that starts it in one, or the `nemia factory add` that files a factory on
  * `repo`, since none adds a repository to a factory.
  */
 export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: string): string | undefined {
   const repos = factory.repos.map((r) => path.resolve(r));
   if (repos.includes(path.resolve(repo))) return undefined;
   const sorted = [...repos].sort();
-  return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or file a factory on this one: wf factory add <name> --repo ${path.resolve(repo)}. Nothing was started.`;
+  return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or file a factory on this one: nemia factory add <name> --repo ${path.resolve(repo)}. Nothing was started.`;
 }
 
 /** A factory one of whose repositories holds a folder, and that repository, as `path.resolve` spells it: the run's root there. */
@@ -178,18 +178,18 @@ const fixFor = (fix: string, name: string): string => fix.replace('<name>', name
 
 /** The store's factories, by name, as a refusal names them to choose from, or how to file the first. */
 const choices = (names: readonly string[]): string =>
-  names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: wf factory add <name> --repo <root>';
+  names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --repo <root>';
 
 /**
  * Why a start that names no factory cannot start in the folder `at`: no factory of the store works on it. Names the store's factories
- * (`names`), the start's own fix (`fix`, `--factory <name>` or `?factory=<name>`), the `wf factory add` that files one on the folder's
+ * (`names`), the start's own fix (`fix`, `--factory <name>` or `?factory=<name>`), the `nemia factory add` that files one on the folder's
  * repository, and the factories whose files do not read (`unread`), which were not looked at.
  */
 export function noFactoryRefusal(at: string, names: readonly string[], fix: string, unread: readonly string[] = []): string {
   const skipped = unread.length
-    ? ` These factories' files do not read, and were not looked at: ${[...unread].sort().join(', ')} (wf factory ls).`
+    ? ` These factories' files do not read, and were not looked at: ${[...unread].sort().join(', ')} (nemia factory ls).`
     : '';
-  return `${path.resolve(at)}: no factory works on this folder, and every run is started in a factory. Name the factory — ${fix}, ${choices(names)} — or file one on this repository and attach the workflow to it: wf factory add <name> --repo <root>, then wf factory attach <name> <workflow>.${skipped} Nothing was started.`;
+  return `${path.resolve(at)}: no factory works on this folder, and every run is started in a factory. Name the factory — ${fix}, ${choices(names)} — or file one on this repository and attach the workflow to it: nemia factory add <name> --repo <root>, then nemia factory attach <name> <workflow>.${skipped} Nothing was started.`;
 }
 
 /**
@@ -217,8 +217,8 @@ export const defaultStartRefusal = (fix: string, names: readonly string[]): stri
 export const factoryMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
   `${why}\nThat folder is the factory ${factory.name}'s: a run in it mounts every repository of the factory but its own, read-only, ` +
   `for each local step, and none is left off by hand. Hire into ${where} an agent whose harness holds the mount ` +
-  `(wf factory hire ${factory.name} <agent> --step ${where}); move or rename the folder, then file the factory again on its new path ` +
-  `(wf factory rm ${factory.name}, then wf factory add ${factory.name} --repo <path> for each, and attach and hire again); ` +
+  `(nemia factory hire ${factory.name} <agent> --step ${where}); move or rename the folder, then file the factory again on its new path ` +
+  `(nemia factory rm ${factory.name}, then nemia factory add ${factory.name} --repo <path> for each, and attach and hire again); ` +
   `or start it in a factory whose repositories that step's harness can hold. Nothing was written.`;
 
 /**
@@ -298,7 +298,7 @@ export function writableRefusal(
   for (const step of steps.filter((s) => s.writable?.length)) {
     const said = writableSaid(workflow, step);
     if (!factory)
-      return `${said} names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — wf start --factory <name> — or delete the line. Nothing was started.`;
+      return `${said} names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — nemia start --factory <name> — or delete the line. Nothing was started.`;
     for (const name of step.writable ?? []) {
       const why = writableNameRefusal(said, name, repos, own, mounts);
       if (why) return why;
@@ -313,20 +313,20 @@ export function writableRefusal(
  */
 export const writableMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
   `${why}\nThat folder is the factory ${factory.name}'s, and ${where} names it in \`writable:\`, so the run would mount it writable for that ` +
-  `step. Hire into ${where} an agent whose harness holds a writable mount (wf factory hire ${factory.name} <agent> --step ${where}), ` +
+  `step. Hire into ${where} an agent whose harness holds a writable mount (nemia factory hire ${factory.name} <agent> --step ${where}), ` +
   `or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`;
 
-/** A factory's hires as `wf factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */
+/** A factory's hires as `nemia factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */
 const hireLines = (hires: Hires, width: number): string[] =>
   Object.keys(hires)
     .sort()
     .map((step) => `${' '.repeat(width)}  ${step} ← ${hires[step]}`);
 
-/** The workflows a factory offers as `wf factory ls` lists them under its line, by name — `workflows: build, intake` — or none. */
+/** The workflows a factory offers as `nemia factory ls` lists them under its line, by name — `workflows: build, intake` — or none. */
 const workflowLine = (workflows: readonly string[], width: number): string[] =>
   workflows.length ? [`${' '.repeat(width)}  workflows: ${[...workflows].sort().join(', ')}`] : [];
 
-/** What `wf factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
+/** What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
 export function factoryLines(listing: readonly FactoryListing[]): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
   const width = Math.max(DEFAULT_FACTORY.length, ...sorted.map((l) => l.name.length));
@@ -341,4 +341,4 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
 
 /** That the store has no factory `name`, and which it has, by name; the default factory is never one to remove. */
 export const noFactoryLine = (name: string, names: readonly string[]): string =>
-  `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with wf factory add <name> --repo <path>.'}`;
+  `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --repo <path>.'}`;

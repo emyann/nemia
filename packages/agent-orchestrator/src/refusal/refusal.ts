@@ -1,6 +1,6 @@
 /**
  * A refusal: an `Error` whose words say what to do next and whose `exitCode` is 2, tagged with what it refuses, so an Effect picks it out
- * with `Effect.catchTag` and a caller of `wf` or the api reads its kind from `_tag`.
+ * with `Effect.catchTag` and a caller of `nemia` or the api reads its kind from `_tag`.
  *
  * Imported from `effect/Data` alone, never the `effect` barrel: `agent-orchestrator/run` and `agent-orchestrator/workflow` load this file,
  * and `test/refusal.test.ts` pins how many modules they load. A reader of `exitCode === 2` needs no change, since each class carries it.

@@ -1,6 +1,6 @@
 /**
  * A person's custom instructions, written: one file per agent name in their store (`customInstructionsFile`), what they add to an agent
- * they use without rewriting it. Read by the load (`readCustomInstructions`), which a run does once, at `wf start`: a write or a clear
+ * they use without rewriting it. Read by the load (`readCustomInstructions`), which a run does once, at `nemia start`: a write or a clear
  * reaches only the runs started after it. The one writer of the folder, and its reader for a person's command and the board alike: a name
  * no place has is refused here, read, written or cleared, so both refuse it in the same words.
  */
@@ -42,7 +42,7 @@ export function writeCustomInstructions(home: string, name: string, text: string
   const file = customInstructionsFile(home, name);
   if (!text.trim())
     throw new Invalid({
-      message: `the custom instructions for ${name} are blank. Write the words the agent is to be told, or remove them: wf agents custom ${name} --clear.`,
+      message: `the custom instructions for ${name} are blank. Write the words the agent is to be told, or remove them: nemia agents custom ${name} --clear.`,
     });
   const refused = customInstructionsRefusal(file, text);
   if (refused !== undefined) throw new Invalid({ message: refused });

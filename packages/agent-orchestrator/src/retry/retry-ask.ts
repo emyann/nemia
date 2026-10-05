@@ -1,6 +1,6 @@
 /**
- * Trying again, as a person asks it and a record keeps it: how a person asks for a try (`wf retry`), the tries a step's record keeps
- * behind the one it is on, a try due and how its record moves on once it is filed — and the words `wf ls` and `wf decide` say of them.
+ * Trying again, as a person asks it and a record keeps it: how a person asks for a try (`nemia retry`), the tries a step's record keeps
+ * behind the one it is on, a try due and how its record moves on once it is filed — and the words `nemia ls` and `nemia decide` say of them.
  * Pure; what reads a step's standing to judge a try — `retryable` and `retriesDue` — is `retry.ts`'s, and `retryRefusal`
  * `retry-refusal.ts`'s.
  */
@@ -8,7 +8,7 @@ import { tryOf, type Run, type StepRecord } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 
 /**
- * How a person asks for another try of a step, with `wf retry`.
+ * How a person asks for another try of a step, with `nemia retry`.
  *
  *   nudge    the last try's session, continued and told what happened — what `retries:` files too
  *   fresh    a new session on the same branch; on another model, when the ask names one
@@ -47,17 +47,17 @@ export type EarlierTry = {
   check?: { taskId: string };
   then: 'retries' | 'signoff' | RetryMode | 'round' | 'back';
   model?: string;
-  /** The pause filed the try after this one (`wf pause --now` stopped it, and the resume tried it again): `then` stays its mode. */
+  /** The pause filed the try after this one (`nemia pause --now` stopped it, and the resume tried it again): `then` stays its mode. */
   paused?: true;
   /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
   budget?: number;
 };
 
 /**
- * A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when — and `message`, what they said
+ * A person's `nemia retry`, as its ask file says it: the step, the try it asks for, how, and when — and `message`, what they said
  * with it (`--message`): the answer to the `needs` of a step that signed off blocked, or anything else they have to say to the
  * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one. And `interrupted`, on the ask
- * `wf pause --now` writes for each task it stops: that task's id, the step's session or its check, which the ask is due on only once
+ * `nemia pause --now` writes for each task it stops: that task's id, the step's session or its check, which the ask is due on only once
  * that very task settled `stopped` (`pauseAskVoid`).
  */
 export type RetryAsk = {
@@ -72,14 +72,14 @@ export type RetryAsk = {
 };
 
 /**
- * How a person asks for a try with `wf retry`: one way, the model a `--model` names, what they said with it — and `budget`, the cap
+ * How a person asks for a try with `nemia retry`: one way, the model a `--model` names, what they said with it — and `budget`, the cap
  * `--budget` raises a step over its budget, or ended at it, to.
  */
 export type RetryHow = { mode: RetryMode; model?: string; message?: string; budget?: number };
 
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, `signoff`, the run's one
- * nudge a round to a session that ended without its closeout, or `pause`, the ask `wf pause --now` wrote for the task it stopped — and,
+ * nudge a round to a session that ended without its closeout, or `pause`, the ask `nemia pause --now` wrote for the task it stopped — and,
  * for a person's, what they said with it.
  *
  * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
@@ -109,7 +109,7 @@ export type Retry = {
  * run: an empty message, which would put an empty answer in the brief; and a message on `--recheck`, which files no session to read it.
  * A message on a step that did not sign off blocked is not refused: a person may have something to say to a step whose check refused.
  */
-export function messageRefusal(how: RetryHow, command = 'wf retry <runId> <step>'): string | null {
+export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <step>'): string | null {
   if (how.message === undefined) return null;
   if (how.mode === 'recheck') {
     return `--message carries your answer into the try's brief, and --recheck files no session to read it — it runs the check again, and nothing else. Recheck without a message (${command} --recheck), or give the answer to a session: ${command} --message "<answer>".`;
@@ -160,7 +160,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
 }
 
 /**
- * The model a step's current try runs on: the one a `wf retry --model` named for the new session it started, carried by every try that
+ * The model a step's current try runs on: the one a `nemia retry --model` named for the new session it started, carried by every try that
  * continued that session since — a nudge, a `retries:` nudge, a sign-off nudge, a round — and the step's own where none did. A recheck is
  * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a nudge after `--model sonnet`
  * on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
@@ -186,7 +186,7 @@ export const turnsOf = (record: StepRecord | undefined): number =>
 export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
 
 /**
- * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does:
+ * A try due now, as `nemia ls` and `nemia decide` say it — and, for a step whose session the tick stops first, that it does:
  * `its blocked session` while its harness says so, and `its session` once it works again (`runsOn`).
  */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => {
@@ -204,11 +204,11 @@ const askedNote = (r: Retry): string => {
   return `try ${r.try} asked (${modeWord(r)}${budget}${answer}) — ${next}`;
 };
 
-/** A try `wf pause --now` asked for, as `dueNote` says it once its task is stopped: the session continued, or the check run again. */
+/** A try `nemia pause --now` asked for, as `dueNote` says it once its task is stopped: the session continued, or the check run again. */
 const pausedNote = (r: Retry): string =>
   r.mode === 'recheck'
-    ? `try ${r.try} due — its check was stopped by wf pause --now, and the next tick runs it again`
-    : `try ${r.try} due — its session was stopped by wf pause --now, and the next tick continues it`;
+    ? `try ${r.try} due — its check was stopped by nemia pause --now, and the next tick runs it again`
+    : `try ${r.try} due — its session was stopped by nemia pause --now, and the next tick continues it`;
 
 /**
  * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try

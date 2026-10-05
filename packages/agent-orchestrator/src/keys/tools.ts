@@ -89,7 +89,7 @@ const RULE_LIST = {
  * Split on commas, as `tools:` is, so a comma inside a rule's parentheses would reach the harness as two pieces of it, and is
  * refused as `tools:` refuses one. Only the parentheses are looked in, not the quotes `tools:` looks in: a quote is legal inside a rule —
  * `Bash(git commit -m 'wip')`. A list written in brackets or quotes splits into entries that are not rules, and is refused for that.
- * Which harnesses take a rule list is the runtime's to say at `wf start` (`configRefused` in start.verb.ts). A line under the key's former
+ * Which harnesses take a rule list is the runtime's to say at `nemia start` (`configRefused` in start.verb.ts). A line under the key's former
  * name (`spelled`) is quoted as written, and said to be the key.
  */
 export function rulesOf(

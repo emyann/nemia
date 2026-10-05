@@ -1,7 +1,7 @@
 /**
- * The package's one reading of a run (`runReading`), which `wf ls` (`list`, `runsListed`) and the api's list answer from: the pure
+ * The package's one reading of a run (`runReading`), which `nemia ls` (`list`, `runsListed`) and the api's list answer from: the pure
  * listing over one read of each task, and what `assess` says of the run on the same inputs. And the runs nobody judged (`unjudgedOf`).
- * `wf ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
+ * `nemia ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
@@ -41,7 +41,7 @@ import { readPause } from '../pause/pause.store.ts';
 import { currentTasks, finishingAmong, type Pause, type Paused, type PauseStaged } from '../pause/pause.ts';
 
 /**
- * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `wf ls` reads it.
+ * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads it.
  *
  * @param views The engine's view of every task the run filed, an earlier try's included; left out, read one by one (`taskPhases`).
  * @param steps The steps the run is judged by; left out, its frozen workflow (`stepsOf`).
@@ -65,7 +65,7 @@ export type ReadingHow = {
 };
 
 /**
- * A run as the package reads it once (`runReading`): what `wf ls` lists (`Listing`) and what `assess` says of the run on the same inputs
+ * A run as the package reads it once (`runReading`): what `nemia ls` lists (`Listing`) and what `assess` says of the run on the same inputs
  * (`assessed`) — with `assessOf` to ask it again of the record as it would stand (a hold lifted), each task's phase as the tick reads it
  * (`phaseOf`), the asks that carried a message (`answers`), what each task cost (`spendOf`), and the whole run's spend (`spend`).
  */
@@ -79,7 +79,7 @@ export type RunReading = Listing & {
 };
 
 /**
- * The package's one reading of a run, over one read of each task: what `wf ls` and the api's list both answer from.
+ * The package's one reading of a run, over one read of each task: what `nemia ls` and the api's list both answer from.
  *
  * Each step's status is `listing`'s, the engine's bare word while a step runs (`needs-human`, compared exactly), with what the harness says
  * it waits for and what it was denied as fields beside it. A refused check's verdict is its exit off the engine's record of the check
@@ -127,7 +127,7 @@ export async function runReading(e: Engine, run: Run, how: ReadingHow = {}): Pro
 }
 
 /**
- * What `wf ls` shows for one run (`runReading`): every result branch asked of git, and the run holding the checkout read.
+ * What `nemia ls` shows for one run (`runReading`): every result branch asked of git, and the run holding the checkout read.
  *
  * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the narrowed `TaskPhase` the DAG decides on: a
  * person reading the list wants the detail. Where the run's result stands against the base branch is read off git on this call: it is what
@@ -137,7 +137,7 @@ export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = br
   runReading(e, run, { slot, git, checkout: true });
 
 /**
- * `wf ls`'s answer: every run, or the one named, each as `list` reads it, and which daemon ticks the store (`daemonStanding`). The cap
+ * `nemia ls`'s answer: every run, or the one named, each as `list` reads it, and which daemon ticks the store (`daemonStanding`). The cap
  * on runs in flight is judged over the whole store even for one run; each task is viewed once and each repository's branches listed once
  * (`viewedOnce`, `branchReader`). A run a task journal of which does not read is answered unjudged (`unjudgedOf`); any other failure
  * rejects. Refuses a run named that is not in the store, as `runStore.runs.read` does.
@@ -153,7 +153,7 @@ export async function runsListed(e: Engine, runId?: string): Promise<RunsListed>
     const held = await runSlots(viewed, runId ? runStore.runs.list() : runs);
     for (const run of runs) {
       const read = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
-        const unjudged = await unjudgedOf(viewed, run, err, 'wf ls');
+        const unjudged = await unjudgedOf(viewed, run, err, 'nemia ls');
         if (!unjudged) throw err;
         return unjudged;
       });
@@ -200,7 +200,7 @@ async function pausedOf(e: Engine, pause: Pause, runs: readonly Run[], reads: re
 }
 
 /**
- * The store's pause, as `GET /api/pause`, `wf feed` and `wf start` answer it: the pause or null; each task still finishing under it, read
+ * The store's pause, as `GET /api/pause`, `nemia feed` and `nemia start` answer it: the pause or null; each task still finishing under it, read
  * on this call while a pause stands; and each landing it holds with its merge staged — read of the runs whose ending lands on its check
  * while MERGE_HEAD is in their checkout, the one landing the pause can leave staged.
  */

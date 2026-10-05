@@ -68,7 +68,7 @@ export async function checkoutHold(
  *
  * Every run is read the same way, this one and the others, so the two readings cannot drift. A step is IN that checkout while the engine
  * holds its task in flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold
- * every other run's ending for ever — but a run somebody called off holds it while its session is still there, between `wf cancel` asking
+ * every other run's ending for ever — but a run somebody called off holds it while its session is still there, between `nemia cancel` asking
  * the engine to stop it and the engine settling it, because that session is still merging in that directory.
  *
  * An ending that lands on its check holds it too, from its filing until the run has landed its merge: while its check runs on that merge,
@@ -129,7 +129,7 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
  * Land the merge the run's ending staged in the repository's checkout, where one lands on its check (`landingDue`): commit it with the
  * message its closeout gave, or abort it, and write on the step's record (in memory — `advance` writes the run) what was done, once for the
  * try. A commit git refuses — a hook, a signature — aborts the merge, and says git's words. An abort git refuses is said, and nothing is
- * written, so the next pass tries again. Nothing is done for a run `wf rm` forgot while this pass was at work. Level-triggered: after a
+ * written, so the next pass tries again. Nothing is done for a run `nemia rm` forgot while this pass was at work. Level-triggered: after a
  * restart, of the daemon or the machine, the pass reads the checkout and the engine as they are, and lands then a merge whose session and
  * check have both stopped running.
  *

@@ -1,8 +1,8 @@
 /**
- * Forgetting a run that is over (`forget`, `wf rm`): it reads a run as `cancel` does, adopting what a pass filed and never wrote down
+ * Forgetting a run that is over (`forget`, `nemia rm`): it reads a run as `cancel` does, adopting what a pass filed and never wrote down
  * (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime through
  * the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`forgetRun`, over `EngineService`), and
- * `forget`, its plain face in a Promise, over the engine it is handed. It never stops anything. `wf rm` closes a task held open that
+ * `forget`, its plain face in a Promise, over the engine it is handed. It never stops anything. `nemia rm` closes a task held open that
  * waits for a word, which runs nothing and is settled as it signed: no pass reads the run again to close it.
  */
 import fs from 'node:fs';
@@ -39,14 +39,14 @@ import { Invalid } from '../refusal/refusal.ts';
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
 const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
 
-/** What `wf rm` is left with once a run's record is read and what a pass filed and never wrote down is adopted onto it. */
+/** What `nemia rm` is left with once a run's record is read and what a pass filed and never wrote down is adopted onto it. */
 type Forgetting = Effect.Success<ReturnType<typeof readForgetting>>;
 
 /** What was done to a git run's worktrees (`removeWorktrees`). */
 type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
 
 /**
- * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
+ * Forget a run that is over — `nemia rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
  * `cancel`, a decision of its own.
  *
  * Read as `cancel` reads a run: a check, a try, a round or a step a pass filed and never wrote down is adopted in memory, so it is in
@@ -56,7 +56,7 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *
  * Once nothing refuses, a task held open that waits for a word is closed, as no pass reads the run again to close it; one the engine
  * refuses to close, answered, settled or stopped since it was read, waits for nothing. A folder run's folders are under its own directory,
- * and go with its record: no worktree, no branch, and no git asked. A git run goes in an order `wf rm` can finish when it is interrupted
+ * and go with its record: no worktree, no branch, and no git asked. A git run goes in an order `nemia rm` can finish when it is interrupted
  * and run again:
  *
  * 1. **Its worktrees, through git**: each git lists inside `worktrees/<id>` (`runWorktrees`), by its real path, so the run's directory and
@@ -65,7 +65,7 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *    lives only there — and what git ignores is not work. Then `git worktree remove`, never with `--force`, and `git worktree prune`. A
  *    worktree git will not remove — locked, still dirty, on no branch with something a removal would leave on none (`heldWorktree`), or
  *    whose hand-off git refuses — is left as it is, and said why; so is a directory in `worktrees/<id>` git does not know. Then the run is
- *    `held`, and nothing else is removed, so its record is there for `wf rm` to find it by once a person has dealt with them.
+ *    `held`, and nothing else is removed, so its record is there for `nemia rm` to find it by once a person has dealt with them.
  * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as git says it, or forced.
  * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
  *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`). The engine's tasks, journal and sessions
@@ -104,7 +104,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
 });
 
 /**
- * `wf rm` (`forgetRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed with,
+ * `nemia rm` (`forgetRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed with,
  * or with whatever else it died of, as it was thrown.
  */
 export const forget = (e: Engine, id: string, how: ForgetHow = {}): Promise<Forgot> =>
@@ -157,7 +157,7 @@ const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: str
 });
 
 /**
- * Why `wf rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result stands
+ * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result stands
  * for an ending that has not run, and a merge the ending staged.
  */
 function refusalOf(id: string, f: Forgetting): string | null {

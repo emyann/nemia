@@ -91,7 +91,7 @@ export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
   route: { method: 'GET', path: '/api/workflows', status: 200 },
   only: {
     side: 'api',
-    why: 'the board lists every folder with its steps and its graph; at the command line, wf start names the one it runs',
+    why: 'the board lists every folder with its steps and its graph; at the command line, nemia start names the one it runs',
   },
   async handler(_e, args, _env, home) {
     const dirs = Array.isArray(args.dirs) ? args.dirs : [];

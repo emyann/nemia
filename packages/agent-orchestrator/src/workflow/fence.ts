@@ -20,7 +20,7 @@ import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
  */
 const reachOf = (harness: string = DEFAULT_HARNESS): FenceReach => fenceReach(harness) ?? fenceReach(DEFAULT_HARNESS)!;
 
-/** How wide fence word `word` is on `reach`: 0 for a word the harness does not take, which `wf start` refuses (`configRefused`). */
+/** How wide fence word `word` is on `reach`: 0 for a word the harness does not take, which `nemia start` refuses (`configRefused`). */
 const rankOf = (reach: FenceReach, word: string): number => reach.rank[word] ?? 0;
 
 /** The widest of a harness's fence words, the first of the top rank: on Claude Code the mode that asks about nothing. */

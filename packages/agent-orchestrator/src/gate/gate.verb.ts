@@ -1,5 +1,5 @@
 /**
- * `wf approve`: approve a step waiting at its gate, by writing the person's approval and nothing else, refused before anything is written.
+ * `nemia approve`: approve a step waiting at its gate, by writing the person's approval and nothing else, refused before anything is written.
  * A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`approveRun`, over `EngineService`), and `approve`, its plain face in a Promise, over the engine it is handed.
  */
@@ -14,11 +14,11 @@ import { standingsOf } from '../branches/branches.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
-/** What `wf approve` did: the run, the approval as written, and its file. */
+/** What `nemia approve` did: the run, the approval as written, and its file. */
 export type Approved = { run: Run; approval: Approval; file: string };
 
 /**
- * Approve a step waiting at its gate — `wf approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`,
+ * Approve a step waiting at its gate — `nemia approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`,
  * whole and exclusively, beside the retry asks, with the time and the words given (`message`). The next tick reads it with the run
  * (`readRun`) and files what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is the
  * person's own file, and the verb never writes the run's json.
@@ -29,14 +29,14 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * such an ending (`approvedFirst`): no other gate's approval turns on it. An approval written by someone else between the look and the
  * write is refused as the look would have refused it, and a file at the approval's name that is not one is named, with how to clear it.
  *
- * Sending back is not this verb's: `wf retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
+ * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
  * Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
  */
 export const approveRun = Effect.fn('approve')(function* (id: string, stepName: string, message?: string) {
   const e = yield* EngineService;
   if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
-      new Missing({ message: `no such run: ${id}. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.` }),
+      new Missing({ message: `no such run: ${id}. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.` }),
     );
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
@@ -72,8 +72,8 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
       () =>
         refusal(runStore.runs.read(id)) ??
         (stray !== null
-          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: wf approve ${id} ${stepName}.`
-          : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: wf ls ${id}.`),
+          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: nemia approve ${id} ${stepName}.`
+          : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: nemia ls ${id}.`),
     );
     return yield* Effect.fail(new Conflict({ message: why }));
   }
@@ -81,7 +81,7 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
 });
 
 /**
- * `wf approve` (`approveRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * `nemia approve` (`approveRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
  * with, or with whatever else it died of, as it was thrown.
  */
 export const approve = (e: Engine, id: string, stepName: string, message?: string): Promise<Approved> =>

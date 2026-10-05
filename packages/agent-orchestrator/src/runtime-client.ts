@@ -41,11 +41,11 @@ export { nameFor } from 'agent-runtime';
 export { lifecycleGraph, type LifecycleGraph } from 'agent-runtime';
 /** A denied call as the runtime words it, and as a permission rule is written: `Skill(look)`, `Bash(pytest)` (`deniedOf`). */
 export { denialText } from 'agent-runtime';
-/** A move the runtime's lifecycle had no edge for, as a person reads it in `wf up`'s log (`refusalLines`). */
+/** A move the runtime's lifecycle had no edge for, as a person reads it in `nemia up`'s log (`refusalLines`). */
 export { refusedText } from 'agent-runtime';
 /**
- * Why the runtime would refuse a task's configuration on one of its default harnesses, in its words, or undefined: what `wf start` and
- * `wf retry` ask of a step's filed config before anything is written, and word in the step's keys (`filedRefusal`).
+ * Why the runtime would refuse a task's configuration on one of its default harnesses, in its words, or undefined: what `nemia start` and
+ * `nemia retry` ask of a step's filed config before anything is written, and word in the step's keys (`filedRefusal`).
  */
 export { configRefusal } from 'agent-runtime';
 
@@ -89,14 +89,14 @@ export const HARNESSES = {
  *
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
  * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
- * `wf ls`, `wf up`, `wf rm`, the api — works on. It is `wf start` that refuses a step naming what was left out, in the file's words.
+ * `nemia ls`, `nemia up`, `nemia rm`, the api — works on. It is `nemia start` that refuses a step naming what was left out, in the file's words.
  * A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at work
  * on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  */
 export const engine = (): Engine => {
   const read = readRemote();
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
-  for (const why of refusalsOf(read)) console.error(`wf: ${why} ${LEFT_OUT}`);
+  for (const why of refusalsOf(read)) console.error(`nemia: ${why} ${LEFT_OUT}`);
   const harnesses = { ...HARNESSES, ...remote };
   return engineOf(RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses, credentials, missingCredential, ...storeAdmission() }));
 };
@@ -164,7 +164,7 @@ const ceilingOf = (): { maxConcurrent?: number } => {
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
 const LEFT_OUT =
-  'It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held, and one not yet started is refused its start.';
+  'It is left out until the file is fixed and this process restarts: a step that names it is refused by `nemia start`, one at work on it is held, and one not yet started is refused its start.';
 
 /**
  * The store's `a2a-agents.json`, judged: the agents the runtime takes, by name; each entry it refuses (`remoteConfigRefusal`), by name, in
@@ -208,7 +208,7 @@ export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
 
 /**
  * The secret for a scheme a remote agent's card asks for: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request,
- * so a variable set for a running `wf up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local
+ * so a variable set for a running `nemia up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local
  * harness.
  */
 export const credentials: Credentials = (scheme, _agentUrl, harness) => {
@@ -219,5 +219,5 @@ export const credentials: Credentials = (scheme, _agentUrl, harness) => {
 /** What a spawn refused for a secret not given says to do: set the variable, where the run's processes read it. */
 export const missingCredential: MissingCredential = (scheme, _agentUrl, harness) => {
   const name = remoteNameOf(harness) ?? harness;
-  return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of the daemon — the api, or \`wf up\` — and of every api that reads a run through the same engine, and restart it; then \`wf retry\` the step. The secret is read from there on every request, and never written to disk.`;
+  return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of the daemon — the api, or \`nemia up\` — and of every api that reads a run through the same engine, and restart it; then \`nemia retry\` the step. The secret is read from there on every request, and never written to disk.`;
 };

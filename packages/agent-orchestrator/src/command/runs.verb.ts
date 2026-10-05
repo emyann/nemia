@@ -1,8 +1,8 @@
 /**
- * The commands over a run's course and the store's tick, each defined once: `wf cancel`, `wf hold`, `wf rm` and `wf prune`, whose
+ * The commands over a run's course and the store's tick, each defined once: `nemia cancel`, `nemia hold`, `nemia rm` and `nemia prune`, whose
  * handlers call the package's verbs (`cancel`, `hold`, `unhold`, `forget`, `prune`) on one run — the CLI's runners walk the many runs
- * `wf rm` and `wf prune` take — the store's pause (`wf pause`, `wf resume`, and the api's read of it), and `wf tick`, `wf up` and
- * `wf watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
+ * `nemia rm` and `nemia prune` take — the store's pause (`nemia pause`, `nemia resume`, and the api's read of it), and `nemia tick`, `nemia up` and
+ * `nemia watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
  */
 import { cancel } from '../cancel/cancel.verb.ts';
 import type { CancelPlan } from '../cancel/cancel.ts';
@@ -46,7 +46,7 @@ const listOf = (args: Args, key: string): readonly string[] => {
   return Array.isArray(value) ? value : [];
 };
 
-/** `wf cancel`: what a run has in flight asked to stop, and nothing more filed; the plan it followed, a run already over included. */
+/** `nemia cancel`: what a run has in flight asked to stop, and nothing more filed; the plan it followed, a run already over included. */
 export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
   name: 'cancel',
   usage: '<runId>',
@@ -54,7 +54,7 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
     flags: [],
-    unknown: (arg) => `wf cancel takes one run's id: not ${arg}.`,
+    unknown: (arg) => `nemia cancel takes one run's id: not ${arg}.`,
   },
   writes: true,
   only: { side: 'cli', why: 'the board offers no cancel: a person stops a run at the command line' },
@@ -71,13 +71,13 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
   },
 };
 
-/** `wf hold`'s two forms, as each of its refusals ends on them. */
-const HOLD_SHAPE = 'wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or wf hold <runId> --off';
+/** `nemia hold`'s two forms, as each of its refusals ends on them. */
+const HOLD_SHAPE = 'nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or nemia hold <runId> --off';
 
 /** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
 type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
 
-/** `wf hold`'s `--why` and `--by`. */
+/** `nemia hold`'s `--why` and `--by`. */
 const SAID: readonly Said[] = [
   { flag: '--why', key: 'why', takes: 'the words for why the run is held', cap: WHY_CAP },
   { flag: '--by', key: 'by', takes: 'who puts the hold, by a name', cap: BY_CAP },
@@ -124,7 +124,7 @@ const saidFlags = (said: readonly Said[], command: string, puts: string, refusal
   }));
 
 /**
- * Refused of `wf hold`'s arguments before any run is read: a run to wait on empty or starting `-`, what `saidRefusal` refuses of `--why`
+ * Refused of `nemia hold`'s arguments before any run is read: a run to wait on empty or starting `-`, what `saidRefusal` refuses of `--why`
  * and `--by`; then together: `--until` and `--off` both, `--why` or `--by` with `--off`, and neither `--until` nor `--off`. A run named
  * twice is the verb's to refuse (`holdRefusal`), in its words.
  */
@@ -134,15 +134,15 @@ function holdArgsRefusal(args: Args): string | null {
   if (until.some((id) => !id || id.startsWith('-'))) return HOLD_TAKES['--until'];
   const said = SAID.map((s) => saidRefusal(args, s, HOLD_TAKES)).find((r) => r !== null);
   if (said) return said;
-  if (off && until.length) return `wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`;
+  if (off && until.length) return `nemia hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`;
   if (off && (args.why !== undefined || args.by !== undefined))
-    return `wf hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`;
-  if (!off && !until.length) return `wf hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`;
+    return `nemia hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`;
+  if (!off && !until.length) return `nemia hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`;
   return null;
 }
 
 /**
- * `wf hold`: a run held until other runs ship, or with `--off` its hold lifted now. The api serves the lift alone, on
+ * `nemia hold`: a run held until other runs ship, or with `--off` its hold lifted now. The api serves the lift alone, on
  * `DELETE /api/runs/:runId/hold`; a hold is put at the command line.
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
@@ -151,26 +151,26 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   help: [
     'file nothing more of a run until other runs ship, as --after would',
     'have: what is in flight finishes, nothing new is filed, and nothing',
-    'is asked of you — wf ls and wf decide say held until <run> ships, and',
+    'is asked of you — nemia ls and nemia decide say held until <run> ships, and',
     'what a step asks is asked once the hold lifts. The tick lifts it when',
     'every run named has shipped. Refused of a run cancelled, pruned,',
     'finished or already held, and of a run named that is unknown, the run',
     'itself, or one that already waits on it, through --after or a hold.',
     '--why: the reason, shown beside held until <run> ships wherever it is',
     'said; --by: who puts the hold (default: your OS user).',
-    'wf hold <runId> --off: lift the hold now, and the next tick goes on as',
+    'nemia hold <runId> --off: lift the hold now, and the next tick goes on as',
     'if it had never been put',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
     flags: [
       { flag: '--until', kind: 'text', key: 'until', takes: HOLD_TAKES['--until'], many: true },
-      ...saidFlags(SAID, 'wf hold', 'a hold', HOLD_TAKES, HOLD_SHAPE),
+      ...saidFlags(SAID, 'nemia hold', 'a hold', HOLD_TAKES, HOLD_SHAPE),
       { flag: '--off', kind: 'switch', key: 'off' },
     ],
-    unknown: (arg) => `wf hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
+    unknown: (arg) => `nemia hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
     apart: (_value, flag) => HOLD_TAKES[flag],
-    missing: 'wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.',
+    missing: 'nemia hold takes the run first: nemia hold <runId> --until <runId> [--until <runId> ...], or nemia hold <runId> --off.',
   },
   check: holdArgsRefusal,
   writes: true,
@@ -194,23 +194,23 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   ],
 };
 
-/** `wf rm`'s form, as its refusals end on it. */
-const RM_FORM = 'wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
+/** `nemia rm`'s form, as its refusals end on it. */
+const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
 
 /**
- * Refused of `wf rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag deletes,
+ * Refused of `nemia rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag deletes,
  * and alone would delete nothing, silently — then a switch with no run to forget.
  */
 function rmRefusal(args: Args): string | null {
   if (args.forceUnmerged === true && args.deleteBranches !== true)
-    return "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.";
+    return "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: nemia rm <runId> --delete-branches --force-unmerged.";
   if (args.runId === undefined && args.deleteBranches === true)
-    return 'wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.';
+    return 'nemia rm takes the runs to forget, by id: nemia rm <runId> [<runId> ...] — nemia ls lists them.';
   return null;
 }
 
 /**
- * `wf rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included. The api removes a
+ * `nemia rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included. The api removes a
  * run only once it is gone: what `forget` refused, or held, is a 409 in its words, and a run gone since the route read it a 404.
  */
 export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
@@ -232,7 +232,7 @@ export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
       { flag: '--force-unmerged', kind: 'switch', key: 'forceUnmerged' },
     ],
     unknown: (arg) =>
-      `wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`,
+      `nemia rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`,
   },
   check: rmRefusal,
   writes: true,
@@ -254,7 +254,7 @@ export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
 };
 
 /**
- * `wf prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes` does,
+ * `nemia prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes` does,
  * its route fixing `yes`. What `prune` refused, or found nothing to prune of, is a 409 on the api, in its words.
  */
 export const PRUNE: Command<{
@@ -271,7 +271,7 @@ export const PRUNE: Command<{
   help: [
     'free the space runs that are over hold: their worktrees, removed',
     "through git, and nothing else — each run's record, branches and",
-    'files are kept, and it stays on wf ls, wf decide and the board,',
+    'files are kept, and it stays on nemia ls, nemia decide and the board,',
     'marked pruned. --artifacts removes its files too (runs/<id>/',
     'artifacts/: screenshots, logs), of a run whose worktrees are',
     'already gone as well; its record and branches are still kept.',
@@ -290,7 +290,7 @@ export const PRUNE: Command<{
       { flag: '--yes', kind: 'switch', key: 'yes' },
     ],
     unknown: (arg) =>
-      `wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
+      `nemia prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
   },
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } },
@@ -311,25 +311,25 @@ export const PRUNE: Command<{
   },
 };
 
-/** `wf pause`'s form, as each of its refusals ends on it. */
-const PAUSE_SHAPE = 'wf pause [--why "<words>"] [--by <name>] [--now [--yes]]';
+/** `nemia pause`'s form, as each of its refusals ends on it. */
+const PAUSE_SHAPE = 'nemia pause [--why "<words>"] [--by <name>] [--now [--yes]]';
 
-/** `wf pause`'s `--why` and `--by`. */
+/** `nemia pause`'s `--why` and `--by`. */
 const PAUSE_SAID: readonly Said[] = [
   { flag: '--why', key: 'why', takes: 'the words for why the store is paused', cap: WHY_CAP },
   { flag: '--by', key: 'by', takes: 'who pauses it, by a name', cap: BY_CAP },
 ];
 
-/** `wf pause`'s `--why` and `--by`, each with its refusal of a value left out. */
+/** `nemia pause`'s `--why` and `--by`, each with its refusal of a value left out. */
 const PAUSE_TAKES = takesOf(PAUSE_SAID, PAUSE_SHAPE);
 
-/** What `wf pause --now` would stop, before it acts: the pause that stands, if one does, and each task at work but a landing. */
+/** What `nemia pause --now` would stop, before it acts: the pause that stands, if one does, and each task at work but a landing. */
 type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 
-/** What `wf pause` answers: the pause put; with `--now`, what it would stop (`PauseNowRead`), or with `--yes` what it did (`PausedNow`). */
+/** What `nemia pause` answers: the pause put; with `--now`, what it would stop (`PauseNowRead`), or with `--yes` what it did (`PausedNow`). */
 type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
 
-/** `wf pause`'s handler, by its flags: a plain pause, refused while one stands; `--now`, which only reads; `--now --yes`, which acts. */
+/** `nemia pause`'s handler, by its flags: a plain pause, refused while one stands; `--now`, which only reads; `--now --yes`, which acts. */
 async function pauseBy(e: Engine, args: Args): Promise<PauseAnswer> {
   const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
   if (args.now !== true) return { pause: putPause(said) };
@@ -338,7 +338,7 @@ async function pauseBy(e: Engine, args: Args): Promise<PauseAnswer> {
 }
 
 /**
- * `wf pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written. Refused while a pause stands (`Conflict`).
+ * `nemia pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written. Refused while a pause stands (`Conflict`).
  * `--now` says what a pause at once would stop and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
  */
 export const PAUSE: Command<PauseAnswer> = {
@@ -350,14 +350,14 @@ export const PAUSE: Command<PauseAnswer> = {
     'what runs finishes, its end and closeout recorded; a landing whose',
     'check has ended commits or aborts. Pausing: N finishing while a',
     'session works or a check or landing runs, Paused once none does.',
-    'wf start still writes a run, and approvals, retries and answers are',
-    'kept, not acted on: the pass after wf resume files what waits. wf ls,',
-    'wf feed, wf start and wf up say it, and wf ls names what finishes.',
+    'nemia start still writes a run, and approvals, retries and answers are',
+    'kept, not acted on: the pass after nemia resume files what waits. nemia ls,',
+    'nemia feed, nemia start and nemia up say it, and nemia ls names what finishes.',
     'Refused while a pause stands.',
     '--why: the reason, said wherever the pause is; --by: who pauses it',
     '(default: your OS user)',
     '--now: pause at once — each step session or check at work, but a',
-    'landing, is asked to stop and tried again on wf resume: a nudge of',
+    'landing, is asked to stop and tried again on nemia resume: a nudge of',
     'its session, or a recheck. A pause that stands is kept as it was.',
     '--yes: with --now, act; without it, --now only says what it would',
     'interrupt',
@@ -365,11 +365,11 @@ export const PAUSE: Command<PauseAnswer> = {
   spec: {
     positionals: [],
     flags: [
-      ...saidFlags(PAUSE_SAID, 'wf pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
+      ...saidFlags(PAUSE_SAID, 'nemia pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
       { flag: '--now', kind: 'switch', key: 'now' },
       { flag: '--yes', kind: 'switch', key: 'yes' },
     ],
-    unknown: (arg) => `wf pause does not take ${arg}: ${PAUSE_SHAPE}.`,
+    unknown: (arg) => `nemia pause does not take ${arg}: ${PAUSE_SHAPE}.`,
     apart: (_value, flag) => PAUSE_TAKES[flag],
   },
   check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
@@ -385,7 +385,7 @@ export const PAUSE: Command<PauseAnswer> = {
 };
 
 /**
- * `wf resume`: the store's pause lifted (`resumePause`), on `DELETE /api/pause` too; the pause lifted. Refused with none (`Missing`).
+ * `nemia resume`: the store's pause lifted (`resumePause`), on `DELETE /api/pause` too; the pause lifted. Refused with none (`Missing`).
  */
 export const RESUME: Command<{ pause: Pause }> = {
   name: 'resume',
@@ -394,7 +394,7 @@ export const RESUME: Command<{ pause: Pause }> = {
   spec: {
     positionals: [],
     flags: [],
-    unknown: (arg) => `wf resume takes no ${arg}: it resumes the store, whoever paused it.`,
+    unknown: (arg) => `nemia resume takes no ${arg}: it resumes the store, whoever paused it.`,
   },
   writes: true,
   route: { method: 'DELETE', path: '/api/pause', status: 200 },
@@ -412,7 +412,7 @@ export const PAUSED: Command<Paused> = {
   route: { method: 'GET', path: '/api/pause', status: 200 },
   only: {
     side: 'api',
-    why: 'the board says the pause in its bottom bar; at the command line, wf ls says it, what finishes and each landing it holds',
+    why: 'the board says the pause in its bottom bar; at the command line, nemia ls says it, what finishes and each landing it holds',
   },
   handler: (e) => pausedRead(e),
   print: () => [],
@@ -426,44 +426,44 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   spec: { positionals: [], flags: [], unknown: (arg) => `what a pause at once would stop takes no ${arg}.` },
   writes: false,
   route: { method: 'GET', path: '/api/pause/now', status: 200 },
-  only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, wf pause --now says it' },
+  only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, nemia pause --now says it' },
   handler: async (e) => ({ interrupts: await nowRead(e), cost: NOW_COST }),
   print: () => [],
 };
 
-/** The `--stats` switch of `wf tick` and `wf up`. */
+/** The `--stats` switch of `nemia tick` and `nemia up`. */
 const STATS = { flag: '--stats', kind: 'switch', key: 'stats' } as const;
 
-/** `wf tick`: one pass of the tick, run by the CLI's runner. */
+/** `nemia tick`: one pass of the tick, run by the CLI's runner. */
 const TICK: Ran = {
   name: 'tick',
   usage: '[--stats]',
   help: [
     'one pass: tick the engine, file what became ready — refused while a',
-    'daemon (the api, or a wf up) ticks the store, since it runs the same',
+    'daemon (the api, or a nemia up) ticks the store, since it runs the same',
     'pass (daemon.json);',
     '--stats says after it what the pass cost, phase by phase',
   ],
   spec: {
     positionals: [],
     flags: [STATS],
-    unknown: (arg) => `wf tick takes no ${arg}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`,
+    unknown: (arg) => `nemia tick takes no ${arg}: nemia tick runs one pass, and nemia tick --stats says after it what the pass cost.`,
   },
   writes: true,
   only: { side: 'cli', why: 'a pass is run where the store is, by a person or by a daemon; the api serves none on a route' },
 };
 
-/** Refused of `wf up`'s arguments: an interval beside `--stats`, which ticks nothing, or one `everyOf` refuses. */
+/** Refused of `nemia up`'s arguments: an interval beside `--stats`, which ticks nothing, or one `everyOf` refuses. */
 function upRefusal(args: Args): string | null {
   const every = textOf(args, 'every');
   if (every === undefined) return null;
   if (args.stats === true)
-    return `wf up --stats reads what the last pass cost and ticks nothing, so it takes no ${every}: wf up --stats alone, or wf up ${every} to tick.`;
+    return `nemia up --stats reads what the last pass cost and ticks nothing, so it takes no ${every}: nemia up --stats alone, or nemia up ${every} to tick.`;
   const asked = everyOf(every);
   return 'refusal' in asked ? asked.refusal : null;
 }
 
-/** `wf up`: a pass every interval, holding the store, until it is stopped; or, with `--stats`, what the last pass cost. */
+/** `nemia up`: a pass every interval, holding the store, until it is stopped; or, with `--stats`, what the last pass cost. */
 const UP: Ran = {
   name: 'up',
   usage: '[ms]',
@@ -479,28 +479,28 @@ const UP: Ran = {
     'once a minute, a line of what its passes cost (tick-stats.json); the',
     "store's pause once it is put, again each time it says another thing",
     '(Pausing: N finishing, then Paused), and once it is resumed.',
-    'wf up --stats: what the last pass cost, phase by phase — read, not',
+    'nemia up --stats: what the last pass cost, phase by phase — read, not',
     'run, so it fits while a daemon holds the store; where none does,',
-    'wf tick --stats',
+    'nemia tick --stats',
   ],
   spec: {
     positionals: [{ key: 'every', takes: 'optional', kind: 'text' }],
     flags: [STATS],
     unknown: (arg) => {
       const asked = everyOf(arg);
-      return 'refusal' in asked ? asked.refusal : `wf up takes one pass interval at most, and was given ${arg} too: wf up [ms].`;
+      return 'refusal' in asked ? asked.refusal : `nemia up takes one pass interval at most, and was given ${arg} too: nemia up [ms].`;
     },
   },
   check: upRefusal,
   writes: true,
-  only: { side: 'cli', why: 'wf up holds the store as long as its process lives; the api holds none' },
+  only: { side: 'cli', why: 'nemia up holds the store as long as its process lives; the api holds none' },
 };
 
-/** `wf watch`: the feed followed from a cursor until it is stopped. */
+/** `nemia watch`: the feed followed from a cursor until it is stopped. */
 const WATCH: Ran = {
   name: 'watch',
   usage: '[cursor]',
-  help: ["wf feed's lines, followed as the tick writes them, until ^C"],
+  help: ["nemia feed's lines, followed as the tick writes them, until ^C"],
   spec: {
     positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],
     flags: [],
@@ -514,5 +514,5 @@ const WATCH: Ran = {
   only: { side: 'cli', why: 'it follows the feed on a terminal until ^C; the board reads what changed from the api' },
 };
 
-/** The commands the CLI serves alone and runs itself, in the order `wf`'s help lists them. */
+/** The commands the CLI serves alone and runs itself, in the order `nemia`'s help lists them. */
 export const RAN: readonly Ran[] = [TICK, UP, WATCH];

@@ -30,14 +30,14 @@ import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 
-/** The names of the inbox's cards, as `wf inbox` lists them. */
+/** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = (): string[] =>
   inboxListing(runStore.inbox.entries(), [], () => true)
     .filter((l) => l.file.endsWith('.md'))
     .map((l) => l.name);
 
 /**
- * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does
+ * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does
  * not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
  * started; and the tick's tries, so a queued card whose start was refused, or failed, says why.
  */
@@ -48,8 +48,8 @@ export const readInbox = (): InboxListing[] =>
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
  * step says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
  *
- * Refused wherever a card's `workflow:` is written — `addToInbox` (`wf inbox add`, and the board's Inbox) and `queueInInbox`
- * (`wf inbox queue --workflow`, which writes that key over the card's own) — in the words `wf start --repo` is refused in: the same
+ * Refused wherever a card's `workflow:` is written — `addToInbox` (`nemia inbox add`, and the board's Inbox) and `queueInInbox`
+ * (`nemia inbox queue --workflow`, which writes that key over the card's own) — in the words `nemia start --repo` is refused in: the same
  * sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no way to edit one from the
  * board, and refusing its start, or its plain re-queue, would strand it — so its `repo:` is ignored and said
  * (`InboxStarted.ignoredRepo`).
@@ -73,7 +73,7 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
 }
 
 /**
- * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
+ * `nemia inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
  * alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is what a
  * refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
  * (`ideaCard`). `workflow`, `repo` and `factory` are written as the card's keys, over the text's own: `repo` an absolute path to a
@@ -96,7 +96,7 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
 }
 
 /**
- * What `wf inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it.
+ * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it.
  */
 export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
 
@@ -105,7 +105,7 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
   startedAs.length || card.queued !== undefined ? new Conflict({ message: why }) : new WorkflowError(why);
 
 /**
- * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given;
+ * `nemia inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given;
  * `off` takes the mark back, whatever the card's `repo:` names: a card whose repository is gone leaves the queue as any card does. The
  * card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the file keeps the time it
  * was last written, as the rename would give it the time of the queue, and a card has no filing time of its own but its mtime: a board
@@ -125,7 +125,7 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   const text = runStore.inbox.read(`${name}.md`);
   if (text === null) {
     throw new Missing({
-      message: `${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`,
+      message: `${noCardLine(name, inboxCards())} Queue one of those — nemia inbox queue <name> — or park the idea first: nemia inbox add "<idea>".`,
     });
   }
   const exists = how.off ? () => true : isDirectory;
@@ -150,11 +150,11 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   return { card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued' };
 }
 
-/** What `wf inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */
+/** What `nemia inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */
 export type InboxDropped = { removed: true; file: string } | { removed: false; cards: string[] };
 
 /**
- * `wf inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with
+ * `nemia inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with
  * no card is normal — dropped already, or never filed — and says which cards there are.
  */
 export function dropFromInbox(name: string): InboxDropped {
@@ -166,7 +166,7 @@ export function dropFromInbox(name: string): InboxDropped {
   } catch (err) {
     throw Object.assign(
       new Error(
-        `wf inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,
+        `nemia inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,
       ),
       { exitCode: 1 },
     );
@@ -176,7 +176,7 @@ export function dropFromInbox(name: string): InboxDropped {
 
 /**
  * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on
- * the way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `wf start <path>` go through `startFromInbox`.
+ * the way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `nemia start <path>` go through `startFromInbox`.
  * A card not there is still a card's path, refused by name at start.
  */
 export function inboxNameAt(given: string): string | null {

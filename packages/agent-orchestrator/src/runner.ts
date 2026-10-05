@@ -8,8 +8,8 @@
  * tasks say), `start.verb.ts`, `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and
  * `advance.verb.ts` (a pass — `tick`, `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
  * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
- * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts` (what a
- * person reads of a run: `wf ls` and `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import one way —
+ * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`nemia rm` and `nemia prune`), `list.verb.ts` and `decide.verb.ts` (what a
+ * person reads of a run: `nemia ls` and `nemia decide`), and `stats.verb.ts` (what the store's runs add up to: `nemia stats`). They import one way —
  * views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:

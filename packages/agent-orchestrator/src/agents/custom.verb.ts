@@ -1,5 +1,5 @@
 /**
- * `wf agents custom`, an entry of the command table: a person's custom instructions for one agent, read, written and cleared. The api
+ * `nemia agents custom`, an entry of the command table: a person's custom instructions for one agent, read, written and cleared. The api
  * serves the write and the clear on the routes the table generates, and the read by a route of its own, which calls the same handler.
  */
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
@@ -14,15 +14,15 @@ const textOf = (args: Args, key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
-/** The refusal of a value flag of `wf agents custom` given twice. */
-const twice = (flag: string): string => `wf agents custom takes ${flag} once: one agent's words are one file.`;
+/** The refusal of a value flag of `nemia agents custom` given twice. */
+const twice = (flag: string): string => `nemia agents custom takes ${flag} once: one agent's words are one file.`;
 
 /** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
 const FILE: Flag = {
   flag: '--file',
   kind: 'text',
   key: 'file',
-  takes: '--file takes the file whose words to write, or - to read them from stdin: wf agents custom <name> --file <path>',
+  takes: '--file takes the file whose words to write, or - to read them from stdin: nemia agents custom <name> --file <path>',
   twice: twice('--file'),
   only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
 };
@@ -32,12 +32,12 @@ const REPO: Flag = {
   flag: '--repo',
   kind: 'text',
   key: 'repo',
-  takes: '--repo takes the repository whose agents to look in: wf agents custom <name> --repo <r>',
+  takes: '--repo takes the repository whose agents to look in: nemia agents custom <name> --repo <r>',
   twice: twice('--repo'),
   only: { side: 'cli', why: 'the api looks in the repository the request is served on (?repo=)' },
 };
 
-/** `wf agents custom`'s spec: the agent's name, then `--file`, `--clear` or `--repo`; and the words, which a body alone carries. */
+/** `nemia agents custom`'s spec: the agent's name, then `--file`, `--clear` or `--repo`; and the words, which a body alone carries. */
 const SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
   flags: [
@@ -52,7 +52,7 @@ const SPEC: Spec = {
     },
   ],
   unknown: (arg) =>
-    `wf agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not ${arg}.`,
+    `nemia agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not ${arg}.`,
   apart: (_value, flag) => (flag === '--repo' ? REPO.takes! : FILE.takes!),
 };
 
@@ -66,7 +66,7 @@ type Cleared = { name: string; file: string; removed: boolean };
 const KEPT = 'a run already started keeps the words it was started with';
 
 /**
- * `wf agents custom`: the custom instructions for the agent `name` in the store `home` — read bare, written from `words`, removed with
+ * `nemia agents custom`: the custom instructions for the agent `name` in the store `home` — read bare, written from `words`, removed with
  * `clear` — for a run on `repo`, `.` where none is named. Refused, writing nothing, as the package refuses: a name no place has, blank
  * words, a frontmatter block, and, on a read, a file there that does not read.
  */
@@ -83,7 +83,7 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
   spec: SPEC,
   check: (args) =>
     args.clear === true && args.file !== undefined
-      ? 'wf agents custom takes --file or --clear, not both: --file writes the words, --clear removes them.'
+      ? 'nemia agents custom takes --file or --clear, not both: --file writes the words, --clear removes them.'
       : leftOut(SPEC, args),
   writes: true,
   route: [
@@ -114,7 +114,7 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
     if (args.words !== undefined)
       return [`${name}: custom instructions written to ${data.file}, told after its instructions in every run started from now — ${KEPT}`];
     if (data.words === null)
-      return [`${name} has no custom instructions. Set them with wf agents custom ${name} --file <path>, or --file - for stdin.`];
+      return [`${name} has no custom instructions. Set them with nemia agents custom ${name} --file <path>, or --file - for stdin.`];
     return [data.file, '', data.words];
   },
 };

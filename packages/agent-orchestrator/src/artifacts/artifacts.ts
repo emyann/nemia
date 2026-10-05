@@ -53,7 +53,7 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
           'only one it keeps.',
           '',
           "This workspace is the repository's own checkout, where the run hands nothing off: a file you leave here is",
-          "not collected and not committed — it stays in a person's checkout, and `wf decide` reads a path named from",
+          "not collected and not committed — it stays in a person's checkout, and `nemia decide` reads a path named from",
           'the workspace root as `not collected`. Name each file by its absolute path in that directory; a directory is',
           'not collected, nor a file that is not there.',
         ]
@@ -116,10 +116,10 @@ export type ArtifactFile = { path: string; bytes: number };
 export type MissingArtifact = { path: string; why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' };
 
 /**
- * What `wf decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
+ * What `nemia decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
  * a refusal is named as one, never passed over — and then every file in the step's directory, collected or written there, with its size.
  *
- * With its files removed by `wf prune --artifacts`, a file the directory does not have, and one named from a workspace also gone, is
+ * With its files removed by `nemia prune --artifacts`, a file the directory does not have, and one named from a workspace also gone, is
  * said `not kept`: a step's files are collected at its hand-off, and the marker cannot tell one the step never wrote from one it did.
  */
 export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[], pruned?: Pruned): string[] {
@@ -135,7 +135,7 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
       ? []
       : line('not there', (names) =>
           pruned
-            ? `!! declared and not collected: ${names}  — on no branch, and its worktree was removed by wf prune at ${pruned.at}`
+            ? `!! declared and not collected: ${names}  — on no branch, and its worktree was removed by nemia prune at ${pruned.at}`
             : `!! declared but not in the workspace: ${names}  — nothing to collect`,
         )),
     ...line('directory', (names) => `!! declared a directory, not collected: ${names}  — a step names each file`),

@@ -1,12 +1,12 @@
 /**
  * Who ticks the store — pure: `$WF_ROOT/daemon.json`, the lease a daemon takes the store with, judged against a clock and a liveness answer
- * the caller brings, and the words a refusal, a takeover and `wf ls` say of it. `daemon.store.ts` reads the file, asks the process table
+ * the caller brings, and the words a refusal, a takeover and `nemia ls` say of it. `daemon.store.ts` reads the file, asks the process table
  * and writes it; nothing here reads a disk or signals a process.
  *
  * One daemon per store, since the tick keeps one writer per file and two ticks are two writers: the api's process, which serves the board
- * and ticks (`by: 'api'`), or a `wf up` on a machine with no board (`by: 'wf up'`). The file is the daemon's alone: it writes it as it
+ * and ticks (`by: 'api'`), or a `nemia up` on a machine with no board (`by: 'wf up'`). The file is the daemon's alone: it writes it as it
  * takes the store, after every pass it completes, on a beat of its interval while it lives — a pass in flight included — and as it stops.
- * A second daemon of either kind, and a `wf tick` by hand, read it and are refused while it names a live process heard from recently
+ * A second daemon of either kind, and a `nemia tick` by hand, read it and are refused while it names a live process heard from recently
  * (`ticking`); anything else — no file, a file that does not read, a holder that stopped, is gone or has been silent for a long while — is
  * free, and the next daemon takes it over.
  */
@@ -30,7 +30,7 @@ export type Instant = { at: number; mono?: Monotonic };
 export const elapsedMs = (from: Instant, to: Instant): number =>
   from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
 
-/** Which daemon holds the store: the api's process, or a `wf up`. */
+/** Which daemon holds the store: the api's process, or a `nemia up`. */
 export type HolderKind = 'api' | 'wf up';
 
 /**
@@ -40,14 +40,14 @@ export type HolderKind = 'api' | 'wf up';
  */
 export type DaemonFile = {
   pid: number;
-  /** Which daemon it is; a file with none was written by a `wf up` before the api held the store (`holderOf`). */
+  /** Which daemon it is; a file with none was written by a `nemia up` before the api held the store (`holderOf`). */
   by?: HolderKind;
-  /** Where the api serves the board, written once it listens (`holdUrl`); never for a `wf up`. */
+  /** Where the api serves the board, written once it listens (`holdUrl`); never for a `nemia up`. */
   url?: string;
   startedAt: string;
   startedMono?: Monotonic;
   cwd: string;
-  /** Its pass interval, in milliseconds (`wf up [ms]`): how stale is stale is measured from it (`staleAfterMs`). */
+  /** Its pass interval, in milliseconds (`nemia up [ms]`): how stale is stale is measured from it (`staleAfterMs`). */
   every: number;
   passedAt: string | null;
   passedMono?: Monotonic;
@@ -75,15 +75,18 @@ export type DaemonFile = {
  */
 export type Identity = 'same' | 'other' | 'unknown' | 'gone';
 
-/** Which daemon wrote the file: its `by`, and a `wf up` for a file that names none. */
+/** Which daemon wrote the file: its `by`, and a `nemia up` for a file that names none. */
 export const holderOf = (file: Pick<DaemonFile, 'by'>): HolderKind => file.by ?? 'wf up';
 
-/** A holder named for a person: `the api of pid 12 at http://127.0.0.1:8787`, `the api of pid 12`, or `the wf up of pid 12`. */
-export const holderWords = (file: Pick<DaemonFile, 'by' | 'pid' | 'url'>): string =>
-  holderOf(file) === 'api' ? `the api of pid ${file.pid}${file.url ? ` at ${file.url}` : ''}` : `the wf up of pid ${file.pid}`;
+/** A holder's kind as a line says it: `api`, or `nemia up` for the `wf up` a file names, which stays as it was written. */
+export const holderName = (kind: HolderKind): string => (kind === 'wf up' ? 'nemia up' : kind);
 
-/** How a daemon is started, said wherever none ticks: the api, which serves the board too, or a `wf up` where none is served. */
-export const START_WORDS = 'start one with npm start in apps/api, or wf up where no board is served';
+/** A holder named for a person: `the api of pid 12 at http://127.0.0.1:8787`, `the api of pid 12`, or `the nemia up of pid 12`. */
+export const holderWords = (file: Pick<DaemonFile, 'by' | 'pid' | 'url'>): string =>
+  holderOf(file) === 'api' ? `the api of pid ${file.pid}${file.url ? ` at ${file.url}` : ''}` : `the nemia up of pid ${file.pid}`;
+
+/** How a daemon is started, said wherever none ticks: the api, which serves the board too, or a `nemia up` where none is served. */
+export const START_WORDS = 'start one with npm start in apps/api, or nemia up where no board is served';
 
 /** The file's name under `WF_ROOT`. */
 export const DAEMON_FILE = 'daemon.json';
@@ -102,14 +105,14 @@ export const STALE_FLOOR_MS = 15 * 60_000;
 /** How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes. */
 export const staleAfterMs = (every: number): number => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
 
-/** The longest interval a timer keeps: Node fires a longer one after 1 ms, so `wf up 1e10` would pass without pause and never go stale. */
+/** The longest interval a timer keeps: Node fires a longer one after 1 ms, so `nemia up 1e10` would pass without pause and never go stale. */
 export const MAX_EVERY_MS = 2 ** 31 - 1;
 
-/** The interval `wf up` ticks at when it is given none. */
+/** The interval `nemia up` ticks at when it is given none. */
 export const DEFAULT_EVERY_MS = 4_000;
 
 /**
- * `wf up [ms]`'s interval, or why it is refused. A whole number of milliseconds from 1 to `MAX_EVERY_MS`: the interval is written into the
+ * `nemia up [ms]`'s interval, or why it is refused. A whole number of milliseconds from 1 to `MAX_EVERY_MS`: the interval is written into the
  * file, and one that does not read there — `-5`, or `1e400`, which JSON writes as `null` — would make the daemon no holder while it ticks.
  */
 export function everyOf(arg: string | undefined): { every: number } | { refusal: string } {
@@ -118,15 +121,15 @@ export function everyOf(arg: string | undefined): { every: number } | { refusal:
   if (arg.trim() !== '' && Number.isInteger(every) && every >= 1 && every <= MAX_EVERY_MS) return { every };
   return {
     refusal:
-      `wf up takes its pass interval in whole milliseconds, from 1 to ${MAX_EVERY_MS}, and ${JSON.stringify(arg)} is not one: ` +
-      `wf up [ms], ${DEFAULT_EVERY_MS} when none is given. The interval is written into ${DAEMON_FILE}, and a holder whose interval does not ` +
-      `read there holds nothing: a second wf up would take the store from it while it ticks.`,
+      `nemia up takes its pass interval in whole milliseconds, from 1 to ${MAX_EVERY_MS}, and ${JSON.stringify(arg)} is not one: ` +
+      `nemia up [ms], ${DEFAULT_EVERY_MS} when none is given. The interval is written into ${DAEMON_FILE}, and a holder whose interval does not ` +
+      `read there holds nothing: a second nemia up would take the store from it while it ticks.`,
   };
 }
 
 /**
  * `daemon.json` as it was read: its text, and the file it holds — undefined when the text does not read as one (`parseDaemonFile` in
- * `daemon.store.ts`, which checks it against what `wf up` writes).
+ * `daemon.store.ts`, which checks it against what `nemia up` writes).
  */
 export type DaemonRead = { text: string; file: DaemonFile | undefined };
 
@@ -208,10 +211,10 @@ const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): str
   identity === 'same'
     ? `kill ${file.pid} — that pid is the node process that ticks, not an npm wrapper around it, which can be killed and leave it ticking`
     : `its pid, once checked: ${file.pid} could not be confirmed here as the process that wrote ${DAEMON_FILE} (${file.procStart === undefined ? 'the file names no process start' : `no /proc/${file.pid}/stat to compare its start with`}), ` +
-      `and a pid is reused once its process ends — if ps -p ${file.pid} -o lstart=,args= shows ${holderOf(file) === 'api' ? 'the api' : 'a wf up'} started at ${file.startedAt}, kill ${file.pid}`;
+      `and a pid is reused once its process ends — if ps -p ${file.pid} -o lstart=,args= shows ${holderOf(file) === 'api' ? 'the api' : 'a nemia up'} started at ${file.startedAt}, kill ${file.pid}`;
 
 /**
- * Why a daemon — `wf up`, or the api (`verb`) — or a `wf tick` by hand may not tick `store`, held by `holder` of either kind: which one,
+ * Why a daemon — `nemia up`, or the api (`verb`) — or a `nemia tick` by hand may not tick `store`, held by `holder` of either kind: which one,
  * its pid, url, where and since when, its last pass, how to stop it, and when it would be taken over on its own. An api is told it can
  * serve beside it with `--no-tick`. A hand tick has no force: a live daemon runs the same pass within its interval.
  */
@@ -219,14 +222,14 @@ export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', sto
   const holder = standing.file;
   const who = `${holderWords(holder)}, started ${holder.startedAt} in ${holder.cwd}, every ${holder.every}ms — ${lastPassWords(holder, now)}`;
   const stale = durationWord(staleAfterMs(holder.every));
-  const second = `One store takes one daemon, the api or a wf up: a second would be a second writer of every file the tick writes.`;
+  const second = `One store takes one daemon, the api or a nemia up: a second would be a second writer of every file the tick writes.`;
   if (verb === 'tick')
     return (
-      `wf tick: ${store} is held by ${who}, which runs this same pass within its interval: a pass by hand beside it would be a second writer. ` +
-      `Wait for its next pass — wf ls says when it was — or stop it with ${stopWords(standing)}, and tick by hand then.`
+      `nemia tick: ${store} is held by ${who}, which runs this same pass within its interval: a pass by hand beside it would be a second writer. ` +
+      `Wait for its next pass — nemia ls says when it was — or stop it with ${stopWords(standing)}, and tick by hand then.`
     );
   return verb === 'up'
-    ? `wf up: ${store} is held by ${who}. ${second} Leave it ticking, or stop it with ${stopWords(standing)}; a holder silent for ${stale} is taken over by the next daemon.`
+    ? `nemia up: ${store} is held by ${who}. ${second} Leave it ticking, or stop it with ${stopWords(standing)}; a holder silent for ${stale} is taken over by the next daemon.`
     : `api: ${store} is held by ${who}. ${second} Leave it ticking and serve a board beside it with --no-tick, or start this api again once it has stopped: ` +
         `stop it with ${stopWords(standing)}; a holder silent for ${stale} is taken over by the next daemon.`;
 }
@@ -234,7 +237,7 @@ export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', sto
 /** Why a holder is gone: its process ended, or its pid is another process's now — never a pid to kill. */
 const goneWords = ({ identity }: Standing): string =>
   identity === 'other'
-    ? `whose process is gone — that pid is another process's now, started after the wf up that wrote ${DAEMON_FILE}`
+    ? `whose process is gone — that pid is another process's now, started after the nemia up that wrote ${DAEMON_FILE}`
     : 'whose process is gone';
 
 /** What a daemon says of the holder it took the store from, when that was not a clean stop — or undefined when there is nothing to say. */
@@ -257,8 +260,8 @@ export function takeoverLine(replaced: DaemonStanding, store: string, now: numbe
  */
 export const takenFromLine = (by: DaemonFile | undefined, store: string, self: HolderKind = 'wf up'): string =>
   by
-    ? `${self}: ${store} was taken over by ${holderWords(by)}, started ${by.startedAt} in ${by.cwd} — this one stops rather than be a second writer.`
-    : `${self}: ${store} no longer names this ${self} as its holder — this one stops rather than be a second writer.`;
+    ? `${holderName(self)}: ${store} was taken over by ${holderWords(by)}, started ${by.startedAt} in ${by.cwd} — this one stops rather than be a second writer.`
+    : `${holderName(self)}: ${store} no longer names this ${holderName(self)} as its holder — this one stops rather than be a second writer.`;
 
 /** Said after a holder ticking whose pid could not be confirmed: that it was not, so a person does not take the pid for certain. */
 const unconfirmed = ({ file, identity }: Standing): string =>
@@ -268,7 +271,7 @@ const unconfirmed = ({ file, identity }: Standing): string =>
 const at = (file: DaemonFile): string => (file.url ? ` at ${file.url}` : '');
 
 /**
- * `wf ls`'s last line: whether a daemon is ticking the store, which — the api, with its url, or a `wf up` — and when its last pass was.
+ * `nemia ls`'s last line: whether a daemon is ticking the store, which — the api, with its url, or a `nemia up` — and when its last pass was.
  * The line starts with the holder's kind, `daemon` when the store names none.
  */
 export function daemonLine(standing: DaemonStanding, now: number): string {
@@ -278,20 +281,20 @@ export function daemonLine(standing: DaemonStanding, now: number): string {
     case 'unreadable':
       return `daemon: none known — ${DAEMON_FILE} does not read as a holder, so nothing is known to tick this store; the next daemon takes it over`;
     case 'ticking':
-      return `${holderOf(standing.file)}: ticking, pid ${standing.file.pid}${at(standing.file)}, every ${standing.file.every}ms — ${lastPassWords(standing.file, now)}${unconfirmed(standing)}`;
+      return `${holderName(holderOf(standing.file))}: ticking, pid ${standing.file.pid}${at(standing.file)}, every ${standing.file.every}ms — ${lastPassWords(standing.file, now)}${unconfirmed(standing)}`;
     case 'stalled':
       return (
-        `${holderOf(standing.file)}: stalled, pid ${standing.file.pid}${at(standing.file)}, every ${standing.file.every}ms — alive, but silent for ${durationWord(standing.quiet)}: ${lastPassWords(standing.file, now)}; ` +
+        `${holderName(holderOf(standing.file))}: stalled, pid ${standing.file.pid}${at(standing.file)}, every ${standing.file.every}ms — alive, but silent for ${durationWord(standing.quiet)}: ${lastPassWords(standing.file, now)}; ` +
         `the next daemon takes the store over, and ${standing.identity === 'same' ? `kill ${standing.file.pid} stops it` : `stopping it now is by ${stopWords(standing)}`}`
       );
     case 'gone':
       return standing.identity === 'other'
-        ? `${holderOf(standing.file)}: none ticking — ${holderWords(standing.file)} is gone, that pid another process's now; its ${lastPassWords(standing.file, now)}; ${START_WORDS}`
-        : `${holderOf(standing.file)}: none ticking — pid ${standing.file.pid} is gone, its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
+        ? `${holderName(holderOf(standing.file))}: none ticking — ${holderWords(standing.file)} is gone, that pid another process's now; its ${lastPassWords(standing.file, now)}; ${START_WORDS}`
+        : `${holderName(holderOf(standing.file))}: none ticking — pid ${standing.file.pid} is gone, its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
     case 'stopped':
-      return `${holderOf(standing.file)}: none ticking — pid ${standing.file.pid} stopped ${durationWord(now - Date.parse(standing.file.stoppedAt!))} ago (${standing.file.stoppedAt}), its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
+      return `${holderName(holderOf(standing.file))}: none ticking — pid ${standing.file.pid} stopped ${durationWord(now - Date.parse(standing.file.stoppedAt!))} ago (${standing.file.stoppedAt}), its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
   }
 }
 
-/** The file's text, as `wf up` writes it. */
+/** The file's text, as `nemia up` writes it. */
 export const daemonText = (file: DaemonFile): string => `${JSON.stringify(file, null, 2)}\n`;

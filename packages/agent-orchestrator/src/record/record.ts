@@ -75,7 +75,7 @@ type RunBase = {
   brief: string;
   workflowDir: string;
   /**
-   * The workflow as it was when the run started, read once by `wf start` and never again.
+   * The workflow as it was when the run started, read once by `nemia start` and never again.
    *
    * A fence, not a cache. The folder is a path anybody can edit — with `--no-worktree` a step works
    * in the very checkout it lives in — and a `check:` is the command that judges a step: one the step
@@ -84,30 +84,30 @@ type RunBase = {
    */
   workflow?: Workflow[];
   /**
-   * The runs this one waits on (`wf start --after`), frozen at start like the workflow: none of its steps is filed until
+   * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
    * every one of them has shipped (`runReady`). Absent on a run that waits on none.
    */
   after?: string[];
   /**
-   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
-   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a
+   * The files `nemia start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
+   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `nemia decide`. Absent on a
    * run given none.
    */
   inputs?: string[];
   /**
-   * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox`
-   * in inbox.verb.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as`
-   * this run, and `wf decide` names the card under the run's line. Absent on a run started any other way.
+   * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox`
+   * in inbox.verb.ts), which removes the card once this record is written. `nemia inbox` reads it to say a card still there was `started as`
+   * this run, and `nemia decide` names the card under the run's line. Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**
-   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `wf start --gate <step>`, and an inbox
-   * card's `gate:`. Each such step's closeout waits for a person — `wf approve` — before anything after it is filed (`hasGate`). Absent on
+   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `nemia start --gate <step>`, and an inbox
+   * card's `gate:`. Each such step's closeout waits for a person — `nemia approve` — before anything after it is filed (`hasGate`). Absent on
    * a run given none.
    */
   gates?: string[];
   /**
-   * The factory the run was started in (`wf start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is one
+   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is one
    * of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
    */
   factory?: string;
@@ -118,14 +118,14 @@ type RunBase = {
    */
   mounts?: Mount[];
   /**
-   * What people approved at a gate (`wf approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>`
+   * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>`
    * — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a
    * person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one for an earlier try is spent. Absent when
    * there are none.
    */
   approvals?: Approval[];
   /**
-   * What people accepted at a loop out of rounds (`wf accept`), each in a file of its own beside the approvals —
+   * What people accepted at a loop out of rounds (`nemia accept`), each in a file of its own beside the approvals —
    * `runs/<id>.asks/accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
    * person's word where the looping step asked for another round it has no rounds left for: what waits on it is filed as if it had said
    * `again: false`, with its findings still on the record (`acceptanceOf`). One for an earlier try is spent. Absent when there are none.
@@ -137,9 +137,9 @@ type RunBase = {
    */
   slotHeldAt?: string;
   /**
-   * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
+   * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (`isShipped` in branches.store.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished.
+   * (`isShipped` in branches.store.ts) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has finished.
    */
   tips?: Record<string, string>;
   /**
@@ -151,22 +151,22 @@ type RunBase = {
    */
   cancelledAt?: string;
   /**
-   * When `wf prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
+   * When `nemia prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
    * `runs/<id>.pruned`, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record. A pruned run is read as it
    * was, off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree
    * refuses it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
    */
   pruned?: Pruned;
   /**
-   * That a person holds the run until other runs ship (`wf hold <run> --until <run>…`), and since when — composed on read from a file of
+   * That a person holds the run until other runs ship (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
    * its own, `runs/<id>.hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
    * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
    * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has shipped, as `--after` reads
-   * shipped (`removeHold`); `wf hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   * shipped (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold?: Hold;
   /**
-   * That a person paused the whole store (`wf pause`), by whom and why — composed on read onto every run from the store's one file,
+   * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
    * `$WF_ROOT/cordon`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
    * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not
    * paused.
@@ -178,7 +178,7 @@ type RunBase = {
    * `taskId` is the step's OWN task, always — `apps/api` reads it. The run's check of the step's work
    * is a task of its own, under `check`, filed once the step has signed off and been handed off.
    *
-   * Both are the CURRENT try's. A step tried again (`retries:`, `wf retry`) keeps the tries it replaced
+   * Both are the CURRENT try's. A step tried again (`retries:`, `nemia retry`) keeps the tries it replaced
    * beside them, under `tries`, in order — so everything that reads `taskId` and `check` reads the try
    * that decides the step.
    */
@@ -192,30 +192,30 @@ type RunBase = {
  */
 export type Hold = { at: string; until: string[]; why?: string; by?: string };
 
-/** The longest a hold's why is kept and shown (`wf hold --why`): what is over it is clipped with `…` (`oneLine`). */
+/** The longest a hold's why is kept and shown (`nemia hold --why`): what is over it is clipped with `…` (`oneLine`). */
 export const WHY_CAP = 200;
 
-/** The longest a hold's name for who put it is kept and shown (`wf hold --by`). */
+/** The longest a hold's name for who put it is kept and shown (`nemia hold --by`). */
 export const BY_CAP = 64;
 
 /**
- * What `wf prune` removed of a run, as its file says it: when, and each worktree with the bytes it held (`du`), which are what it freed —
- * and, once `wf prune --artifacts` removed its files directory (`runs/<id>/artifacts/`), when that was and what it freed. `at` is when
+ * What `nemia prune` removed of a run, as its file says it: when, and each worktree with the bytes it held (`du`), which are what it freed —
+ * and, once `nemia prune --artifacts` removed its files directory (`runs/<id>/artifacts/`), when that was and what it freed. `at` is when
  * its worktrees went; a prune of the files alone, of a run whose worktrees were already gone or never cut, says its own time there too.
  */
 export type Pruned = { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts?: PrunedFiles };
 
-/** When `wf prune --artifacts` removed a run's files directory, and the bytes that freed. */
+/** When `nemia prune --artifacts` removed a run's files directory, and the bytes that freed. */
 export type PrunedFiles = { at: string; bytes: number };
 
 /**
- * A person's word at a gate, as its file says it (`wf approve`): the step, the try it approves, when, and what they said with it — the
+ * A person's word at a gate, as its file says it (`nemia approve`): the step, the try it approves, when, and what they said with it — the
  * words every step after the gate is handed under `## Approved` (`approvedSection`). `message` is absent on an approval given without any.
  */
 export type Approval = { step: string; try: number; at: string; message?: string };
 
 /**
- * A person's word at a loop out of rounds, as its file says it (`wf accept`): the looping step, the try it accepts, when, and what they
+ * A person's word at a loop out of rounds, as its file says it (`nemia accept`): the looping step, the try it accepts, when, and what they
  * said — the words every step after the loop is handed under `## Accepted`, beside the findings the loop left open (`acceptedSection`).
  *
  * `message` is required, where an approval's is not: an approval says yes to work a step handed on, and an acceptance says yes to work a
@@ -226,7 +226,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
 
 /**
  * Where one step stands. ONE vocabulary, shared by `assess`, `listing` and `decision`, so the DAG,
- * `wf ls` and `wf decide` cannot disagree about a step.
+ * `nemia ls` and `nemia decide` cannot disagree about a step.
  *
  *   waiting          not filed
  *   running          filed, and not settled — or a task the engine cannot find
@@ -236,19 +236,19 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
  *   awaiting approval verified or unverified, at a gate (`hasGate`), with no approval of the try it is on: nothing after it is filed until
- *                    a person says so — `wf approve`, or `wf retry --message` to send it back. And, on an ending step in the repository's
+ *                    a person says so — `nemia approve`, or `nemia retry --message` to send it back. And, on an ending step in the repository's
  *                    checkout (`approvedFirst`), the same word before it is filed: its approval is what runs it (`waitsAtGate`)
  *   exhausted        verified or unverified, and it asked for another round of its `loop:` on the last one `rounds:` allows
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
- *                    for one, a step of its loop is. Never a step of a loop whose round is due: `wf round --budget` raised the cap
+ *                    for one, a step of its loop is. Never a step of a loop whose round is due: `nemia round --budget` raised the cap
  *                    (`roundSpans`)
  *   budget exhausted its harness ended its session at the step's `budget:` (a `claude -p` job: the runtime's `limit: 'budget'` on the
  *                    attempt)
  *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is
  *                    filed and no check is run on work done without the tool; `retries:` never files a try of it, since the try would run
- *                    under the same frozen `allowedTools:` — a person does, `wf retry`
+ *                    under the same frozen `allowedTools:` — a person does, `nemia retry`
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
  *
@@ -319,7 +319,7 @@ export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
 
 /**
  * The names on a run's record in the order its steps run — `steps` as `stepsOf` gives them (`orderSteps`) — then any the record has that
- * the workflow does not, in the record's order. Pure. What `wf decide` prints each step in: a record may be keyed in the folder's order,
+ * the workflow does not, in the record's order. Pure. What `nemia decide` prints each step in: a record may be keyed in the folder's order,
  * and read by its keys a `plan → implement ⇄ review` run would print implement first.
  */
 export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workflow, 'name'>[]): string[] => [
@@ -358,8 +358,8 @@ export type Landed = { commit: string } | { aborted: string } | { untouched: str
  *
  * Refused: it ran to its end and exited non-zero — settled `failed`, with an exit code. Did not finish:
  * `stopped` — killed, or never started — or `failed` without an exit code, which is a check stopped at its
- * deadline or lost. That is no verdict on the work: `retries:` spends no try on it, and `wf decide` offers
- * `wf retry --recheck`.
+ * deadline or lost. That is no verdict on the work: `retries:` spends no try on it, and `nemia decide` offers
+ * `nemia retry --recheck`.
  *
  * Only a number is a refusal. A verdict nobody read (`undefined`) is no evidence of one, and is read as `listing`
  * words it: `unfinished`. Read the other way, a caller that passed none would call a check stopped at its
@@ -373,22 +373,22 @@ export const andList = (items: readonly string[]): string =>
   items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : (items[0] ?? '');
 
 /**
- * A pruned run in words, as `wf decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it
+ * A pruned run in words, as `nemia decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it
  * was pruned — or that its marker no longer says — and what was removed. Pure.
  */
 export const prunedWords = (pruned: Pruned): string => {
   const files = pruned.artifacts ? filesPrunedWords(pruned.artifacts) : '';
   if (pruned.artifacts && !pruned.worktrees.length)
     return `pruned at ${pruned.artifacts.at || 'a time its marker no longer says'} — ${files}`;
-  return `pruned at ${pruned.at || 'a time its marker no longer says'} — its worktrees were removed (wf prune)${files ? `, and ${files}` : ''}`;
+  return `pruned at ${pruned.at || 'a time its marker no longer says'} — its worktrees were removed (nemia prune)${files ? `, and ${files}` : ''}`;
 };
 
 /**
- * That `wf prune --artifacts` removed a run's files, and when, as every surface that reads a pruned run says it: `wf decide`, a refusal,
+ * That `nemia prune --artifacts` removed a run's files, and when, as every surface that reads a pruned run says it: `nemia decide`, a refusal,
  * and the api's answer for a file that was there. Pure.
  */
 export const filesPrunedWords = (files: PrunedFiles): string =>
-  `its files were removed at ${files.at || 'a time its marker no longer says'} (wf prune --artifacts)`;
+  `its files were removed at ${files.at || 'a time its marker no longer says'} (nemia prune --artifacts)`;
 
 /**
  * Free text from outside — a harness's word, a closeout's `needs` — made one line of at most `cap` characters: every run of whitespace, a
@@ -435,7 +435,7 @@ export const runTasks = (run: Pick<Run, 'steps'>): string[] => Object.values(run
 /**
  * Why a run is not judged, whole, when a task it reads has a journal that does not read: `own`, the task of its own that does not
  * (`runTasks`), or undefined for a task of a run it waits on; `why`, the runtime's words; `by`, what does not judge it — `the board`,
- * `wf ls`, `wf decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that
+ * `nemia ls`, `nemia decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that
  * costs.
  */
 export function unjudgedWords(runId: string, own: string | undefined, why: string, by: string): string {
@@ -446,7 +446,7 @@ export function unjudgedWords(runId: string, own: string | undefined, why: strin
 /** The asks waiting beside a run, tries and rounds, and a line for each file named as one that cannot be read as one. */
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 
-/** The kinds of ask a person writes: a try (`wf retry`), a round (`wf round`), an approval (`wf approve`), an acceptance (`wf accept`). */
+/** The kinds of ask a person writes: a try (`nemia retry`), a round (`nemia round`), an approval (`nemia approve`), an acceptance (`nemia accept`). */
 export type AskKind = 'retry' | 'round' | 'approve' | 'accept';
 
 /** Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for. */
@@ -484,7 +484,7 @@ export type RunStore = {
      * answers for an id is listed as given, its record not read.
      */
     readonly list: (said?: (line: string) => void, kept?: (id: string) => Run | undefined) => Run[];
-    /** Make a new run's record: `wf start`'s, the one writer that makes one. */
+    /** Make a new run's record: `nemia start`'s, the one writer that makes one. */
     readonly create: (run: Run) => void;
     /**
      * Write back the record a pass read, without the person's files composed onto it, and only while it is there: false when it is not,
@@ -501,7 +501,7 @@ export type RunStore = {
     readonly exists: (id: string) => boolean;
     /** Whether a person called the run off: cancelled it, pruned it, or holds it — or paused the whole store. */
     readonly calledOff: (id: string) => boolean;
-    /** Write down that a person cancelled the run (`wf cancel`), and answer with the time that stands: the first cancellation is kept. */
+    /** Write down that a person cancelled the run (`nemia cancel`), and answer with the time that stands: the first cancellation is kept. */
     readonly cancel: (id: string) => string;
     /**
      * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,
@@ -509,7 +509,7 @@ export type RunStore = {
      * a trailing `/`. Writes nothing.
      */
     readonly forget: (id: string) => string[];
-    /** Write the prune marker a person's `wf prune` puts on the run, whole over the one there; `undefined` takes the marker away. */
+    /** Write the prune marker a person's `nemia prune` puts on the run, whole over the one there; `undefined` takes the marker away. */
     readonly prune: (id: string, marker: Pruned | undefined) => void;
   };
   readonly asks: {
@@ -518,7 +518,7 @@ export type RunStore = {
     /** Every ask that carried a message, waiting or consumed. */
     readonly answers: (id: string) => RetryAsk[];
     /**
-     * Set aside each ask, approval and acceptance the run's record already answers, and each ask of `voided` (an ask `wf pause --now`
+     * Set aside each ask, approval and acceptance the run's record already answers, and each ask of `voided` (an ask `nemia pause --now`
      * wrote, found void): consumed, never edited.
      */
     readonly consume: (run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided?: readonly RetryAsk[]) => void;

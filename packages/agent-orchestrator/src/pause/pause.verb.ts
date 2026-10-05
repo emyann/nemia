@@ -1,5 +1,5 @@
 /**
- * The store's pause at once (`wf pause --now`): what it would stop, read off one view of every run's current tasks and never stored
+ * The store's pause at once (`nemia pause --now`): what it would stop, read off one view of every run's current tasks and never stored
  * (`nowRead`), and the verb that puts the pause, or keeps the one that stands, then writes for each task at work the ask that tries it
  * again on the resume and asks the engine to stop it (`pauseNow`). A controller: it reaches the engine through the client, and writes
  * a person's files — the pause through `putPause`, each ask through `runStore.asks.write` — never a run's record.
@@ -20,7 +20,7 @@ async function interruptsRead(e: Engine): Promise<{ runs: Map<string, Run>; inte
   return { runs: new Map(runs.map((r) => [r.id, r])), interrupts: interruptsAmong(runs, (id) => views.get(id), stepsOf) };
 }
 
-/** Each task a pause at once would stop now, of every run not called off: what `wf pause --now` and the board's confirm show. */
+/** Each task a pause at once would stop now, of every run not called off: what `nemia pause --now` and the board's confirm show. */
 export const nowRead = async (e: Engine): Promise<Interrupt[]> => (await interruptsRead(e)).interrupts;
 
 /**

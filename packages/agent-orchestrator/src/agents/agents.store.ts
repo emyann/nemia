@@ -1,5 +1,5 @@
 /**
- * The agent files: where `wf start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), the
+ * The agent files: where `nemia start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), the
  * version of each skill it rendered (`renderedSkillVersions`) and the rules each declares (`renderedSkillRules`), and a skill read again
  * once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files beside it
  * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`). What a folder holds is `agents.ts`'s; this writes and reads it, and the
@@ -7,7 +7,7 @@
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
- * `wf start`.
+ * `nemia start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,14 +38,14 @@ import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
 
 /**
- * Where `wf start` renders a step's agent for Claude Code (`agents.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and inputs,
+ * Where `nemia start` renders a step's agent for Claude Code (`agents.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and inputs,
  * outside every workspace, and removed with them. The tick files the step with the flags that name it (`renderedFlags`).
  */
 export const agentFilesDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'agents', step);
 
 /**
  * Whether a step's rendered folder `dir` is there as its flags name it (`renderedFlags`): the folder, and the plugin in it where the flags
- * name one (`namesPlugin`). A folder rendered under another plugin name, as one `wf start` wrote before the plugin was renamed, is not:
+ * name one (`namesPlugin`). A folder rendered under another plugin name, as one `nemia start` wrote before the plugin was renamed, is not:
  * its flags would name a plugin that is not there.
  */
 export const renderedIn = (dir: string, step: Workflow): boolean =>
@@ -53,7 +53,7 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
 
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
- * whole from where the load found them (`skills`), and its style. Written once, at `wf start`, so an edit of an agent or a skill after it
+ * whole from where the load found them (`skills`), and its style. Written once, at `nemia start`, so an edit of an agent or a skill after it
  * reaches no run already started, as an edit of its workflow does not. A skill is copied through its links: the folder is the step's own.
  */
 export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {
@@ -86,7 +86,7 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
 }
 
 /**
- * The version (`skillVersion`) of each skill `wf start` rendered for a step of `run` (`writeAgentFiles`), by its name, read off its copy in
+ * The version (`skillVersion`) of each skill `nemia start` rendered for a step of `run` (`writeAgentFiles`), by its name, read off its copy in
  * the step's folder (`agentFilesDir`): a skill whose copy is not there — a step whose agent is not rendered, a folder gone — is left out.
  */
 export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map<string, string> {
@@ -102,7 +102,7 @@ export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map
 }
 
 /**
- * The rules (`readSkillRules`) each skill `wf start` rendered for a step of `run` declares, by the skill's name, read off its copy in the
+ * The rules (`readSkillRules`) each skill `nemia start` rendered for a step of `run` declares, by the skill's name, read off its copy in the
  * step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not read is left out.
  */
 export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<string, SkillRule[]> {
@@ -124,7 +124,7 @@ export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<st
 
 /**
  * The skills of a step whose rendered folder is gone (`unrendered`), read again from where the load finds them now (`skills`): each
- * SKILL.md's body, or why it is not there. The copy `wf start` froze went with the folder, so this is the one read of a skill after a run
+ * SKILL.md's body, or why it is not there. The copy `nemia start` froze went with the folder, so this is the one read of a skill after a run
  * started.
  */
 export function skillsAgain(step: Workflow, skills: SkillsFound): SkillAgain[] {
@@ -215,7 +215,7 @@ const inUseByRepo = (name: string, users: readonly string[], repo: string, does:
 /**
  * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir`
  * is a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps
- * name, at `wf start`, so a write changes what a later `wf start` freezes and nothing else.
+ * name, at `nemia start`, so a write changes what a later `nemia start` freezes and nothing else.
  *
  * `version` is the agent's as it was read (`agentVersion`), or `null` for a new agent; `from` names the agent the draft was read from, when
  * it is renamed. Judged whole before a byte is written, each refusal by name: the place (`agentPlaceRefusal`), each name as a file's

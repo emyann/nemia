@@ -1,5 +1,5 @@
 /**
- * `wf decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the
+ * `nemia decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the
  * repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the
  * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), and
  * `decide`, its plain face in a Promise, over the engine it is handed.
@@ -48,7 +48,7 @@ import { isRemoteHarness } from '../harness/harness.ts';
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
 
-/** What `wf decide` answers of one run (`decideRun`). */
+/** What `nemia decide` answers of one run (`decideRun`). */
 export type Decided = {
   run: Run;
   decision: Decision;
@@ -60,16 +60,16 @@ export type Decided = {
   checks: Record<string, CheckReport>;
   /** The tries the next tick files: asked for, or covered by `retries:`. */
   retrying: Retry[];
-  /** The rounds the next tick files: asked for with `again: true`, or with `wf round`. */
+  /** The rounds the next tick files: asked for with `again: true`, or with `nemia round`. */
   rounding: Round[];
   /**
-   * For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry`
+   * For each loop out of rounds, the `nemia round` that goes once more (`roundLines`); for each step a person may try again, the `nemia retry`
    * (`retryLines`).
    */
   offers: string[];
   /**
-   * The commands a person may type on a run awaiting them (`choicesOf`), each a bare `wf` or `git -C` line with its label: what the board
-   * offers and `wf decide` prints. None on a run that awaits nobody.
+   * The commands a person may type on a run awaiting them (`choicesOf`), each a bare `nemia` or `git -C` line with its label: what the board
+   * offers and `nemia decide` prints. None on a run that awaits nobody.
    */
   commands: DecideCommand[];
   /** The OVER BUDGET line, saying why each step over its budget is held (`overBudgetLine`); undefined with none. */
@@ -88,7 +88,7 @@ export type Decided = {
    * ask file, the `needs` off the engine's record of the try before, as the run's record keeps neither.
    */
   answers: Record<string, Answered>;
-  /** For each step that signed off blocked and may be tried again, the `wf retry --message` that answers it (`answerLines`). */
+  /** For each step that signed off blocked and may be tried again, the `nemia retry --message` that answers it (`answerLines`). */
   answering: Record<string, string>;
   /**
    * For each gated step with something to say, what its gate says (`gateLines`): approved, when and with what words, or awaiting approval
@@ -122,7 +122,7 @@ export type Decided = {
    */
   holding: Wait[];
   /**
-   * For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task
+   * For each step, what a person said to its sessions while they ran (`nemia say`), try by try, off the engine's view of each try's task
    * (`saidLines`). Every try, as words said to a try that was replaced bear on the work the step hands on; a recheck's try shares its task
    * with the try before, and its words are said once.
    */
@@ -300,7 +300,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
 });
 
 /**
- * `wf decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed with,
+ * `nemia decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed with,
  * or with whatever else it died of, as it was thrown.
  */
 export const decide = (engine: Engine, id: string, env?: NodeJS.ProcessEnv): Promise<Decided> =>

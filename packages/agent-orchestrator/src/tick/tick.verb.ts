@@ -52,13 +52,13 @@ export type Pass = {
    */
   feedError?: string;
   /**
-   * What the pass cost, phase by phase (`PassCost`), as written to the store for `wf up --stats` and the api (`recordPassCost`) — its
+   * What the pass cost, phase by phase (`PassCost`), as written to the store for `nemia up --stats` and the api (`recordPassCost`) — its
    * `overheadMs` here with that write in it, which the file cannot hold of itself.
    */
   cost?: PassCost;
   /**
    * The moves the runtime's lifecycle had no edge for on this pass (`TickReport.refused`): each task stalls, asked again every pass, until
-   * what it sees changes or the machine gains the edge. Absent when there were none. `wf up` says each once while it lasts
+   * what it sees changes or the machine gains the edge. Absent when there were none. `nemia up` says each once while it lasts
    * (`refusalLines`).
    */
   refused?: RefusedMove[];
@@ -66,7 +66,7 @@ export type Pass = {
    * Why the runtime left a task out of this pass, or skipped a feed entry, as it said it (`TickReport.unreadable`): a journal holding an
    * entry no runtime wrote, on every pass while it lasts. And each run a read of whose tasks rejected so (`unreadableJournal`): it is left
    * out of `runs` and of the feed, judged on no pass until the journal reads, and counted in flight, while every other run advances; its
-   * line carries the runtime's words, said once. Absent when there were none. `wf up` says each once while it lasts.
+   * line carries the runtime's words, said once. Absent when there were none. `nemia up` says each once while it lasts.
    */
   unreadable?: string[];
   /**
@@ -81,7 +81,7 @@ export type Pass = {
  * What a daemon says of a pass's refused moves, and what it has then said: a refusal it said on an earlier pass and that is still refused
  * is not said again, one that cleared is forgotten, so it is said again if it comes back. `said` holds the refusals of the last pass alone,
  * by task, state and event: a daemon that restarts says every refusal still standing once more, since what it printed before is on a
- * terminal that may be gone. Nothing is decided on it: this is only what has been printed, as `wf up`'s queue and feed failures are.
+ * terminal that may be gone. Nothing is decided on it: this is only what has been printed, as `nemia up`'s queue and feed failures are.
  */
 export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<string>): { lines: string[]; said: Set<string> } {
   const now = new Set<string>();
@@ -160,10 +160,10 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  * The pass `tickRun` meters: the runtime's own pass, then every run judged off the views it reported (`reportedEngine`) — a task it did not
  * report, settled or changed by this pass since, is read off the engine's record where it is settled. In this order:
  * - the memo is brought up to the engine's feed after the runtime's pass (`restingPass`), so what it appended on it — a settled task's
- *   `measured` — is read on this one, and what is appended after is read on the next; a run `wf rm` forgot leaves the memo (`forgotten`).
+ *   `measured` — is read on this one, and what is appended after is read on the next; a run `nemia rm` forgot leaves the memo (`forgotten`).
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
  *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
- * - the ceilings the pass runs with are written (`recordCeilings`), for `wf ls` and `wf decide`, which judge the cap from a shell of their
+ * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of their
  *   own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
  *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again.
@@ -208,7 +208,7 @@ type Judging = { done: Map<string, Advanced>; unjudged: Map<string, string> };
 /** Why a run was left unjudged: a read of one of its tasks' journals was refused (`unreadableJournal`), in the runtime's words. */
 class Unjudged extends Data.TaggedError('Unjudged')<{ why: string }> {}
 
-/** Every run the memo holds that the store no longer lists taken out of it: a run `wf rm` forgot. */
+/** Every run the memo holds that the store no longer lists taken out of it: a run `nemia rm` forgot. */
 const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
   const listed = new Set(runs.map((r) => r.id));
   for (const id of memo.runs.keys()) if (!listed.has(id)) memo.runs.delete(id);
@@ -292,7 +292,7 @@ const passOf = (report: TickReport, runs: readonly Run[], judging: Judging, queu
  * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed.
  *
  * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and reads
- * and judges every run afresh, and no verb, `wf ls` or the api reads it. While a run's stamp holds, the pass is handed the memo's run in
+ * and judges every run afresh, and no verb, `nemia ls` or the api reads it. While a run's stamp holds, the pass is handed the memo's run in
  * place of its record (`keptOf`): an input of the run that the stamp does not cover is never read again.
  */
 export type RestMemo = {
@@ -303,7 +303,7 @@ export type RestMemo = {
 /** A memo that holds nothing: what a daemon starts with, and what a test hands each pass to play a restart. */
 export const freshRestMemo = (): RestMemo => ({ runs: new Map() });
 
-/** Each engine's memo: one engine is one daemon's (`wf up` makes one for all its passes), and one a test builds starts with none. */
+/** Each engine's memo: one engine is one daemon's (`nemia up` makes one for all its passes), and one a test builds starts with none. */
 const memos = new WeakMap<Engine, RestMemo>();
 const restMemo = (e: Engine): RestMemo => {
   let memo = memos.get(e);

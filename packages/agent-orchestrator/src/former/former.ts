@@ -11,7 +11,7 @@ import type { AgentOwnKey, HarnessPrompt, RoleKey } from '../agents/agents.ts';
 /**
  * A key's former name, and the name it has now: `disallow:` and `allow:` are the former names of `disallowedTools:` and `allowedTools:`,
  * Claude Code's `--disallowedTools` and `--allowedTools` — a subagent's `disallowedTools:` and `allowedTools:`. A former name is read as
- * the key it is now (`readKeys`), in step files and agent files alike; `wf start` says which files still use one (`formerKeyLine`); nothing
+ * the key it is now (`readKeys`), in step files and agent files alike; `nemia start` says which files still use one (`formerKeyLine`); nothing
  * writes one (`renderStep`, `renderAgent`); and a run record whose steps hold the former fields is read under the current ones
  * (`asNamed`). A key renamed adds its line here, and `asNamed` carries it.
  */
@@ -20,7 +20,7 @@ export const FORMER_KEYS: Readonly<Record<string, StepKey & RoleKey>> = { disall
 /**
  * An agent's own key's former name, and the name it has now: `systemPrompt:` is the former name of `harnessPrompt:`, what becomes of
  * Claude Code's own prompt. No step has the key, so it is not one of `FORMER_KEYS`: `parseAgent` reads either line, its words through
- * `harnessPromptNamed`; `wf start` names a file still using it (`harnessPromptLine`); nothing writes it (`renderAgent`, the api); and a
+ * `harnessPromptNamed`; `nemia start` names a file still using it (`harnessPromptLine`); nothing writes it (`renderAgent`, the api); and a
  * run record whose agents hold the former field is read under the new one (`asNamed`).
  */
 export const FORMER_OWN_KEYS: Readonly<Record<string, AgentOwnKey>> = { systemPrompt: 'harnessPrompt' };
@@ -39,8 +39,8 @@ export const harnessPromptNamed = (word: string): string =>
 /**
  * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes
  * for the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, that names a
- * codex sandbox under the former key still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is
- * written beside it: on codex the two are one key. Whether the word is a sandbox is the runtime's to say at `wf start`. Pure.
+ * codex sandbox under the former key still loads, and `nemia start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is
+ * written beside it: on codex the two are one key. Whether the word is a sandbox is the runtime's to say at `nemia start`. Pure.
  */
 export function codexSandboxNamed<K extends string>(
   file: string,
@@ -194,24 +194,24 @@ const renamed = (former: string): string => FORMER_KEYS[former] ?? FORMER_OWN_KE
  * from a file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and
  * `writeWorkflow` for a step whose harness is its agent's. What sends one is a stale form that still names a codex sandbox as
  * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, which a file would read as its sandbox. It names no word for
- * the sandbox: which words are one is the runtime's to say at `wf start`.
+ * the sandbox: which words are one is the runtime's to say at `nemia start`.
  */
 export const codexModeWritten = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send the sandbox as \`sandbox:\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
 
-/** What `wf start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it. */
+/** What `nemia start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it. */
 export const codexModeLine = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
 
 /**
- * What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one
+ * What `nemia start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one
  * writer of it.
  */
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 
 /**
- * What `wf start` says of an agent file that still says `systemPrompt:` (`FORMER_OWN_KEYS`), and as what it is read. The one writer of
+ * What `nemia start` says of an agent file that still says `systemPrompt:` (`FORMER_OWN_KEYS`), and as what it is read. The one writer of
  * it.
  */
 export const harnessPromptLine = (file: string, word: string): string =>
@@ -256,7 +256,7 @@ function renamedFields(fields: object) {
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no `allowedTools` and
  * the step would run unfenced, with nothing said; and its agent's harness prompt as `systemPrompt`, in a former word (`FORMER_OWN_KEYS`):
  * read so, `own` would be filed appended to Claude Code's prompt instead of in its place. Read by `readRun`, so no reader — the tick,
- * `wf ls`, the api — ever sees a former name, and the next pass that writes the record back writes the new ones alone. A field under both
+ * `nemia ls`, the api — ever sees a former name, and the next pass that writes the record back writes the new ones alone. A field under both
  * names keeps the new one's value. A step with no former name is returned as it is. Pure.
  */
 export function asNamed(step: FrozenStep): Workflow {

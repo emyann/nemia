@@ -81,7 +81,7 @@ export function readCustomInstructions(home: string, name: string): string | und
   if (!stat.isFile()) throw new WorkflowError(`${file} is not a file: custom instructions are one file per agent. Remove it.`);
   const text = fs.readFileSync(file, 'utf8');
   const refused = customInstructionsRefusal(file, text);
-  if (refused !== undefined) throw new WorkflowError(`${refused} Or remove them: wf agents custom ${name} --clear.`);
+  if (refused !== undefined) throw new WorkflowError(`${refused} Or remove them: nemia agents custom ${name} --clear.`);
   return text.trim() || undefined;
 }
 
@@ -258,7 +258,7 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
 
 /**
  * A line for each file of the workflow in `dir` that still writes a key under its former name (`formerKeyLine`): its step files, then each
- * agent a step names, once. What `wf start` prints after it has started the run, which the former names do not stop. None for a folder that
+ * agent a step names, once. What `nemia start` prints after it has started the run, which the former names do not stop. None for a folder that
  * is not there, and a file that cannot be read says nothing here: the load has said why.
  *
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
@@ -293,7 +293,7 @@ export function formerKeyLines(dir: string): string[] {
 /**
  * The word each step of the workflow in `dir` writes its sandbox under as `permissionMode:`, by the step's name: its own line, else, for a
  * step that writes no fence of its own, its agent's beside the folder. The parser reads the line as `sandbox:` (`codexSandboxNamed`), and
- * `wf start` quotes a refusal of it as the file says it. None for a folder that is not there.
+ * `nemia start` quotes a refusal of it as the file says it. None for a folder that is not there.
  */
 export function formerModesWritten(dir: string): Record<string, string> {
   return Object.fromEntries(
@@ -368,7 +368,7 @@ function entriesOf(dir: string): string[] {
 const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
- * The workflow folder a person names: a path, relative to where it is written — the directory `wf start` is typed in, the plan folder a
+ * The workflow folder a person names: a path, relative to where it is written — the directory `nemia start` is typed in, the plan folder a
  * card is in — or, when no folder is there and it is a bare name, the repository's workflow of that name: `dev` is `<repo>/workflows/dev`.
  * The path is looked at first, so a folder a person points at is never shadowed by one of the repository's.
  *
@@ -543,7 +543,7 @@ export function skillNamesIn(text: string): string[] {
  *
  * Refused, naming the fix: a skill found nowhere or that cannot be used, in `skillAt`'s words for the agent, and a SKILL.md whose
  * frontmatter the card cannot read. The card only describes — no run reads it — so nothing refuses a load or a run for it: it is refused
- * where a card is asked for (`wf agents card`, the api's card route) and said on the board's agent page. `found` is where a start finds
+ * where a card is asked for (`nemia agents card`, the api's card route) and said on the board's agent page. `found` is where a start finds
  * skills (`skillsFor`, with the places), or a card could name a skill the run would not be given.
  */
 export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>, found: SkillsFound): AgentSkill[] {
@@ -676,9 +676,9 @@ const frozenStepFields = {
 const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: frozenStepFields.allowedTools };
 
 /**
- * A step as the run froze it at `wf start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, and each under its former name
+ * A step as the run froze it at `nemia start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, and each under its former name
  * (`FORMER_KEYS`), checked for the type the parser gives it. It checks the shape, not the vocabulary: a harness, a model or a mode is any
  * text, a count any number, judged when the step is filed, so a word retired since the run started does not lose the run. Every key it
- * does not name is kept, as a record a newer `wf` wrote keeps it. Read under the names its keys have now by `asNamed`.
+ * does not name is kept, as a record a newer `nemia` wrote keeps it. Read under the names its keys have now by `asNamed`.
  */
 export const FrozenStepSchema = Schema.StructWithRest(Schema.Struct({ ...frozenStepFields, ...formerStepFields }), Rest);

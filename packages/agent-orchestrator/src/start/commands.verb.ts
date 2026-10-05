@@ -1,5 +1,5 @@
 /**
- * `wf start` and `wf plan`, entries of the command table. A start is served on both sides: the CLI's runner reads the brief and finds the
+ * `nemia start` and `nemia plan`, entries of the command table. A start is served on both sides: the CLI's runner reads the brief and finds the
  * workflow from where it is typed, the api's route from its body, and each hands the same handler what it found. A plan is the command
  * line's alone, run by its runner.
  */
@@ -18,13 +18,13 @@ import { leftOutMounts, start } from './start.verb.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
 
-export const PLAN_HELP = `wf plan <folder> [--repo .] [--factory <name>]
+export const PLAN_HELP = `nemia plan <folder> [--repo .] [--factory <name>]
 
 Start a plan: one run per card in the folder, parents first, each waiting on the runs of the cards it names.
-That is the record wf start --after writes, so the tick files a card's run once its parents have shipped, and
-every card is a decision at its own wf decide. Nothing else is written: the runs and their after are the plan.
+That is the record nemia start --after writes, so the tick files a card's run once its parents have shipped, and
+every card is a decision at its own nemia decide. Nothing else is written: the runs and their after are the plan.
 It prints a line per card: the card, its run, its workflow, and what it waits on. Every run is started in
---factory, else the factory whose repository holds --repo, else the folder wf plan is typed in, when one
+--factory, else the factory whose repository holds --repo, else the folder nemia plan is typed in, when one
 factory alone does, on that repository; none, or two, is refused before any run is started, naming the fix.
 
 A card is one markdown file, <card>.md, and README.md beside the cards says what the plan is for:
@@ -39,8 +39,8 @@ The body is the run's brief. Refused by name before any run is started: a key a 
 with no workflow: or an empty body, an after: naming a card the folder does not have, cards that wait on
 each other, a file that is not .md, a folder with no card, and a card whose workflow does not load.
 
-The folder says what --after, --workflows and --no-worktree would, and wf plan refuses them. A wf start that
-refuses part-way stops the plan: the runs it started stand, and it prints a wf start for each card left.`;
+The folder says what --after, --workflows and --no-worktree would, and nemia plan refuses them. A nemia start that
+refuses part-way stops the plan: the runs it started stand, and it prints a nemia start for each card left.`;
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -54,7 +54,7 @@ const listOf = (args: Args, key: string): string[] => {
   return Array.isArray(value) ? [...value] : [];
 };
 
-/** Why a value flag of `wf start` is taken once, as its refusal says it. */
+/** Why a value flag of `nemia start` is taken once, as its refusal says it. */
 const ONCE: Readonly<Record<string, string>> = {
   '--workflows': 'works on one workflow',
   '--brief': 'is asked one thing',
@@ -62,48 +62,48 @@ const ONCE: Readonly<Record<string, string>> = {
   '--factory': 'is started in one factory',
 };
 
-/** One of `wf start`'s value flags: taken once, unless `many`; `cli`, why the api alone does not take it, where it does not. */
+/** One of `nemia start`'s value flags: taken once, unless `many`; `cli`, why the api alone does not take it, where it does not. */
 function startFlag(flag: string, key: string, takes: string, how: { many?: true; cli?: string } = {}): Flag {
   return {
     flag,
     kind: 'text',
     key,
     takes: `${flag} takes ${takes}`,
-    ...(how.many ? { many: true } : { twice: `wf start takes ${flag} once: a run ${ONCE[flag]}.` }),
+    ...(how.many ? { many: true } : { twice: `nemia start takes ${flag} once: a run ${ONCE[flag]}.` }),
     ...(how.cli !== undefined ? { only: { side: 'cli', why: how.cli } } : {}),
   };
 }
 
-/** `wf start`'s spec: the brief, then its flags, each value flag also as `--flag=<value>`. */
+/** `nemia start`'s spec: the brief, then its flags, each value flag also as `--flag=<value>`. */
 const START_SPEC: Spec = {
   positionals: [{ key: 'brief', takes: 'required', kind: 'text' }],
   flags: [
-    startFlag('--workflows', 'workflows', 'the workflow folder: wf start <brief> --workflows <dir>', {
+    startFlag('--workflows', 'workflows', 'the workflow folder: nemia start <brief> --workflows <dir>', {
       cli: 'the api is sent a workflow by `from` and name, never a folder',
     }),
-    startFlag('--repo', 'repo', 'the repository the run works on: wf start <brief> --repo <r>'),
-    startFlag('--after', 'after', 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]', {
+    startFlag('--repo', 'repo', 'the repository the run works on: nemia start <brief> --repo <r>'),
+    startFlag('--after', 'after', 'the run this one waits on, by its id: nemia start <brief> --after <runId> [--after <runId> ...]', {
       many: true,
     }),
-    startFlag('--input', 'inputs', "a file to hand the run's steps: wf start <brief> --input <file> [--input <file> ...]", {
+    startFlag('--input', 'inputs', "a file to hand the run's steps: nemia start <brief> --input <file> [--input <file> ...]", {
       many: true,
-      cli: 'a file is read from where wf start is typed: the api reads no file a body names',
+      cli: 'a file is read from where nemia start is typed: the api reads no file a body names',
     }),
     startFlag(
       '--gate',
       'gates',
-      'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
+      'the step whose closeout waits for a person before anything after it is filed: nemia start <brief> --gate <step> [--gate <step> ...]',
       { many: true, cli: "the board gates a step by its workflow's own gate: true, or a card's gate:" },
     ),
     startFlag(
       '--brief',
       'instead',
-      'what the run is asked to do in place of an inbox card\'s body, as text or a file: wf start <inbox>/<name>.md --brief "<brief>"',
+      'what the run is asked to do in place of an inbox card\'s body, as text or a file: nemia start <inbox>/<name>.md --brief "<brief>"',
     ),
     startFlag(
       '--factory',
       'factory',
-      "the factory the run is started in, whose hires fill the workflow's steps; without it, the one whose repository holds the folder: wf start <brief> --factory <name>",
+      "the factory the run is started in, whose hires fill the workflow's steps; without it, the one whose repository holds the folder: nemia start <brief> --factory <name>",
     ),
     {
       flag: '--no-worktree',
@@ -114,8 +114,8 @@ const START_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>".`
-      : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`,
+      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>".`
+      : `nemia start takes one brief, and ${arg} is a second. Quote a brief with spaces — nemia start "<brief>" — or give it as a file: nemia start ./brief.md.`,
   apart: (_value, flag) => START_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
 };
 
@@ -155,27 +155,27 @@ function gateLines(run: Run): string[] {
   return [
     ...(held.length
       ? [
-          `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`,
+          `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until nemia approve ${run.id} <step>, once it has signed off`,
         ]
       : []),
     ...(ends.length
       ? [
-          `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
+          `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until nemia approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
         ]
       : []),
   ];
 }
 
-/** Where an inbox card's run came from, and whether the card left the inbox, as `wf start` says it. */
+/** Where an inbox card's run came from, and whether the card left the inbox, as `nemia start` says it. */
 const fromLines = ({ run, card, removed, why }: Started): string[] =>
   card === undefined
     ? []
     : removed
       ? [`${fromNote(run)} — removed from the inbox`]
-      : [`${fromNote(run)} — still in the inbox: ${why}. wf inbox lists it as started as ${run.id}: drop it with wf inbox rm ${card}`];
+      : [`${fromNote(run)} — still in the inbox: ${why}. nemia inbox lists it as started as ${run.id}: drop it with nemia inbox rm ${card}`];
 
 /**
- * What `wf start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and what
+ * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and what
  * it waits on and ends at; while the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:`
  * not taken.
  */
@@ -190,10 +190,10 @@ function startedLines(started: Started): string[] {
     `workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
     ...(run.after?.length
-      ? [`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`]
+      ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has shipped onto ${run.branch}`]
       : []),
     ...gateLines(run),
-    `run 'wf tick' (or 'wf up') to start it`,
+    `run 'nemia tick' (or 'nemia up') to start it`,
     ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
     ...formerKeyLines(run.workflowDir),
     ...(started.ignoredRepo !== undefined ? [ignoredRepoLine(started.ignoredRepo)] : []),
@@ -230,7 +230,7 @@ function cardStart(card: string, args: Args): Started {
 }
 
 /**
- * `wf start`: a run of a brief, or of an inbox card. Its handler is handed what its caller found: under `card`, an inbox card's name,
+ * `nemia start`: a run of a brief, or of an inbox card. Its handler is handed what its caller found: under `card`, an inbox card's name,
  * with `instead` the brief in place of its body, `at` the repository when neither the card nor its factory names one, and `fix` how the
  * caller names a factory; else `brief`, the brief's text, `workflows`, the folder, and `repo`, the repository, with `repoNamed` true where
  * a person named it. The CLI's runner reads a brief's file and finds the folder from where it is typed; the api's route finds both from its
@@ -241,26 +241,26 @@ export const START: Command<Started> = {
   usage:
     '<brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
   help: [
-    '--after <runId>: file nothing of this run until wf decide says that',
+    '--after <runId>: file nothing of this run until nemia decide says that',
     'run has shipped — finished, and its result branch on the base',
     'branch — and start from the base as it is then; once per run.',
-    "--gate <step>: that step's closeout waits for wf approve before",
+    "--gate <step>: that step's closeout waits for nemia approve before",
     "anything after it is filed, as a step's own gate: true does; once",
     "per step. An inbox card's gate: <step> is one more",
     '--workflows takes a folder, or a name under <repo>/workflows/: dev',
-    'a card of a plan (wf plan --help) starts its body: --workflows is its',
+    'a card of a plan (nemia plan --help) starts its body: --workflows is its',
     'workflow: unless given, and its after: needs an --after for each',
     "--input <file>: copied into the run's own inputs/ directory, and named",
     "on every step's brief under what was asked for; once per file",
     '--factory <name>: the workflow must be attached to the factory, whose',
-    'hires fill its steps, and a step left with no agent is refused (wf',
+    'hires fill its steps, and a step left with no agent is refused (nemia',
     'factory --help). A factory with one repository gives the run its',
     "--repo, and a repository not one of the factory's is refused, naming",
     'them. Without it, the run is started in the factory whose repository',
-    'holds --repo, else where wf start is typed, on that repository, when',
+    'holds --repo, else where nemia start is typed, on that repository, when',
     'one factory alone does; none, or two, is refused, naming the fix.',
     'The default factory is history only: --factory default is refused',
-    'a card of the inbox (wf inbox --help) starts its body, or --brief',
+    'a card of the inbox (nemia inbox --help) starts its body, or --brief',
     '"<brief>" in its place, and leaves the inbox: --workflows is its workflow:',
     'unless given, --repo its repo:, --factory its factory:, and a card',
     'that names no factory either way is refused',
@@ -301,21 +301,21 @@ function startOf(args: Args): Started {
   return { id: run.id, run };
 }
 
-/** The flags of `wf start` that `wf plan` refuses, each with why the folder says it instead. */
+/** The flags of `nemia start` that `nemia plan` refuses, each with why the folder says it instead. */
 const PLAN_REFUSES: Readonly<Record<string, string>> = {
   '--after':
-    'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
+    'nemia plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: nemia start <card.md> --workflows <dir> --after <runId>.',
   '--workflows':
-    'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
+    'nemia plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
   '--input':
-    'wf plan does not take --input: a card has no input files of its own. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.',
+    'nemia plan does not take --input: a card has no input files of its own. Start that card by hand with its files: nemia start <card.md> --workflows <dir> --input <file>.',
   '--gate':
-    "wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: wf start <card.md> --workflows <dir> --gate <step>.",
+    "nemia plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: nemia start <card.md> --workflows <dir> --gate <step>.",
   '--no-worktree':
-    'wf plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
+    'nemia plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
 };
 
-/** `wf plan`'s spec: the folder, then `--repo <r>` and `--factory <name>`, once each; `wf start`'s others refused by name. */
+/** `nemia plan`'s spec: the folder, then `--repo <r>` and `--factory <name>`, once each; `nemia start`'s others refused by name. */
 const PLAN_SPEC: Spec = {
   positionals: [{ key: 'folder', takes: 'required', kind: 'text' }],
   flags: [
@@ -323,42 +323,42 @@ const PLAN_SPEC: Spec = {
       flag: '--repo',
       kind: 'text',
       key: 'repo',
-      takes: '--repo takes the repository the plan works on: wf plan <folder> --repo <r>',
-      twice: 'wf plan takes --repo once: a plan works on one repository.',
+      takes: '--repo takes the repository the plan works on: nemia plan <folder> --repo <r>',
+      twice: 'nemia plan takes --repo once: a plan works on one repository.',
     },
     {
       flag: '--factory',
       kind: 'text',
       key: 'factory',
-      takes: "--factory takes the factory every card's run is started in: wf plan <folder> --factory <name>",
-      twice: 'wf plan takes --factory once: a plan is started in one factory.',
+      takes: "--factory takes the factory every card's run is started in: nemia plan <folder> --factory <name>",
+      twice: 'nemia plan takes --factory once: a plan is started in one factory.',
     },
   ],
   unknown: (arg) => {
     const name = arg.startsWith('--') && arg.includes('=') ? arg.slice(0, arg.indexOf('=')) : arg;
     if (Object.hasOwn(PLAN_REFUSES, name)) return PLAN_REFUSES[name];
     return arg.startsWith('-')
-      ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r> and --factory <name>.`
-      : `wf plan takes one folder, and ${arg} is a second. A plan is every card in one folder: wf plan <folder> --repo <r>.`;
+      ? `nemia plan does not take ${arg}. It takes the plan folder, then --repo <r> and --factory <name>.`
+      : `nemia plan takes one folder, and ${arg} is a second. A plan is every card in one folder: nemia plan <folder> --repo <r>.`;
   },
   apart: (_value, flag) => PLAN_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
 };
 
-/** `wf plan`: a run per card of a plan folder, started by the CLI's runner. */
+/** `nemia plan`: a run per card of a plan folder, started by the CLI's runner. */
 export const PLAN: Ran = {
   name: 'plan',
   usage: '<folder> [--repo .] [--factory <name>]',
   help: [
     'start a plan: one run per card in the folder, parents first, each',
     '--after the runs of the cards its after: names, in the factory as',
-    'wf start finds it (wf plan --help)',
+    'nemia start finds it (nemia plan --help)',
   ],
   spec: PLAN_SPEC,
   check: (args) => leftOut(PLAN_SPEC, args),
   writes: true,
   only: {
     side: 'cli',
-    why: 'the board starts runs one at a time, and a plan is a folder of cards read from where wf plan is typed: no api route starts one',
+    why: 'the board starts runs one at a time, and a plan is a folder of cards read from where nemia plan is typed: no api route starts one',
   },
   manual: PLAN_HELP,
 };

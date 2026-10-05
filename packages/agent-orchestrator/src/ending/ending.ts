@@ -151,7 +151,7 @@ export function landingDue(
 /**
  * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its
  * session or its check in flight, its check due, or its merge staged. What keeps another run's ending out of the checkout (`mainClaim`) and
- * `wf rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
+ * `nemia rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
  */
 export const landingOpen = (
   step: Workflow,
@@ -168,7 +168,7 @@ export const landingOpen = (
 
 /**
  * What the run did with an ending's merge — `the run committed its merge onto main as 1a2b3c4`, or why it made no commit — as the tick's
- * note says it (the daemon's log), `wf ls` on the step's line (`listing`, clipped), and `wf decide` in its offer of a try of a merge the
+ * note says it (the daemon's log), `nemia ls` on the step's line (`listing`, clipped), and `nemia decide` in its offer of a try of a merge the
  * run aborted (`retryLines`).
  */
 export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
@@ -178,7 +178,7 @@ export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
       ? `nothing landed on ${run.branch}: ${landed.aborted}`
       : `${landed.untouched}: the run left the checkout as it found it`;
 
-/** The longest `landedWords` a `wf ls` line prints: the reason for an abort can be git's refusal, whole (`commitMerge`). */
+/** The longest `landedWords` a `nemia ls` line prints: the reason for an abort can be git's refusal, whole (`commitMerge`). */
 export const LANDED_CAP = 160;
 
 /**
@@ -192,7 +192,7 @@ export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[])
     : approvalOf(run, step.name)?.at;
 
 /**
- * A run whose ending step waits for the repository's own checkout, as `wf ls` says it on that step's line: `waiting on the checkout
+ * A run whose ending step waits for the repository's own checkout, as `nemia ls` says it on that step's line: `waiting on the checkout
  * (r-1's ship has it)`. Pure.
  *
  * `waiting on …`, and not `waiting for …`, because the board reads the words: `stepState` (`apps/web/src/lib/status.ts`) takes `waiting`,
@@ -202,19 +202,19 @@ export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[])
 export const checkoutWord = (hold: CheckoutHold): string => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
 
 /**
- * What `wf decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees this
+ * What `nemia decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees this
  * one. Pure.
  */
 export const checkoutLine = (step: string, hold: CheckoutHold): string =>
   `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
 
 /**
- * An ending at its gate whose work git already has on the base branch, beside its line on `wf ls` where the approval would be: where each
+ * An ending at its gate whose work git already has on the base branch, beside its line on `nemia ls` where the approval would be: where each
  * branch stands, that nothing is left for the step to merge and the run has shipped as git reads it (`decision`), and the one command there
  * still is. Pure.
  */
 export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]): string =>
-  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel ${run.id}`;
+  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${run.id}`;
 
 /**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
@@ -234,7 +234,7 @@ export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standi
  * decide without anybody telling the run. Nothing while the run is running, nor for a cancelled one.
  *
  * Never `approve` on a pruned run, whose approval is refused (`prunedRefusal`): what its branches hold is what is left to decide. Nothing
- * for an ending that has not run whose result git already has (`resultOnBase`): there is nothing for an approval to file, and `wf
+ * for an ending that has not run whose result git already has (`resultOnBase`): there is nothing for an approval to file, and `nemia
  * approve` is refused in those words. `git` only on a run every step of which finished: one that waits on a person for a step that
  * broke says so.
  */
@@ -287,11 +287,11 @@ export const ownNote = (step: Pick<Workflow, 'body' | 'agent'>): string => (step
  */
 export type ToDecide = { kind: 'approve'; step: string; says: string | null; filed: boolean } | { kind: 'git'; branches: string[] };
 
-/** What `wf ls` says after `→ to decide:`, and the board's banner: what is to be decided, and the command that decides it. Pure. */
+/** What `nemia ls` says after `→ to decide:`, and the board's banner: what is to be decided, and the command that decides it. Pure. */
 export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): string =>
   t.kind === 'approve'
-    ? `${t.says ?? (t.filed ? `${t.step} has signed off at its gate` : `${t.step} has not run: approving runs it`)} — wf approve ${run.id} ${t.step}`
-    : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — wf decide ${run.id}`;
+    ? `${t.says ?? (t.filed ? `${t.step} has signed off at its gate` : `${t.step} has not run: approving runs it`)} — nemia approve ${run.id} ${t.step}`
+    : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — nemia decide ${run.id}`;
 
 /**
  * Why a run cannot be gated at these steps, in words that name the fix — or null. Pure, and asked at start before anything is written: a

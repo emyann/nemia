@@ -88,7 +88,10 @@ when the judgement does: the engine's live words (`running (working)`, `running 
 `working (quiescent)`, `starting`, `between attempts`) read `running`, a slot wait says no count, no
 cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finished run with no
 ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
-are read before the pass files anything.
+are read before the pass files anything. A run the pass finds at rest (`atRest`) whose words are
+the feed's writes nothing when only a note is worded anew, so a new or reworded note does not say
+again every finished run; a run in flight writes every change of word or note, a live step's new
+`denied:` among them.
 
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
 expires. A read stops at the last newline, so it never passes a line half written, and one after

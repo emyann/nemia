@@ -282,7 +282,10 @@ test("a run's asks are listed once a read, and each file in them read once", asy
   assert.deepEqual({ calls: record.calls, reads: record.reads }, { calls: 1, reads: 2 }, 'the approval and the acceptance, off one walk');
 });
 
-/** An engine that answers a view of any task, records each task it is asked to view or list, and holds a view of `slow` until let go. */
+/**
+ * An engine that answers a view of any task, records each task it is asked to view or list, holds a view of `slow` until let go, and
+ * answers a filing, an answer and a forget with nothing.
+ */
 const askedEngine = () => {
   const asked: string[] = [];
   const held: { go?: () => void } = {};
@@ -296,7 +299,7 @@ const askedEngine = () => {
     return { views: ids.map((id) => ({ id })), unreadable: [] };
   };
   const wrote = async () => undefined;
-  return { e: promised({ view, list, file: wrote, answer: wrote }), asked, held };
+  return { e: promised({ view, list, file: wrote, answer: wrote, forget: wrote }), asked, held };
 };
 
 test('a view kept for the pass is read again once a write names its task, and the views of the tasks it does not name are kept', async () => {
@@ -325,4 +328,15 @@ test('a view the engine was still reading when a write of the pass went through 
   held.go?.();
   await again;
   assert.deepEqual(asked, ['slow', 'slow'], 'read again: what it read may be from before the write');
+});
+
+test('a forget drops the views of the tasks it forgets, and keeps the others the pass read', async () => {
+  const { e: engine, asked } = askedEngine();
+  const e = reportedEngine(engine, []);
+  await Effect.runPromise(e.view('a'));
+  await Effect.runPromise(e.view('b'));
+  await Effect.runPromise(e.forget(['a'], { yes: true }));
+  await Effect.runPromise(e.view('a'));
+  await Effect.runPromise(e.view('b'));
+  assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
 });

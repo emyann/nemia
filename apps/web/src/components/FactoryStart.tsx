@@ -180,10 +180,13 @@ function OnRepo({ place }: { place: { factory: string; repos: string[]; repo: st
 
 /**
  * The workflows `place`'s factory offers on its repository, read with its hires, one a radio: one that cannot start says why, in the
- * package's words (`whyNotStarted`), and cannot be picked. Then `StartRun` in the factory for the one picked.
+ * package's words (`whyNotStarted`), and cannot be picked. Then `StartRun` in the factory for the one picked. Where it offers none there,
+ * the line that attaches one, as the api answers it on the factory (`commands.attach`).
  */
 function Workflows({ place }: { place: Place }) {
   const workflows = useQuery(factoryWorkflowsQuery(place));
+  const { data: factories } = useQuery(factoriesQuery);
+  const attach = factories?.find((f) => f.name === place.factory)?.commands.attach;
   const [picked, setPicked] = useState<string | null>(null);
   const legend = useId();
   const workflow = workflows.data?.find((w) => whyNotStarted(w) === null && workflowKey(w) === picked) ?? null;
@@ -202,8 +205,7 @@ function Workflows({ place }: { place: Place }) {
           <p className="text-xs text-neutral-500">Reading the workflows…</p>
         ) : !workflows.data.length ? (
           <p className="text-xs text-neutral-500">
-            No workflow the factory attaches is on {path(place.repo)}: attach one there with{' '}
-            {code(`wf factory attach ${place.factory} <workflow>`)}.
+            No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (
           <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">

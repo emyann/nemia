@@ -45,6 +45,7 @@ import { when } from './Facts';
 export function Gate({
   runId,
   step,
+  approveLine,
   back = [step],
   acts = false,
   framed = true,
@@ -52,6 +53,8 @@ export function Gate({
 }: {
   runId: string;
   step: string;
+  /** The line that approves the step from a terminal, as the api answers it (`commands.approve` on the step). */
+  approveLine: string;
   back?: readonly string[];
   acts?: boolean;
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
@@ -154,7 +157,7 @@ export function Gate({
                 </button>
               )}
               <p className="text-xs">
-                as <code>{`wf approve ${runId} ${step}`}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
+                as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
               </p>
             </div>
             {confirming && (

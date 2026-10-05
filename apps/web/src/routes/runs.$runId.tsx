@@ -312,10 +312,10 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           {acts ? (
             <div className="grid items-start gap-4 lg:grid-cols-2">
               <ActsOn run={run} step={step} />
-              <Gate runId={runId} step={step.name} back={back} acts={acts} />
+              <Gate runId={runId} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} />
             </div>
           ) : (
-            <Gate runId={runId} step={step.name} back={back} closeout={closeout} />
+            <Gate runId={runId} step={step.name} approveLine={step.commands.approve} back={back} closeout={closeout} />
           )}
         </>
       ) : (

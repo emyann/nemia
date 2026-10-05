@@ -4,6 +4,9 @@ import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
 import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
 
+/** The line that continues `step` from a terminal, as the api answers it on the step (`commands.retry`); none for a step the run lacks. */
+const retryLineOf = (run: RunDetail, step: string): string => run.steps.find((s) => s.name === step)?.commands.retry ?? '';
+
 /**
  * A banner's link to the step `step`, saying `children`: a button calling `onStep` with the step where one is given, as in the frame's bar,
  * where a hash would point nowhere; else a hash to the step's section on the run's page.
@@ -94,7 +97,7 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
             ))}
           </strong>{' '}
           — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —{' '}
-          <code>wf decide {run.id}</code>
+          <code>{run.decide}</code>
         </p>
       )}
       {needs.length > 0 && (
@@ -112,7 +115,7 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
                     {need.waitingFor.advice}
                   </p>
                 )}
-                {offer?.kind === 'continue' && <Continue runId={run.id} step={need.step} />}
+                {offer?.kind === 'continue' && <Continue runId={run.id} step={need.step} line={retryLineOf(run, need.step)} />}
                 {offer?.kind === 'asked' && (
                   <p data-note className="font-mono text-xs">
                     {offer.note ?? `try ${offer.try} asked`}

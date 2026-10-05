@@ -100,13 +100,17 @@ export function presetOf(
  */
 export type CardPlace = { factory: string; repos: string[]; repo: string | null } | { why: string };
 
-/** `entry`'s place among `factories`, as the api lists them (`CardPlace`). */
-export function cardPlace(entry: Pick<InboxEntry, 'factory' | 'repo'>, factories: readonly Factory[]): CardPlace | null {
+/** `entry`'s place among `factories`, as the api lists them (`CardPlace`); `fileFactory` is the line that files a factory (`YourStore`). */
+export function cardPlace(
+  entry: Pick<InboxEntry, 'factory' | 'repo'>,
+  factories: readonly Factory[],
+  fileFactory: string,
+): CardPlace | null {
   if (entry.factory === null || entry.factory === 'default') return null;
   const factory = factories.find((f) => f.name === entry.factory);
   if (!factory) {
     return {
-      why: `The card names the factory ${entry.factory}, which the store does not have: file it with wf factory add ${entry.factory} --repo <path>, or change the card's factory: line.`,
+      why: `The card names the factory ${entry.factory}, which the store does not have: file it by that name with ${fileFactory}, or change the card's factory: line.`,
     };
   }
   if (factory.error !== null) return { why: `The card names the factory ${factory.name}, whose file does not read: ${factory.error}` };

@@ -106,6 +106,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
       <PromptBox
         runId={run.id}
         step={step.name}
+        line={step.commands.say}
         sayable={sayable(run, step)}
         onSaid={(entry) =>
           setSent((before) => ({ taskId: step.taskId, said: [...(before.taskId === step.taskId ? before.said : []), entry] }))

@@ -37,20 +37,20 @@ export function Decide({ run }: { run: RunDetail }) {
   const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
   if (decidable && error) {
     return (
-      <DecideFrame runId={run.id}>
+      <DecideFrame>
         {answers}
         <p className="text-sm text-red-600 dark:text-red-400">
-          Could not read what there is to decide: {error.message} <code>wf decide {run.id}</code> reads it from the command line.
+          Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
         </p>
       </DecideFrame>
     );
   }
   if (decidable && isDecidable(data)) return <DecideSection runId={run.id} decision={data} offers={answers} run={run} />;
-  return answers && <DecideFrame runId={run.id}>{answers}</DecideFrame>;
+  return answers && <DecideFrame>{answers}</DecideFrame>;
 }
 
 /** The Decide section's frame: its heading, and what the board does from it and what it leaves to you. */
-function DecideFrame({ runId, children }: { runId: string; children: ReactNode }) {
+function DecideFrame({ children }: { children: ReactNode }) {
   return (
     <section
       aria-label="Decide"
@@ -60,9 +60,8 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
-          What <code>wf decide {runId}</code> shows. Copy a command to run it yourself; the board runs one of them, accepting a loop's work
-          as it stands with your reason, as <code>wf accept</code> does. An answer given here asks for a try as <code>wf retry</code> does,
-          or a round as <code>wf round</code> does; each row says what the tick does with it.
+          What there is to decide on this run. Copy a command to run it yourself; the board runs one of them, accepting a loop's work as it
+          stands with your reason. An answer given here asks for a try, or a round; each row says what the tick does with it.
         </p>
       </div>
       {children}
@@ -91,7 +90,7 @@ export function DecideSection({
   const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
   const inFolders = run?.place === 'folder';
   return (
-    <DecideFrame runId={runId}>
+    <DecideFrame>
       {offers}
 
       {overBudget && (
@@ -140,7 +139,7 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
   return (
     <section aria-label="Answer" className="space-y-2">
       <h3 className="text-xs font-medium text-neutral-500">
-        Answer — each asks for a try as <code>wf retry {runId} &lt;step&gt;</code> does, or a round as <code>wf round</code> does
+        Answer — each asks for a try of its step, or a round of its loop, as the command line would
       </h3>
       <ul className="space-y-3">
         {offers.map((offer) =>
@@ -453,7 +452,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
  * does with it (`askedSaid`), until the run is read again and the banner says it in `wf ls`'s words. Nothing written is a nudge with no
  * message, as `wf retry` sends one; something written goes as it was typed, as `--message` takes it.
  */
-export function Continue({ runId, step }: { runId: string; step: string }) {
+export function Continue({ runId, step, line }: { runId: string; step: string; line: string }) {
   const [message, setMessage] = useState('');
   const field = useId();
   const ask = useAsk(runId, step, () => setMessage(''));
@@ -490,7 +489,7 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
             {ask.isPending ? 'Asking…' : 'Continue'}
           </button>
           <p className="text-xs">
-            as <code>{`wf retry ${runId} ${step}`}</code> asks it: the next tick stops its session, and files the try once it has stopped
+            as <code>{line}</code> asks it: the next tick stops its session, and files the try once it has stopped
           </p>
         </div>
       </form>

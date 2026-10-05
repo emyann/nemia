@@ -1,10 +1,10 @@
 /**
  * A card's start in the factory it names (`factory:`), on the Inbox page: the repository it starts on, the workflow among those the
- * factory offers there, read with its hires, and `StartRun` sending both, as `wf start <card> --factory` starts it.
+ * factory offers there, read with its hires, and `StartRun` sending both, as a start of the card in its factory from the command line does.
  */
 import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { factoriesQuery, factoryWorkflowsQuery, type InboxEntry, type Place, type Started } from '../lib/api';
+import { factoriesQuery, factoryWorkflowsQuery, storeQuery, type InboxEntry, type Place, type Started } from '../lib/api';
 import { cardPlace, presetOf, workflowKey } from '../lib/inbox';
 import { StartRun } from './StartRun';
 import { FIELD, WorkflowOptions } from './WorkflowOptions';
@@ -20,8 +20,9 @@ type Told = { onStarted: (started: Started) => void; onRefused: (message: string
  */
 export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: InboxEntry } & Told) {
   const factories = useQuery(factoriesQuery);
+  const { data: store } = useQuery(storeQuery);
   const [picked, setPicked] = useState<string | null>(null);
-  const place = factories.data ? cardPlace(entry, factories.data) : null;
+  const place = factories.data && store ? cardPlace(entry, factories.data, store.fileFactory) : null;
   const repo = place && 'repos' in place ? (place.repo ?? picked) : null;
 
   return (

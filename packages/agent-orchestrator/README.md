@@ -2799,7 +2799,7 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   pid to kill as it stands: it is said unconfirmed, with `ps -p <pid> -o lstart=,args=` to check it first. A daemon resumed from `^Z`
   after it was taken over finishes the pass it was in before it reads the file again.
 
-## What a pass costs: `wf up --stats`
+## What a pass costs: `wf up --stats` and `wf passes`
 
 Every pass is measured as it runs, phase by phase (`src/meter/tally.store.ts` counts, `src/meter/meter.ts` composes and words it), and what it cost is
 written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on it; it is there to say where a pass's time goes.
@@ -2825,6 +2825,20 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   and said as `measuring`. On a copy of a working store's 191 run records (2026-09-25, a fake engine), a pass took 470 to 600 ms and
   measuring it 1.8 to 2.9 ms, under half a percent; git took 400 to 480 ms of the pass, in 233 processes, and the records 13 to 28 ms for
   their 2.8 MB. Outside a pass the readers count nothing, at the price of one comparison. The api serves the last pass beside the ceilings (`/api/ceilings`), and the Factory's header says `a pass takes N ms`.
+- **The last 150 passes are kept** in `$WF_ROOT/tick-recent.json`, oldest first (`RECENT_KEPT`, `src/meter/meter.ts`): each pass's
+  time and its phases' times, the run records it read and those answered from rest, the journals it read, and what it saw — the runs
+  the store listed, the tasks not settled, the sessions queued and admitted (`Seen`). The tick alone writes it, through a hidden file and a
+  rename (`recordRecentPass`, `src/daemon/daemon.store.ts`); an entry that does not read is left out, and a restarted daemon goes on from
+  the file. `wf passes [--last <n>] [--json]` (`nemia passes`, `src/meter/passes.verb.ts`) reads it: the passes counted in a histogram
+  over `PASS_BOUNDS` (10 ms to 5 s, and one bucket past the last), what the time went to, phase by phase on average and heaviest first,
+  and the median, the slowest, the journal reads and what the last pass saw (`passHistogram`, `passParts`, `passSummary`); `--last` takes
+  a whole number from 1, and anything else is refused as `Invalid`. The api serves the same at `GET /api/passes` (`?last=<n>`), and the
+  board's Stats page draws it at `#passes`, where the Factory's `a pass takes N ms` links.
+- **The ticking process keeps Effect metrics of its passes** (`PASS_METRICS`, `recordPassMetrics` in `src/meter/meter.verb.ts`), in
+  memory, in the registry of the runtime that ticks: `pass.duration` and `pass.phase.duration` (by `phase`), histograms in ms over
+  `PASS_BOUNDS`; `pass.journal_reads`; and the gauges `store.runs`, `sessions.queued` and `sessions.admitted`, as the last pass saw them.
+  The api serves its own process's at `GET /api/metrics`, with `api.poll.reads`: the files the runtime read for each request, by the
+  route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's.
 - **A finished run costs a pass nothing while nothing of it changed.** A run at rest — succeeded, failed, cancelled or pruned, its
   workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest/rest.ts`) — is
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the
@@ -2968,6 +2982,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `checks/<id>-<step>[-try<n>]-check.stderr`, `.stdout` | a check's streams, from before the runtime kept them | the check | removed |
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
 | `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
+| `tick-recent.json` | the last 150 passes, oldest first, each its time, phases and what it saw (`RecentPass`): what `wf passes` and the api's `GET /api/passes` read | the tick (`recordRecentPass`), through a hidden file and a rename, the oldest dropped past 150 | not touched |
 | `feed.jsonl` | what the tick judged of each run and step, a line each time it changed (`wf feed`, `wf watch`) | the tick | kept: the run's lines stay, and the next pass writes its one `removed` |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | not touched |
 | `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
@@ -3164,7 +3179,7 @@ holding a concurrency slot forever.
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), a skill read again once its rendered folder is gone (`skillsAgain`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
-| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
+| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`), `tick-recent.json` (the recent passes, `recordRecentPass` and `recentPasses`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |

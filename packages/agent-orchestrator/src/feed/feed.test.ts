@@ -318,7 +318,8 @@ test('REFUSED: finished runs whose notes are worded anew, as a new denied: part 
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   for (const r of runs) b.set(`${r.id}-implement`, 'succeeded', SIGNED);
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
-  for (const r of runs) assert.deepEqual(lastSaid(r.id), ['succeeded', 'unverified · done', 'unverified · done'], 'each run finished, and the feed said so');
+  for (const r of runs)
+    assert.deepEqual(lastSaid(r.id), ['succeeded', 'unverified · done', 'unverified · done'], 'each run finished, and the feed said so');
 
   for (const r of runs) b.deny(`${r.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
   const quiet = size();
@@ -360,6 +361,26 @@ test("a step whose attempt ends with a new denial says it on the pass that reads
     'the step that ended denied a call says it',
   );
   assert.equal(words(run.id).at(-1), 'succeeded', 'and the run says it finished');
+});
+
+test('a step at work that is denied a call says it while its word stands at running: a run in flight owes a line for a note that moved', async () => {
+  emptyStore();
+  const b = board();
+  const run = await started('the live denial');
+  await runWith(b.e, tickRun());
+  b.set(`${run.id}-plan`, 'running (working)');
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
+  assert.equal(words(run.id, 'plan').at(-1), 'running', 'the step is at work, and the feed said so');
+
+  b.deny(`${run.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
+  const pass = await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+  assert.equal(judged(pass).get(run.id)!.atRest, undefined, 'a run with a step at work is not at rest');
+  const plan = lines().filter((l) => l.run === run.id && l.step === 'plan');
+  assert.deepEqual(
+    { word: plan.at(-1)!.word, note: plan.at(-1)!.note },
+    { word: 'running', note: 'denied: Bash(git push) ×1' },
+    'the same word, with the denial beside it, is a line',
+  );
 });
 
 test('a step that signed off blocked says what it needs on its line in the feed, made one line, beside BLOCKED — and the run says blocked, not failed', async () => {

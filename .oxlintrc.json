@@ -803,7 +803,7 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 121, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 49 }],
         "sonarjs/cognitive-complexity": ["error", 53]
       }

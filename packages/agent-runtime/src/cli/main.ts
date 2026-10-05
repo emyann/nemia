@@ -550,6 +550,29 @@ const engineAt = (root: string): Promise<EngineShape> =>
       throw refusalWords('ae')(e);
     });
 
+/** `ae up`: the engine ticking every `every` ms until the process stops, a line for each pass that acted and each task left out anew. */
+const up = async (engine: EngineShape, every: number): Promise<void> => {
+  console.log(`up — ticking every ${every}ms, ^C to stop`);
+  let leftOut = new Set<string>();
+  await new Promise<void>(() => {
+    Effect.runSync(
+      engine.start({
+        intervalMs: every,
+        onTick: (r) => {
+          for (const why of r.unreadable) if (!leftOut.has(why)) console.error(`left out: ${why}`);
+          leftOut = new Set(r.unreadable);
+          if (!r.actions) return;
+          const load = Object.entries(r.running)
+            .map(([h, n]) => `${h}:${n}`)
+            .join(' ');
+          console.log(`${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
+        },
+        onError: (e) => console.error(String(e)),
+      }),
+    );
+  });
+};
+
 /**
  * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
  * `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`).
@@ -674,29 +697,8 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
 
-    case 'up': {
-      const every = Number(arg) || 3_000;
-      console.log(`up — ticking every ${every}ms, ^C to stop`);
-      let leftOut = new Set<string>();
-      await new Promise<void>(() => {
-        Effect.runSync(
-          engine.start({
-            intervalMs: every,
-            onTick: (r) => {
-              for (const why of r.unreadable) if (!leftOut.has(why)) console.error(`left out: ${why}`);
-              leftOut = new Set(r.unreadable);
-              if (!r.actions) return;
-              const load = Object.entries(r.running)
-                .map(([h, n]) => `${h}:${n}`)
-                .join(' ');
-              console.log(`${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
-            },
-            onError: (e) => console.error(String(e)),
-          }),
-        );
-      });
-      return;
-    }
+    case 'up':
+      return up(engine, Number(arg) || 3_000);
 
     default:
       return console.log(HELP);

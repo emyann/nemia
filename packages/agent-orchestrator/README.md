@@ -2651,6 +2651,30 @@ new session's brief names it (`mountsLine`); a step without the line reads none 
 (Codex) is filed no mount. Refused at load: a name off `STORE_READS`, one given twice, none, and the key on a remote agent. A store
 whose path no permission rule can name refuses `wf start` of such a step, quoting its `reads:` line, before anything is written.
 
+### A factory's instruction: `wf factory instruction` and `wf factory instruct`
+
+A factory has one instruction: what its runs are to know about its work, in markdown. Where it is kept is a key of the factory's file:
+
+- **By default, `NEMIA.md` in its first repository** — the file is the checkout's, edited with the code it speaks of, and read as it is
+  on each request; no file there means no instruction yet.
+- **`"instruction": { "path": "docs/factory.md" }`** — another file of that folder, by its path from it. A path that is empty, absolute,
+  the folder itself or climbs out of it is refused when it is set (`instructionPathRefusal`); a file that is no regular file, or a link
+  that leads out of the folder, does not read, and the read says why (`readInstructionAt`).
+- **`"instruction": { "store": true }`** — `$WF_ROOT/factories/<name>/NEMIA.md`, beside the factory's file, for a factory whose
+  repository a person would rather not write into.
+
+**`wf factory instruction <name>`** says where it is kept and reads it; `--path <path>` points it at a file of the folder, `--store`
+keeps it in the store, and `--clear` drops the key, back to `NEMIA.md`. Each writes the whole file through a hidden file renamed onto
+it, keeping every other key, and never moves the words: the store's text stays, unread, while a folder's file is read.
+**`wf factory instruct <name> --file <path>`** (`--file -` for stdin) writes the words the store keeps, replacing a link there rather
+than writing through it, and `--clear` removes them; both are refused while the instruction is read from the factory's folder
+(`Conflict`, naming the file to edit instead), and blank words are refused (`Invalid`). **`wf factory rm`** removes the store's folder
+for the factory after its file. The default factory has no file, so it keeps no instruction: both verbs refuse it.
+
+The api serves both (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruction`, and on `…/instruction/words`), and the board
+shows it on the factory's settings page, linked from its floor: the words of a store's instruction edited there, a folder's file shown as
+it reads.
+
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
 Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in

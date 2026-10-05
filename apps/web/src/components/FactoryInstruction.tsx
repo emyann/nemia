@@ -194,13 +194,13 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
 }
 
 /**
- * Where the instruction is kept, to change: the store, while it is read from a folder; `NEMIA.md`, while another file is named; and a
- * file of the folder, by its path from it — an empty path naming `NEMIA.md`.
+ * Where the instruction is kept, to change: the store, while it is read from a folder; `NEMIA.md`, while the store or another file keeps
+ * it; and a file of the folder, by its path from it — an empty path naming `NEMIA.md`, but in the store, where Back to NEMIA.md says it.
  */
 function Place({ data, pending, onChange }: { data: Instruction; pending: boolean; onChange: (change: Change) => void }) {
   const [path, setPath] = useState(data.path ?? '');
   const asked = path.trim();
-  const same = !data.store && asked === (data.path ?? '');
+  const same = data.store ? asked === '' : asked === (data.path ?? '');
   return (
     <div data-instruction-place className="flex flex-col gap-3 border-t pt-4">
       <p className="text-sm font-medium">Where it is kept</p>

@@ -64,6 +64,7 @@ import { useContent } from '@/lib/useContent';
 import { useFrameSize } from '@/lib/useFrameSize';
 import { useNow } from '@/lib/useNow';
 import type { Point } from '@/lib/layout';
+import { RouteLink } from './AgentParts';
 import { CanvasLegend } from './CanvasLegend';
 import { QueueLane } from './QueueLane';
 import { RunNode, type RunFlowNode } from './RunNode';
@@ -197,10 +198,10 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - A refetch that moves a status moves no card: what lays the cards out is kept by its content (`useContent`).
  * - Only a run open on the floor reads its detail, again on each of its events on the feed (`runQuery`): each tile's attempt and cost,
  *   which the bar reads for itself. A closed card reads the list, and so does an open card's flowchart.
- * - The cards' positions change only through a drag or React Flow measuring a card, a run joining or leaving the floor, a card opening
- *   or closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless
- *   an opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a
- *   card off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
+ * - The cards' positions change only through a drag or React Flow measuring a card, a run joining or leaving the floor, a card opening   or
+ *   closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless   an
+ *   opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a   card
+ *   off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
  * - On mount it forgets what this browser keeps for the Factory that nothing reads (`forgetFactoryLeftovers`).
  * - A card opened is brought into view once the floor is laid out for it, and the run the bar shows, or a step of, is brought into view as
  *   the bar shows it and kept in view whenever the floor's frame changes size, across or down (`useFrameSize`): panned to its middle, if
@@ -209,13 +210,13 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The floor is fitted once per ask, never before the cards asked for are on it: first on mount, unanimated, in place of React Flow's
  *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane
  *   comes or goes; and when the frame changes size with no run inspected and leaves no card in view (`anyInView`).
- * - No view is aimed at a frame without a size (`sized`), nor a reveal at one with no room below its panels: a reveal or a fit asked
- *   for while the frame is hidden or squeezed flat waits until it has a size.
+ * - No view is aimed at a frame without a size (`sized`), nor a reveal at one with no room below its panels: a reveal or a fit asked   for
+ *   while the frame is hidden or squeezed flat waits until it has a size.
  * - Reset layout lays the cards on the grid again with every run closed and the saved arrangement forgotten; Collapse all closes every
  *   card and leaves the cards they moved aside where they went. The effect that keeps the open runs is their one writer.
- * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
- *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
- *   Beside the counts it draws the cap (`CapLine`), and the Show finished switch, named by a label beside it.
+ * - The header counts runs in flight, finished, to decide as the CLI's `ls` says them, and waiting on you. A run waiting on you, or to
+ *   decide,   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in
+ *   both.   Beside the counts it draws the cap (`CapLine`), and the Show finished switch, named by a label beside it.
  * - The floor fills the screen between the root's header and its bottom bar, its frame narrowed by what the bar covers of it
  *   (`useBarOver`), so the card inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives
  *   its room to the floor while the bar shows a run, a step, or what is the whole machine's: its gauges or the runs waiting on you. The
@@ -533,9 +534,9 @@ const runBar = (run: string): Bar => ({ kind: 'run', run });
 /**
  * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count
  * is the cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is
- * not; the difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, with its breakdown on hover (`passTitle`), once a
- * pass has written it, its time of day said as today's or another day's against a clock read each minute (`useNow`). Nothing until the cap
- * is read; why, when it or the queue cannot be.
+ * not; the difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, a link to the recent passes on the Stats page
+ * (`#passes`) with the last one's breakdown on hover (`passTitle`), once a pass has written it, its time of day said as today's or another
+ * day's against a clock read each minute (`useNow`). Nothing until the cap is read; why, when it or the queue cannot be.
  */
 function CapLine({ queued, queueError }: { queued: number; queueError: Error | null }) {
   const { data, error } = useQuery(ceilingsQuery);
@@ -561,7 +562,14 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
       {data.pass && (
         <span data-pass={Math.round(data.pass.ms)} title={passTitle(data.pass, now)}>
           {' · '}
-          {passLine(data.pass)}
+          <RouteLink
+            to="/stats"
+            search={{}}
+            hash="passes"
+            className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600 dark:decoration-neutral-600 dark:hover:decoration-neutral-300"
+          >
+            {passLine(data.pass)}
+          </RouteLink>
         </span>
       )}
     </p>
@@ -579,13 +587,9 @@ function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
         <CardHeader>
           <CardTitle>Nothing in flight</CardTitle>
           <CardDescription>
-            {anyRuns ? (
-              'Every run has finished. Show finished runs above, or read them on Runs.'
-            ) : (
-              <>
-                No runs yet. Start one with <code>npx wf start</code>.
-              </>
-            )}
+            {anyRuns
+              ? 'Every run has finished. Show finished runs above, or read them on Runs.'
+              : 'No runs yet. Start one from a workflow, on Workflows.'}
             {queued > 0 && (
               <>
                 {' '}

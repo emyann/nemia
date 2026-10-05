@@ -9,7 +9,7 @@ const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
 /**
  * Mirrors `StepArtifact` in apps/api/src/steps/artifacts.ts: a file a closeout named. One the api serves from the step's files
- * directory has its name, the `url` to read it by, its kind and size; one that directory held until `wf prune --artifacts`
+ * directory has its name, the `url` to read it by, its kind and size; one that directory held until the CLI's `prune --artifacts`
  * removed it has the words that say so, `pruned`, and that moment, `prunedAt`; anything else is the path alone.
  */
 export type StepArtifact =
@@ -119,7 +119,7 @@ export const StepLogSchema = Schema.Struct({ lines: StringsSchema, truncated: Sc
 /**
  * Mirrors `StepCheck` in apps/api/src/steps/logs.ts: the command a step is judged by, from the workflow the run
  * froze, its task and verdict — `passed`, `exit 1`, `unfinished`, `checking` — and once its check refused, the
- * exit in `wf ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api does not read.
+ * exit in the CLI `ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api does not read.
  */
 export type StepCheck = {
   command: string;
@@ -176,7 +176,7 @@ export const StepAttemptsSchema = Schema.Struct({
 
 /**
  * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
- * try, which `current` marks; `note` how it was reached, in `wf ls`'s words. `status` is the step's word on the current try, and
+ * try, which `current` marks; `note` how it was reached, in the CLI `ls`'s words. `status` is the step's word on the current try, and
  * the engine's word for the task on an earlier one.
  */
 export type StepTry = {
@@ -192,7 +192,7 @@ export type StepTry = {
   closeout: StepCloseout | null;
   /** A statement it gave that could not be read: why, and the statement as it came. `closeout` is null then. */
   unreadable: StepUnreadable | null;
-  /** What a person said to this try when they asked for it — `wf decide`'s `your answer` — or null. */
+  /** What a person said to this try when they asked for it — the CLI `decide`'s `your answer` — or null. */
   answer: string | null;
 };
 

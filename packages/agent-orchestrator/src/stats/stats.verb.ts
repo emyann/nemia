@@ -1,10 +1,11 @@
 /**
  * `nemia stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
- * task of every try, each viewed once, the calls each session was refused and the skills it loaded read off the same views
- * (`deniedCallsOf`, `skillsLoadedOf`), each try's counts read off its own task's closeout (`taskCloseout`), and the rules each step's
- * skills declare read off their frozen copies (`renderedSkillRules`): no session's log nor transcript, and no skill of the checkout. A
- * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
- * (`EngineService`), and `stats`, its plain face in a Promise, over the engine it is handed. It writes nothing. It keeps nothing between
+ * task of every try, each viewed once, the calls each session was refused, the skills it loaded and the files it touched read off the
+ * same views (`deniedCallsOf`, `skillsLoadedOf`, `filesTouchedOf`), each try's counts read off its own task's closeout (`taskCloseout`),
+ * and the rules and paths each step's skills declare read off their frozen copies (`renderedSkillRules`, `renderedSkillApplies`): no
+ * session's log nor transcript, and no skill of the checkout. A controller, reaching the runtime through the client (`runtime-client.ts`):
+ * an Effect program that requires the engine as a service (`EngineService`), and `stats`, its plain face in a Promise, over the engine it
+ * is handed. It writes nothing. It keeps nothing between
  * calls but in the memo a caller hands it (`StatsMemo`): each finished run's facts, while its inputs stand.
  */
 import { isDeepStrictEqual } from 'node:util';
@@ -18,11 +19,11 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhases, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
+import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
-import { deniedCallsOf, skillsLoadedOf } from './discipline.ts';
+import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
@@ -71,7 +72,9 @@ async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Fa
     closeoutOf: closeoutReader(views, run),
     deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId)).map(denialText),
     skillsOf: (taskId) => skillsLoadedOf(everyTry.get(taskId)),
+    filesOf: (taskId) => filesTouchedOf(everyTry.get(taskId)),
     rulesOf: (step) => renderedSkillRules(run, step),
+    appliesOf: (step) => renderedSkillApplies(run, step),
     closeoutOfTask: (taskId) => taskCloseout(everyTry, taskId),
   });
   return { ...of, settled };

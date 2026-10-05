@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentListing, AgentRoleKey, KeyForm } from '../lib/api';
 import { GivenSkills, Skills } from './AgentParts';
+import { Markdown } from './Markdown';
 import { SkillPicker } from './SkillPicker';
 import {
   choicesOf,
@@ -189,7 +190,7 @@ export function AgentForm({
         value={form.body}
         onChange={(body) => setForm((f) => ({ ...f, body }))}
         readOnly={readOnly}
-        mono
+        markdown
         area="min-h-72"
         placeholder={listing ? undefined : 'You write the notes of a change…'}
       />
@@ -205,7 +206,7 @@ export function AgentForm({
             </Button>
           )}
           <p className="text-xs text-muted-foreground">
-            A save changes what a later <code>wf start</code> freezes. A run already started keeps the agent it froze.
+            A save changes what a run started later freezes. A run already started keeps the agent it froze.
           </p>
           {footer}
         </div>
@@ -294,7 +295,8 @@ function Identity({
 
 /**
  * A text field: a line, or `area`'s textarea. Read-only, it is drawn as text on a quiet ground, not as a box waiting for words. The skill's
- * form draws its fields with it too.
+ * form draws its fields with it too. `markdown` says its words are written in markdown: typed in as written in a mono textarea, and read
+ * as the markdown they are (`MarkdownField`).
  */
 export function Field({
   label,
@@ -303,6 +305,7 @@ export function Field({
   onChange,
   readOnly,
   mono = false,
+  markdown = false,
   area,
   placeholder,
   className,
@@ -313,12 +316,14 @@ export function Field({
   onChange: (value: string) => void;
   readOnly: boolean;
   mono?: boolean;
+  markdown?: boolean;
   area?: string;
   placeholder?: string;
   className?: string;
 }) {
-  const font = mono ? 'font-mono text-xs md:text-xs' : '';
-  const quiet = readOnly ? 'border-dashed bg-neutral-50 dark:bg-neutral-900/60 focus-visible:ring-0' : '';
+  if (markdown && readOnly) return <MarkdownField label={label} hint={hint} value={value} className={className} />;
+  const font = mono || markdown ? 'font-mono text-xs md:text-xs' : '';
+  const quiet = readOnly ? READ_ONLY : '';
   return (
     <TextField value={value} onChange={onChange} isReadOnly={readOnly} className={`space-y-1.5 ${className ?? ''}`}>
       <Label className="text-xs">{label}</Label>
@@ -327,12 +332,41 @@ export function Field({
       ) : (
         <Input placeholder={readOnly ? undefined : placeholder} className={`${font} ${quiet}`} />
       )}
-      {hint && (
-        <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
-          {hint}
-        </Text>
-      )}
+      {hint && <Hint>{hint}</Hint>}
     </TextField>
+  );
+}
+
+const READ_ONLY = 'border-dashed bg-neutral-50 dark:bg-neutral-900/60 focus-visible:ring-0';
+
+const Hint = ({ children }: { children: ReactNode }) => (
+  <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
+    {children}
+  </Text>
+);
+
+/** A field written in markdown, read and not edited: its label, its words drawn as markdown on a read-only field's ground, its hint. */
+function MarkdownField({
+  label,
+  hint,
+  value,
+  className,
+}: {
+  label: string;
+  hint: string | null | undefined;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <section aria-label={label} data-field-markdown className={`space-y-1.5 ${className ?? ''}`}>
+      <p className="text-xs leading-none font-medium">{label}</p>
+      {value.trim() ? (
+        <Markdown className={`rounded-md border px-3 py-2 text-sm ${READ_ONLY}`}>{value}</Markdown>
+      ) : (
+        <p className={`rounded-md border px-3 py-2 text-sm text-muted-foreground italic ${READ_ONLY}`}>Nothing written</p>
+      )}
+      {hint && <Hint>{hint}</Hint>}
+    </section>
   );
 }
 

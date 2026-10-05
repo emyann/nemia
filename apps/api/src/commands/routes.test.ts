@@ -198,6 +198,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'resume DELETE',
       'workflows write POST',
       'workflows write PUT',
+      'workflows remove DELETE',
     ],
   );
   for (const { command, r } of routed) {

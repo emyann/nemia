@@ -259,7 +259,19 @@ export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
 export type { UpOptions } from './daemon/up.verb.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/meter.ts';
-export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter/meter.ts';
+export type {
+  HarnessCost,
+  Interval,
+  PassBucket,
+  PassCost,
+  PassCostRead,
+  PassesRead,
+  PassPart,
+  PassSummary,
+  Phase,
+  PhaseCost,
+  RecentPass,
+} from './meter/meter.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';

@@ -1,4 +1,4 @@
-/** What sessions consumed, in `wf decide`'s words (apps/api/src/detail/usage.ts), each type with the schema `get` decodes it with. */
+/** What sessions consumed, in the CLI `decide`'s words (apps/api/src/detail/usage.ts), each type with the schema `get` decodes it with. */
 import { Schema } from 'effect';
 
 /** Mirrors `Usage` in apps/api/src/detail/usage.ts: a count nobody measured is absent, never 0. */
@@ -49,10 +49,10 @@ export type PeakMark = 'cap' | 'large' | null;
 export const PeakMarkSchema = Schema.NullOr(Schema.Literals(['cap', 'large'])) satisfies Schema.Schema<PeakMark>;
 
 /**
- * Mirrors `StepUsed` in apps/api/src/detail/usage.ts: the usage, and `wf decide`'s words for it — `used` and `cost`, `not measured` where
- * nobody counted — and the engine's cost, api time and tool time off it, each null where nobody measured it. `read` is what the sessions
- * read, by price, in `wf decide`'s words (`read 21.4M · wrote 412k · peak 167k`), null where nothing measured it; `peak` where its peak
- * stands; and `rebuilt` how many resumed sessions wrote their context to the cache again.
+ * Mirrors `StepUsed` in apps/api/src/detail/usage.ts: the usage, and the CLI `decide`'s words for it — `used` and `cost`, `not measured`
+ * where nobody counted — and the engine's cost, api time and tool time off it, each null where nobody measured it. `read` is what the
+ * sessions read, by price, in the CLI `decide`'s words (`read 21.4M · wrote 412k · peak 167k`), null where nothing measured it; `peak`
+ * where its peak stands; and `rebuilt` how many resumed sessions wrote their context to the cache again.
  */
 export type StepUsed = {
   usage: Usage | null;

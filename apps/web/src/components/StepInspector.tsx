@@ -119,8 +119,8 @@ type DetailsProps = {
  * of dashes it says so once, above its spec.
  *
  * Its facts: the try the attempts are of, once there is more than one, since each round and each try within one is a task of its own; how
- * long the latest attempt took, only where its end is on the record; what its current try consumed, in `wf decide`'s words — `not measured`
- * where nobody counted, never 0; what its sessions read (`readRows`); and what every try has cost together (`spentRows`).
+ * long the latest attempt took, only where its end is on the record; what its current try consumed, in the CLI `decide`'s words — `not
+ * measured` where nobody counted, never 0; what its sessions read (`readRows`); and what every try has cost together (`spentRows`).
  */
 function Details({ run, step, state, runCancelled, current, selected, onSelect }: DetailsProps) {
   const { spec, attempts, tries } = step;
@@ -172,8 +172,8 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
         </section>
       ) : (
         <p className="text-neutral-500">
-          No spec: the workflow the run is judged by does not have this step — the one it froze at <code>wf start</code>, or on a record
-          from before runs froze one, its folder.
+          No spec: the workflow the run is judged by does not have this step — the one it froze as it started, or on a record from before
+          runs froze one, its folder.
         </p>
       )}
       <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />
@@ -211,8 +211,8 @@ const ACTIVITY_TURNS = 30;
 
 /**
  * The tail of the step's conversation — the session page's, read and followed the same way — and the way to the whole of it. It is followed
- * until the step waits on a person's word, its session over, and never stops for `held`: a hold on the run (`wf hold`) answers nothing, and
- * the session runs or rests as it did.
+ * until the step waits on a person's word, its session over, and never stops for `held`: a hold on the run (the CLI's `hold`) answers
+ * nothing, and the session runs or rests as it did.
  */
 function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;

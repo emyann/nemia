@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { decisionQuery, type RunDetail } from '../lib/api';
 import { needOf, stepAnchor } from '../lib/asks';
@@ -6,6 +7,7 @@ import { gateBrief, gateFacts, gateOfStep, needWords, type GateFact } from '../l
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { Gate } from './Gate';
+import { Markdown } from './Markdown';
 import { StepPolicy } from './Told';
 
 type Step = RunDetail['steps'][number];
@@ -23,9 +25,17 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
   const gate = gateOfStep(run, step);
   if (gate) return <GateBrief run={run} step={step} />;
   const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
-  if (need) return <Waits run={run} anchor={step.name} said={needWords(need)} kind={need.kind} />;
+  if (need?.kind === 'asks')
+    return (
+      <Waits run={run} anchor={step.name} kind={need.kind}>
+        <div className="break-words">
+          <strong>{need.step}</strong> asks: <Markdown className="max-h-72 overflow-y-auto pr-1">{need.needs}</Markdown>
+        </div>
+      </Waits>
+    );
+  if (need) return <Waits run={run} anchor={step.name} kind={need.kind} said={needWords(need)} />;
   if (run.toDecide?.kind === 'git' && run.cancelledAt === null)
-    return <Waits run={run} anchor={null} said={`The run's result waits on you: ${run.toDecide.said}.`} kind="git" />;
+    return <Waits run={run} anchor={null} kind="git" said={`The run's result waits on you: ${run.toDecide.said}.`} />;
   return null;
 }
 
@@ -73,7 +83,7 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       </dl>
       <StepPolicy layers={step.layers} />
       <div className="border-t border-amber-200 pt-3 dark:border-amber-900">
-        <Gate runId={run.id} step={step.name} back={gate.back} acts={gate.ends} framed={false} />
+        <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={gate.back} acts={gate.ends} framed={false} />
       </div>
     </section>
   );
@@ -98,8 +108,21 @@ function FactWords({ run, fact }: { run: RunDetail; fact: GateFact }) {
 /**
  * What else a run waits on a person for — a question, a session the harness blocked, a result nobody decided — in words, with the way to
  * the run's page where it is answered: the step's section, or the Decide section. No answer here: inline answers are for gates alone.
+ * `said` is words the board composed, said as they are; `children`, what an agent wrote, drawn as its markdown, in their place.
  */
-function Waits({ run, anchor, said, kind }: { run: RunDetail; anchor: string | null; said: string; kind: string }) {
+function Waits({
+  run,
+  anchor,
+  kind,
+  said,
+  children,
+}: {
+  run: RunDetail;
+  anchor: string | null;
+  kind: string;
+  said?: string;
+  children?: ReactNode;
+}) {
   return (
     <section
       aria-label="What the run asks of you"
@@ -107,7 +130,7 @@ function Waits({ run, anchor, said, kind }: { run: RunDetail; anchor: string | n
       className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30"
     >
       <h3 className="text-xs font-semibold tracking-wide text-amber-900 uppercase dark:text-amber-200">Waiting on you</h3>
-      <p className="break-words whitespace-pre-wrap">{said}</p>
+      {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
       <RouteLink
         to="/runs/$runId"
         params={{ runId: run.id }}

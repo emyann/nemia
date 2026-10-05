@@ -136,6 +136,7 @@ test('a session that signs off: spawned, ended with its statement and usage, set
       exitCode: undefined,
       denials: undefined,
       skills: undefined,
+      files: undefined,
       limit: undefined,
     },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
@@ -169,6 +170,7 @@ test("a session that ends with no statement where one was asked: ended as its ha
       exitCode: undefined,
       denials: undefined,
       skills: undefined,
+      files: undefined,
       limit: undefined,
     },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
@@ -250,6 +252,7 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
       exitCode: undefined,
       denials: undefined,
       skills: undefined,
+      files: undefined,
       limit: undefined,
     },
     { kind: 'settled', at: '<at>', outcome: 'stopped', note: 'operator' },
@@ -284,6 +287,7 @@ test('what the harness denied the session is written on its end, as it said it, 
     exitCode: undefined,
     denials,
     skills: undefined,
+    files: undefined,
     limit: undefined,
   });
   assert.deepEqual((await b.engine.view(id)).state.attempts[0]?.denials, denials);
@@ -317,6 +321,26 @@ test('the skills the session loaded are written on its end as its harness said t
 
   const without = none.events.map((e) => (e.kind === 'ended' ? (({ skills: _, ...rest }) => rest)(e) : e)) as Event[];
   assert.equal('skills' in fold(none.id, without).attempts[0], false, 'an end from before the key, or a harness that cannot say: none');
+});
+
+test('the files the session touched are written on its end as its harness said them, an empty list kept, and an end without the key folds with none', async () => {
+  const endWith = async (files: string[]) => {
+    const b = board();
+    const id = await b.engine.file(filing);
+    await b.engine.tick();
+    const name = 'ae/t-words/1';
+    b.sessions.set(name, { ...b.sessions.get(name)!, state: 'failed', busy: false, files });
+    await b.engine.tick();
+    const events = (await b.record(id)) as Event[];
+    return { id, events, ended: events.find((e) => e.kind === 'ended'), attempt: (await b.engine.view(id)).state.attempts[0] };
+  };
+  const touched = await endWith(['apps/web/a.tsx', 'b.ts']);
+  assert.deepEqual(touched.ended && 'files' in touched.ended && touched.ended.files, ['apps/web/a.tsx', 'b.ts']);
+  assert.deepEqual(touched.attempt?.files, ['apps/web/a.tsx', 'b.ts']);
+  const none = await endWith([]);
+  assert.deepEqual(none.attempt?.files, [], 'none touched is a measure, kept');
+  const without = none.events.map((e) => (e.kind === 'ended' ? (({ files: _, ...rest }) => rest)(e) : e)) as Event[];
+  assert.equal('files' in fold(none.id, without).attempts[0], false, 'an end from before the key, or a harness that cannot say: none');
 });
 
 test('a task held open: it signs and waits, an answer is a turn that continues its session, a close settles it', async () => {
@@ -356,6 +380,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
     exitCode: undefined,
     denials: undefined,
     skills: undefined,
+    files: undefined,
     limit: undefined,
   });
   assert.deepEqual(await b.record(id), [

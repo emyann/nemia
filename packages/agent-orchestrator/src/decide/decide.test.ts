@@ -59,11 +59,11 @@ test('each offer is its own bare command, labelled by its verb, with the sentenc
   ].map(offer);
   const commands = choicesOf(STEPS, RUN, awaiting(), offers);
   assert.deepEqual(
-    commands.map((c) => [c.label, c.command, c.said]),
+    commands.map((c) => [c.label, c.command, c.said, c.step]),
     [
-      ...offers.map((o, i) => [['once more', 'once more', 'once more', 'once more', 'accept', 'send back'][i], o.command, o.said]),
-      ['ship it', 'git -C /code/app merge --no-ff wf/r-1/implement', null],
-      ['drop it', 'git -C /code/app branch -D wf/r-1/implement', null],
+      ...offers.map((o, i) => [['once more', 'once more', 'once more', 'once more', 'accept', 'send back'][i], o.command, o.said, o.step]),
+      ['ship it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
+      ['drop it', 'git -C /code/app branch -D wf/r-1/implement', null, null],
     ],
   );
 });
@@ -77,14 +77,16 @@ test('a step waiting at its gate is offered its approval and a send-back for eac
         label: 'approve',
         command: 'nemia approve r-1 plan',
         said: 'plan waits at its gate — with words: nemia approve r-1 plan --message "<words>"',
+        step: 'plan',
       },
-      { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null },
+      { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
       {
         label: 'approve',
         command: 'nemia approve r-1 implement',
         said: 'implement waits at its gate — with words: nemia approve r-1 implement --message "<words>"',
+        step: 'implement',
       },
-      { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null },
+      { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
     ],
     'an unrun step sends back to what it waits on',
   );
@@ -94,11 +96,16 @@ test('a workflow whose step merges is offered no ship it nor drop it; a direct r
   const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'main' }] as Workflow[];
   assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
   assert.deepEqual(choicesOf(STEPS, RUN, awaiting({ direct: true }), []), [
-    { label: 'read it', command: 'git -C /code/app diff abc...main', said: 'worked directly on main; nothing to merge; the base was abc' },
+    {
+      label: 'read it',
+      command: 'git -C /code/app diff abc...main',
+      said: 'worked directly on main; nothing to merge; the base was abc',
+      step: null,
+    },
   ]);
   const folder = { ...RUN, place: { kind: 'folder' }, repo: undefined, baseRef: undefined, branch: undefined } as unknown as Run;
   assert.deepEqual(choicesOf(STEPS, folder, awaiting(), []), [
-    { label: 'forget it', command: 'nemia rm r-1', said: 'forgets the run with its folders and files' },
+    { label: 'forget it', command: 'nemia rm r-1', said: 'forgets the run with its folders and files', step: null },
   ]);
 });
 

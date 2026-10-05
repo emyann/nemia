@@ -5,10 +5,11 @@ import { FactoryTags } from '../components/FactoryTag';
 import { FavoriteStar } from '../components/FavoriteStar';
 import { Markdown } from '../components/Markdown';
 import { NewWorkflow } from '../components/NewWorkflow';
+import { RemoveWorkflow } from '../components/RemoveWorkflow';
 import { StartRun } from '../components/StartRun';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { factoriesQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
+import { factoriesQuery, storeQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
 import { factorySearch, offeredIn, workflowFactories } from '../lib/factories';
 import { workflowAnchor } from '../lib/favorites';
 import { specStep } from '../lib/bar';
@@ -17,7 +18,11 @@ import { useBar } from '../lib/useBar';
 export const Route = createFileRoute('/workflows')({
   validateSearch: factorySearch,
   loader: ({ context }) =>
-    Promise.all([context.queryClient.ensureQueryData(workflowsQuery), context.queryClient.prefetchQuery(factoriesQuery)]),
+    Promise.all([
+      context.queryClient.ensureQueryData(workflowsQuery),
+      context.queryClient.ensureQueryData(storeQuery),
+      context.queryClient.prefetchQuery(factoriesQuery),
+    ]),
   component: WorkflowsPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
@@ -27,7 +32,11 @@ export const Route = createFileRoute('/workflows')({
 });
 
 const where = <code className="font-mono text-xs">workflows/</code>;
-const yours = <code className="font-mono text-xs">~/.agent-workflows/workflows/</code>;
+/** Your workflows' folder, as the api answers it (`storeQuery`). */
+function Yours() {
+  const { data: store } = useSuspenseQuery(storeQuery);
+  return <code className="font-mono text-xs">{store.workflows}/</code>;
+}
 
 /**
  * Every workflow the repository carries, then yours: a card each, drawn, and startable — and yours built on the board, the one just made
@@ -36,6 +45,7 @@ const yours = <code className="font-mono text-xs">~/.agent-workflows/workflows/<
  */
 function WorkflowsPage() {
   const { data: all } = useSuspenseQuery(workflowsQuery);
+  const { data: store } = useSuspenseQuery(storeQuery);
   const { data: factories } = useQuery(factoriesQuery);
   const { factory } = Route.useSearch();
   const [made, setMade] = useState<string | null>(null);
@@ -45,11 +55,10 @@ function WorkflowsPage() {
     <article className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-neutral-500">
-          A workflow is a folder of steps: this repository's under {where}, and yours under {yours}. Starting a run writes its record as{' '}
-          <code className="font-mono text-xs">wf start</code> does, and files nothing: the daemon — this api, or{' '}
-          <code className="font-mono text-xs">wf up</code> — files its steps. Yours are built here too.
+          A workflow is a folder of steps: this repository's under {where}, and yours under <Yours />. Starting a run writes its record and
+          files nothing: the daemon — this api, or the command line's — files its steps. Yours are built here too.
         </p>
-        <NewWorkflow onCreated={setMade} />
+        <NewWorkflow folder={store.workflows} onCreated={setMade} />
       </div>
       {workflows.length === 0 && all.length > 0 && (
         <p data-filtered-out className="text-sm text-neutral-500">
@@ -70,7 +79,7 @@ function WorkflowsPage() {
       {all.length === 0 && (
         <p className="text-sm text-neutral-500">
           No workflows. Add a folder of steps under {where} in the repository —{' '}
-          <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under {yours}.
+          <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under <Yours />.
         </p>
       )}
     </article>
@@ -80,10 +89,10 @@ function WorkflowsPage() {
 /**
  * A workflow's card: what it is, its star, which puts it under Favorites, shown for one that does not read too, the factories it is in
  * (`workflowFactories`), each linked to its floor — nothing while they are unread or for one in none — drawn, its steps' pages and a start
- * — or, for one of yours, its builder in their place (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is.
- * The repository's show none, and say why: the api writes nothing into a checkout. The canvas inspects a step in the frame's bar and the
- * builder edits one, never both on one card: Build swaps the one for the other, and closes the bar where it shows a step of this workflow
- * (`useBuilding`).
+ * — or, for one of yours, its builder in their place (`WorkflowBuilder`), and its removal while the builder is closed (`RemoveWorkflow`).
+ * `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api writes nothing into a
+ * checkout. The canvas inspects a step in the frame's bar and the builder edits one, never both on one card: Build swaps the one for the
+ * other, and closes the bar where it shows a step of this workflow (`useBuilding`).
  */
 function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;
@@ -113,20 +122,22 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
               {steps.length} {steps.length === 1 ? 'step' : 'steps'}
             </span>
           )}
+          {from === 'yours' && !building && <span aria-hidden className="ml-auto" />}
           {from === 'yours' && !error && !building && (
             <button
               type="button"
               onClick={build}
-              className="ml-auto rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+              className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
             >
               Build
             </button>
           )}
+          {from === 'yours' && !building && <RemoveWorkflow workflow={workflow} />}
         </div>
         <p className="font-mono text-[11px] break-all text-neutral-500">{dir}</p>
         {from === 'repo' && (
           <p data-no-builder className="text-xs text-neutral-500">
-            No builder: the board writes only yours, and nothing into this checkout. To build it, copy the folder into {yours}, build it
+            No builder: the board writes only yours, and nothing into this checkout. To build it, copy the folder into <Yours />, build it
             there, and copy it back into the repository by hand.
           </p>
         )}

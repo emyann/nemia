@@ -464,7 +464,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
-  const id = runId(opts.brief);
+  let id = runId(opts.brief);
+  while (runStore.runs.taken(id)) id = runId(opts.brief);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));

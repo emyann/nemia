@@ -14,7 +14,10 @@ import { OUT, store } from '../world.ts';
 async function expectPolicy(policy: Locator, where: string): Promise<void> {
   const { planner } = GATED;
   await expectCount(policy, 1, `${GATED.gated}'s policy is drawn open at its gate, ${where}`);
-  await expectVisible(policy.locator('[data-layer="policy"] pre', { hasText: planner.policy }), `with its words, ${planner.policy}`);
+  await expectVisible(
+    policy.locator('[data-layer="policy"] [data-markdown]', { hasText: planner.policy }),
+    `with its words, ${planner.policy}`,
+  );
   await expectVisible(
     policy.locator('[data-fence="disallowedTools"]', { hasText: `disallowedTools: ${planner.deny}` }),
     `and the deny its file adds, ${planner.deny}`,
@@ -50,7 +53,7 @@ export default {
     const approveOf = (p: Page) => gateOf(p).getByRole('button', { name: 'Approve', exact: true });
 
     const banner = page.locator('section[aria-label="Waiting on you"]');
-    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — wf decide ${id}`;
+    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — nemia decide ${id}`;
     await expectVisible(banner.locator(':scope > p', { hasText: line }), `the banner says, in wf ls's words, ${line}`);
     await expectCount(banner.locator(':scope > p'), 1, 'in its one line');
     await expectCount(
@@ -79,6 +82,10 @@ export default {
     );
     const section = page.locator(`article > section#step-${gated}`);
     await expectVisible(gateOf(page), `${gated}'s section has its gate`);
+    await expectVisible(
+      gateOf(page).locator('p code').getByText(`nemia approve ${id} ${gated}`, { exact: true }),
+      "and beside its Approve, the command that does the same, as the api's decision words it",
+    );
     const handedOn = gateOf(page).locator(`section[aria-label="What ${gated} handed on"]`);
     await expectRendered(handedOn.locator('[data-handed-on] > [data-markdown]'), { heading: GATED.plan.heading, items: GATED.plan.items });
     await expectVisible(

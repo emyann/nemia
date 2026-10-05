@@ -262,16 +262,25 @@ export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefine
 const unsaid = (p: Positional): string =>
   p.takes === 'many' ? `[<${p.key}> ...]` : p.takes === 'optional' ? `[<${p.key}>]` : `<${p.key}>`;
 
+/** The words that say `flag` given `value`: a switch alone where true, a value flag once per value; none for a value not given. */
+const flagWords = (flag: Flag, value: Args[string]): string[] => {
+  if (value === undefined || value === false) return [];
+  if (flag.kind === 'switch') return [flag.flag];
+  return (Array.isArray(value) ? value : [value]).flatMap((v) => [flag.flag, String(v)]);
+};
+
 /**
  * The command line that names `command` on these arguments, as a refusal says what to type: `nemia retry r-1 implement`, `nemia rm a b`. A
- * positional not given is said as the usage says it (`unsaid`); a rest is left out.
+ * positional not given is said as the usage says it (`unsaid`); a rest is left out. `flags`, by their keys, are said after the positionals
+ * in the order the spec lists them: `nemia factory add <name> --repo <path>`; a key no flag of the spec has is left out.
  */
-export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: Args): string {
+export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: Args, flags: Args = {}): string {
   const said = (value: Args[string]) => (Array.isArray(value) ? value.join(' ') : String(value));
   const words = command.spec.positionals
     .filter((p) => p.takes !== 'rest')
     .map((p) => (args[p.key] !== undefined ? said(args[p.key]) : unsaid(p)));
-  return [CLI, command.name, ...words].join(' ');
+  const flagged = command.spec.flags.flatMap((f) => (f.key === undefined ? [] : flagWords(f, flags[f.key])));
+  return [CLI, command.name, ...words, ...flagged].join(' ');
 }
 
 /** The column the help's lines under a command start at. */

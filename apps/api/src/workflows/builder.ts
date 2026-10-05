@@ -352,7 +352,7 @@ function putWords(route: string, name: string, repo: string, home: string): Word
 }
 
 /** A write of yours, as the guard's refusals word it (guard.ts). */
-const buildGuard = (route: string, does: string, shape: string): Guarded => ({
+export const buildGuard = (route: string, does: string, shape: string): Guarded => ({
   route,
   does,
   forAnother: 'write one',

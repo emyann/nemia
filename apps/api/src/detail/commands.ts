@@ -1,0 +1,24 @@
+/**
+ * The command lines a run's page shows a person beside its controls, each built off the orchestrator's table (`commandLine` over
+ * `COMMANDS`), so the board spells none.
+ */
+import { COMMANDS, commandLine } from 'agent-orchestrator';
+
+const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
+const DECIDE = entry('decide');
+const APPROVE = entry('approve');
+const RETRY = entry('retry');
+const SAY = entry('say');
+
+/** The line that prints what there is to decide on a run: `nemia decide <run>`. */
+export const decideLine = (runId: string): string => commandLine(DECIDE, { runId });
+
+/** A step's lines beside its controls: its approval at its gate, a try in its session, and words said to it. */
+export type StepCommands = { approve: string; retry: string; say: string };
+
+/** A step's lines: `nemia approve <run> <step>`, `nemia retry <run> <step>` and `nemia say <run> <step>`. */
+export const stepCommands = (runId: string, step: string): StepCommands => ({
+  approve: commandLine(APPROVE, { runId, step }),
+  retry: commandLine(RETRY, { runId, step }),
+  say: commandLine(SAY, { runId, step }),
+});

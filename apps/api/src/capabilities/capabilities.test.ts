@@ -227,19 +227,32 @@ test('a server that exits before it answers is an error with what it printed on 
 /** A deadline for asking a server that the test can wait for; the api's own is `ASK_MS`. */
 const WAITABLE_DEADLINE_MS = 500;
 
+/** The most asks the silent-server test makes, each with twice the deadline of the one before, for the server to start within it. */
+const SILENT_TRIES = 6;
+
 test('a server that never answers is an error once its time is up, and it is stopped', async () => {
-  const starts = path.join(scratch('nemia-api-starts-'), 'starts');
-  const repo = repoWith({
-    '.mcp.json': { mcpServers: { silent: fixture({ HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts }) } },
-    '.claude/settings.json': { enabledMcpjsonServers: ['silent'] },
-  });
-  const {
-    mcp: [server],
-  } = await capabilitiesOf(repo, { deadlineMs: WAITABLE_DEADLINE_MS });
-  assert.equal(server.tools, null);
-  assert.match(server.error!, /did not list its tools: it did not list its tools within 0\.5 s\./);
-  const [pid] = startsIn(starts);
-  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
+  for (let tries = 1, deadlineMs = WAITABLE_DEADLINE_MS; ; tries++, deadlineMs *= 2) {
+    const starts = path.join(scratch('nemia-api-starts-'), 'starts');
+    const repo = repoWith({
+      '.mcp.json': { mcpServers: { silent: fixture({ HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts }) } },
+      '.claude/settings.json': { enabledMcpjsonServers: ['silent'] },
+    });
+    const {
+      mcp: [server],
+    } = await capabilitiesOf(repo, { deadlineMs });
+    assert.equal(server.tools, null);
+    assert.ok(
+      server.error!.includes(`did not list its tools: it did not list its tools within ${deadlineMs / 1000} s.`),
+      `try ${tries}: ${server.error}`,
+    );
+    const [pid] = startsIn(starts);
+    if (pid === undefined) {
+      assert.ok(tries < SILENT_TRIES, `the server started within its deadline, on one of ${SILENT_TRIES} tries`);
+      continue;
+    }
+    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
+    return;
+  }
 });
 
 test('REFUSED: a server asked, whose ask is interrupted before it answers, is stopped before the interruption returns', async () => {
@@ -252,10 +265,11 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
     serverAsk(repo, { name: 'silent', command: process.execPath, args }, { command: process.execPath, args, env }, 60_000),
     { signal: stop.signal },
   );
-  for (const bound = performance.now() + 5_000; startsIn(starts).length === 0 && performance.now() < bound;)
-    await new Promise((r) => setTimeout(r, 20));
+  const ended = exit.then(() => true);
+  let over = false;
+  while (startsIn(starts).length === 0 && !over) over = await Promise.race([ended, new Promise<boolean>((r) => setTimeout(r, 20, false))]);
   const [pid] = startsIn(starts);
-  assert.ok(pid, 'the server started');
+  assert.ok(pid, 'the server started before its ask ended');
   stop.abort();
   assert.ok(Exit.hasInterrupts(await exit), 'the ask was interrupted, not answered');
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');

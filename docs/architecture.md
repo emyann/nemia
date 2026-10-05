@@ -11,7 +11,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words and what their fence words reach (`fenceReach`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
-| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command it shows is text the api answered. | Its pages. |
+| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
 
 Each layer reaches exactly the one below it, and nothing reaches up or skips one:
 
@@ -65,13 +65,6 @@ else the move and where it goes.
 **Words of another layer, in every layer today**: a harness's words outside the runtime, a workflow's inside it, and this repository's
 team in the packages, each file counted against a baseline that only shrinks (`HARNESS_WORDS`, `WORKFLOW_WORDS` and `TEAM_NAMES` in
 `packages/agent-orchestrator/test/words.test.ts`), each entry naming its card, else the move and where it goes.
-
-**In the web today, against its rule**, until the api answers that text, each file counted against a baseline that only shrinks
-(`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`):
-
-- store paths, in `src/routes/agents.tsx`, `src/routes/agents_.new.tsx`, `src/routes/agents_.skills.new.tsx`,
-  `src/routes/agents_.$from.$agent.tsx`, `src/routes/workflows.tsx` and `src/components/NewWorkflow.tsx`;
-- the commands it spells itself: every file of `apps/web/src` that names a `wf` or `nemia` verb, a JSDoc's mention included.
 
 Nothing here moves until its own card; a change elsewhere does not move it on the side.
 

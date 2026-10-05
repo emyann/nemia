@@ -2,15 +2,15 @@ import { CircleDashed } from 'lucide-react';
 import { stateClass, stateMeaning, stepState } from '../lib/status';
 
 /**
- * A step's status in `wf ls`'s words, coloured by what it means, and what that is on hover.
+ * A step's status in the CLI `ls`'s words, coloured by what it means, and what that is on hover.
  *
  * `unverified` carries a dashed circle before its words: its colour is neutral, like a step still to do,
  * and the mark says it is not one — it signed off, and nothing but its own word says it worked.
  * `data-state` is the state the colour was chosen for, so a check can read it without reading a colour.
  *
- * `runHeld` is whether a person holds the run (`wf hold`): a gate or a step not filed is drawn `held`, in its own words.
+ * `runHeld` is whether a person holds the run (the CLI's `hold`): a gate or a step not filed is drawn `held`, in its own words.
  *
- * `note` is what `wf ls` prints beside the status — `try 2, by retries: 1`, `round 2 of 3` — on its own line after
+ * `note` is what the CLI's `ls` prints beside the status — `try 2, by retries: 1`, `round 2 of 3` — on its own line after
  * the meaning, on hover: for where there is no room under the chip, on a canvas or in a list. Where there is, `StepNote`.
  *
  * No wider than where it is put: a root's `waiting on <run> (cancelled)` names a run by its id, and on a card it is cut short, whole in
@@ -40,7 +40,7 @@ export function StatusChip({
   );
 }
 
-/** What `wf ls` prints beside a step's status, under its chip: the try or round it is on, or the one due. Nothing for a step with none. */
+/** What the CLI's `ls` prints beside a step's status, under its chip: the try or round it is on, or the one due; nothing for none. */
 export function StepNote({ note }: { note: string | null }) {
   if (!note) return null;
   return (

@@ -48,9 +48,9 @@ export default {
     const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: SHIPPED.shot });
     await expectVisible(
       shot,
-      `review's ${SHIPPED.shot} reads as removed by wf prune --artifacts, not drawn as a path as if it had never been made`,
+      `review's ${SHIPPED.shot} reads as removed by a prune of its files, not drawn as a path as if it had never been made`,
     );
-    await expectVisible(shot.getByText(/ — its files were removed at .+ \(wf prune --artifacts\)$/), 'with when, and by what');
+    await expectVisible(shot.getByText(/ — its files were removed at .+, by a prune of its files$/), 'with when, and by what');
     const moment = (await page.locator('article [data-fact="pruned"] [data-pruned] time').first().textContent())!.trim();
     await expectTexts(
       shot.locator('time'),

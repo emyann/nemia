@@ -15,6 +15,7 @@ import { app } from '../src/app.ts';
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
+  'GET /api/store': "your store's folders as the api reads them, under its store root, which no command of the orchestrator answers",
   'GET /api/version': "the api's build, as the board's bottom bar says it",
   'GET /api/capabilities': "the machine's harnesses and MCP servers, asked by the app's asker, which it keeps between requests",
   'GET /api/daemon': "the daemon's standing, read off its lease file: whether anything ticks the store at all",
@@ -25,6 +26,7 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/machines/:name': "one state machine's graph, read off its code: no run, no store",
   'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
   'GET /api/repository': 'the repository the request is served on, as the request names it',
+  'GET /api/metrics': "the api process's own metrics, kept in its memory: the command line runs in another process, which has none of them",
 };
 
 type Table = readonly Parameters<typeof routeList>[0][];

@@ -1,6 +1,6 @@
 /**
  * What the last pass cost, as the Factory says it beside the cap (`lib/pass.ts`): the line, and the breakdown in its title, worded as
- * `wf up --stats` words it.
+ * `nemia up --stats` words it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PassCost } from '../src/lib/api.ts';
-import { bytesWord, msWord, PASS_PHASES, passLine, passTitle } from '../src/lib/pass.ts';
+import { bucketLabel, bucketWord, bytesWord, msWord, PASS_PHASES, passLine, passTitle, seenWords, shareWord } from '../src/lib/pass.ts';
 import { REPO } from './e2e/world.ts';
 import { scratch } from './scratch.ts';
 
@@ -58,7 +58,8 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
     'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
     'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
   ]);
-  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms. wf up --stats says the same.');
+  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms.');
+  assert.ok(!lines.some((l) => l.startsWith('It saw')), 'a pass from before the tick said what it saw says nothing of it');
   assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
   assert.match(
     passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),
@@ -67,8 +68,31 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
   );
 });
 
+test('the title says what the pass saw, before what measuring took, where the pass says it', () => {
+  const lines = passTitle({ ...PASS, runs: 43, tasks: 3, queued: 1, admitted: 2 }, new Date('2026-09-25T10:05:00.000Z'), 'UTC').split('\n');
+  assert.deepEqual(lines.slice(-2), [
+    'It saw 43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted.',
+    'Measuring it took 0.40 ms.',
+  ]);
+});
+
+test('a bucket says its bound, and the last its open end past the last bound; a share rounds to a whole percent, a sliver to < 1%', () => {
+  const bounds = [10, 25, 5000];
+  assert.deepEqual([bucketWord(10, bounds), bucketWord(5000, bounds), bucketWord(null, bounds)], ['≤ 10 ms', '≤ 5000 ms', '> 5000 ms']);
+  assert.deepEqual(
+    [bucketLabel(250, [250, 2500, 5000]), bucketLabel(2500, [2500]), bucketLabel(null, [10, 5000])],
+    ['250', '2.5k', '>5k'],
+    'a label under a column is short',
+  );
+  assert.deepEqual([shareWord(1), shareWord(0.374), shareWord(0.004), shareWord(0)], ['100%', '37%', '< 1%', '0%']);
+  assert.equal(
+    seenWords({ runs: 1, tasks: 3, queued: 0, admitted: 2 }),
+    '1 run in the store, 3 tasks not settled, 0 queued and 2 admitted',
+  );
+});
+
 /**
- * The phases as the package words them: `wf up --stats` over a store holding this pass, its CLI. The web imports nothing of the package,
+ * The phases as the package words them: `nemia up --stats` over a store holding this pass, its CLI. The web imports nothing of the package,
  * and reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. A phase
  * the package added is missing from this pass, which the package then does not read as one; a phase it dropped or moved is a row gone or
  * moved.

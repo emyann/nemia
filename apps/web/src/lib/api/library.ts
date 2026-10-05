@@ -130,7 +130,7 @@ export type WorkflowStepSpec = {
   gate: true | null;
   /** The schema file `output:` names. */
   output: string | null;
-  /** What `wf stats` counts of the step's closeouts (`tally:`): empty for none. */
+  /** What the CLI's `stats` counts of the step's closeouts (`tally:`): empty for none. */
   tally: string[];
   loop: string | null;
   rounds: number | null;

@@ -25,9 +25,12 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { lastPassCost, start, tick } = await import('../runner.ts');
+const { tickRun } = await import('../tick/tick.verb.ts');
+const { EngineService } = await import('../runtime-client.ts');
+const { recentFile, recentPasses } = await import('../daemon/daemon.store.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
 const { metered, meteredPass, metering, within } = await import('./tally.store.ts');
-const { Effect, Fiber } = await import('effect');
+const { Effect, Fiber, Metric } = await import('effect');
 const { Invalid } = await import('../refusal/refusal.ts');
 
 /** A spin, so a fake's time is spent on the thread the meter measures, not handed to a timer that may fire late. */
@@ -39,7 +42,8 @@ const busy = (ms: number) => {
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
  * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that
- * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, and `admitted` has each word said to it.
+ * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, `running` its sessions at work by harness, and
+ * `admitted` has each word said to it.
  * `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a runtime that counts none.
  */
 const fake = ({
@@ -48,6 +52,7 @@ const fake = ({
   withIo = true,
   ioMs = 0,
   queued = [] as string[],
+  running = {},
   unread = undefined as number | undefined,
 } = {}) => {
   const admitted: string[][] = [];
@@ -77,7 +82,7 @@ const fake = ({
         admission: 'queued',
         state: { harness: 'claude', filedAt: '2026-09-25T10:00:00.000Z' },
       }));
-      return { tasks: queued.length, actions: 0, running: {}, views };
+      return { tasks: queued.length, actions: 0, running, views };
     },
     admit: async (ids: string[]) => {
       admitted.push(ids);
@@ -154,7 +159,10 @@ test("a pass's phases add up to its time, less what measuring took, and the time
       cost.ms - sum <= cost.overheadMs + ROUNDING_MS,
       `the phases (${sum} ms) and measuring (${cost.overheadMs} ms) cover the pass (${cost.ms} ms)`,
     );
-    assert.ok(cost.overheadMs < cost.ms, 'measuring costs less than what it measures');
+    assert.ok(
+      sum + cost.overheadMs <= outside + ROUNDING_MS,
+      `the phases (${sum} ms) and measuring, the cost's write after the pass included (${cost.overheadMs} ms), fit in the ${outside} ms tick took`,
+    );
     for (const p of PHASES) assert.ok(cost.phases[p].ms >= 0, `${p} took no negative time`);
   }
 });
@@ -348,4 +356,48 @@ test('REFUSED: a metered program leaves no meter open, whether it fails, dies or
   assert.equal(metering(), true, 'the meter open while the program runs');
   await Effect.runPromise(Fiber.interrupt(fiber));
   assert.equal(metering(), false, 'no meter open after an interruption');
+});
+
+test('a pass keeps what it saw: the runs listed, the tasks, the sessions queued and at work; and the recent passes grow by it', async () => {
+  emptyStore();
+  fs.rmSync(recentFile(), { force: true });
+  started(2);
+  const first = (await tick(fake({ queued: ['t-q'], running: { claude: 1 } }))).cost!;
+  assert.deepEqual(
+    { runs: first.runs, tasks: first.tasks, queued: first.queued, admitted: first.admitted },
+    { runs: 2, tasks: 1, queued: 1, admitted: 1 },
+  );
+  assert.equal(recentPasses().length, 1);
+  started(1);
+  await tick(fake());
+  const kept = recentPasses();
+  assert.deepEqual(
+    kept.map((p) => [p.runs, p.queued]),
+    [
+      [2, 1],
+      [3, 0],
+    ],
+    'one entry a pass, oldest first, each with what its own pass saw',
+  );
+});
+
+test("a pass's metrics go into the registry of whoever runs it: its time, each phase by name, and what it saw", async () => {
+  emptyStore();
+  started(1);
+  const registry = new Map();
+  const own = <A, E>(program: import('effect').Effect.Effect<A, E>) =>
+    Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+  await own(tickRun({}).pipe(Effect.provide(EngineService.layer(fake({ queued: ['t-q', 't-r'], running: { claude: 3 } })))));
+  const snapshot = await own(Metric.snapshot);
+  const one = (id: string) => snapshot.filter((m) => m.id === id);
+  assert.equal((one('pass.duration')[0].state as { count: number }).count, 1);
+  assert.deepEqual(
+    PHASES.map((phase) => one('pass.phase.duration').filter((m) => m.attributes?.phase === phase).length),
+    PHASES.map(() => 1),
+    'a series a phase, each named',
+  );
+  assert.equal((one('store.runs')[0].state as { value: number }).value, 1);
+  assert.equal((one('sessions.queued')[0].state as { value: number }).value, 2);
+  assert.equal((one('sessions.admitted')[0].state as { value: number }).value, 3);
+  assert.equal(one('pass.journal_reads').length, 1);
 });

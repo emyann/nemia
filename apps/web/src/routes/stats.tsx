@@ -4,8 +4,9 @@ import { StatsByStep } from '../components/StatsByStep';
 import { StatsChart } from '../components/StatsChart';
 import { StatsFilters } from '../components/StatsFilters';
 import { StatsMarks } from '../components/StatsMarks';
+import { StatsPasses } from '../components/StatsPasses';
 import { StatsTiles } from '../components/StatsTiles';
-import { statsQuery } from '../lib/api';
+import { passesQuery, statsQuery } from '../lib/api';
 import { apiQueryOf, byStepOf, HEADLINES, marksByDay, searchOf } from '../lib/stats';
 
 /**
@@ -18,6 +19,7 @@ export const Route = createFileRoute('/stats')({
   loader: async ({ context, deps }) => {
     const at = new Date().toISOString();
     const query = apiQueryOf(deps, new Date(at));
+    void context.queryClient.prefetchQuery(passesQuery);
     await context.queryClient.ensureQueryData(statsQuery(query));
     return { query, at };
   },
@@ -34,8 +36,9 @@ export const Route = createFileRoute('/stats')({
 /**
  * How well the factory has worked, measured: the tiles for the last 14 days against the 14 before, then a daily chart per headline number
  * over the period chosen, with a rule on each day something a run froze changed; the skills each step and agent loaded beside the calls
- * refused it, side by side on a wide screen; and the changes in words. Every number is the api's, as `wf stats` counts it; one nothing
- * measured reads — and draws nothing.
+ * refused it, side by side on a wide screen; the changes in words; and the tick's recent passes (`StatsPasses`, at `#passes`), read on
+ * their own so a failed read leaves the page standing. Every number is the api's, as the CLI's `stats` counts it; one nothing measured
+ * reads — and draws nothing.
  */
 function StatsPage() {
   const search = Route.useSearch();
@@ -45,9 +48,9 @@ function StatsPage() {
   return (
     <article className="space-y-6 px-6 py-6">
       <p className="max-w-4xl text-sm text-neutral-600 dark:text-neutral-400">
-        How well the runs went, counted from their journals as <code className="font-mono text-xs">wf stats</code> counts them, by UTC day.
-        A number nothing measured reads — and draws nothing; a measured 0 draws a line at the foot of its day. A violet rule marks a day a
-        run froze something that differs from the run of its workflow before it.
+        How well the runs went, counted from their journals by UTC day. A number nothing measured reads — and draws nothing; a measured 0
+        draws a line at the foot of its day. A violet rule marks a day a run froze something that differs from the run of its workflow
+        before it.
       </p>
       <StatsTiles last={data.all.tiles.last} before={data.all.tiles.before} />
       <StatsFilters search={search} now={new Date(at)} />
@@ -83,9 +86,10 @@ function StatsPage() {
         />
       </div>
       <StatsMarks marks={data.all.marks} />
+      <StatsPasses />
       {data.unreadable.length > 0 && (
         <p data-unreadable className="text-xs text-amber-700 dark:text-amber-400">
-          Left out, a journal of each not reading (<code className="font-mono">wf ls</code> says why): {data.unreadable.join(', ')}
+          Left out, a journal of each not reading: {data.unreadable.join(', ')}
         </p>
       )}
     </article>

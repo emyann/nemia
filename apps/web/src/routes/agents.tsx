@@ -5,11 +5,16 @@ import { LinkButton } from '@/components/ui/button';
 import { AgentCard } from '../components/AgentCard';
 import { SkillLink } from '../components/AgentParts';
 import { routeLink } from '../components/routeLink';
-import { agentsQuery, skillsQuery, type LibraryAgent, type SkillPlace } from '../lib/api';
+import { agentsQuery, skillsQuery, storeQuery, type LibraryAgent, type SkillPlace } from '../lib/api';
 import { PLACE_LABELS } from '../lib/skills';
 
 export const Route = createFileRoute('/agents')({
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(agentsQuery), context.queryClient.prefetchQuery(skillsQuery)]),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(agentsQuery),
+      context.queryClient.ensureQueryData(storeQuery),
+      context.queryClient.prefetchQuery(skillsQuery),
+    ]),
   component: AgentsPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
@@ -24,10 +29,11 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
 /**
  * The agents beside the workflows: yours, which the board writes, then this repository's, which it only reads. An agent is one kind of
  * thing a workflow's node may have attached — what that node's work is told first and runs with — and each lists the nodes that name it.
- * Then the skills an agent can be given, by place, each linked to its page.
+ * Then the skills an agent can be given, by place, each linked to its page. Your folders are the api's (`storeQuery`).
  */
 function AgentsPage() {
   const { data: agents } = useSuspenseQuery(agentsQuery);
+  const { data: store } = useSuspenseQuery(storeQuery);
   const { data: skills } = useQuery(skillsQuery);
   const yours = agents.filter((a) => a.from === 'yours');
   const theirs = agents.filter((a) => a.from === 'repo');
@@ -37,9 +43,8 @@ function AgentsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-neutral-500">
           An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is
-          told first, and how its sessions run. Yours are under {code('~/.agent-workflows/workflows/agents/')} and are edited here; this
-          repository's are under {code('workflows/agents/')}, read-only. An edit changes what a later {code('wf start')} freezes, never a
-          run already started.
+          told first, and how its sessions run. Yours are under {code(`${store.agents}/`)} and are edited here; this repository's are under{' '}
+          {code('workflows/agents/')}, read-only. An edit changes what a run started later freezes, never a run already started.
         </p>
         <div className="flex flex-wrap gap-2">
           <RouterLinkButton to="/agents/new" variant="outline">
@@ -53,9 +58,9 @@ function AgentsPage() {
         </div>
       </div>
 
-      <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code('~/.agent-workflows/workflows/agents/')}.</>} />
+      <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code(`${store.agents}/`)}.</>} />
       <Place title="This repository" agents={theirs} empty={<>None: the repository has no {code('workflows/agents/')}.</>} />
-      {skills && <SkillPlaces places={skills} />}
+      {skills && <SkillPlaces places={skills} library={store.skills} />}
     </article>
   );
 }
@@ -82,16 +87,17 @@ function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]
 
 /**
  * The skills an agent can be given, one list a place in the order an agent of yours finds a name: your library, which the board writes, the
- * repository's and Nemia's, which it reads. Each is linked to its page, which says who gives it and what it costs a turn.
+ * repository's and Nemia's, which it reads; `library` is your library's folder. Each is linked to its page, which says who gives it and
+ * what it costs a turn.
  */
-function SkillPlaces({ places }: { places: readonly SkillPlace[] }) {
+function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; library: string }) {
   return (
     <section aria-label="Skills" className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Skills</h2>
         <p className="text-sm text-neutral-500">
           A skill is a folder with a {code('SKILL.md')}: instructions an agent gives its sessions, by name. Yours are under{' '}
-          {code('~/.agent-workflows/workflows/skills/')} and are written here.
+          {code(`${library}/`)} and are written here.
         </p>
       </div>
       {places.map((place) => (

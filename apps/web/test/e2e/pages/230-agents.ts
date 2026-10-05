@@ -30,6 +30,10 @@ export default {
     const card = (p: Page, from: string, name: string) => p.locator(`section[data-agent="${name}"][data-from="${from}"]`);
     const agentPath = (from: string, name: string) => `/agents/${from}/${name}`;
 
+    await expectVisible(
+      page.locator('article > div > p').getByText(`${agentsDir}/`, { exact: true }),
+      `the page says where yours are, as the api reads its store: ${agentsDir}/`,
+    );
     const yours = page.locator('section[aria-label="Yours"]');
     const theirs = page.locator('section[aria-label="This repository"]');
     await expectCount(yours.locator('section[data-agent]'), 1, `yours lists one agent, ${seeded.name}`);
@@ -95,10 +99,17 @@ export default {
     await expectVisible(repoForm, `${good.agent.name}'s form`);
     if ((await repoForm.getByRole('textbox', { name: 'Model' }).inputValue()) !== 'opus')
       throw new Refused(`${good.agent.name}'s model reads opus, as its file sets it`);
-    for (const field of ['Name', 'Model', 'Instructions']) {
+    for (const field of ['Name', 'Model']) {
       if ((await repoForm.getByRole('textbox', { name: field }).getAttribute('readonly')) === null)
         throw new Refused(`the repository's agent is read-only: its ${field} is not`);
     }
+    const read = repoForm.getByRole('region', { name: 'Instructions', exact: true });
+    await expectCount(repoForm.getByRole('textbox', { name: 'Instructions' }), 0, 'its instructions are read, not a box to type in');
+    await expectVisible(read.locator('[data-markdown] h4', { hasText: 'How you work' }), 'its instructions, read as markdown');
+    await expectVisible(read.locator('[data-markdown] strong', { hasText: 'test' }), 'its bold drawn bold');
+    await expectCount(read.locator('[data-markdown] li'), 2, 'its list drawn as one');
+    await expectCount(read.getByText('**', { exact: false }), 0, 'and no mark printed as it is written');
+    await photograph(read, path.join(OUT, `agents-repo-instructions-${await themeOf(page)}.png`));
     await expectCount(repoForm.getByRole('button', { name: 'Save' }), 0, 'and it offers no Save');
     await expectVisible(
       repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
@@ -112,9 +123,9 @@ export default {
     await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
     await expectVisible(
       page.locator('[data-read-only]', {
-        hasText: `cp ${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)} ~/.agent-workflows/workflows/agents/`,
+        hasText: `mkdir -p '${agentsDir}' && cp '${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)}' '${agentsDir}/'`,
       }),
-      'and says how to start one of yours from it',
+      "and says how to start one of yours from it, in the api's line: into your store's agents folder, absolute",
     );
     const file = page.locator('section[aria-label="The file"]');
     await file.getByRole('button', { name: 'Source' }).click();

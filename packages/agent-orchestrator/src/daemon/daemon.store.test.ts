@@ -25,7 +25,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../runner.ts');
-const { parsePassCost } = await import('./daemon.store.ts');
+const { parsePassCost, recentFile, recentPasses, recordRecentPass } = await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
 const { main } = await import('../cli/main.ts');
 
@@ -727,6 +727,10 @@ const COST = passCost({
   records: 12,
   overheadMs: 0.4,
   rested: 3,
+  runs: 40,
+  tasks: 5,
+  queued: 2,
+  admitted: 1,
 });
 
 test('a cost reads back as written, and REFUSED: half a file, another shape, a phase missing, a count that is not one', () => {
@@ -756,6 +760,40 @@ test('a cost reads back as written, and REFUSED: half a file, another shape, a p
   assert.equal(parsePassCost(JSON.stringify(unrested)), undefined, 'REFUSED: no count of the runs answered from memory');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: 'some' })), undefined, 'and a count of them that is not one');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: -1 })), undefined);
+  const { runs: _runs, tasks: _tasks, queued: _queued, admitted: _admitted, ...older } = COST;
+  assert.deepEqual(parsePassCost(JSON.stringify(older)), older, 'a file an older tick wrote, which kept nothing of what it saw, reads');
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, queued: 'two' })), undefined, 'REFUSED: what it saw, not a count');
+});
+
+test('the recent passes keep the last `keep`, the oldest left out first, and an entry that does not read is left out, the file named once', (t) => {
+  const errors: string[] = [];
+  t.mock.method(process.stderr, 'write', (line: string) => errors.push(line) > 0);
+  fs.rmSync(recentFile(), { force: true });
+  try {
+    assert.deepEqual(recentPasses(), [], 'none before any pass kept one');
+    for (const ms of [1, 2, 3, 4, 5]) recordRecentPass({ ...COST, ms }, 3);
+    assert.deepEqual(
+      recentPasses().map((r) => r.ms),
+      [3, 4, 5],
+    );
+    assert.equal(recentPasses()[0].runs, 40);
+    const kept = JSON.parse(fs.readFileSync(recentFile(), 'utf8')) as unknown[];
+    fs.writeFileSync(recentFile(), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
+    assert.deepEqual(
+      recentPasses().map((r) => r.ms),
+      [3, 5],
+    );
+    assert.equal(errors.length, 1, errors.join(''));
+    assert.ok(errors[0].startsWith(`${recentFile()}: 2 of its passes`), errors[0]);
+    recordRecentPass({ ...COST, ms: 6 }, 3);
+    assert.deepEqual(
+      recentPasses().map((r) => r.ms),
+      [3, 5, 6],
+      'the next pass writes the file without them',
+    );
+  } finally {
+    fs.rmSync(recentFile(), { force: true });
+  }
 });
 
 test('the ceilings of the last pass read back as written, and REFUSED — read as none — when a count is not one', () => {

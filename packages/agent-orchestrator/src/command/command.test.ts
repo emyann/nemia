@@ -204,6 +204,27 @@ test('the command line a refusal shows names what was given and the usage of wha
   assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'nemia say r-1 impl');
 });
 
+test('a command line says the flags it is given after its positionals, in the order its spec lists them', () => {
+  const two: Spec = {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [
+      { flag: '--repo', kind: 'text', key: 'repos', many: true },
+      { flag: '--fresh', kind: 'switch', key: 'fresh' },
+      { flag: '--model', kind: 'name', key: 'model' },
+    ],
+    unknown: (arg) => arg,
+  };
+  const x = { name: 'x', spec: two };
+  assert.equal(
+    commandLine(x, { runId: 'r-1' }, { model: 'm', repos: ['a', 'b'], fresh: true }),
+    'nemia x r-1 --repo a --repo b --fresh --model m',
+  );
+  assert.equal(commandLine(x, {}, { repos: '<path>' }), 'nemia x <runId> --repo <path>');
+  assert.equal(commandLine(x, { runId: 'r-1' }, { fresh: false, other: 'y' }), 'nemia x r-1');
+  const add = COMMANDS.find((c) => c.name === 'factory add')!;
+  assert.equal(commandLine(add, {}, { repos: '<path>' }), 'nemia factory add <name> --repo <path>');
+});
+
 test("the table's help is today's, word for word", () => {
   assert.equal(
     helpOf(TABLE),
@@ -320,6 +341,12 @@ test("the table's help is today's, word for word", () => {
       '                               tries, time, cost, checks and gate waits; first the last 14 days',
       '                               against the 14 before. A number nothing measured reads —, never 0.',
       '                               --line: one line, for a recap; --json: the whole answer',
+      '  nemia passes [--last <n>] [--json]',
+      '                               what the recent passes of the tick cost: their median and slowest',
+      '                               time, a histogram of their times, where the time went phase by',
+      '                               phase, and what the last saw — the runs in the store, its journal',
+      '                               reads, the sessions queued and admitted. --last <n>: the last n',
+      '                               passes only; --json: the whole answer',
       '  nemia agents [--repo .]',
       "                               the agents a step may name, the repository's then yours: what each is",
       '                               for, what it says it can do (an entry for each skill, read off its',

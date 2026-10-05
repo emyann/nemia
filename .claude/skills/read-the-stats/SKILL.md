@@ -14,7 +14,11 @@ description: "Read a factory's stats since the janitor's last run, against the s
    days, ending the day before it starts (`against`). Days are UTC, `YYYY-MM-DD`.
 3. **Read both periods**, by agent and by step (`--by agent`, `--by step`), and the step rows (`all.steps`): tries, time, cost, checks,
    gate waits, and refused calls (`deniedCalls`, `deniedTries`, `denials`). Quote the numbers as `wf stats` gives them; a number it gives
-   as null was not measured, and is said so, never as 0. Never re-derive one from a workflow's step names.
+   as null was not measured, and is said so, never as 0. Never re-derive one from a workflow's step names. Read each step's skills
+   table (`skills`): `loads`, `tries` that loaded the skill, and `when touched`, `<loaded> of <touched>` (`loadedWhenTouched` of
+   `touched`), the tries that touched the paths the skill applies to and how many of them loaded it. A skill touched in many tries
+   and loaded in few is a description to sharpen: propose its new description, with the numbers beside it, on the skill of ours
+   that carries the trigger (`skill`) — never on a vendored one.
 4. **Group the refused calls by agent and by kind**: pipes to `tail` or `grep`, `timeout` and `( )` wrappers, shell variables
    (`VAR=`), `git -C` and `cd`, a read sent to Bash instead of Read or Grep, a write a read-only role tried. For each group, propose one
    correction: an allow by name (`fence`), a line in the agent's body (`body`) or in its skill (`skill`) that sends the call to a tool its

@@ -1018,14 +1018,14 @@ test('given a level, `#` is drawn as that heading and deeper ones follow it, siz
   assert.match(panel, /<h6 class="[^"]*text-\[1\.08em\][^"]*">B<\/h6>/);
   assert.match(panel, /<h6[^>]*>C<\/h6>/);
   assert.doesNotMatch(panel, /<h[1-4][\s>]/, "no heading outranks the panel's own");
-  assert.match(md('# A\n## B'), /<h3[^>]*>A<\/h3><h4[^>]*>B<\/h4>/, 'without a level, `#` is an h3');
+  assert.match(md('# A\n## B'), /<h3[^>]*>A<\/h3>\s*<h4[^>]*>B<\/h4>/, 'without a level, `#` is an h3');
 });
 
 test('a code block keeps its lines as written: a long one scrolls inside the block, never wraps', () => {
   const html = md('```\n' + 'x'.repeat(300) + '\n```');
   const block = /<div class="([^"]*)" data-language="text"/.exec(html);
   assert.ok(block, html);
-  assert.match(block[1], /(^|\s)\[&_pre\]:whitespace-pre(\s|$)/, 'its lines are not wrapped');
+  assert.match(block[1], /(^|\s)\[&amp;_pre\]:whitespace-pre(\s|$)/, 'its lines are not wrapped');
 });
 
 test('a soft line break joins its lines into one paragraph, and nothing around a text keeps its breaks', () => {

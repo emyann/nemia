@@ -60,8 +60,7 @@ function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
   if (need.kind === 'asks')
     return (
       <div data-need-words className="max-h-40 overflow-y-auto pr-1 break-words" title={needText(need)}>
-        <strong>{need.step}</strong> asks:{' '}
-        <Markdown>{need.needs}</Markdown>
+        <strong>{need.step}</strong> asks: <Markdown>{need.needs}</Markdown>
       </div>
     );
   return (

@@ -346,7 +346,17 @@ const Hint = ({ children }: { children: ReactNode }) => (
 );
 
 /** A field written in markdown, read and not edited: its label, its words drawn as markdown on a read-only field's quiet ground, its hint. */
-function MarkdownField({ label, hint, value, className }: { label: string; hint: string | null | undefined; value: string; className?: string }) {
+function MarkdownField({
+  label,
+  hint,
+  value,
+  className,
+}: {
+  label: string;
+  hint: string | null | undefined;
+  value: string;
+  className?: string;
+}) {
   return (
     <section aria-label={label} data-field-markdown className={`space-y-1.5 ${className ?? ''}`}>
       <p className="text-xs leading-none font-medium">{label}</p>

@@ -196,7 +196,10 @@ test('REFUSED: an EventSource opened in another file; one named in a JSDoc is le
 test(`only ${RENDERER} imports a markdown renderer, and it does`, () => {
   const texts = sourceTexts();
   assert.deepEqual(rendererBreaks(texts), []);
-  assert.ok(importsIn(texts.get(RENDERER)!).some((mod) => MARKDOWN_MODULE.test(mod)), `${RENDERER} renders with react-markdown`);
+  assert.ok(
+    importsIn(texts.get(RENDERER)!).some((mod) => MARKDOWN_MODULE.test(mod)),
+    `${RENDERER} renders with react-markdown`,
+  );
 });
 
 test('REFUSED: a second markdown renderer, or a plugin of one, imported outside the one renderer', () => {

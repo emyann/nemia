@@ -2651,13 +2651,19 @@ test("an agent's question is drawn as its markdown after `asks:`, in the banner 
 
   const { Asked } = await import('../src/components/GateBrief.tsx');
   const asked = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
-  assert.match(asked, /data-asked="asks"[^]*<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>/);
+  assert.match(
+    asked,
+    /data-asked="asks"[^]*<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>/,
+  );
   assert.ok(textContentOf(asked).includes('review asks: Which database?'), asked);
   assert.doesNotMatch(asked, /\*\*|whitespace-pre/);
 
   const harness = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: '**not markdown**' }, { waitingOnYou: [] });
   const blocked = await routedWith(createElement(Asked, { run: harness, step: harness.steps[0] }));
-  assert.match(blocked, /data-asked="harness"[^]*<p class="[^"]*break-words[^"]*">review is blocked by the harness; [^<]*\*\*not markdown\*\*<\/p>/);
+  assert.match(
+    blocked,
+    /data-asked="harness"[^]*<p class="[^"]*break-words[^"]*">review is blocked by the harness; [^<]*\*\*not markdown\*\*<\/p>/,
+  );
   assert.doesNotMatch(blocked, /data-markdown/, "the harness's words and the session's last line are said as they are");
 });
 
@@ -2665,7 +2671,10 @@ test('a short string in a closeout is drawn as markdown; a number as it is', asy
   const { FieldView } = await import('../src/components/Outcome.tsx');
   const field = (value: unknown): string =>
     renderToStaticMarkup(createElement(FieldView, { name: 'next', schema: null, value, artifacts: [], images: new Set<string>() }));
-  assert.match(field('Run `npm test`.'), /data-kind="text"[^]*<div data-markdown="true"[^>]*><p[^>]*>Run <code[^>]*>npm test<\/code>\.<\/p>/);
+  assert.match(
+    field('Run `npm test`.'),
+    /data-kind="text"[^]*<div data-markdown="true"[^>]*><p[^>]*>Run <code[^>]*>npm test<\/code>\.<\/p>/,
+  );
   assert.match(field(3), /data-kind="text"[^]*<p class="whitespace-pre-wrap break-words">3<\/p>/);
 });
 
@@ -4616,7 +4625,10 @@ test("a skill of yours is filled from its file, its name set once, and saved; th
   const theirs = await skillForm({ detail: { ...SKILL_DETAIL, skill: { ...SKILL_DETAIL.skill, from: 'repo' } }, readOnly: true });
   assert.doesNotMatch(theirs, />Save<|>Create skill</);
   assert.equal([...theirs.matchAll(/readOnly=""/g)].length, 5, 'every field read-only, and its instructions read as markdown');
-  assert.match(theirs, /<section aria-label="Instructions" data-field-markdown="true"[^>]*>[^]*<div data-markdown="true"[^>]*><p[^>]*>Write them\.<\/p>/);
+  assert.match(
+    theirs,
+    /<section aria-label="Instructions" data-field-markdown="true"[^>]*>[^]*<div data-markdown="true"[^>]*><p[^>]*>Write them\.<\/p>/,
+  );
   assert.equal([...mine.matchAll(/readOnly=""/g)].length, 1, 'of yours, only the name');
   assert.doesNotMatch(mine, /data-field-markdown/, 'of yours, the instructions are typed in');
 });

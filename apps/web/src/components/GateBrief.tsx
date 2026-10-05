@@ -29,8 +29,7 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
     return (
       <Waits run={run} anchor={step.name} kind={need.kind}>
         <div className="break-words">
-          <strong>{need.step}</strong> asks:{' '}
-          <Markdown className="max-h-72 overflow-y-auto pr-1">{need.needs}</Markdown>
+          <strong>{need.step}</strong> asks: <Markdown className="max-h-72 overflow-y-auto pr-1">{need.needs}</Markdown>
         </div>
       </Waits>
     );

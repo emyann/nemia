@@ -107,7 +107,7 @@ caller runs over the engine with `runWith`, and `ae` runs each verb of `Engine.l
 
 Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
 source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the api's imports the orchestrator
-through its four entries alone, and no runtime or harness SDK; the orchestrator's imports no harness SDK; the runtime's imports no
+through its three entries alone, and no runtime or harness SDK; the orchestrator's imports no harness SDK; the runtime's imports no
 layer above it. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
 
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,

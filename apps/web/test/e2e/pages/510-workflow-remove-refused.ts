@@ -51,7 +51,7 @@ export default {
         throw new Refused(`the card shows the package's sentence verbatim — it shows ${JSON.stringify(await shown.textContent())}`);
       if (!fs.existsSync(path.join(dir, 'plan.md'))) throw new Refused(`nothing is removed on a refusal — ${dir} lost its step`);
       await settled(refused);
-      await photograph(section, path.join(OUT, `workflow-remove-refused-${await themeOf(refused)}.png`));
+      await photograph(section, path.join(OUT, `workflow-remove-refused-says-${await themeOf(refused)}.png`));
       await idle(refused);
       const expected = `request answered 409: DELETE ${answered.url()}`;
       const seen = problems();

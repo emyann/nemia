@@ -535,6 +535,31 @@ test('a counted entry is read back as written; one whose usage no runtime wrote 
   );
 });
 
+test('a denied entry is read back as written, with its call or without; one that names no tool fails the read, naming the field', async () => {
+  const entries = [
+    { kind: 'denied', at: '2026-09-24T00:00:01Z', attempt: 1, tool: 'Bash', what: 'ls' },
+    { kind: 'denied', at: '2026-09-24T00:00:02Z', attempt: 1, tool: 'WebFetch' },
+  ];
+  const good = legacyStore({ 't-ok': [TODAY, ...entries] });
+  const events = await run(
+    good,
+    Effect.flatMap(Journal, (j) => j.read('t-ok')),
+  );
+  assert.deepEqual(events.slice(1), entries);
+  const dir = legacyStore({ 't-bad': [TODAY, { kind: 'denied', at: '2026-09-24T00:00:01Z', attempt: 1, what: 'ls' }] });
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.equal(error._tag, 'JournalError');
+  assert.ok(
+    error.message.startsWith(
+      `t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 2 is a \`denied\` event, and its \`tool\` is missing.`,
+    ),
+    error.message,
+  );
+});
+
 test('the skills an end names are read back as written, an empty list kept; a list of anything but names fails the read', async () => {
   const end = (attempt: number, skills: unknown) => ({
     kind: 'ended',

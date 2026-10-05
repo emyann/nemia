@@ -3,14 +3,16 @@
  * each is drawn apart, as the run froze it when it started — the agent's instructions with its own skills, the person's custom
  * instructions, the step's policy with the skills its line adds and the fence lines it tightens, and the task; a run that froze none
  * shows its brief whole. Each is drawn as the markdown it is written in (`Words`). At a gate, the step's policy is drawn open on its
- * own (`StepPolicy`), the layer a person judges the step by.
+ * own (`StepPolicy`), the layer a person judges the step by. The task is drawn in its parts where the api split it (`TaskParts`): each
+ * run it was handed a block of its own, headed by how it was handed and linked to that run.
  *
  * On a step's own page the same layers are what a run of it will be told, read now (`homes`): each beside where it lives, linked to where
  * it is edited, and the task left to the brief a run is started with.
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
-import type { StepLayers } from '../lib/api';
+import type { StepLayers, TaskPart } from '../lib/api';
+import { RouteLink } from './AgentParts';
 import { Markdown } from './Markdown';
 
 /**
@@ -20,17 +22,20 @@ import { Markdown } from './Markdown';
 export type LayerHomes = { instructions: ReactNode; custom: ReactNode; words: ReactNode; skill: (name: string) => ReactNode };
 
 /**
- * The fold: `told`, the brief whole, drawn only where `layers` is null; `filed` says whether it was told or would be told now. Nothing
- * where there is neither. Given `homes`, `layers` are what a run of the step will be told, read now: drawn open, each beside its home.
+ * The fold: `told`, the brief whole, drawn only where `layers` is null; `parts`, the task in its parts, where the api split it; `filed`
+ * says whether it was told or would be told now. Nothing where there is neither. Given `homes`, `layers` are what a run of the step will
+ * be told, read now: drawn open, each beside its home.
  */
 export function Told({
   told,
   layers,
+  parts = null,
   filed,
   homes,
 }: {
   told: string | null;
   layers: StepLayers | null;
+  parts?: TaskPart[] | null;
   filed: boolean;
   homes?: LayerHomes;
 }) {
@@ -41,13 +46,13 @@ export function Told({
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
         {filed ? 'What it was told' : 'What it would be told now'}
       </summary>
-      {layers ? <Layers layers={layers} /> : <Words text={told ?? ''} />}
+      {layers ? <Layers layers={layers} parts={parts} /> : <Words text={told ?? ''} />}
     </details>
   );
 }
 
 /** The four layers in the order the session reads them, and where the agent's words and the person's went. */
-function Layers({ layers }: { layers: StepLayers }) {
+function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | null }) {
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
@@ -73,7 +78,7 @@ function Layers({ layers }: { layers: StepLayers }) {
         <Fence agent={layers.agent} fence={layers.fence} />
       </Layer>
       <Layer name="task" title="The task">
-        <Words text={layers.task} none="Not composed: the run could not say it" />
+        {parts?.length ? <TaskParts parts={parts} /> : <Words text={layers.task} none="Not composed: the run could not say it" />}
       </Layer>
     </div>
   );
@@ -143,6 +148,35 @@ export function StepPolicy({ layers }: { layers: StepLayers | null }) {
       <p className="text-xs text-muted-foreground">
         Told after {before}; where they conflict, this wins. Every layer is under “What it was told”.
       </p>
+    </div>
+  );
+}
+
+/** How a run was handed to the step, as its block's heading says it. */
+const HANDED = { read: 'Read as context', waited: 'Waited on, shipped' } as const;
+
+/**
+ * A task in its parts: its own text as `Words`, and each run it was handed a block headed by how it was handed and the first line that
+ * run was asked, linked to the run's page, over the section's body. A run the record names as neither waited on nor read is a plain
+ * block, its section as it was written.
+ */
+export function TaskParts({ parts }: { parts: TaskPart[] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {parts.map((part, i) => {
+        if (part.kind === 'text') return <Words key={i} text={part.text} />;
+        if (!part.how) return <Words key={i} text={`## From run ${part.run}\n\n${part.body}`} />;
+        return (
+          <section key={i} data-from-run={part.run} data-how={part.how} className="flex flex-col gap-1 rounded border p-2">
+            <h5 title={part.run} className="min-w-0 text-xs font-medium text-muted-foreground">
+              <RouteLink to="/runs/$runId" params={{ runId: part.run }} className="block truncate hover:underline">
+                {HANDED[part.how]} · {part.asked || part.run} ↗
+              </RouteLink>
+            </h5>
+            <Words text={part.body} />
+          </section>
+        );
+      })}
     </div>
   );
 }

@@ -62,6 +62,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   onYou: [],
   after: [],
   waiting: null,
+  context: [],
   heldUntil: [],
   holding: null,
   toDecide: null,

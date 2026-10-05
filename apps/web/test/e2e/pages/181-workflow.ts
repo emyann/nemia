@@ -120,7 +120,11 @@ export default {
         offered.filter({ hasText: run.title }).locator(`input[type="checkbox"][value="${run.id}"]`),
         `${run.id} is offered, by its title`,
       );
-    await expectCount(dev.locator(`[data-run="${FAKE.id}"]`), 0, `${FAKE.id}, on another repository, is not offered`);
+    await expectCount(
+      dev.locator(`ul[aria-label="Runs to wait on"] [data-run="${FAKE.id}"]`),
+      0,
+      `${FAKE.id}, on another repository, is not offered`,
+    );
     for (const [run, standing] of [
       [DIAMOND.orphan, 'waiting on you'],
       [DIAMOND.cancelled, 'cancelled'],
@@ -151,7 +155,7 @@ export default {
       await idle(refused);
       const form = refused.locator('article');
       await form.getByRole('textbox', { name: 'Start a run' }).fill('Wait on a run that was called off');
-      const pick = form.locator(`input[type="checkbox"][value="${DIAMOND.cancelled.id}"]`);
+      const pick = form.locator(`ul[aria-label="Runs to wait on"] input[type="checkbox"][value="${DIAMOND.cancelled.id}"]`);
       await expectVisible(pick, `${DIAMOND.cancelled.id} is offered to wait on`);
       await pick.check();
       const [answered] = await Promise.all([

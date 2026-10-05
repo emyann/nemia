@@ -34,7 +34,7 @@ const FACTORY_SAYS =
   'says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, ' +
   'and removes one with nemia factory rm <name> (nemia factory --help).';
 const START_SAYS =
-  'It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> ' +
+  'It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> ' +
   'once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>".';
 
 /** Each command, the words that fill its required arguments, and what it says of a flag it does not take. */

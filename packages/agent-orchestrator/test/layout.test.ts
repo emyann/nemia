@@ -254,6 +254,8 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
       'src/round/round.ts',
       'src/run.ts',
       'src/say/say.ts',
+      'src/start/context.ts',
+      'src/start/index.ts',
       'src/tick/assess.ts',
       'src/wait/wait.ts',
     ],

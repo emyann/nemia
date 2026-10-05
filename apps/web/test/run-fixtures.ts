@@ -69,6 +69,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   body: 'Build it.',
   told: null,
   layers: null,
+  taskParts: null,
   taskId: 't-2',
   workspace: '/work/tree',
   files: [{ path: 'out/report.md', name: 'report.md', url: '/api/runs/r-1/steps/implement/files/report.md', kind: 'text', size: 12 }],
@@ -211,6 +212,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
     advice: 'wait',
     onYou: false,
   },
+  context: [],
   heldUntil: ['r-0'],
   holding: {
     at: '2026-09-30T05:00:00.000Z',

@@ -20,6 +20,7 @@ test('each command is served on the api where it was before the table, the lift 
     [
       ['start', { method: 'POST', path: '/api/runs', status: 201, hand: true }],
       ['plan', 'cli'],
+      ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
       ['inbox', { method: 'GET', path: '/api/inbox', status: 200 }],
       ['inbox add', { method: 'POST', path: '/api/inbox', status: 201, hand: true }],
       [
@@ -27,6 +28,13 @@ test('each command is served on the api where it was before the table, the lift 
         [
           { method: 'POST', path: '/api/inbox/:name/queue', status: 200, sets: { off: false } },
           { method: 'DELETE', path: '/api/inbox/:name/queue', status: 200, sets: { off: true } },
+        ],
+      ],
+      [
+        'inbox from',
+        [
+          { method: 'PUT', path: '/api/inbox/:name/from', status: 200, sets: { off: false } },
+          { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
         ],
       ],
       ['inbox rm', { method: 'DELETE', path: '/api/inbox/:name', status: 200 }],
@@ -133,6 +141,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
   assert.deepEqual(
     TABLE.filter((c) => !c.writes).map((c) => c.name),
     [
+      'concluded',
       'inbox',
       'inbox card',
       'factory',

@@ -1,7 +1,7 @@
 import { MarkerType } from '@xyflow/react';
-import type { RunDetail, RunSummary } from '../lib/api';
+import type { RunDetail } from '../lib/api';
 import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
-import { runEdges } from '../lib/factory';
+import { contextEdges, runEdges } from '../lib/factory';
 import { stepState, type StepState } from '../lib/status';
 import type { StateFlowEdge } from './StateEdge';
 import type { StepNodeData } from './StepNode';
@@ -85,11 +85,26 @@ export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
 }
 
 /**
- * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that waits on it, out of the one card's right
- * side and into the other's left, drawn as every edge is — dashed while the card waits, solid once its run has started.
+ * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that still waits on it, out of the one card's
+ * right side and into the other's left, dashed: a wait that is over draws nothing.
  */
-export function afterEdges(
-  runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>,
-): StateFlowEdge[] {
+export function afterEdges(runs: Parameters<typeof runEdges>[0]): StateFlowEdge[] {
   return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
+}
+
+/**
+ * The lines of what the focused card reads as context (`contextEdges`): faint and dotted, with no arrow, under the class `context-edge`.
+ * None without a focus.
+ */
+export function readEdges(runs: Parameters<typeof contextEdges>[0], focus: string | null): StateFlowEdge[] {
+  return contextEdges(runs, focus).map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    type: 'state',
+    data: { state: 'to-come', loop: false, read: true },
+    className: 'context-edge',
+    selectable: false,
+    focusable: false,
+  }));
 }

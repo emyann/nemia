@@ -388,6 +388,34 @@ const INBOX_QUEUE: RouteWords = {
   bodyless: ({ name, method }, text) => queueBodyRefusal(queueGuard(name, method === 'DELETE').route, text),
 };
 
+const FROM_SHAPE = '`{ "runs": ["<runId>", ...] }`: the runs the card is handed as context, by id';
+
+/** A card's `from:` set (`PUT`), or taken off (`DELETE`), as the guard's refusals word it. */
+const fromGuard = (name: string, off: boolean): Guarded => ({
+  route: `${off ? 'DELETE' : 'PUT'} /api/inbox/${name}/from`,
+  does: off ? "takes a card's from: off" : "sets a card's from:",
+  forAnother: off ? 'take one off' : 'set one',
+  why: "a card's from: is what its run is handed as context, read into every root step's brief",
+  reach: "set it on the card's page on the board",
+  instead: off
+    ? `Take it off on the card's page on the board, or with \`nemia inbox from ${name} --off\``
+    : `Set it on the card's page on the board, or with \`nemia inbox from ${name} <run>...\``,
+  shape: off ? 'no body, or `{}`: the card is named in the path' : FROM_SHAPE,
+});
+
+/**
+ * A card's `from:` set, or taken off, as the guard's refusals word it: a name that would leave the inbox is refused in the package's words,
+ * before the card is read, and a body whose `runs` is not a list of ids in the api's.
+ */
+const INBOX_FROM: RouteWords = {
+  shape: FROM_SHAPE,
+  guard: ({ name, method }) => fromGuard(name, method === 'DELETE'),
+  issue: () => (_issue, body) =>
+    `PUT /api/inbox/:name/from takes ${FROM_SHAPE}, each an id that is not blank. This request's was ${JSON.stringify(valueAt(body, ['runs']))}.`,
+  named: ({ name }) => inboxNameRefusal(name) ?? null,
+  strict: true,
+};
+
 const CUSTOM_PUT_SHAPE = '`{ "words": "<what the agent is told after its instructions>" }`';
 
 /** The route of the custom instructions `at` names, as a refusal says it: `PUT /api/custom-instructions/<name>`. */
@@ -491,6 +519,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,
+  'inbox from': INBOX_FROM,
   'inbox rm': INBOX_RM,
   'agents custom': AGENTS_CUSTOM,
   'factory instruction': FACTORY_INSTRUCTION,

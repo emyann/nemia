@@ -24,10 +24,12 @@ import { StepRail, StepTiles } from './StepRail';
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
  * `open` is a run whose card is opened on its steps: `detail` its record once read, which gives each tile its attempt and cost, and
  * `trouble` why it could not be read. `inspected` is a run the frame's bar shows, and `selected` the step of it the bar shows.
- * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar.
+ * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar. `reads` is a line per run it reads as context, its id
+ * and title (`readsLines`).
  */
 export type RunNodeData = {
   run: RunSummary;
+  reads: string[];
   finished: boolean;
   open: boolean;
   detail: RunDetail | null;
@@ -70,11 +72,13 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - In its footer, so the card is no taller for them than a line (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none
  *   on it; the tokens its sessions used, `≥` where one measured none, their split on hover; and on its right, or under them where both   do
  *   not fit, its chips; the hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
- *   (`RunSummary.unreadable`), whole on hover.
+ *   (`RunSummary.unreadable`), whole on hover; and how many runs it reads as context, which it does not wait on, each on hover.
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that   waits on
  *   it leaves.
  */
-export function RunNode({ data: { run, finished, open, detail, trouble, inspected, selected, onToggle, onStep } }: NodeProps<RunFlowNode>) {
+export function RunNode({
+  data: { run, reads, finished, open, detail, trouble, inspected, selected, onToggle, onStep },
+}: NodeProps<RunFlowNode>) {
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
@@ -182,32 +186,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, inspecte
 
         <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
           <Took run={run} clock={clock} />
-          <span className="ml-auto flex items-center gap-1">
-            {decide && <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>}
-            {waitsOnYou(run) && <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>}
-            {run.holding && !cancelled && (
-              <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
-                held
-              </Badge>
-            )}
-            {run.holding && !cancelled && <CardLift id={run.id} />}
-            {cancelled && <Badge variant="outline">cancelled</Badge>}
-            {run.pruned && (
-              <Badge variant="outline" data-pruned title={run.pruned.said} className="text-neutral-500">
-                pruned
-              </Badge>
-            )}
-            {run.unreadable && (
-              <Badge
-                variant="outline"
-                data-unreadable
-                title={run.unreadable}
-                className="border-red-400 text-red-700 dark:border-red-700 dark:text-red-400"
-              >
-                unreadable
-              </Badge>
-            )}
-          </span>
+          <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
         </div>
       </div>
 
@@ -347,6 +326,46 @@ function Took({ run, clock }: { run: RunSummary; clock: ReturnType<typeof runClo
         <span data-tokens title={run.tokens.split} className="shrink-0 text-foreground">
           · {run.tokens.said}
         </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A card's chips, on the right of its footer: how many runs it reads as context, each on hover (`reads`); to decide (`decide`); waiting on
+ * you; held, with the hold lifted here (`CardLift`); `cancelled`; pruned; and unreadable, why on hover.
+ */
+function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boolean; cancelled: boolean; reads: string[] }) {
+  return (
+    <span className="ml-auto flex items-center gap-1">
+      {run.context.length > 0 && (
+        <Badge variant="outline" data-context title={reads.join('\n')} className="text-neutral-600 dark:text-neutral-300">
+          ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
+        </Badge>
+      )}
+      {decide && <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>}
+      {waitsOnYou(run) && <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>}
+      {run.holding && !cancelled && (
+        <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+          held
+        </Badge>
+      )}
+      {run.holding && !cancelled && <CardLift id={run.id} />}
+      {cancelled && <Badge variant="outline">cancelled</Badge>}
+      {run.pruned && (
+        <Badge variant="outline" data-pruned title={run.pruned.said} className="text-neutral-500">
+          pruned
+        </Badge>
+      )}
+      {run.unreadable && (
+        <Badge
+          variant="outline"
+          data-unreadable
+          title={run.unreadable}
+          className="border-red-400 text-red-700 dark:border-red-700 dark:text-red-400"
+        >
+          unreadable
+        </Badge>
       )}
     </span>
   );

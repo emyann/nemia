@@ -4241,6 +4241,8 @@ test("a root of a run that waited on runs is handed each parent under `## From r
     {
       run: 'a-1x2y',
       asked: 'Parse the flag',
+      how: 'waited',
+      shipped: true,
       steps: [
         {
           step: review,
@@ -4256,9 +4258,11 @@ test("a root of a run that waited on runs is handed each parent under `## From r
     {
       run: 'b-3z4w',
       asked: '## Store the flag',
+      how: 'waited',
+      shipped: true,
       steps: [{ name: 'implement', unreadable: 'the engine holds no closeout for its task b-3z4w-implement, which is failed' }],
     },
-    { run: 'c-5v6u', unreadable: 'its record cannot be read: no such run: c-5v6u' },
+    { run: 'c-5v6u', unreadable: 'its record cannot be read: no such run: c-5v6u', how: 'waited', shipped: true },
   ];
   const brief = composeBrief(implement, r, STEPS, undefined, undefined, undefined, undefined, undefined, parents);
   const fromA = [

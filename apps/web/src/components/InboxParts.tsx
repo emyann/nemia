@@ -106,9 +106,10 @@ const NOT_DONE: Record<CardRefusal['action'], string> = {
   remove: 'Not removed',
   queue: 'Not queued',
   unqueue: 'Not taken off the queue',
+  from: 'Its runs to read not changed',
 };
 
-/** What a start, a drop, a queue or its taking back was refused with, in the api's words. */
+/** What a start, a drop, a queue or its taking back, or a `from:` set, was refused with, in the api's words. */
 export function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
     <div

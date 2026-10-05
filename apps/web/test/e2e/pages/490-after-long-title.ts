@@ -37,7 +37,10 @@ async function expectWhole(page: Page, what: string): Promise<void> {
   await expectUncut(title, `on ${what}, the long run's title is read whole, wrapped within its row`);
   const shown = await title.textContent();
   if (shown !== LONG.title) throw new Refused(`on ${what}, the row says the whole title — it says ${JSON.stringify(shown)}`);
-  await photograph(card.locator('fieldset'), path.join(OUT, `after-long-title-${what}-${await themeOf(page)}.png`));
+  await photograph(
+    card.locator('fieldset', { has: page.locator('ul[aria-label="Runs to wait on"]') }),
+    path.join(OUT, `after-long-title-${what}-${await themeOf(page)}.png`),
+  );
 }
 
 export default {

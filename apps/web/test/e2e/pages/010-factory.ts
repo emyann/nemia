@@ -206,34 +206,28 @@ export default {
     await expectClearOfPanels(page, 'on first load');
 
     const { top, shipped, running, bottom, cancelled, orphan } = DIAMOND;
-    for (const run of [top, shipped, running, bottom])
+    for (const run of [running, bottom])
       await expectVisible(cardOf(page, run.id), `the diamond's card ${run.id} is on the floor by default`);
-    for (const run of [top, shipped]) {
-      await expectVisible(
-        cardOf(page, run.id).getByText(/^took .+$/),
-        `${run.id}, shipped, is drawn finished — on the floor because a run in flight waits on it — and says what it took`,
+    for (const run of [top, shipped])
+      await expectCount(
+        cardOf(page, run.id),
+        0,
+        `${run.id}, shipped, is not on the floor by default: nothing still waits on it — ${running.id} has started, and ${bottom.id} waits on ${running.id} alone`,
       );
-    }
     await expectCount(cardOf(page, cancelled.id), 0, `${cancelled.id} is not on the floor by default: called off, it waits on nobody`);
     await expectVisible(cardOf(page, orphan.id), `${orphan.id} is on the floor by default: it waits on a run called off, so on a person`);
-    for (const [from, to, state] of [
-      [top, shipped, 'done'],
-      [top, running, 'done'],
-      [shipped, bottom, 'to-come'],
-      [running, bottom, 'to-come'],
-    ] as const) {
-      await expectCount(
-        edgeOf(page, from.id, to.id).locator(`.react-flow__edge-path[data-state="${state}"]`),
-        1,
-        `an edge from ${from.id} into ${to.id}, ${state === 'done' ? 'solid: that run has started' : 'dashed: that run waits'}`,
-      );
-    }
+    await expectCount(
+      edgeOf(page, running.id, bottom.id).locator('.react-flow__edge-path[data-state="to-come"]'),
+      1,
+      `an edge from ${running.id} into ${bottom.id}, dashed: ${bottom.id} still waits on it`,
+    );
     await expectCount(
       page.locator('.react-flow__edge[data-id^="after:"]'),
-      4,
-      'the four edges of the diamond, and no other edge between cards',
+      1,
+      "the diamond's one live wait, and no other edge between cards: a wait that is over draws nothing",
     );
-    await expectDiamond(page, 'on the default floor');
+    await expectCount(page.locator('.react-flow__edge-path[data-state="done"]'), 0, 'and no edge between cards is drawn solid');
+    await expectLeftOf(cardOf(page, running.id), cardOf(page, bottom.id), `${running.id} is left of ${bottom.id}, which waits on it`);
     await expectVisible(
       cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
       `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that shipped is waited on no more`,
@@ -252,15 +246,14 @@ export default {
       cardOf(page, bottom.id),
       'and the rail stays inside the card',
     );
-    for (const run of [top, shipped, running])
-      await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
+    await expectCount(cardOf(page, running.id).locator('[data-waiting]'), 0, `${running.id} waits on no run`);
     await expectVisible(
       cardOf(page, bottom.id).locator(
         `[data-ghost-run] [data-waiting="on-runs"] a[data-waits-on="${running.id}"][href="/runs/${running.id}"]`,
       ),
       `the bottom's card is a ghost until it starts, and names ${running.id}, which it waits on, as a link to that run`,
     );
-    for (const run of [top, shipped, running, orphan])
+    for (const run of [running, orphan])
       await expectCount(cardOf(page, run.id).locator('[data-ghost-run]'), 0, `${run.id}'s card is no ghost: it started, or waits on you`);
     await expectVisible(
       cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s at work$/ }),
@@ -297,21 +290,15 @@ export default {
     const everyOther = (...ids: string[]) =>
       page.locator(`.react-flow__node[data-id]${ids.map((id) => `:not([data-id="${id}"])`).join('')}`);
     await expectMovedAlone(
-      cardOf(page, top.id),
-      () => dragBy(page, cardOf(page, top.id).locator('time'), { x: 40, y: -40 }, `the card of ${top.id}`),
-      `${top.id} dragged moves alone — ${shipped.id}, ${running.id} and ${bottom.id}, which wait on it, stay, and so does every other card`,
-      everyOther(top.id),
-    );
-    await expectMovedAlone(
       cardOf(page, running.id),
       () => dragBy(page, cardOf(page, running.id).locator('time'), { x: 60, y: 30 }, `the card of ${running.id}`),
-      `${running.id} dragged moves alone — ${bottom.id}, which waits on it, stays, and so do ${top.id}, which it waits on, and ${shipped.id}`,
+      `${running.id} dragged moves alone — ${bottom.id}, which waits on it, stays, and so does every other card`,
       everyOther(running.id),
     );
     await expectCount(
       page.locator('.react-flow__edge[data-id^="after:"]'),
-      4,
-      "the diamond's four edges are still drawn: they stretch to the cards where they now are",
+      1,
+      "the diamond's live wait is still drawn: it stretches to the card where it now is",
     );
     await expectCount(page.locator('[data-tile]'), 0, 'a drop is not a click: no card opened');
     await page.getByRole('button', { name: 'Fit view' }).click();
@@ -380,6 +367,15 @@ export default {
     await photograph(page, path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), { fullPage: true });
 
     await showFinished(page);
+    for (const run of [top, shipped]) {
+      await expectVisible(cardOf(page, run.id).getByText(/^took .+$/), `${run.id}, shipped, is drawn finished, and says what it took`);
+    }
+    await expectDiamond(page, 'with the finished shown');
+    await expectCount(
+      page.locator('.react-flow__edge[data-id^="after:"]'),
+      2,
+      `with the finished shown, the live waits alone: into ${bottom.id} from ${running.id}, and into ${orphan.id} from ${cancelled.id}`,
+    );
     await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
     await expectCount(cardOf(page, SHIPPED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
     await expectVisible(cardOf(page, SHIPPED.id).locator('[data-pruned]', { hasText: /^pruned$/ }), 'and it says it was pruned');
@@ -514,8 +510,8 @@ export default {
     await expectCount(opened.locator('[data-arrow]'), FAKE.edges, "an arrow between the tiles for each `after` between the run's steps");
     await expectCount(
       page.locator('.react-flow__edge'),
-      5,
-      'and on the floor only the five edges between cards: none from a card into a step',
+      2,
+      'and on the floor only the two live waits between cards: none from a card into a step',
     );
     await expectCount(
       opened.locator('animateMotion'),

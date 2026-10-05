@@ -3,7 +3,8 @@
  * frozen on its record at `nemia start`, filed with each local step — its first filing, a try and a round — and named on its brief. A
  * folder that is no directory at start is left out, and said; a step on a remote agent is filed none; a run in the default factory mounts
  * nothing, and its record has no `mounts`. A step whose `reads:` names the store's inbox is filed it read-only too, in any factory or
- * none, and its brief names it (`readsMounts`, `mountsLine`).
+ * none, and its brief names it (`readsMounts`, `mountsLine`). Every folder a local step is filed with is named on its brief, as it is
+ * mounted, the artifacts folder of each step before it included (`filedFolders`, `unnamed`).
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -513,7 +514,7 @@ test('mountsLine names the inbox for a local step whose `reads:` names it, and n
   assert.deepEqual(told({ harness: 'codex', reads: ['inbox'] }), [], 'codex reads the disk in its sandbox already');
 });
 
-test("mountsLine names each folder the steps before it handed over, by its path and step, read-only, and how to list one; nothing for none", () => {
+test('mountsLine names each folder the steps before it handed over, by its path and step, read-only, and how to list one; nothing for none', () => {
   const handed = readOnly('/s/runs/r-1/artifacts/design', '/s/runs/r-1/artifacts/implement');
   assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed, store: [] }), [
     '',
@@ -554,7 +555,10 @@ test("every folder a local step is filed with is named on its brief, as it is mo
   assert.equal(filings.length, 3, 'a first filing, a try, and the step after it');
   const kinds = filings.flatMap((f) => (f.config?.mounts ?? []) as { path: string; readOnly: boolean }[]);
   assert.ok(kinds.some((m) => !m.readOnly) && kinds.some((m) => m.path === artifactsDir(run, 'implement')), 'every kind is filed');
-  assert.ok(kinds.some((m) => m.path === path.join(ROOT, 'inbox')), "and the store's");
+  assert.ok(
+    kinds.some((m) => m.path === path.join(ROOT, 'inbox')),
+    "and the store's",
+  );
   for (const filing of filings) assert.deepEqual(unnamed(filing), [], filing.brief);
   const review = b.filed.get(`${run.id}-review`)!;
   assert.ok(review.brief.includes(`\`${artifactsDir(run, 'implement')}\` (implement's)`), review.brief);

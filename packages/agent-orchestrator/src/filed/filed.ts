@@ -45,11 +45,10 @@ export type FiledFolders = { handed: Mount[]; store: Mount[] };
  * (`mountsLine`): the artifacts folder of each step it comes after, under `t.runArtifacts` (`handedMounts`), and the store's folders its
  * `reads:` names, the inbox at `t.inbox` (`readsMounts`). Pure.
  */
-export const filedFolders = (
-  step: Workflow,
-  steps: readonly Workflow[],
-  t: { runArtifacts: string; inbox: string },
-): FiledFolders => ({ handed: handedMounts(step, steps, t.runArtifacts), store: readsMounts(step, t.inbox) });
+export const filedFolders = (step: Workflow, steps: readonly Workflow[], t: { runArtifacts: string; inbox: string }): FiledFolders => ({
+  handed: handedMounts(step, steps, t.runArtifacts),
+  store: readsMounts(step, t.inbox),
+});
 
 /** A step's folders beyond its factory's, in the order they are filed: the handed ones, then the store's. */
 const folders = (f: FiledFolders): Mount[] => [...f.handed, ...f.store];

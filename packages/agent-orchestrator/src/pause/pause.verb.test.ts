@@ -128,6 +128,25 @@ test('a stop the engine refuses leaves its ask for the tick to set aside, and a 
   resumePause();
 });
 
+test('the pause read after a pause at once says each task it stopped resumed, and one stopped by another hand not', async () => {
+  const { pausedRead } = await import('../list/list.verb.ts');
+  writeRun('r-a', { implement: { taskId: 't1' } });
+  writeRun('r-b', { implement: { taskId: 't2' } });
+  const { e } = engineOf(['t1']);
+  await pauseNow(e, {}, new Date('2026-10-04T13:00:00.000Z'));
+  const stopped = (id: string): FinishingView & { id: string } => ({ ...atWork(id), state: { ...atWork(id).state, stopRequested: true } });
+  const read = {
+    list: async (ids: string[]) => ({ views: ids.filter((id) => ['t1', 't2'].includes(id)).map(stopped) }),
+  } as unknown as Engine;
+  assert.deepEqual((await pausedRead(read)).finishing, [
+    { run: 'r-a', step: 'implement', kind: 'session', stopping: true, resumed: true },
+    { run: 'r-b', step: 'implement', kind: 'session', stopping: true },
+  ]);
+  fs.rmSync(asksDir('r-a'), { recursive: true });
+  fs.rmSync(path.join(ROOT, 'runs', 'r-b.json'));
+  resumePause();
+});
+
 test('what a pause at once would stop is read, and nothing is written nor stopped', async () => {
   writeRun('r-a', { implement: { taskId: 't1', check: { taskId: 'c1' } } });
   const { e, stops } = engineOf(['c1']);

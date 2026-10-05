@@ -6,6 +6,7 @@
  * and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
+import type { RetryAsk } from '../retry/retry-ask.ts';
 import type { Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { phaseOfView, type WordView } from '../views/views-words.ts';
@@ -24,9 +25,10 @@ export type PauseStaged = { run: string; step: string; repo: string };
 
 /**
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
- * check of a `landing` (an ending that lands on its check) — and `stopping` once the engine was asked to stop it (`wf pause --now`).
+ * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
+ * `wf pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no `resumed`.
  */
-export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true };
+export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
 
 /**
  * A task a pause at once stops (`wf pause --now`): `run`'s `step`, its `session` at work or the `check` of its work, by the task's id. A
@@ -58,15 +60,21 @@ export const RESUME_LINE = 'wf resume';
 /**
  * The tasks of `run` still at work, which the pause lets finish: each step's current task and its check's, pending or running. Left out:
  * one the runtime holds queued, which no pass admits under the pause; a session that waits on a person (`needs-human`), which holds no
- * slot and does no work until answered; and one with no view.
+ * slot and does no work until answered; and one with no view. Each is `resumed` where one of `asks`, the run's waiting asks, names it.
  */
-export function finishingOf(run: Run, steps: readonly Workflow[], viewOf: (taskId: string) => FinishingView | undefined): Finishing[] {
+export function finishingOf(
+  run: Run,
+  steps: readonly Workflow[],
+  viewOf: (taskId: string) => FinishingView | undefined,
+  asks: readonly RetryAsk[] = [],
+): Finishing[] {
   return steps.flatMap((step) =>
-    stepAtWork(run, step, viewOf).map(({ kind, view }) => ({
+    stepAtWork(run, step, viewOf).map(({ taskId, kind, view }) => ({
       run: run.id,
       step: step.name,
       kind: kind === 'check' && landsOnCheck(step, run) ? ('landing' as const) : kind,
       ...(view.state.stopRequested ? { stopping: true as const } : {}),
+      ...(asks.some((a) => a.step === step.name && a.interrupted === taskId) ? { resumed: true as const } : {}),
     })),
   );
 }
@@ -120,15 +128,16 @@ const live = (run: Run, viewOf: (taskId: string) => FinishingView | undefined): 
   });
 
 /**
- * Each task still finishing under the pause among `runs` (`finishingOf`), each run's steps read (`stepsOf`) only where one of its current
- * tasks or checks is at work.
+ * Each task still finishing under the pause among `runs` (`finishingOf`), each run's steps read (`stepsOf`) and its waiting asks
+ * (`asksOf`) only where one of its current tasks or checks is at work.
  */
 export function finishingAmong(
   runs: readonly Run[],
   viewOf: (taskId: string) => FinishingView | undefined,
   stepsOf: (run: Run) => readonly Workflow[],
+  asksOf: (run: Run) => readonly RetryAsk[] = () => [],
 ): Finishing[] {
-  return runs.filter((run) => live(run, viewOf)).flatMap((run) => finishingOf(run, stepsOf(run), viewOf));
+  return runs.filter((run) => live(run, viewOf)).flatMap((run) => finishingOf(run, stepsOf(run), viewOf, asksOf(run)));
 }
 
 /** Every step's current task and its check's, of `run`: what may still be at work. */
@@ -159,9 +168,14 @@ export const pausedWords = ({ pause, finishing }: Pick<Paused, 'pause' | 'finish
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts; ${RESUME_LINE} resumes it`;
 };
 
-/** A task still finishing under the pause, in one line: its run, its step, and what of it is at work. */
-export const finishingWords = ({ run, step, kind, stopping }: Finishing): string =>
-  `${run}'s ${step} is ${stopping ? 'stopping' : 'finishing'}: ${kind === 'session' ? `its session ${stopping ? 'was asked to stop' : 'is at work'}` : kind === 'check' ? `its check ${stopping ? 'was asked to stop' : 'runs'}` : 'the check of its landing runs'}`;
+/**
+ * A task still finishing under the pause, in one line: its run, its step, and what of it is at work; once asked to stop, that it is
+ * stopping, and that wf resume tries it again only where a pause at once's ask names it (`resumed`).
+ */
+export const finishingWords = ({ run, step, kind, stopping, resumed }: Finishing): string =>
+  stopping
+    ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
+    : `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
 
 /** A task a pause at once stops, in words: its run, its step, and whether its session or its check. */
 export const interruptWords = ({ run, step, kind }: Interrupt): string =>

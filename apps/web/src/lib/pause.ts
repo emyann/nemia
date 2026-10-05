@@ -30,12 +30,12 @@ export function pauseSince(pause: Pause, now: Date): string {
 }
 
 /**
- * A task still finishing under the pause, in a sentence: its run, its step, and what of it is at work; or, once a pause at once asked it to
- * stop, that it is stopping and tried again on the resume.
+ * A task still finishing under the pause, in a sentence: its run, its step, and what of it is at work; or, once asked to stop, that it is
+ * stopping, and tried again on the resume only where a pause at once's ask names it (`resumed`).
  */
-export const finishingSentence = ({ run, step, kind, stopping }: Finishing): string =>
+export const finishingSentence = ({ run, step, kind, stopping, resumed }: Finishing): string =>
   stopping
-    ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop, and is tried again on the resume`
+    ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? ', and is tried again on the resume' : ''}`
     : `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
 
 /** A task a pause at once would stop, in a few words: its run, then its step's session or check. */

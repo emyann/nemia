@@ -244,11 +244,22 @@ test('wf pause --now says each task it would stop, what that costs, and the line
   );
 });
 
-test('a task asked to stop finishes as stopping', () => {
+test('a task asked to stop that no pause ask names finishes as stopping, and is promised no try on the resume', () => {
   const r = run({ implement: { taskId: 't1' } });
-  const finishing = finishingOf(r, [step('implement')], () => view('running (working)', { stopRequested: true }));
+  const other = { step: 'implement', try: 2, mode: 'nudge' as const, interrupted: 't0', at: '2026-10-04T12:00:00Z' };
+  const finishing = finishingOf(r, [step('implement')], () => view('running (working)', { stopRequested: true }), [other]);
   assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true }]);
   assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [] }).slice(1), [
     "   r-1's implement is stopping: its session was asked to stop",
+  ]);
+});
+
+test('a task a pause ask names finishes as stopping and resumed, tried again on wf resume', () => {
+  const r = run({ implement: { taskId: 't1' } });
+  const ask = { step: 'implement', try: 2, mode: 'nudge' as const, interrupted: 't1', at: '2026-10-04T12:00:00Z' };
+  const finishing = finishingOf(r, [step('implement')], () => view('running (working)', { stopRequested: true }), [ask]);
+  assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true, resumed: true }]);
+  assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [] }).slice(1), [
+    "   r-1's implement is stopping: its session was asked to stop, and is tried again on wf resume",
   ]);
 });

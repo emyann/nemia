@@ -14,10 +14,10 @@ export type Pause = { at: string; by: string; why?: string };
 export type PauseStaged = { run: string; step: string; repo: string };
 
 /**
- * Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check, and
- * `stopping` once a pause at once asked it to stop.
+ * Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check;
+ * `stopping` once it was asked to stop, and `resumed` while a pause at once's ask names it, which tries it again on the resume.
  */
-export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true };
+export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
 
 /** Mirrors the package's `Interrupt`: `run`'s `step`, its session at work or its check, which a pause at once stops. */
 export type Interrupt = { run: string; step: string; kind: 'session' | 'check' };
@@ -50,6 +50,7 @@ const PausedSchema = Schema.Struct({
       step: Schema.String,
       kind: Schema.Literals(['session', 'check', 'landing']),
       stopping: Schema.optional(Schema.Literal(true)),
+      resumed: Schema.optional(Schema.Literal(true)),
     }),
   ),
   staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),

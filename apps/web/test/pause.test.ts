@@ -76,12 +76,19 @@ test("what a pause at once would stop is named by its run, then its step's sessi
 
 test('a task a pause at once asked to stop is stopping, and tried again on the resume, not finishing', () => {
   assert.equal(
-    finishingSentence({ run: 'r-1', step: 'implement', kind: 'session', stopping: true }),
+    finishingSentence({ run: 'r-1', step: 'implement', kind: 'session', stopping: true, resumed: true }),
     "r-1's implement is stopping: its session was asked to stop, and is tried again on the resume",
   );
   assert.equal(
-    finishingSentence({ run: 'r-2', step: 'review', kind: 'check', stopping: true }),
+    finishingSentence({ run: 'r-2', step: 'review', kind: 'check', stopping: true, resumed: true }),
     "r-2's review is stopping: its check was asked to stop, and is tried again on the resume",
   );
   assert.equal(finishingSentence({ run: 'r-2', step: 'review', kind: 'check' }), "r-2's review is finishing: its check runs");
+});
+
+test('a task asked to stop that no pause ask names is stopping, and promised no try on the resume', () => {
+  assert.equal(
+    finishingSentence({ run: 'r-1', step: 'implement', kind: 'session', stopping: true }),
+    "r-1's implement is stopping: its session was asked to stop",
+  );
 });

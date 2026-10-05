@@ -101,10 +101,11 @@ export default {
    * work and a landing at work (LANDING, which the page writes), Pause now…, offered beside Pause… while all factories run, names each
    * run's step it stops — the api's read (`GET /api/pause/now`), which leaves the landing out — and says what that costs. Confirmed, the
    * pause's file holds its why, each step it named is asked to stop on its journal and has the try that continues it beside its run, the
-   * landing is left at work, and the popover reads Pausing, each named step stopping. From Pausing, after a plain Pause…, Pause now… is
-   * offered beside Resume, asks no why, and keeps the pause as it was put; on a phone's screen its confirm fits. Resume takes the pause
-   * away. Which tasks a pause at once stops, and how the resume continues each, is the package's judgement, proven in its own tests
-   * (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it wrote, and the window's size.
+   * landing is left at work, and the popover reads Pausing, each named step stopping and tried again on the resume. From Pausing, after
+   * a plain Pause…, Pause now… is offered beside Resume, asks no why, and keeps the pause as it was put; on a phone's screen its confirm
+   * fits. Resume takes the pause away. Which tasks a pause at once stops, and how the resume continues each, is the package's judgement,
+   * proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). The page puts back every file it wrote, and the
+   * window's size.
    */
   name: 'pause-now',
   route: '/factories/default',
@@ -149,13 +150,16 @@ export default {
       }
       if (journalOf(LANDING_TASK).includes('"stop-requested"')) throw new Refused('the landing is left at work, never asked to stop');
       const paused = await apiRead<Paused>(page, '/api/pause');
-      const stopping = paused.finishing.filter((f) => f.stopping);
+      const stopping = paused.finishing.filter((f) => f.stopping && f.resumed);
       if (stopping.length !== read.interrupts.length)
-        throw new Refused(`each step it named is stopping — the api reads ${JSON.stringify(paused.finishing)}`);
+        throw new Refused(`each step it named is stopping, tried again on the resume — the api reads ${JSON.stringify(paused.finishing)}`);
       await expectVisible(button.and(page.locator('[data-pause="pausing"]')), 'the button says Pausing while they stop');
       await button.click();
       await expectTexts(popover.locator('[data-pause-finishing] li'), paused.finishing.map(finishingSentence), 'each, stopping or not');
-      await expectVisible(popover.locator('[data-pause-finishing] li', { hasText: 'is stopping' }).first(), 'a step is stopping');
+      await expectVisible(
+        popover.locator('[data-pause-finishing] li', { hasText: 'tried again on the resume' }).first(),
+        'a step is stopping, and tried again on the resume',
+      );
       await settled(page);
       await photograph(page, path.join(OUT, `pause-now-stopping-${theme}.png`));
       await page.keyboard.press('Escape');

@@ -25,8 +25,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor } from 'agent-runtime';
-import { fold } from 'agent-runtime/effect';
+import { nameFor, fold } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 

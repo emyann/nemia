@@ -5,15 +5,11 @@
 import path from 'node:path';
 import { Effect } from 'effect';
 import {
-  addPass,
   breakdownLines,
   ceilingLines,
   ceilings,
   Conflict,
   pausedLines,
-  pausedWords,
-  RESUMED,
-  stagedWords,
   engine,
   everyOf,
   feedCursorRefusal,
@@ -24,16 +20,14 @@ import {
   refusalLines,
   slotWord,
   storeRefusal,
-  summaryDue,
-  summaryLine,
   takeoverLine,
   runMain,
   tickRun,
   runWith,
+  telemetryLayer,
   up,
   waitWord,
   watchFeed,
-  type Interval,
   type TakenStore,
   parseArgv,
   TABLE,
@@ -43,7 +37,7 @@ import {
 } from '../runner.ts';
 import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
+import { agentsCustomRun, factoryInstructRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
@@ -134,74 +128,10 @@ function upStats(): void {
 }
 
 /**
- * What `nemia up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move
- * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
- * change of its words and once resumed; and the passes its next summary counts (`interval`).
- */
-type UpSaid = {
-  said: string | undefined;
-  pauseSaid: string | undefined;
-  feedSaid: string | undefined;
-  refusedSaid: ReadonlySet<string>;
-  unreadableSaid: ReadonlySet<string>;
-  interval: Interval | undefined;
-};
-
-/** The queued card's line on `nemia up`, unless it is the failure it said last; returns the failure it says now, if any. */
-function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined): string | undefined {
-  const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
-  if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
-  return failure;
-}
-
-/** What a pass did to each run, as `nemia up` says it: its notes, then what it filed, tried again, rounded again and is checking. */
-function advancedLines(advanced: Pass['runs']): void {
-  for (const r of advanced) {
-    for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
-    if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
-    if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
-    if (r.looped.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  round again ${r.looped.join(', ')}`);
-    if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
-  }
-}
-
-/**
- * The store's pause on `nemia up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put,
- * again each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns
- * the lines it said, if any, as one string.
- */
-export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
-  const lines = pause ? [pausedWords(pause) ?? '', ...pause.staged.map((s) => `   ${stagedWords(s)}`)] : [RESUMED];
-  const now = pause ? lines.join('\n') : undefined;
-  if (now !== said) for (const line of lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
-  return now;
-}
-
-/** One pass's lines on `nemia up`, going by what it has printed (`was`), not by the store; returns what it has printed now. */
-function passLines(pass: Pass, was: UpSaid): UpSaid {
-  const { runs: advanced, queue, feedError, cost, refused, unreadable } = pass;
-  const paused = pauseSaid(pass.pause, was.pauseSaid);
-  let interval = was.interval;
-  if (cost) interval = addPass(interval, cost, Date.now());
-  if (summaryDue(interval, Date.now())) {
-    console.log(`${new Date().toISOString().slice(11, 19)}  ${summaryLine(interval!, Date.now())}`);
-    interval = undefined;
-  }
-  if (feedError && feedError !== was.feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
-  const stalled = refusalLines(refused ?? [], was.refusedSaid);
-  for (const line of stalled.lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
-  for (const why of unreadable ?? [])
-    if (!was.unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
-  const said = queue ? queueSaid(queue, was.said) : was.said;
-  advancedLines(advanced);
-  return { said, pauseSaid: paused, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
-}
-
-/**
  * `nemia up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
- * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, saying each
- * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `nemia start` takes
- * `.`.
+ * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, its passes
+ * said through the process's telemetry (`telemetryLayer`). A queued card that names no repository starts on the one it is typed in, as
+ * `nemia start` takes `.`.
  */
 function upVerb(args: Args, e: Engine): void | Promise<void> {
   if (args.stats === true) return upStats();
@@ -209,14 +139,6 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
   const ceiling = ceilings();
   const store = HOME;
-  let was: UpSaid = {
-    said: undefined,
-    pauseSaid: undefined,
-    feedSaid: undefined,
-    refusedSaid: new Set(),
-    unreadableSaid: new Set(),
-    interval: undefined,
-  };
   const onTaken = ({ held, replaced }: TakenStore) =>
     Effect.sync(() => {
       console.log(`up — every ${every}ms, ^C to stop`);
@@ -227,10 +149,8 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
     });
-  const onPass = (pass: Pass) => {
-    was = passLines(pass, was);
-  };
-  return runMain(up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken, onPass }).pipe(Effect.scoped));
+  const daemon = up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken });
+  return runMain(daemon.pipe(Effect.scoped, Effect.provide(telemetryLayer(process.env))));
 }
 
 /** `nemia watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */
@@ -247,8 +167,8 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`
- * and `nemia agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once
- * read and checked.
+ * and `nemia agents custom` and `nemia factory instruct`, whose runners read the files and folders a command line names before their
+ * handlers: handed its arguments once read and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
@@ -261,6 +181,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
   ['agents custom', agentsCustomRun],
+  ['factory instruct', factoryInstructRun],
 ]);
 
 /**

@@ -251,15 +251,21 @@ function primitiveProblems(skill: string, barrel: Record<string, unknown>, exist
 
 const installed = (file: string) => fs.existsSync(path.join(ROOT, file));
 
+/** The names a row of the primitives table may give: `effect`'s barrel, and its door to the exporters, `effect/observability`. */
+const primitivesBarrel = async (): Promise<Record<string, unknown>> => ({
+  ...(await import(EFFECT)),
+  ...(await import('effect/observability')),
+});
+
 test("the effect skill sends each task to one of Effect's own primitives, on a page the pinned version installs", async () => {
   const skill = fs.readFileSync(path.join(ROOT, SKILL), 'utf8');
-  const barrel = { ...(await import(EFFECT)) } as Record<string, unknown>;
+  const barrel = await primitivesBarrel();
   assert.deepEqual(primitiveProblems(skill, barrel, installed), []);
 });
 
 test('REFUSED: a page not installed, a name effect lacks, a primitive with no row, a section renamed or below the Effect 3 names', async () => {
   const skill = fs.readFileSync(path.join(ROOT, SKILL), 'utf8');
-  const barrel = { ...(await import(EFFECT)) } as Record<string, unknown>;
+  const barrel = await primitivesBarrel();
   const PUBSUB = 'node_modules/effect/ai-docs/src/01_effect/07_pubsub/10_pubsub.ts';
   assert.ok(skill.includes(PUBSUB));
   assert.deepEqual(primitiveProblems(skill.replace(PUBSUB, PUBSUB.replace('07_pubsub', '08_pubsub')), barrel, installed), [
@@ -267,6 +273,9 @@ test('REFUSED: a page not installed, a name effect lacks, a primitive with no ro
   ]);
   assert.deepEqual(primitiveProblems(skill.replace('`FiberMap.run`', '`FiberMapped.run`'), barrel, installed), [
     `${SKILL} names FiberMapped.run, which effect does not export: read its page, not your memory`,
+  ]);
+  assert.deepEqual(primitiveProblems(skill.replace('`OtlpTracer.layer`', '`OtlpTracers.layer`'), barrel, installed), [
+    `${SKILL} names OtlpTracers.layer, which effect does not export: read its page, not your memory`,
   ]);
   const withoutPubSub = skill
     .split('\n')

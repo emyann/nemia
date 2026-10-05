@@ -277,6 +277,20 @@ test('a gated step with `check:` is checked before it is held: its check filed o
   );
 });
 
+test("every filing of a pass goes out with its brief cut where its sections open, the parts joining into it: a step's and its check's", async () => {
+  const run = await Effect.runPromise(
+    startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned({ plan: 'check: test -f PLAN.md' }), isolate: false }),
+  );
+  const { e, specs, settle } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
+  settle(`${run.id}-plan`, 'succeeded', SIGNED);
+  await runWith(e, advanceRun(readRun(run.id)));
+  const [step, check] = specs;
+  assert.ok(step.briefParts!.length > 1, `the step's brief has sections: ${JSON.stringify(step.brief.slice(0, 200))}`);
+  assert.equal(step.briefParts!.join(''), step.brief);
+  assert.deepEqual(check.briefParts, ['test -f PLAN.md']);
+});
+
 test("REFUSED at shipped defaults: a parent whose last step waits at its gate has not shipped, though a person merged its branch — a run `--after` it files nothing — and once that step is approved, it has, and the child's next tick files its roots", async () => {
   const repo = aRepo();
   const b = board();

@@ -528,7 +528,7 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   assert.deepEqual(impurities(adding('src/check/check.ts', 'node:child_process')), [
     'src/check/check.ts is pure and imports node:child_process',
   ]);
-  assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/effect')), ['src/run.ts is pure and imports agent-runtime/effect']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/harness')), ['src/run.ts is pure and imports agent-runtime/harness']);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime')), ['src/run.ts is pure and imports agent-runtime']);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/vocabulary/x')), [
     'src/run.ts is pure and imports agent-runtime/vocabulary/x',
@@ -753,7 +753,7 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   assert.deepEqual(clientBreaks(adding('src/record/record.store.ts', 'agent-runtime')), [
     'src/record/record.store.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
-  assert.deepEqual(clientBreaks(adding('src/timeline/timeline.ts', 'agent-runtime/effect')), [
+  assert.deepEqual(clientBreaks(adding('src/timeline/timeline.ts', 'agent-runtime/harness')), [
     'src/timeline/timeline.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
   assert.deepEqual(clientBreaks(adding('src/cli/main.ts', 'agent-runtime')), [

@@ -40,7 +40,7 @@ import {
 } from '../src/harness/detached/detached.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/harness/seam.ts';
 import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
@@ -51,6 +51,7 @@ import { stepClock } from './clock.ts';
 import { FILES_STREAM, resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { monoNow } from '../src/core/engine/now.ts';
+import { builtEngine } from './engine.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
@@ -1816,15 +1817,15 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
   process.env.PATH = `${bin}:${prev}`;
   try {
     const cwd = root();
-    const engine = promiseEngine(Engine.layer({ root: root() }));
+    const engine = builtEngine(Engine.layer({ root: root() }));
     const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
-    const id = await engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema });
+    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema }));
     const until = performance.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && performance.now() < until) {
-      await engine.tick();
+    while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
+      await Effect.runPromise(engine.tick());
       await new Promise((r) => setTimeout(r, 100));
     }
-    const { state } = await engine.view(id);
+    const { state } = await Effect.runPromise(engine.view(id));
     assert.equal(state.settled, 'succeeded');
     assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
     assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
@@ -1840,14 +1841,14 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
 
 /** File a task on `spec` through an engine, tick it until it settles, and give back its state. */
 const settledOn = async (spec: HarnessSpec, task: { resumeFrom?: string } = {}) => {
-  const engine = promiseEngine(Engine.layer({ root: root(), harnesses: { sh: spec } }));
-  const id = await engine.file({ brief: 'x', cwd: root(), harness: 'sh', closeoutSchema: { type: 'object' }, ...task });
+  const engine = builtEngine(Engine.layer({ root: root(), harnesses: { sh: spec } }));
+  const id = await Effect.runPromise(engine.file({ brief: 'x', cwd: root(), harness: 'sh', closeoutSchema: { type: 'object' }, ...task }));
   const until = performance.now() + 15_000;
-  while (!(await engine.view(id)).state.settled && performance.now() < until) {
-    await engine.tick();
+  while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
+    await Effect.runPromise(engine.tick());
     await new Promise((r) => setTimeout(r, 100));
   }
-  return (await engine.view(id)).state;
+  return (await Effect.runPromise(engine.view(id))).state;
 };
 
 /** This process's clock 10 s ahead of the files': the attempt is journalled after the moment its statement's file was written. */
@@ -1915,27 +1916,33 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
   try {
-    const engine = promiseEngine(Engine.layer({ root: root() }));
+    const engine = builtEngine(Engine.layer({ root: root() }));
     const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
     const allow = ['Write(**)'];
-    const id = await engine.file({
-      brief: 'the prompt',
-      cwd: root(),
-      harness: 'claude-detached',
-      config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
-    });
+    const id = await Effect.runPromise(
+      engine.file({
+        brief: 'the prompt',
+        cwd: root(),
+        harness: 'claude-detached',
+        config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
+      }),
+    );
     const until = performance.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && performance.now() < until) {
-      await engine.tick();
+    while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
+      await Effect.runPromise(engine.tick());
       await new Promise((r) => setTimeout(r, 100));
     }
-    assert.deepEqual((await engine.view(id)).state.config?.disallowedTools, rules, 'on the record');
+    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.config?.disallowedTools, rules, 'on the record');
     const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
     const i = argv.indexOf('--disallowedTools');
     assert.notEqual(i, -1, argv.join(' '));
     assert.equal(argv[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
     assert.match(argv[i + 2], /^--/, 'a flag ends the variadic list');
-    assert.deepEqual((await engine.view(id)).state.config?.allowedTools, allow, 'and the allow list beside it, on the record');
+    assert.deepEqual(
+      (await Effect.runPromise(engine.view(id))).state.config?.allowedTools,
+      allow,
+      'and the allow list beside it, on the record',
+    );
     const a = argv.indexOf('--allowedTools');
     assert.notEqual(a, -1, argv.join(' '));
     assert.equal(argv[a + 1], 'Write(**)');
@@ -1999,14 +2006,14 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
   process.env.PATH = `${bin}:${prev.PATH}`;
   process.env.CODEX_HOME = root();
   try {
-    const engine = promiseEngine(Engine.layer({ root: root() }));
-    const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' });
+    const engine = builtEngine(Engine.layer({ root: root() }));
+    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
     const until = performance.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && performance.now() < until) {
-      await engine.tick();
+    while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
+      await Effect.runPromise(engine.tick());
       await new Promise((r) => setTimeout(r, 100));
     }
-    const { state } = await engine.view(id);
+    const { state } = await Effect.runPromise(engine.view(id));
     assert.equal(state.settled, 'succeeded');
     assert.deepEqual(
       state.attempts[0]?.usage,

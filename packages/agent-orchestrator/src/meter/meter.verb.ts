@@ -17,6 +17,7 @@ const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   view: 'journals',
   list: 'journals',
   feed: 'journals',
+  sweep: 'journals',
   logs: 'journals',
   output: 'journals',
   transcript: 'journals',
@@ -26,6 +27,7 @@ const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   close: 'act',
   answer: 'act',
   say: 'act',
+  removeBody: 'act',
 };
 
 type EngineIo = Effect.Success<ReturnType<Engine['io']>>;

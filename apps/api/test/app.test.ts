@@ -20,7 +20,7 @@ import {
   VERSION,
   type RunSummary,
 } from 'agent-orchestrator';
-import { claudeDetached, claudeOps } from 'agent-runtime/effect';
+import { claudeDetached, claudeOps } from 'agent-runtime';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */

@@ -93,14 +93,29 @@ export const UsageSchema = Schema.StructWithRest(
   Rest,
 );
 
+/**
+ * A body kept once in the store's body store, by the sha256 of its UTF-8 in lowercase hex: what an entry holds in place of a long
+ * text (`core/engine/bodies.ts`), and `Journal.layer` reads back.
+ */
+export const BodyRefSchema = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
+
+/** A brief in parts as a store holds it: each part its text, or a body named by its reference. */
+const BriefPartsSchema = Schema.mutable(Schema.Array(Schema.Union([Schema.String, Schema.Struct({ body: BodyRefSchema })])));
+
 const event = <const K extends string, const F extends Schema.Struct.Fields>(kind: K, fields: F) =>
   Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal(kind), at: Schema.String, ...fields }), Rest);
 
-/** A filing: one an older runtime wrote may carry its harness's arguments beside its own fields, which `upgrade` lifts into `config`. */
+/**
+ * A filing: one an older runtime wrote may carry its harness's arguments beside its own fields, which `upgrade` lifts into `config`.
+ * A store that keeps bodies holds its brief in parts (`briefParts`) and its schema an end is held to as a body
+ * (`closeoutSchemaBody`), each where the field it stands for was.
+ */
 const Filed = event('filed', {
   ...harnessArgs,
   ...formerArgs,
-  brief: Schema.String,
+  brief: Schema.optional(Schema.String),
+  briefParts: Schema.optional(BriefPartsSchema),
+  closeoutSchemaBody: Schema.optional(BodyRefSchema),
   cwd: Schema.String,
   harness: Schema.optional(Schema.String),
   deadlineSeconds: Schema.optional(Schema.Finite),
@@ -138,9 +153,13 @@ const Ended = event('ended', {
   mono: Schema.optional(MonotonicSchema),
 });
 
-/** A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it. */
+/**
+ * A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it. A store that
+ * keeps bodies may hold its text as a body (`textBody`).
+ */
 const Input = event('input', {
-  text: Schema.String,
+  text: Schema.optional(Schema.String),
+  textBody: Schema.optional(BodyRefSchema),
   config: Schema.optional(HarnessArgsSchema),
   budgetUsd: Schema.optional(Schema.Finite),
 });
@@ -152,6 +171,7 @@ export const StoredEventSchema = Schema.Union([
     attempt: Schema.Finite,
     resumeFrom: Schema.optional(Schema.String),
     nudge: Schema.optional(Schema.String),
+    nudgeBody: Schema.optional(BodyRefSchema),
     mono: Schema.optional(MonotonicSchema),
   }),
   event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String), mono: Schema.optional(MonotonicSchema) }),

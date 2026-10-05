@@ -95,7 +95,7 @@ export type ClaudeFlags = {
    * account can drive it — type into it, answer its prompts, stop it — from a browser or a phone. Never a default, for that reason.
    * A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves here (`FORMER_ARGS`).
    * Refused on a job — `claude -p` opens no bridge — and on any
-   * harness but Claude Code; a harness brought as a `PromiseRunner` is handed it on the spawn and asked nothing.
+   * harness but Claude Code; a harness brought as a `RunnerOps` is handed it on the spawn, and asked only its own `refuses`.
    */
   remoteControl?: true | string;
   [flag: string]: string | number | true | string[] | undefined;
@@ -246,7 +246,7 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 /**
  * What Claude Code run as `claude -p` cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a bridge to claude.ai,
  * which only a background session opens, and which `claudeFlagsOf` would otherwise spell onto a prompt that runs and exits. The
- * engine's own door words it with the harnesses that do bridge (`harnessRefusalOf` in `facade/consumer.ts`); this is the Effect door's.
+ * engine words it with the harnesses that do bridge (`harnessRefusalOf` in `service/harness-refusal.ts`); this is a bare `Runner`'s.
  */
 export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??

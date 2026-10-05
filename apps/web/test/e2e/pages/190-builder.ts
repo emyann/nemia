@@ -74,39 +74,66 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
   await instructions.locator('summary').click();
 }
 
+/**
+ * The README in the builder of the workflow `name`, made with none: a draft discarded goes back to none; one saved is written as
+ * `README.md` beside the steps, and once the builder is closed, the page reads it as its README.
+ */
+async function writesReadme(page: Page, builder: Locator, name: string, put: (r: Response) => boolean): Promise<void> {
+  const readme = builder.getByRole('textbox', { name: /^README/ });
+  await expectVisible(readme, 'the builder has a box for the README');
+  await expectCount(page.getByRole('region', { name: 'README' }), 0, 'and the page shows it there alone, not again above the builder');
+  await readme.fill('A draft let go.');
+  await expectVisible(builder.locator('[data-readme-unsaved]'), 'a README typed is marked unsaved');
+  await builder.getByRole('button', { name: 'Discard changes' }).click();
+  if ((await readme.inputValue()) !== '') throw new Refused(`Discard puts the README back to none — it holds ${await readme.inputValue()}`);
+  const text = `# ${name}\n\nPlan it, then build it.\n`;
+  await readme.fill(text);
+  const [saved] = await Promise.all([
+    page.waitForResponse(put, { timeout: WAIT_MS }),
+    builder.getByRole('button', { name: 'Save', exact: true }).click(),
+  ]);
+  if (saved.status() !== 200) throw new Refused(`the api saves the README — it answered ${saved.status()}: ${await saved.text()}`);
+  await expectCount(builder.locator('[data-readme-unsaved]'), 0, 'once saved, the README is not unsaved');
+  const file = path.join(store!, 'workflows', name, 'README.md');
+  if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text)
+    throw new Refused(
+      `the README is written beside the steps — ${file} holds ${fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : 'nothing'}`,
+    );
+  await builder.getByRole('button', { name: 'Close', exact: true }).click();
+  await expectVisible(
+    page.getByRole('region', { name: 'README' }).getByText('Plan it, then build it.', { exact: true }),
+    'closed, the page reads the README saved',
+  );
+}
+
 export default {
   /**
    * The builder, on the store's workflows: a workflow of yours made with a first step, a step added, an edge drawn from one block to the
    * other, two keys set in the step's form, a schema pasted, saved, and the folder read back through the api and on disk, then taken back,
    * so every page after this one, in either theme, reads the store as seeded. Each in a page of its own: a cycle drawn and saved, with a
    * schema pasted beside it, refused, and nothing written; a save of the folder changed by hand since, refused; and a step with an agent,
-   * whose form shows what each agent picked gives it. The repository's workflow has no builder, and says why.
+   * whose form shows what each agent picked gives it. The workflow made opens on its page, in its builder, where its README
+   * is written.
    */
   name: 'builder',
   route: '/workflows',
   expect: async (page) => {
     await sidebar(page);
-    const { good, yours } = WORKFLOWS;
-    const card = (p: Page, name: string) => p.locator(`section[aria-label="Workflow ${name}"]`);
+    const { yours } = WORKFLOWS;
+    const card = (p: Page, name: string) => p.locator(`article[aria-label="Workflow ${name}"]`);
+    const open = async (p: Page, name: string) => {
+      await p.goto(new URL(`/workflows/yours/${name}`, page.url()).href, { waitUntil: 'load' });
+      await idle(p);
+    };
     const puts = (name: string) => (r: Response) =>
       r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/workflows/yours/${name}`;
-
-    await expectVisible(
-      card(page, good.name).locator('[data-no-builder]', {
-        hasText: 'No builder: the board writes only yours, and nothing into this checkout.',
-      }),
-      `${good.name}, the repository's, says why it has no builder`,
-    );
-    await expectCount(card(page, good.name).getByRole('button', { name: 'Build', exact: true }), 0, `and offers no Build`);
-    await expectVisible(card(page, yours.name).getByRole('button', { name: 'Build', exact: true }), `${yours.name}, yours, offers Build`);
 
     const mineDir = path.join(store!, 'workflows', yours.name);
     const before = filesIn(mineDir);
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'load' });
-      await idle(refused);
+      await open(refused, yours.name);
       const mine = card(refused, yours.name);
       await mine.getByRole('button', { name: 'Build', exact: true }).click();
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
@@ -198,8 +225,7 @@ export default {
     const stale = await page.context().newPage();
     try {
       const { problems } = watch(stale);
-      await stale.goto(page.url(), { waitUntil: 'load' });
-      await idle(stale);
+      await open(stale, yours.name);
       const mine = card(stale, yours.name);
       await mine.getByRole('button', { name: 'Build', exact: true }).click();
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
@@ -277,8 +303,7 @@ export default {
         `---\nagent: ${agent}\ncheck: npm test\ndisallowedTools: Bash(rm:*)\n---\nMind the cache.\n`,
       );
       const { problems } = watch(crewed);
-      await crewed.goto(page.url(), { waitUntil: 'load' });
-      await idle(crewed);
+      await open(crewed, crew);
       await card(crewed, crew).getByRole('button', { name: 'Build', exact: true }).click();
       const builder = card(crewed, crew).locator(`section[data-builder="${crew}"]`);
       const keys = builder.locator('[data-step-form="build"]');
@@ -372,6 +397,9 @@ export default {
 
       const builder = card(page, name).locator(`section[data-builder="${name}"]`);
       await expectVisible(builder, 'the workflow made opens in its builder');
+      await page.waitForURL((url) => url.pathname === `/workflows/yours/${name}`, { timeout: WAIT_MS });
+      if (new URL(page.url()).searchParams.get('build') !== 'true')
+        throw new Refused(`on its own page, the address saying so, ?build=true — it is ${page.url()}`);
       await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'with nothing unsaved');
       await addStep(builder, 'implement', implement);
       await expectVisible(builder.locator('[data-unsaved]', { hasText: 'Unsaved changes' }), 'a step added is marked unsaved on the card');
@@ -451,6 +479,7 @@ export default {
       if (source !== files[0][1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);
       await settled(page);
       await photograph(page, path.join(OUT, `builder-saved-${await themeOf(page)}.png`), { fullPage: true });
+      await writesReadme(page, builder, name, puts(name));
     } finally {
       fs.rmSync(made, { recursive: true, force: true });
     }

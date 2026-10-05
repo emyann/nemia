@@ -11,11 +11,11 @@ const { good, yours } = WORKFLOWS;
 /** The step the page inspects first, which waits on the other: `review`, after `implement`. */
 const [FIRST, WAITS] = good.steps;
 
-/** The card of the workflow `name`. */
-const cardOf = (page: Page, name: string) => page.locator(`section[aria-label="Workflow ${name}"]`);
+/** The page of the workflow `name`, read from `from`. */
+const pageOf = (from: string, name: string) => `/workflows/${from}/${name}`;
 
-/** The canvas of the workflow `name`. */
-const canvasOf = (page: Page, name: string) => cardOf(page, name).locator('.react-flow');
+/** The canvas of the workflow `name`, whose page is open. */
+const canvasOf = (page: Page, name: string) => page.locator(`article[aria-label="Workflow ${name}"] .react-flow`);
 
 /** The node of the step `step` on the canvas of the workflow `name`. */
 const nodeOf = (page: Page, name: string, step: string) => canvasOf(page, name).locator(`.react-flow__node[data-id="${step}"]`);
@@ -80,7 +80,7 @@ async function clickPane(page: Page, name: string): Promise<void> {
  * closes it.
  */
 async function presses(page: Page): Promise<void> {
-  await cardOf(page, good.name).scrollIntoViewIfNeeded();
+  await canvasOf(page, good.name).scrollIntoViewIfNeeded();
   await nodeOf(page, good.name, WAITS).click();
   const bar = await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node shows the step in the bar`);
   await expectVisible(bar.getByRole('heading', { name: WAITS }), `the bar is titled ${WAITS}`);
@@ -110,19 +110,21 @@ async function presses(page: Page): Promise<void> {
   await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node then switches the bar to it`);
   await settled(page);
   const [mine] = yours.steps;
-  await cardOf(page, yours.name).scrollIntoViewIfNeeded();
+  await visit(page, `${pageOf('yours', yours.name)}?bar=spec:repo/${good.name}/${WAITS}`);
+  await expectVisible(specBar(page, 'repo', good.name, WAITS), `the bar showing ${WAITS} stays open on ${yours.name}'s page`);
   await nodeOf(page, yours.name, mine).click();
   const theirs = await expectSpec(
     page,
     'yours',
     yours.name,
     mine,
-    `a click on ${mine}'s node, in ${yours.name}'s card, switches the bar to it`,
+    `a click on ${mine}'s node, on ${yours.name}'s page, switches the bar to it`,
   );
   await expectVisible(theirs.getByText(`a step of ${yours.name} · yours`), `and says it is a step of ${yours.name}, yours`);
   await settled(page);
   await clickPane(page, yours.name);
   await expectNoBar(page, 'a click on the empty canvas closes the bar');
+  await visit(page, pageOf('repo', good.name));
 
   await nodeOf(page, good.name, FIRST).focus();
   await page.keyboard.press('Enter');
@@ -138,11 +140,10 @@ async function opens(page: Page): Promise<void> {
   const bar = await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node shows it`);
   await bar.getByRole('link', { name: 'Open', exact: true }).click();
   await expectAt(page, to, "the bar's Open opens the step's page");
-  await visit(page, '/workflows');
+  await visit(page, pageOf('repo', good.name));
   await nodeOf(page, good.name, WAITS).dblclick();
   await expectAt(page, to, `a double click on ${WAITS}'s node opens its page`);
   if (barInUrl(page) !== null) throw new Refused(`the step's page opens with no bar — it is ${page.url()}`);
-  await visit(page, '/workflows');
 }
 
 /**
@@ -151,14 +152,15 @@ async function opens(page: Page): Promise<void> {
  */
 async function builds(page: Page): Promise<void> {
   const [mine] = yours.steps;
-  const card = cardOf(page, yours.name);
-  await card.scrollIntoViewIfNeeded();
+  await visit(page, pageOf('yours', yours.name));
   await nodeOf(page, yours.name, mine).click();
   await expectSpec(page, 'yours', yours.name, mine, `a click on ${mine}'s node shows it`);
-  await card.getByRole('button', { name: 'Build', exact: true }).focus();
+  await page.getByRole('button', { name: 'Build', exact: true }).focus();
   await page.keyboard.press('Enter');
-  const builder = card.locator(`section[data-builder="${yours.name}"]`);
+  const builder = page.locator(`section[data-builder="${yours.name}"]`);
   await expectVisible(builder, `Build opens ${yours.name}'s builder`);
+  if (new URL(page.url()).searchParams.get('build') !== 'true')
+    throw new Refused(`the address says the builder is open, ?build=true — it is ${page.url()}`);
   await expectNoBar(page, `and closes the bar showing a step of ${yours.name}`);
   await builder.locator(`.react-flow__node[data-id="${mine}"]`).click();
   await expectVisible(builder.locator(`[data-step-form="${mine}"]`), `a click on ${mine} in the builder selects it for its form`);
@@ -166,17 +168,18 @@ async function builds(page: Page): Promise<void> {
   await expectNoBar(page, 'and shows no bar');
   await builder.getByRole('button', { name: 'Close', exact: true }).click();
   await expectVisible(nodeOf(page, yours.name, mine), `Close puts ${yours.name}'s canvas back`);
+  if (new URL(page.url()).searchParams.has('build')) throw new Refused(`and the address no longer says build — it is ${page.url()}`);
 }
 
 export default {
   /**
-   * A workflow's canvas and the frame's bar: a click or Enter on a step shows it in the bar, ringed, clear of the bar; the bar says what it
-   * runs on, its keys and what it waits on; again, or the empty canvas, closes it, and another step, on another workflow's canvas too,
-   * switches it. Open and a double click open the step's page. Build swaps the canvas for the builder, closes the bar showing one of its
-   * steps, and keeps a click on a step to edit it.
+   * A workflow's canvas, on its page, and the frame's bar: a click or Enter on a step shows it in the bar, ringed, clear of the bar; the
+   * bar says what it runs on, its keys and what it waits on; again, or the empty canvas, closes it, and another step, on this canvas or
+   * another workflow's page, switches it. Open and a double click open the step's page. Build swaps the canvas for the builder, closes the
+   * bar showing one of its steps, and keeps a click on a step to edit it.
    */
   name: 'workflow-bar',
-  route: '/workflows',
+  route: pageOf('repo', good.name),
   expect: async (page) => {
     await presses(page);
     await opens(page);

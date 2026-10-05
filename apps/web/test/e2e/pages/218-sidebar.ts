@@ -131,10 +131,8 @@ async function favorites(page: Page): Promise<void> {
   await settled(page);
   await photograph(page, path.join(OUT, `sidebar-favorites-${await themeOf(page)}.png`));
   await links.filter({ hasText: WORKFLOWS.good.name }).click();
-  await expectAt(page, '/workflows', '', 'a workflow favourite opens the Workflows page');
-  if (new URL(page.url()).hash !== `#workflow-repo-${WORKFLOWS.good.name}`)
-    throw new Refused(`at its card, #workflow-repo-${WORKFLOWS.good.name} — the address is ${page.url()}`);
-  await expectVisible(page.locator(`section#workflow-repo-${WORKFLOWS.good.name}`), 'its card is on the page');
+  await expectAt(page, `/workflows/repo/${WORKFLOWS.good.name}`, '', 'a workflow favourite opens its own page');
+  await expectVisible(page.locator('h1', { hasText: new RegExp(`^${WORKFLOWS.good.name}$`) }), 'which is titled by its name');
   await links.filter({ hasText: FOLDER.title }).click();
   await expectAt(page, `/runs/${FOLDER.id}`, '', 'a run favourite opens its page');
 }

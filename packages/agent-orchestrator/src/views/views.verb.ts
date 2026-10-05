@@ -171,7 +171,20 @@ function droppingOnWrite(
 }
 
 /** The engine's verbs that change no task. */
-const ENGINE_READS = new Set(['tick', 'list', 'logs', 'output', 'transcript', 'path', 'feed', 'watch', 'io', 'start']);
+const ENGINE_READS = new Set([
+  'tick',
+  'list',
+  'logs',
+  'output',
+  'transcript',
+  'path',
+  'feed',
+  'watch',
+  'io',
+  'start',
+  'sweep',
+  'removeBody',
+]);
 
 /** The engine's verbs that change a task, each with the tasks it names: a filing names the task it files, which a read may have kept. */
 const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {

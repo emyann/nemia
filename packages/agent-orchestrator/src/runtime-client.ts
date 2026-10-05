@@ -4,7 +4,7 @@
  * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`, `QuotaLimit`, `nameFor`,
  * `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
  *
- * It builds the runtime's `Engine` service (`agent-runtime/effect`) once, changed in one verb: `file`, so that every task the orchestrator
+ * It builds the runtime's `Engine` service (`agent-runtime`) once, changed in one verb: `file`, so that every task the orchestrator
  * files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. What the controllers do with the
  * runtime — file a task, view one, tick, admit, stop one, read its logs, say something to it, read the feed — are the verbs of that
  * service, each an Effect, which every controller takes as it is and every test hands one of (`engineOf` over a layer of its own). A
@@ -16,7 +16,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
-import { Engine as RuntimeEngine, refusalWords, type EngineShape } from 'agent-runtime/effect';
 import {
   claudeDetached,
   codex,
@@ -25,6 +24,9 @@ import {
   type Credentials,
   type MissingCredential,
   type RemoteAgent,
+  Engine as RuntimeEngine,
+  refusalWords,
+  type EngineShape,
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';

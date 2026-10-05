@@ -23,9 +23,11 @@ import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as AgentsSkillsNewRouteImport } from './routes/agents_.skills.new'
+import { Route as FactoriesFactorySettingsRouteImport } from './routes/factories.$factory_.settings'
+import { Route as WorkflowsFromWorkflowRouteImport } from './routes/workflows_.$from.$workflow'
 import { Route as AgentsSkillsFromSkillRouteImport } from './routes/agents_.skills.$from.$skill'
 import { Route as RunsRunIdStepsStepRouteImport } from './routes/runs.$runId_.steps.$step'
-import { Route as WorkflowsFromWorkflowStepRouteImport } from './routes/workflows_.$from.$workflow.$step'
+import { Route as WorkflowsFromWorkflowStepRouteImport } from './routes/workflows_.$from.$workflow_.$step'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -97,6 +99,17 @@ const AgentsSkillsNewRoute = AgentsSkillsNewRouteImport.update({
   path: '/agents/skills/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FactoriesFactorySettingsRoute =
+  FactoriesFactorySettingsRouteImport.update({
+    id: '/factories/$factory_/settings',
+    path: '/factories/$factory/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const WorkflowsFromWorkflowRoute = WorkflowsFromWorkflowRouteImport.update({
+  id: '/workflows_/$from/$workflow',
+  path: '/workflows/$from/$workflow',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsSkillsFromSkillRoute = AgentsSkillsFromSkillRouteImport.update({
   id: '/agents_/skills/$from/$skill',
   path: '/agents/skills/$from/$skill',
@@ -109,7 +122,7 @@ const RunsRunIdStepsStepRoute = RunsRunIdStepsStepRouteImport.update({
 } as any)
 const WorkflowsFromWorkflowStepRoute =
   WorkflowsFromWorkflowStepRouteImport.update({
-    id: '/workflows_/$from/$workflow/$step',
+    id: '/workflows_/$from/$workflow_/$step',
     path: '/workflows/$from/$workflow/$step',
     getParentRoute: () => rootRouteImport,
   } as any)
@@ -129,6 +142,8 @@ export interface FileRoutesByFullPath {
   '/runs/': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
+  '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
+  '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
@@ -148,6 +163,8 @@ export interface FileRoutesByTo {
   '/runs': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
+  '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
+  '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
@@ -168,9 +185,11 @@ export interface FileRoutesById {
   '/runs/': typeof RunsIndexRoute
   '/agents_/$from/$agent': typeof AgentsFromAgentRoute
   '/agents_/skills/new': typeof AgentsSkillsNewRoute
+  '/factories/$factory_/settings': typeof FactoriesFactorySettingsRoute
+  '/workflows_/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents_/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
   '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
-  '/workflows_/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/workflows_/$from/$workflow_/$step': typeof WorkflowsFromWorkflowStepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,6 +208,8 @@ export interface FileRouteTypes {
     | '/runs/'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
+    | '/factories/$factory/settings'
+    | '/workflows/$from/$workflow'
     | '/agents/skills/$from/$skill'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
@@ -208,6 +229,8 @@ export interface FileRouteTypes {
     | '/runs'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
+    | '/factories/$factory/settings'
+    | '/workflows/$from/$workflow'
     | '/agents/skills/$from/$skill'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
@@ -227,9 +250,11 @@ export interface FileRouteTypes {
     | '/runs/'
     | '/agents_/$from/$agent'
     | '/agents_/skills/new'
+    | '/factories/$factory_/settings'
+    | '/workflows_/$from/$workflow'
     | '/agents_/skills/$from/$skill'
     | '/runs/$runId_/steps/$step'
-    | '/workflows_/$from/$workflow/$step'
+    | '/workflows_/$from/$workflow_/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -247,6 +272,8 @@ export interface RootRouteChildren {
   RunsIndexRoute: typeof RunsIndexRoute
   AgentsFromAgentRoute: typeof AgentsFromAgentRoute
   AgentsSkillsNewRoute: typeof AgentsSkillsNewRoute
+  FactoriesFactorySettingsRoute: typeof FactoriesFactorySettingsRoute
+  WorkflowsFromWorkflowRoute: typeof WorkflowsFromWorkflowRoute
   AgentsSkillsFromSkillRoute: typeof AgentsSkillsFromSkillRoute
   RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
   WorkflowsFromWorkflowStepRoute: typeof WorkflowsFromWorkflowStepRoute
@@ -352,6 +379,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsSkillsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/factories/$factory_/settings': {
+      id: '/factories/$factory_/settings'
+      path: '/factories/$factory/settings'
+      fullPath: '/factories/$factory/settings'
+      preLoaderRoute: typeof FactoriesFactorySettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workflows_/$from/$workflow': {
+      id: '/workflows_/$from/$workflow'
+      path: '/workflows/$from/$workflow'
+      fullPath: '/workflows/$from/$workflow'
+      preLoaderRoute: typeof WorkflowsFromWorkflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents_/skills/$from/$skill': {
       id: '/agents_/skills/$from/$skill'
       path: '/agents/skills/$from/$skill'
@@ -366,8 +407,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdStepsStepRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workflows_/$from/$workflow/$step': {
-      id: '/workflows_/$from/$workflow/$step'
+    '/workflows_/$from/$workflow_/$step': {
+      id: '/workflows_/$from/$workflow_/$step'
       path: '/workflows/$from/$workflow/$step'
       fullPath: '/workflows/$from/$workflow/$step'
       preLoaderRoute: typeof WorkflowsFromWorkflowStepRouteImport
@@ -391,6 +432,8 @@ const rootRouteChildren: RootRouteChildren = {
   RunsIndexRoute: RunsIndexRoute,
   AgentsFromAgentRoute: AgentsFromAgentRoute,
   AgentsSkillsNewRoute: AgentsSkillsNewRoute,
+  FactoriesFactorySettingsRoute: FactoriesFactorySettingsRoute,
+  WorkflowsFromWorkflowRoute: WorkflowsFromWorkflowRoute,
   AgentsSkillsFromSkillRoute: AgentsSkillsFromSkillRoute,
   RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,
   WorkflowsFromWorkflowStepRoute: WorkflowsFromWorkflowStepRoute,

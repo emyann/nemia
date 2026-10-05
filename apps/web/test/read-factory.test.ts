@@ -11,7 +11,13 @@ import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilitie
 import { quotaQuery, type Quota } from '../src/lib/api/quota.ts';
 import { ceilingsQuery, passesQuery, type Ceilings, type PassesRead } from '../src/lib/api/ceilings.ts';
 import { daemonQuery, type Daemon } from '../src/lib/api/daemon.ts';
-import { factoriesQuery, type Factory } from '../src/lib/api/factories.ts';
+import {
+  factoriesQuery,
+  factoryInstructionQuery,
+  writeInstruction,
+  type Factory,
+  type FactoryInstruction,
+} from '../src/lib/api/factories.ts';
 import {
   capabilities,
   cardPage,
@@ -42,6 +48,7 @@ const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>
 const readPasses = passesQuery.queryFn as unknown as () => Promise<PassesRead>;
 const readDaemon = daemonQuery.queryFn as unknown as () => Promise<Daemon>;
 const readFactories = factoriesQuery.queryFn as unknown as () => Promise<Factory[]>;
+const readInstruction = factoryInstructionQuery('mill').queryFn as unknown as () => Promise<FactoryInstruction>;
 
 /** Whether `err` is an `UnreadAnswer` of `route` whose message names `at`, what was found there, and the fix. */
 const unread = (route: string, at: string, found: string) => (err: unknown) => {
@@ -287,4 +294,32 @@ test('REFUSED, the recent passes: an answer with no histogram, a part of a phase
   const [first, ...rest] = passesRead().recent;
   answering(t, passesRead({ recent: [without(first, 'runs'), ...rest] }));
   await assert.rejects(readPasses(), unread('/api/passes', 'recent[0].runs', 'is missing'));
+});
+
+/** A factory's instruction as the api answers it: kept in the store, with words. */
+const instruction: FactoryInstruction = {
+  name: 'mill',
+  path: null,
+  store: true,
+  file: '/home/me/.agent-workflows/factories/mill/NEMIA.md',
+  words: 'Keep it short.\n',
+  error: null,
+  stored: true,
+};
+
+test("a factory's instruction reads as the api gives it, kept in the store or in a folder with no file there yet; a write's answer the same", async (t) => {
+  answering(t, instruction);
+  assert.deepEqual(await readInstruction(), instruction);
+  const folder = { ...instruction, path: 'docs/NEMIA.md', store: false, file: '/src/mill/docs/NEMIA.md', words: null, stored: false };
+  answering(t, folder);
+  assert.deepEqual(await readInstruction(), folder);
+  answering(t, instruction);
+  assert.deepEqual(await writeInstruction('mill', 'Keep it short.'), instruction);
+});
+
+test("REFUSED, a factory's instruction: one that does not say whether the store keeps it, and one whose words are left out", async (t) => {
+  answering(t, without(instruction, 'store'));
+  await assert.rejects(readInstruction(), unread('/api/factories/mill/instruction', 'store', 'is missing'));
+  answering(t, without(instruction, 'words'));
+  await assert.rejects(readInstruction(), unread('/api/factories/mill/instruction', 'words', 'is missing'));
 });

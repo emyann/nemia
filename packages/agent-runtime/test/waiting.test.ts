@@ -9,6 +9,7 @@
  * Where Claude Code keeps transcripts, `CLAUDE_CONFIG_DIR`, is read when the runner is loaded, so it is set before the
  * runner's import.
  */
+import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,9 @@ import { scratch } from './scratch.ts';
 const tmp = (label: string) => scratch(`ae-waiting-${label}-`);
 
 process.env.CLAUDE_CONFIG_DIR = tmp('config');
-const { Engine, promiseEngine } = await import('../src/index.ts');
+const { Engine } = await import('../src/index.ts');
+
+const { builtEngine } = await import('./engine.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; waitingFor?: unknown; startedAt: number };
 
@@ -62,9 +65,9 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 
 /** A task whose one session the registry lists blocked, and the engine that reads it. */
 const blocked = async () => {
-  const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
-  const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
-  await engine.tick();
+  const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+  const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+  await Effect.runPromise(engine.tick());
   return { engine, id };
 };
 
@@ -75,7 +78,7 @@ test("a blocked session carries what its harness says it waits for, in the harne
     const [row] = claude.rows();
     claude.set(row.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
 
-    const v = await engine.view(id);
+    const v = await Effect.runPromise(engine.view(id));
     assert.equal(v.phase, 'needs-human', 'the phase is the word everything above judges on, and it is unchanged');
     assert.equal(v.waitingFor, 'permission prompt', 'and beside it, what the harness says it waits for');
   });
@@ -88,14 +91,14 @@ test('a blocked session whose harness says nothing carries nothing: the field is
     const [row] = claude.rows();
     claude.set(row.name, { state: 'blocked', status: 'waiting' });
 
-    const v = await engine.view(id);
+    const v = await Effect.runPromise(engine.view(id));
     assert.equal(v.phase, 'needs-human');
     assert.equal(Object.hasOwn(v, 'waitingFor'), false, 'nothing said is nothing carried');
 
     claude.set(row.name, { waitingFor: '   ' });
-    assert.equal(Object.hasOwn(await engine.view(id), 'waitingFor'), false, 'a blank word is no word');
+    assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'waitingFor'), false, 'a blank word is no word');
     claude.set(row.name, { waitingFor: { reason: 'permission prompt' } });
-    assert.equal(Object.hasOwn(await engine.view(id), 'waitingFor'), false, 'and neither is one that is not a string');
+    assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'waitingFor'), false, 'and neither is one that is not a string');
   });
 });
 
@@ -106,15 +109,15 @@ test('level-triggered: the word is read afresh each pass — the second pass sho
     const [row] = claude.rows();
 
     claude.set(row.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
-    assert.equal((await engine.view(id)).waitingFor, 'permission prompt');
+    assert.equal((await Effect.runPromise(engine.view(id))).waitingFor, 'permission prompt');
 
     claude.set(row.name, { waitingFor: 'workspace trust dialog' });
-    const second = await engine.view(id);
+    const second = await Effect.runPromise(engine.view(id));
     assert.equal(second.waitingFor, 'workspace trust dialog', 'the second pass shows the new word');
     assert.equal(second.waitingFor?.includes('permission'), false, 'and none of the old: nothing is carried between passes');
 
     claude.set(row.name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
-    const third = await engine.view(id);
+    const third = await Effect.runPromise(engine.view(id));
     assert.equal(third.phase.startsWith('needs-human'), false, 'it is working again');
     assert.equal(Object.hasOwn(third, 'waitingFor'), false, 'and carries no word: the field rides on needs-human alone');
   });

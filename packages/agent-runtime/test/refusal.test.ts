@@ -1,11 +1,11 @@
 /**
- * What `file` refuses, at both doors, in one set of words.
+ * What `file` refuses, in the core and through the engine, in one set of words.
  *
- * The harness-agnostic refusals live under the Effect `file` (`refusalOf` in `src/core/engine/filing.ts`), so a consumer of
- * `agent-runtime/effect` cannot journal `deadlineSeconds: NaN`, which would stop its task on the first pass, and
- * the Promise engine's `file` throws the same sentence behind `file: `. The harness's own words stay at the facade
- * (`test/facade.test.ts`); the Effect door has no harnesses to ask. Codex's arguments (`config.codex`) on a harness that is not
- * Codex are refused at both of the engine's doors, the `Engine` service and `promiseEngine`, which have harnesses to ask.
+ * The harness-agnostic refusals live under the core `file` (`refusalOf` in `src/core/engine/filing.ts`), so a caller of
+ * `agent-runtime` cannot journal `deadlineSeconds: NaN`, which would stop its task on the first pass, and the `Engine`
+ * service's `file` fails with the same `FileRefused`. The harness's own words are the engine's (`test/engine-verbs.test.ts`); the
+ * core `file` has no harnesses to ask. Codex's arguments (`config.codex`) on a harness that is not Codex, and a long-lived task
+ * on a harness that ends its session with its turn, are refused by the `Engine` service, which has harnesses to ask.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,29 +14,22 @@ import { Effect, Layer } from 'effect';
 import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/harness/seam.ts';
 import { file, type Filing } from '../src/core/engine/filing.ts';
-import {
-  claudeDetached,
-  codex,
-  type EngineOptions,
-  type Event,
-  type HarnessArgs,
-  type PromiseJournal,
-  type PromiseRunner,
-  type Sighting,
-} from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { claudeDetached, codex, type EngineOptions, type Event, type HarnessArgs, type Sighting } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { claudeBgRefuses, claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
 import { scratch } from './scratch.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
-/** The Effect door, over a store and a harness that cost nothing. */
-const effectDoor = () => {
+/** The core `file`, over a store and a harness that cost nothing. */
+const coreDoor = () => {
   const layer = Layer.mergeAll(Journal.test(), Runner.test({ sessions: new Map<string, Sighting>(), spawned: [] }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   return { run, listed: () => run(Effect.flatMap(Journal, (j) => j.list)) };
 };
 
 /** A store in memory a test can read. */
-const memoryStore = (): PromiseJournal => {
+const memoryStore = (): AsyncJournal => {
   const tasks = new Map<string, Event[]>();
   return {
     async append(taskId, event) {
@@ -54,10 +47,10 @@ const memoryStore = (): PromiseJournal => {
   };
 };
 
-/** The Promise door, at shipped defaults, over a store a test can read. */
-const promiseDoor = () => {
+/** The `Engine` service, at shipped defaults, over a store a test can read. */
+const engineDoor = () => {
   const journal = memoryStore();
-  return { engine: promiseEngine(Engine.layer({ journal })), listed: () => journal.list() };
+  return { engine: builtEngine(Engine.layer({ journal: asyncStore(journal) })), listed: () => journal.list() };
 };
 
 const ok: Filing = { brief: 'b', cwd: '/r' };
@@ -168,25 +161,23 @@ for (const [bad, says] of REFUSALS) {
     .map(([k, v]) => `${k}: ${typeof v === 'number' ? v : JSON.stringify(v)}`)
     .join(', ');
 
-  test(`the Effect door refuses ${name}, journals nothing, and the Promise door refuses it in the same words`, async () => {
-    const effect = effectDoor();
+  test(`the core \`file\` refuses ${name}, journals nothing, and the engine refuses it in the same words`, async () => {
+    const effect = coreDoor();
     const err = await effect.run(Effect.flip(file(spec)));
     assert.equal(err._tag, 'FileRefused', `failed with ${err._tag}: ${err.message}`);
     assert.match(err.message, says);
     assert.deepEqual(await effect.listed(), [], 'nothing was journalled, so no tick can spawn it');
 
-    const promise = promiseDoor();
-    await assert.rejects(promise.engine.file(spec), (e: Error & { exitCode?: number }) => {
-      assert.equal(e.exitCode, 2, e.message);
-      assert.equal(e.message, `file: ${err.message}`, 'one function, one sentence, at both doors');
-      return true;
-    });
-    assert.deepEqual(await promise.listed(), []);
+    const door = engineDoor();
+    const refused = await Effect.runPromise(Effect.flip(door.engine.file(spec)));
+    assert.equal(refused._tag, 'FileRefused', `failed with ${refused._tag}: ${refused.message}`);
+    assert.equal(refused.message, err.message, 'one function, one sentence, in the core and through the engine');
+    assert.deepEqual(await door.listed(), []);
   });
 }
 
-test('the Effect door journals a filing that refuses nothing, with every checked key set', async () => {
-  const effect = effectDoor();
+test('the core `file` journals a filing that refuses nothing, with every checked key set', async () => {
+  const effect = coreDoor();
   const full: Filing = {
     ...ok,
     deadlineSeconds: 60,
@@ -209,8 +200,8 @@ test('the Effect door journals a filing that refuses nothing, with every checked
   assert.deepEqual(await effect.listed(), [id]);
 });
 
-test('the Effect door journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
-  const effect = effectDoor();
+test('the core `file` journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
+  const effect = coreDoor();
   const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true, config: { background: true } }));
   const job = await effect.run(file(ok));
   const filedOf = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(id))).then((es) => es[0]);
@@ -219,18 +210,18 @@ test('the Effect door journals a long-lived filing with its restart policy, and 
   assert.equal(Object.hasOwn(await filedOf(job), 'restartPolicy'), false, 'a job journals no restart policy');
 });
 
-test("the Effect door journals a harness's own words it cannot check: it has no harness to ask", async () => {
-  const effect = effectDoor();
+test("the core `file` journals a harness's own words it cannot check: it has no harness to ask", async () => {
+  const effect = coreDoor();
   await effect.run(file({ ...ok, harness: 'banana', config: { permissionMode: 'yolo' } }));
   assert.equal(
     (await effect.listed()).length,
     1,
-    "a harness's own words are its runner's to refuse: the day the Effect door refuses them, this test says so",
+    "a harness's own words are its runner's to refuse: the day the core `file` refuses them, this test says so",
   );
 });
 
-test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Codex, at both of the engine's doors, naming the harness that takes them — and taken on Codex", async () => {
-  const mine: PromiseRunner = {
+test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Codex, by the engine, naming the harness that takes them — and taken on Codex", async () => {
+  const mine: AsyncRunner = {
     async spawn() {},
     async observe() {
       return new Map();
@@ -242,36 +233,40 @@ test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Co
   };
   const options: EngineOptions = {
     root: scratch('ae-codex-bag-'),
-    journal: memoryStore(),
-    harnesses: { claude: 'claude', bg: 'claude-bg', codex, 'claude-detached': claudeDetached, remote: { url: 'https://a.example' }, mine },
+    journal: asyncStore(memoryStore()),
+    harnesses: {
+      claude: 'claude',
+      bg: 'claude-bg',
+      codex,
+      'claude-detached': claudeDetached,
+      remote: { url: 'https://a.example' },
+      mine: asyncOps(mine),
+    },
   };
-  const promise = promiseEngine(Engine.layer(options));
-  const viaEffect = (spec: Filing) =>
-    Effect.runPromise(Effect.flip(Engine.use((e) => e.file(spec)).pipe(Effect.provide(Engine.layer(options)))));
+  const engine = builtEngine(Engine.layer(options));
+  const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
   const config = { codex: { trustFrom: '/repo' } };
   for (const harness of ['claude', 'bg', 'claude-detached', 'remote']) {
     const says = `\`codex\` gives Codex arguments of its own, and the \`${harness}\` harness is not Codex: its session would start without them. File the task on \`codex\`, or leave \`codex\` off.`;
-    const err = await viaEffect({ ...ok, harness, config });
+    const err = await refused({ ...ok, harness, config });
+    assert.equal(err._tag, 'FileRefused', harness);
     assert.equal(err.message, says, harness);
-    await assert.rejects(promise.file({ ...ok, harness, config }), (e: Error & { exitCode?: number }) => {
-      assert.equal(e.exitCode, 2, e.message);
-      assert.equal(e.message, `file: ${says}`, harness);
-      return true;
-    });
   }
-  assert.ok(await promise.file({ ...ok, harness: 'codex', config }), 'Codex takes them');
-  assert.ok(await promise.file({ ...ok, harness: 'mine', config }), "a PromiseRunner is the consumer's own, and asked nothing");
-  const lone = promiseEngine(Engine.layer({ root: scratch('ae-codex-bag-'), journal: memoryStore(), harnesses: { claude: 'claude' } }));
+  assert.ok(await Effect.runPromise(engine.file({ ...ok, harness: 'codex', config })), 'Codex takes them');
+  assert.ok(await Effect.runPromise(engine.file({ ...ok, harness: 'mine', config })), 'a runner brought as its own is asked nothing');
+  const lone = builtEngine(
+    Engine.layer({ root: scratch('ae-codex-bag-'), journal: asyncStore(memoryStore()), harnesses: { claude: 'claude' } }),
+  );
   await assert.rejects(
-    lone.file({ ...ok, harness: 'claude', config }),
+    Effect.runPromise(lone.file({ ...ok, harness: 'claude', config })),
     (e: Error) =>
       e.message ===
-      "file: `codex` gives Codex arguments of its own, and the `claude` harness is not Codex: its session would start without them. Leave `codex` off: none of this engine's harnesses is Codex.",
+      "`codex` gives Codex arguments of its own, and the `claude` harness is not Codex: its session would start without them. Leave `codex` off: none of this engine's harnesses is Codex.",
   );
 });
 
-test("REFUSED at shipped defaults: a long-lived task on a harness that ends its session with its turn, at both of the engine's doors, naming the harnesses that keep one open — and taken on those", async () => {
-  const mine: PromiseRunner = {
+test('REFUSED at shipped defaults: a long-lived task on a harness that ends its session with its turn, by the engine, naming the harnesses that keep one open — and taken on those', async () => {
+  const mine: AsyncRunner = {
     async spawn() {},
     async observe() {
       return new Map();
@@ -283,12 +278,18 @@ test("REFUSED at shipped defaults: a long-lived task on a harness that ends its 
   };
   const options: EngineOptions = {
     root: scratch('ae-long-lived-'),
-    journal: memoryStore(),
-    harnesses: { claude: 'claude', bg: 'claude-bg', codex, 'claude-detached': claudeDetached, remote: { url: 'https://a.example' }, mine },
+    journal: asyncStore(memoryStore()),
+    harnesses: {
+      claude: 'claude',
+      bg: 'claude-bg',
+      codex,
+      'claude-detached': claudeDetached,
+      remote: { url: 'https://a.example' },
+      mine: asyncOps(mine),
+    },
   };
-  const promise = promiseEngine(Engine.layer(options));
-  const viaEffect = (spec: Filing) =>
-    Effect.runPromise(Effect.flip(Engine.use((e) => e.file(spec)).pipe(Effect.provide(Engine.layer(options)))));
+  const engine = builtEngine(Engine.layer(options));
+  const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
   const open = 'File the task on `claude` with `config.background: true` or `bg`, or leave `restartPolicy` off.';
   const cases: Array<[string, string]> = [
     ['claude', 'the `claude` harness runs this task as a job, which ends its session with its turn.'],
@@ -298,36 +299,34 @@ test("REFUSED at shipped defaults: a long-lived task on a harness that ends its 
   ];
   for (const [harness, why] of cases) {
     const says = `\`restartPolicy: 'Always'\` keeps a session open until it is stopped, and ${why} ${open}`;
-    const err = await viaEffect({ ...ok, harness, restartPolicy: 'Always' });
+    const err = await refused({ ...ok, harness, restartPolicy: 'Always' });
+    assert.equal(err._tag, 'FileRefused', harness);
     assert.equal(err.message, says, harness);
-    await assert.rejects(promise.file({ ...ok, harness, restartPolicy: 'Always' }), (e: Error & { exitCode?: number }) => {
-      assert.equal(e.exitCode, 2, e.message);
-      assert.equal(e.message, `file: ${says}`, harness);
-      return true;
-    });
   }
   assert.ok(
-    await promise.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true } }),
+    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true } })),
     'claude --bg keeps it open',
   );
-  assert.ok(await promise.file({ ...ok, harness: 'bg', restartPolicy: 'Always' }), 'so does the claude-bg harness');
+  assert.ok(await Effect.runPromise(engine.file({ ...ok, harness: 'bg', restartPolicy: 'Always' })), 'so does the claude-bg harness');
   assert.ok(
-    await promise.file({ ...ok, harness: 'mine', restartPolicy: 'Always' }),
-    "a PromiseRunner is the consumer's own, and asked nothing",
+    await Effect.runPromise(engine.file({ ...ok, harness: 'mine', restartPolicy: 'Always' })),
+    'a runner brought as its own is asked nothing',
   );
-  const lone = promiseEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: memoryStore(), harnesses: { claude: 'claude' } }));
+  const lone = builtEngine(
+    Engine.layer({ root: scratch('ae-long-lived-'), journal: asyncStore(memoryStore()), harnesses: { claude: 'claude' } }),
+  );
   await assert.rejects(
-    lone.file({ ...ok, harness: 'claude', config: { background: false }, restartPolicy: 'Always' }),
+    Effect.runPromise(lone.file({ ...ok, harness: 'claude', config: { background: false }, restartPolicy: 'Always' })),
     (e: Error) =>
       e.message ===
-      "file: `restartPolicy: 'Always'` keeps a session open until it is stopped, and the `claude` harness runs this task as a job, which ends its session with its turn. File the task on `claude` with `config.background: true`, or leave `restartPolicy` off.",
+      "`restartPolicy: 'Always'` keeps a session open until it is stopped, and the `claude` harness runs this task as a job, which ends its session with its turn. File the task on `claude` with `config.background: true`, or leave `restartPolicy` off.",
   );
-  const jobs = promiseEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: memoryStore(), harnesses: { codex } }));
+  const jobs = builtEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: asyncStore(memoryStore()), harnesses: { codex } }));
   await assert.rejects(
-    jobs.file({ ...ok, harness: 'codex', restartPolicy: 'Always' }),
+    Effect.runPromise(jobs.file({ ...ok, harness: 'codex', restartPolicy: 'Always' })),
     (e: Error) =>
       e.message ===
-      "file: `restartPolicy: 'Always'` keeps a session open until it is stopped, and the `codex` harness ends its session with its turn. Leave `restartPolicy` off: none of this engine's harnesses keeps a session open.",
+      "`restartPolicy: 'Always'` keeps a session open until it is stopped, and the `codex` harness ends its session with its turn. Leave `restartPolicy` off: none of this engine's harnesses keeps a session open.",
   );
 });
 

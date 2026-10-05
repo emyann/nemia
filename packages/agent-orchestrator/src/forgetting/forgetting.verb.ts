@@ -8,7 +8,15 @@
 import { Cause, Effect, Result } from 'effect';
 import { EngineService, ForgetRefused, tried, type ForgetReport } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
-import { engineWords, forgettingDone, forgettingOf, type EngineAnswer, type TaskForgotten, type TaskWaiting } from './forgetting.ts';
+import {
+  engineWords,
+  forgettingDone,
+  forgettingOf,
+  forgettingRefused,
+  type EngineAnswer,
+  type TaskForgotten,
+  type TaskKept,
+} from './forgetting.ts';
 
 /** A task of the engine's report as `EngineAnswer` keeps it: what its harness leaves, every session's together. */
 const forgottenOf = (t: ForgetReport['tasks'][number]): TaskForgotten => ({
@@ -21,30 +29,32 @@ const forgottenOf = (t: ForgetReport['tasks'][number]): TaskForgotten => ({
 /**
  * The tasks `ids` forgotten by the engine, or, without `yes`, counted: each viewed first, one the engine has no record of — forgotten
  * already, or never filed — left out, and one not settled set waiting. The settled ones are asked of `forget` together, which refuses
- * the whole call for one task it cannot forget: that task is set waiting with the runtime's words, and the rest asked again, so it costs
+ * the whole call for one task it cannot forget: that task is set refused with the runtime's words, and the rest asked again, so it costs
  * one call, and one more for each task refused on its own. A refusal that names no task, or any other failure of the engine's, is the
- * answer's `refusal`, and nothing more is asked. A view that fails sets its task waiting in the runtime's words. Never fails.
+ * answer's `refusal`, and nothing more is asked. A view that fails sets its task refused in the runtime's words. Never fails.
  */
 export const engineForgetting = Effect.fn('engineForgetting')(function* (ids: readonly string[], { yes }: { yes: boolean }) {
   const e = yield* EngineService;
-  const waiting: TaskWaiting[] = [];
+  const waiting: TaskKept[] = [];
+  const refused: TaskKept[] = [];
   let settled: string[] = [];
   for (const taskId of new Set(ids)) {
-    const view = yield* e.view(taskId).pipe(Effect.catch((err) => Effect.sync(() => void waiting.push({ taskId, why: err.message }))));
+    const view = yield* e.view(taskId).pipe(Effect.catch((err) => Effect.sync(() => void refused.push({ taskId, why: err.message }))));
     if (!view?.state.brief) continue;
     if (view.state.settled === null) waiting.push({ taskId, why: `${taskId} has not settled yet` });
     else settled.push(taskId);
   }
   while (settled.length) {
     const asked = yield* Effect.result(e.forget(settled, { yes }));
-    if (Result.isSuccess(asked)) return { tasks: asked.success.tasks.map(forgottenOf), waiting } satisfies EngineAnswer;
+    if (Result.isSuccess(asked)) return { tasks: asked.success.tasks.map(forgottenOf), waiting, refused } satisfies EngineAnswer;
     const err = asked.failure;
     const taskId = err instanceof ForgetRefused ? err.taskId : undefined;
-    if (taskId === undefined || !settled.includes(taskId)) return { tasks: [], waiting, refusal: err.message } satisfies EngineAnswer;
-    waiting.push({ taskId, why: err.message });
+    if (taskId === undefined || !settled.includes(taskId))
+      return { tasks: [], waiting, refused, refusal: err.message } satisfies EngineAnswer;
+    refused.push({ taskId, why: err.message });
     settled = settled.filter((id) => id !== taskId);
   }
-  return { tasks: [], waiting } satisfies EngineAnswer;
+  return { tasks: [], waiting, refused } satisfies EngineAnswer;
 });
 
 /**
@@ -83,7 +93,7 @@ export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, Engin
         continue;
       }
       const forgetting = yield* forgetTasks(id, taskIds);
-      const refused = forgetting.refusal !== undefined;
+      const refused = forgettingRefused(forgetting);
       if (forgetting.forgotten.length || refused)
         said.push({ text: `${id} (removed): ${engineWords(forgetting, { id })}`, ...(refused ? { warn: true as const } : {}) });
     }

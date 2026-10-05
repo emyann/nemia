@@ -3048,10 +3048,13 @@ engine's `forget` removes each settled task's journal, its session files and its
 and the marker is lifted; the line says how many tasks went, and the bytes and lines with them. A task
 `wf rm` has just closed, held open for a word, has not settled yet: the line says it waits, and the
 daemon's passes forget it once it settles, from the marker (`finishForgetting`), as `wf rm <id>` again
-does. A marker beside a record is a `wf rm` cut short, and no pass touches it. The engine refusing the
-whole call is not a refusal of the run: `wf rm` exits 0, the line gives the engine's words, the marker
-keeps the ids and every pass asks again; only a person removes the marker, with the `rm` the line gives,
-once nothing of those tasks is wanted. A marker that does not read is said on every pass, the same way.
+does. A marker beside a record is a `wf rm` cut short, and no pass touches it. The engine refusing a
+settled task by name — a harness it no longer has, a session its harness still holds, a journal it cannot
+read — sets that task apart as refused, not waiting, and asks again for the rest, one call more for each.
+A refusal, of a task or of the whole call, is not a refusal of the run: `wf rm` exits 0, the line gives
+the engine's words, the marker keeps the ids and every pass asks again and warns, lifting the marker once
+the engine forgets them; only a person removes the marker, with the `rm` the line gives, once nothing of
+those tasks is wanted. A marker that does not read is said on every pass, the same way.
 A run held lifts its marker and forgets nothing: it is still there to be read.
 
 The marker's code is a feature folder of its own, `src/forgetting/`, beside `src/forget/`, which removes

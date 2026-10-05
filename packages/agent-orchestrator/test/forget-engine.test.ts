@@ -1,11 +1,13 @@
 /**
  * `nemia rm` forgets the engine's tasks of the run it removes, through the runtime's `forget`: every task its record names, earlier tries
  * and checks among them, gone from the engine's list, of a git run and of a folder run; a task it closed and the engine has not settled
- * waits, with the run's marker (`runStore.forgetting`), until a pass of the daemon forgets it, or `nemia rm` again; a refusal writes no
- * marker and asks nothing; and `nemia prune` counts what rm would forget, in one dry call over every run it prunes, and forgets nothing.
+ * waits, with the run's marker (`runStore.forgetting`), until a pass of the daemon forgets it, or `nemia rm` again; a settled task the
+ * engine refuses by name is said refused, on rm and each pass, and the rest forgotten; a refusal writes no marker and asks nothing; and
+ * `nemia prune` counts what rm would forget, in one dry call over every run it prunes, and forgets nothing.
  *
  * Walked through the runtime itself, `plainEngine` over its files store under a scratch root and a harness the test signs by hand, so the
- * journals, the feed and the list are the runtime's own. One engine serves the file, since a pass reads every run of the store.
+ * journals, the feed and the list are the runtime's own. One engine serves the file, since a pass reads every run of the store, but for
+ * `lacking`, the runtime's engine over the same store without a harness a task ran on.
  *
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest, and throws on a difference; `WF_MAX_CONCURRENT` admits sessions enough, and no cap is set on runs.
@@ -84,11 +86,28 @@ const real = plainEngine(
 const forgets: { taskIds: string[]; yes: boolean }[] = [];
 /** The words the engine's `forget` refuses every call in, naming no task, while set: a refusal that does not clear. */
 let refusing: string | undefined;
+/** The task the engine's `forget` refuses by name, in the runtime's words, while set, every call that asks it: a refusal of its own. */
+let refusingTask: { taskId: string; message: string } | undefined;
 const e: Engine = {
   ...real,
   forget: (taskIds, options) => {
     forgets.push({ taskIds: [...taskIds], yes: options?.yes === true });
-    return refusing === undefined ? real.forget(taskIds, options) : Effect.fail(new ForgetRefused({ message: refusing }));
+    if (refusing !== undefined) return Effect.fail(new ForgetRefused({ message: refusing }));
+    if (refusingTask && taskIds.includes(refusingTask.taskId)) return Effect.fail(new ForgetRefused(refusingTask));
+    return real.forget(taskIds, options);
+  },
+};
+/** Every call of `lacking`'s `forget`, its tasks and whether it removed them. */
+const lackingForgets: { taskIds: string[]; yes: boolean }[] = [];
+const lackingReal = plainEngine(
+  EngineService.layer({ root: ENGINE_ROOT, harnesses: { claude: harness, check: checks }, defaultHarness: 'claude' }),
+);
+/** The runtime's engine over the same store without the `codex` harness: a task that ran on it is one it refuses to forget, by name. */
+const lacking: Engine = {
+  ...lackingReal,
+  forget: (taskIds, options) => {
+    lackingForgets.push({ taskIds: [...taskIds], yes: options?.yes === true });
+    return lackingReal.forget(taskIds, options);
   },
 };
 
@@ -146,13 +165,16 @@ const finished = async () => {
 const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
 
 /** `nemia <args>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const typed = async (t: TestContext, ...args: string[]) => {
+const typed = (t: TestContext, ...args: string[]) => typedOn(t, e, ...args);
+
+/** `nemia <args>` through the CLI over the engine `engine`: the lines it printed, and the error it ended with, if it did. */
+const typedOn = async (t: TestContext, engine: Engine, ...args: string[]) => {
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
     printed.push(a.join(' '));
   });
   try {
-    await main(args, e);
+    await main(args, engine);
     return { printed, error: undefined };
   } catch (err) {
     return { printed, error: err as Error & { exitCode?: number } };
@@ -381,4 +403,69 @@ test('an engine that refuses to forget: `nemia rm` removes the run, exits 0 and 
   }
   await runWith(e, tickRun({ repo: ROOT }));
   assert.ok(!fs.existsSync(markerOf(run.id)) && !(await listed()).includes(task), 'once the engine forgets, a pass lifts it');
+});
+
+test('a settled task the engine refuses to forget by name is said refused, not waiting, and the rest forgotten in a second call; the marker keeps it, each pass warns and asks again, and a pass lifts it once the refusal clears', async (t) => {
+  const { run, tasks } = await finished();
+  const [refused, ...rest] = tasks;
+  const message = `task ${refused}'s harness, \`codex\`, still holds session s-1; the next pass lets a finished session go.`;
+  refusingTask = { taskId: refused, message };
+  try {
+    const before = forgets.length;
+    const said = await typed(t, 'rm', run.id);
+    assert.equal(said.error, undefined, 'exit 0: the run is removed');
+    assert.deepEqual(
+      forgets.slice(before),
+      [
+        { taskIds: tasks, yes: true },
+        { taskIds: rest, yes: true },
+      ],
+      'all of them, then the rest',
+    );
+    const marker = markerOf(run.id);
+    const words = `the engine refused to forget 1 task of it: ${message} ${marker} keeps their ids and the daemon asks again each pass`;
+    assert.ok(said.printed[0].includes(`the engine forgot 2 tasks of it (`) && said.printed[0].includes(words), said.printed.join('\n'));
+    assert.ok(said.printed[0].endsWith(`only a person removes it, once nothing of them is wanted: rm ${marker}`), said.printed[0]);
+    assert.ok(!said.printed[0].includes('waits'), said.printed[0]);
+    const left = await listed();
+    assert.deepEqual([left.includes(refused), rest.filter((id) => left.includes(id))], [true, []], 'the rest forgotten');
+    assert.deepEqual(runStore.forgetting.read(run.id), tasks, 'the marker keeps their ids');
+
+    const done = await runWith(e, tickRun({ repo: ROOT }));
+    const [line, ...more] = done.forgetting ?? [];
+    assert.deepEqual([more, line?.warn], [[], true], JSON.stringify(done.forgetting));
+    assert.ok(line.text.startsWith(`${run.id} (removed): ${words}`) && line.text.endsWith(`rm ${marker}`), line.text);
+    assert.ok(fs.existsSync(marker), 'the marker stands');
+  } finally {
+    refusingTask = undefined;
+  }
+  const cleared = await runWith(e, tickRun({ repo: ROOT }));
+  const [line] = cleared.forgetting ?? [];
+  assert.match(line?.text ?? '', new RegExp(`^${run.id} \\(removed\\): the engine forgot 1 task of it \\(`));
+  assert.equal(line.warn, undefined);
+  assert.ok(!(await listed()).includes(refused) && !fs.existsSync(markerOf(run.id)), 'once the refusal clears, a pass lifts it');
+});
+
+test("an engine without the harness a task ran on refuses it by name: `nemia rm` says it refused, in the runtime's words, the marker kept; each pass on that engine warns of it with how a person removes the marker", async (t) => {
+  const run = await signed(oneStep('harness: codex'), SIGNED);
+  const task = `${run.id}-implement`;
+  const said = await typedOn(t, lacking, 'rm', run.id);
+  assert.equal(said.error, undefined, 'exit 0: the run is removed');
+  const marker = markerOf(run.id);
+  const words = `the engine refused to forget 1 task of it: task ${task} ran on the \`codex\` harness, which this engine does not have`;
+  assert.ok(said.printed[0].includes(words), said.printed.join('\n'));
+  assert.ok(said.printed[0].endsWith(`only a person removes it, once nothing of them is wanted: rm ${marker}`), said.printed[0]);
+  assert.ok(!said.printed[0].includes('waits'), said.printed[0]);
+  assert.deepEqual(runStore.forgetting.read(run.id), [task], 'the marker keeps its id');
+
+  const before = lackingForgets.length;
+  const done = await runWith(lacking, tickRun({ repo: ROOT }));
+  assert.equal(lackingForgets.length, before + 1, 'a pass asks again');
+  const [line, ...more] = done.forgetting ?? [];
+  assert.deepEqual([more, line?.warn], [[], true], JSON.stringify(done.forgetting));
+  assert.ok(line.text.startsWith(`${run.id} (removed): ${words}`) && line.text.endsWith(`rm ${marker}`), line.text);
+  assert.ok(fs.existsSync(marker) && (await listed()).includes(task), "the marker stands, and the task is the engine's");
+
+  await runWith(e, tickRun({ repo: ROOT }));
+  assert.ok(!fs.existsSync(marker) && !(await listed()).includes(task), 'the engine with the harness forgets it, and a pass lifts it');
 });

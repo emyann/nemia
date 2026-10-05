@@ -8,25 +8,27 @@ import { sizeOf } from '../artifacts/artifacts.ts';
 /** A task the engine forgot, or would: its journal's bytes, its lines in the feed, and what its harness keeps that the runtime leaves. */
 export type TaskForgotten = { taskId: string; journalBytes: number; feedLines: number; left: string[] };
 
-/** A task the engine has not forgotten yet, and why, in the runtime's words: not settled, or refused on its own account. */
-export type TaskWaiting = { taskId: string; why: string };
+/** A task the engine has not forgotten, and why, in the runtime's words. */
+export type TaskKept = { taskId: string; why: string };
 
 /**
- * One call over the engine (`engineForgetting`): each task forgotten, or that would be; each that waits; and why the engine refused the
- * whole call, for a reason no one task carries.
+ * One call over the engine (`engineForgetting`): each task forgotten, or that would be; each that waits, not settled yet; each the engine
+ * refused on its own account, settled; and why the engine refused the whole call, for a reason no one task carries.
  */
-export type EngineAnswer = { tasks: TaskForgotten[]; waiting: TaskWaiting[]; refusal?: string };
+export type EngineAnswer = { tasks: TaskForgotten[]; waiting: TaskKept[]; refused: TaskKept[]; refusal?: string };
 
 /**
- * What the engine forgot of one run's tasks, or would (`forgettingOf`): the tasks forgotten; those that wait, with the runtime's words
- * for why (`why`, each once); what their harness keeps that the runtime leaves (`left`); the engine's refusal of the whole call; and
- * the journals' bytes and feed lines of the tasks forgotten; and, while something is left, where the run's marker keeps their ids
- * (`marker`, `runStore.forgetting`).
+ * What the engine forgot of one run's tasks, or would (`forgettingOf`): the tasks forgotten; those that wait, not settled, with the
+ * runtime's words for why (`why`, each once); those the engine refused by name, with its words (`refusedWhy`, each once); what their
+ * harness keeps that the runtime leaves (`left`); the engine's refusal of the whole call; the journals' bytes and feed lines of the tasks
+ * forgotten; and, while something is left, where the run's marker keeps their ids (`marker`, `runStore.forgetting`).
  */
 export type EngineForgetting = {
   forgotten: string[];
   waiting: string[];
   why: string[];
+  refused: string[];
+  refusedWhy: string[];
   left: string[];
   refusal?: string;
   journalBytes: number;
@@ -39,10 +41,13 @@ export function forgettingOf(answer: EngineAnswer, ids: readonly string[]): Engi
   const own = new Set(ids);
   const tasks = answer.tasks.filter((t) => own.has(t.taskId));
   const waiting = answer.waiting.filter((w) => own.has(w.taskId));
+  const refused = answer.refused.filter((r) => own.has(r.taskId));
   return {
     forgotten: tasks.map((t) => t.taskId),
     waiting: waiting.map((w) => w.taskId),
     why: [...new Set(waiting.map((w) => w.why))],
+    refused: refused.map((r) => r.taskId),
+    refusedWhy: [...new Set(refused.map((r) => r.why))],
     left: tasks.flatMap((t) => t.left),
     ...(answer.refusal ? { refusal: answer.refusal } : {}),
     journalBytes: tasks.reduce((n, t) => n + t.journalBytes, 0),
@@ -50,8 +55,11 @@ export function forgettingOf(answer: EngineAnswer, ids: readonly string[]): Engi
   };
 }
 
-/** Whether the engine has nothing left to forget of the run: no task waits and the call was not refused. */
-export const forgettingDone = (f: EngineForgetting): boolean => !f.waiting.length && f.refusal === undefined;
+/** Whether the engine has nothing left to forget of the run: no task waits, none was refused, and the call was not refused. */
+export const forgettingDone = (f: EngineForgetting): boolean => !f.waiting.length && !f.refused.length && f.refusal === undefined;
+
+/** Whether the engine refused to forget something of the run: a task by name, or the whole call. */
+export const forgettingRefused = (f: EngineForgetting): boolean => f.refused.length > 0 || f.refusal !== undefined;
 
 /** `n` tasks, in words. */
 const tasksWord = (n: number): string => `${n} task${n === 1 ? '' : 's'}`;
@@ -75,17 +83,27 @@ const waitWords = (f: EngineForgetting, marker: string, dry: boolean): string =>
   return `${tasksWord(f.waiting.length)} of it ${one ? 'waits' : 'wait'} — ${f.why.join('; ')} — and the daemon's passes forget ${once}, from ${marker}`;
 };
 
-/** The engine's refusal of the whole call, and, unless `dry`, the marker it leaves, which only a person removes; empty without one. */
+/**
+ * The engine's refusals, of tasks by name and of the whole call, in its words, and, unless `dry`, the marker they leave, which only a
+ * person removes; empty without one.
+ */
 const refusalWords = (f: EngineForgetting, marker: string, dry: boolean): string => {
-  if (f.refusal === undefined) return '';
-  if (dry) return `the engine would refuse to forget its tasks: ${f.refusal}`;
+  if (!forgettingRefused(f)) return '';
+  const refused = dry ? 'would refuse' : 'refused';
+  const said = [
+    f.refused.length ? `the engine ${refused} to forget ${tasksWord(f.refused.length)} of it: ${f.refusedWhy.join('; ')}` : '',
+    f.refusal === undefined ? '' : `the engine ${refused} to forget its tasks: ${f.refusal}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  if (dry) return said;
   const asks = `${marker} keeps their ids and the daemon asks again each pass`;
-  return `the engine refused to forget its tasks: ${f.refusal} ${asks}; only a person removes it, once nothing of them is wanted: rm ${marker}`;
+  return `${said} ${asks}; only a person removes it, once nothing of them is wanted: rm ${marker}`;
 };
 
 /**
  * What `nemia rm` says the engine did with the run `id`'s tasks, or, `dry`, what `nemia prune` says it would: the tasks forgotten with
- * their journals' size and feed lines, what their harness keeps, what waits and why, and a refusal of the whole call with the marker it
+ * their journals' size and feed lines, what their harness keeps, what waits and why, and what the engine refused with the marker it
  * leaves, which only a person removes. Empty when the engine keeps no task of the run.
  */
 export function engineWords(f: EngineForgetting, { id, dry = false }: { id: string; dry?: boolean }): string {

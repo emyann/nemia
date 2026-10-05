@@ -113,9 +113,10 @@ version, and the version above must be the pin. An upgrade re-measures the table
   so a refusal's `exitCode` reaches `bin/wf.ts`. Not `NodeRuntime.runMain` of `@effect/platform-node`, which is not installed: its
   default teardown (`Runtime.defaultTeardown`) exits 130 on any interruption, whichever signal came, it handles no SIGHUP, and it
   hands no failure back to the caller.
-- What an api route holds is let go in its scope too. A callback watch becomes a stream with `Stream.callback` on a bounded `suspend`
-  buffer, each item handed on with an awaited `Queue.offer`, so the watch waits for a slow reader: `feedEvents` in
-  `apps/api/src/factory/feed.ts`. Hono's `streamSSE` runs it with the app's `runtime.runPromiseExit(program, { signal })`, the signal
+- What an api route holds is let go in its scope too. A live reader is a stream that takes what it holds in its own scope: `followFeed`
+  in `packages/agent-orchestrator/src/feed/feed.verb.ts` subscribes to the process's `PubSub.sliding` (`FeedHub`), so a slow reader never
+  holds up the writer, reads what the hub dropped from the file, and is counted while it is open; `feedEvents` in
+  `apps/api/src/factory/feed.ts` maps it to the stream's events. Hono's `streamSSE` runs it with the app's `runtime.runPromiseExit(program, { signal })`, the signal
   aborted from `stream.onAbort`: `runPromiseExit`, since `streamSSE` prints a rejection. A child process is `acquireRelease` with its
   release reading the `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `claudeQuota` in
   `packages/agent-runtime/src/harness/claude/quota.ts`, `serverAsk` in `apps/api/src/capabilities/capabilities.ts`.
@@ -161,7 +162,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - **Each layer annotates in its own words**, on its spans and its logs alike: the orchestrator the `run` (`advancePass`) and the `step`
   (`forStep` in `packages/agent-orchestrator/src/telemetry/telemetry.store.ts`); the runtime the `task`, `kind` and `attempt`
   (`appendFields` in `packages/agent-runtime/src/core/engine/journal.ts`), and never a run or a step.
-- **Levels**: Info is what a person reads in `nemia up`'s lines (`logPass` in `packages/agent-orchestrator/src/daemon/up.verb.ts`); a
+- **Levels**: Info is what a person reads in `nemia up`'s lines (`logPass` in `packages/agent-orchestrator/src/daemon/up.verb.ts`) and
+  each line of the feed, said once as it is written (`emitFeed` in `packages/agent-orchestrator/src/feed/feed.verb.ts`); a
   warning or worse goes to stderr; Debug is the journal, an append said by its kind, below the default level.
 - **One `telemetryLayer`, provided by the process around its program**, never by a verb: `nemia up` in
   `packages/agent-orchestrator/src/cli/main.ts` and the api's daemon in `apps/api/src/main.ts`. A test provides its own logger

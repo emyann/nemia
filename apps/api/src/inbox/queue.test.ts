@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } from 'agent-orchestrator';
+import { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, runWith, slotWord } from 'agent-orchestrator';
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('nemia-api-queue-repo-');
 process.env.HKB_REPO = repo;
@@ -407,7 +407,7 @@ const ceilings = async (): Promise<Ceilings> => {
 
 /** The runs the package's own `runSlots` holds, on the same store, as the api answers them. */
 const packageHeld = async (): Promise<Ceilings['held']> =>
-  [...(await runSlots(engine()))].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
+  [...(await runWith(engine(), runSlots(engine())))].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 
 /** One run in flight, two wanting a slot, one waiting on the run in flight, one called off. */
 function seedRuns(): void {

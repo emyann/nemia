@@ -2,7 +2,7 @@
  * A journal that does not read is a check's, or an earlier try's: `nemia ls` says the run it belongs to is unreadable, in the words the
  * board's list says it with (`unjudgedWords`), marks `unreadable` the step whose check or try it is, and lists every other run — a run
  * waiting on it among them, and with a cap on runs in flight (`runSlots`) — while `nemia decide` of such a run refuses in those words.
- * Walked through the runtime itself, `promiseEngine` over an in-memory journal that hands back what was put in it, as a store does.
+ * Walked through the runtime itself, `plainEngine` over an in-memory journal that hands back what was put in it, as a store does.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads; `WF_MAX_RUNS` caps the runs, so `nemia ls`
  * reads the slots.
@@ -13,8 +13,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
+import { plainEngine } from './promised.ts';
 
 const ROOT = scratch('wf-unreadable-list-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -90,7 +91,7 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = promiseEngine(
+const e = plainEngine(
   Engine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
     journal,

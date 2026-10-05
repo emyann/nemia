@@ -1,9 +1,9 @@
 /**
  * Between packages, only the public contract (`docs/architecture.md`, rule 1), for this package.
  *
- * The apps reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`, `agent-orchestrator/workflow` and
- * `agent-orchestrator/effect` alone. `./workflow` is the pure format, `./effect` the refusals an Effect caller picks out by kind, and what
- * reads a folder from disk is exported from `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that
+ * The apps reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`
+ * alone. `./workflow` is the pure format, and what reads a folder from disk, the controllers and the refusals by kind are exported from
+ * `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that
  * names a file in src/ is not a route to it.
  *
  * The scan reads every file git lists outside this package, tracked or not yet added. Turbo caches this package's pass by this package's
@@ -27,7 +27,7 @@ const PKG = path.join(import.meta.dirname, '..');
 const GUARDED = {
   name: 'agent-orchestrator',
   dir: 'packages/agent-orchestrator',
-  entries: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow', 'agent-orchestrator/effect'],
+  entries: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow'],
 } as const;
 
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
@@ -94,7 +94,7 @@ test('the scan reads the apps above this package — or it would pass by reading
   for (const entry of GUARDED.entries) assert.ok(named.has(entry), `and some of it imports ${entry}`);
 });
 
-test('code outside packages/agent-orchestrator reaches it through agent-orchestrator, agent-orchestrator/run, agent-orchestrator/workflow and agent-orchestrator/effect alone', () => {
+test('code outside packages/agent-orchestrator reaches it through agent-orchestrator, agent-orchestrator/run and agent-orchestrator/workflow alone', () => {
   const found = workspaceFiles(GUARDED).flatMap((f) => breaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'), GUARDED));
   assert.deepEqual(found, []);
 });
@@ -102,8 +102,7 @@ test('code outside packages/agent-orchestrator reaches it through agent-orchestr
 test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolve, and a path built into src — each route', () => {
   const at = 'apps/api/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
-  const instead =
-    'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow or agent-orchestrator/effect';
+  const instead = 'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow';
   assert.deepEqual(refused("import { x } from 'agent-orchestrator/src/run.ts';"), [
     `${at} imports agent-orchestrator/src/run.ts, which is not an entry of agent-orchestrator: ${instead}`,
   ]);
@@ -111,12 +110,12 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
     `${at} imports agent-orchestrator/feed, which is not an entry of agent-orchestrator: ${instead}`,
   ]);
   assert.deepEqual(
-    refused("import { Missing } from 'agent-orchestrator/effect/refusal';\nimport { Invalid } from 'agent-orchestrator/src/effect.ts';"),
+    refused("import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';"),
     [
-      `${at} imports agent-orchestrator/effect/refusal, which is not an entry of agent-orchestrator: ${instead}`,
-      `${at} imports agent-orchestrator/src/effect.ts, which is not an entry of agent-orchestrator: ${instead}`,
+      `${at} imports agent-orchestrator/effect, which is not an entry of agent-orchestrator: ${instead}`,
+      `${at} imports agent-orchestrator/src/refusal/refusal.ts, which is not an entry of agent-orchestrator: ${instead}`,
     ],
-    'REFUSED: a path under the Effect face, and its file in src',
+    "REFUSED: the retired Effect face, and the refusals' file in src",
   );
   assert.deepEqual(
     breaches('apps/web/test/x.test.ts', "import { foldFeed } from '../../../packages/agent-orchestrator/src/feed.ts';", GUARDED),
@@ -142,13 +141,13 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
   ]);
 });
 
-test('and what is not a route is not refused: the four entries, the wf CLI spawned, and prose that names a file in src', () => {
+test('and what is not a route is not refused: the three entries, the wf CLI spawned, and prose that names a file in src', () => {
   const text = [
     "import { loadWorkflows } from 'agent-orchestrator';",
     "import type { Run } from 'agent-orchestrator/run';",
     "const { messageRefusal } = await import('agent-orchestrator/run');",
     "import { parseFolder } from 'agent-orchestrator/workflow';",
-    "import { isRefusal, type Refusal } from 'agent-orchestrator/effect';",
+    "import { isRefusal, type Refusal } from 'agent-orchestrator';",
     "const WF = path.join(ROOT, 'packages', 'agent-orchestrator', 'bin', 'wf.ts');",
     "commit(ENDING.branch, 'Cap the runs in flight', [['packages/agent-orchestrator/src/queue.ts', [",
     ' * `packages/agent-orchestrator/src/run.ts`, which briefs write constantly.',
@@ -156,13 +155,12 @@ test('and what is not a route is not refused: the four entries, the wf CLI spawn
   assert.deepEqual(breaches('apps/web/test/e2e/x.ts', text, GUARDED), []);
 });
 
-test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./effect, and nothing else but its package.json", () => {
+test("agent-orchestrator's exports are . (runner.ts), ./run and ./workflow, and nothing else but its package.json", () => {
   const { exports } = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')) as { exports: Record<string, string> };
   assert.deepEqual(exports, {
     '.': './src/runner.ts',
     './run': './src/run.ts',
     './workflow': './src/workflow.ts',
-    './effect': './src/effect.ts',
     './package.json': './package.json',
   });
 });
@@ -176,6 +174,7 @@ const READERS = [
   'loadWorkflows',
   'skillsFor',
   'workflowDescription',
+  'workflowReadme',
   'workflowFolder',
   'workflowsIn',
 ];

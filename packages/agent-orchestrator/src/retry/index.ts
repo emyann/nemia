@@ -9,6 +9,7 @@ export {
   sessionModel,
   signoffsSpent,
   spentAsks,
+  tryWord,
   turnsOf,
 } from './retry-ask.ts';
 export type { EarlierTry, Retry, RetryAsk, RetryHow, RetryMode } from './retry-ask.ts';

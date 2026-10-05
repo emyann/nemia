@@ -4,7 +4,7 @@
  * request, where the factory's file says: a file in its first folder, which the api never writes, or the store.
  */
 import { Hono } from 'hono';
-import { FACTORY_INSTRUCTION, factoryNameRefusal, type FactoryInstruction } from 'agent-orchestrator';
+import { FACTORY_INSTRUCTION, factoryNameRefusal, runWith, type FactoryInstruction } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
 
 /**
@@ -24,6 +24,6 @@ export const factoryInstruction = new Hono<ApiEnv>().get('/api/factories/:name/i
     const { name } = c.req.param();
     const wrong = factoryNameRefusal(name);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${name}/instruction: ${wrong}` }, 400);
-    return c.json((await FACTORY_INSTRUCTION.handler(e, { name })) satisfies FactoryInstruction);
+    return c.json((await runWith(e, FACTORY_INSTRUCTION.handler({ name }))) satisfies FactoryInstruction);
   }),
 );

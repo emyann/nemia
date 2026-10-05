@@ -5,7 +5,7 @@
 import { closeoutOf, type RetryHow, judgedSteps, workflowsOf } from 'agent-orchestrator';
 import { type Answer, answerRefusal, answerText, askedQuestions, type Run } from 'agent-orchestrator/run';
 import type { Refusal } from '../guard.ts';
-import { type Engine } from '../store.ts';
+import { engineRead, type Engine } from '../store.ts';
 
 /**
  * `how` with `answers` written into its message, the message it had becoming their note; or why they cannot be (400): answers on a
@@ -28,7 +28,7 @@ export async function answeredHow(
     };
   }
   const taskId = run.steps[step]?.taskId;
-  const views = new Map(taskId ? [[taskId, await e.view(taskId)]] : []);
+  const views = new Map(taskId ? [[taskId, await engineRead('view', e.view(taskId))]] : []);
   const frozen = judgedSteps(run, workflowsOf(run, home).steps).find((s) => s.name === step);
   const asked = askedQuestions(frozen, closeoutOf(views, run, step)).flatMap((a) => a.questions);
   const wrong = answerRefusal(asked, answers);

@@ -9,6 +9,7 @@ import { DEFAULT_FACTORY, defaultFactoryRefusal, instructionAt, type FactoryWrit
 import { readFactory, setInstruction } from './factory.store.ts';
 import { clearInstructionText, instructionFile, readInstructionAt, storeKeeps, writeInstructionText } from './instruction.store.ts';
 import { Conflict } from '../refusal/refusal.ts';
+import { tried } from '../runtime-client.ts';
 
 /**
  * A factory's instruction as it reads: its factory's `name`; `path`, the path in its first folder its file names, null where it names
@@ -116,6 +117,18 @@ function readLines(data: FactoryInstruction): string[] {
 }
 
 /**
+ * The instruction of the factory `args` name, after its place is set as they ask (`placeAsked`), if they ask one, in its file
+ * (`setInstruction`). Refused, writing nothing: as `FACTORY_INSTRUCTION` says.
+ */
+function placed(args: Args): FactoryInstruction {
+  const name = textOf(args, 'name') ?? '';
+  refuseDefault(name, 'instruction');
+  const asked = placeAsked(args);
+  if (asked !== undefined) setInstruction({ factory: name, at: asked.at });
+  return factoryInstruction(name);
+}
+
+/**
  * `nemia factory instruction`: where the instruction of the factory `name` is kept — read bare; set to a path in its first folder
  * (`--path`) or to the store (`--store`), or cleared back to `NEMIA.md` in its first folder (`--clear`), in its file (`setInstruction`) —
  * and the instruction read there after. Refused, writing nothing: the default factory, two places at once, a path that is not one, and a
@@ -142,13 +155,7 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
     { method: 'PUT', path: '/api/factories/:name/instruction', status: 200, sets: { clear: false } },
     { method: 'DELETE', path: '/api/factories/:name/instruction', status: 200, sets: { clear: true } },
   ],
-  async handler(_e, args) {
-    const name = textOf(args, 'name') ?? '';
-    refuseDefault(name, 'instruction');
-    const asked = placeAsked(args);
-    if (asked !== undefined) setInstruction({ factory: name, at: asked.at });
-    return factoryInstruction(name);
-  },
+  handler: (args) => tried(() => placed(args)),
   print(data, args) {
     const asked = placeAsked(args);
     return asked === undefined ? readLines(data) : [`${data.name}: instruction ${keptLine(data)}`];
@@ -208,24 +215,30 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
     { method: 'PUT', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: false } },
     { method: 'DELETE', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: true } },
   ],
-  async handler(_e, args) {
-    const name = textOf(args, 'name') ?? '';
-    refuseDefault(name, 'instruct');
-    const before = factoryInstruction(name);
-    if (!before.store)
-      throw new Conflict({
-        message: `${name}'s instruction is read from ${before.file}, in the factory's first folder, and the store writes no file there: edit it in the folder, or keep it in the store first — nemia factory instruction ${name} --store. Nothing was written.`,
-      });
-    if (args.clear === true) {
-      const removed = clearInstructionText(name);
-      return { ...factoryInstruction(name), removed };
-    }
-    writeInstructionText(name, textOf(args, 'words') ?? '');
-    return factoryInstruction(name);
-  },
+  handler: (args) => tried(() => instructed(args)),
   print(data) {
     if (data.removed !== undefined)
       return [data.removed ? `${data.name}: instruction removed, ${data.file}` : `${data.name} has no instruction in the store to remove`];
     return [`${data.name}: instruction written to ${data.file}`];
   },
 };
+
+/**
+ * The instruction of the factory `args` name, after its text in the store is written from their words or removed with `clear`. Refused,
+ * writing nothing: as `FACTORY_INSTRUCT` says.
+ */
+function instructed(args: Args): Instructed {
+  const name = textOf(args, 'name') ?? '';
+  refuseDefault(name, 'instruct');
+  const before = factoryInstruction(name);
+  if (!before.store)
+    throw new Conflict({
+      message: `${name}'s instruction is read from ${before.file}, in the factory's first folder, and the store writes no file there: edit it in the folder, or keep it in the store first — nemia factory instruction ${name} --store. Nothing was written.`,
+    });
+  if (args.clear === true) {
+    const removed = clearInstructionText(name);
+    return { ...factoryInstruction(name), removed };
+  }
+  writeInstructionText(name, textOf(args, 'words') ?? '');
+  return factoryInstruction(name);
+}

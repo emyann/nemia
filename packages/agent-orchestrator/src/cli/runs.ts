@@ -14,6 +14,7 @@ import {
   pruningBytes,
   RM,
   runStore,
+  runWith,
   sizeOf,
   type Args,
   type Pruning,
@@ -29,7 +30,7 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  */
 async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
-    const data = await RM.handler(e, { ...args, runId: id });
+    const data = await runWith(e, RM.handler({ ...args, runId: id }));
     for (const line of RM.print(data, args)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -90,7 +91,7 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
   const found: Pruning[] = [];
   for (const id of ids) {
     try {
-      found.push((await PRUNE.handler(e, { ...args, runId: id, yes: false })).pruning);
+      found.push((await runWith(e, PRUNE.handler({ ...args, runId: id, yes: false }))).pruning);
     } catch (err) {
       notPrunedLine(id, err, tally);
     }
@@ -117,7 +118,7 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
 async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
   for (const p of prunable) {
     try {
-      const data = await PRUNE.handler(e, { ...args, runId: p.id, yes: true });
+      const data = await runWith(e, PRUNE.handler({ ...args, runId: p.id, yes: true }));
       const done = data.pruning;
       for (const line of PRUNE.print(data, args)) console.log(line);
       if (done.kind === 'refused' || done.left.length) tally.notPruned.push(p.id);
@@ -189,7 +190,7 @@ const withWords = (args: Args, command: string): Args =>
  */
 export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, AGENTS_CUSTOM.name);
-  const data = await AGENTS_CUSTOM.handler(e, asked, undefined, HOME);
+  const data = await runWith(e, AGENTS_CUSTOM.handler(asked, undefined, HOME));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }
 
@@ -198,6 +199,6 @@ export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
  */
 export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
-  const data = await FACTORY_INSTRUCT.handler(e, asked, undefined, HOME);
+  const data = await runWith(e, FACTORY_INSTRUCT.handler(asked, undefined, HOME));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }

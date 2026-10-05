@@ -283,10 +283,11 @@ export const removeHold = (id: string, at: string): boolean => {
 };
 
 /**
- * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold
- * (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is
- * ever written into the record (`rewriteRun`), and whatever the record carries under their keys is dropped, the store's pause's
- * (`pause`, which `runStore` composes) with them. Counted as one record read (`countRecord`) under `records` while a pass is metered.
+ * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its
+ * hold (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
+ * listing of its asks directory. None of them is ever written into the record (`rewriteRun`), and whatever the record carries under their
+ * keys is dropped, the store's pause's (`pause`, which `runStore` composes) with them. Counted as one record read (`countRecord`) under
+ * `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
@@ -312,8 +313,10 @@ const readRecord = (id: string): Run => {
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
   const pruned = readPruned(id);
   const hold = readHold(id);
-  const { approvals } = readApprovals(id);
-  const { acceptances } = readAcceptances(id);
+  const { approvals, acceptances } = within('asks', () => {
+    const names = fileNames(asksDir(id));
+    return { ...readApprovalsNow(id, names), ...readAcceptancesNow(id, names) };
+  });
   return {
     ...run,
     ...(at ? { cancelledAt: at } : {}),
@@ -396,10 +399,9 @@ export function readApprovals(id: string): { approvals: Approval[]; notes: strin
   return within('asks', () => readApprovalsNow(id));
 }
 
-function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] } {
+function readApprovalsNow(id: string, names = fileNames(asksDir(id))): { approvals: Approval[]; notes: string[] } {
   const approvals: Approval[] = [];
   const notes: string[] = [];
-  const names = fileNames(asksDir(id));
   if (!names) return { approvals, notes };
   for (const name of names) {
     const approved = /^approve-(.+)-(\d+)$/.exec(name);
@@ -483,10 +485,9 @@ export function readAcceptances(id: string): { acceptances: Acceptance[]; notes:
   return within('asks', () => readAcceptancesNow(id));
 }
 
-function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: string[] } {
+function readAcceptancesNow(id: string, names = fileNames(asksDir(id))): { acceptances: Acceptance[]; notes: string[] } {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
-  const names = fileNames(asksDir(id));
   if (!names) return { acceptances, notes };
   for (const name of names) {
     const took = /^accept-(.+)-(\d+)$/.exec(name);
@@ -522,7 +523,8 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
 /**
  * The asks waiting in a run's directory — tries and rounds — and a line for each file there that names one and cannot be read as one, and
  * for each approval and acceptance that cannot be read (`readApprovals`, `readAcceptances`), said on the pass as an ask's is. A file named
- * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them.
+ * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them. The directory is listed once,
+ * and each file in it read once.
  */
 export function readAsks(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
   return within('asks', () => readAsksNow(id));
@@ -534,7 +536,7 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
   const notes: string[] = [];
   const names = fileNames(asksDir(id));
   if (!names) return { asks, rounds, notes };
-  notes.push(...readApprovals(id).notes, ...readAcceptances(id).notes);
+  notes.push(...readApprovalsNow(id, names).notes, ...readAcceptancesNow(id, names).notes);
   for (const name of names) {
     const tried = /^retry-(.+)-(\d+)$/.exec(name);
     const again = /^round-(.+)-(\d+)$/.exec(name);

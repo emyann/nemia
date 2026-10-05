@@ -11,13 +11,14 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { board as engineBoard } from './engine-board.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-retry-config-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advance, retry, start } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
@@ -36,17 +37,17 @@ function aRepo(): string {
 async function failed() {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nmodel: opus\n---\nimplement it\n');
-  const run = start({ brief: 'the flag', repo: aRepo(), workflowDir: dir, isolate: false });
+  const run = await Effect.runPromise(startRun({ brief: 'the flag', repo: aRepo(), workflowDir: dir, isolate: false }));
   const b = engineBoard();
   const e = engineOf(b.layer);
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'failed');
   return { e, id: run.id };
 }
 
 test('REFUSED: a fresh try on a model its harness refuses, named by the flag as typed, and no ask written', async () => {
   const { e, id } = await failed();
-  await assert.rejects(retry(e, id, 'implement', { mode: 'fresh', model: '' }), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(runWith(e, retryRun(id, 'implement', { mode: 'fresh', model: '' })), (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2);
     assert.equal(err.message, `implement: \`--model ''\` (filed as \`model\`): ${configRefusal('claude', { model: '' })}`);
     return true;
@@ -56,6 +57,6 @@ test('REFUSED: a fresh try on a model its harness refuses, named by the flag as 
 
 test('a fresh try on a model its harness takes is asked for', async () => {
   const { e, id } = await failed();
-  const { ask } = await retry(e, id, 'implement', { mode: 'fresh', model: 'sonnet' });
+  const { ask } = await runWith(e, retryRun(id, 'implement', { mode: 'fresh', model: 'sonnet' }));
   assert.deepEqual([ask.try, ask.mode, ask.model], [2, 'fresh', 'sonnet']);
 });

@@ -1,15 +1,16 @@
 /**
  * The tick: every run advanced once a pass, and the memo of runs at rest that answers a run whose inputs did not change without a read of
  * the engine (`RestMemo`, `advanceResting`). This is the whole daemon. A controller, reaching the runtime through the client
- * (`runtime-client.ts`): an Effect program that requires the engine as a service (`tickRun`, over `EngineService`), and `tick`, its plain
- * face in a Promise, over the engine it is handed.
+ * (`runtime-client.ts`): an Effect program that requires the engine as a service (`tickRun`, over `EngineService`), run by a caller
+ * with `runWith`.
  */
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { Data, Effect } from 'effect';
+import { Cause, Data, Effect, Exit } from 'effect';
 import {
   EngineService,
-  awaited,
+  asked,
+  over,
   refusedText,
   tried,
   unreadableJournal,
@@ -20,6 +21,7 @@ import {
 import type { QueueStarted } from '../inbox/inbox.ts';
 import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
+import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { finishingAmong, type Finishing, type PauseStanding } from '../pause/pause.ts';
 import { isGitRun, type Run } from '../record/record.ts';
@@ -33,9 +35,9 @@ import { headsOf } from '../branches/branches.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
-import { countRested, meteredPass, noteSeen, within } from '../meter/tally.store.ts';
+import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
 import { sessionsOf, type PassCost } from '../meter/meter.ts';
-import { advanceRun, type Advanced } from './advance.verb.ts';
+import { advancePass, type Advanced } from './advance.verb.ts';
 import { stagedRead } from '../list/list.verb.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
 
@@ -95,7 +97,7 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
 }
 
 /** What the runtime's own pass reported (`Engine`'s `tick`). */
-type TickReport = Awaited<ReturnType<Engine['tick']>>;
+type TickReport = Effect.Success<ReturnType<Engine['tick']>>;
 
 /**
  * What a pass is handed: where a queued card with no repository of its own is started, the memo it answers from, and whether it verifies.
@@ -104,7 +106,7 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
 
 /**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon: an
- * Effect program that requires the engine as a service (`EngineService`), whose plain face is `tick`.
+ * Effect program that requires the engine as a service (`EngineService`).
  *
  * First, the engine's own tick, which admits what waits per pool under the ceiling `engine()` gave it (`WF_MAX_CONCURRENT`), the filed
  * `priority` first, and starts it on its next pass. So a task filed on this pass is admitted on the next and started on the one after,
@@ -140,23 +142,16 @@ export const tickRun = Effect.fn('tick')(function* ({
     memo: memo ?? restMemo(e),
     verify: verifyRest ?? (yield* tried(() => verifiesRest())),
   };
-  const io0 = ioOf(e);
+  const io0 = yield* ioOf(e);
   const { value, ms, tallies } = yield* meteredPass(pass(meteredEngine(e), options));
   if (!tallies) return value;
   const t0 = performance.now();
-  const measured = costOf(tallies, ms, io0, ioOf(e));
+  const measured = costOf(tallies, ms, io0, yield* ioOf(e));
   const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
   const written = yield* tried(() => recordPassCost(cost) + recordRecentPass(cost));
   yield* recordPassMetrics(cost);
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 });
-
-/**
- * One pass of the tick (`tickRun`) over the engine it is handed, `engine()`'s or a test's. Rejects with the refusal it failed with, or the
- * defect it died of, as it was thrown.
- */
-export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verifyRest?: boolean } = {}): Promise<Pass> =>
-  Effect.runPromise(tickRun(options).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * The pass `tickRun` meters: the runtime's own pass, then every run judged off the views it reported (`reportedEngine`) — a task it did not
@@ -165,7 +160,8 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  *   `measured` — is read on this one, and what is appended after is read on the next; a run `nemia rm` forgot leaves the memo
  *   (`forgotten`).
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
- *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
+ *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue; with it, the cap's
+ *   slots and the runs others wait on, each read once for the pass where a run asks (`passRead`).
  * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of
  *   their own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
@@ -176,7 +172,7 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  * flight (`judged`). An engine's report that carries no refusals — a test's fake — is read as having none.
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
-  const report = yield* awaited(() => engine.tick());
+  const report = yield* asked('tick', engine.tick());
   noteSeen(sessionsOf(report));
   const e = reportedEngine(engine, report.views ?? []);
   const resting = yield* restingPass(e, memo, verify);
@@ -187,17 +183,16 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
-  for (const run of runs.filter(hasStarted)) yield* judged(e, judging, runs, run, resting);
-  const counted = yield* waitingJudged(e, judging, runs, resting, ran.runs);
+  const read = passRead(e, runs);
+  for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
+  const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
-      ? yield* tried(() => within('act', () => startQueued(repo, runs)))
+      ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
   return {
     ...passOf(report, runs, judging, queue),
-    ...(pause
-      ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []), staged: yield* awaited(() => stagedRead(e, runs)) } }
-      : {}),
+    ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []), staged: yield* stagedRead(e, runs) } } : {}),
   };
 });
 
@@ -220,11 +215,11 @@ const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
 };
 
 /**
- * One run of the pass's listing `runs` judged into `judging` (`advanceResting`), and what it was judged: undefined when a read of its
+ * One run of the pass's listing (`PassRead`) judged into `judging` (`advanceResting`), and what it was judged: undefined when a read of its
  * journal was refused, the run then left unjudged with the runtime's words for why.
  */
-const judged = (e: Engine, judging: Judging, runs: readonly Run[], run: Run, resting: RestingPass | undefined, slot?: RunSlot) =>
-  advanceResting(e, run, runs, resting, slot).pipe(
+const judged = (e: Engine, judging: Judging, pass: PassRead, run: Run, resting: RestingPass | undefined, slot?: RunSlot) =>
+  advanceResting(e, run, pass, resting, slot).pipe(
     Effect.map((advanced): Advanced | undefined => {
       judging.done.set(run.id, advanced);
       return advanced;
@@ -245,13 +240,13 @@ const judged = (e: Engine, judging: Judging, runs: readonly Run[], run: Run, res
 const waitingJudged = Effect.fn('waitingJudged')(function* (
   e: Engine,
   judging: Judging,
-  runs: readonly Run[],
+  pass: PassRead,
   resting: RestingPass | undefined,
   cap: RunSlot['cap'],
 ) {
   let counted = [...judging.done.values()].filter((a) => a.inFlight).length + judging.unjudged.size;
-  for (const run of admissionOrder(runs.filter((r) => !hasStarted(r)))) {
-    const advanced = yield* judged(e, judging, runs, run, resting, { inFlight: counted, cap });
+  for (const run of admissionOrder(pass.runs.filter((r) => !hasStarted(r)))) {
+    const advanced = yield* judged(e, judging, pass, run, resting, { inFlight: counted, cap });
     if (!advanced || advanced.inFlight) counted++;
   }
   return counted;
@@ -339,7 +334,7 @@ const keptOf =
  */
 const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMemo, verify: boolean) {
   if (typeof e.feed !== 'function') return undefined;
-  if (!(yield* Effect.promise(() => followedFeed(e, memo)))) return undefined;
+  if (!(yield* followedFeed(e, memo))) return undefined;
   const stamps = yield* tried(() => runStore.runs.stamps());
   const heads = new Map<string, Record<string, string>>();
   const resting: RestingPass = {
@@ -356,42 +351,40 @@ const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMem
 });
 
 /**
- * A run's full pass (`advanceRun`), the pass's listing `runs` handed on: what it advanced, what holds it out of rest, and what it rests
- * on. Fails with `Unjudged` where a read of one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the pass
- * refused, and dies of anything else.
+ * A run's full pass (`advancePass`), the pass's reads (`PassRead`) handed on: what it advanced, what holds it out of rest, and what it
+ * rests on. Fails with `Unjudged` where a read of one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the
+ * pass refused, and dies of anything else.
  */
-const fullPass = (e: Engine, run: Run, runs: readonly Run[], slot?: RunSlot) =>
-  awaited(() =>
-    advanceRun(e, run, slot, runs).catch((err: unknown) => {
-      const why = unreadableJournal(err);
-      if (why === undefined) throw err;
-      return new Unjudged({ why });
-    }),
-  ).pipe(Effect.flatMap((full) => (full instanceof Unjudged ? Effect.fail(full) : Effect.succeed(full))));
+const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRead, slot?: RunSlot) {
+  const exit = yield* Effect.exit(advancePass(e, run, slot, pass).pipe(over(e)));
+  if (Exit.isSuccess(exit)) return exit.value;
+  const why = unreadableJournal(Cause.squash(exit.cause));
+  return why === undefined ? yield* Effect.failCause(exit.cause) : yield* new Unjudged({ why });
+});
 
 /**
  * One run's pass, answered from the memo where the run was at rest on its last full pass and nothing it was judged by has changed:
  * its files in the store stamp the same, the pass was handed the memo's own run for it (`keptOf`), nothing of its tasks is on the feed
  * since (`restingPass`), and every result branch it would read the tip of is where its record says (`tipsSeen`, off one `for-each-ref` a
- * repository). Otherwise a full pass (`advanceRun`), kept in the memo if the run is at rest after it and the pass left the run as it read.
+ * repository). Otherwise a full pass (`advancePass`), kept in the memo if the run is at rest after it and the pass left the run as it read.
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches.
  *
- * `runs` is the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout are
- * read (`checkoutHold`): the store is not listed again. `slot` is `advance`'s, handed on to every full pass. A run with nothing filed
- * comes here too — one called off before it started rests like any other — and its answer from memory does not hang on the slot: a run at
- * rest has nothing ready (`atRest`), and only a run with a step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it
- * counts on none.
+ * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout
+ * are read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot`
+ * is `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like
+ * any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a
+ * step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
  */
 const advanceResting = Effect.fn('advanceResting')(function* (
   e: Engine,
   run: Run,
-  runs: readonly Run[],
+  pass: PassRead,
   resting: RestingPass | undefined,
   slot?: RunSlot,
 ) {
-  if (!resting) return (yield* fullPass(e, run, runs, slot)).advanced;
+  if (!resting) return (yield* fullPass(e, run, pass, slot)).advanced;
   const { memo, stamps, heads, verify } = resting;
   const stamp = stamps.get(run.id);
   const kept = memo.runs.get(run.id);
@@ -401,12 +394,12 @@ const advanceResting = Effect.fn('advanceResting')(function* (
     (yield* tried(() => !kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined))
   ) {
     countRested();
-    if (verify) yield* verified(e, run, runs, slot, kept.advanced);
+    if (verify) yield* verified(e, run, pass, slot, kept.advanced);
     return { ...kept.advanced, run };
   }
   memo.runs.delete(run.id);
   const record = JSON.stringify(run);
-  const { advanced, rest } = yield* fullPass(e, run, runs, slot);
+  const { advanced, rest } = yield* fullPass(e, run, pass, slot);
   if (rest && stamp !== undefined && JSON.stringify(run) === record) {
     const { run: _, ...answered } = advanced;
     memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
@@ -422,7 +415,7 @@ const advanceResting = Effect.fn('advanceResting')(function* (
 const verified = Effect.fn('verified')(function* (
   e: Engine,
   run: Run,
-  runs: readonly Run[],
+  pass: PassRead,
   slot: RunSlot | undefined,
   kept: Omit<Advanced, 'run'>,
 ) {
@@ -439,7 +432,7 @@ const verified = Effect.fn('verified')(function* (
     advanced: { run: _, ...judged },
     blockers,
     rest,
-  } = yield* fullPass(e, fresh, runs, slot);
+  } = yield* fullPass(e, fresh, pass, slot);
   if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(fresh) === record) return;
   return yield* Effect.die(
     new Error(

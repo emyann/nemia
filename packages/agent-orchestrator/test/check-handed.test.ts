@@ -1,9 +1,9 @@
 /**
  * The step after a checked step is handed every `wf <name>:` line of its check's whole stdout, however long the output after it: walked
  * on the client's `engine()` with the shipped `check` harness, a check filed with the `config` `fileCheck` gives it, run by the real
- * detached worker, and read back through `checksHandedOf`, as the pass that files the next step reads it. The engine's log of a task keeps
- * only its end, so the fixture's marked lines sit further from the end than that log reaches; the runtime keeps each stream whole, read
- * through `output`.
+ * detached worker, and read back through `checksHandedRead`, as the pass that files the next step reads it. The engine's log of a task
+ * keeps only its end, so the fixture's marked lines sit further from the end than that log reaches; the runtime keeps each stream whole,
+ * read through `output`.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST` has every run a pass answers from its memo
  * of runs at rest judged in full as well.
@@ -16,14 +16,15 @@ import type { Run } from '../src/run.ts';
 import type { Workflow } from '../src/step/step.ts';
 import { CHECK_NICENESS, checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-check-handed-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { engine, tick } = await import('../src/runner.ts');
-const { checksHandedOf } = await import('../src/views/views.verb.ts');
+const { engine, tickRun, runWith } = await import('../src/runner.ts');
+const { checksHandedRead } = await import('../src/views/views.verb.ts');
 
 const e = engine();
 
@@ -31,10 +32,10 @@ const e = engine();
 const settled = async (id: string) => {
   const deadline = Date.now() + 20_000;
   for (;;) {
-    const v = await e.view(id);
+    const v = await Effect.runPromise(e.view(id));
     if (v.state.settled) return v.state.settled;
     assert.ok(Date.now() < deadline, `${id} never settled: ${v.phase}`);
-    await tick(e);
+    await runWith(e, tickRun());
     await new Promise((r) => setTimeout(r, 50));
   }
 };
@@ -56,17 +57,19 @@ const COMMAND = [
 /** File `COMMAND` as `fileCheck` files a check, under `id`, and wait for it to settle. */
 const checked = async (id: string) => {
   const workspace = scratch('wf-check-handed-ws-');
-  await e.file({
-    id,
-    cwd: workspace,
-    harness: 'check',
-    brief: COMMAND,
-    config: {
-      command: checkArgv(COMMAND),
-      env: { WF_RUN: 'r-1', WF_STEP: 'implement', WF_WORKSPACE: workspace, WF_ARTIFACTS: '' },
-      niceness: CHECK_NICENESS,
-    },
-  });
+  await Effect.runPromise(
+    e.file({
+      id,
+      cwd: workspace,
+      harness: 'check',
+      brief: COMMAND,
+      config: {
+        command: checkArgv(COMMAND),
+        env: { WF_RUN: 'r-1', WF_STEP: 'implement', WF_WORKSPACE: workspace, WF_ARTIFACTS: '' },
+        niceness: CHECK_NICENESS,
+      },
+    }),
+  );
   assert.equal(await settled(id), 'succeeded');
 };
 
@@ -77,14 +80,14 @@ const handed = async (id: string, engine = e) => {
     { name: 'implement', after: [], check: COMMAND },
     { name: 'review', after: ['implement'] },
   ] as unknown as Workflow[];
-  const [said] = await checksHandedOf(engine, run, steps, steps[1]);
+  const [said] = await runWith(engine, checksHandedRead(run, steps, steps[1]));
   return said;
 };
 
 test('LIVE: the step after a checked step is handed every `wf <name>:` line of the whole stdout, not of the end the engine keeps', async () => {
   const id = 'r-1-implement-check';
   await checked(id);
-  const log = await e.logs(id);
+  const log = await Effect.runPromise(e.logs(id));
   assert.doesNotMatch(log, /wf mutants: baseline/, 'the marked lines sit before the end the engine keeps, so its log cannot hand them');
   assert.match(log, /wf check: no e2e/);
 
@@ -103,7 +106,7 @@ test('LIVE: a check whose streams the runtime did not keep — one run before it
   const kept = fs.readdirSync(dir).filter((f) => f.includes(id.replace(/[^a-zA-Z0-9]+/g, '_')) && /\.(stdout|stderr)$/.test(f));
   assert.equal(kept.length, 2, `the runtime keeps both streams in ${dir}: ${kept.join(', ')}`);
   for (const f of kept) fs.rmSync(path.join(dir, f));
-  assert.equal(await e.output(id, 'stdout'), undefined);
+  assert.equal(await Effect.runPromise(e.output(id, 'stdout')), undefined);
 
   const said = await handed(id);
   assert.ok(said && !('unreadable' in said), JSON.stringify(said));
@@ -116,7 +119,7 @@ test('LIVE: a check whose streams the runtime did not keep — one run before it
 test('a check whose streams the engine cannot give is handed as unreadable, with why', async () => {
   const refusing = new Proxy(e, {
     get: (target, key, receiver) =>
-      key === 'output' ? () => Promise.reject(new Error('the disk is gone')) : (Reflect.get(target, key, receiver) as unknown),
+      key === 'output' ? () => Effect.fail(new Error('the disk is gone') as never) : (Reflect.get(target, key, receiver) as unknown),
   });
   const said = await handed('r-1-implement-check', refusing);
   assert.ok(said && 'unreadable' in said, JSON.stringify(said));

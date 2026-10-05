@@ -4,7 +4,7 @@
  * character is the screen's own. `main` is imported on the first call, once the test file has set `WF_ROOT`.
  */
 import type { TestContext } from 'node:test';
-import type { Engine } from 'agent-runtime';
+import type { Engine } from '../src/runtime-client.ts';
 
 /**
  * What `nemia decide <argv>` prints, split on line breaks, with each value of `as` replaced by its key: `{ '<id>': run.id }`. A value that

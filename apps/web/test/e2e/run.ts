@@ -1,6 +1,9 @@
 /**
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
+ *     npm run e2e [-- [--photos] [--pages <name,…>]]
+ *
+ *  0. Reads its plan from its command line (`planOf`, pages.ts), refusing a flag or a page it does not know before anything else.
  *  1. Builds the web app.
  *  2. Seeds a store in a temporary WF_ROOT with six fake runs, the first with a real repository and branch to decide
  *     on, and beside it a checkout for the api to serve (`HKB_REPO`) on the Capabilities page, and workflows in both for
@@ -10,10 +13,13 @@
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
  *     another worktree's e2e.
- *  4. Visits every page in pages/ in headless Chromium, in the order of their file names (pages.ts), in a light and a
- *     dark theme: no console error, no failed request, the page in the theme asked for, and the elements the page must have.
- *  5. Screenshots each page in each theme into $WF_ARTIFACTS when a run gives one — the step's files
- *     directory — and into `.e2e/` at the repository root otherwise.
+ *  4. Visits every page in pages/ in headless Chromium, in the order of their file names (pages.ts), in the dark theme: no console
+ *     error, no failed request, the page in the theme asked for, and the elements the page must have. With `--pages`, every page up to
+ *     the last one named; with `--photos`, in a light and then a dark theme.
+ *  5. Takes no picture but a failing page's. With `--photos`, screenshots each page visited, or each `--pages` names, in each theme,
+ *     with the pictures the page takes of itself, into $WF_ARTIFACTS when a run gives one — the step's files directory — and into
+ *     `.e2e/` at the repository root otherwise.
+ *  6. Says last how many pages passed, in which themes, and in how many seconds.
  *
  * Exits non-zero on the first failure, naming the page, the theme and the assertion, with a screenshot
  * of what the page looked like. Both servers are stopped on the way out: on success, on failure, and on a
@@ -44,7 +50,7 @@ import {
   seedWorkflows,
 } from './seed.ts';
 import { QUOTA_ASKS_MS } from './board.ts';
-import { loadPages } from './pages.ts';
+import { loadPages, planOf } from './pages.ts';
 import { exitOn, launch, visitAll } from './visit.ts';
 import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './world.ts';
 
@@ -144,7 +150,8 @@ function fromNodeModules(file: string): string {
 }
 
 /**
- * The run: loads the pages first, so a stray in pages/ is refused before the build, not after it; builds the app; seeds the store; starts
+ * The run: loads the pages and reads its plan first, so a stray in pages/ or a bad command line is refused before the build, not after
+ * it; builds the app; seeds the store; starts
  * the api and `vite preview`; and visits every page. The seed writes the diamond after the checkout's files, which its base commits; then
  * the run with no repository anywhere in it, newest of them all; then the feed, over every journal the seed wrote, where the api reads
  * when each task was filed.
@@ -158,7 +165,9 @@ function fromNodeModules(file: string): string {
  * words between calls.
  */
 async function main(): Promise<void> {
+  const started = performance.now();
   const pages = await loadPages();
+  const plan = planOf(process.argv.slice(2), pages);
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
 
   console.log('e2e: building the web app');
@@ -245,13 +254,16 @@ async function main(): Promise<void> {
   const browser = await launch();
   let shots: string[];
   try {
-    shots = await visitAll(browser, base, pages, OUT, store);
+    shots = await visitAll(browser, base, plan.visit, OUT, { store, themes: plan.themes, pictured: plan.pictured });
   } finally {
     await browser.close();
   }
-
-  console.log(`\ne2e: every page passed in both themes. Read the screenshots before you sign off:`);
-  for (const shot of shots) console.log(`  ${shot}`);
+  if (shots.length) console.log(`\ne2e: the pages pictured:\n${shots.map((shot) => `  ${shot}`).join('\n')}`);
+  const seconds = Math.round((performance.now() - started) / 1000);
+  console.log(
+    `\ne2e: ${plan.visit.length} of ${pages.length} pages passed in the ${plan.themes.join(' and ')} theme${plan.themes.length > 1 ? 's' : ''}` +
+      ` in ${seconds} s`,
+  );
 }
 
 exitOn(main(), cleanUp, () =>

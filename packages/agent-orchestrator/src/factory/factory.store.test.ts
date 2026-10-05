@@ -8,8 +8,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine } from 'agent-runtime';
 import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -21,7 +21,7 @@ const { main } = await import('../cli/main.ts');
 const { FACTORY_HELP } = await import('./factory.verb.ts');
 
 /** No verb here asks the engine anything. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>

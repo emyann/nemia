@@ -11,6 +11,7 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +19,7 @@ import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import type { MetricRead } from '../factory/ceilings.ts';
 import { Engine, findRun } from '../store.ts';
-import { approve, engine, verifiesRest, restingRead, type RunSummary } from 'agent-orchestrator';
+import { approveRun, engine, restingRead, runWith, type RunSummary, verifiesRest } from 'agent-orchestrator';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
@@ -32,9 +33,11 @@ const git = (repo: string, ...args: string[]) =>
     { cwd: repo, encoding: 'utf8' },
   );
 
+/** A file written whole, by a rename over it: as a hand edit of a journal must be, since the engine reads one only past what it kept. */
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
+  fs.writeFileSync(`${file}.new`, text);
+  fs.renameSync(`${file}.new`, file);
 };
 
 const repo = fs.mkdtempSync(path.join(root, 'repo-'));
@@ -62,6 +65,13 @@ const fed = (taskId: string) =>
     path.join(root, 'engine', 'feed.jsonl'),
     `${JSON.stringify({ taskId, event: { kind: 'settled', at, outcome: 'succeeded' } })}\n`,
   );
+
+/** A line appended to a task's journal, then the same event on the engine's feed, as the runtime's every append writes the two. */
+const appended = (taskId: string, event: object) => {
+  fs.mkdirSync(path.dirname(journal(taskId)), { recursive: true });
+  fs.appendFileSync(journal(taskId), `${JSON.stringify(event)}\n`);
+  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event })}\n`);
+};
 
 const started = () => [
   { kind: 'filed', at, brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
@@ -156,6 +166,31 @@ function aRefusedRun(id: string) {
   writeRun(id, 'Refuse it', 'npm test');
 }
 
+/**
+ * The journals `f` asks the engine for: a task it views, and each task a list answers, read or unreadable. What a poll costs whether or
+ * not the engine's reader reads their bytes again: it reads a journal only for what was appended since it last read it.
+ */
+async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
+  const { view, list } = e;
+  let asked = 0;
+  Object.assign(e, {
+    view: (taskId: string) => {
+      asked++;
+      return view(taskId);
+    },
+    list: (...args: unknown[]) =>
+      Effect.map(Reflect.apply(list, e, args) as ReturnType<typeof list>, (listed) => {
+        asked += listed.views.length + listed.unreadable.length;
+        return listed;
+      }),
+  });
+  try {
+    return { value: await f(), asked };
+  } finally {
+    Object.assign(e, { view, list });
+  }
+}
+
 const list = async () => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200, await res.clone().text());
@@ -186,11 +221,10 @@ test("a finished run is kept and a moving one is not, and a poll then reads the 
   assert.ok(resting.runs.has('r-rest'), 'kept');
   assert.ok(!resting.runs.has('r-moving'), 'not kept: its task is in flight');
 
-  const reads = e.io().reads;
   const hits = resting.hits;
-  const again = await unverified(list);
+  const { value: again, asked } = await journalsAsked(() => unverified(list));
   assert.deepEqual(again, first, 'the same answer from memory');
-  assert.equal(e.io().reads - reads, 1, "the moving run's one journal, and not the finished run's");
+  assert.equal(asked, 1, "the moving run's one journal, and not the finished run's");
   assert.equal(resting.hits - hits, 1);
 });
 
@@ -202,12 +236,13 @@ test("a poll's reads are counted into api.poll.reads under /api/runs as the engi
     return { count: metric?.count ?? 0, sum: metric?.sum ?? 0 };
   };
   await list();
+  appended('r-moving-implement', { kind: 'said', at, attempt: 1, text: 'Keep going.' });
   const before = await readsOf();
-  const reads = e.io().reads;
+  const reads = Effect.runSync(e.io()).reads;
   await unverified(list);
-  const read = e.io().reads - reads;
+  const read = Effect.runSync(e.io()).reads - reads;
   const after = await readsOf();
-  assert.ok(read > 0, "the moving run's journal was read");
+  assert.ok(read > 0, "the line appended to the moving run's journal was read");
   assert.deepEqual(after, { count: before.count + 1, sum: before.sum + read }, "the poll's reads, the engine's own count");
 });
 
@@ -298,11 +333,7 @@ test("runs waiting on the same run read its journals once between them, off the 
     );
   child('r-child-1');
   await list();
-  const cost = async () => {
-    const reads = e.io().reads;
-    await unverified(list);
-    return e.io().reads - reads;
-  };
+  const cost = async () => (await journalsAsked(() => unverified(list))).asked;
   const one = await cost();
   child('r-child-2');
   await list();
@@ -320,10 +351,10 @@ test('two requests at once: the first reads the feed and judges the run succeede
   resting.runs.delete('r-raced');
   const { startedAt: _, ...judged } = answer;
 
-  const first = await restingRead(e, resting, false);
+  const first = await runWith(e, restingRead(e, resting, false));
   blocked('r-raced-implement');
   fed('r-raced-implement');
-  await restingRead(e, resting, false);
+  await runWith(e, restingRead(e, resting, false));
   first.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(
     !resting.runs.has('r-raced'),
@@ -331,17 +362,11 @@ test('two requests at once: the first reads the feed and judges the run succeede
   );
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
 
-  const alone = await restingRead(e, resting, false);
+  const alone = await runWith(e, restingRead(e, resting, false));
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
 });
-
-/** A line appended to a task's journal, then the same event on the engine's feed, as the runtime's every append writes the two. */
-const appended = (taskId: string, event: object) => {
-  write(journal(taskId), `${fs.existsSync(journal(taskId)) ? fs.readFileSync(journal(taskId), 'utf8') : ''}${JSON.stringify(event)}\n`);
-  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event })}\n`);
-};
 
 /** A run of `design → implement` whose design is gated, its record as the tick writes it: design's task given once filed. */
 function writeGated(id: string, filed: boolean) {
@@ -414,7 +439,7 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.deepEqual(gated.waitingOnYou, ['design']);
   assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');
 
-  await approve(engine(), id, 'design');
+  await runWith(engine(), approveRun(id, 'design'));
   const approved = await read('approved');
   assert.ok(!resting.runs.has(id), 'the approval takes it out');
   assert.equal(approved.moving, true, 'implement is due: the tick files it');
@@ -425,11 +450,7 @@ test('a gated run read by the list at every event from being filed to being appr
 
 test("a poll's reads: a run at rest, a moving one and one whose check refused it cost the journals of the moving one alone, and judged afresh their own journals and no more", async () => {
   await list();
-  const cost = async () => {
-    const reads = e.io().reads;
-    await unverified(list);
-    return e.io().reads - reads;
-  };
+  const cost = async () => (await journalsAsked(() => unverified(list))).asked;
   const before = await cost();
   aFinishedRun('r-count-rest');
   running('r-count-moving-implement');
@@ -485,13 +506,13 @@ test("a held run's decision reads what holds it and none of its own tasks: a ses
   writeRun('r-held', 'Held while it runs');
   write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at, until: ['r-nowhere'] }));
   try {
-    const reads = e.io().reads;
+    const reads = Effect.runSync(e.io()).reads;
     const res = await app.request('/api/runs/r-held/decision');
     assert.equal(res.status, 200, await res.clone().text());
     const decided = (await res.json()) as { holding?: unknown };
     assert.ok(decided.holding, JSON.stringify(decided));
     assert.equal(
-      e.io().reads - reads,
+      Effect.runSync(e.io()).reads - reads,
       1,
       "the route's check that the run's journal reads (`viewsFor`), and no view more: the hold is answered off the runs it is held until",
     );

@@ -29,7 +29,7 @@ holds what every change needs.
   `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
-- `npm run build`, then `npm run e2e`, when you touch `apps/web`, and read the pictures the e2e writes (`apps/web/CLAUDE.md`).
+- `npm run build`, then `npm run e2e`, when you touch `apps/web`: its assertions, in the dark theme (`apps/web/CLAUDE.md`).
 - Run them before you commit. Green is the floor, not the bar: a change that makes the suite pass by weakening a test is a finding to
   report, not a fix.
 - Turbo does not see `workflows/`: after touching a workflow folder, run `npx turbo run test --force --continue`. The same goes for a
@@ -75,8 +75,9 @@ holds what every change needs.
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Four rules hold the layers, each a test** (`docs/architecture.md`):
   - *Between packages, only the public contract*: `agent-runtime`, `agent-runtime/effect` and `agent-runtime/vocabulary`; `agent-orchestrator`,
-    `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a
-    relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`).
+    `agent-orchestrator/run` and `agent-orchestrator/workflow` — never a subpath outside `exports`, a
+    relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`). The packages' entries are Effect, and the api is the system's
+    public interface.
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
   - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test): its behaviour through the client,

@@ -10,9 +10,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine, TaskSpec } from 'agent-runtime';
+import type { TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -20,7 +22,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advance, list, retry, runSlots, start } = await import('../src/runner.ts');
+const { advanceRun, list, retryRun, runSlots, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -56,7 +58,7 @@ const board = () => {
   const filings: string[] = [];
   const stopped: string[] = [];
   const reads: string[] = [];
-  const e = {
+  const e = promised({
     view: async (id: string) => {
       const t = tasks.get(id);
       reads.push(id);
@@ -101,10 +103,10 @@ const board = () => {
     tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }),
     admit: async () => [],
     list: async (ids?: readonly string[]) => ({
-      views: await Promise.all((ids ?? [...tasks.keys()]).filter((id) => tasks.has(id)).map((id) => e.view(id))),
+      views: await Promise.all((ids ?? [...tasks.keys()]).filter((id) => tasks.has(id)).map((id) => Effect.runPromise(e.view(id)))),
       unreadable: [],
     }),
-  } as unknown as Engine;
+  });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, costUsd?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, costUsd });
   return { e, tasks, filings, stopped, reads, settle };
@@ -113,9 +115,9 @@ const board = () => {
 test('a step answered five times over keeps working: each answer a try of the same session, told what was said, on the window it was started with, and nothing capping the count', async () => {
   const repo = aRepo();
   const { e, tasks, filings, settle } = board();
-  const run = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
+  const run = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
 
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual(filings, [`${run.id}-supervise`], "filed once, in the repository's own checkout");
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.cwd, repo);
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.claude?.remoteControl, true, 'bridged, as `remote: true` says');
@@ -129,16 +131,16 @@ test('a step answered five times over keeps working: each answer a try of the sa
       artifacts: [],
       needs: `Merge r-${n}, or hold it?`,
     });
-    const quiet = await advance(e, readRun(run.id));
+    const quiet = await runWith(e, advanceRun(readRun(run.id)));
     assert.deepEqual(
       [quiet.filed, quiet.tried],
       [[], []],
       `answer ${n}: the pass that reads the question files nothing until a person answers`,
     );
-    assert.deepEqual((await list(e, readRun(run.id))).waitingOnYou, ['supervise'], `answer ${n}: it waits on you`);
+    assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['supervise'], `answer ${n}: it waits on you`);
 
-    await retry(e, run.id, 'supervise', { mode: 'nudge', message: `yes, merge r-${n}` });
-    const filed = await advance(e, readRun(run.id));
+    await runWith(e, retryRun(run.id, 'supervise', { mode: 'nudge', message: `yes, merge r-${n}` }));
+    const filed = await runWith(e, advanceRun(readRun(run.id)));
     const next = `${run.id}-supervise-try${n + 1}`;
     assert.deepEqual(filed.tried, ['supervise'], `answer ${n} files try ${n + 1}`);
     assert.ok(tasks.has(next), `try ${n + 1} is on the board: ${filings.join(', ')}`);
@@ -157,20 +159,20 @@ test('a step answered five times over keeps working: each answer a try of the sa
 test('a pass over a step answered again and again reads what it is working on, not every try it has left behind — and with a cap in force it reads them all', async () => {
   const repo = aRepo();
   const { e, reads, settle } = board();
-  const run = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
-  await advance(e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
+  await runWith(e, advanceRun(readRun(run.id)));
 
   const passReads = async (): Promise<string[]> => {
     reads.length = 0;
-    await advance(e, readRun(run.id));
+    await runWith(e, advanceRun(readRun(run.id)));
     return [...reads];
   };
   const answer = async (n: number) => {
     const taskId = n === 1 ? `${run.id}-supervise` : `${run.id}-supervise-try${n}`;
     settle(taskId, 'succeeded', { outcome: 'blocked', summary: `round ${n}`, artifacts: [], needs: 'Merge it?' });
-    await advance(e, readRun(run.id));
-    await retry(e, run.id, 'supervise', { mode: 'nudge', message: `yes (${n})` });
-    await advance(e, readRun(run.id));
+    await runWith(e, advanceRun(readRun(run.id)));
+    await runWith(e, retryRun(run.id, 'supervise', { mode: 'nudge', message: `yes (${n})` }));
+    await runWith(e, advanceRun(readRun(run.id)));
   };
 
   await answer(1);
@@ -181,20 +183,22 @@ test('a pass over a step answered again and again reads what it is working on, n
   assert.deepEqual(later, [`${run.id}-supervise-try7`], 'the try it is on, and nothing else');
   assert.equal(later.length, early.length, 'a pass costs the same at six answers as at one: it does not grow with them');
 
-  const capped = start({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude\nbudget: 1' }), isolate: false });
-  await advance(e, readRun(capped.id));
+  const capped = await Effect.runPromise(
+    startRun({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude\nbudget: 1' }), isolate: false }),
+  );
+  await runWith(e, advanceRun(readRun(capped.id)));
   settle(`${capped.id}-implement`, 'failed', undefined, undefined, 0.6);
-  await advance(e, readRun(capped.id));
-  await retry(e, capped.id, 'implement', { mode: 'fresh' });
-  await advance(e, readRun(capped.id));
+  await runWith(e, advanceRun(readRun(capped.id)));
+  await runWith(e, retryRun(capped.id, 'implement', { mode: 'fresh' }));
+  await runWith(e, advanceRun(readRun(capped.id)));
   settle(`${capped.id}-implement-try2`, 'failed', undefined, undefined, 0.6);
   reads.length = 0;
-  await advance(e, readRun(capped.id));
+  await runWith(e, advanceRun(readRun(capped.id)));
   assert.ok(
     reads.includes(`${capped.id}-implement`),
     `try 1 is read while a cap is in force, the one thing those tries are read for, what they cost together: ${reads.join(', ')}`,
   );
-  const held = await list(e, readRun(capped.id));
+  const held = await runWith(e, list(e, readRun(capped.id)));
   assert.deepEqual(
     held.steps.map((st) => st.status),
     ['over budget $1.20 of $1'],
@@ -205,40 +209,42 @@ test('a pass over a step answered again and again reads what it is working on, n
 test("`slot: none` on disk: a watcher's run files its step at a full cap, counts against nothing, and holds no other run — while the run beside it waits", async () => {
   const repo = aRepo();
   const { e, filings, settle } = board();
-  const watcher = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
-  const work = start({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false });
+  const watcher = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
+  const work = await Effect.runPromise(
+    startRun({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false }),
+  );
 
   const full = { inFlight: 1, cap: 1 };
-  const held = await advance(e, readRun(work.id), full);
+  const held = await runWith(e, advanceRun(readRun(work.id), full));
   assert.deepEqual([held.filed, held.held], [[], full], 'one slot, and it is taken: the work waits for a run slot');
-  const watching = await advance(e, readRun(watcher.id), full);
+  const watching = await runWith(e, advanceRun(readRun(watcher.id), full));
   assert.deepEqual(watching.filed, ['supervise'], 'the supervisor files its step all the same');
   assert.equal(watching.held, undefined, 'and is not held');
   assert.equal(watching.inFlight, false, "nor counted: what it filed is its own watching, not a run's work");
 
   process.env.WF_MAX_RUNS = '1';
   assert.deepEqual(
-    [...(await runSlots(e, [readRun(watcher.id), readRun(work.id)]))],
+    [...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)])))],
     [],
     'nothing held: with the supervisor running, one slot is still free for the work',
   );
-  const free = await advance(e, readRun(work.id), { inFlight: 0, cap: 1 });
+  const free = await runWith(e, advanceRun(readRun(work.id), { inFlight: 0, cap: 1 }));
   assert.deepEqual(free.filed, ['implement'], 'the work takes the slot the supervisor never held');
   assert.equal(free.inFlight, true);
 
   settle(`${watcher.id}-supervise`, 'succeeded', { outcome: 'blocked', summary: 'a run is ready', artifacts: [], needs: 'Merge it?' });
   for (let pass = 0; pass < 2; pass++)
     assert.equal(
-      (await advance(e, readRun(watcher.id), { inFlight: 1, cap: 1 })).inFlight,
+      (await runWith(e, advanceRun(readRun(watcher.id), { inFlight: 1, cap: 1 }))).inFlight,
       false,
       `pass ${pass}: its own filing is not counted while its session runs`,
     );
-  assert.deepEqual([...(await runSlots(e, [readRun(watcher.id), readRun(work.id)]))], []);
+  assert.deepEqual([...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)])))], []);
   delete process.env.WF_MAX_RUNS;
   assert.ok(filings.includes(`${watcher.id}-supervise`) && filings.includes(`${work.id}-implement`));
 });
 
-test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of a workflow that has another — a slot is a run's, and the work beside it would run outside the cap", () => {
+test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of a workflow that has another — a slot is a run's, and the work beside it would run outside the cap", async () => {
   const repo = aRepo();
   const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   const before = runs();
@@ -248,8 +254,8 @@ test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of 
     { supervise: 'slot: none', review: 'after: supervise' },
   ];
   for (const steps of shapes) {
-    assert.throws(
-      () => start({ brief: 'watch it', repo, workflowDir: folderOf(steps) }),
+    await assert.rejects(
+      async () => await Effect.runPromise(startRun({ brief: 'watch it', repo, workflowDir: folderOf(steps) })),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 &&
         /^supervise: `slot: none` takes this step's whole RUN out of the cap on runs in flight \(WF_MAX_RUNS\), and this workflow has \w+ beside it — a slot is a run's, not a step's/.test(
@@ -260,7 +266,7 @@ test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of 
   }
   assert.equal(runs(), before, 'nothing written');
   assert.ok(
-    start({ brief: 'watch it', repo, workflowDir: FOLDER }).id,
+    (await Effect.runPromise(startRun({ brief: 'watch it', repo, workflowDir: FOLDER }))).id,
     'a watcher alone in its workflow is the shape that is allowed: one step, and it starts',
   );
 });

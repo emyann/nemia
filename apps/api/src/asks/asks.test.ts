@@ -1,7 +1,7 @@
 /**
  * What a step needs from a person, and the board's answer to it: `needs` and `blockedByHarness` on each step, `answer` on a try a
  * person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `nemia retry` does — through the package's
- * `retry()`, given the harness's word as `nemia retry` gives it, and refused in the package's words.
+ * `retryRun`, given the harness's word as `nemia retry` gives it, and refused in the package's words.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading transcripts where Claude Code keeps them
  * (CLAUDE_CONFIG_DIR). The harness's fake `claude` (test/harness.ts) is first on PATH, listing the sessions this file says are running
@@ -15,7 +15,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { askFile, engine, list, retry, runStore, type RunSummary } from 'agent-orchestrator';
+import { askFile, engine, list, retryRun, runStore, runWith, type RunSummary } from 'agent-orchestrator';
 import { messageRefusal } from 'agent-orchestrator/run';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
@@ -212,12 +212,12 @@ const nothingWritten = (why: string) => {
 };
 
 /**
- * What the package's `retry()` refuses `how` for, word for word — given the harness's word, as `nemia retry` gives it: what `nemia retry`
+ * What the package's `retryRun` refuses `how` for, word for word — given the harness's word, as `nemia retry` gives it: what `nemia retry`
  * prints.
  */
 const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   try {
-    await retry(engine(), R, step, how, { stopBlocked: true });
+    await runWith(engine(), retryRun(R, step, how, { stopBlocked: true }));
   } catch (err) {
     return (err as Error).message;
   }
@@ -417,7 +417,7 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
     assert.equal(res.status, 422, JSON.stringify(how));
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, messageRefusal(how, `nemia retry ${R} ${step}`));
-    assert.equal(error, await retryRefuses(step, how), "the package's own sentence, and the one `retry()` refuses with");
+    assert.equal(error, await retryRefuses(step, how), "the package's own sentence, and the one `retryRun` refuses with");
     assert.match(
       error,
       how.mode === 'recheck'
@@ -495,7 +495,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
   assert.deepEqual(asked(), ['retry-implement-2']);
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   const run = await detail();
   const implement = run.steps.find((s) => s.name === 'implement')!;
   assert.equal(implement.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
@@ -566,7 +566,7 @@ test("a session the harness blocked is continued as `nemia retry` continues it: 
   assert.deepEqual({ held: journalOf('t-held'), idle: journalOf('t-idle') }, journals, "nor of the engine's journals");
   assert.equal(stops(), 0, "and stopped no session: the api wrote the asks and nothing else, stopping the session is the tick's");
 
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
   const run = await detail();
   const held = run.steps.find((s) => s.name === 'held')!;
@@ -653,7 +653,7 @@ test("a try a person answered carries the answer, as `nemia decide` prints it �
   assert.equal(implement.tries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
   assert.equal(implement.needs, null, 'the current try signed off done');
 
-  const words = await list(engine(), runStore.runs.read(A));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(A)));
   for (const [where, said] of [
     ['detail', run],
     ['list', await summary(A)],

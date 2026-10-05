@@ -1,15 +1,16 @@
 /**
  * The commands over a run's course and the store's tick, each defined once: `nemia cancel`, `nemia hold`, `nemia rm` and `nemia prune`,
- * whose handlers call the package's verbs (`cancel`, `hold`, `unhold`, `forget`, `prune`) on one run — the CLI's runners walk the many runs
- * `nemia rm` and `nemia prune` take — the store's pause (`nemia pause`, `nemia resume`, and the api's read of it), and `nemia tick`, `nemia
- * up` and `nemia watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
+ * whose handlers call the package's verbs (`cancelRun`, `hold`, `unhold`, `forgetRun`, `prune`) on one run — the CLI's runners walk the
+ * many runs `nemia rm` and `nemia prune` take — the store's pause (`nemia pause`, `nemia resume`, and the api's read of it), and `nemia
+ * tick`, `nemia up` and `nemia watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no
+ * handler.
  */
-import { cancel } from '../cancel/cancel.verb.ts';
+import { cancelRun } from '../cancel/cancel.verb.ts';
 import type { CancelPlan } from '../cancel/cancel.ts';
 import { everyOf } from '../daemon/daemon.ts';
 import { cursorTakes } from '../feed/feed.ts';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
-import { forget } from '../forget/forget.verb.ts';
+import { forgetRun } from '../forget/forget.verb.ts';
 import { pruneLines, type Pruning } from '../prune/prune.ts';
 import { prune } from '../prune/prune.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -29,8 +30,9 @@ import {
   type Paused,
   type PausedNow,
 } from '../pause/pause.ts';
+import { Effect } from 'effect';
 import { pausedRead } from '../list/list.verb.ts';
-import type { Engine } from '../runtime-client.ts';
+import { tried } from '../runtime-client.ts';
 import type { Args } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
@@ -58,10 +60,10 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
   },
   writes: true,
   only: { side: 'cli', why: 'the board offers no cancel: a person stops a run at the command line' },
-  async handler(e, args) {
-    const { run, plan } = await cancel(e, textOf(args, 'runId') ?? '');
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const { run, plan } = yield* cancelRun(textOf(args, 'runId') ?? '');
     return { id: run.id, plan };
-  },
+  }),
   print: ({ id, plan }) => {
     if (plan.kind === 'finished') return [`${id}  already ${plan.status} — nothing to stop`];
     const head = plan.kind === 'already-cancelled' ? `${id}  already cancelled at ${plan.at}` : `${id}  cancelled`;
@@ -175,15 +177,15 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   check: holdArgsRefusal,
   writes: true,
   route: { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
-  async handler(e, args) {
+  handler: Effect.fnUntraced(function* (args: Args) {
     const runId = textOf(args, 'runId') ?? '';
     if (args.off === true) {
       const { run, hold: lifted } = unhold(runId);
       return { id: run.id, lifted: true, hold: lifted };
     }
-    const { run, hold: put } = await hold(e, runId, [...listOf(args, 'until')], { why: saidOf(args, 'why'), by: saidOf(args, 'by') });
+    const { run, hold: put } = yield* hold(runId, [...listOf(args, 'until')], { why: saidOf(args, 'why'), by: saidOf(args, 'by') });
     return { id: run.id, lifted: false, hold: put };
-  },
+  }),
   print: ({ id, lifted, hold: put }, args) => [
     lifted
       ? `${id}  hold lifted — the next tick goes on, and what its steps ask is asked`
@@ -237,13 +239,13 @@ export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
   check: rmRefusal,
   writes: true,
   route: { method: 'DELETE', path: '/api/runs/:runId', status: 200 },
-  async handler(e, args) {
-    const forgot = await forget(e, textOf(args, 'runId') ?? '', {
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const forgot = yield* forgetRun(textOf(args, 'runId') ?? '', {
       deleteBranches: args.deleteBranches === true,
       forceUnmerged: args.forceUnmerged === true,
     });
     return { id: forgot.id, removed: forgot.kind === 'forgotten', forgot };
-  },
+  }),
   print: ({ forgot }) => [forgetLine(forgot)],
   apiKeys: ['id', 'removed'],
   apiRefusal: ({ forgot }) => {
@@ -294,15 +296,15 @@ export const PRUNE: Command<{
   },
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } },
-  async handler(e, args) {
-    const p = await prune(e, textOf(args, 'runId') ?? '', {
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const p: Pruning = yield* prune(textOf(args, 'runId') ?? '', {
       unmerged: args.unmerged === true,
       artifacts: args.artifacts === true,
       yes: args.yes === true,
     });
     const { id, worktrees, left } = p;
     return { id, pruned: p.kind === 'pruned', lines: pruneLines(p), worktrees, artifacts: p.artifacts ?? null, left, pruning: p };
-  },
+  }),
   print: ({ pruning }) => pruneLines(pruning),
   apiKeys: ['id', 'pruned', 'lines', 'worktrees', 'artifacts', 'left'],
   apiRefusal: ({ pruning }) => {
@@ -332,12 +334,12 @@ type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
 
 /** `nemia pause`'s handler, by its flags: a plain pause, refused while one stands; `--now`, which only reads; `--now --yes`, which acts. */
-async function pauseBy(e: Engine, args: Args): Promise<PauseAnswer> {
+const pauseBy = Effect.fnUntraced(function* (args: Args) {
   const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
-  if (args.now !== true) return { pause: putPause(said) };
-  if (args.yes !== true) return { pause: readPause(), interrupts: await nowRead(e) };
-  return pauseNow(e, said);
-}
+  if (args.now !== true) return { pause: putPause(said) } satisfies PauseAnswer;
+  if (args.yes !== true) return { pause: readPause(), interrupts: yield* nowRead() } satisfies PauseAnswer;
+  return (yield* pauseNow(said)) satisfies PauseAnswer;
+});
 
 /**
  * `nemia pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written. Refused while a pause stands (`Conflict`).
@@ -377,7 +379,7 @@ export const PAUSE: Command<PauseAnswer> = {
   check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
   writes: true,
   route: { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } },
-  handler: (e, args) => pauseBy(e, args),
+  handler: pauseBy,
   print: (answer) =>
     'interrupts' in answer
       ? nowLines(answer.interrupts, answer.pause !== null)
@@ -400,7 +402,7 @@ export const RESUME: Command<{ pause: Pause }> = {
   },
   writes: true,
   route: { method: 'DELETE', path: '/api/pause', status: 200 },
-  handler: async () => ({ pause: resumePause() }),
+  handler: () => tried(() => ({ pause: resumePause() })),
   print: () => [RESUMED],
 };
 
@@ -416,7 +418,7 @@ export const PAUSED: Command<Paused> = {
     side: 'api',
     why: 'the board says the pause in its bottom bar; at the command line, nemia ls says it, what finishes and each landing it holds',
   },
-  handler: (e) => pausedRead(e),
+  handler: () => pausedRead(),
   print: () => [],
 };
 
@@ -429,7 +431,9 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   writes: false,
   route: { method: 'GET', path: '/api/pause/now', status: 200 },
   only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, nemia pause --now says it' },
-  handler: async (e) => ({ interrupts: await nowRead(e), cost: NOW_COST }),
+  handler: Effect.fnUntraced(function* () {
+    return { interrupts: yield* nowRead(), cost: NOW_COST };
+  }),
   print: () => [],
 };
 

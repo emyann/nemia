@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { type SSEMessage, streamSSE } from 'hono/streaming';
 import { Effect, Queue, Stream } from 'effect';
 import { feedCursorRefusal, type FeedLine, REMOVED, watchFeed } from 'agent-orchestrator';
-import { isRefusal } from 'agent-orchestrator/effect';
+import { isRefusal } from 'agent-orchestrator';
 import type { ApiEnv } from '../layer.ts';
 
 /**

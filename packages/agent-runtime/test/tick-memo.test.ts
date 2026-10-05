@@ -1,7 +1,8 @@
 /**
  * What an engine's pass reads of a store of settled tasks, on the files store and through the meter (`Engine.io()`): once
- * a pass has folded a settled task, the passes after it read only the feed's new bytes and the journals the feed names,
- * until the engine is made again (`core/engine/memo.ts`).
+ * a pass has folded a settled task, the passes after it read only the feed's new bytes and what was appended to the journals the
+ * feed names, until the engine is made again (`core/engine/memo.ts`): the files store reads a journal's bytes once per engine
+ * (`journalReader` in `core/engine/journal.ts`).
  *
  * The harness is a `PromiseRunner` that lists nothing and refuses every spawn, so each task settles on its first pass and
  * the only bytes a pass reads are the journal's: a detached harness would read its run files through the same meter.
@@ -56,24 +57,27 @@ test('a pass over settled tasks nothing has written to reads no journal, and not
   assert.equal(after.reads - before.reads, 0, 'no read made');
 });
 
-test("a pass after an entry is appended to one settled task reads the feed's new bytes and that one journal, and the pass after it nothing", async () => {
+test("a pass after an entry is appended to one settled task reads the feed's new bytes and what was appended to that one journal, and the pass after it nothing", async () => {
   const { root, cwd, engine, ids } = await settledStore();
   const feed = path.join(root, 'feed.jsonl');
   const feed0 = sizeOf(feed);
+  const journalFile = path.join(root, 'tasks', `${ids[7]}.jsonl`);
+  const journal0 = sizeOf(journalFile);
   await engine.file({ brief: 'task 7, filed again under its id', cwd, id: ids[7] });
   const grown = sizeOf(feed) - feed0;
   assert.ok(grown > 0, 'the filing was written to the feed');
-  const journal = sizeOf(path.join(root, 'tasks', `${ids[7]}.jsonl`));
+  const appended = sizeOf(journalFile) - journal0;
+  assert.ok(appended > 0, 'the filing was written to the journal');
 
   const before = engine.io();
   await engine.tick();
   const after = engine.io();
   assert.equal(
     after.bytesRead - before.bytesRead,
-    grown + 2 * journal,
-    `read ${after.bytesRead - before.bytesRead}; the feed grew ${grown} and the journal is ${journal}`,
+    grown + appended,
+    `read ${after.bytesRead - before.bytesRead}; the feed grew ${grown} and the journal ${appended}`,
   );
-  assert.equal(after.reads - before.reads, 3, "the feed's new bytes, then the one journal it names, twice: folded, and read by its step");
+  assert.equal(after.reads - before.reads, 2, "the feed's new bytes, then what was appended to the one journal it names, once");
 
   const again = engine.io();
   await engine.tick();
@@ -82,11 +86,12 @@ test("a pass after an entry is appended to one settled task reads the feed's new
 
 test("a task filed again under a settled task's id is folded again on the next pass", async () => {
   const { root, cwd, engine, ids } = await settledStore();
+  const journal = path.join(root, 'tasks', `${ids[3]}.jsonl`);
+  const journal0 = sizeOf(journal);
   await engine.file({ id: ids[3], brief: 'again', cwd });
   const before = engine.io();
   await engine.tick();
-  const journal = sizeOf(path.join(root, 'tasks', `${ids[3]}.jsonl`));
-  assert.ok(engine.io().bytesRead - before.bytesRead >= 2 * journal, 'its journal was read');
+  assert.ok(engine.io().bytesRead - before.bytesRead >= sizeOf(journal) - journal0, 'what was appended to its journal was read');
 });
 
 test('a fresh engine on the same store folds every task on its first pass, and reads the whole feed once to learn where it ends', async () => {
@@ -97,7 +102,7 @@ test('a fresh engine on the same store folds every task on its first pass, and r
   const first = engine.io().bytesRead - before.bytesRead;
   const journals = journalsOf(root);
   const feed = sizeOf(path.join(root, 'feed.jsonl'));
-  assert.equal(first, feed + 2 * journals, `read ${first}: the feed's ${feed} bytes, and each journal twice (${journals} bytes)`);
+  assert.equal(first, feed + journals, `read ${first}: the feed's ${feed} bytes, and each journal once (${journals} bytes)`);
   const second = engine.io();
   await engine.tick();
   assert.equal(

@@ -1,6 +1,6 @@
 /** The flow numbers of every run in the store, for the board: what `nemia stats --json` prints. */
 import { Hono } from 'hono';
-import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
+import { STATS, statsQueryOf, type QueryKey, type Stats, runWith } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
 
 export type { Stats };
@@ -47,6 +47,6 @@ export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
       }),
     );
     statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await STATS.handler(e, given, env, home, { stats: memo.stats }));
+    return c.json(await runWith(e, STATS.handler(given, env, home, { stats: memo.stats })));
   }),
 );

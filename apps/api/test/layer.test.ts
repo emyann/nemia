@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Layer } from 'effect';
+import { Effect, Layer } from 'effect';
 import { scratch } from './scratch.ts';
 import type { WorkflowListing } from '../src/workflows/workflows.ts';
 import { app, appOf, liveOf, runtime } from '../src/app.ts';
@@ -50,7 +50,9 @@ test("a mounted router's route reads the store's root of the app it was asked th
 });
 
 test('an app keeps what its reads keep of its own: one over another engine starts with none, and reads the feed from its start', async () => {
-  await engine().file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('nemia-api-layer-cwd-'), harness: 'claude' });
+  await Effect.runPromise(
+    engine().file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('nemia-api-layer-cwd-'), harness: 'claude' }),
+  );
   const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
   assert.equal((await app.request('/api/runs')).status, 200);
   const theProcess = await memoOf(runtime);

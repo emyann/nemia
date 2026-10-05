@@ -3,6 +3,7 @@
  * route, and `ls` — then filed, given workflows and relieved of them, hired into, fired from and removed, which the command line alone
  * does; and its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
+import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { factoryLines, type FactoryListing } from './factory.ts';
@@ -110,7 +111,7 @@ export const FACTORY: Command<Listed> = {
   writes: false,
   route: { method: 'GET', path: '/api/factories', status: 200 },
   manual: FACTORY_HELP,
-  handler: async () => ({ factories: readFactories() }),
+  handler: () => tried(() => ({ factories: readFactories() })),
   print: listed,
 };
 
@@ -126,7 +127,7 @@ const FACTORY_LS: Command<Listed> = {
   },
   writes: false,
   only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
-  handler: async () => ({ factories: readFactories() }),
+  handler: () => tried(() => ({ factories: readFactories() })),
   print: listed,
 };
 
@@ -161,11 +162,12 @@ const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: strin
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
   only: WRITTEN_HERE,
-  async handler(_e, args) {
-    const repos = Array.isArray(args.repos) ? args.repos : [];
-    const { factory, file } = addFactory({ name: textOf(args, 'name'), repos });
-    return { name: factory.name, repos: factory.repos, file };
-  },
+  handler: (args) =>
+    tried(() => {
+      const repos = Array.isArray(args.repos) ? args.repos : [];
+      const { factory, file } = addFactory({ name: textOf(args, 'name'), repos });
+      return { name: factory.name, repos: factory.repos, file };
+    }),
   print: ({ name, repos, file }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`],
 };
 
@@ -192,10 +194,11 @@ const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
   spec: workflowSpec('attach'),
   writes: true,
   only: WRITTEN_HERE,
-  async handler(_e, args) {
-    const { file, already } = attachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') });
-    return { file, already: already === true };
-  },
+  handler: (args) =>
+    tried(() => {
+      const { file, already } = attachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') });
+      return { file, already: already === true };
+    }),
   print: ({ file, already }, args) => [
     `${textOf(args, 'factory')}  ${already ? 'already attached' : 'attached'} ${textOf(args, 'workflow')}`,
     `${already ? 'unchanged' : 'attached'}: ${file}`,
@@ -210,7 +213,7 @@ const FACTORY_DETACH: Command<{ file: string }> = {
   spec: workflowSpec('detach'),
   writes: true,
   only: WRITTEN_HERE,
-  handler: async (_e, args) => detachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') }),
+  handler: (args) => tried(() => detachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') })),
   print: ({ file }, args) => [`${textOf(args, 'factory')}  detached ${textOf(args, 'workflow')}`, `detached: ${file}`],
 };
 
@@ -258,14 +261,15 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   check: stepCheck('hire', '<factory> <agent>', HIRE_SPEC),
   writes: true,
   only: WRITTEN_HERE,
-  async handler(_e, args) {
-    const { file, replaced } = hireAgent({
-      factory: textOf(args, 'factory'),
-      agent: textOf(args, 'agent'),
-      step: textOf(args, 'step'),
-    });
-    return { file, replaced: replaced ?? null };
-  },
+  handler: (args) =>
+    tried(() => {
+      const { file, replaced } = hireAgent({
+        factory: textOf(args, 'factory'),
+        agent: textOf(args, 'agent'),
+        step: textOf(args, 'step'),
+      });
+      return { file, replaced: replaced ?? null };
+    }),
   print: ({ file, replaced }, args) => [
     `${textOf(args, 'factory')}  ${textOf(args, 'step')} ← ${textOf(args, 'agent')}${replaced === null ? '' : ` (was ${replaced})`}`,
     `hired: ${file}`,
@@ -287,7 +291,7 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   check: stepCheck('fire', '<factory>', FIRE_SPEC),
   writes: true,
   only: WRITTEN_HERE,
-  handler: async (_e, args) => fireAgent({ factory: textOf(args, 'factory'), step: textOf(args, 'step') }),
+  handler: (args) => tried(() => fireAgent({ factory: textOf(args, 'factory'), step: textOf(args, 'step') })),
   print: ({ file, fired }, args) => [`${textOf(args, 'factory')}  ${textOf(args, 'step')}  fired ${fired}`, `fired: ${file}`],
 };
 
@@ -307,11 +311,12 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   },
   writes: true,
   only: WRITTEN_HERE,
-  async handler(_e, args) {
-    const name = textOf(args, 'name');
-    const { file } = removeFactory(name);
-    return { file, instruction: removeInstructionFolder(name) };
-  },
+  handler: (args) =>
+    tried(() => {
+      const name = textOf(args, 'name');
+      const { file } = removeFactory(name);
+      return { file, instruction: removeInstructionFolder(name) };
+    }),
   print: ({ file, instruction }, args) => [
     `${textOf(args, 'name')}  removed — ${file}`,
     ...(instruction === null ? [] : [`instruction removed: ${instruction}`]),

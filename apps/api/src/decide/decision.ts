@@ -14,7 +14,7 @@ import {
   type DecideCommand,
   diffStat,
   lessonLine,
-  parentsOf,
+  parentsRead,
   resultSteps,
   sensitiveDiff,
   touchedBy,
@@ -27,6 +27,7 @@ import {
   type RunHolding,
   type RunWaiting,
   runWaitingOf,
+  runWith,
 } from 'agent-orchestrator';
 import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitsOf } from 'agent-orchestrator/run';
 import { type Engine } from '../store.ts';
@@ -184,8 +185,8 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  * What `nemia decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
  * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
  *
- * First, as `nemia decide` asks it first, off the runs it waits on and is held until, each read once (`parentsOf`): a run whose roots wait
- * on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`, and none is read
+ * First, as `nemia decide` asks it first, off the runs it waits on and is held until, each read once (`parentsRead`): a run whose roots
+ * wait on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`, and none is read
  * either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A run still
  * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its `WF_MAX_RUNS` before
  * any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is not asked a thing: the page asks while a run is
@@ -200,15 +201,16 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
 export async function decisionOf(run: Run, e: Engine['Service'], home: string, env: NodeJS.ProcessEnv): Promise<RunDecision> {
-  const parent = await parentsOf(e, run);
+  const parent = await runWith(e, parentsRead(run));
   const waiting = runWaitingOf(run, waitsOf(run, parent));
   const holding = holdingOf(run, holdsOf(run, parent));
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };
   const folder = workflowsOf(run, home).steps;
-  const judged = await judge(run, stepNames(run, folder), folder, await viewsOf(run, e), { reader: e, parent });
+  const views = await runWith(e, viewsOf(run, e));
+  const judged = await runWith(e, judge(run, stepNames(run, folder), folder, views, { reader: e, parent }));
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
-  const decided = (await DECIDE.handler(e, { runId: run.id }, env)) as Decided;
+  const decided = (await runWith(e, DECIDE.handler({ runId: run.id }, env))) as Decided;
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };
   const d = decided.decision;
   const nothing = nothingOf(run, d);
@@ -280,5 +282,5 @@ async function branchesOf(e: Engine['Service'], run: Run, steps: Parameters<type
 async function mergesOf(e: Engine['Service'], run: GitRun, standings: readonly BranchStanding[]) {
   const branches = standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
   if (!branches.length) return {};
-  return (await MERGES.handler(e, { runId: run.id, branches })) as Record<string, StandingMerge>;
+  return (await runWith(e, MERGES.handler({ runId: run.id, branches }))) as Record<string, StandingMerge>;
 }

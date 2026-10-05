@@ -12,12 +12,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = path.join(scratch('wf-start-handed-'), 'First Last');
 fs.mkdirSync(ROOT);
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, start } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, startRun } = await import('../src/runner.ts');
 const { artifactsDir } = await import('../src/record/record.store.ts');
 
 /** A git repository with one commit on `main`, under the store. */
@@ -42,12 +43,19 @@ function folderOf(steps: Record<string, string>): string {
 /** The runs on disk, by file name. */
 const runs = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
 
-test('REFUSED at shipped defaults: a store no permission rule can name refuses a later step on Claude Code at start, before anything is written', () => {
+test('REFUSED at shipped defaults: a store no permission rule can name refuses a later step on Claude Code at start, before anything is written', async () => {
   const repo = aRepo();
   const before = runs();
   let message = '';
   try {
-    start({ brief: 'build it', repo, workflowDir: folderOf({ implement: 'harness: claude', review: 'after: implement' }), isolate: false });
+    await Effect.runPromise(
+      startRun({
+        brief: 'build it',
+        repo,
+        workflowDir: folderOf({ implement: 'harness: claude', review: 'after: implement' }),
+        isolate: false,
+      }),
+    );
   } catch (err) {
     message = (err as Error).message;
   }
@@ -57,16 +65,20 @@ test('REFUSED at shipped defaults: a store no permission rule can name refuses a
   assert.deepEqual(runs(), before, 'nothing was written');
 });
 
-test('a workflow of one step, handed nothing, starts in the same store', () => {
-  const run = start({ brief: 'build it', repo: aRepo(), workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false });
+test('a workflow of one step, handed nothing, starts in the same store', async () => {
+  const run = await Effect.runPromise(
+    startRun({ brief: 'build it', repo: aRepo(), workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false }),
+  );
   assert.ok(runs().includes(`${run.id}.json`), runs().join('\n'));
 });
 
-test("REFUSED at shipped defaults: a store no permission rule can name refuses a step's `reads: inbox` at start, quoting the line, before anything is written", () => {
+test("REFUSED at shipped defaults: a store no permission rule can name refuses a step's `reads: inbox` at start, quoting the line, before anything is written", async () => {
   const before = runs();
   let message = '';
   try {
-    start({ brief: 'read it', repo: aRepo(), workflowDir: folderOf({ argus: 'reads: inbox' }), isolate: false });
+    await Effect.runPromise(
+      startRun({ brief: 'read it', repo: aRepo(), workflowDir: folderOf({ argus: 'reads: inbox' }), isolate: false }),
+    );
   } catch (err) {
     message = (err as Error).message;
   }
@@ -76,7 +88,7 @@ test("REFUSED at shipped defaults: a store no permission rule can name refuses a
   assert.deepEqual(runs(), before, 'nothing was written');
 });
 
-test('REFUSED at shipped defaults: a step with both `writable:` and `reads: inbox`, refused its mounts at start, quotes both lines', () => {
+test('REFUSED at shipped defaults: a step with both `writable:` and `reads: inbox`, refused its mounts at start, quotes both lines', async () => {
   const repos = [aRepo(), aRepo()].sort();
   addFactory({ name: 'both', repos });
   const web = path.basename(repos[1]);
@@ -87,7 +99,7 @@ test('REFUSED at shipped defaults: a step with both `writable:` and `reads: inbo
   const before = runs();
   let message = '';
   try {
-    start({ brief: 'read it', repo: repos[0], workflowDir, isolate: false, factory: 'both' });
+    await Effect.runPromise(startRun({ brief: 'read it', repo: repos[0], workflowDir, isolate: false, factory: 'both' }));
   } catch (err) {
     message = (err as Error).message;
   }

@@ -75,6 +75,7 @@ const PINNED: Record<string, string[]> = {
     'fold',
     'nameFor',
     'promiseEngine',
+    'refusalWords',
     'remoteOps',
     'requestStop',
     'sdkRunner',

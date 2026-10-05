@@ -1,11 +1,11 @@
 /**
  * `nemia decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the
  * repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the
- * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), and
- * `decide`, its plain face in a Promise, over the engine it is handed.
+ * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with
+ * `runWith`.
  */
 import { Effect } from 'effect';
-import { EngineService, awaited, nameFor, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
+import { EngineService, asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
@@ -25,7 +25,7 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { branchReader, shippedOf, standingsOf } from '../branches/branches.store.ts';
 import {
-  checkReports,
+  checkReportsRead,
   closeoutAsked,
   closeoutOf,
   closeoutReader,
@@ -33,10 +33,10 @@ import {
   deniedOf,
   everyTryOf,
   harnessBlocked,
-  parentsOf,
+  parentsRead,
   saidIn,
   spendReader,
-  taskPhases,
+  taskPhasesRead,
   viewedOnce,
   waitingOf,
   type CheckReport,
@@ -162,7 +162,7 @@ const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: 
     const answer = answerOf(run, name, given);
     if (!answer) continue;
     const before = run.steps[name].tries!.at(-1)!.taskId;
-    const closeout = (views.get(before) ?? (yield* awaited(() => e.view(before)))).state.attempts.at(-1)?.closeout;
+    const closeout = (views.get(before) ?? (yield* engineAsked('view', e.view(before)))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
@@ -233,17 +233,17 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
  * The cap on runs in flight, whose `WF_MAX_RUNS` before any pass is `env`'s, is read for both facts it bears on: whether a run nothing of
  * which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`).
- * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`, `awaited`).
+ * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
 export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env) {
   const e = viewedOnce(yield* EngineService);
   const git = yield* tried(() => branchReader());
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
-  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(
-    yield* awaited(() => checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped')),
+    yield* checkReportsRead(run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped').pipe(over(e)),
   );
   const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
   const reader = closeoutReader(views, run);
@@ -251,7 +251,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const checkout = yield* awaited(() => checkoutHold(e, run, steps, undefined, env));
+  const checkout = yield* checkoutHold(e, run, steps, undefined, env);
   const shipped = yield* tried(() => shippedOf(run, git));
   const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));
@@ -264,17 +264,17 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const costs = costsOf(steps, run, used, spendOf);
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => slotsOf(e, undefined, env))).held.get(id) : undefined;
-  const over = Boolean(run.cancelledAt || run.pruned || run.hold);
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, undefined, env)).held.get(id) : undefined;
+  const ended = Boolean(run.cancelledAt || run.pruned || run.hold);
   const offers = [...roundOffers(steps, run, d, spendOf), ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)];
-  const parent = yield* awaited(() => parentsOf(e, run, git));
+  const parent = yield* parentsRead(run, git).pipe(over(e));
   const answer: Decided = {
     run,
     decision: d,
     closeouts,
     checks,
-    retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
-    rounding: over ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
+    retrying: ended ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
+    rounding: ended ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
     offers: offers.map((o) => o.said),
     commands: choicesOf(steps, run, d, offers),
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),
@@ -298,10 +298,3 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   };
   return answer;
 });
-
-/**
- * `nemia decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
- */
-export const decide = (engine: Engine, id: string, env?: NodeJS.ProcessEnv): Promise<Decided> =>
-  Effect.runPromise(decideRun(id, env).pipe(Effect.provide(EngineService.layer(engine))));

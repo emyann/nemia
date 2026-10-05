@@ -29,7 +29,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { Engine } from '../src/runtime-client.ts';
 import { decideScreen } from './screens.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-folder-');
 const NOT_A_REPO = path.join(ROOT, 'somewhere');
@@ -80,7 +83,8 @@ process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT_ASKED, 'utf8').trim().split('\n') : []);
 
 process.env.WF_ROOT = ROOT;
-const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, retry, start, startQueued } = await import('../src/runner.ts');
+const { addToInbox, advanceRun, decideRun, forgetRun, list, queueInInbox, queueLine, retryRun, startRun, startQueued, runWith } =
+  await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { forgetLine, sentBack, stepTaskId } = await import('../src/run.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -99,14 +103,16 @@ const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
   }
   return lines.join('\n').split('\n');
 };
-type Engine = Parameters<typeof advance>[0];
 
 const SIGNED = { outcome: 'done', summary: 'wrote it', artifacts: ['note.md'], needs: null };
 
 /** Just enough engine: what each task is doing and how it signed off, and every task's spec as it was filed. */
 const board = () => {
-  const tasks = new Map<string, { spec: { id: string; brief: string; cwd: string }; phase: string; closeout?: unknown }>();
-  const e = {
+  const tasks = new Map<
+    string,
+    { spec: { id: string; brief: string; cwd: string; config?: { mounts?: { path: string }[] } }; phase: string; closeout?: unknown }
+  >();
+  const e = promised({
     view: async (id: string) => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
@@ -146,7 +152,7 @@ const board = () => {
     stop: async () => {},
     logs: async () => '',
     feed: async () => ({ entries: [], cursor: 0 }),
-  } as unknown as Engine;
+  });
   const settle = (id: string, phase: string, closeout?: unknown) => {
     tasks.set(id, { ...tasks.get(id)!, phase, closeout });
   };
@@ -162,8 +168,17 @@ const refusal = (fn: () => unknown): { message: string; exitCode: unknown } => {
   assert.fail('it was not refused');
 };
 
-test('a folder team starts from a directory that is no repository, and its record has a place and no git', () => {
-  const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
+const rejection = async (fn: () => Promise<unknown>): Promise<{ message: string; exitCode: unknown }> => {
+  try {
+    await fn();
+  } catch (err) {
+    return { message: (err as Error).message, exitCode: (err as { exitCode?: unknown }).exitCode };
+  }
+  assert.fail('it was not refused');
+};
+
+test('a folder team starts from a directory that is no repository, and its record has a place and no git', async () => {
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const record = readRun(run.id);
   assert.deepEqual(record.place, { kind: 'folder' });
   assert.equal(record.workspace, path.join(ROOT, 'runs', run.id, 'work'));
@@ -173,18 +188,20 @@ test('a folder team starts from a directory that is no repository, and its recor
   assert.deepEqual(gitAsked(), []);
 });
 
-test('a folder team refuses --repo, --no-worktree and --after, before anything is written', () => {
+test('a folder team refuses --repo, --no-worktree and --after, before anything is written', async () => {
   const before = fs.readdirSync(path.join(ROOT, 'runs')).sort();
-  const named = refusal(() => start({ brief: 'x', repo: NOT_A_REPO, repoNamed: true, workflowDir: TEAM }));
+  const named = await rejection(() => Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, repoNamed: true, workflowDir: TEAM })));
   assert.equal(named.exitCode, 2);
   assert.match(named.message, /^--repo .*: this workflow's steps say `workspace: folder`/);
   assert.match(named.message, /Start it without --repo/);
 
-  const inPlace = refusal(() => start({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, isolate: false }));
+  const inPlace = await rejection(() => Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, isolate: false })));
   assert.equal(inPlace.exitCode, 2);
   assert.match(inPlace.message, /^--no-worktree: this workflow's steps say `workspace: folder`/);
 
-  const waiting = refusal(() => start({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, after: ['some-run-a1b2'] }));
+  const waiting = await rejection(() =>
+    Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, after: ['some-run-a1b2'] })),
+  );
   assert.equal(waiting.exitCode, 2);
   assert.match(waiting.message, /^--after some-run-a1b2: this run's team works in folders \(workspace: folder\)/);
 
@@ -192,20 +209,20 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
   assert.deepEqual(gitAsked(), []);
 });
 
-test('a git team is still a git run: from a directory that is no repository, it is refused by git', () => {
+test('a git team is still a git run: from a directory that is no repository, it is refused by git', async () => {
   const GIT_TEAM = path.join(ROOT, 'workflows', 'plain');
   fs.mkdirSync(GIT_TEAM, { recursive: true });
   fs.writeFileSync(path.join(GIT_TEAM, 'write.md'), 'write the note\n');
-  assert.throws(() => start({ brief: 'x', repo: NOT_A_REPO, workflowDir: GIT_TEAM }));
+  await assert.rejects(async () => await Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: GIT_TEAM })));
   assert.ok(gitAsked().length > 0, 'a git team asks git');
   fs.rmSync(GIT_ASKED, { force: true });
 });
 
 test('a folder run advances, is decided and is forgotten with no git: each step works in its folder, the next continues it, and nemia rm takes it all', async () => {
-  const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, tasks, settle } = board();
 
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['write']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['write']);
   const write = tasks.get(`${run.id}-write`)!.spec;
   const writeFolder = path.join(ROOT, 'runs', run.id, 'work', 'write');
   assert.equal(write.cwd, writeFolder);
@@ -219,7 +236,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   fs.writeFileSync(path.join(writeFolder, 'note.md'), '# Tides\n');
 
   settle(`${run.id}-write`, 'succeeded', SIGNED);
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['review']);
   assert.equal(
     fs.readFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'write', 'note.md'), 'utf8'),
     '# Tides\n',
@@ -229,12 +246,12 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(readRun(run.id).steps.review?.branch, undefined);
 
   settle(`${run.id}-review`, 'succeeded', { ...SIGNED, artifacts: [] });
-  await advance(e, readRun(run.id));
-  const decided = await decide(e, run.id);
+  await runWith(e, advanceRun(readRun(run.id)));
+  const decided = await runWith(e, decideRun(run.id));
   assert.equal(decided.decision.kind, 'awaiting');
   assert.deepEqual(decided.decision.kind === 'awaiting' && [decided.decision.branches, decided.decision.direct], [[], false]);
   assert.deepEqual([decided.standings, decided.toDecide], [[], undefined]);
-  const listed = await list(e, readRun(run.id));
+  const listed = await runWith(e, list(e, readRun(run.id)));
   assert.deepEqual(
     listed.steps.map((s) => s.branch),
     [null, null],
@@ -255,7 +272,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   );
   assert.equal(screen.filter((l) => /\bgit (-C|merge|branch|diff)/.test(l)).length, 0, `and no git command:\n${screen.join('\n')}`);
 
-  const forgot = await forget(e, run.id);
+  const forgot = await runWith(e, forgetRun(run.id));
   assert.equal(forgot.kind, 'forgotten');
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
@@ -268,19 +285,19 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
 });
 
 test("a folder run's folder outlives its end: a run that ended blocked is tried again in the folder its step left, with the step's work still in it", async () => {
-  const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, tasks, settle } = board();
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['write']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['write']);
   const writeFolder = path.join(ROOT, 'runs', run.id, 'work', 'write');
   fs.writeFileSync(path.join(writeFolder, 'note.md'), '# Tides\n');
 
   settle(`${run.id}-write`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which tides?' });
-  await advance(e, readRun(run.id));
-  const ended = (await decide(e, run.id)).decision;
+  await runWith(e, advanceRun(readRun(run.id)));
+  const ended = (await runWith(e, decideRun(run.id))).decision;
   assert.deepEqual(ended.kind === 'awaiting' && ended.outcome, 'blocked', JSON.stringify(ended));
 
-  await retry(e, run.id, 'write', { mode: 'nudge', message: 'the ocean ones' });
-  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['write']);
+  await runWith(e, retryRun(run.id, 'write', { mode: 'nudge', message: 'the ocean ones' }));
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['write']);
   const again = tasks.get(stepTaskId(readRun(run.id), 'write', 2));
   assert.ok(again, 'the try is filed');
   assert.equal(again.spec.cwd, writeFolder, 'in the folder the first try worked in');
@@ -380,7 +397,7 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
       return name;
     };
     const named = card('a-note-queued', `repo: ${NOT_A_REPO}\n`);
-    const started = startQueued(NOT_A_REPO)!;
+    const started = (await Effect.runPromise(startQueued(NOT_A_REPO)))!;
     assert.ok('run' in started, JSON.stringify(started));
     const run = readRun(started.run);
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', named, false], 'the run looked at no repository');
@@ -392,7 +409,7 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
     );
 
     const plain = card('a-note-queued-plain', '');
-    const next = startQueued(NOT_A_REPO)!;
+    const next = (await Effect.runPromise(startQueued(NOT_A_REPO)))!;
     assert.ok('run' in next, JSON.stringify(next));
     assert.equal(next.ignoredRepo, undefined, 'a card of the same folder team that names no repository has nothing to say');
     assert.equal(queueLine(next), `started ${plain} as ${next.run}`, 'so the line is not one every start carries');
@@ -404,22 +421,28 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
 
 /**
  * The paths a brief names, of the kind a session would open: every backtick-quoted token that reads as a path rather than as a command or
- * a key. A folder step is fenced to its own directory (`dontAsk`), so each of them has to be inside it and on disk.
+ * a key, but those in a folder the step is filed with (`mounted`). A folder step is fenced to its own directory (`dontAsk`) and reads a
+ * mounted folder alone outside it, so each of them has to be inside it and on disk.
  */
-const pathsNamed = (brief: string): string[] =>
-  [...brief.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]).filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'));
+const pathsNamed = (brief: string, mounted: readonly string[] = []): string[] =>
+  [...brief.matchAll(/`([^`\n]+)`/g)]
+    .map((m) => m[1])
+    .filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'))
+    .filter((t) => !mounted.some((m) => t === m || t.startsWith(`${m}/`)));
 
 test('a folder team with a fan-in, given files at its start: what each brief tells a step to read is inside its own folder, and on disk', async () => {
-  const run = start({
-    brief: 'two sides of a note',
-    repo: NOT_A_REPO,
-    workflowDir: FAN,
-    inputs: [path.join(GIVEN_FILES, 'mock.png'), path.join(GIVEN_FILES, 'brief notes.md')],
-  });
+  const run = await Effect.runPromise(
+    startRun({
+      brief: 'two sides of a note',
+      repo: NOT_A_REPO,
+      workflowDir: FAN,
+      inputs: [path.join(GIVEN_FILES, 'mock.png'), path.join(GIVEN_FILES, 'brief notes.md')],
+    }),
+  );
   const { e, tasks, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
 
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['a', 'b']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['a', 'b']);
   for (const name of ['a', 'b']) {
     const folder = path.join(work, name);
     assert.deepEqual(
@@ -435,7 +458,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   fs.symlinkSync(path.join(ROOT, 'somewhere'), path.join(work, 'b', 'out'));
 
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   const c = path.join(work, 'c');
   assert.equal(tasks.get(`${run.id}-c`)!.spec.cwd, c, 'a fan-in gets a folder of its own');
   assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'a', 'side-a.md'), 'utf8'), '# a\n');
@@ -457,7 +480,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   );
 
   settle(`${run.id}-c`, 'succeeded', SIGNED);
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['d']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['d']);
   assert.equal(tasks.get(`${run.id}-d`)!.spec.cwd, c, 'd continues c where it left off');
   assert.equal(
     fs.existsSync(path.join(c, 'given', 'from', 'a')),
@@ -466,22 +489,32 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   );
 
   for (const name of ['a', 'b', 'c', 'd']) {
-    const { brief, cwd } = tasks.get(`${run.id}-${name}`)!.spec;
-    assert.ok(!brief.includes(ROOT), `${name}'s brief names no path under the store, which its fence denies it:\n${brief}`);
-    const named = pathsNamed(brief);
+    const { brief, cwd, config } = tasks.get(`${run.id}-${name}`)!.spec;
+    const mounted = (config?.mounts ?? []).map((m) => m.path);
+    for (const at of mounted) assert.ok(brief.includes(`\`${at}\``), `${name}'s brief names ${at}, which it is filed with:\n${brief}`);
+    assert.ok(
+      !mounted.reduce((rest, at) => rest.replaceAll(at, ''), brief).includes(ROOT),
+      `${name}'s brief names no path under the store but the folders it is filed with, which its fence denies it:\n${brief}`,
+    );
+    const named = pathsNamed(brief, mounted);
     assert.ok(named.length, `${name}'s brief names a path`);
     for (const at of named) {
       assert.equal(path.isAbsolute(at), false, `${name}: ${at} is named by its path from the folder`);
       assert.ok(fs.existsSync(path.join(cwd, at)), `${name}: ${at} is on disk in its folder`);
     }
   }
+  assert.deepEqual(
+    tasks.get(`${run.id}-c`)!.spec.config?.mounts?.map((m) => path.basename(m.path)),
+    ['a', 'b'],
+    "c is filed a's and b's artifacts folders, so its brief is held to naming them",
+  );
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
   assert.match(tasks.get(`${run.id}-a`)!.spec.brief, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
   const d = tasks.get(`${run.id}-d`)!.spec.brief;
   assert.match(d, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
   assert.doesNotMatch(d, /given\/from/, 'a step standing in the folder it was given is given nothing more');
 
-  await forget(e, run.id);
+  await runWith(e, forgetRun(run.id));
   assert.deepEqual(gitAsked(), []);
 });
 
@@ -543,16 +576,16 @@ test("REFUSED: a card with a repository queued onto a folder team — `--workflo
 });
 
 test("a fan-in filed a second time is given its parent's folder as it stands then, not laid over the copy it had", async () => {
-  const run = start({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN });
+  const run = await Effect.runPromise(startRun({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN }));
   const { e, tasks, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
   const givenA = path.join(work, 'c', 'given', 'from', 'a');
 
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(work, 'a', 'keep.md'), '# kept\n');
   fs.writeFileSync(path.join(work, 'a', 'gone.md'), '# only the first time\n');
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   assert.deepEqual(fs.readdirSync(givenA).sort(), ['gone.md', 'keep.md'], 'what a had made when c was first filed');
   settle(`${run.id}-c`, 'succeeded', SIGNED);
 
@@ -562,7 +595,7 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
   fs.rmSync(path.join(work, 'a', 'gone.md'));
   fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
 
-  const again = await advance(e, readRun(run.id));
+  const again = await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual(again.filed, ['c'], again.notes.join('\n'));
   assert.equal(tasks.get(`${run.id}-c-try2`)!.spec.cwd, path.join(work, 'c'), 'the folder it had, since a send-back keeps it');
   assert.deepEqual(
@@ -571,34 +604,34 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
     "a's folder as it stands now — the copy is replaced, not merged over, or the step reads work that is not there any more",
   );
 
-  await forget(e, run.id);
+  await runWith(e, forgetRun(run.id));
   assert.deepEqual(gitAsked(), []);
 });
 
 test("a parent's regular file called `given` is its work, and reaches the step after it: only the run's own given/ directory stays behind", async () => {
-  const run = start({ brief: 'two sides, one of them fond of a name', repo: NOT_A_REPO, workflowDir: FAN });
+  const run = await Effect.runPromise(startRun({ brief: 'two sides, one of them fond of a name', repo: NOT_A_REPO, workflowDir: FAN }));
   const { e, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(work, 'b', 'given'), 'what b was given to understand\n');
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   assert.equal(
     fs.readFileSync(path.join(work, 'c', 'given', 'from', 'b', 'given'), 'utf8'),
     'what b was given to understand\n',
     "b has no parent and the run no inputs, so the run made no given/ in b's folder: b's file of that name is its work, copied on",
   );
-  await forget(e, run.id);
+  await runWith(e, forgetRun(run.id));
 });
 
 test("REFUSED: a step's given/ that is a link is never followed — filed again, nothing outside the folder is removed or written, and the pass says why", async () => {
-  const run = start({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN });
+  const run = await Effect.runPromise(startRun({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN }));
   const { e, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   settle(`${run.id}-c`, 'succeeded', SIGNED);
 
   const outside = path.join(ROOT, 'outside-the-run');
@@ -613,7 +646,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   let said = '';
   let filed: string[] = [];
   try {
-    const pass = await advance(e, readRun(run.id));
+    const pass = await runWith(e, advanceRun(readRun(run.id)));
     filed = pass.filed;
     said = pass.notes.join('\n');
   } catch (err) {
@@ -632,18 +665,18 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
     ['theirs.md'],
     'and nothing of the run was written in a directory shaped as the copy is, which a followed link would empty',
   );
-  await forget(e, run.id);
+  await runWith(e, forgetRun(run.id));
 });
 
 test('the whole screen of a folder run: where the work is, and the one command there is', async (t) => {
-  const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, settle } = board();
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'work', 'write', 'note.md'), '# Tides\n');
   settle(`${run.id}-write`, 'succeeded', SIGNED);
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-review`, 'succeeded', { ...SIGNED, artifacts: [] });
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual(await decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT }), [
     '<id>  a note on tides',
     '',

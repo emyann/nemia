@@ -1,4 +1,5 @@
 /** The merge check as an entry of the command table (`MERGES`), served on the api alone. */
+import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { mergesOf, type StandingMerge } from './merge.store.ts';
 
@@ -23,6 +24,6 @@ export const MERGES: Command<Record<string, StandingMerge>> = {
     side: 'api',
     why: "the board's decision says whether each branch ahead still merges onto its base; nemia decide leaves a trial merge to the person",
   },
-  handler: async (_e, args) => mergesOf(String(args.runId ?? ''), Array.isArray(args.branches) ? args.branches : []),
+  handler: (args) => tried(() => mergesOf(String(args.runId ?? ''), Array.isArray(args.branches) ? args.branches : [])),
   print: () => [],
 };

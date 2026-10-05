@@ -1,5 +1,5 @@
 /**
- * `nemia stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
+ * `nemia stats` over a store of seeded records and the runtime itself, `plainEngine` over an in-memory journal: the numbers `--json`
  * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), the calls a session was
  * refused on a harness that records them, the skills a session loaded where each of its ends says, and the refusals of a key and a day
  * it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out whole, and named.
@@ -11,9 +11,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import type { Stats } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
+import { plainEngine } from './promised.ts';
 
 const ROOT = scratch('wf-stats-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -81,7 +82,7 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = promiseEngine(
+const e = plainEngine(
   Engine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
     journal,

@@ -2,12 +2,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, sidebarOf, themeOf } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The workflow of yours the page writes, stars and removes from its card. */
 const GOING = 'goes-from-its-card-e2e';
+
+/** The runner's viewport, put back before the page ends. */
+const WIDE = { width: 1280, height: 800 };
+
+/** A phone held upright. */
+const PHONE = { width: 390, height: 844 };
 
 /** Its card on the Workflows page. */
 const cardOf = (page: Page) => page.locator(`section[aria-label="Workflow ${GOING}"]`);
@@ -23,8 +29,9 @@ export default {
   /**
    * A workflow of yours removed from its card: Remove… asks first, naming the folder, its steps and its star, and saying that a run
    * started on it goes on from what it froze and that a card naming it not queued is refused at its start; Keep it takes the question
-   * back. Remove then takes the folder off the disk, the card off the page and its star off Favorites. The repository's cards offer no
-   * Remove. The folder is written by the page, and removed by it; a failure removes it too.
+   * back. On a phone, the question and its buttons wrap inside the card. Remove then takes the folder off the disk, the card off the page
+   * and its star off Favorites. The repository's cards offer no Remove. The folder is written by the page, and removed by it; a failure
+   * removes it too.
    */
   name: 'workflow-remove',
   route: '/workflows',
@@ -56,7 +63,12 @@ export default {
       const said = (await asks.locator('p').first().textContent())?.replace(/\s+/g, ' ');
       if (said !== asked(dir)) throw new Refused(`the question says what goes — it says ${JSON.stringify(said)}`);
       await settled(page);
-      await photograph(card, path.join(OUT, `workflow-remove-asks-${await themeOf(page)}.png`));
+      await photograph(card, path.join(OUT, `workflow-remove-confirm-${await themeOf(page)}.png`));
+      await page.setViewportSize(PHONE);
+      await settled(page);
+      await expectInside(asks.locator('p, button'), card, 'on a phone, the question and its buttons lie inside the card');
+      await photograph(card, path.join(OUT, `workflow-remove-confirm-phone-${await themeOf(page)}.png`));
+      await page.setViewportSize(WIDE);
       await card.getByRole('button', { name: 'Keep it' }).click();
       await expectCount(asks, 0, 'Keep it takes the question back');
       if (!fs.existsSync(dir)) throw new Refused(`Keep it removes nothing — ${dir} is gone`);
@@ -79,7 +91,10 @@ export default {
       const kept = await page.evaluate(() => localStorage.getItem('nemia:favorites'));
       if (kept?.includes(GOING)) throw new Refused(`removed, its star goes from what the browser keeps — it keeps ${kept}`);
       await idle(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await photograph(page, path.join(OUT, `workflow-remove-done-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
+      await page.setViewportSize(WIDE);
       fs.rmSync(dir, { recursive: true, force: true });
     }
   },

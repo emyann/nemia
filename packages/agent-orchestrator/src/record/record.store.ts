@@ -42,7 +42,7 @@ const EarlierTrySchema = Schema.StructWithRest(
 
 const LandedSchema = Schema.Union([
   Schema.StructWithRest(Schema.Struct({ commit: Schema.String }), Rest),
-  Schema.StructWithRest(Schema.Struct({ aborted: Schema.String }), Rest),
+  Schema.StructWithRest(Schema.Struct({ aborted: Schema.String, refusedOn: Schema.optional(Schema.String) }), Rest),
   Schema.StructWithRest(Schema.Struct({ untouched: Schema.String }), Rest),
 ]);
 

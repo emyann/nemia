@@ -5,12 +5,22 @@
  * engine's word for it are `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the
  * store's files beneath it, and files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the
  * engine is an Effect program that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`,
- * `refusalRead`, `checksHandedRead`, `parentRead`, `parentsRead`, `filingsRead` — and fails with a refusal and dies of anything else.
+ * `refusalRead`, `checksHandedRead`, `landingSaidRead`, `parentRead`, `parentsRead`, `filingsRead` — and fails with a refusal and dies
+ * of anything else.
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
 import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
-import { attemptVerdict, lastLines, reportedLines, type CheckHanded, type CheckRefusal, type Verdict } from '../check/check.ts';
+import {
+  attemptVerdict,
+  failingLines,
+  lastLines,
+  reportedLines,
+  type CheckHanded,
+  type CheckRefusal,
+  type LandingSaid,
+  type Verdict,
+} from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
@@ -412,19 +422,37 @@ export const refusalRead = Effect.fn('refusalOf')(function* (command: string, ta
 export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
   const e = yield* EngineService;
   const read = yield* Effect.exit(checkStreams(e, taskId));
-  if (Exit.isFailure(read)) {
-    const failed = Cause.squash(read.cause);
-    return {
-      step,
-      command,
-      unreadable: `the engine could not give what its task ${taskId} printed: ${failed instanceof Error ? failed.message : String(failed)}`,
-    } satisfies CheckHanded;
-  }
+  if (Exit.isFailure(read)) return { step, command, unreadable: unreadWords(taskId, read.cause) } satisfies CheckHanded;
   const { verdict, stdout, stderr, kept } = read.value;
   const { lines, cut } = reportedLines(stdout);
   const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), reported: lines, cut, partial: !kept };
   return { step, command, ...said } satisfies CheckHanded;
 });
+
+/**
+ * What the check of a run's ending said when it refused the merged tree, for the loop's target filed to merge that base (`LandingSaid`):
+ * the verdict, the tails of its streams, and the lines naming a failing test (`failingLines`) from its whole stdout and the end of its
+ * stderr (`checkStreams`) — `partial` where no whole stdout was kept. A read that rejects is `unreadable`, and the target is filed all the
+ * same. Dies of nothing a read throws.
+ *
+ * @param step The ending step, whose frozen `check:` is `command`.
+ * @param check The task of that check.
+ */
+export const landingSaidRead = Effect.fn('landingSaid')(function* (step: string, command: string, check: string) {
+  const e = yield* EngineService;
+  const read = yield* Effect.exit(checkStreams(e, check));
+  if (Exit.isFailure(read)) return { step, check, command, unreadable: unreadWords(check, read.cause) } satisfies LandingSaid;
+  const { verdict, stdout, stderr, kept } = read.value;
+  const { lines, cut } = failingLines(`${stdout}\n${stderr}`);
+  const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), failing: lines, cut, partial: !kept };
+  return { step, check, command, ...said } satisfies LandingSaid;
+});
+
+/** Why what a check's task printed cannot be given: the engine's words for the read that failed. */
+const unreadWords = (taskId: string, cause: Cause.Cause<unknown>): string => {
+  const failed = Cause.squash(cause);
+  return `the engine could not give what its task ${taskId} printed: ${failed instanceof Error ? failed.message : String(failed)}`;
+};
 
 /**
  * What a step is told its checked steps' checks said (`checkHandedRead`): for each step it waits on (`after:`) that has a `check:` whose

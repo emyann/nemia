@@ -23,7 +23,7 @@ import {
   budgetWord,
 } from '../status/status.ts';
 import { modeWord, retriesDue, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
-import { refusalSection, type CheckRefusal, type Verdict } from '../check/check.ts';
+import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/check.ts';
 import type { Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { heldLater, roundsDue } from '../round/round.ts';
@@ -255,8 +255,11 @@ export type RoundBriefing = {
    * What a person said to the target's last session while it ran (`nemia say`), given again to a round that continues it (`saidSection`).
    */
   said?: readonly Said[];
-  /** On a merge (`by: 'merge'`): the base branch and the commit of it the target merges (`mergeSection`). */
-  merge?: { onto: string; sha: string };
+  /**
+   * On a merge (`by: 'merge'`): the base branch and the commit of it the target merges (`mergeSection`), and what the ending's check said
+   * of the merged tree where it refused it (`LandingSaid`).
+   */
+  merge?: { onto: string; sha: string; landing?: LandingSaid };
 };
 
 /**

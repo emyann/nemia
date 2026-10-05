@@ -23,6 +23,9 @@ import {
   REPORTED_LINES,
   reportedLines,
   checkHandedSection,
+  FAILING_LINES,
+  failingLines,
+  landingSaidSection,
   type CheckEnv,
   type Verdict,
 } from './check.ts';
@@ -394,5 +397,65 @@ test('the section a step after a check is handed opens on the verdict it had, an
   assert.equal(
     checkHandedSection({ step: 'implement', command: 'npm test', unreadable: 'the engine could not give the log of its task t: gone' }),
     "\n## What implement's check said\n\nWhat it said cannot be given here — the engine could not give the log of its task t: gone. implement is judged by `npm test`, which the run executed after it signed off.",
+  );
+});
+
+test("the lines naming a failing test are node's `✖` and TAP's `not ok`, after an indent and a tool's prefix, each once and in order — never the spec reporter's heading over them", () => {
+  const log = [
+    '@x/agent-orchestrator:test: ✔ a test that passed (1.0ms)',
+    '@x/agent-orchestrator:test: ✖ a test that failed (12.3ms)  ',
+    '  ✖ a subtest that failed (2ms)\r',
+    'not ok 3 - a TAP test',
+    '@x/agent-orchestrator:test: ✖ failing tests:',
+    '@x/agent-orchestrator:test: ✖ a test that failed (12.3ms)',
+    'a line that says ✖ in its middle',
+    'nothing ok 4',
+  ].join('\n');
+  assert.deepEqual(failingLines(log), {
+    lines: ['@x/agent-orchestrator:test: ✖ a test that failed (12.3ms)', '✖ a subtest that failed (2ms)', 'not ok 3 - a TAP test'],
+    cut: 0,
+  });
+});
+
+test('past FAILING_LINES the first that many failing tests are kept, and how many more there were is said', () => {
+  const log = Array.from({ length: FAILING_LINES + 2 }, (_, i) => `✖ test ${i + 1}`).join('\n');
+  const { lines, cut } = failingLines(log);
+  assert.equal(lines.length, FAILING_LINES);
+  assert.equal(lines.at(-1), `✖ test ${FAILING_LINES}`);
+  assert.equal(cut, 2);
+  assert.ok(
+    landingSaidSection({
+      step: 'ship',
+      check: 'c',
+      command: 'npm test',
+      verdict: 1,
+      stdout: '',
+      stderr: '',
+      failing: lines,
+      cut,
+      partial: false,
+    }).includes(`In \`failing\`, the first ${FAILING_LINES}, and \`cut\` says how many more there were.`),
+  );
+});
+
+test('what a landing check said on the merged tree is handed as data: its command, exit, failing tests and streams — and why it is missing where it cannot be read', () => {
+  const said = { step: 'ship', check: 'r-ship-check', command: 'npm test' };
+  const section = landingSaidSection({ ...said, verdict: 1, stdout: 'out ```', stderr: 'err', failing: ['✖ x'], cut: 0, partial: true });
+  assert.match(
+    section,
+    /^\n## What ship's check said on the merged tree\n\nThe run executed `npm test` on the merged tree after ship signed off/,
+  );
+  assert.ok(section.includes('Its whole stdout was not kept, so `failing` is read from the end of it'), section);
+  assert.ok(
+    section.endsWith(
+      '\n````json\n' +
+        JSON.stringify({ command: 'npm test', exit: 1, failing: ['✖ x'], stdout: 'out ```', stderr: 'err', partial: true }, null, 2) +
+        '\n````',
+    ),
+    section,
+  );
+  assert.equal(
+    landingSaidSection({ ...said, unreadable: 'gone' }),
+    "\n## What ship's check said on the merged tree\n\nWhat it said cannot be given here — gone. Its task is `r-ship-check`.",
   );
 });

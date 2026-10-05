@@ -48,9 +48,16 @@ const trialOf =
   (branch: string): Trial =>
     isGitRun(run) ? mergesOnto(run.repo, run.branch, branch) : { error: 'no repository' };
 
+/** The commit the run's base branch is at now, as git reads it in the run's repository, and when it was read; '' where git cannot. */
+const baseOf = (run: Run) => ({
+  sha: isGitRun(run) ? (gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() ?? '') : '',
+  at: new Date().toISOString(),
+});
+
 /**
  * The merges `nemia decide` offers on a run awaiting a person (`Decision`): one for each loop whose merge the verb would take now
- * (`mergeAsk`, which asks git last, once nothing else refuses it), in the words of `mergeOffer`. None on any other run.
+ * (`mergeAsk`, which asks git last, once nothing else refuses it), on the commit the base is at (`baseOf`), in the words of `mergeOffer`.
+ * None on any other run.
  */
 export function mergeOffers(
   steps: readonly Workflow[],
@@ -66,10 +73,11 @@ export function mergeOffers(
 ): Offer[] {
   if (d.kind !== 'awaiting' || !isGitRun(run)) return [];
   const reads = mergeReads(steps, run, ...read);
+  const base = baseOf(run);
   return steps
     .filter((s) => s.loop)
     .flatMap((looping) => {
-      const answer = mergeAsk(steps, run, looping.name, reads, rounds, trialOf(run), { sha: '', at: '' });
+      const answer = mergeAsk(steps, run, looping.name, reads, rounds, trialOf(run), base);
       return 'ask' in answer ? [mergeOffer(run, answer.ask)] : [];
     });
 }
@@ -95,8 +103,8 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const reads = mergeReads(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views));
-  const sha = isGitRun(run) ? (gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() ?? '') : '';
-  const base = { sha, at: new Date().toISOString() };
+  const base = baseOf(run);
+  const { sha } = base;
   const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run), base);
 
   const first = answer((yield* tried(() => runStore.asks.read(id))).rounds);

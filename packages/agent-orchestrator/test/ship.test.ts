@@ -116,11 +116,11 @@ const folder = (): string => {
 /**
  * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, and every filing. `settle` takes a check's
  * exit code where it is given: a check settled with none did not finish (`exitVerdicts`). `list` views the tasks it is handed that were
- * filed.
+ * filed. A check's stdout is empty unless a test gives it (`printed`), and an `Error` given in its place is what reading it throws.
  */
 const board = () => {
   type Filed = { id: string; brief: string; cwd?: string; closeoutSchema?: object; config?: TaskSpec['config'] } & Record<string, unknown>;
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; printed?: string | Error }>();
   const filings: string[] = [];
   const e = promised({
     view: async (id: string) => {
@@ -155,7 +155,11 @@ const board = () => {
     }),
     /** A check's verdict is its attempt's exit code (`exitVerdicts`); its log and streams say nothing of it. */
     logs: async () => '(no output yet)',
-    output: async (id: string) => (typeof tasks.get(id)?.exitCode === 'number' ? '' : undefined),
+    output: async (id: string, stream: 'stdout' | 'stderr') => {
+      const t = tasks.get(id);
+      if (t?.printed instanceof Error) throw t.printed;
+      return typeof t?.exitCode === 'number' ? (stream === 'stdout' ? (t.printed ?? '') : '') : undefined;
+    },
     feed: async () => ({ entries: [], cursor: 0 }),
     list: async (ids?: readonly string[]) => ({
       views: await Promise.all((ids ?? [...tasks.keys()]).filter((id) => tasks.has(id)).map((id) => Effect.runPromise(e.view(id)))),
@@ -922,7 +926,11 @@ for (const [said, exitCode, words] of [
     assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'nothing landed');
     assert.equal(git(repo, 'status', '--porcelain'), '', 'and the checkout is as it was: the merge was aborted');
     assert.equal(mergeHead(repo), false);
-    assert.deepEqual(readRun(id).steps.ship.landed, { aborted: words });
+    assert.deepEqual(
+      readRun(id).steps.ship.landed,
+      { aborted: words, ...(exitCode === undefined ? {} : { refusedOn: base }) },
+      'a refusal names the base the merge was staged on, which `nemia merge` reads; a check that did not finish names none',
+    );
     assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
     const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
     assert.equal(shipLine.status, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
@@ -2431,4 +2439,162 @@ test('a merge a pass filed and never wrote down is adopted as a merge: the round
   assert.equal(roundOf(run, 'review'), 1);
   assert.equal(run.baseRef, sha);
   assert.ok(!filings.slice(before).includes(`${id}-implement-try2`), filings.join(', '));
+});
+
+/** What the ship's check printed on the merged tree it refused, as turbo prefixes node's spec reporter: a test failed, listed twice. */
+const FAILING = [
+  '@x/add:test: ✔ add adds (1.2ms)',
+  '@x/add:test: ✖ sub subtracts (2.1ms)',
+  '@x/add:test: ℹ fail 1',
+  '@x/add:test: ✖ failing tests:',
+  '@x/add:test: ✖ sub subtracts (2.1ms)',
+].join('\n');
+
+/**
+ * A loop's work that merges cleanly onto main and that ship's check refused on the merged tree: implement and review done, ship approved
+ * and filed, its merge staged and signed off, and its check settled `failed` with exit 1 — with none where it did not finish (`finished`)
+ * — printing `FAILING`; the pass after aborts the merge. The base branch is where the merge was staged on (`base`).
+ */
+async function refusedOnBase(finished = true) {
+  const repo = aRepo();
+  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder() }));
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const work = readRun(run.id).steps.implement;
+  addSub(work.workspace!);
+  git(work.workspace!, 'commit', '-q', '-am', 'add sub');
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, approveRun(run.id, 'ship', 'Merge it.'));
+  assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed, ['ship']);
+  git(repo, 'merge', '--no-ff', '--no-commit', work.branch!);
+  b.settle(`${run.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
+  assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).checked, ['ship']);
+  const checkId = `${run.id}-ship-check`;
+  b.settle(checkId, 'failed', undefined, finished ? 1 : undefined);
+  b.tasks.get(checkId)!.printed = FAILING;
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.equal(mergeHead(repo), false, 'the run aborted the merge its check refused');
+  return { repo, id: run.id, branch: work.branch!, ...b, checkId, base: git(repo, 'rev-parse', 'HEAD') };
+}
+
+test("a merge of work that merges cleanly but whose landing check refused the merged tree on the base as it is: the conflict is semantic, the ask names the landing, and the target is told so with the check's failing tests", async () => {
+  const { id, e, tasks, checkId, base } = await refusedOnBase();
+  assert.deepEqual(
+    readRun(id).steps.ship.landed,
+    { aborted: 'its check refused the merge (exit 1)', refusedOn: base },
+    'the record names the base the refused merge was staged on',
+  );
+  const before = roundOf(readRun(id), 'review');
+
+  const { ask } = await runWith(e, mergeRun(id));
+  const merge = { target: 'implement', try: 2, onto: 'main', sha: base, landing: { step: 'ship', check: checkId } };
+  assert.deepEqual(ask.merge, merge);
+  assert.deepEqual(
+    runStore.asks.read(id).rounds.map((a) => a.merge),
+    [merge],
+    'the ask file keeps the landing it was asked on',
+  );
+
+  const sent = await runWith(e, advanceRun(readRun(id)));
+  assert.deepEqual([sent.looped, sent.filed], [['review'], []], sent.notes.join('\n'));
+  const run = readRun(id);
+  assert.equal(roundOf(run, 'review'), before, 'the round stays as it is');
+  assert.equal(run.baseRef, base, "the run's base is the commit merged");
+  assert.deepEqual(
+    run.steps.ship.tries?.map((t) => t.then),
+    ['back'],
+  );
+  assert.equal(run.steps.ship.landed, undefined, 'the ending sent back keeps no landing, and so lets no merge through a second time');
+  const brief = tasks.get(`${id}-implement-try2`)!.spec.brief;
+  assert.match(brief, /^## Merge main\n/);
+  assert.ok(
+    brief.includes(
+      `the work merges cleanly onto \`main\` as text, but ship's check refused the\nmerged tree at \`${base}\` (exit 1), so the conflict is semantic`,
+    ),
+    brief,
+  );
+  assert.ok(brief.includes(`\n    git merge --no-ff --no-commit ${base}\n`), brief);
+  assert.ok(!brief.includes(`\n    git merge ${base}\n`), 'never the merge a textual conflict is made by');
+  assert.ok(brief.includes('so `git show --remerge-diff` shows the fix'), brief);
+  assert.match(brief, /\n## What ship's check said on the merged tree\n/);
+  assert.ok(brief.includes(`"exit": 1,\n  "failing": [\n    "@x/add:test: ✖ sub subtracts (2.1ms)"\n  ],\n`), brief);
+  assert.ok(brief.includes('You were handed no findings this round.'), 'a merge answers no finding');
+});
+
+test('REFUSED at shipped defaults: a merge of work that merges cleanly onto a base moved since its landing check refused it is nothing to merge, in the words of any clean trial merge; a base that moves into a conflict is a merge as text', async () => {
+  const { repo, id, e, branch } = await refusedOnBase();
+  fs.writeFileSync(path.join(repo, 'mul.ts'), 'export const mul = (a, b) => a * b;\n');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'mul');
+  await assert.rejects(
+    runWith(e, mergeRun(id)),
+    mergeRefused(id, new RegExp(`^${branch} merges cleanly onto main: nothing to merge — ship it again: nemia retry ${id} ship\\.$`)),
+  );
+  const sha = mainMoves(repo);
+  const { ask } = await runWith(e, mergeRun(id));
+  const merge = { target: 'implement', try: 2, onto: 'main', sha };
+  assert.deepEqual(ask.merge, merge, 'no landing: its check refused another commit of the base');
+  assert.deepEqual(
+    runStore.asks.read(id).rounds.map((a) => a.merge),
+    [merge],
+  );
+});
+
+test('REFUSED at shipped defaults: a merge of work that merges cleanly whose landing check did not finish is nothing to merge', async () => {
+  const { id, e, branch } = await refusedOnBase(false);
+  const landed = readRun(id).steps.ship.landed;
+  assert.ok(landed && 'aborted' in landed && !('refusedOn' in landed), JSON.stringify(landed));
+  await assert.rejects(
+    runWith(e, mergeRun(id)),
+    mergeRefused(id, new RegExp(`^${branch} merges cleanly onto main: nothing to merge — ship it again: nemia retry ${id} ship\\.$`)),
+  );
+});
+
+test('nemia decide offers the merge of work its landing check refused, saying the conflict is semantic, and `nemia merge` says what it asked', async (t) => {
+  const { id, e, base } = await refusedOnBase();
+  assert.deepEqual(
+    (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'merge'),
+    [
+      {
+        label: 'merge',
+        command: `nemia merge ${id} review`,
+        said: `review: implement's work merges cleanly onto main, but ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic. Merge main into it and fix what broke — implement continued, then a new review, on round 1, which the merge does not spend:  nemia merge ${id} review`,
+        step: 'review',
+      },
+    ],
+  );
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+    printed.push(args.map(String).join(' '));
+  });
+  try {
+    await main(['merge', id], e);
+  } finally {
+    log.mock.restore();
+  }
+  assert.ok(
+    printed[0]?.includes(
+      `asked: merge main at ${base.slice(0, 7)} into implement's work, where ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic — the next tick files it`,
+    ),
+    printed.join('\n'),
+  );
+});
+
+test("a semantic merge whose check's output the engine cannot give is filed all the same, its brief saying why the output is missing", async () => {
+  const { id, e, tasks, checkId } = await refusedOnBase();
+  await runWith(e, mergeRun(id));
+  tasks.get(checkId)!.printed = new Error('the stream is gone');
+  const sent = await runWith(e, advanceRun(readRun(id)));
+  assert.deepEqual(sent.looped, ['review'], sent.notes.join('\n'));
+  const brief = tasks.get(`${id}-implement-try2`)!.spec.brief;
+  assert.ok(brief.includes('git merge --no-ff --no-commit'), brief);
+  assert.ok(
+    brief.includes(
+      `What it said cannot be given here — the engine could not give what its task ${checkId} printed: the stream is gone. Its task is \`${checkId}\`.`,
+    ),
+    brief,
+  );
 });

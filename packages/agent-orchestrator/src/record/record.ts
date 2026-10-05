@@ -356,9 +356,10 @@ export type StepRecord = {
 /**
  * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to
  * commit — and why; or, for an ending that stopped on its own word with nothing staged, nothing at all (`untouched`), written down so that
- * what a person stages in the checkout after it is theirs.
+ * what a person stages in the checkout after it is theirs. An abort of a merge its check refused names the base it was staged on
+ * (`refusedOn`), which `nemia merge` reads (`mergeAsk`).
  */
-export type Landed = { commit: string } | { aborted: string } | { untouched: string };
+export type Landed = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
 
 /**
  * Whether a check that did not pass REFUSED the work, rather than not finishing.
@@ -474,9 +475,17 @@ export type PersonAsk =
   | { kind: 'merge'; ask: RoundAsk & { merge: MergeOf } };
 
 /**
- * What a merge ask's file holds (`mergeAskIn`): the looping step, the round it is on, the base branch, its commit, and when it was asked.
+ * What a merge ask's file holds (`mergeAskIn`): the looping step, the round it is on, the base branch, its commit, when it was asked, and
+ * the landing refused on that commit, where one was (`MergeOf`).
  */
-export type MergeAskHeld = { loop: string; round: number; onto: string; sha: string; at: string };
+export type MergeAskHeld = {
+  loop: string;
+  round: number;
+  onto: string;
+  sha: string;
+  at: string;
+  landing?: { step: string; check: string };
+};
 
 /**
  * What writing a person's ask did, and `where` a person finds its file: written; or not, since a file already stood at its name — `stray`

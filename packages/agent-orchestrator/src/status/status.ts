@@ -659,8 +659,15 @@ export type Round = {
   back?: string[];
 };
 
-/** What a person's `nemia merge` asks: the step that merges (the loop's target), its try that does, the base branch, and its commit. */
-export type MergeOf = { target: string; try: number; onto: string; sha: string };
+/**
+ * What a person's `nemia merge` asks: the step that merges (the loop's target), its try that does, the base branch, and its commit; and,
+ * where the work merges cleanly onto that commit and the ending's check refused the merged tree there, that landing (`landing`): the
+ * ending and its check's task, whose failing tests the target is told.
+ */
+export type MergeOf = { target: string; try: number; onto: string; sha: string; landing?: MergeLanding };
+
+/** A landing refused on the commit a merge takes in: the ending step, and the task of its check that refused the merged tree. */
+export type MergeLanding = { step: string; check: string };
 
 /**
  * A person's `nemia round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. A

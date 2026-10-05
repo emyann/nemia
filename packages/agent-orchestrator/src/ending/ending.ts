@@ -72,7 +72,10 @@ export type MergeState = {
  * What a pass does about an ending's staged merge (`landingDue`): commit it with the step's message, abort it, or only write down how it
  * stands.
  */
-export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: string } | { act: 'record'; landed: Landed };
+export type Landing =
+  | { act: 'commit'; message: string }
+  | { act: 'abort'; why: string; refusedOn?: string }
+  | { act: 'record'; landed: Landed };
 
 /**
  * What this pass does with the merge an ending that lands on its check staged in the repository's checkout (`landsOnCheck`), or undefined
@@ -94,7 +97,7 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  * - **abort**, of a merge that is this run's: its check refused it or did not finish — a check that did not finish is no verdict, and no
  *   merge waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
  *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
- *   step gave no message to commit it with.
+ *   step gave no message to commit it with. A check that refused it names the base the merge was staged on (`refusedBase`).
  * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having
  *   staged none (nothing is checked or committed); the check passed and the result is on the checkout's HEAD already (it landed there as
  *   that commit); or the check ended and the merge it judged is no longer staged.
@@ -124,7 +127,8 @@ export function landingDue(
   if (merging === 'other') return undefined;
   const ours = merging === 'ours';
   const onHead = !ours && merging === 'none' && missing.length === 0;
-  const end = (why: string): Landing | undefined => (ours ? { act: 'abort', why } : { act: 'record', landed: { aborted: why } });
+  const end = (why: string, refused: { refusedOn?: string } = {}): Landing =>
+    ours ? { act: 'abort', why, ...refused } : { act: 'record', landed: { aborted: why } };
   if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : nothing;
   if (run.cancelledAt) return end('the run was called off before its merge was committed');
   if (ours && conflicted) return end('the merge it staged has conflicts');
@@ -145,8 +149,19 @@ export function landingDue(
     };
   }
   const why = refusedCheck(check, verdict) ? `its check refused the merge (exit ${verdict})` : 'its check did not finish';
-  return end(onHead ? `${why}, and the result is on ${run.branch} already: it was committed before its check ran` : why);
+  return end(
+    onHead ? `${why}, and the result is on ${run.branch} already: it was committed before its check ran` : why,
+    refusedBase(head, check, verdict),
+  );
 }
+
+/**
+ * The base a landing's check refused the merge on (`refusedOn`): the checkout's HEAD, where the merge was staged, once the check exited
+ * non-zero (`refusedCheck`) — nothing for a check that did not finish, or with no HEAD read. What lets `nemia merge` file a merge of work
+ * that merges cleanly onto that base and breaks on it (`mergeAsk`). Pure.
+ */
+const refusedBase = (head: string | undefined, check: TaskPhase, verdict: Verdict | undefined): { refusedOn?: string } =>
+  head && refusedCheck(check, verdict) ? { refusedOn: head } : {};
 
 /**
  * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its

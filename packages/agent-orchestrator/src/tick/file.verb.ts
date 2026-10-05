@@ -16,6 +16,7 @@ import {
   LANDING_CHECK_DEADLINE_SECONDS,
   type CheckEnv,
   type CheckHanded,
+  type LandingSaid,
   type Verdict,
 } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
@@ -59,7 +60,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
-import { checksHandedRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
@@ -387,14 +388,27 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   }
   looped.push(r.step);
   notes.push(roundFiledNote(r, looping));
-  if (!(yield* asked('view', e.view(taskId))).state.brief)
-    yield* asked('file', e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId)));
+  if (!(yield* asked('view', e.view(taskId))).state.brief) {
+    const landing = yield* landingOf(f, r);
+    yield* asked('file', e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId, landing)));
+  }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
   if (r.merge && isGitRun(run)) run.baseRef = r.merge.sha;
 });
 
+/**
+ * What the ending's check said of the merged tree it refused, for a merge asked on that refusal (`MergeOf.landing`), read off the check's
+ * task with the command the run froze (`landingSaidRead`) — or undefined for any other round.
+ */
+const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
+  const landing = r.merge?.landing;
+  const command = landing && f.reads.steps.find((s) => s.name === landing.step)?.check;
+  if (!landing || !command) return undefined;
+  return yield* landingSaidRead(landing.step, command, landing.check).pipe(over(asRead(f)));
+});
+
 /** A round's target filed under its next try's id: its session continued, told the round, with its cap for the round. */
-function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, taskId: string): Spec {
+function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, taskId: string, landing?: LandingSaid): Spec {
   const { run, reads } = f;
   const record = run.steps[r.target];
   const files = artifactsDir(run, r.target);
@@ -413,7 +427,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       undefined,
       undefined,
       {
-        ...roundBriefed(r, looping),
+        ...roundBriefed(r, looping, landing),
         resumed: Boolean(resumeFrom),
         ...(resumeFrom ? { said: saidIn(reads.views.get(record.taskId!)) } : {}),
       },

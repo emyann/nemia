@@ -9,6 +9,7 @@ import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
 import { Check, code, Facts, readRows, specRows, spentRows, when } from './Facts';
+import { StepPageLink } from './StepParts';
 import { Told } from './Told';
 import { Asked } from './GateBrief';
 
@@ -177,6 +178,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
         </p>
       )}
       <Told told={step.told} layers={step.layers} parts={step.taskParts} filed={step.taskId !== null} />
+      <StepPageLink page={run.workflowPage} step={step.name} />
     </>
   );
 }

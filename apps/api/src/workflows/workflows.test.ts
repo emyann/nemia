@@ -27,7 +27,7 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
-type WorkflowStepPage = import('./workflows.ts').WorkflowStepPage;
+type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
 type RunSummary = import('agent-orchestrator').RunSummary;
 type RunDetail = import('../detail/detail.ts').RunDetail;
@@ -263,6 +263,23 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
       keys: undefined,
       /** This step names no agent, so there is nothing it says it can do; a step whose agent has skills is further down, in this test. */
       agentSkills: null,
+      factory: null,
+      /** With no agent, its own words are all a run would be told, before a task no run has given yet. */
+      layers: {
+        agent: null,
+        instructions: null,
+        custom: null,
+        agentSkills: [],
+        policy: 'Review it.',
+        addedSkills: [],
+        fence: [],
+        task: null,
+        via: 'brief',
+      },
+      hired: null,
+      hiredIn: [],
+      skillsFrom: [],
+      recentRuns: [],
     },
   );
   assert.deepEqual(
@@ -329,6 +346,12 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
     attached.keys.find((k) => k.key === 'harness'),
     { key: 'harness', value: 'claude', meaning: STEP_KEY_MEANINGS.harness },
     "the agent's keys are the step's too",
+  );
+  assert.equal(attached.layers.instructions, 'Write it down.', "what a run would be told first: the agent's instructions, read now");
+  assert.deepEqual(
+    attached.skillsFrom,
+    [{ name: 'take-notes', from: 'yours' }],
+    "each skill of its layers, with where it is found: in your library, so its page is yours'",
   );
   write(path.join(mine, 'notes.md'), 'Take notes.\n');
   assert.equal(

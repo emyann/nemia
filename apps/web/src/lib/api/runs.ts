@@ -4,6 +4,7 @@ import { Schema } from 'effect';
 import { pace } from '../feed.ts';
 import { get, send } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
+import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import {
   AtWorkSchema,
   PlaceKindSchema,
@@ -28,7 +29,7 @@ import {
   type StepNeeds,
 } from './judged.ts';
 
-/** Mirrors `RunSummary` in apps/api/src/runs/runs.ts. */
+/** Mirrors `RunListing` in apps/api/src/runs/runs.ts: a run's summary, and the address of its workflow's page. */
 export type RunSummary = {
   id: string;
   /** The repository a git run is about; null for a folder run (`place`), which has none. */
@@ -41,6 +42,8 @@ export type RunSummary = {
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
+  /** The address of its workflow's page, and each step's under it: null where the board pages none, as for a folder given by path. */
+  workflowPage: WorkflowPageAddress | null;
   /** The agent it tried, for a try started from an agent's page; null for every other run. */
   try: { agent: string } | null;
   createdAt: string;
@@ -123,6 +126,7 @@ const RunSummarySchema = Schema.Struct({
   work: Schema.NullOr(Schema.String),
   brief: Schema.String,
   workflowDir: Schema.String,
+  workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
   try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
   createdAt: Schema.String,
   startedAt: Schema.NullOr(Schema.String),

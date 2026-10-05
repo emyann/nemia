@@ -16,7 +16,7 @@ export default {
     await sidebar(page);
     await expectVisible(
       page.locator(`article header a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
-      `the run's header names its workflow (${FAKE.workflow}), linked to the Workflows page`,
+      `the run's header names its workflow (${FAKE.workflow}), a folder the board pages on no address, linked to the Workflows page`,
     );
     await expectCount(page.locator('[data-from]'), 0, 'a run started with no card says it came from none');
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);

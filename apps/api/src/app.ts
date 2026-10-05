@@ -15,6 +15,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { machines } from './machines/machines.ts';
 import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
+import { step } from './step/step.ts';
 import { steps } from './steps/index.ts';
 import { engineRead, Engine, StoreRoot } from './store.ts';
 import { builder, remover, workflows, yours } from './workflows/index.ts';
@@ -141,6 +142,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', factories)
     .route('/', factoryInstruction)
     .route('/', workflows)
+    .route('/', step)
     .route('/', builder)
     .route('/', remover)
     .route('/', yours)

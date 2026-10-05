@@ -12,8 +12,7 @@
  * card removed.
  * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
- * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
- * the page itself has on the board.
+ * A step's page reads one step of one folder through its own router (step/step.ts), which reads the step's file with `stepSourceOf`.
  *
  * Each is answered in the factory the request names (`served`, factories/place.ts): a factory offers only the workflows attached to it,
  * each step its hires fill read with the agent hired, and a run is started in it. The default factory offers every workflow, as it is.
@@ -37,11 +36,9 @@ import {
   skillVersion,
   START as START_ENTRY,
   startFactory,
-  unattachedRefusal,
   unfilledRefusal,
   workflowDescription,
   workflowReadme,
-  Missing,
   type Factory,
   type FolderLoaded,
   type Places,
@@ -213,23 +210,6 @@ export type StepOwn = { keys: StepKey[]; body: string };
 export type KeyRow = { key: string; value: string | null; meaning: string };
 
 /**
- * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
- * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds`
- * is the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can
- * do, generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
- */
-export type WorkflowStepPage = {
-  workflow: string;
-  from: WorkflowSource;
-  dir: string;
-  step: string;
-  body: string;
-  source: string;
-  keys: KeyRow[];
-  agentSkills: AgentSkill[] | null;
-};
-
-/**
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
  * `renderStep` writes it), `output:` as the file it names, and null for none.
  */
@@ -248,6 +228,9 @@ function keyValue(step: Workflow, key: StepKey): string | null {
 export const keyRows = (step: Workflow): KeyRow[] =>
   STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
+/** The file of the step `name` in the workflow folder `dir`, as written: frontmatter and all. */
+export const stepSourceOf = (dir: string, name: string): string => fs.readFileSync(path.join(dir, `${name}.md`), 'utf8');
+
 /** Where workflows are read from, in the order they are listed: the repository's, then yours. */
 export const sourcesOf = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> => [
   { from: 'repo', dir: path.join(repo, 'workflows') },
@@ -256,7 +239,6 @@ export const sourcesOf = (repo: string, home: string): Array<{ from: WorkflowSou
 
 /** The table's entries the board's workflows are read through, each served on the api alone. */
 const LIST = COMMANDS.find((c) => c.name === 'workflows list')!;
-const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
 
 /**
  * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows list`, by
@@ -614,7 +596,7 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string): Aske
  * What the agent a step is read with says it can do, generated from its skills, found where the load found them (`cardSkills`): null for a
  * step with no agent, one the folder's places do not have, and one whose card the package refuses.
  */
-function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[] | null {
+export function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[] | null {
   const attached = step.agent ? agentsFor(dir, places).get(step.agent.name) : undefined;
   if (attached === undefined || attached instanceof Error) return null;
   try {
@@ -659,15 +641,7 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  * - `GET /api/workflows` — every workflow (`listWorkflows`), read from disk on each request, so a folder a person has just edited lists as
  *   it is now; in a factory (`?factory=`), only those attached to it, read with its hires, each saying what they leave `unfilled` and
  *   each step the agent hired into it (`hired`). 500 for a folder that could not be listed.
- * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
- *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
- *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for
- *   the loader's refusal, word for word (an `Invalid`, answered by `app.onError`), with which the folder is listed and has no step to show;
- *   404 for a step the folder does not have. In a factory, the step is read with its hires, and a workflow the factory has not attached
- *   is a 404 in the package's words (`unattachedRefusal`, a `Missing`).
- *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
- *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each Claude Code skill its `skills:` gives a
- *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
+ * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page: `step` (step/step.ts).
  * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
  *   lists the runs of, for a run to wait on.
  * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `nemia start <brief> --workflows <folder>
@@ -696,40 +670,6 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  */
 export const workflows = new Hono<ApiEnv>()
   .get('/api/workflows', (c) => served(c, async ({ e, repo, home, factory }) => c.json(await listWorkflows(e, repo, home, factory))))
-  .get('/api/workflows/:from/:name/:step', (c) =>
-    served(c, async ({ e, repo, home, factory }) => {
-      const { from, name, step } = c.req.param();
-      if (from !== 'repo' && from !== 'yours') {
-        return c.json(
-          {
-            error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.`,
-          },
-          400,
-        );
-      }
-      const unattached = factory && unattachedRefusal(factory, name);
-      if (unattached) throw new Missing({ message: unattached });
-      const folder = folderOf(name, from, repo, home);
-      if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-      const args = { from, name, step, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-      const { step: found, steps } = (await runWith(e, STEP.handler(args, undefined, home))) as { step: Workflow | null; steps: string[] };
-      if (!found) {
-        return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
-      }
-      const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      const agentSkills = agentSkillsOf(found, folder.dir, placesOf(repo, home));
-      return c.json({
-        workflow: name,
-        from,
-        dir: folder.dir,
-        step: found.name,
-        body: found.body,
-        source,
-        keys: keyRows(found),
-        agentSkills,
-      } satisfies WorkflowStepPage);
-    }),
-  )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
     served(c, async ({ e, repo, home, factory }) => {

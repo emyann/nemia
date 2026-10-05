@@ -32,9 +32,10 @@ import {
 } from 'agent-orchestrator';
 
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
-type WorkflowStepPage = import('../workflows/workflows.ts').WorkflowStepPage;
-type RunSummary = import('agent-orchestrator').RunSummary;
+type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
 type FactoryAnswer = import('./factories.ts').FactoryAnswer;
+type RunPage = import('../runs/runs.ts').RunPage;
+type RunListing = import('../runs/runs.ts').RunListing;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -197,8 +198,22 @@ test("a step's page in a factory is read with its hires, and a workflow the fact
   const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');
   assert.equal(page.status, 200);
   assert.equal(page.body.keys.find((k) => k.key === 'agent')?.value, 'ada');
+  assert.deepEqual(
+    [page.body.factory, page.body.hired, page.body.layers.agent, page.body.layers.instructions, page.body.hiredIn],
+    ['hired', 'ada', 'ada', 'You implement what you are asked.', []],
+    'the factory hires ada into the step: the page marks it hired, and what a run would be told starts from her instructions',
+  );
   const unhired = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=solo');
   assert.equal(unhired.body.keys.find((k) => k.key === 'agent')?.value, null);
+  assert.deepEqual([unhired.body.hired, unhired.body.layers.agent], [null, null], 'a factory that hires no one into it hires no one');
+
+  const plain = await get<WorkflowStepPage>(`/api/workflows/repo/alpha/implement?repo=${encodeURIComponent(repoR)}`);
+  assert.deepEqual(
+    [plain.body.factory, plain.body.hired, plain.body.layers.agent],
+    [null, null, null],
+    "in the default factory the step is the file's: no agent",
+  );
+  assert.deepEqual(plain.body.hiredIn, [{ factory: 'hired', agent: 'ada' }], 'and the factories that hire into it are named');
 
   const gamma = await get<unknown>('/api/workflows/repo/gamma/plan?factory=hired');
   assert.equal(gamma.status, 404);
@@ -221,8 +236,26 @@ test('POST /api/runs?factory= starts the run in the factory: its record names th
   const run = runStore.runs.read(id);
   assert.deepEqual([run.factory, run.repo, run.workflowDir], ['hired', repoR, path.join(repoR, 'workflows', 'alpha')]);
 
-  const listed = await get<RunSummary[]>('/api/runs');
+  const listed = await get<RunListing[]>('/api/runs');
   assert.equal(listed.body.find((r) => r.id === id)?.factory, 'hired', 'the list names the factory the run is in');
+
+  const address = { from: 'repo', workflow: 'alpha', factory: 'hired', repo: repoR };
+  assert.deepEqual(
+    listed.body.find((r) => r.id === id)?.workflowPage,
+    address,
+    "the list gives the address of the run's workflow page, in its factory",
+  );
+  const detail = await get<RunPage>(`/api/runs/${id}`);
+  assert.deepEqual(detail.body.workflowPage, address, 'and so does its page');
+
+  const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');
+  assert.deepEqual(
+    page.body.recentRuns.map((r) => [r.id, r.brief, r.factory]),
+    [[id, 'Add a cache', 'hired']],
+    "the step's page lists the run among its recent runs",
+  );
+  const elsewhere = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=solo');
+  assert.ok(!elsewhere.body.recentRuns.some((r) => r.id === id), "and only in its factory: another factory's page does not");
 });
 
 test('POST /api/runs?factory= starts a card in the factory: the record names the factory, its repository and the card, and the card leaves the inbox', async () => {

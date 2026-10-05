@@ -5,6 +5,9 @@
  * shows its brief whole. Each is drawn as the markdown it is written in (`Words`). At a gate, the step's policy is drawn open on its
  * own (`StepPolicy`), the layer a person judges the step by. The task is drawn in its parts where the api split it (`TaskParts`): each
  * run it was handed a block of its own, headed by how it was handed and linked to that run.
+ *
+ * On a step's own page the same layers are what a run of it will be told, read now (`homes`): each beside where it lives, linked to where
+ * it is edited, and the task left to the brief a run is started with.
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -13,21 +16,31 @@ import { RouteLink } from './AgentParts';
 import { Markdown } from './Markdown';
 
 /**
+ * Where each layer of a step lives, for its page: drawn beside the agent's instructions, your custom instructions and the step's policy,
+ * each a link to where it is edited or the file it is written in; and each skill, by its name, as a link to its page or its name alone.
+ */
+export type LayerHomes = { instructions: ReactNode; custom: ReactNode; words: ReactNode; skill: (name: string) => ReactNode };
+
+/**
  * The fold: `told`, the brief whole, drawn only where `layers` is null; `parts`, the task in its parts, where the api split it; `filed`
- * says whether it was told or would be told now. Nothing where there is neither.
+ * says whether it was told or would be told now. Nothing where there is neither. Given `homes`, `layers` are what a run of the step will
+ * be told, read now: drawn open, each beside its home.
  */
 export function Told({
   told,
   layers,
   parts = null,
   filed,
+  homes,
 }: {
   told: string | null;
   layers: StepLayers | null;
   parts?: TaskPart[] | null;
   filed: boolean;
+  homes?: LayerHomes;
 }) {
   if (!told && !layers) return null;
+  if (layers && homes) return <WillBeTold layers={layers} homes={homes} />;
   return (
     <details className="text-sm" data-told>
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
@@ -68,6 +81,50 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
         {parts?.length ? <TaskParts parts={parts} /> : <Words text={layers.task} none="Not composed: the run could not say it" />}
       </Layer>
     </div>
+  );
+}
+
+/**
+ * What a run of a step will be told, read now from the files and frozen when a run starts: the layers in the order the session reads them,
+ * each beside where it lives, the agent's instructions folded, and the task left to the brief a run is started with.
+ */
+function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }) {
+  return (
+    <details open className="text-sm" data-told data-will-be-told>
+      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What it will be told</summary>
+      <div className="mt-2 flex flex-col gap-3">
+        <p data-read-now className="text-xs text-muted-foreground">
+          Read now from the files, and frozen when a run starts: a run is told what they say then
+          {layers.agent === null
+            ? '.'
+            : `, ${layers.via === 'prompt' ? "the agent's words and yours in its system prompt" : "the agent's words and yours at the head of its brief"}.`}
+        </p>
+        {layers.agent === null ? (
+          <p className="text-xs text-muted-foreground">No agent: its own words are all it will be told, before the task.</p>
+        ) : (
+          <>
+            <Layer name="instructions" title={`Instructions — ${layers.agent}'s`} home={homes.instructions}>
+              <details data-instructions-fold>
+                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">Read them</summary>
+                <Words text={layers.instructions} none="Its file gives no instructions" />
+              </details>
+              <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
+            </Layer>
+            <Layer name="custom" title="Your custom instructions" home={homes.custom}>
+              <Words text={layers.custom} none="None written" />
+            </Layer>
+          </>
+        )}
+        <Layer name="policy" title="The step's policy" home={homes.words}>
+          <Words text={layers.policy || null} none="No words of its own" />
+          <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
+          <Fence agent={layers.agent} fence={layers.fence} />
+        </Layer>
+        <p data-layer="task" className="text-xs text-muted-foreground">
+          Then the task: the brief a run is started with.
+        </p>
+      </div>
+    </details>
   );
 }
 
@@ -124,11 +181,20 @@ export function TaskParts({ parts }: { parts: TaskPart[] }) {
   );
 }
 
-/** One layer, under its title. */
-export function Layer({ name, title, children }: { name: string; title: string; children: ReactNode }) {
+/** One layer, under its title, and where it lives beside the title where `home` is given. */
+export function Layer({ name, title, home, children }: { name: string; title: string; home?: ReactNode; children: ReactNode }) {
   return (
     <section data-layer={name} className="flex flex-col gap-1">
-      <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
+      {home === undefined ? (
+        <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
+      ) : (
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
+          <span data-home={name} className="min-w-0 text-xs break-all text-muted-foreground">
+            {home}
+          </span>
+        </div>
+      )}
       {children}
     </section>
   );
@@ -147,15 +213,15 @@ export function Words({ text, none = 'None frozen on this run' }: { text: string
   );
 }
 
-/** The skills a layer gives, after `word`; nothing where it gives none. */
-export function Skills({ word, skills }: { word: string; skills: string[] }) {
+/** The skills a layer gives, after `word`, each drawn by `link` where it is given; nothing where it gives none. */
+export function Skills({ word, skills, link }: { word: string; skills: string[]; link?: (name: string) => ReactNode }) {
   if (!skills.length) return null;
   return (
     <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
       {word}{' '}
       {skills.map((skill) => (
         <Badge key={skill} variant="outline" data-skill={skill}>
-          {skill}
+          {link ? link(skill) : skill}
         </Badge>
       ))}
     </p>

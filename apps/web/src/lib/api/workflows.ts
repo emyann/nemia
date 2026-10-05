@@ -136,9 +136,17 @@ export const factoryWorkflowsQuery = (place: Place) =>
     queryFn: () => get(`/api/workflows${placeQuery(place)}`, Schema.mutable(Schema.Array(WorkflowListingSchema))),
   });
 
+/** Mirrors `RecentRun` in apps/api/src/step/step.ts: one of a step's newest runs, and whether the step was filed in it. */
+export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
+
+/** Mirrors `SkillFrom` in apps/api/src/step/step.ts: a skill a step's layers give, and where its page is; null where none is. */
+export type SkillFrom = { name: string; from: 'yours' | 'repo' | 'shipped' | null };
+
 /**
- * Mirrors `WorkflowStepPage` in apps/api/src/workflows/workflows.ts: one step of a workflow — its body, its file as written, and every key
- * a step may set, in the package's order, with its value as the loader read it.
+ * Mirrors `WorkflowStepPage` in apps/api/src/step/step.ts: one step of a workflow — its body, its file as written, and every key a step
+ * may set, in the package's order, with its value as the loader read it; and, read now in the request's factory (`factory`, null for the
+ * default), what a run of it would be told (`layers`), the agent the factory hires into it (`hired`), the factories that hire into it when
+ * none is named (`hiredIn`), where each skill of its layers is found (`skillsFrom`) and its newest runs (`recentRuns`).
  */
 export type WorkflowStepPage = {
   workflow: string;
@@ -153,6 +161,12 @@ export type WorkflowStepPage = {
    * read.
    */
   agentSkills: AgentSkill[] | null;
+  factory: string | null;
+  layers: StepLayers;
+  hired: string | null;
+  hiredIn: Array<{ factory: string; agent: string }>;
+  skillsFrom: SkillFrom[];
+  recentRuns: RecentRun[];
 };
 
 /** Decodes a `WorkflowStepPage`. */
@@ -165,14 +179,50 @@ const WorkflowStepPageSchema = Schema.Struct({
   source: Schema.String,
   keys: Schema.mutable(Schema.Array(KeyRowSchema)),
   agentSkills: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
+  factory: Schema.NullOr(Schema.String),
+  layers: StepLayersSchema,
+  hired: Schema.NullOr(Schema.String),
+  hiredIn: Schema.mutable(Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String }))),
+  skillsFrom: Schema.mutable(
+    Schema.Array(Schema.Struct({ name: Schema.String, from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])) })),
+  ),
+  recentRuns: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        brief: Schema.String,
+        createdAt: Schema.String,
+        factory: Schema.NullOr(Schema.String),
+        filed: Schema.Boolean,
+      }),
+    ),
+  ),
 }) satisfies Schema.Schema<WorkflowStepPage>;
 
-/** A step of a workflow, for its page. Read again on each visit, as the Workflows page is: a person edits the folder. */
-export const stepQuery = (from: string, workflow: string, step: string) =>
+/** The place a workflow's or a step's page is read in, as its address carries it: a factory, and a repository where one is named. */
+export type PagePlace = { factory?: string; repo?: string };
+
+/** The query naming `place` on a page's read: each of its keys that is set, the factory first. */
+export const pagePlaceQuery = (place: PagePlace = {}): string => {
+  const keys = [
+    ...(place.factory ? [`factory=${encodeURIComponent(place.factory)}`] : []),
+    ...(place.repo ? [`repo=${encodeURIComponent(place.repo)}`] : []),
+  ];
+  return keys.length ? `?${keys.join('&')}` : '';
+};
+
+/**
+ * A step of a workflow, for its page, read in `place`: the factory picked and its repository. Read again on each visit, as the Workflows
+ * page is: a person edits the folder, and a factory's hires.
+ */
+export const stepQuery = (from: string, workflow: string, step: string, place: PagePlace = {}) =>
   queryOptions({
-    queryKey: ['workflows', from, workflow, step],
+    queryKey: ['workflows', from, workflow, step, place.factory ?? null, place.repo ?? null],
     queryFn: () =>
-      get(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`, WorkflowStepPageSchema),
+      get(
+        `/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}${pagePlaceQuery(place)}`,
+        WorkflowStepPageSchema,
+      ),
   });
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */

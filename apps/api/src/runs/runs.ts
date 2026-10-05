@@ -1,12 +1,19 @@
 /** The runs, for the board: every run listed, one run in full, and what `nemia decide` shows of it. */
 import { Effect } from 'effect';
 import { Hono } from 'hono';
-import { COMMANDS, judgedUnlessUnreadable, viewsFor, runWith } from 'agent-orchestrator';
+import { COMMANDS, judgedUnlessUnreadable, viewsFor, runWith, type RunSummary } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/decision.ts';
-import { detail } from '../detail/index.ts';
+import { detail, type RunDetail } from '../detail/index.ts';
 import { type ApiEnv, served } from '../layer.ts';
+import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
 import { findRun, noSuchRun } from '../store.ts';
+
+/** A run as the list answers it: its summary, and the address of its workflow's page, null where the board pages none. */
+export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null };
+
+/** A run as its page answers it: in full (`RunDetail`), and the address of its workflow's page, null where the board pages none. */
+export type RunPage = RunDetail & { workflowPage: WorkflowPageAddress | null };
 
 /** Every run's summary (`runs`), an entry of the package's table the api serves alone: on `GET /api/runs`. */
 const RUNS = COMMANDS.find((c) => c.name === 'runs')!;
@@ -21,18 +28,20 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  * The runs' routes: the list, one run in full, what `nemia decide` shows of it, and what it would hand as context. The board's writes on a
  * run — its removal and its prune among them — are the command table's routes (`commands`, commands/routes.ts).
  *
- * - `GET /api/runs` — every run's summary (`RunSummary`), in the store's order: the package's entry (`runs`), handed the app's memo of runs
- *   at rest and its feed's filing times. One request costs, however many runs there are, one harness observation (one listing of the
- *   sessions it holds, one scan of the detached runs' files), a read of every task journal in the engine's store, and each run's record and
- *   workflow folder. The records are read before the engine: `nemia` files a step's task before it writes the id on the run, so every id
- *   read is in the listing that follows; the other way round, a task filed between the two reads would show as `unknown` until the next
- *   poll. A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed.
- *   The feed's filing times are read once, on from where the last read stopped (`filedTimes`): when each run started. A run at rest is
- *   answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of the runs still
- *   moving and of none other; the rest are read through the request's own engine and git (`viewsFor`, `branchReader`). With
- *   `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request.
- * - `GET /api/runs/:id` — a run in full (`detail`), found by the package's entry (`run`): refused with a 404 when there is no such run,
- *   and with a 502 when a task it reads does not, in the words the list says it with (`RunSummary.unreadable`).
+ * - `GET /api/runs` — every run's summary (`RunListing`), each with the address of its workflow's page (`workflowPageOf`), in the store's
+ *   order: the package's entry (`runs`), handed the app's memo of runs at rest and its feed's filing times. One request costs, however many
+ *   runs there are, one harness observation (one listing of the sessions it holds, one scan of the detached runs' files), a read of every
+ *   task journal in the engine's store, and each run's record and workflow folder. The records are read before the engine: `nemia` files a
+ *   step's task before it writes the id on the run, so every id read is in the listing that follows; the other way round, a task filed
+ *   between the two reads would show as `unknown` until the next poll. A run that waits on runs reads each of them off the same views
+ *   (`seenBy`): its record and git, and its tasks as they were listed. The feed's filing times are read once, on from where the last read
+ *   stopped (`filedTimes`): when each run started. A run at rest is answered from the list's memo (`restingRead`) while nothing it was
+ *   judged on has moved, so a poll reads the journals of the runs still moving and of none other; the rest are read through the request's
+ *   own engine and git (`viewsFor`, `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails
+ *   the request.
+ * - `GET /api/runs/:id` — a run in full (`detail`) with the address of its workflow's page (`RunPage`), found by the package's entry
+ *   (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
+ *   (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not
  *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
@@ -43,9 +52,13 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
 
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
-    served(c, async ({ e, env, home, memo }) =>
-      c.json(await runWith(e, RUNS.handler({}, env, home, { runs: memo.resting, filings: memo.filings }))),
-    ),
+    served(c, async ({ e, env, home, memo, repo }) => {
+      const summaries = (await runWith(
+        e,
+        RUNS.handler({}, env, home, { runs: memo.resting, filings: memo.filings }),
+      )) as unknown as RunSummary[];
+      return c.json(summaries.map((run): RunListing => ({ ...run, workflowPage: workflowPageOf(run, repo, home) })));
+    }),
   )
   .get('/api/runs/:id', (c) =>
     served(c, async (s) => {
@@ -54,7 +67,7 @@ export const runs = new Hono<ApiEnv>()
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
-      return c.json(full);
+      return c.json({ ...full, workflowPage: workflowPageOf(run, s.repo, s.home) } satisfies RunPage);
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>

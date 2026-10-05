@@ -9,20 +9,26 @@ import { StepRows } from '../components/StepRows';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { FromBadge, NoBuilder } from '../components/WorkflowParts';
-import { factoriesQuery, storeQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
+import { factoriesQuery, storeQuery, workflowsQuery, type PagePlace, type WorkflowListing } from '../lib/api';
+import { pagePlaceOf } from '../lib/factories';
 import { specStep, barOf } from '../lib/bar';
 import { workflowFactories } from '../lib/factories';
 
-/** The page's search: `build`, while the builder of one of yours is open. */
-const buildSearch = (search: Record<string, unknown>): { build?: true } =>
-  search.build === true || search.build === 'true' ? { build: true } : {};
+/**
+ * The page's search: `build`, while the builder of one of yours is open; and the place its steps' pages are read in, `factory` and `repo`,
+ * as the Workflows list or a run reached it.
+ */
+const workflowSearch = (search: Record<string, unknown>): { build?: true } & PagePlace => ({
+  ...(search.build === true || search.build === 'true' ? { build: true as const } : {}),
+  ...pagePlaceOf(search),
+});
 
 /**
  * The page of a workflow, at /workflows/$from/$workflow: `workflows_` draws it on its own, not inside the Workflows page, which has no
  * outlet for it. `?build=true` opens the builder of one of yours.
  */
 export const Route = createFileRoute('/workflows_/$from/$workflow')({
-  validateSearch: buildSearch,
+  validateSearch: workflowSearch,
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(workflowsQuery),
@@ -47,7 +53,7 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
 function WorkflowPage() {
   const { from, workflow: name } = Route.useParams();
   const { data: all } = useSuspenseQuery(workflowsQuery);
-  const { build: building = false } = Route.useSearch();
+  const { build: building = false, ...place } = Route.useSearch();
   const navigate = useNavigate();
   const workflow = all.find((w) => w.from === from && w.name === name);
   if (!workflow) return <NotListed from={from} name={name} />;
@@ -88,7 +94,7 @@ function WorkflowPage() {
           <WorkflowCanvas workflow={workflow} />
           <section className="space-y-2">
             <h2 className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Steps</h2>
-            <StepRows workflow={workflow} />
+            <StepRows workflow={workflow} place={place} />
           </section>
           <StartRun workflow={workflow} />
         </>

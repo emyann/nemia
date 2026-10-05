@@ -279,6 +279,8 @@ test('runs are read from the workflow store and summarized, with what each step 
       toDecide: null,
       /** Every task of it reads, or has no journal at all: judged. */
       unreadable: null,
+      /** Another repository's folder, in no factory: the board pages it on no address. */
+      workflowPage: null,
     },
   ]);
 });
@@ -406,6 +408,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
       steps: undefined,
       timeline: oneTaskTotals(),
+      /** A folder given by path: the board pages it on no address. */
+      workflowPage: null,
     },
   );
 

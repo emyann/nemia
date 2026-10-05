@@ -34,7 +34,7 @@ const { advance, approve, hold, retry, start, tick } = await import('../src/runn
 const { acceptFile, askFile, asksDir, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
-const { passParents } = await import('../src/views/views.verb.ts');
+const { passParents, reportedEngine } = await import('../src/views/views.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
@@ -194,7 +194,7 @@ const store = async () => {
     if (n === 2) b.settle(readRun(trying.id).steps.implement.taskId!, 'failed');
   }
   for (let i = 0; i < 10; i++) await settledOne(b, repo, 'succeeded');
-  return { b, repo, waiting };
+  return { b, repo, waiting, second };
 };
 
 /** The one store every test reads, built on first use: a board settles only the tasks it filed, so each test's store is the same. */
@@ -242,14 +242,22 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
 });
 
-test('a pass spends no git process more for more runs waiting on the same run', async () => {
-  const { b, repo, waiting } = await theStore();
-  const before = (await onePass(b)).tallies.kinds.git.spawned;
+test('a pass spends no git process more for more runs waiting on runs of the same repository', async () => {
+  const { b, repo, waiting, second } = await theStore();
+  const runs = () => runStore.runs.list().length;
+  const was = runs();
+  const { tallies: before } = await onePass(b);
   await waitingOn(b, repo, waiting.id);
-  await waitingOn(b, repo, waiting.id);
-  const after = (await onePass(b)).tallies.kinds.git.spawned;
-  assert.ok(before > 0, 'the pass asked git');
-  assert.equal(after, before, 'each run waited on is read once for the pass, over one listing of branches per repository');
+  await waitingOn(b, repo, second.id);
+  const added = runs() - was;
+  const { tallies: after } = await onePass(b);
+  assert.ok(before.kinds.git.spawned > 0, 'the pass asked git');
+  assert.equal(after.kinds.git.spawned, before.kinds.git.spawned, 'over one listing of branches per repository');
+  assert.equal(
+    after.records - before.records,
+    added + 1,
+    'each run waited on read once for the pass: the runs added cost their own records, and the one they newly wait on its, once',
+  );
 });
 
 test("a run's asks are listed once a read, and each file in them read once", async () => {
@@ -265,4 +273,50 @@ test("a run's asks are listed once a read, and each file in them read once", asy
   assert.deepEqual({ calls: asks.calls, reads: asks.reads }, { calls: 1, reads: files }, 'one walk of the folder, each file read once');
   const record = (await metered(async () => readRun(id))).tallies!.kinds.asks;
   assert.deepEqual({ calls: record.calls, reads: record.reads }, { calls: 1, reads: 2 }, 'the approval and the acceptance, off one walk');
+});
+
+/** An engine that answers a view of any task, records each task it is asked to view or list, and holds a view of `slow` until let go. */
+const askedEngine = () => {
+  const asked: string[] = [];
+  const held: { go?: () => void } = {};
+  const view = async (id: string) => {
+    asked.push(id);
+    if (id === 'slow') await new Promise<void>((go) => (held.go = go));
+    return { id } as never;
+  };
+  const list = async (ids: string[]) => {
+    asked.push(...ids);
+    return { views: ids.map((id) => ({ id })), unreadable: [] };
+  };
+  const wrote = async () => undefined;
+  const e = { view, list, file: wrote, answer: wrote } as unknown as Engine;
+  return { e, asked, held };
+};
+
+test('a view kept for the pass is read again once a write names its task, and the views of the tasks it does not name are kept', async () => {
+  const { e: engine, asked } = askedEngine();
+  const e = reportedEngine(engine, []);
+  await e.view('t-1');
+  await e.list(['t-1', 't-2']);
+  await e.view('t-2');
+  assert.deepEqual(asked, ['t-1', 't-2'], 'each read once');
+  await e.file({ id: 't-1' } as never);
+  await e.list(['t-1', 't-2']);
+  assert.deepEqual(asked, ['t-1', 't-2', 't-1'], 'the task filed is read again, and the other kept');
+  await e.answer('t-2', 'yes');
+  await e.view('t-2');
+  assert.deepEqual(asked, ['t-1', 't-2', 't-1', 't-2'], 'the task answered is read again');
+});
+
+test('a view the engine was still reading when a write of the pass went through is not kept', async () => {
+  const { e: engine, asked, held } = askedEngine();
+  const e = reportedEngine(engine, []);
+  const slow = e.view('slow');
+  await e.file({ id: 'other' } as never);
+  held.go?.();
+  await slow;
+  const again = e.view('slow');
+  held.go?.();
+  await again;
+  assert.deepEqual(asked, ['slow', 'slow'], 'read again: what it read may be from before the write');
 });

@@ -49,7 +49,7 @@ test("an ending's check that owes an install runs it first, its text fixed, and 
   const [sh, c, script] = checkArgv('npm test # the suite', true);
   assert.deepEqual([sh, c], ['sh', '-c']);
   const lines = script.split('\n');
-  assert.equal(lines[0], `echo '[wf check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`);
+  assert.equal(lines[0], `echo '[nemia check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`);
   assert.ok(lines[1].startsWith(`${INSTALL} 2>&1 || {`), lines[1]);
   assert.match(lines[1], /kill -s KILL \$\$; \}$/, 'an install that fails ends the process by a signal: no exit code, no verdict');
   assert.equal(lines.at(-1), 'npm test # the suite', 'the command last, alone on its line');
@@ -99,7 +99,7 @@ test("a check that owes an install runs `npm install --no-save` first, in its wo
   assert.deepEqual(fs.readFileSync(npm.args, 'utf8').trim().split('\n'), ['install', '--no-save', '--no-audit', '--no-fund']);
   assert.equal(INSTALL, 'npm install --no-save --no-audit --no-fund');
   assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')), 'the command ran after it');
-  assert.match(r.stdout, /^\[wf check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
+  assert.match(r.stdout, /^\[nemia check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
   assert.match(r.stdout, /^npm said this$/m, "the install's stderr is in the log");
 });
 
@@ -112,7 +112,7 @@ test('REFUSED: an install that fails runs no command and prints no exit code —
     `the worker records no exit code for a process a signal ended, which the run reads as unfinished\n${r.stdout}${r.stderr}`,
   );
   assert.equal(fs.existsSync(path.join(workspace, 'ran.txt')), false, 'the command never ran');
-  assert.match(r.stdout, /^\[wf check\] install failed, exit 3: no verdict on the work$/m);
+  assert.match(r.stdout, /^\[nemia check\] install failed, exit 3: no verdict on the work$/m);
 });
 
 test('a check that owes no install never calls npm', () => {
@@ -222,7 +222,7 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
 
   const refused = await file(
     'refused',
-    'echo "$WF_STEP in $(pwd) against $WF_BASE_REF"; echo loud >&2; echo "[wf check] exit 0"; exit 3 # the suite',
+    'echo "$WF_STEP in $(pwd) against $WF_BASE_REF"; echo loud >&2; echo "[nemia check] exit 0"; exit 3 # the suite',
   );
   const passed = await file('passed', 'test -d .');
 
@@ -301,7 +301,7 @@ test("LIVE: an ending's check whose install fails settles failed with no exit co
   const log = (await e.output(id, 'stdout')) ?? '';
   assert.match(
     log,
-    /\[wf check\] install failed, exit 3/,
+    /\[nemia check\] install failed, exit 3/,
     "the worker inherits this process's environment when a tick starts it: its npm is the fake until the check has settled",
   );
   assert.doesNotMatch(log, /command ran/);
@@ -315,7 +315,7 @@ test('the lines a check marks are those starting `wf <name>:`, whole and in orde
     'wf check: nothing under apps/web/ was touched\r',
     'Wf Mutants: shouting',
     '',
-    '[wf check] exit 0',
+    '[nemia check] exit 0',
   ].join('\n');
   assert.deepEqual(reportedLines(log), {
     lines: [

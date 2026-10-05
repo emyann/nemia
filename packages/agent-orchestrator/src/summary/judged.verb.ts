@@ -1,5 +1,5 @@
 /**
- * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
+ * What a run established, over one read of its tasks (`judge`): each step's word and note in `nemia ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result. The board's reading
  * of a run, as the list and a run's page give it. A controller: it reads the run through `runReading` and git through `branchStandings`.
  */
@@ -36,8 +36,8 @@ export type RunStoppedOn = NonNullable<Assessment['stoppedOn']>;
  *   git      nothing waits at such a gate, every step finished, no step of the workflow merges, and `branches` are ahead of the base
  *            branch: merging or dropping them is a person's, by hand
  *
- * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it — `wf approve <run> <step>`,
- * or `wf decide <run>` for the branches, which the board runs no more than `wf ls` does.
+ * `said` is the whole of what `nemia ls` prints after `→ to decide:`, and `command` the command at the end of it — `nemia approve <run>
+ * <step>`, or `nemia decide <run>` for the branches, which the board runs no more than `nemia ls` does.
  *
  * An approval carries what the Factory's card answers it with, off the record alone: `back`, the steps a send-back goes to (`sendBackTo`) —
  * the step itself once it has a task, and at an ending's gate, held before it is filed, the work it waits on — and `onto`, the base branch
@@ -55,9 +55,15 @@ export type RunToDecide = (
 function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[]): RunToDecide | null {
   if (!t) return null;
   const said = toDecideWords(run, t);
-  if (t.kind === 'git') return { ...t, said, command: `wf decide ${run.id}` };
+  if (t.kind === 'git') return { ...t, said, command: `nemia decide ${run.id}` };
   const step = steps.find((s) => s.name === t.step);
-  return { ...t, back: step ? sendBackTo(step, run) : [t.step], onto: run.branch ?? null, said, command: `wf approve ${run.id} ${t.step}` };
+  return {
+    ...t,
+    back: step ? sendBackTo(step, run) : [t.step],
+    onto: run.branch ?? null,
+    said,
+    command: `nemia approve ${run.id} ${t.step}`,
+  };
 }
 
 /**
@@ -75,12 +81,12 @@ export const spentOf = (spend: Spend): Spent | null =>
   spend.measured ? { usd: spend.usd, measured: spend.measured, unmeasured: spend.unmeasured, said: spentWord(spend) } : null;
 
 /**
- * What a run started `--after` still waits on, as `wf ls` and `wf decide` say it — never worded here.
+ * What a run started `--after` still waits on, as `nemia ls` and `nemia decide` say it — never worded here.
  *
- * `runs` are the package's `waitsOf`: each run in `after` that has not shipped, as its own `wf decide` says it, and, for one that never
+ * `runs` are the package's `waitsOf`: each run in `after` that has not shipped, as its own `nemia decide` says it, and, for one that never
  * will without a person, why — the store has no such run (`missing`), it was cancelled, or a result branch it recorded is gone. `word` is
- * what `wf ls` prints on each root (`waitWord`), and `advice` the line `wf decide` prints under it (`waitAdvice`). `onYou` is whether a
- * person has to act — some run of `runs` never ships on its own — which is when `wf ls` prints `→ waiting on you:` before the advice.
+ * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `onYou` is whether
+ * a person has to act — some run of `runs` never ships on its own — which is when `nemia ls` prints `→ waiting on you:` before the advice.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
@@ -90,16 +96,17 @@ export type RunWaiting = {
 };
 
 /**
- * What a person's hold on a run says (`wf hold <run> --until <run>`, `Run.hold`), as `wf ls` and `wf decide` say it — never worded here.
+ * What a person's hold on a run says (`nemia hold <run> --until <run>`, `Run.hold`), as `nemia ls` and `nemia decide` say it — never worded
+ * here.
  *
  * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not shipped,
  * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has shipped and the next
- * tick has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints under the run (`holdWord`), with the person's why
- * and name when the hold has them, and `advice` the line
- * `wf decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it names
- * never ships on its own — the rule `wf ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every verb a
- * step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and nothing is
- * offered.
+ * tick has not yet lifted the hold, each of them `shipped`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
+ * why and name when the hold has them, and `advice` the line
+ * `nemia decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it
+ * names never ships on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every
+ * verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and
+ * nothing is offered.
  */
 export type RunHolding = {
   at: string;
@@ -122,17 +129,17 @@ export type RunHolding = {
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
  * views — no observation of its own, unlike `lastLine`). Both halves are the package's words, never worded here: `words` is
  * the wait a card or a node says (`waiting for a permission prompt`), `advice` what a person does about it, naming the
- * session its harness lists it under, or for a step on a remote A2A agent the `wf say` that answers its Task (`answerIn`). Said under
+ * session its harness lists it under, or for a step on a remote A2A agent the `nemia say` that answers its Task (`answerIn`). Said under
  * the wait, never with it — one sentence between them, and a surface with room for both. Null where the harness said nothing, and for a
  * step nothing blocked — read afresh on every request, so a session that stops waiting stops carrying it.
  *
- * `approve` is what `wf ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for:
+ * `approve` is what `nemia ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for:
  * `approve plan` (`onYouWords`). Null for any other step — one not gated, not signed off yet, approved, or sent back.
  *
  * `denied` is what the harness denied the step's current try, off the engine's record of each ended attempt (`deniedOf`, the same views):
  * `calls`, each as a permission rule names it (`Skill(look)`, `Bash(pytest)`), once each in the order first denied, and `words`, the line
- * `wf ls` and `wf decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the word the
- * board's chip compares. Null for a step denied nothing — and for one whose harness cannot say, as a `background: true` session cannot.
+ * `nemia ls` and `nemia decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the word
+ * the board's chip compares. Null for a step denied nothing — and for one whose harness cannot say, as a `background: true` session cannot.
  */
 export type StepNeeds = {
   needs: string | null;
@@ -143,7 +150,7 @@ export type StepNeeds = {
 };
 
 /**
- * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
+ * A run waited on that never ships without a person: what `nemia ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
  * resolve.
  *
  * The package decides it (`neverShips` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
@@ -164,8 +171,8 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
 
 /**
  * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never ships on its own — no such run, a
- * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli/main.ts). Not `neverShips` above, which reads any reason a
- * `Wait` carries as one it may never ship for: a hold's `shipped` is the opposite.
+ * cancelled one, a result branch gone. As `nemia ls` and `nemia decide` decide it (cli/main.ts). Not `neverShips` above, which reads any
+ * reason a `Wait` carries as one it may never ship for: a hold's `shipped` is the opposite.
  */
 const holdNeedsYou = (holds: readonly Wait[]): boolean =>
   !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
@@ -189,7 +196,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
 }
 
 /**
- * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it (`wordOfView`): `unknown`
+ * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `nemia ls` shows it (`wordOfView`): `unknown`
  * for a task the engine has no record of, which it folds to the state of one filed and waiting for a slot and calls `pending`, in flight;
  * and `succeeded` for a task held open that was closed after it signed, which it calls `between attempts` until its next pass settles it.
  */
@@ -205,10 +212,12 @@ export const wordOf =
 type Judged = {
   words: ReadonlyMap<string, string>;
   notes: ReadonlyMap<string, string | null>;
+  /** The looping steps whose next round is due (`Listing`'s `roundDue`). */
+  roundDue: ReadonlySet<string>;
   /** What the reading says beside each step's word: what its harness waits for (`waits`) and what its try was denied (`denied`). */
   beside: ReadonlyMap<string, { waits?: string; denied?: string }>;
   waitingOnYou: string[];
-  /** `waitingOnYou` in `wf ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
+  /** `waitingOnYou` in `nemia ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
   onYou: string[];
   /**
    * What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while
@@ -216,7 +225,7 @@ type Judged = {
    */
   toDecide: RunToDecide | null;
   status: RunStatus;
-  /** What stopped a `failed` run in which no step broke, off the same `assess` as `status`: what `wf decide` says. Null otherwise. */
+  /** What stopped a `failed` run in which no step broke, off the same `assess` as `status`: what `nemia decide` says. Null otherwise. */
   stoppedOn: RunStoppedOn | null;
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
@@ -271,7 +280,7 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
  * a run whose branch had nothing on it past its base reads `on` too (`isShipped`'s `unchanged`), and its next try may commit. A try or a
  * round files a task, which the record carries, so the memo is dropped and git is asked afresh. What is left is a person committing to a
- * finished run's branch by hand, which nothing on the board is told of either: `wf decide` reads git every time, and so does a fresh
+ * finished run's branch by hand, which nothing on the board is told of either: `nemia decide` reads git every time, and so does a fresh
  * process.
  */
 const onTheBase = new Map<string, string>();
@@ -341,8 +350,8 @@ export type JudgeHow = {
 };
 
 /**
- * What `wf ls` says about each step, what `assess` says about the run, and whether the run still moves: the package's one reading of the
- * run (`runReading`), which `wf ls` answers from too, over the views the request already has.
+ * What `nemia ls` says about each step, what `assess` says about the run, and whether the run still moves: the package's one reading of the
+ * run (`runReading`), which `nemia ls` answers from too, over the views the request already has.
  *
  * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`, `unsigned`, `succeeded · BLOCKED`,
  * `rounds exhausted`, the engine's bare word while a step runs (`needs-human`, which the board's chip and `needsOf` compare exactly), and
@@ -380,6 +389,7 @@ export async function judge(
   return {
     words: new Map(read.steps.map((s) => [s.name, s.status])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
+    roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
     beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
     waitingOnYou,
     onYou: onYouWords({ steps: read.steps, waitingOnYou }),
@@ -401,7 +411,7 @@ export async function judge(
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
  * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
- * on you, what `wf ls` asks of you, in its words (`onYouWords`). A wait is said only for a step the harness blocked, nothing else having
+ * on you, what `nemia ls` asks of you, in its words (`onYouWords`). A wait is said only for a step the harness blocked, nothing else having
  * one for a person to answer: the words the reading put beside its status (`waits`), and the name its harness lists that session under
  * (`nameFor`). What its try was denied is the reading's words too (`denied`), with each call off the views (`deniedOf`).
  */

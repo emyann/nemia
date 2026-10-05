@@ -1,8 +1,8 @@
 /**
  * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the list marks the step whose check or
- * try it is `unreadable`, not the word its session's view would give; and the decision `wf decide` shows (`GET /api/runs/:runId/decision`)
- * is refused as the run's page is, a 502 in the list's words — for a run waiting on such a run too — while a run whose tasks read is
- * answered.
+ * try it is `unreadable`, not the word its session's view would give; and the decision `nemia decide` shows (`GET
+ * /api/runs/:runId/decision`) is refused as the run's page is, a 502 in the list's words — for a run waiting on such a run too — while a
+ * run whose tasks read is answered.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -142,7 +142,7 @@ test("the list marks unreadable the step whose check's journal, or an earlier tr
   }
 });
 
-test("the decision `wf decide` shows is refused as the run's page is, in the list's words, and answered for a run whose tasks read", async () => {
+test("the decision `nemia decide` shows is refused as the run's page is, in the list's words, and answered for a run whose tasks read", async () => {
   const runs = await listed();
   const child = runs.get('r-child')!.unreadable;
   assert.ok(

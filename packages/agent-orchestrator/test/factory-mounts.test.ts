@@ -1,7 +1,7 @@
 /**
  * A factory's folders, mounted: a run started in a factory reaches every repository of it but its own, read-only (`factoryMounts`),
- * frozen on its record at `wf start`, filed with each local step — its first filing, a try and a round — and named on its brief. A folder
- * that is no directory at start is left out, and said; a step on a remote agent is filed none; a run in the default factory mounts
+ * frozen on its record at `nemia start`, filed with each local step — its first filing, a try and a round — and named on its brief. A
+ * folder that is no directory at start is left out, and said; a step on a remote agent is filed none; a run in the default factory mounts
  * nothing, and its record has no `mounts`.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
@@ -21,7 +21,7 @@ const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactory, advance, attachWorkflow, hireAgent, retry, start } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 /** A git repository with one commit on `main`, in a folder named from `prefix`. */
@@ -105,7 +105,7 @@ const board = () => {
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
-/** What `wf <argv>` prints, a line each. */
+/** What `nemia <argv>` prints, a line each. */
 async function typed(argv: string[]): Promise<string[]> {
   const lines: string[] = [];
   const log = console.log;
@@ -149,7 +149,7 @@ test('a folder team in a factory mounts every repository of it, having none of i
   assert.deepEqual(readRun(run.id).mounts, readOnly(...repos));
 });
 
-test('a factory folder that is no directory at start is left out of the mounts, and wf start says so', async () => {
+test('a factory folder that is no directory at start is left out of the mounts, and nemia start says so', async () => {
   const { repos, loop } = fresh();
   fs.rmSync(repos[2], { recursive: true });
   const out = await typed(['start', 'build it', '--workflows', loop, '--factory', 'trio', '--repo', repos[0], '--no-worktree']);
@@ -178,6 +178,11 @@ test('a run in the default factory, or in a factory of one repository, mounts no
     const filing = b.filed.get(`${run.id}-implement`)!;
     assert.equal(Object.hasOwn(filing.config!, 'mounts'), false, `${String(factory)}: the config as it was before mounts`);
     assert.doesNotMatch(filing.brief, /mounted read-only/, String(factory));
+    b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+    await advance(b.e, readRun(run.id));
+    const review = b.filed.get(`${run.id}-review`)!;
+    assert.deepEqual(review.config?.mounts, readOnly(artifactsDir(run, 'implement')), `${String(factory)}: implement's folder alone`);
+    assert.doesNotMatch(review.brief, /mounted read-only/, `${String(factory)}: no factory folder said`);
   }
 });
 
@@ -188,7 +193,8 @@ test('REFUSED: a record whose mounts are not mounts is unreadable, naming the fi
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), mounts: [{ path: 1 }] }));
   assert.throws(
     () => readRun(run.id),
-    (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message.includes('its `mounts.0.path` is 1, where wf writes string'),
+    (err: Error & { _tag?: string }) =>
+      err._tag === 'Invalid' && err.message.includes('its `mounts.0.path` is 1, where nemia writes string'),
   );
 });
 
@@ -216,7 +222,14 @@ test("the frozen mounts are filed with a local step's first filing, a try and a 
   assert.deepEqual(b.filed.get(tried)?.config?.mounts, frozen, 'a try');
   b.settle(tried, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
-  assert.deepEqual(b.filed.get(`${run.id}-review`)?.config?.mounts, frozen, 'the step after it');
+  const handed = { path: artifactsDir(run, 'implement'), readOnly: true };
+  assert.deepEqual(b.filed.get(`${run.id}-review`)?.config?.mounts, [...frozen, handed], "the step after it, and implement's folder");
+  assert.ok(fs.statSync(handed.path).isDirectory(), "implement's folder is there when the step after it is filed");
+  assert.doesNotMatch(
+    b.filed.get(`${run.id}-review`)!.brief,
+    /Folders of this factory[^\n]*artifacts/,
+    'no handed folder said as a factory folder',
+  );
   b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
   await advance(b.e, readRun(run.id));
   const round = readRun(run.id).steps.implement.taskId!;
@@ -262,7 +275,7 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
         `\`mounts\` gives the session ${repos[1]} read-only, and Codex's \`danger-full-access\` sandbox writes everywhere.`,
       ) &&
       err.message.includes("That folder is the factory trio's") &&
-      err.message.includes('wf factory hire trio <agent> --step coded/code'),
+      err.message.includes('nemia factory hire trio <agent> --step coded/code'),
   );
   assert.deepEqual(runs(), before, 'nothing written');
   addFactory({ name: 'solo', repos: [repos[0]] });
@@ -293,9 +306,9 @@ test('REFUSED: a factory folder whose path a permission rule cannot name refuses
   assert.ok(
     message.endsWith(
       "\nThat folder is the factory spaced's: a run in it mounts every repository of the factory but its own, read-only, for each local " +
-        'step, and none is left off by hand. Hire into loop/implement an agent whose harness holds the mount (wf factory hire spaced ' +
-        '<agent> --step loop/implement); move or rename the folder, then file the factory again on its new path (wf factory rm spaced, ' +
-        'then wf factory add spaced --repo <path> for each, and attach and hire again); or start it in a factory whose repositories ' +
+        'step, and none is left off by hand. Hire into loop/implement an agent whose harness holds the mount (nemia factory hire spaced ' +
+        '<agent> --step loop/implement); move or rename the folder, then file the factory again on its new path (nemia factory rm spaced, ' +
+        'then nemia factory add spaced --repo <path> for each, and attach and hire again); or start it in a factory whose repositories ' +
         "that step's harness can hold. Nothing was written.",
     ),
     message,
@@ -324,7 +337,7 @@ function refusal(opts: Parameters<typeof start>[0]): string {
   return failed.message;
 }
 
-test("a step's `writable:` folder is filed writable for that step alone, on its first filing, a try and a round, and said on its brief and by wf start", async () => {
+test("a step's `writable:` folder is filed writable for that step alone, on its first filing, a try and a round, and said on its brief and by nemia start", async () => {
   const { repos, loop } = fresh();
   writing(loop, path.basename(repos[1]));
   const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' });
@@ -353,7 +366,11 @@ test("a step's `writable:` folder is filed writable for that step alone, on its 
   b.settle(tried, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
   const review = b.filed.get(`${run.id}-review`)!;
-  assert.deepEqual(review.config?.mounts, readOnly(repos[1], repos[2]), 'every other step reads it');
+  assert.deepEqual(
+    review.config?.mounts,
+    [...readOnly(repos[1], repos[2]), ...readOnly(artifactsDir(run, 'implement'))],
+    "every other step reads it, and the step after it implement's folder",
+  );
   assert.doesNotMatch(review.brief, /you may write/);
   b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
   await advance(b.e, readRun(run.id));
@@ -417,7 +434,7 @@ test('REFUSED: a `writable:` in a run started in no factory', () => {
   writing(loop, path.basename(repos[1]));
   assert.equal(
     refusal({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }),
-    `loop/implement: \`writable: ${path.basename(repos[1])}\` names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — wf start --factory <name> — or delete the line. Nothing was started.`,
+    `loop/implement: \`writable: ${path.basename(repos[1])}\` names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — nemia start --factory <name> — or delete the line. Nothing was started.`,
   );
 });
 
@@ -452,6 +469,6 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
   assert.equal(
     refusal({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'trio' }),
     `code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): \`mounts\` gives the session ${repos[1]} writable, and the \`codex\` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on \`claude\` or \`claude-detached\`, or leave the mount off.\n` +
-      `That folder is the factory trio's, and coded/code names it in \`writable:\`, so the run would mount it writable for that step. Hire into coded/code an agent whose harness holds a writable mount (wf factory hire trio <agent> --step coded/code), or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`,
+      `That folder is the factory trio's, and coded/code names it in \`writable:\`, so the run would mount it writable for that step. Hire into coded/code an agent whose harness holds a writable mount (nemia factory hire trio <agent> --step coded/code), or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`,
   );
 });

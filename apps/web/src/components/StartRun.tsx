@@ -6,22 +6,23 @@ import { standingOf, titleOf } from '../lib/factory';
 import { afterFor, ignoredRepoNote } from '../lib/inbox';
 
 /**
- * A brief, the runs the new run waits on, and the button that starts a run of the workflow with them: then the new run, linked to
- * its page, or the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait on), or its own
- * about the brief.
+ * A brief, the runs the new run waits on, and the button that starts a run of the workflow with them: then the new run, linked to its page,
+ * or the api's refusal in full — the loader's, the CLI `start`'s (`afterRefusal`'s, for a run it will not wait on), or its own about the
+ * brief.
  *
- * Given a `card`, it starts that inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the card's
- * body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted` is told
- * of a start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives
- * none, and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to wait on are
- * listed from. A card's start sits under the workflow it picks, with no rule of its own above it. `place` starts it in a factory, on one
- * of its repositories, which `repo` then is too.
+ * Given a `card`, it starts that inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the
+ * card's body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted`
+ * is told of a start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows
+ * page gives none, and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to
+ * wait on are listed from. A card's start sits under the workflow it picks, with no rule of its own above it. `place` starts it in a
+ * factory, on one of its repositories, which `repo` then is too.
  *
- * A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one, since there is no branch to
- * wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks (`afterFor`), none
- * for such a team. A card that names a repository for such a team is started all the same, its repository unread; the package says so
- * afterwards, and this form says it before, while the choice is still a person's (`ignoredRepoNote`). A start reads the list of runs again
- * alone (`exact`): a prefix would reach every run's decision, which is keyed by the run's state and read again under a key of its own.
+ * A team whose every step works in a folder runs on no repository, and the CLI's `start` refuses `--after` for one, since there is no
+ * branch to wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks
+ * (`afterFor`), none for such a team. A card that names a repository for such a team is started all the same, its repository unread; the
+ * package says so afterwards, and this form says it before, while the choice is still a person's (`ignoredRepoNote`). A start reads the
+ * list of runs again alone (`exact`): a prefix would reach every run's decision, which is keyed by the run's state and read again under a
+ * key of its own.
  *
  * A card's inbox is read again after any answer to its start. Taken, the card leaves it; refused, it may have left behind the page's back —
  * a 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it
@@ -118,8 +119,7 @@ export function StartRun({
           <Link to="/runs/$runId" params={{ runId: start.data.id }} className="font-mono text-sm underline underline-offset-2">
             {start.data.id}
           </Link>
-          . Nothing is filed until <code className="font-mono text-xs">wf tick</code> or <code className="font-mono text-xs">wf up</code>{' '}
-          runs
+          . Nothing is filed until the daemon&apos;s next pass
           {start.variables.after.length > 0 && (
             <>
               , and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped
@@ -163,11 +163,11 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
 }
 
 /**
- * The runs a new run waits on (`wf start --after`): every run on the repository a start runs in, in flight and finished, newest first,
- * each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which runs it
- * may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is that repository when it is not
- * the api's own: an inbox card's `repo:`. The runs are read as the page opens, not on the list's beat: a run started since is listed on the
- * next visit. A title wraps within its row, read whole, and no row runs past the card it is in, however long the title.
+ * The runs a new run waits on (the CLI's `start --after`): every run on the repository a start runs in, in flight and finished, newest
+ * first, each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which
+ * runs it may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is that repository when
+ * it is not the api's own: an inbox card's `repo:`. The runs are read as the page opens, not on the list's beat: a run started since is
+ * listed on the next visit. A title wraps within its row, read whole, and no row runs past the card it is in, however long the title.
  */
 export function AfterPicker({
   selected,
@@ -190,9 +190,7 @@ export function AfterPicker({
       <legend id={legend} className="text-sm font-medium">
         After
       </legend>
-      <p className="text-xs text-neutral-500">
-        The runs it waits on: nothing of it is filed until each has shipped, as <code className="font-mono">wf start --after</code> has it.
-      </p>
+      <p className="text-xs text-neutral-500">The runs it waits on: nothing of it is filed until each has shipped.</p>
       {error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to wait on: {error.message}</p>
       ) : !onRepo ? (

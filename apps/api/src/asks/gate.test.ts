@@ -1,8 +1,8 @@
 /**
  * A gate on the board: a step's handoff that waits for a person, as the api carries it — `gates` and each step's `gate` on a run's detail,
  * the need `approve <step>` on the list and the detail — and POST /api/runs/:id/steps/:step/approve, which approves the step as
- * `wf approve` does, through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST …/retry
- * with words, as `wf retry --message` is.
+ * `nemia approve` does, through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST
+ * …/retry with words, as `nemia retry --message` is.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, the harness's fake `claude`
  * (test/harness.ts) first on PATH.
@@ -120,7 +120,7 @@ const nothingWritten = (why: string, run = R) => {
   );
 };
 
-/** What the package's `approve()` refuses, word for word: what `wf approve` prints. */
+/** What the package's `approve()` refuses, word for word: what `nemia approve` prints. */
 const approveRefuses = async (step: string, message?: string, run = R): Promise<string> => {
   try {
     await approve(engine(), run, step, message);
@@ -141,7 +141,7 @@ const summary = async (id = R) => {
   return found;
 };
 
-test("a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `wf ls`'s words", async () => {
+test("a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `nemia ls`'s words", async () => {
   const run = await detail();
   assert.deepEqual(run.gates, ['plan', 'sketch'], "the start's gate and the step's own, in the order they run");
   assert.deepEqual(
@@ -160,7 +160,7 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   assert.deepEqual(run.onYou, ['approve plan']);
 
   const words = await list(engine(), runStore.runs.read(R));
-  assert.deepEqual(run.onYou, onYouWords(words), "as `wf ls` has it: the words after `→ waiting on you:` are the package's");
+  assert.deepEqual(run.onYou, onYouWords(words), "as `nemia ls` has it: the words after `→ waiting on you:` are the package's");
   const listed = await summary();
   assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
   assert.deepEqual(listed.onYou, ['approve plan']);
@@ -185,12 +185,13 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
     [
       {
         label: 'approve',
-        command: `wf approve ${R} plan`,
-        said: `plan waits at its gate — with words: wf approve ${R} plan --message "<words>"`,
+        command: `nemia approve ${R} plan`,
+        said: `plan waits at its gate — with words: nemia approve ${R} plan --message "<words>"`,
+        step: 'plan',
       },
-      { label: 'send back', command: `wf retry ${R} plan --message "<objection>"`, said: null },
+      { label: 'send back', command: `nemia retry ${R} plan --message "<objection>"`, said: null, step: 'plan' },
     ],
-    "the decision offers the gate's two commands, as `wf decide` prints them under the step, and nothing else on a run with no branch to ship",
+    "the decision offers the gate's two commands, as `nemia decide` prints them under the step, and nothing else on a run with no branch to ship",
   );
 
   const cancelled = await summary(CANCELLED);
@@ -213,7 +214,7 @@ test('REFUSED at shipped defaults: an approval another site could make — a pag
       ),
       error,
     );
-    assert.ok(error.endsWith(`Approve it from the run's page on the board, or with \`wf approve ${R} plan\`.`), error);
+    assert.ok(error.endsWith(`Approve it from the run's page on the board, or with \`nemia approve ${R} plan\`.`), error);
   }
   for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
     const res = await approveOver('plan', body, { ...BOARD, host });
@@ -257,7 +258,7 @@ test("REFUSED: a body that is not an approval (400), a run or a step that does n
     const res = await approveOver('plan', { message });
     assert.equal(res.status, 422, JSON.stringify(message));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, approvalWordsRefusal(message, `wf approve ${R} plan`), "the package's own sentence");
+    assert.equal(error, approvalWordsRefusal(message, `nemia approve ${R} plan`), "the package's own sentence");
     assert.equal(error, await approveRefuses('plan', message), 'the one `approve()` refuses with');
     assert.match(error, /^--message is empty, and an approval's words are handed to every step after the gate/);
   }
@@ -288,7 +289,7 @@ test("REFUSED at shipped defaults: a step not gated, a gated step not signed off
   nothingWritten('a step of a run called off', CANCELLED);
 });
 
-test("an approval as the board sends it is the package's: 202 with the try, when, the words and its file — the file as `wf approve` writes it, the record untouched — and the detail reads the approval under the step, which waits on nobody; a second approval refused", async () => {
+test("an approval as the board sends it is the package's: 202 with the try, when, the words and its file — the file as `nemia approve` writes it, the record untouched — and the detail reads the approval under the step, which waits on nobody; a second approval refused", async () => {
   const res = await approveOver('plan', { message: 'Ship the second reading.' });
   assert.equal(res.status, 202, await res.clone().text());
   const took = (await res.json()) as Approved;
@@ -317,9 +318,9 @@ test("an approval as the board sends it is the package's: 202 with the try, when
   assert.equal(
     plan.status,
     words.steps.find((s) => s.name === 'plan')?.status,
-    'as `wf ls` has it until the tick files what waits: the plan on its own word',
+    'as `nemia ls` has it until the tick files what waits: the plan on its own word',
   );
-  assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `wf ls` has it');
+  assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
 
   const again = await approveOver('plan', { message: 'Ship the first reading.' });
   assert.equal(again.status, 409);
@@ -377,7 +378,7 @@ test("REFUSED at shipped defaults: sending a step back from its gate without wor
   assert.deepEqual(
     await (await app.request(`/api/runs/${id}/decision`)).json(),
     { running: true },
-    'the send-back is due, so the run moves and waits on nobody: nothing to decide, as `wf decide` says, and so no gate offered',
+    'the send-back is due, so the run moves and waits on nobody: nothing to decide, as `nemia decide` says, and so no gate offered',
   );
 
   const res = await approveOver('plan', { message: 'Ship it.' }, BOARD, id);

@@ -16,8 +16,8 @@ export type Sayable = { open: true } | { open: false; why: string };
  * harness — a session waiting on a person is running, and the engine hands it the words. Closed, with the reason, for a run called off, a
  * step not filed, a task the engine has no record of, one filed and not started, and a session that has ended — signed off, checked, failed
  * or stopped — which is the run page's to answer or try again. A held run stays open: a hold stops what is filed next and the answers to a
- * gate, never a session at work, and `wf say` is not refused on it. What the page cannot see coming, the api refuses in the package's words
- * or the engine's, and the box shows that refusal as it is.
+ * gate, never a session at work, and the CLI's `say` is not refused on it. What the page cannot see coming, the api refuses in the
+ * package's words or the engine's, and the box shows that refusal as it is.
  */
 export function sayable(
   run: Pick<RunDetail, 'cancelledAt'>,

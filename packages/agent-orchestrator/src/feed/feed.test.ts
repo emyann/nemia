@@ -1,6 +1,6 @@
 /**
- * The feed on disk (`wf feed`, `wf watch`): what the tick judged of each run and each step, a line each time it changed, in a store of its
- * own.
+ * The feed on disk (`nemia feed`, `nemia watch`): what the tick judged of each run and each step, a line each time it changed, in a store
+ * of its own.
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: the runs of the other store tests would
  * be in it. The fold and the diff are pure, and are tested here beside the file, since what matters of them is what the file ends up
@@ -188,7 +188,7 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
   assert.deepEqual(
     onYou.map((l) => l.word),
     ['awaiting approval'],
-    'at its gate, in the word wf decide says it in: nothing failed',
+    'at its gate, in the word nemia decide says it in: nothing failed',
   );
 
   await approve(b.e, run.id, 'plan');
@@ -226,7 +226,7 @@ const ending = (() => {
   return dir;
 })();
 
-test("a run waiting at its ending's gate reads `awaiting approval` in the feed, as wf decide says it — never `failed`, since nothing failed", async (t) => {
+test("a run waiting at its ending's gate reads `awaiting approval` in the feed, as nemia decide says it — never `failed`, since nothing failed", async (t) => {
   emptyStore();
   const b = board();
   const repo = aRepo();
@@ -250,7 +250,7 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   assert.deepEqual({ word: last.word, note: last.note }, { word: 'awaiting approval', note: 'waiting on you: approve ship' });
   assert.equal(words(run.id).includes('failed'), false, `no line of the run says failed: ${words(run.id).join(' → ')}`);
   const decided = (await printedBy(t, b.e, 'decide', run.id)).join('\n');
-  assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'wf decide says the same run awaits approval');
+  assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'nemia decide says the same run awaits approval');
   assert.doesNotMatch(decided, /FAILED/, 'and that nothing failed');
 
   const broke = start({ brief: 'the break', repo: aRepo(), workflowDir: ending });
@@ -299,7 +299,7 @@ test('a step that signed off blocked says what it needs on its line in the feed,
     .at(-1)!.note!;
   assert.ok(
     clipped.startsWith('needs: why why') && clipped.endsWith('…') && clipped.length <= 'needs: '.length + 200,
-    `long, it is clipped, and wf decide has it whole: ${clipped}`,
+    `long, it is clipped, and nemia decide has it whole: ${clipped}`,
   );
   assert.equal(
     lines().some((l) => l.run === other.id && l.note?.includes('needs:')),
@@ -394,7 +394,7 @@ test('a person calling the run off writes one line, and a run gone from the stor
   assert.deepEqual(
     said.map((l) => [l.run, l.step, l.word]),
     [[goes.id, undefined, 'removed']],
-    "`wf rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once, with no line for its steps",
+    "`nemia rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once, with no line for its steps",
   );
   assert.deepEqual(
     recordFeed(judged(await tick(b.e)), { memo: freshFeedMemo() }),
@@ -403,7 +403,7 @@ test('a person calling the run off writes one line, and a run gone from the stor
   );
 });
 
-test("a pruned run's word says so, once: `wf prune`'s marker is a person's fact, and the run's line gains it", async () => {
+test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
   emptyStore();
   const b = board();
   const run = started('the pruned');
@@ -417,7 +417,7 @@ test("a pruned run's word says so, once: `wf prune`'s marker is a person's fact,
   );
 });
 
-test('REFUSED: a cursor inside a line is refused by name, by the read, by `wf feed` and by `wf watch` — and one past the end, and one that is not a number', async (t) => {
+test('REFUSED: a cursor inside a line is refused by name, by the read, by `nemia feed` and by `nemia watch` — and one past the end, and one that is not a number', async (t) => {
   emptyStore();
   const b = board();
   started('the cursor');
@@ -439,10 +439,10 @@ test('REFUSED: a cursor inside a line is refused by name, by the read, by `wf fe
 
   assert.throws(
     () => readFeed(cursor + 10),
-    refusedWith(new RegExp(`^cursor ${cursor + 10} is past the end of the feed \\(${cursor} bytes, .*wf feed 0$`)),
+    refusedWith(new RegExp(`^cursor ${cursor + 10} is past the end of the feed \\(${cursor} bytes, .*nemia feed 0$`)),
   );
-  await assert.rejects(main(['feed', 'twelve'], b.e), refusedWith(/^wf feed takes one cursor at most, a whole number of bytes/));
-  await assert.rejects(main(['feed', '0', '1'], b.e), refusedWith(/^wf feed takes one cursor at most/));
+  await assert.rejects(main(['feed', 'twelve'], b.e), refusedWith(/^nemia feed takes one cursor at most, a whole number of bytes/));
+  await assert.rejects(main(['feed', '0', '1'], b.e), refusedWith(/^nemia feed takes one cursor at most/));
   assert.throws(() => readFeed(-1), refusedWith(/^a feed cursor is a whole number of bytes/));
 
   let at = 0;
@@ -525,7 +525,7 @@ test('a line a writer died in the middle of is ended by the next pass, and costs
   assert.equal(new Set(plan).size, plan.length, `nothing after it is said twice: ${plan.join(' → ')}`);
 });
 
-test('`wf feed` prints each line and the cursor to read on from; `wf watch` follows the lines as they are written, until stopped', async (t) => {
+test('`nemia feed` prints each line and the cursor to read on from; `nemia watch` follows the lines as they are written, until stopped', async (t) => {
   emptyStore();
   const b = board();
   const run = started('the watch');
@@ -631,7 +631,7 @@ test('a watch hands each line on with its own cursor: the byte after it, in byte
   );
 });
 
-test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, it says so once and delivers the next transition', async () => {
+test('`nemia watch` survives a feed cut under it: truncated, deleted or replaced, it says so once and delivers the next transition', async () => {
   emptyStore();
   const b = board();
   const run = started('the cut');
@@ -649,13 +649,13 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   try {
     await w.until(
       () => w.out().includes('watching from'),
-      'a real `wf watch`, in a process killed at the end since it never returns, its engine never asked anything, starts',
+      'a real `nemia watch`, in a process killed at the end since it never returns, its engine never asked anything, starts',
     );
 
     fs.truncateSync(FEED, 0);
     await w.until(() => cuts().length >= 1, 'truncated to nothing: the truncation is said');
     assert.equal(cuts().length, 1, 'the truncation is said once');
-    assert.match(cuts()[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+    assert.match(cuts()[0], /^nemia watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
     await tick(b.e);
     await tick(b.e);
@@ -697,7 +697,7 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   }
 });
 
-test('`wf watch` says it is watching only once it holds its cursor: a feed cut the moment the banner is read is said, not refused', async (t) => {
+test('`nemia watch` says it is watching only once it holds its cursor: a feed cut the moment the banner is read is said, not refused', async (t) => {
   emptyStore();
   const line = JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' });
   fs.writeFileSync(FEED, `${line}\n${line}\n`);
@@ -723,13 +723,13 @@ test('`wf watch` says it is watching only once it holds its cursor: a feed cut t
       assert.ok(performance.now() < bound, 'the truncation was not said in 10s');
       await new Promise((r) => setTimeout(r, 20));
     }
-    assert.match(err[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+    assert.match(err[0], /^nemia watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
   } finally {
     watch.stop();
   }
 });
 
-test('`wf watch` interrupted in the process, as a signal interrupts it, leaves no watcher and no timer behind, and prints nothing more', async (t) => {
+test('`nemia watch` interrupted in the process, as a signal interrupts it, leaves no watcher and no timer behind, and prints nothing more', async (t) => {
   emptyStore();
   const line = (run: string) => `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word: 'running' })}\n`;
   fs.writeFileSync(FEED, line('r-before'));
@@ -876,11 +876,11 @@ test('a watch says each read that works, before the lines it found and whether o
   }
 });
 
-test('`wf --help` names wf feed and wf watch, and says which feed is whose', async (t) => {
+test('`wf --help` names nemia feed and nemia watch, and says which feed is whose', async (t) => {
   const printed = (await printedBy(t, board().e, '--help')).join('\n');
-  assert.match(printed, /^ {2}wf feed \[cursor\]$/m);
-  assert.match(printed, /^ {2}wf watch \[cursor\]$/m);
-  assert.match(printed, /wf watch follows what the workflow decides/);
+  assert.match(printed, /^ {2}nemia feed \[cursor\]$/m);
+  assert.match(printed, /^ {2}nemia watch \[cursor\]$/m);
+  assert.match(printed, /nemia watch follows what the workflow decides/);
   assert.match(printed, /ae watch/);
 });
 

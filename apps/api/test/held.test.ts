@@ -1,12 +1,12 @@
 /**
  * A step whose task is held open, as the board reads it: signed, and waiting for a person's word with nothing running — the engine's
  * `input-required`. Blocked, it reads `input-required · BLOCKED` with its question, waiting on you; gated, it reads `awaiting approval`.
- * Each held to what `wf ls` says of the same run, and neither read as a session still going.
+ * Each held to what `nemia ls` says of the same run, and neither read as a session still going.
  *
  * The runs it seeds: `h-blocked`, signed off blocked; `h-gate`, gated at plan; `h-closed`, approved — closed on the pass that filed
- * implement, and not yet settled: the engine settles it on its next pass; `h-answered`, blocked, then answered (`wf retry --message`) — the
- * answer is the task's next turn, under the same id, and its attempt has not ended; and `h-rechecked`, whose task is filed without
- * `holdOpen` — its check rechecked (`wf retry --recheck`, the same task and turn), then nudged, a task of its own.
+ * implement, and not yet settled: the engine settles it on its next pass; `h-answered`, blocked, then answered (`nemia retry --message`) —
+ * the answer is the task's next turn, under the same id, and its attempt has not ended; and `h-rechecked`, whose task is filed without
+ * `holdOpen` — its check rechecked (`nemia retry --recheck`, the same task and turn), then nudged, a task of its own.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, and the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -122,7 +122,7 @@ const summary = async (id: string) => {
   return run;
 };
 
-test('a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `wf ls` says', async () => {
+test('a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `nemia ls` says', async () => {
   assert.equal((await engine().view('h-blocked-plan')).phase, 'input-required', "the seed is the engine's held task, waiting");
   const listed = await list(engine(), runStore.runs.read('h-blocked'));
   for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
@@ -151,7 +151,7 @@ test("a held step at its gate reads `awaiting approval`, never the engine's word
   }
 });
 
-test("a held step closed and not yet settled reads as it signed, never the engine's `between attempts` for a session still going — as `wf ls` says", async () => {
+test("a held step closed and not yet settled reads as it signed, never the engine's `between attempts` for a session still going — as `nemia ls` says", async () => {
   assert.equal((await engine().view('h-closed-plan')).phase, 'between attempts', 'the seed: closed, and the engine has not settled it');
   await approve(engine(), 'h-closed', 'plan');
   const listed = await list(engine(), runStore.runs.read('h-closed'));

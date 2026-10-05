@@ -5,7 +5,7 @@
  * A git run's steps work in worktrees of its repository, and every word about them is in worktree.store.ts, branches.store.ts,
  * forget.verb.ts and prune.verb.ts. A folder run is the other kind, whole: what
  * `advance` makes for a step, what it does when the step is finished, and where it all lives, which is under the run's own directory in the
- * store, so `wf rm` forgets it with the record and runs no git.
+ * store, so `nemia rm` forgets it with the record and runs no git.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,8 +28,9 @@ export type Place = {
 export const workRoot = (runs: string, id: string): string => path.join(runs, id, 'work');
 
 /**
- * Where `wf start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which record.store.ts's `inputsDir` reads.
- * Here because a folder step's folder is given a copy of it (`folderPlace.make`), and a path two files spell for themselves drifts apart.
+ * Where `nemia start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which record.store.ts's `inputsDir`
+ * reads. Here because a folder step's folder is given a copy of it (`folderPlace.make`), and a path two files spell for themselves drifts
+ * apart.
  */
 export const inputsRoot = (runs: string, id: string): string => path.join(runs, id, 'inputs');
 
@@ -95,7 +96,7 @@ export const folderPlace = (runs: string): Place => ({
     if (given.inputs || given.from.length > 0) ownGiven(workspace);
     if (given.inputs) {
       copyGiven(inputsRoot(runs, run.id), path.join(workspace, given.inputs));
-      notes.push(`${given.inputs}: the files wf start --input gave the run, copied in`);
+      notes.push(`${given.inputs}: the files nemia start --input gave the run, copied in`);
     }
     for (const g of given.from) {
       copyGiven(g.source, path.join(workspace, g.dir));

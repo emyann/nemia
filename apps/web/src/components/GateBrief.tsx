@@ -73,7 +73,7 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       </dl>
       <StepPolicy layers={step.layers} />
       <div className="border-t border-amber-200 pt-3 dark:border-amber-900">
-        <Gate runId={run.id} step={step.name} back={gate.back} acts={gate.ends} framed={false} />
+        <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={gate.back} acts={gate.ends} framed={false} />
       </div>
     </section>
   );

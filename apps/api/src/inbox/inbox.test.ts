@@ -38,7 +38,7 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-/** A record of a run started from `card`, as `wf start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
+/** A record of a run started from `card`, as `nemia start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
 const startedFrom = (id: string, card: string): string =>
   JSON.stringify({
     id,
@@ -87,7 +87,7 @@ test('GET /api/inbox on a store with no inbox yet is an empty list', async () =>
   assert.deepEqual(await listed(), []);
 });
 
-test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a repository's workflow by name; yours as its folder; the repository it is about — and GET /api/inbox lists each with its body and when it was filed", async () => {
+test("POST /api/inbox files a card as `nemia inbox add` does: the idea alone; a repository's workflow by name; yours as its folder; the repository it is about — and GET /api/inbox lists each with its body and when it was filed", async () => {
   clear();
   const bare = await file({ body: 'Cache the views between passes\n\nThe tick reads each task twice.' });
   assert.equal(bare.status, 201, await bare.clone().text());
@@ -110,7 +110,7 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
   assert.equal(
     fs.readFileSync(named.file, 'utf8'),
     `---\nworkflow: dev\nrepo: ${repo}\n---\nShow what a step cost\n`,
-    "the repository's, on a card about the api's repository: by name, as `wf inbox add --workflow dev` writes it",
+    "the repository's, on a card about the api's repository: by name, as `nemia inbox add --workflow dev` writes it",
   );
   const yours = (await (await file({ body: 'Plan the inbox', workflow: 'mine' })).json()) as InboxFiled;
   assert.deepEqual(
@@ -164,7 +164,7 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
   assert.ok(Date.parse(namedEntry.filedAt!) > old.getTime());
 });
 
-test("POST /api/inbox writes an absolute repo as `wf inbox add --repo` does — no trailing slash, no `.` or `..` — so a card's run records the repository as every other run on it does", async () => {
+test("POST /api/inbox writes an absolute repo as `nemia inbox add --repo` does — no trailing slash, no `.` or `..` — so a card's run records the repository as every other run on it does", async () => {
   clear();
   for (const given of [
     `${repo}/`,
@@ -326,7 +326,7 @@ test("REFUSED at shipped defaults: a card's page for a name that is not there, i
   assert.equal(
     error,
     ((await dropped.json()) as Refused).error,
-    "the sentence `wf inbox rm` gives for the same name, word for word: the package's own list of cards",
+    "the sentence `nemia inbox rm` gives for the same name, word for word: the package's own list of cards",
   );
   assert.equal(error, noCardLine('no-such-card', ['broken', card.name]));
   assert.ok(!error.includes('notes.txt') && !error.includes('sub/'), error);
@@ -359,7 +359,7 @@ test("REFUSED at shipped defaults: a filing of the wrong shape is a 400 in the a
     const res = await file({ body: idea });
     assert.equal(res.status, 400, JSON.stringify(idea));
     assert.ok(
-      ((await res.json()) as Refused).error.startsWith('`body` is the idea, as `wf inbox add "<idea>"` takes it: text.'),
+      ((await res.json()) as Refused).error.startsWith('`body` is the idea, as `nemia inbox add "<idea>"` takes it: text.'),
       JSON.stringify(idea),
     );
   }
@@ -429,7 +429,7 @@ test("REFUSED at shipped defaults: what the package refuses to file is a 422 car
   assert.deepEqual(cards(), []);
 });
 
-test('DELETE /api/inbox/:name drops a card as `wf inbox rm` does, and leaves the others', async () => {
+test('DELETE /api/inbox/:name drops a card as `nemia inbox rm` does, and leaves the others', async () => {
   clear();
   const kept = addToInbox({ text: 'Keep this one' });
   const gone = addToInbox({ text: 'Drop this one' });
@@ -604,7 +604,7 @@ test(
   },
 );
 
-test("GET /api/runs/:id says a run came from a card — the record's `from`, and `wf decide`'s sentence for it — and a run started without one carries neither", async () => {
+test("GET /api/runs/:id says a run came from a card — the record's `from`, and `nemia decide`'s sentence for it — and a run started without one carries neither", async () => {
   clear();
   const { card } = addToInbox({ text: 'Say where a run came from' });
   const started = await startCard({ workflow: 'dev', card: card.name });
@@ -625,7 +625,7 @@ test("GET /api/runs/:id says a run came from a card — the record's `from`, and
   assert.deepEqual(
     ['from' in plain, 'fromNote' in plain],
     [false, false],
-    "typed at the board's start, as at `wf start`: no card, so no `from`, absent and not null, and no sentence",
+    "typed at the board's start, as at `nemia start`: no card, so no `from`, absent and not null, and no sentence",
   );
 });
 
@@ -688,7 +688,7 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
   assert.equal(waits.status, 422);
   assert.equal(
     ((await waits.json()) as Refused).error,
-    '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — wf ls lists them.',
+    '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — nemia ls lists them.',
   );
 
   assert.deepEqual(runFiles(), before);
@@ -732,7 +732,7 @@ test("REFUSED at shipped defaults: a `card` that is not a card's name is a 400 i
     const res = await startCard({ workflow: 'nope', card: name, brief: 'Do it.' });
     assert.equal(res.status, 400, JSON.stringify(name));
     assert.ok(
-      ((await res.json()) as Refused).error.startsWith('`card` names the inbox card to start, as `wf inbox` lists it'),
+      ((await res.json()) as Refused).error.startsWith('`card` names the inbox card to start, as `nemia inbox` lists it'),
       JSON.stringify(name),
     );
   }
@@ -756,7 +756,7 @@ test('REFUSED at shipped defaults: a card start another site could make is refus
   const body = { workflow: 'dev', card: card.name, brief: 'Do it.' };
   const site = await startCard(body, { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
   assert.equal(site.status, 403);
-  assert.ok(((await site.json()) as Refused).error.includes("Start it from the board's Workflows or Inbox page, or with `wf start`."));
+  assert.ok(((await site.json()) as Refused).error.includes("Start it from the board's Workflows or Inbox page, or with `nemia start`."));
   const type = await startCard(body, { 'content-type': 'text/plain;charset=UTF-8' });
   assert.equal(type.status, 415);
   assert.ok(((await type.json()) as Refused).error.includes('`"card": "<name>"`'), 'the shape it takes names `card`');

@@ -1,6 +1,6 @@
 /**
- * What `wf ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's (`waitingWords`,
- * `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
+ * What `nemia ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's
+ * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
 import { gated, hasStarted, holdAdvice, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
@@ -51,17 +51,27 @@ export type Listing = {
    * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
-   * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `wf ls` prints
-   * in the line (`shownStatus`, `shownNote`) and the board does not.
+   * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls`
+   * prints in the line (`shownStatus`, `shownNote`) and the board does not. `roundDue`, only on a looping step whose next round is due
+   * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`.
    */
-  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string; waits?: string; denied?: string }>;
+  steps: Array<{
+    name: string;
+    status: string;
+    branch: string | null;
+    note?: string;
+    cost?: string;
+    waits?: string;
+    denied?: string;
+    roundDue?: true;
+  }>;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has
    * called off, pruned or held.
    */
   waitingOnYou: string[];
   /**
-   * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `wf ls` says
+   * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `nemia ls` says
    * `held until <run> ships` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
    * on a hold whose file names no run, which `Run.hold` still says.
    */
@@ -89,8 +99,8 @@ export type Listing = {
 export type Unjudged = { said: string; steps: Array<{ name: string; status: string; branch?: string }> };
 
 /**
- * `wf ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
- * (`resultBranches`); whether a wf up ticks the store; and, while the store is paused, the pause and the landings it holds staged.
+ * `nemia ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
+ * (`resultBranches`); whether a nemia up ticks the store; and, while the store is paused, the pause and the landings it holds staged.
  */
 export type RunsListed = {
   runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>;
@@ -112,16 +122,16 @@ export interface ListingInput {
   readonly askedCloseout?: (taskId: string) => CloseoutAsked;
   /** What a refused check exited with, as its log tells it. */
   readonly verdictOf?: (step: string) => Verdict | undefined;
-  /** What people asked for with `wf retry`, and the run has not consumed yet. */
+  /** What people asked for with `nemia retry`, and the run has not consumed yet. */
   readonly asks?: readonly RetryAsk[];
-  /** What people asked for with `wf round`, and the run has not consumed yet. */
+  /** What people asked for with `nemia round`, and the run has not consumed yet. */
   readonly roundAsks?: readonly RoundAsk[];
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   readonly answers?: readonly RetryAsk[];
   /** The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be. */
   readonly waits?: readonly Wait[];
   /**
-   * How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its
+   * How many times a person said something to each step's current try while it ran (`nemia say`), off the engine's `said` on its
    * task.
    */
   readonly saidTo?: (step: string) => number;
@@ -143,12 +153,12 @@ export interface ListingInput {
    * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): the row's `waits` beside
    * the engine's `needs-human`. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and by everything
    * that reads a step's status — `harnessBlocked` in views.verb.ts, the api's `needsOf`, `stepState` on the board — so the status stays the
-   * engine's bare word, and only what `wf ls` prints gains the harness's (`shownStatus`).
+   * engine's bare word, and only what `nemia ls` prints gains the harness's (`shownStatus`).
    */
   readonly waitingOf?: (taskId: string) => string | undefined;
   /**
    * What each task's sessions were denied, as permission rules name them (`deniedOf` in views.verb.ts): the row's `denied`,
-   * `denied: Skill(look), Bash(pytest)` (`deniedWords`), for the step's current try, and neither in its status nor its note; `wf ls`
+   * `denied: Skill(look), Bash(pytest)` (`deniedWords`), for the step's current try, and neither in its status nor its note; `nemia ls`
    * prints it last in the note (`shownNote`), and the api carries the list as a field of its own (`StepNeeds.denied`).
    */
   readonly deniedOf?: (taskId: string) => readonly string[];
@@ -160,7 +170,7 @@ export interface ListingInput {
 }
 
 /**
- * What `wf ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
+ * What `nemia ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
  *
  * The words are `stepStatus`'s, so the list says what the run established and not only what the
  * engine settled: `verified ✓`, `checking`, `failed ✗ check (exit 1)`, `unsigned` — and `unverified`
@@ -170,14 +180,14 @@ export interface ListingInput {
  * Where the run has no verdict of its own, the step's closeout goes beside the word — `closeout unreadable`
  * for one nobody can read. A step that stopped itself `blocked` ended its session as cleanly as one that
  * finished the work, so the engine's phase reads `succeeded` for both; `BLOCKED` is shouted beside it, in
- * the word `wf decide` uses. A step still running shows the engine's own word for it, and a session whose
+ * the word `nemia decide` uses. A step still running shows the engine's own word for it, and a session whose
  * word is exactly `needs-human` what the harness says it waits for (`waitingWords`). Nothing is inferred
  * for a step with no closeout — a missing closeout is not a claim that the work was done, and a run with
  * none still lists. A cap reached says what was spent and the cap in force; a looping step held on another
  * step's budget shows that step's.
  *
  * One line per step, deliberately. The summary, `needs` and a check's output were written for
- * `wf decide`, where there is room to read them; here they would turn a list into a report.
+ * `nemia decide`, where there is room to read them; here they would turn a list into a report.
  *
  * Who a run waits on is asked again here, so a caller's stale list cannot say a run that started, or was
  * called off, waits on a run or a slot. A root not filed names them, and an ending step approved and not
@@ -191,7 +201,7 @@ export interface ListingInput {
  * where the branch stands (`resultOnBase`).
  *
  * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
- * says so (`heldByCheckout`) — or that a person accepted its loop (`wf accept`), never their words, which
+ * says so (`heldByCheckout`) — or that a person accepted its loop (`nemia accept`), never their words, which
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
@@ -276,10 +286,9 @@ export function listing({
           ? onBaseNote(run, step.name, standings)
           : gateNote(run, step.name, sendBackTo(step, run));
     const taskId = run.steps[step.name]?.taskId;
-    const landed = run.steps[step.name]?.landed;
-    const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
-    const note = [tried, gate, landing, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
-    return { ...row, ...(note ? { note } : {}), ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
+    const note = [tried, gate, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    const roundDue = round && !retry ? { roundDue: true as const } : {};
+    return { ...row, ...(note ? { note } : {}), ...roundDue, ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
   });
 
   function lineOf(step: Workflow): Listing['steps'][number] {
@@ -374,7 +383,7 @@ export function listing({
 
 /**
  * The longest harness word a screen will print. Whatever `waitingFor` holds is the harness's, shown to a person verbatim, and on
- * `wf ls` it goes inside a column sized to the widest status: a long word from a future Claude Code would stretch the list. Clipped,
+ * `nemia ls` it goes inside a column sized to the widest status: a long word from a future Claude Code would stretch the list. Clipped,
  * never dropped — but `claude agents` is the only place the rest of it is: every screen here words it through `waitingWords`, the
  * board's included (`StepNeeds.waitingFor.words`), so a word over this length is read whole nowhere else.
  */
@@ -386,15 +395,15 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
 /**
  * What the harness says a blocked session is waiting for, in a sentence a person reads: `waiting for a permission prompt`.
  *
- * **One writer for these words**, because `wf ls`, `wf decide` and the board all say the same fact and must not word it three ways.
+ * **One writer for these words**, because `nemia ls`, `nemia decide` and the board all say the same fact and must not word it three ways.
  * The word itself is the harness's — no enum, here or in the engine — so all this does is put an
  * article in front of it and clip it: `a`/`an` by the sound, none where the word brings its own determiner or is plural. That rule is
  * a guess about English, not about the harness, and it is wrong for an odd noun phrase a harness emits; printing the word bare reads
  * wrong for `permission prompt`.
  *
  * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
- * would run, say — and `wf ls` pads each status to the width of the widest (`cli/main.ts`): a status with a newline in it breaks its row in
- * two and mis-aligns every other row of that run, and `wf decide` splits the same way. So every run of whitespace becomes one space
+ * would run, say — and `nemia ls` pads each status to the width of the widest (`cli/main.ts`): a status with a newline in it breaks its row
+ * in two and mis-aligns every other row of that run, and `nemia decide` splits the same way. So every run of whitespace becomes one space
  * before the word is measured or clipped.
  */
 export function waitingWords(waitingFor: string): string {
@@ -406,10 +415,10 @@ export function waitingWords(waitingFor: string): string {
 /**
  * What a step's sessions were denied, in a line a person reads: `denied: Skill(look), Bash(pytest)` — or nothing, for none. Pure.
  *
- * **One writer for these words**, as `waitingWords` is for a wait: `wf ls`, `wf decide` and the board say the same fact. Each call is the
- * harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `wf ls` prints the
- * line in its note, `wf decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named, then how many
- * more.
+ * **One writer for these words**, as `waitingWords` is for a wait: `nemia ls`, `nemia decide` and the board say the same fact. Each call is
+ * the harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `nemia ls`
+ * prints the line in its note, `nemia decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named,
+ * then how many more.
  */
 export function deniedWords(denied: readonly string[]): string {
   if (!denied.length) return '';
@@ -421,77 +430,87 @@ export function deniedWords(denied: readonly string[]): string {
 /**
  * What a person does about such a wait: `answer it in Claude Code: claude agents, session ae/<task>/1`, naming the session `claude agents`
  * lists it under (`nameFor`), or without it where no attempt is on the record yet. Its own writer, because a screen with room for the
- * whole sentence says it in one line (`harnessWaitLine`, `wf decide`) and one whose card says the wait already puts this under it (the
+ * whole sentence says it in one line (`harnessWaitLine`, `nemia decide`) and one whose card says the wait already puts this under it (the
  * board's banner): the same words either way, and never assembled twice.
  *
  * The advice assumes the wait is something a person can answer in the harness, as a `permission prompt` is: a `waitingFor` naming
  * something nobody can answer there is given the same advice.
  *
  * A step on a remote A2A agent (`harness: a2a:<name>`, given as `remote`) is in no Claude Code: its Task waits on its caller, and the
- * answer is a follow-up message on it, which `wf say` sends; the question is the Task's last message, which `wf logs` prints.
+ * answer is a follow-up message on it, which `nemia say` sends; the question is the Task's last message, which `nemia logs` prints.
  */
 export const answerIn = (session: string | null, remote?: { run: string; step: string }): string =>
   remote
-    ? `read its question with wf logs ${remote.run} ${remote.step}, and answer it with wf say ${remote.run} ${remote.step} "<your answer>"`
+    ? `read its question with nemia logs ${remote.run} ${remote.step}, and answer it with nemia say ${remote.run} ${remote.step} "<your answer>"`
     : `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
 
 /** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
 export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }): string =>
   `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
 
+/** What a step's landing adds to its note, cut to one line (`LANDED_CAP`): nothing for one that left the base untouched, or none yet. */
+function landingWord(run: Run, name: string): string {
+  const landed = run.steps[name]?.landed;
+  return landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
+}
+
 /** A row's `denied`, what a step's current try was denied (`deniedWords`); none for a step denied nothing. */
 const deniedRow = (denied: readonly string[]): { denied?: string } => (denied.length ? { denied: deniedWords(denied) } : {});
 
-/** A step's word as `wf ls` prints it: the bare `needs-human` the row's status keeps, then what the harness says it waits for (`waits`). */
+/**
+ * A step's word as `nemia ls` prints it: the bare `needs-human` the row's status keeps, then what the harness says it waits for (`waits`).
+ */
 export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'>): string =>
   s.waits ? s.status.replace(/^needs-human/, (word) => `${word}: ${s.waits}`) : s.status;
 
-/** A step's note as `wf ls` prints it: the row's note, then what its current try was denied (`denied`), last. */
+/** A step's note as `nemia ls` prints it: the row's note, then what its current try was denied (`denied`), last. */
 export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied'>): string | undefined =>
   [s.note, s.denied].filter(Boolean).join(' · ') || undefined;
 
 /**
- * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to
+ * A step at its gate, beside its line on `nemia ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
- * Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`). Held, neither is yet (`heldRefusal`).
+ * Pruned, neither word is left: `nemia approve` and `nemia retry` are each refused there (`prunedRefusal`). Held, neither is yet
+ * (`heldRefusal`).
  */
 const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: readonly string[]): string =>
   run.pruned
     ? neverApproved(run.pruned)
     : run.hold
       ? heldLater(run.hold, 'its approval')
-      : `approve it: wf approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
+      : `approve it: nemia approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
 
 /**
- * What `wf ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a
+ * What `nemia ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a
  * step at its gate, what is asked of them, `approve plan`. Pure.
  */
 export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));
 
-/** What `wf ls` says a run asks beneath its steps: its ending's gate once, what waits on a person, a hold, and its result. */
+/** What `nemia ls` says a run asks beneath its steps: its ending's gate once, what waits on a person, a hold, and its result. */
 function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }: Listing, result: readonly string[]): string[] {
   const lines: string[] = [];
   if (toDecide) lines.push(`   → to decide: ${toDecideWords(run, toDecide)}`);
   const onYou = onYouWords({ steps, waitingOnYou }).filter(
     (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
   );
-  if (onYou.length) lines.push(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
+  if (onYou.length) lines.push(`   → waiting on you: ${onYou.join(', ')}  —  nemia decide ${run.id}`);
   if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
   if (holding) {
     const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
     const lifting = holding.length > 0 && holding.every((w) => w.shipped);
     lines.push(
-      `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
+      `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  nemia hold ${run.id} --off lifts it`}`,
     );
   }
-  if (result.length) lines.push(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
+  if (result.length) lines.push(`   → result: ${result.join(', ')}  —  nemia decide ${run.id}`);
   return lines;
 }
 
 /**
- * A run's lines on `wf ls`: its brief and what it cost, a step a line — its word with what the harness says it waits for (`shownStatus`),
- * its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and why.
+ * A run's lines on `nemia ls`: its brief and what it cost, a step a line — its word with what the harness says it waits for
+ * (`shownStatus`), its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and
+ * why.
  */
 function runLines({ run, listed, result }: RunsListed['runs'][number]): string[] {
   const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
@@ -516,7 +535,7 @@ function runLines({ run, listed, result }: RunsListed['runs'][number]): string[]
   ];
 }
 
-/** Every line `wf ls` prints of its answer at `now`: `no runs` for none, each run's lines, and whether a wf up ticks the store. */
+/** Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, and whether a nemia up ticks the store. */
 export const lsLines = ({ runs, daemon }: RunsListed, now: number): string[] => [
   ...(runs.length ? runs.flatMap(runLines) : ['no runs']),
   daemonLine(daemon, now),

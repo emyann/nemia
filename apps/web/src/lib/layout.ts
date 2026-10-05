@@ -65,7 +65,7 @@ export function layers(steps: readonly StepEdges[]): string[][] {
     const stuck = names.filter((name) => waiting.get(name)! > 0);
     throw new Error(
       `The steps' \`after\` go round in a cycle among ${stuck.join(', ')}, so they have no order to be drawn in. ` +
-        '`wf start` refuses a folder like that; look at what changed in the workflow folder since the run started.',
+        'A start refuses a folder like that; look at what changed in the workflow folder since the run started.',
     );
   }
 

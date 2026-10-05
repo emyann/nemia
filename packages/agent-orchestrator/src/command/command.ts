@@ -8,7 +8,7 @@ import { dollarsOf } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** The CLI's name, as every command line the package writes says it. */
-export const CLI = 'wf';
+export const CLI = 'nemia';
 
 /**
  * What a command is handed: each argument by its key — text, dollars for an amount, true for a switch that has a key, every value in order
@@ -95,11 +95,11 @@ export type Route =
   | { readonly method: 'GET'; readonly path: string; readonly status: 200; readonly hand?: string };
 
 /**
- * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `wf`'s help prints them; its `spec`; `check`, the
+ * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
  * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
  * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
- * for; `manual`, the long help `wf <name> --help` prints in place of running it, where it has one.
+ * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one.
  */
 export type CommandSpec = {
   readonly name: string;
@@ -262,22 +262,31 @@ export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefine
 const unsaid = (p: Positional): string =>
   p.takes === 'many' ? `[<${p.key}> ...]` : p.takes === 'optional' ? `[<${p.key}>]` : `<${p.key}>`;
 
+/** The words that say `flag` given `value`: a switch alone where true, a value flag once per value; none for a value not given. */
+const flagWords = (flag: Flag, value: Args[string]): string[] => {
+  if (value === undefined || value === false) return [];
+  if (flag.kind === 'switch') return [flag.flag];
+  return (Array.isArray(value) ? value : [value]).flatMap((v) => [flag.flag, String(v)]);
+};
+
 /**
- * The command line that names `command` on these arguments, as a refusal says what to type: `wf retry r-1 implement`, `wf rm a b`. A
- * positional not given is said as the usage says it (`unsaid`); a rest is left out.
+ * The command line that names `command` on these arguments, as a refusal says what to type: `nemia retry r-1 implement`, `nemia rm a b`. A
+ * positional not given is said as the usage says it (`unsaid`); a rest is left out. `flags`, by their keys, are said after the positionals
+ * in the order the spec lists them: `nemia factory add <name> --repo <path>`; a key no flag of the spec has is left out.
  */
-export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: Args): string {
+export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: Args, flags: Args = {}): string {
   const said = (value: Args[string]) => (Array.isArray(value) ? value.join(' ') : String(value));
   const words = command.spec.positionals
     .filter((p) => p.takes !== 'rest')
     .map((p) => (args[p.key] !== undefined ? said(args[p.key]) : unsaid(p)));
-  return [CLI, command.name, ...words].join(' ');
+  const flagged = command.spec.flags.flatMap((f) => (f.key === undefined ? [] : flagWords(f, flags[f.key])));
+  return [CLI, command.name, ...words, ...flagged].join(' ');
 }
 
 /** The column the help's lines under a command start at. */
 const HELP_INDENT = ' '.repeat(31);
 
-/** The commands' lines of `wf`'s help, in the table's order: each usage, then its help lines under it; none the CLI does not serve. */
+/** The commands' lines of `nemia`'s help, in the table's order: each usage, then its help lines under it; none the CLI does not serve. */
 export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only'>[]): string =>
   table
     .filter((c) => c.only?.side !== 'api')

@@ -1,6 +1,6 @@
 /**
  * The harnesses a step runs on (`HARNESSES`), and a step on a remote agent: how it is named (`remoteNameOf`) and the keys it may not set
- * (`remoteRefusal`, `REMOTE_REFUSED_KEYS`). The words each harness takes are the runtime's, asked at `wf start` (`configRefused` in
+ * (`remoteRefusal`, `REMOTE_REFUSED_KEYS`). The words each harness takes are the runtime's, asked at `nemia start` (`configRefused` in
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type Workflow } from '../step/step.ts';
@@ -11,7 +11,7 @@ export const DEFAULT_HARNESS = 'claude';
 /**
  * How a step names a remote A2A agent, one another party runs: `harness: a2a:<name>`, the name one the store's `a2a-agents.json` declares
  * (`a2a.store.ts`), which the runtime client hands the engine as a harness of that name. The parser checks the shape and what such a step
- * may not set (`REMOTE_REFUSED`); `wf start` checks the name is declared (`undeclaredRefusal` in start.verb.ts).
+ * may not set (`REMOTE_REFUSED`); `nemia start` checks the name is declared (`undeclaredRefusal` in start.verb.ts).
  */
 export const REMOTE_PREFIX = 'a2a:';
 
@@ -62,8 +62,9 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
 };
 
 /**
- * Why a remote step's try may not be asked for with `wf retry --<key>` — `--model`, `--budget` — in the words its load refuses the key in,
- * or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be dropped.
+ * Why a remote step's try may not be asked for with `nemia retry --<key>` — `--model`, `--budget` — in the words its load refuses the key
+ * in, or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be
+ * dropped.
  */
 export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
   if (!isRemoteHarness(step.harness)) return undefined;

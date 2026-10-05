@@ -1,8 +1,8 @@
 /**
  * A `wf` child a test waits on by what it says or by its end, never by a length of time.
  *
- * A test that spawns `wf watch` or `wf up` waits for its banner or for a file it writes; the child first imports the CLI, which under a
- * machine's load can take longer than any bound a test would pick. So the wait is an event: the awaited thing, or the child's end, which
+ * A test that spawns `nemia watch` or `nemia up` waits for its banner or for a file it writes; the child first imports the CLI, which under
+ * a machine's load can take longer than any bound a test would pick. So the wait is an event: the awaited thing, or the child's end, which
  * fails the wait at once with how it ended, its stdout and its stderr. A child that never returns is bound by its parent instead of a
  * clock: its stdin is a pipe from the test's process, and the end of that pipe, when the test kills it or dies, ends the child.
  */

@@ -1,7 +1,7 @@
 /**
  * The store's pause on disk: put once, read back, refused a second time while it stands, lifted once, refused a second lift; and a file
- * that does not read as the pause still pauses; and a cordon `wf cordon` put before the switch, at the same `WF_ROOT/cordon`, is the pause,
- * honoured by every reader and resumed by `wf resume`. A store of its own, since `WF_ROOT` is read as the module loads.
+ * that does not read as the pause still pauses; and a cordon `nemia cordon` put before the switch, at the same `WF_ROOT/cordon`, is the
+ * pause, honoured by every reader and resumed by `nemia resume`. A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,12 +37,12 @@ test('a pause is put once, read back, refused while it stands, and lifted once',
   refusedAs(
     () => putPause({ by: 'bob' }),
     'Conflict',
-    'the store is already paused by ann since 2026-10-04T12:00:00.000Z: wf resume lifts it first, and wf pause --now stops what still finishes under it.',
+    'the store is already paused by ann since 2026-10-04T12:00:00.000Z: nemia resume lifts it first, and nemia pause --now stops what still finishes under it.',
   );
   assert.deepEqual(readPause(), put);
   assert.deepEqual(resumePause(), put);
   assert.equal(readPause(), null);
-  refusedAs(() => resumePause(), 'Missing', 'the store is not paused: there is nothing to resume (wf pause puts one).');
+  refusedAs(() => resumePause(), 'Missing', 'the store is not paused: there is nothing to resume (nemia pause puts one).');
 });
 
 test('a pause put with no name is put by the machine user, and with no words has no why', () => {
@@ -69,9 +69,9 @@ test('a cordon put before the switch is the pause: read, refused a second, unsch
   refusedAs(
     () => putPause({ by: 'bob' }),
     'Conflict',
-    `the store is already paused by ann since ${cordon.at}: wf resume lifts it first, and wf pause --now stops what still finishes under it.`,
+    `the store is already paused by ann since ${cordon.at}: nemia resume lifts it first, and nemia pause --now stops what still finishes under it.`,
   );
   assert.deepEqual(resumePause(), cordon);
-  assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'wf resume removes it');
+  assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'nemia resume removes it');
   assert.equal(storeAdmission().unschedulable(), false);
 });

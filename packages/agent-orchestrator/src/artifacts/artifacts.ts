@@ -1,9 +1,13 @@
 /**
  * Files a step leaves for the steps after it and for the person who decides: what its brief says of them (`artifactsContract`), where a
- * file it names is found (`artifactPlace`), and the lines that list them (`artifactLines`). Pure: `artifacts.store.ts` copies them.
+ * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), and the lines that list them
+ * (`artifactLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
-import { filesPrunedWords, type Pruned } from '../record/record.ts';
+import { filesPrunedWords, type Mount, type Pruned } from '../record/record.ts';
+import { sandboxed, upstreamOf } from '../workflow/index.ts';
+import type { Workflow } from '../step/step.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 
 /**
  * Where a step's files go, told on its brief beside the closeout contract.
@@ -53,7 +57,7 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
           'only one it keeps.',
           '',
           "This workspace is the repository's own checkout, where the run hands nothing off: a file you leave here is",
-          "not collected and not committed — it stays in a person's checkout, and `wf decide` reads a path named from",
+          "not collected and not committed — it stays in a person's checkout, and `nemia decide` reads a path named from",
           'the workspace root as `not collected`. Name each file by its absolute path in that directory; a directory is',
           'not collected, nor a file that is not there.',
         ]
@@ -116,10 +120,10 @@ export type ArtifactFile = { path: string; bytes: number };
 export type MissingArtifact = { path: string; why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' };
 
 /**
- * What `wf decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
+ * What `nemia decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
  * a refusal is named as one, never passed over — and then every file in the step's directory, collected or written there, with its size.
  *
- * With its files removed by `wf prune --artifacts`, a file the directory does not have, and one named from a workspace also gone, is
+ * With its files removed by `nemia prune --artifacts`, a file the directory does not have, and one named from a workspace also gone, is
  * said `not kept`: a step's files are collected at its hand-off, and the marker cannot tell one the step never wrote from one it did.
  */
 export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[], pruned?: Pruned): string[] {
@@ -135,7 +139,7 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
       ? []
       : line('not there', (names) =>
           pruned
-            ? `!! declared and not collected: ${names}  — on no branch, and its worktree was removed by wf prune at ${pruned.at}`
+            ? `!! declared and not collected: ${names}  — on no branch, and its worktree was removed by nemia prune at ${pruned.at}`
             : `!! declared but not in the workspace: ${names}  — nothing to collect`,
         )),
     ...line('directory', (names) => `!! declared a directory, not collected: ${names}  — a step names each file`),
@@ -159,3 +163,16 @@ export const sizeOf = (bytes: number): string =>
       : bytes < 1024 ** 3
         ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
         : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+
+/**
+ * The folders of the run's artifacts (`runArtifacts`, one folder per step under it) a step is filed with, each read-only: the folder of
+ * every step of `steps` it comes after, through `after:` and on (`upstreamOf`), in `steps`' order. It reads what they handed over and
+ * writes none of it, whatever its fence. Its own folder is left out, writable as its workspace's mode makes it, and so is every step it
+ * does not come after: a sibling, a step after it. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
+ * agent, filed no local field.
+ */
+export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: readonly Workflow[], runArtifacts: string): Mount[] => {
+  if (isRemoteHarness(step.harness) || sandboxed(step.harness ?? DEFAULT_HARNESS)) return [];
+  const upstream = upstreamOf(steps, step.name);
+  return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
+};

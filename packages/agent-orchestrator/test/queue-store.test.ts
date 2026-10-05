@@ -1,5 +1,5 @@
 /**
- * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`wf inbox queue`), judged by the
+ * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`nemia inbox queue`), judged by the
  * tick over every run and card in a store of its own.
  *
  * What the cap and the queue decide is pure, and lives in run.test.ts and inbox.test.ts. This is the part that is not: a pass over the
@@ -152,8 +152,8 @@ const oneStep = (() => {
 })();
 
 /**
- * `wf start`, for real, of a one-step run over a repository of its own unless given one — created at `createdAt`, written over the record
- * as the test's to say.
+ * `nemia start`, for real, of a one-step run over a repository of its own unless given one — created at `createdAt`, written over the
+ * record as the test's to say.
  */
 const started = (brief: string, createdAt: string, opts: { isolate?: boolean; after?: string[]; repo?: string } = {}): Run => {
   const run = start({
@@ -187,7 +187,7 @@ const printedBy = async (
   return printed.join('\n').split('\n');
 };
 
-test('REFUSED at a cap of 2 at shipped defaults: a third run is not filed — `wf tick`, `wf ls` and `wf decide` say it is waiting for a run slot (2 of 2 in flight), and the record says when the cap first held it, once', async (t) => {
+test('REFUSED at a cap of 2 at shipped defaults: a third run is not filed — `nemia tick`, `nemia ls` and `nemia decide` say it is waiting for a run slot (2 of 2 in flight), and the record says when the cap first held it, once', async (t) => {
   emptyStore('2');
   const b = board();
   const [one, two, three] = [started('first', at(1)), started('second', at(2)), started('third', at(3))];
@@ -238,7 +238,7 @@ test('REFUSED at a cap of 2 at shipped defaults: a third run is not filed — `w
   assert.equal((await decide(b.e, one.id)).held, undefined);
 });
 
-test("`wf ls` and `wf decide` judge by the cap the last pass ran with, not their own shell's: WF_MAX_RUNS set on the daemon alone still reads a held run as waiting for a run slot, and a shell's own value does not change the count — before any pass, the shell's own", async (t) => {
+test("`nemia ls` and `nemia decide` judge by the cap the last pass ran with, not their own shell's: WF_MAX_RUNS set on the daemon alone still reads a held run as waiting for a run slot, and a shell's own value does not change the count — before any pass, the shell's own", async (t) => {
   emptyStore('2');
   const b = board();
   const [one, two, three] = [started('first', at(1)), started('second', at(2)), started('third', at(3))];
@@ -264,7 +264,7 @@ test("`wf ls` and `wf decide` judge by the cap the last pass ran with, not their
   for (const shell of [undefined, '5', '1', 'two']) {
     if (shell === undefined) delete process.env.WF_MAX_RUNS;
     else process.env.WF_MAX_RUNS = shell;
-    assert.deepEqual(await seen(), held, `a shell with WF_MAX_RUNS=${shell} says in wf ls and wf decide what the daemon holds`);
+    assert.deepEqual(await seen(), held, `a shell with WF_MAX_RUNS=${shell} says in nemia ls and nemia decide what the daemon holds`);
   }
 
   fs.rmSync(path.join(ROOT, 'tick.json'));
@@ -395,7 +395,7 @@ test('the oldest run is admitted first, by when it was created — not by its id
   assert.deepEqual(b.filings, [`${oldest.id}-implement`, `${middle.id}-implement`]);
 });
 
-test('`wf up` says both ceilings in words before its first pass — and REFUSED by name, exit 2, a WF_MAX_RUNS that is not a count, by `wf up`, `wf tick` and `wf ls`', async (t) => {
+test('`nemia up` says both ceilings in words before its first pass — and REFUSED by name, exit 2, a WF_MAX_RUNS that is not a count, by `nemia up`, `nemia tick` and `nemia ls`', async (t) => {
   emptyStore(undefined);
   const b = board();
   const stop = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
@@ -417,7 +417,7 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
     if (concurrent === undefined) delete process.env.WF_MAX_CONCURRENT;
     else process.env.WF_MAX_CONCURRENT = concurrent;
   }
-  const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`;
+  const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
   assert.deepEqual(
     printed,
     [
@@ -444,7 +444,7 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
   emptyStore(undefined);
 });
 
-test('REFUSED at shipped defaults: WF_MAX_CONCURRENT=-3 by `wf up`, before the store is taken, and by `wf tick` before it admits anything; WF_VERIFY_REST=true by `wf up`, `wf tick` and `tick`, before the engine is asked anything — each by name, exit 2', async (t) => {
+test('REFUSED at shipped defaults: WF_MAX_CONCURRENT=-3 by `nemia up`, before the store is taken, and by `nemia tick` before it admits anything; WF_VERIFY_REST=true by `nemia up`, `nemia tick` and `tick`, before the engine is asked anything — each by name, exit 2', async (t) => {
   emptyStore(undefined);
   started('first', at(1));
   const daemon = path.join(ROOT, 'daemon.json');
@@ -510,7 +510,7 @@ const aCard = (name: string, keys: Record<string, string>, body: string): string
 
 const fromCard = (card: string) => listRuns().filter((r) => r.from?.inbox === card);
 
-test('`wf inbox queue` marks a card, and the next pass starts it with no cap — on its workflow and repo, through the start any card has: the card removed, `wf tick` and `wf up` saying `started <card> as <runId>`, and its roots filed on the pass after', async (t) => {
+test('`nemia inbox queue` marks a card, and the next pass starts it with no cap — on its workflow and repo, through the start any card has: the card removed, `nemia tick` and `nemia up` saying `started <card> as <runId>`, and its roots filed on the pass after', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
@@ -523,7 +523,7 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   );
   assert.deepEqual(queued, [
     `${card.name}  queued at ${at}, 1 of 1  workflow: dev  repo: ${repo}`,
-    `the tick starts it on its own once its turn comes and a run slot is free — take it back with wf inbox queue ${card.name} --off`,
+    `the tick starts it on its own once its turn comes and a run slot is free — take it back with nemia inbox queue ${card.name} --off`,
   ]);
   assert.match(
     (await printedBy(t, b.e, 'inbox'))[0],
@@ -568,11 +568,11 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   const [upRun] = fromCard(again.card.name);
   assert.ok(
     printed.some((l) => new RegExp(`^\\d\\d:\\d\\d:\\d\\d  started ${again.card.name} as ${upRun.id}$`).test(l)),
-    `\`wf up\` logs it the same way, a time before it, on a pass that starts a card:\n${printed.join('\n')}`,
+    `\`nemia up\` logs it the same way, a time before it, on a pass that starts a card:\n${printed.join('\n')}`,
   );
 });
 
-test("`wf inbox queue` keeps the card file's time: a queue is no edit of the idea, and a card's filing time is its mtime — at the command line as through the board", async (t) => {
+test("`nemia inbox queue` keeps the card file's time: a queue is no edit of the idea, and a card's filing time is its mtime — at the command line as through the board", async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
@@ -595,11 +595,11 @@ test("`wf inbox queue` keeps the card file's time: a queue is no edit of the ide
   const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', repo });
   assert.ok(
     fs.statSync(fresh.file).mtime > filed,
-    'wf inbox add writes a card at the time it is filed: it is the queue that keeps the time it found, not every write of the inbox',
+    'nemia inbox add writes a card at the time it is filed: it is the queue that keeps the time it found, not every write of the inbox',
   );
 });
 
-test('a queued card that names no repository starts on the repository the daemon runs in, as `wf start` takes `.`', async (t) => {
+test('a queued card that names no repository starts on the repository the daemon runs in, as `nemia start` takes `.`', async (t) => {
   emptyStore(undefined);
   const b = board();
   const daemons = aRepoWith('dev');
@@ -662,7 +662,7 @@ test('the oldest queued card starts first — by when it was queued, not by its 
   assert.ok(fs.existsSync(path.join(INBOX, 'm-parked-e5f6.md')));
 });
 
-test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no card, of a card with no workflow — `--workflow` writes both — of one already queued, and of one a run was started from; `--off` and `wf inbox rm` take a card back, and nothing is started', async (t) => {
+test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no card, of a card with no workflow — `--workflow` writes both — of one already queued, and of one a run was started from; `--off` and `nemia inbox rm` take a card back, and nothing is started', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
@@ -675,14 +675,14 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
     refusedAs(
       'Missing',
       new RegExp(
-        `^no card no-such-card in the inbox\\. Its cards are: ${bare.card.name}\\. Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>"\\.$`,
+        `^no card no-such-card in the inbox\\. Its cards are: ${bare.card.name}\\. Queue one of those — nemia inbox queue <name> — or park the idea first: nemia inbox add "<idea>"\\.$`,
       ),
     ),
   );
   await assert.rejects(
     queue(),
     refusedWith(
-      /^wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> \[--workflow <w>\] \[--off\]\.$/,
+      /^nemia inbox queue takes the name of the card to queue, as nemia inbox lists it: nemia inbox queue <name> \[--workflow <w>\] \[--off\]\.$/,
     ),
   );
   await assert.rejects(queue('../runs/x'), refusedWith(/^`\.\.\/runs\/x` is not a card's name/));
@@ -691,7 +691,7 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
     refusedAs(
       'Invalid',
       new RegExp(
-        `^${bare.card.name}\\.md: no workflow — a queued card starts on its own, and nothing says what runs it\\. Queue it with its workflow: wf inbox queue ${bare.card.name} --workflow <w> writes both\\.$`,
+        `^${bare.card.name}\\.md: no workflow — a queued card starts on its own, and nothing says what runs it\\. Queue it with its workflow: nemia inbox queue ${bare.card.name} --workflow <w> writes both\\.$`,
       ),
     ),
   );
@@ -700,7 +700,7 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
     refusedWith(/^--off takes the card out of the queue, and --workflow writes what starts it: give one of them\.$/),
   );
   await assert.rejects(queue(bare.card.name, '--workflow'), refusedWith(/^--workflow takes the workflow the card starts on/));
-  await assert.rejects(queue(bare.card.name, 'another'), refusedWith(/^wf inbox queue queues one card, and another is a second/));
+  await assert.rejects(queue(bare.card.name, 'another'), refusedWith(/^nemia inbox queue queues one card, and another is a second/));
   assert.equal(fs.readFileSync(bare.file, 'utf8'), before, 'nothing written');
   assert.deepEqual(await printedBy(t, b.e, 'inbox', 'queue', bare.card.name, '--off'), [
     `${bare.card.name}  not queued — nothing to take back`,
@@ -717,12 +717,12 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
     refusedAs(
       'Conflict',
       new RegExp(
-        `^${bare.card.name}\\.md: already queued, at \\S+, 1 in the queue's order: the tick starts it when its turn comes and a run slot is free\\. To queue it again, take it back first: wf inbox queue ${bare.card.name} --off\\.$`,
+        `^${bare.card.name}\\.md: already queued, at \\S+, 1 in the queue's order: the tick starts it when its turn comes and a run slot is free\\. To queue it again, take it back first: nemia inbox queue ${bare.card.name} --off\\.$`,
       ),
     ),
   );
   assert.deepEqual(await printedBy(t, b.e, 'inbox', 'queue', bare.card.name, '--off'), [
-    `${bare.card.name}  taken back: it no longer starts on its own — start it with wf start ${bare.file}`,
+    `${bare.card.name}  taken back: it no longer starts on its own — start it with nemia start ${bare.file}`,
   ]);
   assert.equal(fs.readFileSync(bare.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nNo workflow yet\n`);
   assert.deepEqual([(await tick(b.e)).queue, listRuns()], [undefined, []], 'taken back: not started');
@@ -750,7 +750,7 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
   );
   assert.throws(
     () => startFromInbox({ name: 'no-such-card', callerRepo: repo }),
-    refusedAs('Missing', /^no card no-such-card in the inbox\. Its cards are: .*\. Start one of those — wf start /),
+    refusedAs('Missing', /^no card no-such-card in the inbox\. Its cards are: .*\. Start one of those — nemia start /),
     'a start of a card not there',
   );
   assert.equal(fs.readFileSync(kept, 'utf8').includes('queued:'), false, 'and not queued');
@@ -790,7 +790,7 @@ test(
   },
 );
 
-test('REFUSED at shipped defaults: a queued card whose start the package refuses — its workflow gone — is left as it is, named on `wf tick` and in `wf inbox`, tried once and not again while it reads the same, and the card behind it has its turn; queued again, it is tried again', async (t) => {
+test('REFUSED at shipped defaults: a queued card whose start the package refuses — its workflow gone — is left as it is, named on `nemia tick` and in `nemia inbox`, tried once and not again while it reads the same, and the card behind it has its turn; queued again, it is tried again', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
@@ -803,7 +803,7 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
   assert.ok(ticked[0].startsWith(`gone-a1b2 not started: ${why}`), ticked.join('\n'));
   assert.ok(
     ticked[0].endsWith(
-      ' — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue gone-a1b2 --off, then wf inbox queue gone-a1b2)',
+      ' — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (nemia inbox queue gone-a1b2 --off, then nemia inbox queue gone-a1b2)',
     ),
     ticked[0],
   );
@@ -837,7 +837,7 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'queue')), [], 'its refusal removed once the card no longer read as refused');
 });
 
-test('REFUSED at shipped defaults: a queued card whose `repo:` folder was deleted keeps its place, is tried, and its start refused by name on `wf tick` and in `wf inbox`, the card left as it is — the card behind it starts on the next pass, and `--off` takes it back', async (t) => {
+test('REFUSED at shipped defaults: a queued card whose `repo:` folder was deleted keeps its place, is tried, and its start refused by name on `nemia tick` and in `nemia inbox`, the card left as it is — the card behind it starts on the next pass, and `--off` takes it back', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
@@ -849,7 +849,7 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
 
   const why = `gone-a1b2.md: \`repo: ${doomed}\` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.`;
   assert.deepEqual(await printedBy(t, b.e, 'tick'), [
-    `gone-a1b2 not started: ${why} — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue gone-a1b2 --off, then wf inbox queue gone-a1b2)`,
+    `gone-a1b2 not started: ${why} — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (nemia inbox queue gone-a1b2 --off, then nemia inbox queue gone-a1b2)`,
   ]);
   assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns()], [text, []], 'the card as it was, and no run');
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('gone-a1b2'))!;
@@ -866,7 +866,7 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
 
   assert.deepEqual(
     await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off'),
-    [`gone-a1b2  taken back: it no longer starts on its own — start it with wf start ${gone}`],
+    [`gone-a1b2  taken back: it no longer starts on its own — start it with nemia start ${gone}`],
     'taken back though its repository is gone',
   );
   assert.equal(fs.readFileSync(gone, 'utf8'), `---\nworkflow: dev\nrepo: ${doomed}\n---\nIts repository is gone\n`);
@@ -878,7 +878,7 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
   );
 });
 
-test('a queued card whose start fails without a refusal — its repository no git repository, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `wf up`, and started once the failure clears', async (t) => {
+test('a queued card whose start fails without a refusal — its repository no git repository, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
@@ -925,7 +925,7 @@ test('a queued card whose start fails without a refusal — its repository no gi
   assert.equal(
     named.length,
     1,
-    `\`wf up\` over two passes says the failure once, on its first pass, though it is \`again\`: the \`tick\` above wrote it down and this daemon never printed its line, and a person restarting \`wf up\` to see why cards stopped starting is told by it:\n${printed.join('\n')}`,
+    `\`nemia up\` over two passes says the failure once, on its first pass, though it is \`again\`: the \`tick\` above wrote it down and this daemon never printed its line, and a person restarting \`nemia up\` to see why cards stopped starting is told by it:\n${printed.join('\n')}`,
   );
   assert.match(
     named[0],
@@ -987,7 +987,7 @@ test("a queued card whose `repo:` is no git repository leaves the daemon's own s
   );
 });
 
-test('a `wf up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written', async (t) => {
+test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written', async (t) => {
   emptyStore('1');
   const b = board();
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
@@ -1044,7 +1044,7 @@ test("REFUSED at shipped defaults, on the repository it was tried on: a queued c
   assert.match(
     queueLine(refused.queue),
     new RegExp(
-      `^${card.name} not started on ${none.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: ${card.name}\\.md: \`workflow: dev\` — no workflow folder at .*, or run wf up in the repository it is about$`,
+      `^${card.name} not started on ${none.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: ${card.name}\\.md: \`workflow: dev\` — no workflow folder at .*, or run nemia up in the repository it is about$`,
     ),
   );
   assert.deepEqual([(await tick(b.e, { repo: none })).queue, listRuns()], [undefined, []], 'passed over on the same repository');
@@ -1101,7 +1101,7 @@ test("REFUSED at shipped defaults, on its factory's repository: a queued card of
   assert.deepEqual([(await tick(b.e, { repo: daemons })).queue, listRuns()], [undefined, []], 'passed over on the same repository');
 });
 
-test("REFUSED as shipped: a queued card that names no factory is refused from a daemon in a repository one factory alone holds, said with no start's flag and no repository to run wf up in, and not tried again; with its factory: written, it starts in it", async (t) => {
+test("REFUSED as shipped: a queued card that names no factory is refused from a daemon in a repository one factory alone holds, said with no start's flag and no repository to run nemia up in, and not tried again; with its factory: written, it starts in it", async (t) => {
   const was = process.env.WF_DEFAULT_FACTORY_STARTS;
   delete process.env.WF_DEFAULT_FACTORY_STARTS;
   t.after(() => {
@@ -1120,11 +1120,11 @@ test("REFUSED as shipped: a queued card that names no factory is refused from a 
     /^\S+\/inbox\/loose-card\.md: this card names no factory, .* — one of solo; a new card names it as it is filed: /,
   );
   assert.doesNotMatch(refused.queue.refused, /--factory <name>;|at start/, 'a daemon has no flag to give');
-  assert.doesNotMatch(queueLine(refused.queue), / not started on |run wf up in the repository/);
+  assert.doesNotMatch(queueLine(refused.queue), / not started on |run nemia up in the repository/);
   assert.deepEqual([(await tick(b.e, { repo: solo })).queue, listRuns()], [undefined, []], 'the refusal lasts');
   const [line] = await printedBy(t, b.e, 'inbox');
   assert.match(line, /^loose-card .* — not started at \S+: \S+\/inbox\/loose-card\.md: this card names no factory, /);
-  assert.doesNotMatch(line, /run wf up in the repository/);
+  assert.doesNotMatch(line, /run nemia up in the repository/);
 
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('---\nworkflow: dev', '---\nworkflow: dev\nfactory: solo'));
   const pass = await tick(b.e, { repo: aRepoWith('dev') });
@@ -1202,7 +1202,7 @@ test('the whole screen of a run held by the cap on runs in flight', async (t) =>
   ]);
 });
 
-test('`wf inbox queue --workflow` given a path reads it from where it is typed, and writes it absolute on the card', async (t) => {
+test('`nemia inbox queue --workflow` given a path reads it from where it is typed, and writes it absolute on the card', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');

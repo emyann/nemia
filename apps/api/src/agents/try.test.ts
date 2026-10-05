@@ -248,9 +248,9 @@ test('a run that is no try says so', async () => {
     assert.equal(((await (await app.request(`/api/runs/${run.id}`)).json()) as RunDetail).try, null);
     const res = await remove(run.id);
     const body = (await res.json()) as { error: string };
-    assert.equal(res.status, 409, "the board removes only a try: another run is `wf rm`'s, which says what it leaves");
+    assert.equal(res.status, 409, "the board removes only a try: another run is `nemia rm`'s, which says what it leaves");
     assert.match(body.error, /removes only a try/);
-    assert.match(body.error, new RegExp(`wf rm ${run.id}`));
+    assert.match(body.error, new RegExp(`nemia rm ${run.id}`));
     assert.ok(fs.existsSync(path.join(RUNS, `${run.id}.json`)), 'and it is still there');
   } finally {
     fs.rmSync(path.join(RUNS, `${run.id}.json`));
@@ -291,7 +291,7 @@ test('a try still in flight is not removed: the package says to cancel it first'
   const res = await remove(id);
   const body = (await res.json()) as { error: string };
   assert.equal(res.status, 409);
-  assert.match(body.error, new RegExp(`wf cancel ${id}`));
+  assert.match(body.error, new RegExp(`nemia cancel ${id}`));
   assert.ok(fs.existsSync(path.join(RUNS, `${id}.json`)), 'and it is still there');
   ended(id);
   assert.equal((await remove(id)).status, 200);

@@ -58,8 +58,8 @@ export type StepUnreadable = { error: string; raw: unknown };
  *
  * `try` counts from 1, and `round` is the round of its loop the try was filed in (`roundIn`). `then` is what replaced it —
  * `round`, `retries`, or the mode a person asked for — and null on the current try, which `current` marks. `note` is how the
- * try was reached, in `wf ls`'s words (`tryNote`), and null on the first. `status` on the current try is the step's word, as on
- * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `wf ls` words only the try
+ * try was reached, in `nemia ls`'s words (`tryNote`), and null on the first. `status` on the current try is the step's word, as on
+ * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `nemia ls` words only the try
  * that decides the step. `attempts`, `check` and `closeout` are the try's own, in the step's shapes.
  */
 export type StepTry = {
@@ -79,7 +79,7 @@ export type StepTry = {
    */
   unreadable: StepUnreadable | null;
   /**
-   * What a person said to this try when they asked for it (`answerOf`, off their ask file): the answer `wf decide` prints under the
+   * What a person said to this try when they asked for it (`answerOf`, off their ask file): the answer `nemia decide` prints under the
    * `needs` of the try before as `your answer`. Null for a try nobody answered — and for every first try, which nobody asked for.
    */
   answer: string | null;
@@ -174,8 +174,8 @@ export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
  * An earlier try is read on the turn of its task it was: a held task a person answered keeps each try they answered under its one id, and a
  * recheck replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them). Its status is `succeeded` for a
  * turn a person answered, which signed and ended `done` for it, the task's own word being the turn it is on now. What a person said to a
- * try, and how it was reached as `wf ls` words it — `answered`, when a person answered it — are read off the step's record as it stood on
- * that try, the tries behind it: `answerOf` reads a step's current try.
+ * try, and how it was reached as `nemia ls` words it — `answered`, when a person answered it — are read off the step's record as it stood
+ * on that try, the tries behind it: `answerOf` reads a step's current try.
  */
 export function triesOf(
   run: Run,

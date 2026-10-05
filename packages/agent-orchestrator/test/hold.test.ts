@@ -1,7 +1,7 @@
 /**
- * `wf hold`: a person's word that a run files nothing more until other runs ship — over a store and repositories of its own, with git for
- * real. A file of its own, since `WF_ROOT` is read once, as the package loads. `--until=<run>` is the same flag as `--until <run>`: nothing
- * is refused of it but the run it names.
+ * `nemia hold`: a person's word that a run files nothing more until other runs ship — over a store and repositories of its own, with git
+ * for real. A file of its own, since `WF_ROOT` is read once, as the package loads. `--until=<run>` is the same flag as `--until <run>`:
+ * nothing is refused of it but the run it names.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ const git = (cwd: string, ...args: string[]) =>
 const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
 
 /**
- * The hold on `id` made one that code older than `wf hold --by` wrote: its file without `by`, which every screen says as the plain
+ * The hold on `id` made one that code older than `nemia hold --by` wrote: its file without `by`, which every screen says as the plain
  * `held until <run> ships`.
  */
 const asOlder = (id: string): void => {
@@ -175,7 +175,7 @@ const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
   return run;
 };
 
-/** `wf <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
+/** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
@@ -194,12 +194,12 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
 /** A refusal through the CLI: exit 2, and a message that `pattern` matches. */
 const refused = async (t: TestContext, e: Engine, pattern: RegExp, ...argv: string[]) => {
   const { error } = await typed(t, e, ...argv);
-  assert.ok(error, `wf ${argv.join(' ')} was not refused`);
+  assert.ok(error, `nemia ${argv.join(' ')} was not refused`);
   assert.equal(error.exitCode, 2, error.message);
   assert.match(error.message, pattern);
 };
 
-const VERBS = /wf (approve|retry|round|accept) /;
+const VERBS = /nemia (approve|retry|round|accept) /;
 
 test('holdWord and holdAdvice say what holds a run and what is left to a person, and never that it waits on you', () => {
   const run = { id: 'r-1', branch: 'main' } as Parameters<typeof holdAdvice>[0];
@@ -209,13 +209,13 @@ test('holdWord and holdAdvice say what holds a run and what is left to a person,
   assert.equal(holdWord([]), 'held, on a hold that names no run');
   assert.equal(
     holdAdvice(run, [{ run: 'a-1' }]),
-    'nothing of r-1 is filed, and nothing is asked of you, until wf decide says a-1 has shipped; to go on before then: wf hold r-1 --off',
+    'nothing of r-1 is filed, and nothing is asked of you, until nemia decide says a-1 has shipped; to go on before then: nemia hold r-1 --off',
   );
   assert.equal(
     holdAdvice(run, [{ run: 'a-1', missing: true }]),
-    'the store has no run a-1 — yours to resolve: wf hold r-1 --off, or wf cancel r-1',
+    'the store has no run a-1 — yours to resolve: nemia hold r-1 --off, or nemia cancel r-1',
   );
-  assert.equal(holdAdvice(run, []), "the hold on r-1 names no run, so no run's shipping lifts it — yours to lift: wf hold r-1 --off");
+  assert.equal(holdAdvice(run, []), "the hold on r-1 names no run, so no run's shipping lifts it — yours to lift: nemia hold r-1 --off");
   for (const w of [[{ run: 'a-1' }], [{ run: 'a-1', missing: true as const }], [{ run: 'a-1', shipped: true as const }], []]) {
     assert.doesNotMatch(`${holdWord(w)} ${holdAdvice(run, w)}`, /waiting on you/);
   }
@@ -235,19 +235,19 @@ test('holdWord and holdAdvice say what holds a run and what is left to a person,
   );
 });
 
-test("REFUSED at shipped defaults: wf hold with neither --until nor --off, with both, a flag it does not take, --until with no run, and an id that is not a run's", async (t) => {
+test("REFUSED at shipped defaults: nemia hold with neither --until nor --off, with both, a flag it does not take, --until with no run, and an id that is not a run's", async (t) => {
   const b = board();
-  await refused(t, b.e, /^wf hold needs the runs to wait on, or --off/, 'hold', 'r-x');
-  await refused(t, b.e, /^wf hold takes --until or --off, not both/, 'hold', 'r-x', '--until', 'a', '--off');
-  await refused(t, b.e, /^wf hold does not take --after/, 'hold', 'r-x', '--after', 'a');
+  await refused(t, b.e, /^nemia hold needs the runs to wait on, or --off/, 'hold', 'r-x');
+  await refused(t, b.e, /^nemia hold takes --until or --off, not both/, 'hold', 'r-x', '--until', 'a', '--off');
+  await refused(t, b.e, /^nemia hold does not take --after/, 'hold', 'r-x', '--after', 'a');
   await refused(t, b.e, /^--until takes the run to wait on/, 'hold', 'r-x', '--until');
   await refused(t, b.e, /^--until takes the run to wait on/, 'hold', 'r-x', '--until', '--off');
-  await refused(t, b.e, /^wf hold takes the run first/, 'hold', '--until', 'a');
-  await refused(t, b.e, /wf hold writes its file under WF_ROOT by id/, 'hold', '../x', '--until', 'a');
+  await refused(t, b.e, /^nemia hold takes the run first/, 'hold', '--until', 'a');
+  await refused(t, b.e, /nemia hold writes its file under WF_ROOT by id/, 'hold', '../x', '--until', 'a');
   await refused(
     t,
     b.e,
-    /^--until "\.\.\/a" is not a run's id, and wf hold writes its file under WF_ROOT by id .* as in wf hold r-x --until add-a-flag-x1y2\.$/,
+    /^--until "\.\.\/a" is not a run's id, and nemia hold writes its file under WF_ROOT by id .* as in nemia hold r-x --until add-a-flag-x1y2\.$/,
     'hold',
     'r-x',
     '--until',
@@ -256,7 +256,7 @@ test("REFUSED at shipped defaults: wf hold with neither --until nor --off, with 
   await refused(
     t,
     b.e,
-    /^--until "a-1\.json" is not a run's id: \.json is on the name of one of its files under runs\/, not on the run's\. Give the id wf ls prints: wf hold r-x --until a-1\.$/,
+    /^--until "a-1\.json" is not a run's id: \.json is on the name of one of its files under runs\/, not on the run's\. Give the id nemia ls prints: nemia hold r-x --until a-1\.$/,
     'hold',
     'r-x',
     '--until',
@@ -265,14 +265,14 @@ test("REFUSED at shipped defaults: wf hold with neither --until nor --off, with 
   await refused(
     t,
     b.e,
-    /^"r-x\.hold" is not a run's id: .* Give the id wf ls prints: wf hold r-x\.$/,
+    /^"r-x\.hold" is not a run's id: .* Give the id nemia ls prints: nemia hold r-x\.$/,
     'hold',
     'r-x.hold',
     '--until',
     'a-1',
   );
-  await refused(t, b.e, /^no such run: r-nope\. wf hold takes a run by its id/, 'hold', 'r-nope', '--until', 'a');
-  await refused(t, b.e, /^no such run: r-nope\. wf hold takes a run by its id/, 'hold', 'r-nope', '--off');
+  await refused(t, b.e, /^no such run: r-nope\. nemia hold takes a run by its id/, 'hold', 'r-nope', '--until', 'a');
+  await refused(t, b.e, /^no such run: r-nope\. nemia hold takes a run by its id/, 'hold', 'r-nope', '--off');
   await refused(t, b.e, /^no such run: r-nope/, 'hold', 'r-nope', '--until=a');
   const runs = path.join(ROOT, 'runs');
   assert.deepEqual(fs.existsSync(runs) ? fs.readdirSync(runs).filter((f) => f.endsWith('.hold')) : [], [], 'nothing written');
@@ -393,12 +393,12 @@ test('a held run files nothing — the next step, nor on a hold written between 
   assert.ok(!b.filings.includes(`${run.id}-implement`), 'nothing filed while held');
   assert.equal(quiet.feed.run.note, `held until ${target.id} ships`, 'the feed says the hold, and not that the run waits on you');
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
-  assert.match(ls, new RegExp(`→ held until ${target.id} ships  —  wf hold ${run.id} --off lifts it`));
+  assert.match(ls, new RegExp(`→ held until ${target.id} ships  —  nemia hold ${run.id} --off lifts it`));
   const screen = (await typed(t, b.e, 'decide', run.id)).printed;
   assert.match(
     screen,
     new RegExp(
-      `\n  held until ${target.id} ships\n  nothing of ${run.id} is filed, and nothing is asked of you, until wf decide says ${target.id} has shipped`,
+      `\n  held until ${target.id} ships\n  nothing of ${run.id} is filed, and nothing is asked of you, until nemia decide says ${target.id} has shipped`,
     ),
   );
 
@@ -485,7 +485,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   );
 });
 
-test('REFUSED while held: an approval, a retry, a round and an acceptance — and wf ls, wf decide and decide offer none of them, but say the hold; the question comes back once it lifts', async (t) => {
+test('REFUSED while held: an approval, a retry, a round and an acceptance — and nemia ls, nemia decide and decide offer none of them, but say the hold; the question comes back once it lifts', async (t) => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -497,14 +497,14 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   assert.match((await typed(t, b.e, 'ls', atGate.id)).printed, /waiting on you: approve implement/, 'the gate is asked before');
   assert.equal((await typed(t, b.e, 'hold', atGate.id, '--until', target.id)).error, undefined);
   asOlder(atGate.id);
-  const held = `${atGate.id} is held until ${target.id} ships (wf hold, at `;
+  const held = `${atGate.id} is held until ${target.id} ships (nemia hold, at `;
   await assert.rejects(
     approve(b.e, atGate.id, 'implement'),
     (err: Error & { exitCode?: number }) =>
       err.message.startsWith(held) &&
       err.exitCode === 2 &&
       err.message.includes(`an approval would release work the hold keeps back`) &&
-      err.message.endsWith(`wf hold ${atGate.id} --off.`),
+      err.message.endsWith(`nemia hold ${atGate.id} --off.`),
   );
   await assert.rejects(
     retry(b.e, atGate.id, 'implement', { mode: 'nudge', message: 'change it' }),
@@ -541,7 +541,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
     /waiting on you: approve implement/,
     'lifted by hand, the gate is asked again, as it stood',
   );
-  assert.match((await typed(t, b.e, 'decide', atGate.id)).printed, new RegExp(`wf approve ${atGate.id} implement`));
+  assert.match((await typed(t, b.e, 'decide', atGate.id)).printed, new RegExp(`nemia approve ${atGate.id} implement`));
 
   const loop = start({ brief: 'a loop', repo, workflowDir: looping() });
   await advance(b.e, readRun(loop.id));
@@ -615,7 +615,7 @@ test("a blocked step's question stays on its record while the run is held, asked
   assert.match((await typed(t, b.e, 'decide', run.id)).printed, /which colour\?/);
 });
 
-test('REFUSED at shipped defaults: wf rm of a run another holds on names the hold to lift; wf rm of a held run takes its hold with it', async (t) => {
+test('REFUSED at shipped defaults: nemia rm of a run another holds on names the hold to lift; nemia rm of a held run takes its hold with it', async (t) => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -629,14 +629,14 @@ test('REFUSED at shipped defaults: wf rm of a run another holds on names the hol
   assert.match(
     refusedRm.refusal ?? '',
     new RegExp(
-      `^${run.id} is held until it ships: forgotten, its hold would wait on no such run for ever\\. Lift the hold: wf hold ${run.id} --off\\.$`,
+      `^${run.id} is held until it ships: forgotten, its hold would wait on no such run for ever\\. Lift the hold: nemia hold ${run.id} --off\\.$`,
     ),
   );
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
   assert.match(
     ls,
     new RegExp(
-      `→ held until ${target.id} \\(cancelled\\) ships: ${target.id} was cancelled at .* — yours to resolve: wf hold ${run.id} --off, or wf cancel ${run.id}`,
+      `→ held until ${target.id} \\(cancelled\\) ships: ${target.id} was cancelled at .* — yours to resolve: nemia hold ${run.id} --off, or nemia cancel ${run.id}`,
     ),
     'the held run is told why it will never go on, and how to let it go',
   );
@@ -773,7 +773,8 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     () => unhold(run.id),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
-      err.message === `${run.id}'s hold changed as it was lifted: read it again (wf ls ${run.id}), then lift it: wf hold ${run.id} --off.`,
+      err.message ===
+        `${run.id}'s hold changed as it was lifted: read it again (nemia ls ${run.id}), then lift it: nemia hold ${run.id} --off.`,
   );
   t.mock.restoreAll();
   assert.deepEqual(
@@ -793,7 +794,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     hold(b.e, race.id, [other.id]),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
-      err.message.startsWith(`${race.id} is already held until ${other.id} ships (wf hold, at ${first.at}). A hold is put once, whole`),
+      err.message.startsWith(`${race.id} is already held until ${other.id} ships (nemia hold, at ${first.at}). A hold is put once, whole`),
   );
   t.mock.restoreAll();
   assert.deepEqual(
@@ -804,7 +805,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   );
 });
 
-test('wf decide on a held run that also waits --after a run says both, and that --off lifts only the hold', async (t) => {
+test('nemia decide on a held run that also waits --after a run says both, and that --off lifts only the hold', async (t) => {
   const b = board();
   const repo = aRepo();
   const parent = await aRunning(b, repo);
@@ -816,7 +817,7 @@ test('wf decide on a held run that also waits --after a run says both, and that 
   assert.match(screen, new RegExp(`\n  waiting on ${parent.id}`), screen);
   assert.match(
     screen,
-    new RegExp(`\n  held until ${target.id} ships as well — wf hold ${child.id} --off lifts the hold, and not the wait above$`),
+    new RegExp(`\n  held until ${target.id} ships as well — nemia hold ${child.id} --off lifts the hold, and not the wait above$`),
     screen,
   );
   assert.doesNotMatch(screen, VERBS, screen);
@@ -824,13 +825,13 @@ test('wf decide on a held run that also waits --after a run says both, and that 
   assert.match(
     (await typed(t, b.e, 'decide', child.id)).printed,
     new RegExp(
-      `held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: wf hold ${child.id} --off, or wf cancel ${child.id}$`,
+      `held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: nemia hold ${child.id} --off, or nemia cancel ${child.id}$`,
     ),
     'a run named that never ships: how to let it go, on the same screen',
   );
 });
 
-test('REFUSED while held or pruned: wf say to a step that has settled offers no wf retry, which either refuses', async () => {
+test('REFUSED while held or pruned: nemia say to a step that has settled offers no nemia retry, which either refuses', async () => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -840,7 +841,7 @@ test('REFUSED while held or pruned: wf say to a step that has settled offers no 
   await advance(b.e, readRun(run.id));
   await assert.rejects(
     say(b.e, run.id, 'implement', 'hello'),
-    (err: Error) => /: wf retry /.test(err.message),
+    (err: Error) => /: nemia retry /.test(err.message),
     'offered before the hold on a step that signed off blocked: settled, and the run not finished, so it may be held',
   );
   await hold(b.e, run.id, [target.id]);
@@ -849,7 +850,7 @@ test('REFUSED while held or pruned: wf say to a step that has settled offers no 
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
       err.message.endsWith(
-        `no try is filed while ${run.id} is held until ${target.id} ships: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`,
+        `no try is filed while ${run.id} is held until ${target.id} ships: say them once the hold lifts, or lift it first: nemia hold ${run.id} --off.`,
       ) &&
       !VERBS.test(err.message),
   );
@@ -876,7 +877,7 @@ test('the whole screen of a run held by a person while its step runs, of one wai
     '',
     '  held until <target> ships',
     '  still running: implement',
-    '  nothing of <id> is filed, and nothing is asked of you, until wf decide says <target> has shipped; to go on before then: wf hold <id> --off',
+    '  nothing of <id> is filed, and nothing is asked of you, until nemia decide says <target> has shipped; to go on before then: nemia hold <id> --off',
   ]);
 
   const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
@@ -884,7 +885,7 @@ test('the whole screen of a run held by a person while its step runs, of one wai
     '<id>  after the parent',
     '',
     '  waiting on <parent>',
-    '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
+    '  nothing of <id> is filed until nemia decide says <parent> has shipped onto main; nothing to decide yet',
   ]);
   await hold(b.e, child.id, [target.id]);
   asOlder(child.id);
@@ -892,8 +893,8 @@ test('the whole screen of a run held by a person while its step runs, of one wai
     '<id>  after the parent',
     '',
     '  waiting on <parent>',
-    '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
-    '  held until <target> ships as well — wf hold <id> --off lifts the hold, and not the wait above',
+    '  nothing of <id> is filed until nemia decide says <parent> has shipped onto main; nothing to decide yet',
+    '  held until <target> ships as well — nemia hold <id> --off lifts the hold, and not the wait above',
   ]);
 
   assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
@@ -902,8 +903,8 @@ test('the whole screen of a run held by a person while its step runs, of one wai
     '<id>  after the parent',
     '',
     '  waiting on <parent>',
-    '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
-    '  held until <target> (cancelled) ships as well — <target> was cancelled at <at>, and a cancelled run never ships — yours to resolve: wf hold <id> --off, or wf cancel <id>',
+    '  nothing of <id> is filed until nemia decide says <parent> has shipped onto main; nothing to decide yet',
+    '  held until <target> (cancelled) ships as well — <target> was cancelled at <at>, and a cancelled run never ships — yours to resolve: nemia hold <id> --off, or nemia cancel <id>',
   ]);
   assert.deepEqual(await decideScreen(t, b.e, [target.id], { ...ids, '<at>': at }), [
     '<target>  still going',
@@ -937,8 +938,8 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
     '  ROUNDS EXHAUSTED, waiting on you: review  — asked for another round on the last one rounds: allows; its findings are below',
     '',
     '  once more, on the next tick:',
-    '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round <id> review',
-    '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept <id> review --message "<why>"',
+    '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia round <id> review',
+    '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept <id> review --message "<why>"',
     '',
     '  touched  wf/<id>/implement',
     '    nothing — the branch changed no file against the base',
@@ -975,7 +976,7 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
     '<id>  a loop',
     '',
     '  still running: review',
-    '  review: round 2 asked (wf round) — the next tick files implement',
+    '  review: round 2 asked (nemia round) — the next tick files implement',
     '  nothing to decide yet',
   ]);
 });
@@ -1055,7 +1056,7 @@ test("holdWord says the person's why and who put the hold after `ships`, before 
   assert.equal(heldLater({ at: 't', until: ['a-1'] }, 'its approval'), 'held until a-1 ships; its approval is asked once the hold lifts');
 });
 
-test("wf hold writes the person's why, one line, and who they are into the hold's file — by default the OS user — and says them back", async (t) => {
+test("nemia hold writes the person's why, one line, and who they are into the hold's file — by default the OS user — and says them back", async (t) => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -1112,13 +1113,13 @@ test('REFUSED at shipped defaults: --why and --by with no value, given twice, wi
   const target = await aRunning(b, repo);
   const run = start({ brief: 'not held', repo, workflowDir: oneStep() });
   const u = ['hold', run.id, '--until', target.id];
-  await refused(t, b.e, /^--why takes the words for why the run is held: wf hold <runId>/, ...u, '--why');
+  await refused(t, b.e, /^--why takes the words for why the run is held: nemia hold <runId>/, ...u, '--why');
   await refused(t, b.e, /^--why takes the words for why the run is held/, ...u, '--why', '--by', 'x');
-  await refused(t, b.e, /^--by takes who puts the hold, by a name: wf hold <runId>/, ...u, '--by');
-  await refused(t, b.e, /^wf hold takes --why once: a hold says one why/, ...u, '--why', 'a', '--why', 'b');
-  await refused(t, b.e, /^wf hold takes --by once: a hold says one by/, ...u, '--by', 'a', '--by=b');
-  await refused(t, b.e, /^wf hold --off lifts the hold whole, and takes no --why or --by/, 'hold', run.id, '--off', '--why', 'w');
-  await refused(t, b.e, /^wf hold --off lifts the hold whole, and takes no --why or --by/, 'hold', run.id, '--by', 'x', '--off');
+  await refused(t, b.e, /^--by takes who puts the hold, by a name: nemia hold <runId>/, ...u, '--by');
+  await refused(t, b.e, /^nemia hold takes --why once: a hold says one why/, ...u, '--why', 'a', '--why', 'b');
+  await refused(t, b.e, /^nemia hold takes --by once: a hold says one by/, ...u, '--by', 'a', '--by=b');
+  await refused(t, b.e, /^nemia hold --off lifts the hold whole, and takes no --why or --by/, 'hold', run.id, '--off', '--why', 'w');
+  await refused(t, b.e, /^nemia hold --off lifts the hold whole, and takes no --why or --by/, 'hold', run.id, '--by', 'x', '--off');
   await refused(t, b.e, /^--why takes the words for why the run is held, and was given only blanks: give it words/, ...u, '--why', ' \n ');
   await refused(t, b.e, /^--by takes who puts the hold, by a name, and was given only blanks/, ...u, '--by=');
   await refused(
@@ -1150,7 +1151,7 @@ test('REFUSED at shipped defaults: a hold on a run already held with words names
   await refused(
     t,
     b.e,
-    new RegExp(`${literal(`then wf hold ${run.id} --until ${target.id} --why 'it'\\''s blocked'.`)}$`),
+    new RegExp(`${literal(`then nemia hold ${run.id} --until ${target.id} --why 'it'\\''s blocked'.`)}$`),
     'hold',
     run.id,
     '--until',
@@ -1161,7 +1162,7 @@ test('REFUSED at shipped defaults: a hold on a run already held with words names
   await refused(
     t,
     b.e,
-    new RegExp(`${literal(`then wf hold ${plain.id} --until ${target.id}.`)}$`),
+    new RegExp(`${literal(`then nemia hold ${plain.id} --until ${target.id}.`)}$`),
     'hold',
     plain.id,
     '--until',
@@ -1169,7 +1170,7 @@ test('REFUSED at shipped defaults: a hold on a run already held with words names
   );
 });
 
-test("wf ls, wf decide and the feed say a hold's why and who put it beside held until, on the run's row and at the gate it holds back; a hold older code wrote says the plain line", async (t) => {
+test("nemia ls, nemia decide and the feed say a hold's why and who put it beside held until, on the run's row and at the gate it holds back; a hold older code wrote says the plain line", async (t) => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -1189,10 +1190,10 @@ test("wf ls, wf decide and the feed say a hold's why and who put it beside held 
   asOlder(olderGate.id);
 
   const ls = (await typed(t, b.e, 'ls', atGate.id)).printed;
-  assert.match(ls, new RegExp(`→ ${literal(words)}  —  wf hold ${atGate.id} --off lifts it`), ls);
+  assert.match(ls, new RegExp(`→ ${literal(words)}  —  nemia hold ${atGate.id} --off lifts it`), ls);
   assert.match(ls, new RegExp(`${literal(words)}; its approval is asked once the hold lifts`), ls);
   const olderLs = (await typed(t, b.e, 'ls', olderGate.id)).printed;
-  assert.match(olderLs, new RegExp(`→ held until ${target.id} ships  —  wf hold ${olderGate.id} --off lifts it`), olderLs);
+  assert.match(olderLs, new RegExp(`→ held until ${target.id} ships  —  nemia hold ${olderGate.id} --off lifts it`), olderLs);
   assert.match(olderLs, new RegExp(`held until ${target.id} ships; its approval is asked once the hold lifts`), olderLs);
 
   const screen = (await typed(t, b.e, 'decide', atGate.id)).printed;
@@ -1207,7 +1208,7 @@ test("wf ls, wf decide and the feed say a hold's why and who put it beside held 
   assert.equal((await typed(t, b.e, 'hold', child.id, '--until', target.id, ...why)).error, undefined);
   assert.match(
     (await typed(t, b.e, 'decide', child.id)).printed,
-    new RegExp(`\n  ${literal(words)} as well — wf hold ${child.id} --off lifts the hold, and not the wait above$`),
+    new RegExp(`\n  ${literal(words)} as well — nemia hold ${child.id} --off lifts the hold, and not the wait above$`),
   );
 
   const quiet = start({ brief: 'held before it files', repo, workflowDir: oneStep() });

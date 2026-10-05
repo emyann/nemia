@@ -126,7 +126,7 @@ function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number; draft
   );
 }
 
-/** A step whose try a person just asked for, as its row says it until the run is read again: `wf ls`'s note. */
+/** A step whose try a person just asked for, as its row says it until the run is read again: the CLI `ls`'s note. */
 function AskedRow({ step, said }: { step: string; said: string }) {
   return (
     <li data-offer="asked" data-step={step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
@@ -154,10 +154,10 @@ function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; 
 }
 
 /**
- * A step's questions, answered by choosing: nothing is chosen until the person chooses, or presses `Choose the recommended answers`,
- * which chooses each recommended option and leaves every other question as it was. `Answer and continue` waits until every question has a
- * choice or words, then asks for the try with the answers, a note beside them if one was written, as `wf retry --message` would carry
- * them — the api checks them against what the step asks now, and its refusal is shown verbatim.
+ * A step's questions, answered by choosing: nothing is chosen until the person chooses, or presses `Choose the recommended answers`, which
+ * chooses each recommended option and leaves every other question as it was. `Answer and continue` waits until every question has a choice
+ * or words, then asks for the try with the answers, a note beside them if one was written, as the CLI's `retry --message` would carry them
+ * — the api checks them against what the step asks now, and its refusal is shown verbatim.
  */
 export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<Answer, { kind: 'answer' }> }) {
   const [draft, setDraft] = useState<Draft>({});

@@ -1,8 +1,8 @@
 /**
  * A task whose journal holds an entry no runtime wrote, beside a run whose tasks read: the runtime leaves the task out of its pass and says
  * why (`TickReport.unreadable`), and the tick leaves the run it belongs to unjudged and says so, while every other run advances — through
- * `tick` and `wf tick`, never a throw that stops the daemon. Walked through the runtime itself, `promiseEngine` over an in-memory journal
- * that hands back what was put in it, as a store does, and a harness the test signs by hand, as rest-store.test.ts does.
+ * `tick` and `nemia tick`, never a throw that stops the daemon. Walked through the runtime itself, `promiseEngine` over an in-memory
+ * journal that hands back what was put in it, as a store does, and a harness the test signs by hand, as rest-store.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` admits sessions enough for both
  * runs, and no cap is set on runs.

@@ -1,6 +1,6 @@
 /**
- * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` here, the others
- * beside.
+ * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `nemia tick`, `nemia up` and `nemia watch` here, the
+ * others beside.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -40,14 +40,14 @@ import {
   type Command,
   type Ran,
 } from '../runner.ts';
-import { HELP, usage, type Engine, type Verb } from './flags.ts';
+import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
- * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
- * said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
+ * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch
+ * is said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
  *
  * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it
  * — finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
@@ -56,15 +56,15 @@ export function watchPrinted(from: number): { stop(): void } {
   const watch = watchFeed({
     from,
     onLine: (line) => console.log(feedLineWords(line)),
-    onCut: (said) => console.error(`wf watch: ${said}`),
-    onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`),
+    onCut: (said) => console.error(`nemia watch: ${said}`),
+    onError: (err) => console.error(`nemia watch: ${(err as Error).message ?? String(err)}`),
   });
   console.log(`watching from ${from}, ^C to stop`);
   return watch;
 }
 
 /**
- * `wf watch` as an Effect: `watchPrinted(from)` held in its scope until it is interrupted, and stopped as that scope closes, so an
+ * `nemia watch` as an Effect: `watchPrinted(from)` held in its scope until it is interrupted, and stopped as that scope closes, so an
  * interrupted watch leaves no watcher and no timer behind. It never ends of itself; a cursor it cannot read from fails it.
  */
 export const watching = (from: number): Effect.Effect<never, unknown> =>
@@ -75,7 +75,7 @@ export const watching = (from: number): Effect.Effect<never, unknown> =>
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
 type Pass = Awaited<ReturnType<typeof tick>>;
 
-/** A run's line on `wf tick`: its status and what the pass did to it, then its notes, a line each. */
+/** A run's line on `nemia tick`: its status and what the pass did to it, then its notes, a line each. */
 function tickRunLines(r: Pass['runs'][number]): void {
   const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
@@ -88,8 +88,8 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `wf tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it refused,
- * the queue's card and each run; returns it.
+ * A pass's lines on `nemia tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it
+ * refused, the queue's card and each run; returns it.
  */
 function tickLines(pass: Pass): Pass {
   const { runs: results, queue, feedError, refused, unreadable, pause } = pass;
@@ -104,37 +104,37 @@ function tickLines(pass: Pass): Pass {
 }
 
 /**
- * `wf tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is refused,
- * with no way to force it. A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
+ * `nemia tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is
+ * refused, with no way to force it. A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
 async function tickVerb(args: Args, e: Engine): Promise<void> {
   const stats = args.stats === true;
   const held = storeRefusal('tick');
-  if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held });
+  if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
   const { cost } = tickLines(await tick(e, { repo: path.resolve('.') }));
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;
 }
 
-/** `wf up --stats`: what the last pass cost, read off the store, ticking nothing, and who wrote it. */
+/** `nemia up --stats`: what the last pass cost, read off the store, ticking nothing, and who wrote it. */
 function upStats(): void {
   const cost = lastPassCost();
   const daemon = storeRefusal('tick') !== undefined;
   if (!cost)
     return console.log(
-      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run wf tick --stats, or start one (npm start in apps/api, or wf up)'}`,
+      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up)'}`,
     );
   for (const line of breakdownLines(cost)) console.log(line);
   return console.log(
     daemon
       ? 'written by the daemon that holds this store, after its last pass'
-      : 'no daemon holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
+      : 'no daemon holds this store now, so this was the last pass anyone ran: nemia tick --stats runs one and says what it cost',
   );
 }
 
 /**
- * What `wf up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move the
- * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
+ * What `nemia up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move
+ * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
  * change of its words and once resumed; and the passes its next summary counts (`interval`).
  */
 type UpSaid = {
@@ -146,14 +146,14 @@ type UpSaid = {
   interval: Interval | undefined;
 };
 
-/** The queued card's line on `wf up`, unless it is the failure it said last; returns the failure it says now, if any. */
+/** The queued card's line on `nemia up`, unless it is the failure it said last; returns the failure it says now, if any. */
 function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined): string | undefined {
   const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
   if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
   return failure;
 }
 
-/** What a pass did to each run, as `wf up` says it: its notes, then what it filed, tried again, rounded again and is checking. */
+/** What a pass did to each run, as `nemia up` says it: its notes, then what it filed, tried again, rounded again and is checking. */
 function advancedLines(advanced: Pass['runs']): void {
   for (const r of advanced) {
     for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
@@ -165,9 +165,9 @@ function advancedLines(advanced: Pass['runs']): void {
 }
 
 /**
- * The store's pause on `wf up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put, again
- * each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns the
- * lines it said, if any, as one string.
+ * The store's pause on `nemia up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put,
+ * again each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns
+ * the lines it said, if any, as one string.
  */
 export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
   const lines = pause ? [pausedWords(pause) ?? '', ...pause.staged.map((s) => `   ${stagedWords(s)}`)] : [RESUMED];
@@ -176,7 +176,7 @@ export function pauseSaid(pause: Pass['pause'], said: string | undefined): strin
   return now;
 }
 
-/** One pass's lines on `wf up`, going by what it has printed (`was`), not by the store; returns what it has printed now. */
+/** One pass's lines on `nemia up`, going by what it has printed (`was`), not by the store; returns what it has printed now. */
 function passLines(pass: Pass, was: UpSaid): UpSaid {
   const { runs: advanced, queue, feedError, cost, refused, unreadable } = pass;
   const paused = pauseSaid(pass.pause, was.pauseSaid);
@@ -197,9 +197,10 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
 }
 
 /**
- * `wf up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
- * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `wf up` under `runMain`, saying each
- * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
+ * `nemia up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
+ * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, saying each
+ * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `nemia start` takes
+ * `.`.
  */
 function upVerb(args: Args, e: Engine): void | Promise<void> {
   if (args.stats === true) return upStats();
@@ -220,7 +221,7 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
       console.log(`up — every ${every}ms, ^C to stop`);
       for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
       console.log(
-        `   holds ${store} as pid ${held.pid} — a second daemon, the api or a wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+        `   holds ${store} as pid ${held.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`,
       );
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
@@ -231,7 +232,7 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   return runMain(up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken, onPass }).pipe(Effect.scoped));
 }
 
-/** `wf watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */
+/** `nemia watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */
 function watchVerb(args: Args): void | Promise<void> {
   const from = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
   const refusal = feedCursorRefusal(from);
@@ -239,14 +240,14 @@ function watchVerb(args: Args): void | Promise<void> {
   return runMain(watching(from));
 }
 
-/** Each verb `wf` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
+/** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `wf plan`); `wf rm` and `wf prune`, whose
- * runners walk the many runs a command line names through their handlers; and `wf start`, `wf inbox add`, `wf inbox queue` and
- * `wf agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once read
- * and checked.
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
+ * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`
+ * and `nemia agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once
+ * read and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
@@ -279,7 +280,7 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine): Pro
   for (const line of command.note?.(data, args) ?? []) console.error(line);
 }
 
-/** The names `wf` takes, its commands' and its verbs', a name of two words among them: `agents card`. */
+/** The names `nemia` takes, its commands' and its verbs', a name of two words among them: `agents card`. */
 const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name), ...VERBS.keys()];
 
 /**
@@ -303,4 +304,10 @@ export async function main(argv: string[], e: Engine = engine()): Promise<void> 
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(command, named.rest, e);
   return VERBS.get(named.name)!(named.rest, e);
+}
+
+/** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */
+export function aliased(argv: string[], e?: Engine): Promise<void> {
+  process.stderr.write(`${WF_HINT}\n`);
+  return main(argv, e);
 }

@@ -1,4 +1,4 @@
-# packages/agent-orchestrator — `wf`
+# packages/agent-orchestrator — `nemia` (`wf`, its alias)
 
 Workflows as folders of markdown, runs of their steps, a tick that files and admits them on the runtime, and the verbs a person uses:
 run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. It
@@ -16,6 +16,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `place.json` has its script (`readPlaceJson`).
 - **A harness's word or a team name in `src` or `bin` is refused by `test/words.test.ts`**, which holds today's per file
   (`HARNESS_WORDS`, `TEAM_NAMES`, each naming its card or move): lower a count in the commit that removes one, and add none.
+- **The command is `nemia` in every printed word; a `wf` said in `src` or `bin` is refused by `test/cli-name.test.ts`**, but a value
+  stored and read back as written (`by: 'wf up'`, the check's marker `wf <name>:`), listed in its `KEPT` (the api's has none).
 - **Git holds `index.lock` through a clean filter under `git add`, not through `git commit`'s pre-commit hook** (it writes the index
   first): a test that holds a lock past a verb's deadline holds it with a filter (`test/git-skill.test.ts`).
 

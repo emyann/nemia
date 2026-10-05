@@ -91,13 +91,13 @@ function inWorkspace(
 /**
  * Copy each file a step's closeout names from its workspace root into the step's files directory, at the same path — so a step that cannot
  * write outside its worktree (Codex in `workspace-write`, which the engine gives no other directory) still hands its files over, and the
- * steps after it and `wf decide` read them from one place (`missingArtifacts`, `artifactFiles`).
+ * steps after it and `nemia decide` read them from one place (`missingArtifacts`, `artifactFiles`).
  *
  * `advance` runs it on each pass that hands a step off (`handOffDue`): until its check is filed, and until a step after it works in its
  * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and, within a
- * millisecond, its time is left as it is, since a copy's time reads back a hair off its source's. Nothing is copied, and `wf decide` says
- * why, for a path that climbs out of the workspace (never read), a link that leads out of it (not followed), a directory, a file that is
- * not there, and a copy that fails. Nothing is written through a link in the files directory, which a step may have made. It never
+ * millisecond, its time is left as it is, since a copy's time reads back a hair off its source's. Nothing is copied, and `nemia decide`
+ * says why, for a path that climbs out of the workspace (never read), a link that leads out of it (not followed), a directory, a file that
+ * is not there, and a copy that fails. Nothing is written through a link in the files directory, which a step may have made. It never
  * throws, as a hand-off does not. The pass's note names what was copied.
  */
 export function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {
@@ -160,7 +160,7 @@ function isFileIn(file: string, dir: string): boolean {
 }
 
 /**
- * Every file in a step's files directory, every level down, with its size: what `wf decide` lists after
+ * Every file in a step's files directory, every level down, with its size: what `nemia decide` lists after
  * the step's closeout. Regular files only, and no link is followed, so nothing outside the directory is
  * listed because something inside it points there.
  */
@@ -190,7 +190,7 @@ export const LANDED_PICTURES = 'e2e-pictures.txt';
  * Remove the pictures an ending's check took of the merged tree, once that check passed and the merge landed: what `landEnding` does on
  * the pass that writes `{ commit }`. The ship's check runs the e2e on the merge staged in the repository's checkout, with its files
  * directory as `WF_ARTIFACTS`, after the ship's gate — so no person and no step reads those pictures before it, and after a pass nothing
- * shows them but `wf decide`'s list of files (sizes, no pictures). They are a second photograph, of another tree, not copies of the
+ * shows them but `nemia decide`'s list of files (sizes, no pictures). They are a second photograph, of another tree, not copies of the
  * implement step's, which are kept. A check that did not pass is never landed as a commit, so its pictures, the failed page's among them,
  * stay for whoever reads why.
  *

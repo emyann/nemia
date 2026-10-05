@@ -59,7 +59,7 @@ test("a branch git does not have is neither clean nor conflicted: it carries git
 
 test("REFUSED: the merge check of a run the store does not have, in the store's words whole", async () => {
   await assert.rejects(MERGES.handler({} as never, { runId: 'r-none', branches: ['wf/r-none/implement'] }), (err: Error) => {
-    assert.equal(err.message, "no such run: r-none  (try 'wf ls')");
+    assert.equal(err.message, "no such run: r-none  (try 'nemia ls')");
     return true;
   });
 });

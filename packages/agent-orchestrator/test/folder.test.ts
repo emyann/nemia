@@ -4,14 +4,14 @@
  * reading that list: a folder run runs no git at all. `WF_ROOT` is set before the modules are imported, since they read it as they load.
  *
  * What the tests hold, beyond their names:
- * - A folder run's folders live until `wf rm`, not until its end (features.md, *Decided: a folder lives as long as its run*): a run
+ * - A folder run's folders live until `nemia rm`, not until its end (features.md, *Decided: a folder lives as long as its run*): a run
  *   that ended on anything but success is written again in the folder it worked in. A try is filed there, a nudge continues a session
  *   tied to that directory, and what the first try left in it is what the second one works on.
- * - A folder team never reads a card's `repo:`, so a card filed with one is refused where it is written, in the words `wf start --repo`
+ * - A folder team never reads a card's `repo:`, so a card filed with one is refused where it is written, in the words `nemia start --repo`
  *   is refused in; a card for a git team, and a card for a folder team with no repository, are filed.
  * - A card that already names a repository (written by hand, or before that refusal) cannot be edited from the board, so its start is
  *   not refused: the record has no repository, and the start says so, by hand and in the line a tick prints (`QueueStarted`).
- * - `wf inbox queue <card> --workflow <w>` writes `workflow:` over the card's own, so it is judged as the card's writer is
+ * - `nemia inbox queue <card> --workflow <w>` writes `workflow:` over the card's own, so it is judged as the card's writer is
  *   (`cardRepoRefusal`), taking it off the queue included (`queuedText`); a re-queue with no `--workflow` writes nobody's choice of team
  *   and is not refused, since refusing it would strand a card nobody can edit from the board.
  * - Every path a folder brief names is inside the step's folder and on disk: the run's inputs and the folders a fan-in waits on are
@@ -57,7 +57,7 @@ fs.writeFileSync(
   path.join(FAN, 'd.md'),
   '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: c\n---\nread it once more\n',
 );
-/** Two files a person hands the run with `wf start --input`. */
+/** Two files a person hands the run with `nemia start --input`. */
 const GIVEN_FILES = path.join(ROOT, 'given-files');
 fs.mkdirSync(GIVEN_FILES, { recursive: true });
 fs.writeFileSync(path.join(GIVEN_FILES, 'mock.png'), 'PNG');
@@ -201,7 +201,7 @@ test('a git team is still a git run: from a directory that is no repository, it 
   fs.rmSync(GIT_ASKED, { force: true });
 });
 
-test('a folder run advances, is decided and is forgotten with no git: each step works in its folder, the next continues it, and wf rm takes it all', async () => {
+test('a folder run advances, is decided and is forgotten with no git: each step works in its folder, the next continues it, and nemia rm takes it all', async () => {
   const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
   const { e, tasks, settle } = board();
 
@@ -246,11 +246,11 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
     screen.includes(
       `  worked in folders, with no git repository: ${path.join(ROOT, 'runs', run.id, 'work')}, a folder per step; nothing to merge`,
     ),
-    `wf decide says where the work is:\n${screen.join('\n')}`,
+    `nemia decide says where the work is:\n${screen.join('\n')}`,
   );
   assert.equal(
     screen.at(-1),
-    `  done with it   wf rm ${run.id}  — forgets the run with its folders and files`,
+    `  done with it   nemia rm ${run.id}  — forgets the run with its folders and files`,
     'and the one command there is',
   );
   assert.equal(screen.filter((l) => /\bgit (-C|merge|branch|diff)/.test(l)).length, 0, `and no git command:\n${screen.join('\n')}`);
@@ -288,7 +288,7 @@ test("a folder run's folder outlives its end: a run that ended blocked is tried 
   assert.deepEqual(gitAsked(), []);
 });
 
-test('wf start from a directory that is no repository: a folder team starts, and --repo named is refused in its words', async () => {
+test('nemia start from a directory that is no repository: a folder team starts, and --repo named is refused in its words', async () => {
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
@@ -388,7 +388,7 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
     assert.equal(
       queueLine(started),
       `started ${named} as ${started.run} (the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository)`,
-      "and the line a daemon prints says it, in the sentence wf start prints: a daemon's log is the only place a tick's start is read",
+      "and the line a daemon prints says it, in the sentence nemia start prints: a daemon's log is the only place a tick's start is read",
     );
 
     const plain = card('a-note-queued-plain', '');
@@ -669,7 +669,7 @@ test('the whole screen of a folder run: where the work is, and the one command t
     '',
     '  worked in folders, with no git repository: <root>/runs/<id>/work, a folder per step; nothing to merge',
     '',
-    '  done with it   wf rm <id>  — forgets the run with its folders and files',
+    '  done with it   nemia rm <id>  — forgets the run with its folders and files',
   ]);
   assert.deepEqual(gitAsked(), []);
 });

@@ -1,5 +1,5 @@
 /**
- * The factories on disk: `$WF_ROOT/factories/`, filed, listed and removed through `wf factory`, as a person types it.
+ * The factories on disk: `$WF_ROOT/factories/`, filed, listed and removed through `nemia factory`, as a person types it.
  *
  * Names and lines are pure, and live in factory.test.ts. This is the part that is not: the folder, what is and is not written, and the
  * create that two adds of one name cannot both win. `WF_ROOT` is set before the import, since the module reads it as it loads.
@@ -54,7 +54,7 @@ const fresh = (): string => {
   return fs.mkdtempSync(path.join(ROOT, 'repo-'));
 };
 
-test('wf factory add files <name>.json under the store, each repository absolute and named once, a plain directory being enough', async (t) => {
+test('nemia factory add files <name>.json under the store, each repository absolute and named once, a plain directory being enough', async (t) => {
   const repo = fresh();
   assert.equal(factoriesDir(), FACTORIES);
   const printed = await printedBy(t, 'factory', 'add', 'pipao', '--repo', repo, '--repo', path.relative(process.cwd(), repo));
@@ -71,7 +71,7 @@ test('REFUSED: an add of a name already filed is a Conflict, and the file is lef
   const before = fs.readFileSync(path.join(FACTORIES, 'pipao.json'));
   await assert.rejects(
     main(['factory', 'add', 'pipao', '--repo', other], NO_ENGINE),
-    refusedWith('Conflict', /^There is a factory pipao already, .* wf factory ls; .* wf factory rm pipao, then add it again\.$/),
+    refusedWith('Conflict', /^There is a factory pipao already, .* nemia factory ls; .* nemia factory rm pipao, then add it again\.$/),
   );
   assert.deepEqual(fs.readFileSync(path.join(FACTORIES, 'pipao.json')), before);
   assert.deepEqual(filed(), ['pipao.json'], 'no hidden file left behind');
@@ -97,7 +97,7 @@ test('REFUSED: the default factory is not added, and no file of its name is writ
   const repo = fresh();
   await assert.rejects(
     main(['factory', 'add', 'default', '--repo', repo], NO_ENGINE),
-    refusedWith('Conflict', /^`default` is the default factory: .* wf factory add does not take it/),
+    refusedWith('Conflict', /^`default` is the default factory: .* nemia factory add does not take it/),
   );
   assert.deepEqual(filed(), []);
 });
@@ -109,7 +109,7 @@ test('REFUSED: an add with no --repo, or with one that is missing or a file, is 
   fs.writeFileSync(aFile, 'not a directory\n');
   await assert.rejects(
     main(['factory', 'add', 'pipao'], NO_ENGINE),
-    refusedWith('Invalid', /^A factory names one repository at least, and none was given: wf factory add pipao --repo <path>/),
+    refusedWith('Invalid', /^A factory names one repository at least, and none was given: nemia factory add pipao --repo <path>/),
   );
   await assert.rejects(
     main(['factory', 'add', 'pipao', '--repo', repo, '--repo', gone, '--repo', aFile], NO_ENGINE),
@@ -134,7 +134,7 @@ test('REFUSED: a name that is not a slug is Invalid before any path is made of i
   assert.ok(!fs.existsSync(path.join(ROOT, 'x.json')));
 });
 
-test('wf factory ls: the default alone with no folder; then the default first and each factory by name', async (t) => {
+test('nemia factory ls: the default alone with no folder; then the default first and each factory by name', async (t) => {
   const repo = fresh();
   const other = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   assert.deepEqual(readFactories(), []);
@@ -151,7 +151,7 @@ test('wf factory ls: the default alone with no folder; then the default first an
   ]);
 });
 
-test('wf factory ls: a file that does not read is listed with why, the others still listed, and a hidden file not at all', async (t) => {
+test('nemia factory ls: a file that does not read is listed with why, the others still listed, and a hidden file not at all', async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   fs.writeFileSync(path.join(FACTORIES, 'empty.json'), '{}\n');
@@ -161,22 +161,22 @@ test('wf factory ls: a file that does not read is listed with why, the others st
   fs.writeFileSync(path.join(FACTORIES, '.hidden.json'), '{"repos": ["/x"]}\n');
   const listed = await printedBy(t, 'factory', 'ls');
   assert.equal(listed[0].split(' ')[0], 'default');
-  assert.match(listed[1], /^empty {4}\S*empty\.json does not read as a factory: `repos` is missing\. wf factory rm empty/);
-  assert.match(listed[2], /^none {5}\S*none\.json does not read as a factory: `repos.0` is missing\. wf factory rm none/);
+  assert.match(listed[1], /^empty {4}\S*empty\.json does not read as a factory: `repos` is missing\. nemia factory rm empty/);
+  assert.match(listed[2], /^none {5}\S*none\.json does not read as a factory: `repos.0` is missing\. nemia factory rm none/);
   assert.equal(listed[3], `pipao    ${repo}`);
   assert.match(listed[4], /^torn {5}\S*torn\.json is not JSON \(/);
   assert.equal(listed[5], '');
   assert.equal(listed.length, 7);
 });
 
-test('wf factory ls: a default.json written by hand is listed as a file to remove, never as the default factory or as a factory', async (t) => {
+test('nemia factory ls: a default.json written by hand is listed as a file to remove, never as the default factory or as a factory', async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"repos": ["/x"]}\n');
   const listed = await printedBy(t, 'factory', 'ls');
   assert.deepEqual(listed.slice(0, 3), [
     'default  every run and card that names no factory — read, never written',
-    `default  ${path.join(FACTORIES, 'default.json')} is no factory: the default factory is no file, and wf factory rm does not take it. Remove this file by hand.`,
+    `default  ${path.join(FACTORIES, 'default.json')} is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.`,
     `pipao    ${repo}`,
   ]);
   assert.deepEqual(
@@ -188,7 +188,7 @@ test('wf factory ls: a default.json written by hand is listed as a file to remov
 test('REFUSED: an rm of the default is a Conflict, and of a name with no factory is Missing, naming those there are', async () => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
-  await assert.rejects(main(['factory', 'rm', 'default'], NO_ENGINE), refusedWith('Conflict', /wf factory rm does not take it/));
+  await assert.rejects(main(['factory', 'rm', 'default'], NO_ENGINE), refusedWith('Conflict', /nemia factory rm does not take it/));
   await assert.rejects(
     main(['factory', 'rm', 'nope'], NO_ENGINE),
     refusedWith('Missing', /^no factory nope in the store\. Its factories are: pipao\. Nothing was removed\.$/),
@@ -197,7 +197,7 @@ test('REFUSED: an rm of the default is a Conflict, and of a name with no factory
   assert.deepEqual(filed(), ['pipao.json']);
 });
 
-test("wf factory rm removes that factory's file alone, and one that does not read too", async (t) => {
+test("nemia factory rm removes that factory's file alone, and one that does not read too", async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   await main(['factory', 'add', 'nemia', '--repo', repo], NO_ENGINE);
@@ -210,12 +210,12 @@ test("wf factory rm removes that factory's file alone, and one that does not rea
   assert.deepEqual(filed(), ['nemia.json']);
 });
 
-test('REFUSED: wf factory with a subcommand it does not have names the seven; --help prints its help', async (t) => {
+test('REFUSED: nemia factory with a subcommand it does not have names the seven; --help prints its help', async (t) => {
   await assert.rejects(
     main(['factory', 'frob'], NO_ENGINE),
     refusedWith(
       'Invalid',
-      /^wf factory does not take frob\. .*wf factory ls.*wf factory add <name> --repo <path>.*wf factory attach <factory> <workflow>.*wf factory detach <factory> <workflow>.*wf factory hire <factory> <agent> --step <workflow>\/<step>.*wf factory fire <factory> --step <workflow>\/<step>.*wf factory rm <name>/,
+      /^nemia factory does not take frob\. .*nemia factory ls.*nemia factory add <name> --repo <path>.*nemia factory attach <factory> <workflow>.*nemia factory detach <factory> <workflow>.*nemia factory hire <factory> <agent> --step <workflow>\/<step>.*nemia factory fire <factory> --step <workflow>\/<step>.*nemia factory rm <name>/,
     ),
   );
   await assert.rejects(main(['factory', 'add', 'pipao', '--rep', '/x'], NO_ENGINE), refusedWith('Invalid', /does not take --rep\./));
@@ -225,7 +225,7 @@ test('REFUSED: wf factory with a subcommand it does not have names the seven; --
 /** The factory `name`'s file, as JSON. */
 const fileOf = (name: string): Record<string, unknown> => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8'));
 
-test('wf factory hire files one agent a step, keeping repos and a key a later wf wrote; a second hire into the step replaces the first', async (t) => {
+test('nemia factory hire files one agent a step, keeping repos and a key a later nemia wrote; a second hire into the step replaces the first', async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   const file = path.join(FACTORIES, 'pipao.json');
@@ -262,7 +262,7 @@ test('wf factory hire files one agent a step, keeping repos and a key a later wf
   ]);
 });
 
-test('wf factory fire takes one hire back and keeps the rest; a step it hires no one into is Missing, naming its hires', async (t) => {
+test('nemia factory fire takes one hire back and keeps the rest; a step it hires no one into is Missing, naming its hires', async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   attachWorkflow({ factory: 'pipao', workflow: 'build' });
@@ -294,12 +294,12 @@ test('REFUSED: a hire or a fire in the default factory is a Conflict, and in no 
     main(['factory', 'hire', 'default', 'ada', '--step', 'build/implement'], NO_ENGINE),
     refusedWith(
       'Conflict',
-      /^`default` is the default factory: .* wf factory hire does not take it\. In it, a step that names no agent runs as a plain session/,
+      /^`default` is the default factory: .* nemia factory hire does not take it\. In it, a step that names no agent runs as a plain session/,
     ),
   );
   await assert.rejects(
     main(['factory', 'fire', 'default', '--step', 'build/implement'], NO_ENGINE),
-    refusedWith('Conflict', /wf factory fire does not take it/),
+    refusedWith('Conflict', /nemia factory fire does not take it/),
   );
   await assert.rejects(
     main(['factory', 'hire', 'nope', 'ada', '--step', 'build/implement'], NO_ENGINE),
@@ -354,25 +354,25 @@ test('REFUSED: a factory whose file does not read is Invalid to hire, fire and a
   );
 });
 
-test('REFUSED: wf factory hire and fire with a --step missing or twice, an unknown flag, or an argument too many, each by name', async () => {
+test('REFUSED: nemia factory hire and fire with a --step missing or twice, an unknown flag, or an argument too many, each by name', async () => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   const refusals: Array<[string[], RegExp]> = [
-    [['hire', 'pipao', 'ada'], /^wf factory hire names the step with --step: .* Nothing was hired\.$/],
-    [['hire', 'pipao'], /^wf factory hire takes the factory, then the agent/],
-    [['hire', 'pipao', 'ada', '--step', 'build/a', '--step', 'build/b'], /^wf factory hire takes --step once/],
-    [['hire', 'pipao', 'ada', '--step', 'build/a', '--stp', 'x'], /^wf factory hire does not take --stp\./],
-    [['hire', 'pipao', 'ada', 'otto', '--step', 'build/a'], /^wf factory hire takes <factory> <agent>, and otto is one more/],
-    [['fire', 'pipao'], /^wf factory fire names the step with --step: .* Nothing was fired\.$/],
-    [['fire', 'pipao', 'ada', '--step', 'build/a'], /^wf factory fire takes <factory>, and ada is one more/],
-    [['fire', '--step', 'build/a'], /^wf factory fire takes the factory first/],
+    [['hire', 'pipao', 'ada'], /^nemia factory hire names the step with --step: .* Nothing was hired\.$/],
+    [['hire', 'pipao'], /^nemia factory hire takes the factory, then the agent/],
+    [['hire', 'pipao', 'ada', '--step', 'build/a', '--step', 'build/b'], /^nemia factory hire takes --step once/],
+    [['hire', 'pipao', 'ada', '--step', 'build/a', '--stp', 'x'], /^nemia factory hire does not take --stp\./],
+    [['hire', 'pipao', 'ada', 'otto', '--step', 'build/a'], /^nemia factory hire takes <factory> <agent>, and otto is one more/],
+    [['fire', 'pipao'], /^nemia factory fire names the step with --step: .* Nothing was fired\.$/],
+    [['fire', 'pipao', 'ada', '--step', 'build/a'], /^nemia factory fire takes <factory>, and ada is one more/],
+    [['fire', '--step', 'build/a'], /^nemia factory fire takes the factory first/],
   ];
   for (const [argv, pattern] of refusals)
     await assert.rejects(main(['factory', ...argv], NO_ENGINE), refusedWith('Invalid', pattern), argv.join(' '));
   assert.deepEqual(fileOf('pipao'), { repos: [repo] });
 });
 
-test('wf factory attach adds a workflow by name, sorted and once, keeping every other key; detach takes it back and keeps the rest', async (t) => {
+test('nemia factory attach adds a workflow by name, sorted and once, keeping every other key; detach takes it back and keeps the rest', async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   const file = path.join(FACTORIES, 'pipao.json');
@@ -421,12 +421,12 @@ test('REFUSED: a hire into a step of a workflow the factory has not attached is 
     () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' }),
     refusedWith(
       'Invalid',
-      /^pipao does not offer the workflow build, so it hires no one into its steps\. Attach it first — wf factory attach pipao build — then hire\. Nothing was hired\.$/,
+      /^pipao does not offer the workflow build, so it hires no one into its steps\. Attach it first — nemia factory attach pipao build — then hire\. Nothing was hired\.$/,
     ),
   );
   assert.throws(
     () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'intak/x' }),
-    refusedWith('Invalid', /wf factory attach pipao intak /),
+    refusedWith('Invalid', /nemia factory attach pipao intak /),
   );
   assert.deepEqual(fs.readFileSync(file), before);
   hireAgent({ factory: 'pipao', agent: 'ada', step: 'intake/frame' });
@@ -446,7 +446,7 @@ test('REFUSED: a detach of a workflow the factory still hires into is Invalid, n
     () => detachWorkflow({ factory: 'pipao', workflow: 'build' }),
     refusedWith(
       'Invalid',
-      /^pipao hires into build's steps: build\/implement, build\/review\. Fire each first — wf factory fire pipao --step build\/implement; wf factory fire pipao --step build\/review — then detach it\. Nothing was detached\.$/,
+      /^pipao hires into build's steps: build\/implement, build\/review\. Fire each first — nemia factory fire pipao --step build\/implement; nemia factory fire pipao --step build\/review — then detach it\. Nothing was detached\.$/,
     ),
   );
   assert.throws(
@@ -480,7 +480,7 @@ test('REFUSED: attach and detach on the default factory, on no factory, with a n
     const change = verb === 'attach' ? attachWorkflow : detachWorkflow;
     await assert.rejects(
       main(['factory', verb, 'default', 'build'], NO_ENGINE),
-      refusedWith('Conflict', new RegExp(`^\`default\` is the default factory: .* wf factory ${verb} does not take it\\. `)),
+      refusedWith('Conflict', new RegExp(`^\`default\` is the default factory: .* nemia factory ${verb} does not take it\\. `)),
     );
     await assert.rejects(
       main(['factory', verb, 'nope', 'build'], NO_ENGINE),
@@ -510,16 +510,16 @@ test('REFUSED: attach and detach on the default factory, on no factory, with a n
   assert.deepEqual(fs.readFileSync(bent), bentBefore);
 });
 
-test('REFUSED: wf factory attach and detach with no workflow, a second one, or a flag, each by name, writing nothing', async () => {
+test('REFUSED: nemia factory attach and detach with no workflow, a second one, or a flag, each by name, writing nothing', async () => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   const refusals: Array<[string[], RegExp]> = [
-    [['attach', 'pipao'], /^wf factory attach takes the factory, then the workflow, by its folder's name: .* Nothing was attached\.$/],
-    [['attach'], /^wf factory attach takes the factory, then the workflow/],
-    [['attach', 'pipao', 'build', 'extra'], /^wf factory attach takes one workflow, and extra is a second/],
-    [['attach', 'pipao', 'build', '--x'], /^wf factory attach does not take --x\./],
-    [['detach', 'pipao'], /^wf factory detach takes the factory, then the workflow, .* Nothing was detached\.$/],
-    [['detach', '--step', 'build'], /^wf factory detach does not take --step\./],
+    [['attach', 'pipao'], /^nemia factory attach takes the factory, then the workflow, by its folder's name: .* Nothing was attached\.$/],
+    [['attach'], /^nemia factory attach takes the factory, then the workflow/],
+    [['attach', 'pipao', 'build', 'extra'], /^nemia factory attach takes one workflow, and extra is a second/],
+    [['attach', 'pipao', 'build', '--x'], /^nemia factory attach does not take --x\./],
+    [['detach', 'pipao'], /^nemia factory detach takes the factory, then the workflow, .* Nothing was detached\.$/],
+    [['detach', '--step', 'build'], /^nemia factory detach does not take --step\./],
   ];
   for (const [argv, pattern] of refusals)
     await assert.rejects(main(['factory', ...argv], NO_ENGINE), refusedWith('Invalid', pattern), argv.join(' '));

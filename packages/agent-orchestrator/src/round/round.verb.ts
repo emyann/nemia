@@ -1,6 +1,6 @@
 /**
- * `wf round` and `wf accept`: go round a loop once more, and end a loop as it stands. Each refuses before anything is written, and writes a
- * person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
+ * `nemia round` and `nemia accept`: go round a loop once more, and end a loop as it stands. Each refuses before anything is written, and
+ * writes a person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
  * (`runtime-client.ts`): Effect programs that require the engine as a service (`roundRun` and `acceptRun`, over `EngineService`), and
  * `round` and `accept`, their plain faces in a Promise, over the engine they are handed.
  */
@@ -18,11 +18,11 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
 
 /**
- * Ask for one more round of a loop whose rounds are spent — `wf round` — by writing the ask, and nothing else. The next tick honours it
+ * Ask for one more round of a loop whose rounds are spent — `nemia round` — by writing the ask, and nothing else. The next tick honours it
  * once.
  *
  * Refused before anything is written, with what to do instead (`roundAsk`): a round still running, one the run files itself, a loop that
- * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `wf retry`'s, the ask is
+ * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `nemia retry`'s, the ask is
  * the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one
  * loop. `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps
  * it. An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
@@ -52,16 +52,16 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
     const why =
       'refusal' in now
         ? now.refusal
-        : strayAsk(file, written.stray, `round ${ask.round} of ${ask.step}'s loop`, `wf round ${id} ${ask.step}`);
+        : strayAsk(file, written.stray, `round ${ask.round} of ${ask.step}'s loop`, `nemia round ${id} ${ask.step}`);
     return yield* Effect.fail(
-      new Conflict({ message: why ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.` }),
+      new Conflict({ message: why ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: nemia ls ${id}.` }),
     );
   }
   return { run, ask, file } satisfies RoundAsked;
 });
 
 /**
- * `wf round` (`roundRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * `nemia round` (`roundRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
  * with, or with whatever else it died of, as it was thrown.
  */
 export const round = (e: Engine, id: string, stepName?: string, budget?: number): Promise<RoundAsked> =>
@@ -70,25 +70,25 @@ export const round = (e: Engine, id: string, stepName?: string, budget?: number)
 export type Accepted = { run: Run; acceptance: Acceptance; file: string };
 
 /**
- * End a loop out of rounds on a person's word, with what they said — `wf accept` — by writing the acceptance, and nothing else. From the
+ * End a loop out of rounds on a person's word, with what they said — `nemia accept` — by writing the acceptance, and nothing else. From the
  * next tick the looping step reads as having handed on, and what waits on it is filed: a gated ending goes to its gate, `awaiting
  * approval`, and is approved or not as ever.
  *
  * Refused before anything is written, with what to do instead (`acceptAsk`): no words, a round the run files itself or that waits on a
  * budget, a round already asked for, a loop that ended `again: false`, a round still running, a try already accepted, a cancelled run. Like
- * `wf round`'s, the acceptance is the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be
- * left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as the look would
+ * `nemia round`'s, the acceptance is the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may
+ * be left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as the look would
  * have refused it, and a file at the acceptance's name that ends no loop is named, with how to clear it.
  *
- * Going round once more is not this verb's: `wf round <run> [<step>]` — and the two are offered side by side (`roundLines`). Fails with a
- * refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
+ * Going round once more is not this verb's: `nemia round <run> [<step>]` — and the two are offered side by side (`roundLines`). Fails with
+ * a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
  */
 export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
   const e = yield* EngineService;
   if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
       new Missing({
-        message: `no such run: ${id}. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".`,
+        message: `no such run: ${id}. nemia accept takes a run by its id, as nemia ls lists it: nemia accept <runId> [<step>] --message "<why>".`,
       }),
     );
   const run = yield* tried(() => runStore.runs.read(id));
@@ -113,8 +113,8 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
 });
 
 /**
- * `wf accept` (`acceptRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
+ * `nemia accept` (`acceptRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program
+ * failed with, or with whatever else it died of, as it was thrown.
  */
 export const accept = (e: Engine, id: string, stepName?: string, message?: string): Promise<Accepted> =>
   Effect.runPromise(acceptRun(id, stepName, message).pipe(Effect.provide(EngineService.layer(e))));
@@ -132,6 +132,6 @@ function acceptedAlready(
 ): string {
   if ('refusal' in now) return now.refusal;
   return stray !== null
-    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${stray}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
-    : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`;
+    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${stray}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: nemia accept ${id} ${acceptance.step} --message "<why>".`
+    : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: nemia ls ${id}.`;
 }

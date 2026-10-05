@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 type Props = {
   runId: string;
   step: string;
+  /** The line that says words to the step from a terminal, as the api answers it on the step (`commands.say`). */
+  line: string;
   /** Whether the box may send to the step's session, or why not (`sayable`). */
   sayable: Sayable;
   /** Given the engine's entry once the api has taken the words, so the page draws the turn before the run is read again. */
@@ -17,14 +19,14 @@ type Props = {
 
 /**
  * The chat input under a step's conversation, in the conversation layer's look: a rounded field that grows with what is written, and a send
- * button in its corner. Enter sends; Shift+Enter breaks the line. Sending posts the words to the api (`sayToStep`), which calls `wf say`'s
- * own `say()`: the words go to the session through its harness, and onto the step's record. A refusal shows under the box as the api said
- * it — the package's words or the engine's — and the words stay in the box, to send again. Closed, with the reason and where to go instead,
- * when the step has no session in flight. Once said, the box is emptied only if it still holds what was sent, keeping what a person wrote
- * meanwhile, and the run's record alone is read again (`exact`): nothing said to a session changes what there is to decide, and a decision
- * is keyed by the state it was read for.
+ * button in its corner. Enter sends; Shift+Enter breaks the line. Sending posts the words to the api (`sayToStep`), which calls the
+ * package's own `say()`: the words go to the session through its harness, and onto the step's record. A refusal shows under the box as the
+ * api said it — the package's words or the engine's — and the words stay in the box, to send again. Closed, with the reason and where to go
+ * instead, when the step has no session in flight. Once said, the box is emptied only if it still holds what was sent, keeping what a
+ * person wrote meanwhile, and the run's record alone is read again (`exact`): nothing said to a session changes what there is to decide,
+ * and a decision is keyed by the state it was read for.
  */
-export function PromptBox({ runId, step, sayable, onSaid }: Props) {
+export function PromptBox({ runId, step, line, sayable, onSaid }: Props) {
   const [text, setText] = useState('');
   const field = useId();
   const form = useRef<HTMLFormElement>(null);
@@ -85,7 +87,7 @@ export function PromptBox({ runId, step, sayable, onSaid }: Props) {
           />
           <div className="pointer-events-none absolute inset-x-3 bottom-2.5 flex items-center justify-between gap-3">
             <p className="min-w-0 truncate pl-1 text-xs text-muted-foreground">
-              as <code className="font-mono">{`wf say ${runId} ${step}`}</code>
+              as <code className="font-mono">{line}</code>
             </p>
             <Button
               type="submit"

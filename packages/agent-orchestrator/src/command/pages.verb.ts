@@ -53,7 +53,7 @@ export const RUN: Command<{ run: Run | null }> = {
   route: { method: 'GET', path: '/api/runs/:id', status: 200 },
   only: {
     side: 'api',
-    why: "the board's run page is a run judged, with its steps and their files; at the command line, wf show reads its record",
+    why: "the board's run page is a run judged, with its steps and their files; at the command line, nemia show reads its record",
   },
   handler: async (_e, args) => ({ run: runOf(args) ?? null }),
   print: () => [],
@@ -131,7 +131,7 @@ export const STEP_PATH: Command<{ path: LifecycleStep[] }> = {
   spec: stepSpec([], ['task']),
   writes: false,
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 },
-  only: { side: 'api', why: "the board draws each try of a step on the lifecycle's diagram; at the command line, wf ls says its state" },
+  only: { side: 'api', why: "the board draws each try of a step on the lifecycle's diagram; at the command line, nemia ls says its state" },
   handler: async (e, args) => ({ path: [...(await e.path(textOf(args, 'task') ?? ''))] }),
   print: () => [],
 };
@@ -152,7 +152,7 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/transcript', status: 200 },
   only: {
     side: 'api',
-    why: "the board reads a step's conversation as it goes; at the command line, wf logs reads what its session printed",
+    why: "the board reads a step's conversation as it goes; at the command line, nemia logs reads what its session printed",
   },
   handler: async (e, args) => {
     const { events, cursor } = await e.transcript(textOf(args, 'task') ?? '', textOf(args, 'after'));

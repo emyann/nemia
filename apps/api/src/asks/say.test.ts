@@ -1,6 +1,6 @@
 /**
  * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `say()` —
- * `wf say`'s own — and the `said` on the step's detail, read back off the engine's journal.
+ * `nemia say`'s own — and the `said` on the step's detail, read back off the engine's journal.
  *
  * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH,
  * listing the sessions this file says are running, each with a pid, so the registry of the sessions on this machine is never asked; and a
@@ -152,7 +152,7 @@ const written = () =>
     ),
   );
 
-/** What the package's `say()` refuses the words for, word for word: what `wf say` prints. */
+/** What the package's `say()` refuses the words for, word for word: what `nemia say` prints. */
 const sayRefuses = async (step: string, text: string, run = R): Promise<string> => {
   try {
     await say(engine(), run, step, text);
@@ -173,7 +173,7 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
     assert.equal(res.status, 403, site);
     assert.equal(
       ((await res.json()) as { error: string }).error,
-      `POST /api/runs/${R}/steps/implement/say refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the words go into the session of a step at work in this repository, as a person's, and its agent acts on them. Say it from the step's session page on the board, or with \`wf say ${R} implement "<words>"\`.`,
+      `POST /api/runs/${R}/steps/implement/say refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the words go into the session of a step at work in this repository, as a person's, and its agent acts on them. Say it from the step's session page on the board, or with \`nemia say ${R} implement "<words>"\`.`,
     );
   }
   for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
@@ -210,7 +210,7 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
   assert.deepEqual(written(), before, 'nothing written');
 });
 
-test("REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a step not filed, a cancelled run — 409s in the package's words and the engine's, verbatim, as `wf say` prints them — and no such run or step, 404: nothing said, nothing written", async () => {
+test("REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a step not filed, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them — and no such run or step, 404: nothing said, nothing written", async () => {
   const before = written();
   const cases: Array<[string, string, string, RegExp]> = [
     [R, 'implement', '', /^say: `text` is empty\. Give the words the session should hear\.$/],
@@ -219,7 +219,7 @@ test("REFUSED at shipped defaults: empty words (the engine's sentence), a settle
       R,
       'settled',
       'Widen the scope.',
-      /^settled is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything\. .*: wf retry r-say settled --message "<words>"\.$/,
+      /^settled is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything\. .*: nemia retry r-say settled --message "<words>"\.$/,
     ],
     [R, 'review', 'Look at the parser first.', /^review has not been filed yet, so there is no session to hear anything\./],
     [
@@ -234,7 +234,7 @@ test("REFUSED at shipped defaults: empty words (the engine's sentence), a settle
     assert.equal(res.status, 409, `${run} ${step} ${JSON.stringify(text)}`);
     const { error } = (await res.json()) as { error: string };
     assert.match(error, words);
-    assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `wf say` prints them");
+    assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `nemia say` prints them");
   }
   const noRun = await sayTo('implement', { text: 'Widen the scope.' }, BOARD, 'r-nope');
   assert.equal(noRun.status, 404);
@@ -255,7 +255,7 @@ test("words the harness could not be given come back in the engine's words, 502 
   assert.deepEqual(written(), before, 'nothing written');
 });
 
-test("words as the board sends them are the package's `say`: 202 with the engine's entry — `at`, `attempt`, `text` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `wf ls` words it; nothing else written", async () => {
+test("words as the board sends them are the package's `say`: 202 with the engine's entry — `at`, `attempt`, `text` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `nemia ls` words it; nothing else written", async () => {
   const records = Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir)));
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
   const res = await sayTo('implement', { text: words });
@@ -284,7 +284,7 @@ test("words as the board sends them are the package's `say`: 202 with the engine
   assert.equal(
     (await list(engine(), runStore.runs.read(R))).steps.find((s) => s.name === 'implement')!.note,
     'said to 1×',
-    "`wf ls`'s words",
+    "`nemia ls`'s words",
   );
   const summary = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
   assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');

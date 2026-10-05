@@ -1,6 +1,6 @@
 /**
- * GET /api/daemon (app.ts, daemon.ts): whether a `wf up` ticks the store, judged by the package off `daemon.json` and the process table as
- * `wf ls` judges it, and never written by the api — and the pure `daemonOf` under it. In the harness's scratch store
+ * GET /api/daemon (app.ts, daemon.ts): whether a `nemia up` ticks the store, judged by the package off `daemon.json` and the process table
+ * as `nemia ls` judges it, and never written by the api — and the pure `daemonOf` under it. In the harness's scratch store
  * (`root`).
  */
 import { root } from '../../test/harness.ts';
@@ -22,8 +22,8 @@ const MIN = 60_000;
 const ago = (ms: number, now = Date.now()) => new Date(now - ms).toISOString();
 
 /**
- * A file as `wf up` writes it: this test's own process, confirmed by its start, every 4 s, passed and beating `quiet` ago — each stamp off
- * one reading of the clock, so a step between two readings cannot set the pass after the beat.
+ * A file as `nemia up` writes it: this test's own process, confirmed by its start, every 4 s, passed and beating `quiet` ago — each stamp
+ * off one reading of the clock, so a step between two readings cannot set the pass after the beat.
  */
 const written = (quiet: number, over: Partial<DaemonFile> = {}): DaemonFile => {
   const procStart = procStartOf(process.pid);
@@ -61,13 +61,13 @@ test('with no daemon.json, nothing ticks the store, and the api makes none', asy
   assert.equal(d.pid, null);
   assert.equal(
     d.line,
-    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or wf up where no board is served',
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served',
   );
   assert.deepEqual([d.by, d.url, d.start], [null, null, 'npm start in apps/api']);
   assert.equal(fs.existsSync(FILE), false);
 });
 
-test('a live wf up heard from recently is ticking: its pid, where, since when, and its last pass', async () => {
+test('a live nemia up heard from recently is ticking: its pid, where, since when, and its last pass', async () => {
   const file = written(3_000);
   put(file);
   const d = await get();
@@ -82,8 +82,8 @@ test('a live wf up heard from recently is ticking: its pid, where, since when, a
   assert.equal(d.stoppedAt, null);
   assert.equal(d.staleAfterMs, STALE_FLOOR_MS);
   assert.equal(d.identity, procStartOf(process.pid) === undefined ? 'unknown' : 'same');
-  assert.match(d.line, new RegExp(`^wf up: ticking, pid ${process.pid}, every 4000ms — last pass `));
-  assert.deepEqual([d.by, d.url], ['wf up', null], 'a file that names no holder is a wf up');
+  assert.match(d.line, new RegExp(`^nemia up: ticking, pid ${process.pid}, every 4000ms — last pass `));
+  assert.deepEqual([d.by, d.url], ['wf up', null], 'a file that names no holder is a wf up, as it was written');
 });
 
 test('a live api holding the store is ticking as the api, at the url it serves the board on', async () => {
@@ -101,7 +101,7 @@ test('a pass that runs long is still ticking: silence is measured from the beat,
   assert.equal(d.ticking, true);
 });
 
-test('a live wf up is judged on the monotonic clock: wall stamps a stepped clock left twenty minutes behind are still ticking', async () => {
+test('a live nemia up is judged on the monotonic clock: wall stamps a stepped clock left twenty minutes behind are still ticking', async () => {
   const boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
   const mono = { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) };
   put(written(20 * MIN, { startedMono: mono, passedMono: mono, beatMono: mono }));
@@ -109,7 +109,7 @@ test('a live wf up is judged on the monotonic clock: wall stamps a stepped clock
   assert.equal(d.kind, 'ticking', d.line);
 });
 
-test('REFUSED: a live wf up silent past the stale mark is stalled, not ticking', async () => {
+test('REFUSED: a live nemia up silent past the stale mark is stalled, not ticking', async () => {
   const at = ago(20 * MIN);
   const file = written(20 * MIN, { passedAt: at, beatAt: at });
   put(file);
@@ -117,7 +117,7 @@ test('REFUSED: a live wf up silent past the stale mark is stalled, not ticking',
   assert.equal(d.kind, 'stalled');
   assert.equal(d.ticking, false);
   const [, pid, silent, lastPass, passedAt] =
-    /^wf up: stalled, pid (\d+), every 4000ms — alive, but silent for (\d+m\d{2}s): last pass (\d+m\d{2}s) ago \(([^)]+)\); /.exec(
+    /^nemia up: stalled, pid (\d+), every 4000ms — alive, but silent for (\d+m\d{2}s): last pass (\d+m\d{2}s) ago \(([^)]+)\); /.exec(
       d.line,
     ) ?? [];
   assert.equal(Number(pid), process.pid, d.line);
@@ -125,7 +125,7 @@ test('REFUSED: a live wf up silent past the stale mark is stalled, not ticking',
   assert.equal(passedAt, file.passedAt, "the file's last pass, as written");
 });
 
-test('REFUSED: a wf up that said it stopped is stopped, though its process lives', async () => {
+test('REFUSED: a nemia up that said it stopped is stopped, though its process lives', async () => {
   const stoppedAt = ago(5 * MIN);
   put(written(5 * MIN, { stoppedAt }));
   const d = await get();
@@ -134,7 +134,7 @@ test('REFUSED: a wf up that said it stopped is stopped, though its process lives
   assert.equal(d.stoppedAt, stoppedAt);
 });
 
-test('REFUSED: a wf up whose process is gone is gone, however recently it passed', async () => {
+test('REFUSED: a nemia up whose process is gone is gone, however recently it passed', async () => {
   put(written(1_000, { pid: NO_PID }));
   const d = await get();
   assert.equal(d.kind, 'gone');
@@ -143,7 +143,7 @@ test('REFUSED: a wf up whose process is gone is gone, however recently it passed
   assert.equal(d.identity, 'gone');
 });
 
-test("REFUSED: a daemon.json that does not read as a wf up's is unreadable, and the api leaves it as it is", async () => {
+test("REFUSED: a daemon.json that does not read as a nemia up's is unreadable, and the api leaves it as it is", async () => {
   put('{"pid": "not a pid"}\n');
   const d = await get();
   assert.equal(d.kind, 'unreadable');
@@ -160,7 +160,7 @@ test('REFUSED: a daemon.json that cannot be read is a 500 that says why, and not
   assert.equal(fs.statSync(FILE).isDirectory(), true);
 });
 
-test("daemonOf: the standing as facts, and wf ls's line with them", () => {
+test("daemonOf: the standing as facts, and nemia ls's line with them", () => {
   const now = Date.parse('2026-09-22T10:00:00.000Z');
   const file: DaemonFile = {
     pid: 42,

@@ -197,7 +197,7 @@ function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
 /**
  * The harnesses a step may name: the package's, then each remote A2A agent the store declares, as `a2a:<name>` (`remoteAgents`, read
  * afresh). An entry the runtime refuses is not offered, and a file refused as it stands offers none of its agents — the form is still
- * drawn, a step already naming one keeps its word, and `wf start` and `wf up` say what is wrong with the file.
+ * drawn, a step already naming one keeps its word, and `nemia start` and `nemia up` say what is wrong with the file.
  */
 function harnessChoices(): readonly string[] {
   try {

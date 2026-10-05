@@ -58,7 +58,7 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
     'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
     'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
   ]);
-  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms. wf up --stats says the same.');
+  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms.');
   assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
   assert.match(
     passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),
@@ -76,14 +76,14 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
 function packagePhases(pass: PassCost): string[] {
   const store = scratch('web-pass-');
   fs.writeFileSync(path.join(store, 'tick-stats.json'), JSON.stringify(pass));
-  const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'up', '--stats'], {
+  const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'up', '--stats'], {
     env: { ...process.env, WF_ROOT: store },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const lines = out.split('\n');
   const head = lines.findIndex((l) => /^ {2}phase +ms +calls/.test(l));
-  assert.ok(head > 0, `wf up --stats read the pass as one: ${out}`);
+  assert.ok(head > 0, `nemia up --stats read the pass as one: ${out}`);
   const rows = lines.slice(head + 1);
   return rows
     .slice(

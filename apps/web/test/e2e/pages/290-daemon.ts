@@ -77,7 +77,7 @@ export default {
       const title = await page.locator('[data-daemon-dot="stalled"]').getAttribute('title');
       if (!title?.startsWith(`Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent`))
         throw new Refused(`the dot's hover says the gauges' sentence — its title is ${JSON.stringify(title)}`);
-      if (!(await stalled.getAttribute('title'))?.startsWith(`wf up: stalled, pid ${process.pid}`)) {
+      if (!(await stalled.getAttribute('title'))?.startsWith(`nemia up: stalled, pid ${process.pid}`)) {
         throw new Refused(
           `the line holds wf ls's own words on hover — its title is ${JSON.stringify(await stalled.getAttribute('title'))}`,
         );
@@ -101,7 +101,7 @@ export default {
       await shoot('api-stale');
 
       for (const [holder, what] of [
-        [{}, 'wf up'],
+        [{}, 'nemia up'],
         [API_HOLDER, 'api'],
       ] as const) {
         fs.writeFileSync(file, daemonFile(1_000, holder));

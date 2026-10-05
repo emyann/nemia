@@ -1,9 +1,9 @@
 /**
  * The store's pause, which the runtime calls unschedulable: while it stands no pass starts new work — no step, try, round or check
  * filed, no queued task admitted, no queued card started — and what runs finishes. What still finishes under it (`finishingOf`), read off
- * the views on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `wf ls`,
- * `wf feed`, `wf start`, `wf up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour it are `assess`
- * and the tick's `pass`.
+ * the views on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `nemia ls`,
+ * `nemia feed`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour it are
+ * `assess` and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -26,12 +26,13 @@ export type PauseStaged = { run: string; step: string; repo: string };
 /**
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
  * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
- * `wf pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no `resumed`.
+ * `nemia pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no
+ * `resumed`.
  */
 export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
 
 /**
- * A task a pause at once stops (`wf pause --now`): `run`'s `step`, its `session` at work or the `check` of its work, by the task's id. A
+ * A task a pause at once stops (`nemia pause --now`): `run`'s `step`, its `session` at work or the `check` of its work, by the task's id. A
  * landing is never one.
  */
 export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; taskId: string };
@@ -51,11 +52,11 @@ export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: Paus
  */
 export type FinishingView = WordView & { admission?: string; state: WordView['state'] & { stopRequested?: boolean } };
 
-/** What a pause at once costs, as `wf pause --now` and the board's confirm say it before it is paid. */
+/** What a pause at once costs, as `nemia pause --now` and the board's confirm say it before it is paid. */
 export const NOW_COST = 'An interrupted step redoes its unfinished work and reads its context again.';
 
-/** How `wf resume` is typed, as every line that offers it says it. */
-export const RESUME_LINE = 'wf resume';
+/** How `nemia resume` is typed, as every line that offers it says it. */
+export const RESUME_LINE = 'nemia resume';
 
 /**
  * The tasks of `run` still at work, which the pause lets finish: each step's current task and its check's, pending or running. Left out:
@@ -170,7 +171,7 @@ export const pausedWords = ({ pause, finishing }: Pick<Paused, 'pause' | 'finish
 
 /**
  * A task still finishing under the pause, in one line: its run, its step, and what of it is at work; once asked to stop, that it is
- * stopping, and that wf resume tries it again only where a pause at once's ask names it (`resumed`).
+ * stopping, and that nemia resume tries it again only where a pause at once's ask names it (`resumed`).
  */
 export const finishingWords = ({ run, step, kind, stopping, resumed }: Finishing): string =>
   stopping
@@ -181,22 +182,22 @@ export const finishingWords = ({ run, step, kind, stopping, resumed }: Finishing
 export const interruptWords = ({ run, step, kind }: Interrupt): string =>
   `${run}'s ${step}: its ${kind === 'session' ? 'session' : 'check'}`;
 
-/** What a pause at once did, as `wf pause --now --yes` answers it: the pause, whether it stood already, what it stopped and left. */
+/** What a pause at once did, as `nemia pause --now --yes` answers it: the pause, whether it stood already, what it stopped and left. */
 export type PausedNow = { pause: Pause; kept: boolean; interrupted: Interrupt[]; skipped: Interrupt[] };
 
-/** How `wf pause --now` acts once it is shown what it stops. */
-export const NOW_LINE = 'wf pause --now --yes';
+/** How `nemia pause --now` acts once it is shown what it stops. */
+export const NOW_LINE = 'nemia pause --now --yes';
 
 /**
- * What `wf pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
+ * What `nemia pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
  * stop, what that costs (`NOW_COST`), that a landing finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
  */
 export const nowLines = (interrupts: readonly Interrupt[], standing = false): string[] => {
   const pausing = standing ? "would keep the store's pause as it stands" : 'would pause the store';
   return [
     interrupts.length
-      ? `wf pause --now ${pausing} and stop ${interrupts.length} at work, each tried again on ${RESUME_LINE}:`
-      : `wf pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
+      ? `nemia pause --now ${pausing} and stop ${interrupts.length} at work, each tried again on ${RESUME_LINE}:`
+      : `nemia pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
     ...interrupts.map((i) => `   ${interruptWords(i)}`),
     `${NOW_COST} A landing that checks or merges is left to finish.`,
     `${NOW_LINE} does it.`,
@@ -204,7 +205,7 @@ export const nowLines = (interrupts: readonly Interrupt[], standing = false): st
 };
 
 /**
- * What `wf pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it stopped, or that
+ * What `nemia pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it stopped, or that
  * none was at work; each it left at work, since a try of it was asked for already; and the cost.
  */
 export const pausedNowLines = ({ pause, kept, interrupted, skipped }: PausedNow): string[] => [
@@ -233,5 +234,5 @@ export const pausedLines = (paused: Paused): string[] => {
   return [line, ...paused.finishing.map((f) => `   ${finishingWords(f)}`), ...paused.staged.map((s) => `   ${stagedWords(s)}`)];
 };
 
-/** What `wf up` says once the pause it said is resumed. */
+/** What `nemia up` says once the pause it said is resumed. */
 export const RESUMED = 'the store is resumed — the next pass files what waits';

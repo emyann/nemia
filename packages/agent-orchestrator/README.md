@@ -510,7 +510,10 @@ project` (the runtime's README, *Settings: the checkout's, never the operator's*
 carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A rule in a checkout's
 `.claude/settings.local.json`, where "don't ask again" writes, reaches no step's job, only a background session. A step in the checkout
 itself (`workspace: main`) is given one rule by the run: a read of its own run's artifacts folder, where the steps before it left their
-files, and of no other run's (`filedAllows`). A step's `model:` and `effort:` go on
+files, and of no other run's (`filedAllows`). Every step on a harness fenced by a permission mode is filed the artifacts folder of each
+step it comes after, through `after:` and on, mounted read-only (`handedMounts`): it reads what they handed over, a picture included,
+and writes none of it in any mode. Its own folder is as it was, and the folder of a step it does not come after is not mounted. A step's
+`model:` and `effort:` go on
 the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
 must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
 the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).
@@ -2614,6 +2617,10 @@ not what: the key widens where a step's writes reach, never what it may do. Refu
 (`writableRefusal`): a name no folder of the factory has, one two share, one that is no directory now, a `writable:` in a run in no
 factory, and a step whose harness holds no writable mount, Codex's, in the runtime's words (`writableMountRefusal`).
 
+The same mounts carry what the steps before a step handed over: the artifacts folder of each step it comes after, read-only, after the
+factory's (`handedMounts`, in `filedConfig`), on a harness fenced by a permission mode and never named on its brief. A store whose path
+no permission rule can name refuses `wf start` of a workflow with such a later step, in the runtime's words, before anything is written.
+
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
 Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in
@@ -3196,7 +3203,7 @@ holding a concurrency slot forever.
 | `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start` and `wf plan` (`START`, `PLAN`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
 | `src/branches/merges.verb.ts`, `src/command/pages.verb.ts`, `src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts` | entries of the command table the api alone serves, each with why (`only`): whether a run's branches still merge (`MERGES`); a run's page and its steps' files, path and conversation (`PAGES`); the agent library's writes, removal, try and read (`LIBRARY_ENTRIES`); the skill library's list, read and writes (`SKILL_ENTRIES`); the workflow builder's reads and writes (`WORKFLOW_ENTRIES`) |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
-| `src/cli/exit.ts` | what `wf` exits with (`exitCodeOf`), imported by `bin/wf.ts` before the package |
+| `src/cli/exit.ts` | what `nemia` exits with (`exitCodeOf`), imported by each bin, `bin/nemia.ts` and its alias `bin/wf.ts`, before the package |
 
 The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),
 `agent-orchestrator/workflow` (`src/workflow.ts`) and `agent-orchestrator/effect` (`src/effect.ts`, the refusals by kind, which
@@ -3240,8 +3247,8 @@ no runtime, never a controller and not the client, and load as a tree — `recor
 controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which
 re-exports; the tick (`tick/tick.verb.ts`, `tick/advance.verb.ts`) and the verbs, one feature each (`start/start.verb.ts`,
 `decide/decide.verb.ts` and the rest), which import one another one way, with no cycle; and `src/cli/` and
-`bin/wf.ts` — a file of `src/cli/` reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts`
-only through `cli/main.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
+the bins, `bin/nemia.ts` and its alias `bin/wf.ts` — a file of `src/cli/` reaches the package only through `runner.ts`, `workflow.ts` and
+its own folder, and each bin only through `cli/main.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
 through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a
 controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders: at most six source
 files in one, no folder named `utils` or the like, no two files that need each other's values, no source file that

@@ -36,7 +36,7 @@ export type WordView = TaskClock & {
  * thing that tells them apart is that a filed task has the brief it was filed with.
  *
  * Worth the line, because `pending` counts as in flight: a run whose engine board has been cleared
- * would read as running for ever, `wf cancel` claiming to stop steps nobody can find.
+ * would read as running for ever, `nemia cancel` claiming to stop steps nobody can find.
  *
  * A task held open whose turn signed (`signedAndHeld`) is `succeeded`: waiting on a person with no
  * process running, its session is over, and the run reads its closeout, check and gate as a settled
@@ -90,7 +90,7 @@ export const endWords = (state: WordView['state'], a: WordAttempt): { ended: str
 
 /**
  * The engine's own word for a task's phase, off views already read — but `unknown` for a task it has no record of, as `phaseOfView` has it:
- * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `wf ls`
+ * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `nemia ls`
  * prints beside a step, and what the feed words it from (`feedPhase`).
  */
 export const engineWord =
@@ -101,7 +101,7 @@ export const engineWord =
 /**
  * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
  * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on
- * it, so `wf ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
+ * it, so `nemia ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
  */
 export const wordOfView = (v: WordView | undefined): string =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;

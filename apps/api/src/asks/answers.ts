@@ -1,6 +1,6 @@
 /**
  * A person's answers to the questions a step asks, as the board sends them on `POST …/retry`: checked against the questions its current
- * closeout asks (`askedQuestions`), and written as the words its next try reads (`answerText`), which `wf retry --message` would carry.
+ * closeout asks (`askedQuestions`), and written as the words its next try reads (`answerText`), which `nemia retry --message` would carry.
  */
 import { closeoutOf, type RetryHow, judgedSteps, workflowsOf } from 'agent-orchestrator';
 import { type Answer, answerRefusal, answerText, askedQuestions, type Run } from 'agent-orchestrator/run';
@@ -24,7 +24,7 @@ export async function answeredHow(
     return {
       status: 400,
       error:
-        '`answers` are carried into the step\'s next try, as `wf retry --message` carries an answer, and a recheck files no session to read them. Send them with "mode": "nudge" or "fresh".',
+        '`answers` are carried into the step\'s next try, as `nemia retry --message` carries an answer, and a recheck files no session to read them. Send them with "mode": "nudge" or "fresh".',
     };
   }
   const taskId = run.steps[step]?.taskId;

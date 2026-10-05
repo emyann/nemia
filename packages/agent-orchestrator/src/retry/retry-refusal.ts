@@ -1,5 +1,5 @@
 /**
- * What `wf retry` refuses (`retryRefusal`): the ask read first, then the step's standing, each refusal a named phase, asked in the order
+ * What `nemia retry` refuses (`retryRefusal`): the ask read first, then the step's standing, each refusal a named phase, asked in the order
  * a person is told them. Pure; what may be tried is `retry.ts`'s (`retryable`, `retriesDue`).
  */
 import type { Workflow } from '../step/step.ts';
@@ -56,11 +56,11 @@ type Judged = Asked &
   ReturnType<typeof retryable> & { step: Workflow; next: number; pending?: RetryAsk; stoppedAt?: Workflow; again: string };
 
 /**
- * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
+ * Why `nemia retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
  * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
  * `auto` would run in `default` on (`autoDropped`, as the load refuses it on the step's own `model:`); a cancelled run, which files
- * nothing, so the ask would never be honoured; an ask for the same try already waiting — one `wf pause --now` wrote that is void
+ * nothing, so the ask would never be honoured; an ask for the same try already waiting — one `nemia pause --now` wrote that is void
  * (`pauseAskVoid`) too, said as set aside by the next pass, which alone moves it; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted;
  * and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a person.
@@ -105,7 +105,7 @@ export function retryRefusal(
     run,
     name,
     how,
-    command: `wf retry ${run.id} ${name}`,
+    command: `nemia retry ${run.id} ${name}`,
     phaseOf,
     closeoutOf,
     askedCloseout,
@@ -150,7 +150,7 @@ function askedStep(asked: Asked): string | Workflow {
     );
   }
   if (run.cancelledAt) {
-    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
+    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with nemia start.`;
   }
   const pruned = prunedRefusal(run, 'a retry');
   if (pruned) return pruned;
@@ -164,7 +164,7 @@ function judged(asked: Asked, step: Workflow): Judged {
   const { steps, run, name, phaseOf, closeoutOf, askedCloseout, asks, spendOf } = asked;
   const next = tryOf(run, name) + 1;
   const stoppedAt = steps.find((s) => endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
-  const again = stoppedAt ? `wf retry ${run.id} ${stoppedAt.name}` : '';
+  const again = stoppedAt ? `nemia retry ${run.id} ${stoppedAt.name}` : '';
   return {
     ...asked,
     ...retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, asked.harnessBlocked, spendOf, asked.verdictOf),
@@ -183,15 +183,15 @@ function stoppedWords(c: Judged, ending: Workflow): string {
   return `${ending.name} stopped on the base branch (${ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for`;
 }
 
-/** The ask `wf pause --now` wrote for this try: void, which the next pass sets aside; or still due, tried on the resume. */
+/** The ask `nemia pause --now` wrote for this try: void, which the next pass sets aside; or still due, tried on the resume. */
 function pauseAskRefusal(c: Judged): string | undefined {
   const { run, name, command, next, pending } = c;
   if (pending?.interrupted === undefined) return undefined;
   const ran = pending.mode === 'recheck' ? 'check' : 'session';
   if (pauseAskVoid(c.step, run, pending, c.phaseOf, c.spendOf)) {
-    return `try ${next} of ${name} is held by the ask wf pause --now wrote (at ${pending.at}), void since its ${ran} ended on its own or another try replaced it: the next pass sets it aside, and no tick files it. Ask again once it has: ${command}.`;
+    return `try ${next} of ${name} is held by the ask nemia pause --now wrote (at ${pending.at}), void since its ${ran} ended on its own or another try replaced it: the next pass sets it aside, and no tick files it. Ask again once it has: ${command}.`;
   }
-  return `try ${next} of ${name} is asked by wf pause --now (at ${pending.at}), which stopped its ${ran}: it is tried once the store is resumed (wf resume), or set aside if it ended on its own first. Wait for it: wf ls ${run.id}.`;
+  return `try ${next} of ${name} is asked by nemia pause --now (at ${pending.at}), which stopped its ${ran}: it is tried once the store is resumed (nemia resume), or set aside if it ended on its own first. Wait for it: nemia ls ${run.id}.`;
 }
 
 /** An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a ship again that takes the same try. */
@@ -206,19 +206,19 @@ function pendingRefusal(c: Judged): string | undefined {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${back ? `sends the work back from ${back.join(', ')}` : gateWords(run, name)}, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --message "<objection>".`;
   }
   if (pending) {
-    return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
+    return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`;
   }
   const shipping = back?.map((b) => asks.find((a) => a.step === b && a.try === tryOf(run, b) + 1)).find(Boolean);
   if (shipping) {
     return (
       `try ${shipping.try} of ${shipping.step} is asked for (${modeWord(shipping)}, at ${shipping.at}): it does the act again on the work as it stands, and a send-back would take that try back. ` +
-      `Wait for it: wf ls ${run.id} — or, if the work is what must change, delete that ask — retry-${shipping.step}-${shipping.try}, in the run's .asks directory — and send the work back: ${command} --message "<objection>".`
+      `Wait for it: nemia ls ${run.id} — or, if the work is what must change, delete that ask — retry-${shipping.step}-${shipping.try}, in the run's .asks directory — and send the work back: ${command} --message "<objection>".`
     );
   }
   if (stoppedAt?.name === name) {
     const sending = stoppedAt.after.map((a) => asks.find((x) => x.step === a && x.try === tryOf(run, a) + 1)).find(Boolean);
     if (sending) {
-      return `the work is being sent back from ${name} (wf retry ${run.id} ${sending.step}, at ${sending.at}): ${name} returns to its gate once it settles, and a try of ${name} now would act on work that is being changed. Wait for it: wf ls ${run.id}.`;
+      return `the work is being sent back from ${name} (nemia retry ${run.id} ${sending.step}, at ${sending.at}): ${name} returns to its gate once it settles, and a try of ${name} now would act on work that is being changed. Wait for it: nemia ls ${run.id}.`;
     }
   }
   return undefined;
@@ -237,12 +237,12 @@ function stoppedEndingRefusal(c: Judged): string | undefined {
   if (through.length) {
     return (
       `${stoppedWords(c, stoppedAt)}, and the work goes back through the folder's loop, not to ${name}: send it back to ${through.join(' or ')}, which is filed again with your objection and what ${stoppedAt.name} said, and may ask for a round of the work — ` +
-      `${through.map((t) => `wf retry ${run.id} ${t} --message "<objection>"`).join(' or ')}. Or ship again, for what was not the work — a dirty checkout, a flaky test: ${again}.`
+      `${through.map((t) => `nemia retry ${run.id} ${t} --message "<objection>"`).join(' or ')}. Or ship again, for what was not the work — a dirty checkout, a flaky test: ${again}.`
     );
   }
   return (
     `${stoppedWords(c, stoppedAt)}, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose \`again: true\` gives the work a round, and ${stoppedAt.after.join(', ') || 'nothing'} ${stoppedAt.after.length > 1 ? 'do' : 'does'} not loop. ` +
-    `Ship again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (wf cancel ${run.id}) and start one for the work on the base branch as it is now (wf start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
+    `Ship again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (nemia cancel ${run.id}) and start one for the work on the base branch as it is now (nemia start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
   );
 }
 
@@ -251,11 +251,11 @@ function endingGateRefusal(c: Judged): string | undefined {
   const { step, run, name, status } = c;
   if (status !== 'awaiting approval' || run.steps[name].taskId) return undefined;
   const back = sendBackTo(step, run)
-    .map((s) => `wf retry ${run.id} ${s} --message "<objection>"`)
+    .map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`)
     .join(' or ');
   return (
     `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. ` +
-    `Approve it: wf approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`
+    `Approve it: nemia approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`
   );
 }
 
@@ -263,14 +263,14 @@ function endingGateRefusal(c: Judged): string | undefined {
 function statusRefusal(c: Judged): string {
   const { steps, step, run, name, status } = c;
   const why: Partial<Record<StepStatus, string>> = {
-    waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
-    running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,
-    checking: `${name}'s check is still due or running, so there is no verdict to act on yet. Wait for it: wf ls ${run.id}.`,
+    waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: nemia ls ${run.id}.`,
+    running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: nemia ls ${run.id} (or stop the run: nemia cancel ${run.id}).`,
+    checking: `${name}'s check is still due or running, so there is no verdict to act on yet. Wait for it: nemia ls ${run.id}.`,
     verified: `${name} is verified: its check passed, and there is nothing to try again.`,
     unverified: `${name} signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.`,
-    blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: wf ls ${run.id}.`,
-    exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — wf round ${run.id} ${name} — or take the work as it stands, its findings open: wf accept ${run.id} ${name} --message "<why>".`,
-    'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: wf round ${run.id} ${loopOf(steps, name)?.name ?? name} --budget <amount>.`,
+    blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: nemia ls ${run.id}.`,
+    exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — nemia round ${run.id} ${name} — or take the work as it stands, its findings open: nemia accept ${run.id} ${name} --message "<why>".`,
+    'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: nemia round ${run.id} ${loopOf(steps, name)?.name ?? name} --budget <amount>.`,
   };
   return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
 }
@@ -292,8 +292,8 @@ function modeRefusal(c: Judged): string | undefined {
       : `is ${status}`;
   return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. ${
     sendsBack
-      ? `To send it back from its gate, say what to change: wf retry ${run.id} ${name} --message "<objection>".`
-      : `Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`
+      ? `To send it back from its gate, say what to change: nemia retry ${run.id} ${name} --message "<objection>".`
+      : `Ask for another session instead: nemia retry ${run.id} ${name} (or --fresh).`
   }`;
 }
 
@@ -306,7 +306,7 @@ function wordlessRefusal(c: Judged): string | undefined {
     const ending = steps.find((s) => s.name === back[0])!;
     return (
       `${name}'s work went on to ${ending.name}, and ${stoppedWords(c, ending)}: a try of ${name} sends the work back from there, and one with no words tells its session nothing to change. ` +
-      `${say} — or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${run.id} ${ending.name}.`
+      `${say} — or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${ending.name}.`
     );
   }
   const ending = steps.find(
@@ -315,11 +315,11 @@ function wordlessRefusal(c: Judged): string | undefined {
   if (ending) {
     return (
       `${ending.name} is at its gate, not ${name}: ${ending.name} ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to ${name}, the work it would act on. ` +
-      `A try with no words tells its session nothing to change, so it would sign off as it did. ${say} — or approve the ending, which is what files it: wf approve ${run.id} ${ending.name}.`
+      `A try with no words tells its session nothing to change, so it would sign off as it did. ${say} — or approve the ending, which is what files it: nemia approve ${run.id} ${ending.name}.`
     );
   }
   const given = approvalOf(run, name);
-  return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. ${say} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
+  return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. ${say} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: nemia approve ${run.id} ${name}`}.`;
 }
 
 /** A `--budget` missing from a try of a step over its budget, or one given that the step cannot take. */
@@ -368,11 +368,11 @@ function runTriesItself(c: Judged): string | undefined {
     (r) => r.step === name,
   );
   if (itself?.by === 'signoff') {
-    return `the run nudges ${name} itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
+    return `the run nudges ${name} itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
   }
   if (itself) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
-    return `the run tries ${name} again itself: its check refused, and \`retries: ${step.retries}\` has ${left} left, so the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
+    return `the run tries ${name} again itself: its check refused, and \`retries: ${step.retries}\` has ${left} left, so the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
   }
   return undefined;
 }

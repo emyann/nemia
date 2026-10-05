@@ -1,7 +1,7 @@
 /**
- * A run that waits on a run (`wf start --after`), as the board reads it: `after` as the record froze it, and `waiting` — the runs its
- * roots wait on, in the package's words — on the list, the detail and the decision, each held to what `wf ls` and `wf decide` say. Off a
- * real repository, where a parent ships by its branch being merged, and in a scratch store, `WF_ROOT` set before the orchestrator is
+ * A run that waits on a run (`nemia start --after`), as the board reads it: `after` as the record froze it, and `waiting` — the runs its
+ * roots wait on, in the package's words — on the list, the detail and the decision, each held to what `nemia ls` and `nemia decide` say.
+ * Off a real repository, where a parent ships by its branch being merged, and in a scratch store, `WF_ROOT` set before the orchestrator is
  * imported, as it locates its store when it loads.
  *
  * The runs: `a-shipped`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
@@ -75,12 +75,12 @@ const signedOff = (taskId: string) =>
   ]);
 const working = (taskId: string) => journal(taskId, [filed(), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
 
-/** One step, frozen on the record as `wf start` freezes it: its branch is the run's result. */
+/** One step, frozen on the record as `nemia start` freezes it: its branch is the run's result. */
 const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
 /**
- * Writes run `id`'s record, one `implement` step frozen on it; `cancelledAt` marks it cancelled as `wf cancel` does, in a file of its own
- * beside the record.
+ * Writes run `id`'s record, one `implement` step frozen on it; `cancelledAt` marks it cancelled as `nemia cancel` does, in a file of its
+ * own beside the record.
  */
 function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}): void {
   const { cancelledAt, ...rest } = fields;
@@ -154,7 +154,7 @@ const asWaits = (waiting: Listed['waiting']): Wait[] =>
     ...(w.gone.length ? { gone: w.gone } : {}),
   }));
 
-test("the list carries each run's `after` as the record froze it, and `waiting` in `wf ls`'s words: a root says `waiting on <run>`, and a parent that never ships says why", async () => {
+test("the list carries each run's `after` as the record froze it, and `waiting` in `nemia ls`'s words: a root says `waiting on <run>`, and a parent that never ships says why", async () => {
   const runs = await listedRuns();
   const d = runs.get('d-waits')!;
   assert.deepEqual(d.after, ['a-shipped', 'b-running']);
@@ -163,7 +163,7 @@ test("the list carries each run's `after` as the record froze it, and `waiting` 
     {
       runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
       word: 'waiting on b-running',
-      advice: 'nothing of d-waits is filed until wf decide says b-running has shipped onto main; nothing to decide yet',
+      advice: 'nothing of d-waits is filed until nemia decide says b-running has shipped onto main; nothing to decide yet',
       onYou: false,
     },
     'a-shipped has shipped, so only b-running is waited on',
@@ -177,7 +177,7 @@ test("the list carries each run's `after` as the record froze it, and `waiting` 
   assert.deepEqual(e.waiting, {
     runs: [{ run: 'c-cancelled', missing: false, cancelledAt, gone: [] }],
     word: 'waiting on c-cancelled (cancelled)',
-    advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never ships — yours to resolve: wf cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
+    advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never ships — yours to resolve: nemia cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
     onYou: true,
   });
   assert.deepEqual(runs.get('f-no-such-parent')!.waiting?.runs, [{ run: 'no-such-run', missing: true, cancelledAt: null, gone: [] }]);
@@ -298,14 +298,14 @@ test('reading the runs a run waits on observes no harness again: the list and th
   assert.equal(
     observations() - before,
     0,
-    "the list: a-shipped's tasks, read to ask its wf decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
+    "the list: a-shipped's tasks, read to ask its nemia decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
   );
   const again = observations();
   assert.equal((await app.request('/api/runs/d-waits')).status, 200);
   assert.equal(observations() - again, 0, 'the detail');
 });
 
-test('the decision of a run waiting on runs is `waiting`, and nothing else: what `wf decide` prints for it', async () => {
+test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
   const runs = await listedRuns();
   const e = engine();
   for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {

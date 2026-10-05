@@ -1,5 +1,5 @@
 /**
- * What is left for a person to do about a run (`decision`), the commands `wf decide` offers for it (`choicesOf`), and the cost lines it
+ * What is left for a person to do about a run (`decision`), the commands `nemia decide` offers for it (`choicesOf`), and the cost lines it
  * prints (`costLine`, `runCostLines`). Pure.
  */
 import type { Workflow } from '../step/step.ts';
@@ -46,7 +46,7 @@ import { merges } from '../ending/ending.ts';
  *
  * Git's yes is not always an answer, though. A result branch is cut at the run's base, which is on the
  * base branch, so a branch nobody committed to is "on the base branch" from the moment it is cut. Read
- * as shipped, a run whose last step failed with nothing committed would say `shipped`: `wf decide` would
+ * as shipped, a run whose last step failed with nothing committed would say `shipped`: `nemia decide` would
  * hide the failure, and a run waiting on it (`--after`) would start. So `shipped` says which yes it is (`Shipped`).
  */
 export type Decision =
@@ -84,7 +84,7 @@ export type Decision =
        * Steps that signed off having been denied a call, and say `denials: fail`: nothing after them is filed, and no check of them ran.
        */
       denied: string[];
-      /** Gated steps that signed off and wait for a person's `wf approve` (`stepStatus`): nothing after them is filed. */
+      /** Gated steps that signed off and wait for a person's `nemia approve` (`stepStatus`): nothing after them is filed. */
       awaitingApproval: string[];
       /** The steps worked on the base branch itself (`--no-worktree`): there is nothing to merge. */
       direct: boolean;
@@ -251,10 +251,10 @@ export function decision(
 }
 
 /**
- * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read, by
- * price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran more
- * than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody measured,
- * never $0, and nothing of what it read where nobody counted that.
+ * A step's `cost` line on `nemia decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read,
+ * by price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran
+ * more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody
+ * measured, never $0, and nothing of what it read where nobody counted that.
  */
 export function costLine(step: Workflow | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
   const current = used?.costUsd !== undefined ? dollars(used.costUsd) : 'not measured';
@@ -271,8 +271,8 @@ export function costLine(step: Workflow | undefined, run: Run, name: string, use
 }
 
 /**
- * The run's `cost` on `wf decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost on
- * them — or `not measured`. Pure. None before any attempt has ended.
+ * The run's `cost` on `nemia decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost
+ * on them — or `not measured`. Pure. None before any attempt has ended.
  */
 export function runCostLines(run: Run, spendOf: SpendOf): string[] {
   const spent = runSpend(run, spendOf);
@@ -284,70 +284,78 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 }
 
 /**
- * A verb `wf decide` offers a person for one step (`retryOffers`, `roundOffers`): the sentence it prints, and the bare command that
- * sentence ends on — `wf retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message "<objection>"`; `wf round
- * <run> <step>`, with `--budget <amount>` past a cap; or `wf accept <run> <step> --message "<why>"`.
+ * A verb `nemia decide` offers a person for one step (`retryOffers`, `roundOffers`): the sentence it prints, and the bare command that
+ * sentence ends on — `nemia retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message "<objection>"`; `nemia
+ * round <run> <step>`, with `--budget <amount>` past a cap; or `nemia accept <run> <step> --message "<why>"`.
  */
 export type Offer = { step: string; command: string; said: string };
 
 /**
- * A command `wf decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
- * run, each once-more (`wf retry`, `wf round`) and accept with the line it prints it in, and for a step waiting at its gate on you, the
- * approval (`wf approve`) and a send-back (`wf retry --message`) for each step it names. `said` is null where the label is all it says.
+ * A command `nemia decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
+ * run, each once-more (`nemia retry`, `nemia round`) and accept with the line it prints it in, and for a step waiting at its gate on you,
+ * the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is null where the label is all it
+ * says; `step`, the step it acts on, null for a command on the whole run.
  */
 export type DecideCommand = {
   label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
+  step: string | null;
 };
 
 /** The label of an offer's command: an acceptance, a send-back with its objection, or once more. */
 const labelOf = (command: string): DecideCommand['label'] =>
-  command.startsWith('wf accept ') ? 'accept' : command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
+  command.startsWith('nemia accept ') ? 'accept' : command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
 
 /** For each step waiting at its gate on you (`awaitingApproval`), its approval and a send-back for each step it names (`sendBackTo`). */
 function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly string[]): DecideCommand[] {
   return steps
     .filter((s) => waiting.includes(s.name))
     .flatMap((step): DecideCommand[] => {
-      const approve = `wf approve ${run.id} ${step.name}`;
+      const approve = `nemia approve ${run.id} ${step.name}`;
       return [
-        { label: 'approve', command: approve, said: `${step.name} waits at its gate — with words: ${approve} --message "<words>"` },
+        {
+          label: 'approve',
+          command: approve,
+          said: `${step.name} waits at its gate — with words: ${approve} --message "<words>"`,
+          step: step.name,
+        },
         ...sendBackTo(step, run).map((name): DecideCommand => ({
           label: 'send back',
-          command: `wf retry ${run.id} ${name} --message "<objection>"`,
+          command: `nemia retry ${run.id} ${name} --message "<objection>"`,
           said: null,
+          step: name,
         })),
       ];
     });
 }
 
 /**
- * The commands `wf decide` offers on a run awaiting a person (`Decision`), none on any other: once more, accept or a send-back for each
+ * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, accept or a send-back for each
  * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then ship it and drop
  * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
- * none of those: forgetting it (`wf rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself
+ * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself
  * (`merges`) is offered no ship it nor drop it: its ending step is what merges, one approval away.
  *
- * Every command is a bare `wf` or `git -C` line, never a sentence: an offer's is the one it was made with.
+ * Every command is a bare `nemia` or `git -C` line, never a sentence: an offer's is the one it was made with.
  */
 export function choicesOf(steps: readonly Workflow[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
-    ...offers.map(({ command, said }): DecideCommand => ({ label: labelOf(command), command, said })),
+    ...offers.map(({ step, command, said }): DecideCommand => ({ label: labelOf(command), command, said, step })),
     ...gateChoices(steps, run, d.awaitingApproval),
   ];
   if (!isGitRun(run))
-    return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
+    return [...once, { label: 'forget it', command: `nemia rm ${run.id}`, said: 'forgets the run with its folders and files', step: null }];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
-    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
+    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said, step: null }];
   }
   const first = merges(steps) ? undefined : d.branches[0];
   if (!first) return once;
   return [
     ...once,
-    { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null },
-    { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null },
+    { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
+    { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null, step: null },
   ];
 }

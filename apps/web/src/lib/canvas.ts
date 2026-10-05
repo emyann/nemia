@@ -73,8 +73,8 @@ export type CanvasEdge = {
   label: string | null;
 };
 
-/** A step as its edges read it: its state, and the note `wf ls` prints beside it. */
-export type EdgeStep = { name: string; state: StepState; note: string | null };
+/** A step as its edges read it: its state, the note the list words beside it, and whether its next round is due, as the api answers it. */
+export type EdgeStep = { name: string; state: StepState; note: string | null; roundDue: boolean };
 
 /**
  * The run's graph as the api gives it, between the steps the run has: an `after` edge done when the work at both ends is
@@ -107,7 +107,7 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
         source: edge.from,
         target: edge.to,
         kind: 'loop',
-        state: roundDue(source.note) ? 'running' : 'to-come',
+        state: source.roundDue ? 'running' : 'to-come',
         label: loopLabel([source.note, target.note], edge.rounds),
       },
     ];
@@ -115,13 +115,13 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
 }
 
 /**
- * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (wf round) — …` — and
- * its cap when it says one.
+ * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (…) — …`
+ * — and its cap when it says one.
  */
 const ROUND = /^round (\d+)(?: of (\d+))?/;
 
 /**
- * `round n of N` for a loop past its first round, off the notes `wf ls` prints: the looping step's first, where a round due
+ * `round n of N` for a loop past its first round, off the notes the CLI's `ls` prints: the looping step's first, where a round due
  * and a loop out of rounds are said, then its target's, which is filed first each round. Null while the loop is on its first.
  * N is the note's, else the loop's `rounds`: a round a person asked for past the cap reads `round 4 of 3`.
  */
@@ -132,9 +132,6 @@ export function loopLabel(notes: ReadonlyArray<string | null>, rounds: number): 
   }
   return null;
 }
-
-/** Whether the looping step's note says its next round is due: it asked again with rounds left, or a person asked (`roundDueNote`). */
-export const roundDue = (note: string | null): boolean => note !== null && /^round \d+(?: of \d+ due\b| asked \(wf round\))/.test(note);
 
 /** The handles a `loop` edge leaves its looping step by and comes into its target by: under each node (`StepNode`). */
 export const LOOP_SOURCE = 'loop-out';

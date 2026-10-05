@@ -276,7 +276,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.equal(
     parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`).permissionMode,
     codexOnly,
-    "a mode's word is the runtime's to judge, at `wf start`: the load reads it as written",
+    "a mode's word is the runtime's to judge, at `nemia start`: the load reads it as written",
   );
   assert.throws(
     () => parseWorkflow('a', `---\nsandbox: ${codexOnly}\n---\nDo a.\n`),
@@ -473,7 +473,7 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
     assert.equal(
       listing?.error,
       null,
-      `the board reads with the repository's place and yours, as wf start --repo does: ${JSON.stringify(listing?.error)}`,
+      `the board reads with the repository's place and yours, as nemia start --repo does: ${JSON.stringify(listing?.error)}`,
     );
     const [build] = await listedSteps('skilled');
     const at = versionOf(dir);

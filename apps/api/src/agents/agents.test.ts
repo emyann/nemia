@@ -766,7 +766,7 @@ test('an agent is listed with each skill it gives, found where a start finds it,
   assert.deepEqual(all.find((a) => a.from === 'yours' && a.name === 'broken')?.given ?? [], [], 'none for an agent that does not read');
 });
 
-test("the listing and a card are the package's wf agents and wf agents card, answered with what the board adds and without a person's custom file", async () => {
+test("the listing and a card are the package's nemia agents and nemia agents card, answered with what the board adds and without a person's custom file", async () => {
   const AGENTS_ENTRY = COMMANDS.find((c) => c.name === 'agents')!;
   const CARD_ENTRY = COMMANDS.find((c) => c.name === 'agents card')!;
   writeCustomInstructions(root, 'reviewer', 'Say it in French.', repo);

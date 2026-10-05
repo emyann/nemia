@@ -363,10 +363,10 @@
     {
       "files": ["apps/web/src/components/Decide.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 725, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 130, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 28 }],
-        "sonarjs/cognitive-complexity": ["error", 31]
+        "max-lines": ["error", { "max": 723, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 27 }],
+        "sonarjs/cognitive-complexity": ["error", 30]
       }
     },
     {
@@ -378,7 +378,7 @@
     {
       "files": ["apps/web/src/components/Gate.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 171, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 160, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
@@ -386,7 +386,7 @@
     {
       "files": ["apps/web/src/components/NewWorkflow.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 106, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -419,13 +419,13 @@
     {
       "files": ["apps/web/src/components/SkillForm.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 112, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
       "files": ["apps/web/src/components/StartRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 108, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 107, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -642,7 +642,7 @@
     {
       "files": ["packages/agent-orchestrator/src/list/list.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 169, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 168, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 49 }],
         "sonarjs/cognitive-complexity": ["error", 41]
       }

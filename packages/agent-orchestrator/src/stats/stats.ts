@@ -325,7 +325,7 @@ export type Group = {
 };
 
 /**
- * What `wf stats` and `GET /api/stats` answer: the days asked for, the filters and the key, the numbers of every fact kept (`all`), and,
+ * What `nemia stats` and `GET /api/stats` answer: the days asked for, the filters and the key, the numbers of every fact kept (`all`), and,
  * with a key, one group per value of it (`key`, null for a step with no agent or a run with no repository). `unreadable` names each run
  * left out because a journal of it does not read.
  */

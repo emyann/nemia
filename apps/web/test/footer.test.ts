@@ -49,6 +49,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
     branch: null,
     status,
     note: null,
+    roundDue: false,
     needs: null,
     blockedByHarness: false,
     waitingFor: null,

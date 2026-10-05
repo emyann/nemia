@@ -1,6 +1,6 @@
 /**
- * The Stats page's rules: the headline numbers it draws, each worded as `wf stats` words it (`stats-words.ts` in the orchestrator), the
- * page's search and the api's query it asks, the period counted in UTC days, the days and marks turned into what a chart draws, and the
+ * The Stats page's rules: the headline numbers it draws, each worded as the CLI's `stats` words it (`stats-words.ts` in the orchestrator),
+ * the page's search and the api's query it asks, the period counted in UTC days, the days and marks turned into what a chart draws, and the
  * steps into the rows of what each loaded or was refused. A number nothing measured is null here, and `—` in words, never 0. Pure.
  */
 import type { StatsDay, StatsHeadline, StatsMark, StatsStep } from './api.ts';
@@ -12,8 +12,8 @@ export const NONE = '—';
 export type HeadlineKey = keyof StatsHeadline;
 
 /**
- * A headline number: its key, its name as `wf stats` prints it, what it counts, and its value in words; `tile: false` for one the page
- * draws as a chart only, with no tile.
+ * A headline number: its key, its name as the CLI's `stats` prints it, what it counts, and its value in words; `tile: false` for one the
+ * page draws as a chart only, with no tile.
  */
 export type HeadlineNumber = { key: HeadlineKey; label: string; about: string; words: (value: number | null) => string; tile?: false };
 
@@ -169,7 +169,8 @@ export type ByStepRow = { step: string; agent: string | null; total: string; ite
 
 /**
  * A row per step and agent of the skills its sessions loaded (`skills`) or the calls refused it (`denials`): the total over its measured
- * tries, as `wf stats` words it — `—` where none was measured, the count where all were, else the count and how many were, `3 (2 of 4)`.
+ * tries, as the CLI's `stats` words it — `—` where none was measured, the count where all were, else the count and how many were, `3 (2 of
+ * 4)`.
  */
 export function byStepOf(steps: readonly StatsStep[], of: 'skills' | 'denials'): ByStepRow[] {
   return steps.map((s) => {

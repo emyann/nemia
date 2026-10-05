@@ -38,7 +38,7 @@ export const gatesOf = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): st
   steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
 /**
- * The approval of the try a step is on, if a person gave one (`wf approve`). One for an earlier try was spent by the try after it. Pure.
+ * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it. Pure.
  */
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
@@ -58,8 +58,8 @@ export const holdsOpenOn = (step: Pick<Workflow, 'harness' | 'background'>): boo
 export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
 
 /**
- * What a person accepted of a loop on the try its looping step is on (`wf accept`). One for an earlier try was spent by the try after it.
- * Pure.
+ * What a person accepted of a loop on the try its looping step is on (`nemia accept`). One for an earlier try was spent by the try after
+ * it. Pure.
  */
 export const acceptanceOf = (run: Run, step: string): Acceptance | undefined =>
   run.acceptances?.find((a) => a.step === step && a.try === tryOf(run, step));
@@ -141,9 +141,9 @@ export function waitsAtGate(
  *
  * The round is the case a status alone does not tell: a looping step that says `again: true` below its cap reads `unverified` on its own
  * work, since it signed off — and `assess` only calls it `running` when it sets the round due. An ending read off that word would hold its
- * gate in the very pass that sends the work round again: `wf ls` would offer the merge while the reviewer was asking for a change, and an
- * approval taken then names a try nothing spends, so the round's work would merge unread. `atGate` keeps the same rule for a gated step of
- * its own loop; this is that rule for the step after one.
+ * gate in the very pass that sends the work round again: `nemia ls` would offer the merge while the reviewer was asking for a change, and
+ * an approval taken then names a try nothing spends, so the round's work would merge unread. `atGate` keeps the same rule for a gated step
+ * of its own loop; this is that rule for the step after one.
  *
  * A predecessor approved first itself is read on its own work (`ownStatus`): `validate` refuses one that anything waits on, and reading
  * it so keeps this from asking itself where it stands.
@@ -174,9 +174,9 @@ export function notHandedOn(
  * The ending steps a pass is about to un-hold: those held at their gate, unfiled (`waitsAtGate`), that wait on a step this pass files
  * again — a try due, or a step a round re-files (`roundSpans`). Pure.
  *
- * A person's `wf retry` of the work is the send-back at an ending's gate, and between the ask and the pass that files it the record alone
- * still reads the work as handed on. Read off the record, such an ending would offer its merge in the very moment somebody objected to the
- * work it would merge; so `assess` and `listing` take these steps as waiting, which is what the next pass will say anyway.
+ * A person's `nemia retry` of the work is the send-back at an ending's gate, and between the ask and the pass that files it the record
+ * alone still reads the work as handed on. Read off the record, such an ending would offer its merge in the very moment somebody objected
+ * to the work it would merge; so `assess` and `listing` take these steps as waiting, which is what the next pass will say anyway.
  *
  * Also an ending that stopped on the base branch whose work a try due sends back (`Retry.back`): the pass that files the try moves the
  * ending's try behind (`sentBack`), and it waits for the work again.
@@ -192,9 +192,9 @@ export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Ret
  * try settled and it signed off blocked, ended without its closeout, failed — its session or its check — was stopped, or reached its
  * budget. Pure.
  *
- * Such an ending has two ways on. Its own try (`wf retry <run> <ending>`) does the act again, for what was not the work — a checkout left
- * dirty, a flaky test. And the send-back (`sendsBack` in `retryable`): the work does not hold on the base branch as it is now, so it goes
- * back through the folder's loop, and the ending returns to its gate once that settles (`sentBack`).
+ * Such an ending has two ways on. Its own try (`nemia retry <run> <ending>`) does the act again, for what was not the work — a checkout
+ * left dirty, a flaky test. And the send-back (`sendsBack` in `retryable`): the work does not hold on the base branch as it is now, so it
+ * goes back through the folder's loop, and the ending returns to its gate once that settles (`sentBack`).
  */
 export function endingStopped(
   step: Workflow,
@@ -319,8 +319,9 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  *
  * **A gate holds a signed step for a person.** A gated step (`hasGate`) that reads verified or unverified on its own work reads `awaiting
  * approval` until the try it is on is approved (`approvalOf`), whatever its closeout says: it stops what follows as `blocked` does, and
- * only a person moves it — `wf approve`, or a send-back with `wf retry --message`. Its check comes first: a gated step still `checking`
- * is checking. A looping step that asked for another round is not held: the gate is on what comes after it, and a round is not that.
+ * only a person moves it — `nemia approve`, or a send-back with `nemia retry --message`. Its check comes first: a gated step still
+ * `checking` is checking. A looping step that asked for another round is not held: the gate is on what comes after it, and a round is not
+ * that.
  *
  * @param steps The run's steps: what says whether this one is a loop's target, and owes `replies`.
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, nothing is known spent: no step is over budget, nor ended at one.
@@ -529,8 +530,8 @@ export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
   addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
 
 /**
- * The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `wf retry --budget`, `wf round --budget`), else its
- * `budget:`.
+ * The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia round --budget`), else
+ * its `budget:`.
  */
 export const budgetOf = (step: Workflow, record: StepRecord | undefined): number | undefined =>
   [...(record?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget ?? step.budget;
@@ -569,7 +570,7 @@ export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${do
  * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, so the harness holds the tries
  * together to the cap, and not each session to a whole cap of its own. A resume is charged its own spend (agent-runtime's open issue 28,
  * M2), and a cap caps a resume's own spend (M5), so the remainder is what the next try may spend. Which harness keeps a cap is the
- * runtime's to judge: it refuses one on codex and on a background session, at `wf start` and `wf retry` (`configRefusal`).
+ * runtime's to judge: it refuses one on codex and on a background session, at `nemia start` and `nemia retry` (`configRefusal`).
  *
  * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
  * left is `over budget`, and filed nothing (`overBudget`). The engine starts no attempt again on its own, so each try is handed what is
@@ -625,7 +626,7 @@ export const raiseWords = (status: StepStatus, r: Raise): string =>
  * Why a `--budget` cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the run,
  * as `messageRefusal` is: an amount that is not dollars above zero, and `--budget` on `--recheck`, which files no session to spend it.
  */
-export function budgetRefusal(how: RetryHow, command = 'wf retry <runId> <step>'): string | null {
+export function budgetRefusal(how: RetryHow, command = 'nemia retry <runId> <step>'): string | null {
   if (how.budget === undefined) return null;
   if (!(typeof how.budget === 'number' && Number.isFinite(how.budget) && how.budget > 0)) {
     return `--budget ${String(how.budget)} is not an amount. It is the most the step's tries may cost together, in dollars, above what they have cost: ${command} --budget <amount>, like 5 or 2.50.`;
@@ -638,7 +639,7 @@ export function budgetRefusal(how: RetryHow, command = 'wf retry <runId> <step>'
 
 /**
  * A loop going round again: the looping step, the step its `loop:` runs again, the round to file, and on whose word — the looping step's
- * `again: true` with rounds left, or a person's `wf round` once they are spent.
+ * `again: true` with rounds left, or a person's `nemia round` once they are spent.
  */
 export type Round = {
   step: string;
@@ -646,14 +647,14 @@ export type Round = {
   round: number;
   by: 'again' | 'ask';
   /**
-   * On a person's round past a step of the loop's budget (`wf round --budget`): the cap, and the steps of the loop it is raised for — those
-   * over it.
+   * On a person's round past a step of the loop's budget (`nemia round --budget`): the cap, and the steps of the loop it is raised for —
+   * those over it.
    */
   budget?: number;
   raise?: string[];
 };
 
-/** A person's `wf round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. */
+/** A person's `nemia round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. */
 export type RoundAsk = { step: string; round: number; budget?: number; at: string };
 
 /** The rounds a looping step's loop runs on its own word: its `rounds:`, which the parser always sets. */
@@ -669,7 +670,7 @@ export const roundOf = (run: Run, step: string): number => roundIn(run.steps[ste
 export const loopOf = (steps: readonly Workflow[], name: string): Workflow | undefined =>
   steps.find((s) => s.loop && loopSpan(steps, s).includes(name));
 
-/** A round, as `wf ls` says it: `round 2 of 3`, or past the cap, where only a person's word takes a loop. */
+/** A round, as `nemia ls` says it: `round 2 of 3`, or past the cap, where only a person's word takes a loop. */
 export const roundWord = (round: number, cap: number): string =>
   round <= cap ? `round ${round} of ${cap}` : `round ${round}, past rounds: ${cap}, on your word`;
 
@@ -705,9 +706,9 @@ export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[])
 
 /**
  * The steps the rounds due now file again: each looping step's loop (`loopSpan`), the looping step included. Pure. None of them reads `over
- * budget` on the pass before its round is filed — in `assess`, `wf ls` or `wf decide` — since a round held on a budget is due only once a
- * person raised the cap above what was spent (`wf round --budget`), and held, the run read as waiting on that person for a tick after they
- * had answered.
+ * budget` on the pass before its round is filed — in `assess`, `nemia ls` or `nemia decide` — since a round held on a budget is due only
+ * once a person raised the cap above what was spent (`nemia round --budget`), and held, the run read as waiting on that person for a tick
+ * after they had answered.
  */
 export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[]): Set<string> =>
   new Set(

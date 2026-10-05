@@ -55,10 +55,10 @@ function InboxPage() {
   return (
     <article className="space-y-6">
       <p className="text-sm text-neutral-500">
-        An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as{' '}
-        {code('wf inbox add')} parks one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A
-        card queued starts on its own, on the workflow it names, when the daemon — this api, or {code('wf up')} — has a run slot free: the
-        oldest queued first.
+        An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
+        command line parks one. Starting a card writes its run&apos;s record as any start does, and removes the card. A card queued starts
+        on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the oldest
+        queued first.
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">
@@ -95,7 +95,7 @@ function InboxPage() {
         )}
         {all.length === 0 && (
           <p data-empty className="text-sm text-neutral-500">
-            The inbox is empty. File an idea in the box above, or from the command line: {code('wf inbox add "<idea>"')}.
+            The inbox is empty. File an idea in the box above, or from the command line.
           </p>
         )}
       </section>
@@ -104,10 +104,11 @@ function InboxPage() {
 }
 
 /**
- * The box that files a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does: the idea; what runs it, when it is known; and
- * the repository it is about, the api's own until a person changes it — empty, for a card that names none. Then the api's refusal in full,
- * with the idea kept to send again. A workflow whose every step works in a folder (`folderTeam`) looks at no repository, and the api
- * refuses a card for one that names one: once it is picked, the box goes, and no repository is sent, whatever a person typed before.
+ * The box that files a card, as the CLI's `inbox add "<idea>" --workflow <name> --repo <path>` does: the idea; what runs it, when it is
+ * known; and the repository it is about, the api's own until a person changes it — empty, for a card that names none. Then the api's
+ * refusal in full, with the idea kept to send again. A workflow whose every step works in a folder (`folderTeam`) looks at no repository,
+ * and the api refuses a card for one that names one: once it is picked, the box goes, and no repository is sent, whatever a person typed
+ * before.
  */
 function FileCard() {
   const queryClient = useQueryClient();
@@ -210,7 +211,7 @@ function FileCard() {
  * which opens its start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it
  * was queued, and Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
  * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
- * card shows why, with its file for a title, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
+ * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
  *
  * Its page shows the body rendered and its keys explained, and for a file that does not read, the file as written. A folder, a name the api
  * refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and its title is its name alone.
@@ -446,7 +447,7 @@ function StartHere({
             {namedElsewhere(entry.workflow, entry.repo, here) ? (
               <>
                 The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s:
-                pick the one to run it on, or start it with {code('wf start')}, which finds that one.
+                pick the one to run it on, or start it from the command line, which finds that one.
               </>
             ) : (
               <>The card names {code(entry.workflow)}, which is not a workflow here that reads: pick the one to run it on.</>

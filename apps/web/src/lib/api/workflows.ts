@@ -196,17 +196,17 @@ const StartedSchema = Schema.Struct({
 }) satisfies Schema.Schema<Started>;
 
 /**
- * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
- * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait
- * on), or the api's own about the request; and an answer the board does not read, saying the run may have started. `after` names the
- * runs it waits on, as `--after` does; left out when there are none.
+ * Start a run of a workflow, as the CLI's `start` does: the api writes the run's record and files nothing. Resolves with the new run's id;
+ * rejects with the api's refusal in full — the loader's, the CLI `start`'s (`afterRefusal`'s, for a run it will not wait on), or the api's
+ * own about the request; and an answer the board does not read, saying the run may have started. `after` names the runs it waits on, as
+ * `--after` does; left out when there are none.
  *
- * `card` starts an inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the card
- * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
+ * `card` starts an inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the
+ * card leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
  * already.
  *
- * `place` starts it in a factory, on one of its repositories, as `wf start --factory` does (`placeQuery`): refused in the package's words
- * for a workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
+ * `place` starts it in a factory, on one of its repositories, as the CLI's `start --factory` does (`placeQuery`): refused in the package's
+ * words for a workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */

@@ -50,7 +50,7 @@ export default {
     const approveOf = (p: Page) => gateOf(p).getByRole('button', { name: 'Approve', exact: true });
 
     const banner = page.locator('section[aria-label="Waiting on you"]');
-    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — wf decide ${id}`;
+    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — nemia decide ${id}`;
     await expectVisible(banner.locator(':scope > p', { hasText: line }), `the banner says, in wf ls's words, ${line}`);
     await expectCount(banner.locator(':scope > p'), 1, 'in its one line');
     await expectCount(
@@ -79,6 +79,10 @@ export default {
     );
     const section = page.locator(`article > section#step-${gated}`);
     await expectVisible(gateOf(page), `${gated}'s section has its gate`);
+    await expectVisible(
+      gateOf(page).locator('p code').getByText(`nemia approve ${id} ${gated}`, { exact: true }),
+      "and beside its Approve, the command that does the same, as the api's decision words it",
+    );
     const handedOn = gateOf(page).locator(`section[aria-label="What ${gated} handed on"]`);
     await expectRendered(handedOn.locator('[data-handed-on] > [data-markdown]'), { heading: GATED.plan.heading, items: GATED.plan.items });
     await expectVisible(
@@ -123,11 +127,11 @@ export default {
       "the Decide section offers no answer of its own: the gate is the step's",
     );
     await expectVisible(
-      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^wf approve ${id} ${gated}$`) }),
+      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^nemia approve ${id} ${gated}$`) }),
       'the Decide section offers the approval to copy, as wf decide prints it under the step',
     );
     await expectVisible(
-      decide.locator('[data-command="send back"] code', { hasText: `wf retry ${id} ${gated} --message "<objection>"` }),
+      decide.locator('[data-command="send back"] code', { hasText: `nemia retry ${id} ${gated} --message "<objection>"` }),
       'and the send-back',
     );
     await expectCount(

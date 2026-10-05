@@ -1,6 +1,6 @@
 /**
- * A workflow step on a remote A2A agent, end to end: `wf start` on a folder team whose step says `harness: a2a:reviewer`, the store's
- * `a2a-agents.json` naming an agent the SDK's own server runs over HTTP (`a2a-server.ts`), and ticks of the engine `wf up` makes
+ * A workflow step on a remote A2A agent, end to end: `nemia start` on a folder team whose step says `harness: a2a:reviewer`, the store's
+ * `a2a-agents.json` naming an agent the SDK's own server runs over HTTP (`a2a-server.ts`), and ticks of the engine `nemia up` makes
  * (`engine()`), each run at rest judged in full as well (`WF_VERIFY_REST`): a difference throws (`verifyRest` in tick.verb.ts). The agent
  * is sent the brief as a message, with the secret its card asks for read from the variable `envNameOf` names, WF_A2A_REVIEWER_TOKEN here,
  * and never written to the store; the brief names nothing of this machine; the Task it completes is the step's sign-off, and a data part on
@@ -57,7 +57,7 @@ const declare = (agents: Record<string, { url: string }>): void =>
 const GIVEN = path.join(ROOT, 'tides.md');
 fs.writeFileSync(GIVEN, '# Tides\n');
 
-/** `wf start`, from a directory that is no repository, and the run's id. */
+/** `nemia start`, from a directory that is no repository, and the run's id. */
 async function started(dir: string): Promise<string> {
   const cwd = process.cwd();
   process.chdir(ROOT);
@@ -107,7 +107,7 @@ test('a step on a remote agent is sent its brief, with the secret its card asks 
   assert.equal(server.sent.length, 1, 'one message, one Task');
   const brief = server.sent[0];
   assert.match(brief, /^Read the note and say whether it is right\.\n\n## What was asked for\n\na note on tides\n/);
-  assert.match(brief, /Files were given with it \(`wf start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/);
+  assert.match(brief, /Files were given with it \(`nemia start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/);
   assert.equal(brief.includes(ROOT), false, `the brief names no path of this machine: ${brief}`);
   assert.ok(
     server.headers.some((h) => h.authorization === 'Bearer s3cret'),
@@ -148,13 +148,13 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
   assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
   assert.ok(
-    decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  wf retry ${id} ask`),
-    `offered a new Task, not a session continued nor a model, which wf retry refuses on a remote step:\n${decided.join('\n')}`,
+    decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  nemia retry ${id} ask`),
+    `offered a new Task, not a session continued nor a model, which nemia retry refuses on a remote step:\n${decided.join('\n')}`,
   );
   assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
 });
 
-test('a Task the agent leaves waiting on a question reads as waiting on you: wf logs prints the question, and wf say answers it', async () => {
+test('a Task the agent leaves waiting on a question reads as waiting on you: nemia logs prints the question, and nemia say answers it', async () => {
   const server = await a2aServer({
     answer: (text) => (text.includes('Brest') ? { text: 'Right, for Brest.' } : { asks: 'Which tide tables — Brest or Dover?' }),
   });
@@ -175,9 +175,9 @@ test('a Task the agent leaves waiting on a question reads as waiting on you: wf 
     assert.match(
       decided,
       new RegExp(
-        `ask: waiting for an input — read its question with wf logs ${id} ask, and answer it with wf say ${id} ask "<your answer>"`,
+        `ask: waiting for an input — read its question with nemia logs ${id} ask, and answer it with nemia say ${id} ask "<your answer>"`,
       ),
-      `a person answers with wf say, not in a Claude Code session a remote agent is not in:\n${decided}`,
+      `a person answers with nemia say, not in a Claude Code session a remote agent is not in:\n${decided}`,
     );
     assert.equal(decided.includes('claude agents'), false, decided);
     assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);

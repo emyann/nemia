@@ -1,5 +1,5 @@
 /**
- * `wf start` asks the runtime of each local step's first filing's config (`configRefused`, which `stepsToStart` asks last, before any
+ * `nemia start` asks the runtime of each local step's first filing's config (`configRefused`, which `stepsToStart` asks last, before any
  * run is written) and refuses one it refuses, in its words, after the step's line they come from. The load judges no harness's words,
  * so a folder that names one its harness refuses loads, and is refused here: by `startRun` and `startPlan` with nothing written, and
  * started once the refusal `startRun` reads (`StartRefusal`) is another. `WF_ROOT` is set before the import, since the module reads it as
@@ -90,7 +90,7 @@ test('a step on a remote agent is asked nothing, and a folder whose every step i
 const ULTRA = folder('ultra', 'effort: ultra');
 const ULTRA_REFUSED = `implement: \`effort: ultra\` (filed as \`effort\`): ${configRefusal('claude', { effort: 'ultra' })}`;
 
-test("REFUSED at `wf start`: a step whose line its harness refuses fails `startRun` as Invalid, naming the step and its line, in the runtime's words, and no run is written", () => {
+test("REFUSED at `nemia start`: a step whose line its harness refuses fails `startRun` as Invalid, naming the step and its line, in the runtime's words, and no run is written", () => {
   const before = runsWritten();
   assert.throws(
     () => started(ULTRA),
@@ -99,7 +99,7 @@ test("REFUSED at `wf start`: a step whose line its harness refuses fails `startR
   assert.deepEqual(runsWritten(), before);
 });
 
-test('REFUSED at `wf plan`: a card whose workflow has a step its harness refuses fails `startPlan` behind the card, and no run is written', () => {
+test('REFUSED at `nemia plan`: a card whose workflow has a step its harness refuses fails `startPlan` behind the card, and no run is written', () => {
   const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${ULTRA}\n---\nadd a flag\n`);
   const before = runsWritten();
@@ -124,7 +124,7 @@ test('the gates `startRun` is given are the gates its refusal is asked of the st
   assert.deepEqual(asked, [['implement']]);
 });
 
-test("REFUSED at `wf start`: `remote: true` where the runtime bridges no session — codex, claude-detached, a claude job — named by its line, in the runtime's words; taken on a claude background session, and `remote: false` on any", () => {
+test("REFUSED at `nemia start`: `remote: true` where the runtime bridges no session — codex, claude-detached, a claude job — named by its line, in the runtime's words; taken on a claude background session, and `remote: false` on any", () => {
   for (const [own, harness] of [
     ['harness: codex\nremote: true', 'codex'],
     ['harness: claude-detached\nremote: true', 'claude-detached'],
@@ -144,7 +144,7 @@ test("REFUSED at `wf start`: `remote: true` where the runtime bridges no session
   assert.ok(started(folder('unbridged', 'harness: codex\nremote: false')));
 });
 
-test("REFUSED at `wf start`, every word the load once judged by a copy of the runtime's lists, now by the runtime, after the step's line", () => {
+test("REFUSED at `nemia start`, every word the load once judged by a copy of the runtime's lists, now by the runtime, after the step's line", () => {
   const cases: [string, string, string, Record<string, unknown>][] = [
     ['effort: ultra', 'claude', 'effort', { effort: 'ultra' }],
     ['harness: codex\neffort: ultra', 'codex', 'effort', { effort: 'ultra' }],
@@ -178,7 +178,7 @@ test("REFUSED at `wf start`, every word the load once judged by a copy of the ru
   );
 });
 
-test("REFUSED at `wf start`: a codex sandbox written under its former name, `permissionMode:`, is quoted as the file writes it — the step's own line, or its agent's — never as the `sandbox:` it is read as", () => {
+test("REFUSED at `nemia start`: a codex sandbox written under its former name, `permissionMode:`, is quoted as the file writes it — the step's own line, or its agent's — never as the `sandbox:` it is read as", () => {
   const refusedAs = `implement: \`permissionMode: dontAsk\` (filed as \`permissionMode\`): ${configRefusal('codex', { permissionMode: 'dontAsk' })}`;
   const own = folder('former-mode', 'harness: codex\npermissionMode: dontAsk');
   assert.throws(

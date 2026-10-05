@@ -5,7 +5,7 @@
  * changed (`writeSkill`), each write refused as `SkillWriteError`.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run
- * is changed by none of it: it froze its folder, and its agents' skills, at `wf start`.
+ * is changed by none of it: it froze its folder, and its agents' skills, at `nemia start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';

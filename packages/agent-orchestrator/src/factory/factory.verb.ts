@@ -1,5 +1,5 @@
 /**
- * `wf factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves on its own
+ * `nemia factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves on its own
  * route, and `ls` — then filed, given workflows and relieved of them, hired into, fired from and removed, which the command line alone
  * does. Their handlers answer data, and the CLI prints it.
  */
@@ -17,38 +17,38 @@ import {
   removeFactory,
 } from './factory.store.ts';
 
-export const FACTORY_HELP = `wf factory [ls]
-wf factory add <name> --repo <path> [--repo <path> ...]
-wf factory attach <factory> <workflow>
-wf factory detach <factory> <workflow>
-wf factory hire <factory> <agent> --step <workflow>/<step>
-wf factory fire <factory> --step <workflow>/<step>
-wf factory rm <name>
+export const FACTORY_HELP = `nemia factory [ls]
+nemia factory add <name> --repo <path> [--repo <path> ...]
+nemia factory attach <factory> <workflow>
+nemia factory detach <factory> <workflow>
+nemia factory hire <factory> <agent> --step <workflow>/<step>
+nemia factory fire <factory> --step <workflow>/<step>
+nemia factory rm <name>
 
 A factory is a named grouping in the store: \${WF_ROOT:-~/.agent-workflows}/factories/, one <name>.json per
 factory, naming the repositories its work is on, the workflows it offers and the agents it hires into their steps:
 
     { "repos": ["/home/me/code/app"], "workflows": ["build"], "hires": { "build/implement": "implementer" } }
 
-  wf factory     lists the default factory first — every run and card that names no factory; it is no file,
+  nemia factory     lists the default factory first — every run and card that names no factory; it is no file,
                  and is read, never written — then each factory by name with its repositories. A file that
                  does not read as a factory is listed with why.
-  wf factory add files a factory: its name a lowercase slug (letters, digits, dashes; 40 at most), and one
+  nemia factory add files a factory: its name a lowercase slug (letters, digits, dashes; 40 at most), and one
                  --repo at least, each a directory, written as an absolute path and named once. Git is not asked.
-  wf factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
+  nemia factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
                  workflows attached to it — none, until one is. Only the name is stored, and a step that
                  names its own agent is filled already; whether the workflow exists is judged at the start.
-  wf factory detach takes a workflow back, once the factory hires no one into its steps.
-  wf factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step
+  nemia factory detach takes a workflow back, once the factory hires no one into its steps.
+  nemia factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step
                  by its file's, without .md: one agent a step, so a second hire replaces the first. Any agent
                  fills any step; it is found, when the run starts, where the step's own agent: would be.
-  wf factory fire takes a step's hire back.
-  wf factory rm  removes a factory's file, one that does not read included.
+  nemia factory fire takes a step's hire back.
+  nemia factory rm  removes a factory's file, one that does not read included.
 
-wf start --factory <name> starts a run in a factory, of a workflow attached to it: each step its hires fill runs
+nemia start --factory <name> starts a run in a factory, of a workflow attached to it: each step its hires fill runs
 as its agent, and the start is refused while a step names no agent and is hired none, or names its own agent
 and is hired one too. Every run is started in a factory: with no --factory, in the one whose repository holds
---repo or the directory wf start is typed in, and refused where none or two do; a card names its own, by its
+--repo or the directory nemia start is typed in, and refused where none or two do; a card names its own, by its
 factory: line or --factory. The default factory holds the history of runs and cards that named none, and an
 agent's try; no start names it.
 
@@ -60,7 +60,7 @@ not attached, and a fire of a step with no hire. A start in a factory of a workf
 refused, naming the attach.`;
 
 /** Why the api writes no factory: the board reads them, and the command line is their one writer. */
-const WRITTEN_HERE = { side: 'cli', why: 'the board reads factories and writes none: wf factory is their one writer' } as const;
+const WRITTEN_HERE = { side: 'cli', why: 'the board reads factories and writes none: nemia factory is their one writer' } as const;
 
 /** The text under `key`: what the spec read there. */
 const textOf = (args: Args, key: string): string => {
@@ -71,26 +71,26 @@ const textOf = (args: Args, key: string): string => {
 /** The listing every factory shares: those of the store, as `readFactories` reads them. */
 type Listed = { factories: FactoryListing[] };
 
-/** The lines `wf factory` prints of the store's factories, and how to file one or remove one. */
+/** The lines `nemia factory` prints of the store's factories, and how to file one or remove one. */
 const listed = ({ factories }: Listed): string[] => [
   ...factoryLines(factories),
-  `\nfile one: wf factory add <name> --repo <path> — remove one: wf factory rm <name> — in ${factoriesDir()}`,
+  `\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in ${factoriesDir()}`,
 ];
 
-/** `wf factory`: the default factory, then each in the store; a word it does not take is refused naming its seven forms. */
+/** `nemia factory`: the default factory, then each in the store; a word it does not take is refused naming its seven forms. */
 export const FACTORY: Command<Listed> = {
   name: 'factory',
   usage: '',
   help: [
     "the store's factories: the default first — every run and card that",
     'names no factory, read, never written — then each by name with its',
-    'repositories (wf factory --help)',
+    'repositories (nemia factory --help)',
   ],
   spec: {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `wf factory does not take ${arg}. It lists the factories — wf factory ls — files one with wf factory add <name> --repo <path>, attaches a workflow with wf factory attach <factory> <workflow>, detaches it with wf factory detach <factory> <workflow>, hires an agent into a step with wf factory hire <factory> <agent> --step <workflow>/<step>, fires it with wf factory fire <factory> --step <workflow>/<step>, and removes one with wf factory rm <name> (wf factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   route: { method: 'GET', path: '/api/factories', status: 200 },
@@ -99,7 +99,7 @@ export const FACTORY: Command<Listed> = {
   print: listed,
 };
 
-/** `wf factory ls`: the same listing, by its name. */
+/** `nemia factory ls`: the same listing, by its name. */
 const FACTORY_LS: Command<Listed> = {
   name: 'factory ls',
   usage: '',
@@ -107,10 +107,10 @@ const FACTORY_LS: Command<Listed> = {
   spec: {
     positionals: [],
     flags: [],
-    unknown: (arg) => `wf factory ls takes nothing, and was given ${arg}: wf factory ls lists every factory.`,
+    unknown: (arg) => `nemia factory ls takes nothing, and was given ${arg}: nemia factory ls lists every factory.`,
   },
   writes: false,
-  only: { side: 'cli', why: "the api lists the factories on wf factory's route: ls is the command line's second name for it" },
+  only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
   handler: async () => ({ factories: readFactories() }),
   print: listed,
 };
@@ -121,22 +121,23 @@ const REPOS: Flag = {
   kind: 'text',
   key: 'repos',
   many: true,
-  takes: "--repo takes a repository's directory: wf factory add <name> --repo <path> [--repo <path> ...]",
+  takes: "--repo takes a repository's directory: nemia factory add <name> --repo <path> [--repo <path> ...]",
 };
 
-/** `wf factory add`'s spec: the factory's name, then `--repo` once per repository. */
+/** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository. */
 const ADD_SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
   flags: [REPOS],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `wf factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository.`
-      : `wf factory add files one factory, and ${arg} is a second: wf factory add <name> --repo <path>, once per factory.`,
+      ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository.`
+      : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
   apart: () => REPOS.takes!,
-  missing: "wf factory add takes the factory's name, first: wf factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
+  missing:
+    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
 };
 
-/** `wf factory add`: one factory filed, and where. */
+/** `nemia factory add`: one factory filed, and where. */
 const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string }> = {
   name: 'factory add',
   usage: '<name> --repo <path> [--repo <path> ...]',
@@ -153,7 +154,7 @@ const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: strin
   print: ({ name, repos, file }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`],
 };
 
-/** `wf factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
+/** `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
 const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
   positionals: [
     { key: 'factory', takes: 'required', kind: 'name' },
@@ -162,13 +163,13 @@ const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
   flags: [],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `wf factory ${verb} does not take ${arg}. It takes the factory, then the workflow: wf factory ${verb} <factory> <workflow>.`
-      : `wf factory ${verb} takes one workflow, and ${arg} is a second: wf factory ${verb} <factory> <workflow>, once per workflow.`,
-  missing: `wf factory ${verb} takes the factory, then the workflow, by its folder's name: wf factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
+      ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>.`
+      : `nemia factory ${verb} takes one workflow, and ${arg} is a second: nemia factory ${verb} <factory> <workflow>, once per workflow.`,
+  missing: `nemia factory ${verb} takes the factory, then the workflow, by its folder's name: nemia factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
   flagFirst: true,
 });
 
-/** `wf factory attach`: one workflow attached to one factory, or said to be attached already. */
+/** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
 const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
   name: 'factory attach',
   usage: '<factory> <workflow>',
@@ -186,7 +187,7 @@ const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
   ],
 };
 
-/** `wf factory detach`: one workflow taken from one factory. */
+/** `nemia factory detach`: one workflow taken from one factory. */
 const FACTORY_DETACH: Command<{ file: string }> = {
   name: 'factory detach',
   usage: '<factory> <workflow>',
@@ -198,42 +199,42 @@ const FACTORY_DETACH: Command<{ file: string }> = {
   print: ({ file }, args) => [`${textOf(args, 'factory')}  detached ${textOf(args, 'workflow')}`, `detached: ${file}`],
 };
 
-/** `wf factory hire`'s and `fire`'s spec: `shape`, their positional arguments, then `--step <workflow>/<step>` once. */
+/** `nemia factory hire`'s and `fire`'s spec: `shape`, their positional arguments, then `--step <workflow>/<step>` once. */
 function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string): Spec {
   const step: Flag = {
     flag: '--step',
     kind: 'text',
     key: 'step',
-    takes: `--step takes the step, as <workflow>/<step>: wf factory ${verb} ${shape} --step build/implement`,
-    twice: `wf factory ${verb} takes --step once: one step at a time.`,
+    takes: `--step takes the step, as <workflow>/<step>: nemia factory ${verb} ${shape} --step build/implement`,
+    twice: `nemia factory ${verb} takes --step once: one step at a time.`,
   };
   return {
     positionals: shape.split(' ').map((p) => ({ key: p.slice(1, -1), takes: 'required', kind: 'name' })),
     flags: [step],
     unknown: (arg) =>
       arg.startsWith('-')
-        ? `wf factory ${verb} does not take ${arg}. It takes ${shape}, then --step <workflow>/<step>.`
-        : `wf factory ${verb} takes ${shape}, and ${arg} is one more: wf factory ${verb} ${shape} --step <workflow>/<step>, once per step.`,
+        ? `nemia factory ${verb} does not take ${arg}. It takes ${shape}, then --step <workflow>/<step>.`
+        : `nemia factory ${verb} takes ${shape}, and ${arg} is one more: nemia factory ${verb} ${shape} --step <workflow>/<step>, once per step.`,
     apart: () => step.takes!,
     missing,
   };
 }
 
-/** The refusal of `wf factory hire` or `fire` given no step, or a step's value left out. */
+/** The refusal of `nemia factory hire` or `fire` given no step, or a step's value left out. */
 const stepCheck =
   (verb: 'hire' | 'fire', shape: string, spec: Spec) =>
   (args: Args): string | null =>
     args.step === undefined
-      ? `wf factory ${verb} names the step with --step: wf factory ${verb} ${shape} --step <workflow>/<step>. Nothing was ${verb}d.`
+      ? `nemia factory ${verb} names the step with --step: nemia factory ${verb} ${shape} --step <workflow>/<step>. Nothing was ${verb}d.`
       : leftOut(spec, args);
 
 const HIRE_SPEC = stepSpec(
   'hire',
   '<factory> <agent>',
-  'wf factory hire takes the factory, then the agent: wf factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
+  'nemia factory hire takes the factory, then the agent: nemia factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
 );
 
-/** `wf factory hire`: one agent hired into one step, and the agent it replaced, if any. */
+/** `nemia factory hire`: one agent hired into one step, and the agent it replaced, if any. */
 const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   name: 'factory hire',
   usage: '<factory> <agent> --step <workflow>/<step>',
@@ -259,10 +260,10 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
 const FIRE_SPEC = stepSpec(
   'fire',
   '<factory>',
-  'wf factory fire takes the factory first: wf factory fire <factory> --step <workflow>/<step>. Nothing was fired.',
+  'nemia factory fire takes the factory first: nemia factory fire <factory> --step <workflow>/<step>. Nothing was fired.',
 );
 
-/** `wf factory fire`: one step's hire taken back. */
+/** `nemia factory fire`: one step's hire taken back. */
 const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   name: 'factory fire',
   usage: '<factory> --step <workflow>/<step>',
@@ -275,7 +276,7 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   print: ({ file, fired }, args) => [`${textOf(args, 'factory')}  ${textOf(args, 'step')}  fired ${fired}`, `fired: ${file}`],
 };
 
-/** `wf factory rm`: one factory's file removed. */
+/** `nemia factory rm`: one factory's file removed. */
 const FACTORY_RM: Command<{ file: string }> = {
   name: 'factory rm',
   usage: '<name>',
@@ -283,8 +284,8 @@ const FACTORY_RM: Command<{ file: string }> = {
   spec: {
     positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
     flags: [],
-    unknown: (arg) => `wf factory rm removes one factory, and ${arg} is a second: wf factory rm <name>, once per factory.`,
-    missing: 'wf factory rm takes the name of the factory to remove, as wf factory ls lists it: wf factory rm <name>.',
+    unknown: (arg) => `nemia factory rm removes one factory, and ${arg} is a second: nemia factory rm <name>, once per factory.`,
+    missing: 'nemia factory rm takes the name of the factory to remove, as nemia factory ls lists it: nemia factory rm <name>.',
   },
   writes: true,
   only: WRITTEN_HERE,
@@ -292,7 +293,7 @@ const FACTORY_RM: Command<{ file: string }> = {
   print: ({ file }, args) => [`${textOf(args, 'name')}  removed — ${file}`],
 };
 
-/** `wf factory`'s entries, in the order `wf`'s help lists them. */
+/** `nemia factory`'s entries, in the order `nemia`'s help lists them. */
 export const FACTORIES: readonly Command[] = [
   FACTORY,
   FACTORY_LS,

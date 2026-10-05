@@ -17,7 +17,7 @@ import { listWorkflows, versionOf as versionIn } from './workflows.ts';
 import { engine, loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
-/** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `wf start` reads its HEAD. */
+/** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -381,7 +381,7 @@ test("REFUSED at shipped defaults: a step's page from somewhere that is not repo
   }
 });
 
-test('POST /api/runs starts a run of the workflow it names as `wf start` does: the record is written, and nothing is filed', async () => {
+test('POST /api/runs starts a run of the workflow it names as `nemia start` does: the record is written, and nothing is filed', async () => {
   assert.deepEqual(runFiles(), []);
   const res = await post({ workflow: 'good', brief: 'Add a cache\n\nKeep it small.\n' });
   assert.equal(res.status, 201);
@@ -418,7 +418,7 @@ test('POST /api/runs starts a run of the workflow it names as `wf start` does: t
     'the workflow frozen on the record',
   );
 
-  assert.deepEqual(filedTasks(), [], "nothing filed: no task in the engine's store — `wf tick` files the first step");
+  assert.deepEqual(filedTasks(), [], "nothing filed: no task in the engine's store — `nemia tick` files the first step");
   assert.equal(fs.existsSync(path.join(root, 'worktrees')), false, 'and no worktree cut');
 
   const listed = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
@@ -571,7 +571,7 @@ test("REFUSED at shipped defaults: what `start()` refuses is a 422 carrying its 
   assert.equal(
     (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'clash')?.error,
     null,
-    "the loader reads this folder; `wf start` refuses it, as the run files build's check as `build-check`",
+    "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
   );
   const res = await post({ workflow: 'clash', brief: 'Do it.' });
   assert.equal(res.status, 422);
@@ -601,7 +601,7 @@ test('REFUSED: a name both the repository and yours have is a 409 until `from` s
   assert.deepEqual(Object.keys(run.steps), ['implement']);
 });
 
-/** A run of the repository's `good` as `wf start` records one, never filed — and called off, when `cancelledAt` says when. */
+/** A run of the repository's `good` as `nemia start` records one, never filed — and called off, when `cancelledAt` says when. */
 function parentRun(id: string, cancelledAt?: string): void {
   if (fs.existsSync(path.join(root, 'runs', `${id}.json`))) return;
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
@@ -636,7 +636,7 @@ test('GET /api/repository is the repository a start runs in, as the start form l
   assert.deepEqual(await res.json(), { repo });
 });
 
-test('POST /api/runs takes `after` and passes it to `start()`, which freezes it on the record as `wf start --after` does — and the board reads the run waiting on it', async () => {
+test('POST /api/runs takes `after` and passes it to `start()`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it', async () => {
   parents();
   const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
   assert.equal(res.status, 201, await res.clone().text());
@@ -652,7 +652,7 @@ test('POST /api/runs takes `after` and passes it to `start()`, which freezes it 
   assert.equal(
     Object.hasOwn(runStore.runs.read(((await none.json()) as { id: string }).id), 'after'),
     false,
-    'none to wait on is a run that waits on none: a record with no `after`, as `wf start` writes without one',
+    'none to wait on is a run that waits on none: a record with no `after`, as `nemia start` writes without one',
   );
 });
 
@@ -663,7 +663,7 @@ test('REFUSED at shipped defaults: `after` that is not a list of run ids is a 40
     assert.equal(res.status, 400, JSON.stringify(after));
     const { error } = (await res.json()) as { error: string };
     assert.ok(
-      error.startsWith('`after` is the runs this one waits on, by id, as `wf start --after <runId>` takes each: a list of run ids'),
+      error.startsWith('`after` is the runs this one waits on, by id, as `nemia start --after <runId>` takes each: a list of run ids'),
       error,
     );
     assert.ok(error.includes(`This request's was ${JSON.stringify(after)}.`), error);
@@ -677,7 +677,7 @@ test('REFUSED at shipped defaults: `after` that is not a list of run ids is a 40
   assert.deepEqual(filedTasks(), []);
 });
 
-test("REFUSED at shipped defaults: a run `wf start --after` will not wait on is a 422 carrying `afterRefusal`'s sentence word for word — no such run, a cancelled one, one given twice — and nothing is written", async () => {
+test("REFUSED at shipped defaults: a run `nemia start --after` will not wait on is a 422 carrying `afterRefusal`'s sentence word for word — no such run, a cancelled one, one given twice — and nothing is written", async () => {
   parents();
   const before = runFiles();
   const refusedBy = async (after: string[]): Promise<string> => {
@@ -689,7 +689,7 @@ test("REFUSED at shipped defaults: a run `wf start --after` will not wait on is 
   };
   assert.equal(
     await refusedBy(['no-such-run']),
-    '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — wf ls lists them.',
+    '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — nemia ls lists them.',
   );
   assert.equal(
     await refusedBy(['p-running', 'p-cancelled']),

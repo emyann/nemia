@@ -40,7 +40,7 @@ import type { StepState } from '../src/lib/status.ts';
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
 const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, kind: 'loop', rounds });
 const graphOf = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
-const step = (name: string, state: StepState, note: string | null = null): EdgeStep => ({ name, state, note });
+const step = (name: string, state: StepState, note: string | null = null, roundDue = false): EdgeStep => ({ name, state, note, roundDue });
 
 test("a duration reads in its two largest units, and one below zero — the engine's clock ahead of this one — as nothing elapsed yet", () => {
   const s = 1000;
@@ -154,11 +154,11 @@ test("a loop's edge is labelled with the round it is on past the first, as `wf l
     [null, null, 3, null],
     ['try 2, by retries: 1', null, 3, null],
     ['try 2 due — retries: 1, 0 spent', null, 3, null],
-    ['round 3 of 3, and it asked again — once more: wf round r-1 review', 'round 3 of 3', 3, 'round 3 of 3'],
+    ['round 3 of 3, and it asked again — once more: nemia round r-1 review', 'round 3 of 3', 3, 'round 3 of 3'],
     ['round 2 of 5 due — review asked again, and the next tick files implement', null, 5, 'round 2 of 5'],
     [null, 'round 2 of 3', 3, 'round 2 of 3'],
     ['round 2 of 3, try 3, by retries: 1', 'round 2 of 3', 3, 'round 2 of 3'],
-    ['round 4 asked (wf round) — the next tick files implement', 'round 3 of 3', 3, 'round 4 of 3'],
+    ['round 4 asked (nemia round) — the next tick files implement', 'round 3 of 3', 3, 'round 4 of 3'],
     ['round 4, past rounds: 3, on your word', 'round 4, past rounds: 3, on your word', 3, 'round 4 of 3'],
   ];
   for (const [review, implement, rounds, label] of cases) {
@@ -171,25 +171,29 @@ test("a loop's edge is labelled with the round it is on past the first, as `wf l
   }
 });
 
-test('an edge runs while work moves along it — into a step at work or at its check, or back round a loop whose next round is due, which a try due is not — and not otherwise', () => {
-  const loopState = (review: string | null, implement: string | null = null) =>
-    edgesOf(graphOf(loop('review', 'implement')), [step('implement', 'unverified', implement), step('review', 'unverified', review)])[0]
-      .state;
-  assert.equal(
-    loopState('round 2 of 3 due — review asked again, and the next tick files implement'),
-    'running',
-    'asked again with rounds left',
-  );
-  assert.equal(loopState('round 4 asked (wf round) — the next tick files implement'), 'running', 'a person sent it round');
-  const still: Array<[string | null, string | null]> = [
-    [null, null],
-    ['round 3 of 3, and it asked again — once more: wf round r-1 review', 'round 3 of 3'],
-    ['round 2 of 3', 'round 2 of 3'],
-    ['try 2 due — retries: 1, 0 spent', null],
-    [null, 'round 2 of 3 due — review asked again, and the next tick files implement'],
+test('an edge runs while work moves along it — into a step at work or at its check, or back round a loop whose looping step the api says is due, whatever its note words — and not otherwise', () => {
+  const loopState = (review: string | null, due: boolean, implement: string | null = null, implementDue = false) =>
+    edgesOf(graphOf(loop('review', 'implement')), [
+      step('implement', 'unverified', implement, implementDue),
+      step('review', 'unverified', review, due),
+    ])[0].state;
+  assert.equal(loopState('round 2 of 3 due — review asked again, and the next tick files implement', true), 'running', 'asked again');
+  assert.equal(loopState('round 4 asked (nemia round) — the next tick files implement', true), 'running', 'a person sent it round');
+  assert.equal(loopState(null, true), 'running', 'the fact, with no note to word it');
+  const still: Array<[review: string | null, implement: string | null, implementDue: boolean]> = [
+    [null, null, false],
+    ['round 2 of 3 due — review asked again, and the next tick files implement', null, false],
+    ['round 4 asked (nemia round) — the next tick files implement', null, false],
+    ['round 3 of 3, and it asked again — once more: nemia round r-1 review', 'round 3 of 3', false],
+    ['try 2 due — retries: 1, 0 spent', null, false],
+    [null, 'round 2 of 3 due — review asked again, and the next tick files implement', true],
   ];
-  for (const [review, implement] of still)
-    assert.equal(loopState(review, implement), 'to-come', `review: ${review}; implement: ${implement}`);
+  for (const [review, implement, implementDue] of still)
+    assert.equal(
+      loopState(review, false, implement, implementDue),
+      'to-come',
+      `REFUSED: review not due, its note ${review}; implement: ${implement}`,
+    );
 
   const into = (state: StepState, from: StepState = 'verified') =>
     edgesOf(graphOf(after('a', 'b')), [step('a', from), step('b', state)])[0].state;

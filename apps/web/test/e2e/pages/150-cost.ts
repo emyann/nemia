@@ -71,7 +71,7 @@ export default {
       palette.locator('[data-peak="large"]', { hasText: COSTLY.read.palette.peak }),
       `and marks its peak, past 200k with no cap`,
     );
-    const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
+    const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — nemia decide ${COSTLY.id}`;
     await expectVisible(
       page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }),
       `the banner says every step past its budget waits on you, implement and review held on implement's budget alone, and why: ${reasons}`,
@@ -213,11 +213,11 @@ export default {
       `${held.target} has no row of its own: it goes again with ${held.step}'s round`,
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf retry ${COSTLY.id} ${over.step} --budget <amount>` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia retry ${COSTLY.id} ${over.step} --budget <amount>` }),
       'once more: the try with its cap raised, as a line',
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf round ${COSTLY.id} ${held.step} --budget <amount>` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia round ${COSTLY.id} ${held.step} --budget <amount>` }),
       'once more: the round with its cap raised, as a line',
     );
 

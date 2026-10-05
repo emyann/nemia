@@ -1,7 +1,7 @@
 /**
- * A gate on disk: a step's handoff that waits for a person, as `wf start --gate`, a card's `gate:` and a step's `gate: true` freeze it on
- * a run, and as the tick holds it. What a gate means to `assess`, `listing`, `decision` and a brief is pure, and lives in run.test.ts.
- * This is the part that is not: the record `wf start` writes, the files a person writes beside it, and a tick that reads both on every
+ * A gate on disk: a step's handoff that waits for a person, as `nemia start --gate`, a card's `gate:` and a step's `gate: true` freeze it
+ * on a run, and as the tick holds it. What a gate means to `assess`, `listing`, `decision` and a brief is pure, and lives in run.test.ts.
+ * This is the part that is not: the record `nemia start` writes, the files a person writes beside it, and a tick that reads both on every
  * pass.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
@@ -30,7 +30,7 @@ const { engineOf } = await import('../src/runtime-client.ts');
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
@@ -53,7 +53,7 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
   return dir;
 };
 
-/** The engine board (`test/engine-board.ts`), and the engine the controllers take over it, as `wf` builds one over the runtime. */
+/** The engine board (`test/engine-board.ts`), and the engine the controllers take over it, as `nemia` builds one over the runtime. */
 const board = () => {
   const b = engineBoard();
   return { ...b, e: engineOf(b.layer) };
@@ -70,7 +70,7 @@ const gitIn = (cwd: string, ...args: string[]) =>
   }).trim();
 
 const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
-/** An approval, written as a person's file beside the retry asks — what `wf approve` writes. */
+/** An approval, written as a person's file beside the retry asks — what `nemia approve` writes. */
 const approveByHand = (id: string, step: string, n: number, held: unknown = { step, try: n, at: '2026-09-16T23:10:00.000Z' }) => {
   fs.mkdirSync(asksDir(id), { recursive: true });
   fs.writeFileSync(path.join(asksDir(id), `approve-${step}-${n}`), typeof held === 'string' ? held : `${JSON.stringify(held, null, 2)}\n`);
@@ -96,7 +96,7 @@ const printedBy = async (
   return printed.join('\n').split('\n');
 };
 
-test("`wf start --gate <step>` freezes `gates` on the record, once per step; a step's own `gate: true` is frozen with its workflow; a run given none has no `gates`", async (t) => {
+test("`nemia start --gate <step>` freezes `gates` on the record, once per step; a step's own `gate: true` is frozen with its workflow; a run given none has no `gates`", async (t) => {
   const repo = aRepo();
   const run = start({ brief: 'plan the flag', repo, workflowDir: planned({ review: 'gate: true' }), isolate: false, gates: ['plan'] });
   assert.deepEqual(readRun(run.id).gates, ['plan']);
@@ -120,13 +120,13 @@ test("`wf start --gate <step>` freezes `gates` on the record, once per step; a s
   assert.deepEqual(readRun(id).gates, ['plan', 'implement']);
   assert.ok(
     printed.includes(
-      `gated at: plan, implement, review — nothing after each is filed until wf approve ${id} <step>, once it has signed off`,
+      `gated at: plan, implement, review — nothing after each is filed until nemia approve ${id} <step>, once it has signed off`,
     ),
     printed.join('\n'),
   );
 });
 
-test('REFUSED at `wf start`, before a run is written: a --gate naming a step the workflow does not have — naming the steps it has — and one given twice; the CLI refuses --gate with no step, and `wf plan --gate` by name', async () => {
+test('REFUSED at `nemia start`, before a run is written: a --gate naming a step the workflow does not have — naming the steps it has — and one given twice; the CLI refuses --gate with no step, and `nemia plan --gate` by name', async () => {
   const repo = aRepo();
   const before = runsWritten();
   const starting =
@@ -155,7 +155,7 @@ test('REFUSED at `wf start`, before a run is written: a --gate naming a step the
   await assert.rejects(typed('--gate', 'reveiw'), refusedWith(/^--gate reveiw: the workflow has no step "reveiw"/));
   await assert.rejects(
     main(['plan', ROOT, '--gate', 'plan']),
-    refusedWith(/^wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true\./),
+    refusedWith(/^nemia plan does not take --gate: a plan's cards are gated by their workflows' own gate: true\./),
   );
   assert.equal(runsWritten(), before, 'nor by the CLI');
 });
@@ -193,7 +193,7 @@ test("an inbox card's `gate:` is frozen on the run it starts, beside a start's -
   );
 });
 
-test("REFUSED at shipped defaults, pass after pass: a gated step that signed off files nothing after it — `wf ls` says awaiting approval and `waiting on you: approve plan` — and no approval but the try's own opens it: not another try's, not a file that is not one; the try's own does, on the next pass, and is never written into the record", async (t) => {
+test("REFUSED at shipped defaults, pass after pass: a gated step that signed off files nothing after it — `nemia ls` says awaiting approval and `waiting on you: approve plan` — and no approval but the try's own opens it: not another try's, not a file that is not one; the try's own does, on the next pass, and is never written into the record", async (t) => {
   const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] });
   const { e, filings, settle } = board();
   await advance(e, readRun(run.id));
@@ -205,7 +205,7 @@ test("REFUSED at shipped defaults, pass after pass: a gated step that signed off
   const l = await list(e, readRun(run.id));
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
   const printed = await printedBy(t, ['ls', run.id], e);
-  assert.ok(printed.includes(`   → waiting on you: approve plan  —  wf decide ${run.id}`), printed.join('\n'));
+  assert.ok(printed.includes(`   → waiting on you: approve plan  —  nemia decide ${run.id}`), printed.join('\n'));
 
   approveByHand(run.id, 'plan', 2);
   approveByHand(run.id, 'implement', 1);
@@ -214,7 +214,7 @@ test("REFUSED at shipped defaults, pass after pass: a gated step that signed off
   assert.deepEqual(others.filed, [], "another try's approval, another step's, and a file that is not one open nothing");
   assert.ok(
     others.notes.includes(
-      `${path.join(asksDir(run.id), 'approve-plan-3')}: it says no time it was given, so it opens no gate — remove it, and approve with wf approve`,
+      `${path.join(asksDir(run.id), 'approve-plan-3')}: it says no time it was given, so it opens no gate — remove it, and approve with nemia approve`,
     ),
     others.notes.join('\n'),
   );
@@ -299,7 +299,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
 });
 
 /**
- * `wf start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits at its gate.
+ * `nemia start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits at its gate.
  */
 const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
   const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(keys), isolate: false, gates: ['plan'] });
@@ -319,7 +319,7 @@ const asksOf = (id: string, dir = '') =>
         .sort()
     : [];
 
-test("`wf approve` writes the person's approval beside the retry asks — the try it approves, the time and the words — and nothing else; the next tick files what waits on the step, once, and the approval stays where it was written", async (t) => {
+test("`nemia approve` writes the person's approval beside the retry asks — the try it approves, the time and the words — and nothing else; the next tick files what waits on the step, once, and the approval stays where it was written", async (t) => {
   const { run, e, filings } = await atItsGate();
   const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
   const printed = await printedBy(t, ['approve', run.id, 'plan', '--message', 'ship the second reading'], e);
@@ -340,7 +340,7 @@ test("`wf approve` writes the person's approval beside the retry asks — the tr
   assert.deepEqual(Object.keys(approval).sort(), ['at', 'step', 'try'], 'with no words, the approval has none');
 });
 
-test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not signed off yet, one already approved, a cancelled run, a run not there, a step the run does not have, empty words, and while a send-back is asked for — exit 2, by name, nothing written; the CLI refuses a flag it does not take, --message with no words or twice, before it reads a run', async () => {
+test('REFUSED at shipped defaults: `nemia approve` on a step not gated, one not signed off yet, one already approved, a cancelled run, a run not there, a step the run does not have, empty words, and while a send-back is asked for — exit 2, by name, nothing written; the CLI refuses a flag it does not take, --message with no words or twice, before it reads a run', async () => {
   const gate = await atItsGate();
   const id = gate.run.id;
   await assert.rejects(
@@ -358,7 +358,7 @@ test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not sig
   await assert.rejects(approve(gate.e, id, 'plan', ''), refusedWith(/^--message is empty/));
   await assert.rejects(
     approve(gate.e, 'no-such-run-zz9z', 'plan'),
-    refusedWith(/^no such run: no-such-run-zz9z\. wf approve takes a run by its id, as wf ls lists it/),
+    refusedWith(/^no such run: no-such-run-zz9z\. nemia approve takes a run by its id, as nemia ls lists it/),
   );
   assert.deepEqual(asksOf(id), []);
 
@@ -411,7 +411,7 @@ test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not sig
   const typed = (...flags: string[]) => main(['approve', 'no-such-run-zz9z', 'plan', ...flags]);
   await assert.rejects(
     typed('--mesage', 'yes'),
-    refusedWith(/^wf approve does not take --mesage\. It takes the run, the step, and --message "<words>"/),
+    refusedWith(/^nemia approve does not take --mesage\. It takes the run, the step, and --message "<words>"/),
   );
   await assert.rejects(typed('--message'), refusedWith(/^--message takes the words that go with your approval, quoted/));
   await assert.rejects(typed('--message='), (err: Error & { exitCode?: number }) => {
@@ -419,15 +419,15 @@ test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not sig
     assert.equal(
       err.message,
       "--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. " +
-        'Say what you approve, or on what terms — wf approve no-such-run-zz9z plan --message "<words>" — or leave --message out.',
+        'Say what you approve, or on what terms — nemia approve no-such-run-zz9z plan --message "<words>" — or leave --message out.',
     );
     return true;
   });
-  await assert.rejects(typed('--message', 'a', '--message', 'b'), refusedWith(/^wf approve takes --message once/));
-  await assert.rejects(typed('yes'), refusedWith(/^wf approve does not take yes\./));
+  await assert.rejects(typed('--message', 'a', '--message', 'b'), refusedWith(/^nemia approve takes --message once/));
+  await assert.rejects(typed('yes'), refusedWith(/^nemia approve does not take yes\./));
 });
 
-test("REFUSED at shipped defaults: a send-back spends the approval given before it — `wf approve`, then `wf retry --message` before the tick — the step's session continues with the objection and nothing after it is filed; it signs off anew and its gate holds again, pass after pass, until that try is approved", async () => {
+test("REFUSED at shipped defaults: a send-back spends the approval given before it — `nemia approve`, then `nemia retry --message` before the tick — the step's session continues with the objection and nothing after it is filed; it signs off anew and its gate holds again, pass after pass, until that try is approved", async () => {
   const { run, e, tasks, filings, settle } = await atItsGate();
   await approve(e, run.id, 'plan', 'go ahead');
   await retry(e, run.id, 'plan', { mode: 'nudge', message: 'Store the flag before you parse it.' });
@@ -448,7 +448,7 @@ test("REFUSED at shipped defaults: a send-back spends the approval given before 
   for (let pass = 1; pass <= 3; pass++) assert.deepEqual((await advance(e, readRun(run.id))).filed, [], `pass ${pass}: held again`);
   const l = await list(e, readRun(run.id));
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
-  assert.match(l.steps[0].note ?? '', /^try 2, nudged on your word, answered · approve it: wf approve /);
+  assert.match(l.steps[0].note ?? '', /^try 2, nudged on your word, answered · approve it: nemia approve /);
 
   fs.copyFileSync(path.join(asksDir(run.id), 'done', 'approve-plan-1'), path.join(asksDir(run.id), 'approve-plan-1'));
   assert.deepEqual(
@@ -463,13 +463,13 @@ test("REFUSED at shipped defaults: a send-back spends the approval given before 
   assert.equal(filings.filter((f) => f === `${run.id}-implement`).length, 1);
 });
 
-test('REFUSED at shipped defaults: `wf cancel` calls a run waiting at its gate off as any run — marked, not `already failed` — and it files nothing after, approval or not; `wf rm` refuses a run at its gate, naming the approval it waits for, and forgets it once it is called off', async (t) => {
+test('REFUSED at shipped defaults: `nemia cancel` calls a run waiting at its gate off as any run — marked, not `already failed` — and it files nothing after, approval or not; `nemia rm` refuses a run at its gate, naming the approval it waits for, and forgets it once it is called off', async (t) => {
   const gate = await atItsGate();
   const refusal = await forget(gate.e, gate.run.id);
   assert.equal(refusal.kind, 'refused');
   assert.equal(
     refusal.refusal,
-    `plan waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve ${gate.run.id} plan. Forgetting is not cancelling: wf cancel ${gate.run.id} files nothing more, then wf rm ${gate.run.id}.`,
+    `plan waits at its gate for your approval, and what waits on it is filed once it is approved: nemia approve ${gate.run.id} plan. Forgetting is not cancelling: nemia cancel ${gate.run.id} files nothing more, then nemia rm ${gate.run.id}.`,
   );
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${gate.run.id}.json`)), 'nothing of it removed');
   await assert.rejects(main(['rm', gate.run.id], gate.e), refusedWith(/not forgotten/));
@@ -483,7 +483,7 @@ test('REFUSED at shipped defaults: `wf cancel` calls a run waiting at its gate o
   assert.equal((await forget(gate.e, gate.run.id)).kind, 'forgotten');
 });
 
-test('`wf decide` at a gate says AWAITING APPROVAL and, under the step, the approval and the send-back to give; approved with words, the tick hands them to implement and to review after it under `## Approved`, as data, and `wf decide` prints the gate `approved <time> — "<words>"`', async (t) => {
+test('`nemia decide` at a gate says AWAITING APPROVAL and, under the step, the approval and the send-back to give; approved with words, the tick hands them to implement and to review after it under `## Approved`, as data, and `nemia decide` prints the gate `approved <time> — "<words>"`', async (t) => {
   const { run, e, tasks, settle } = await atItsGate();
   const atGate = await printedBy(t, ['decide', run.id], e);
   assert.ok(
@@ -496,7 +496,7 @@ test('`wf decide` at a gate says AWAITING APPROVAL and, under the step, the appr
   assert.ok(
     under > 0 &&
       atGate[under + 1] ===
-        `    gate  awaiting approval:  wf approve ${run.id} plan [--message "<words>"]  — or send it back:  wf retry ${run.id} plan --message "<objection>"`,
+        `    gate  awaiting approval:  nemia approve ${run.id} plan [--message "<words>"]  — or send it back:  nemia retry ${run.id} plan --message "<objection>"`,
     atGate.join('\n'),
   );
 
@@ -522,7 +522,7 @@ test('`wf decide` at a gate says AWAITING APPROVAL and, under the step, the appr
   assert.equal(decided[plan + 1], `    gate  approved ${approval.at.slice(11, 16)}Z — "Ship the second reading."`);
 });
 
-test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated step's harness blocked its session, whose session then signs off before any tick, is not filed at the gate — pass after pass nothing is tried or filed, `wf ls` says awaiting approval, `wf approve` names the ask to delete — and with it deleted, the approval files what follows", async () => {
+test("REFUSED at shipped defaults: a wordless `nemia retry` taken while a gated step's harness blocked its session, whose session then signs off before any tick, is not filed at the gate — pass after pass nothing is tried or filed, `nemia ls` says awaiting approval, `nemia approve` names the ask to delete — and with it deleted, the approval files what follows", async () => {
   const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] });
   const { e, tasks, filings, stopped, settle } = board();
   await advance(e, readRun(run.id));
@@ -562,7 +562,7 @@ test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated ste
     approve(e, run.id, 'plan'),
     refusedWith(
       new RegExp(
-        `^try 1 of plan is already approved, at .*, and it has handed on: what waits on it has been filed, so there is nothing to approve, nor to send back\\. See where the run stands: wf ls ${run.id}\\.$`,
+        `^try 1 of plan is already approved, at .*, and it has handed on: what waits on it has been filed, so there is nothing to approve, nor to send back\\. See where the run stands: nemia ls ${run.id}\\.$`,
       ),
     ),
     'handed on, a second approval says so, and offers no send-back that would be refused',

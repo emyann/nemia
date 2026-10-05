@@ -450,7 +450,7 @@ test("a start the tick tried and did not make says so as `wf inbox` does: refuse
   );
   assert.equal(
     triedLine({ repo: null, factory: 'solo', error: null, tried: refused }, 'then'),
-    'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run wf up in the repository it is about.',
+    'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run the daemon in the repository it is about.',
   );
   const unfactored = 'card.md: this card names no factory, and a card is started only in the factory named for it.';
   assert.equal(
@@ -534,6 +534,9 @@ test('a card in a factory starts there: in the /api/runs request, the factory an
   );
 });
 
+/** The line that files a factory, as `GET /api/store` answers it. */
+const FILE_FACTORY = 'nemia factory add <name> --repo <path>';
+
 /** A factory as the api lists it, on `repos`. */
 const factoryOn = (name: string, repos: string[], error: string | null = null): Factory => ({
   name,
@@ -542,27 +545,44 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
   workflows: name === 'default' ? null : ['good'],
   hires: {},
   error,
+  commands: {
+    attach: `nemia factory attach ${name} <workflow>`,
+    rm: `nemia factory rm ${name}`,
+    add: `nemia factory add ${name} --repo <path>`,
+  },
 });
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];
 
 test("a card's place: none in the default factory; a factory's one repository filled in; the card's repo: among several, else none to pick", () => {
-  assert.equal(cardPlace(entry('a', null), FACTORIES), null);
-  assert.equal(cardPlace(entry('a', null, { factory: 'default' }), FACTORIES), null);
-  assert.deepEqual(cardPlace(entry('a', null, { factory: 'solo' }), FACTORIES), { factory: 'solo', repos: ['/r/a'], repo: '/r/a' });
-  assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair', repo: '/r/b' }), FACTORIES), {
+  assert.equal(cardPlace(entry('a', null), FACTORIES, FILE_FACTORY), null);
+  assert.equal(cardPlace(entry('a', null, { factory: 'default' }), FACTORIES, FILE_FACTORY), null);
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'solo' }), FACTORIES, FILE_FACTORY), {
+    factory: 'solo',
+    repos: ['/r/a'],
+    repo: '/r/a',
+  });
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair', repo: '/r/b' }), FACTORIES, FILE_FACTORY), {
     factory: 'pair',
     repos: ['/r/a', '/r/b'],
     repo: '/r/b',
   });
-  assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair' }), FACTORIES), { factory: 'pair', repos: ['/r/a', '/r/b'], repo: null });
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair' }), FACTORIES, FILE_FACTORY), {
+    factory: 'pair',
+    repos: ['/r/a', '/r/b'],
+    repo: null,
+  });
 });
 
 test('REFUSED: no place for a card naming a factory the store does not list, or one whose file does not read — each says why', () => {
-  assert.deepEqual(cardPlace(entry('a', null, { factory: 'gone' }), FACTORIES), {
-    why: "The card names the factory gone, which the store does not have: file it with wf factory add gone --repo <path>, or change the card's factory: line.",
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'gone' }), FACTORIES, FILE_FACTORY), {
+    why: "The card names the factory gone, which the store does not have: file it by that name with nemia factory add <name> --repo <path>, or change the card's factory: line.",
   });
   assert.deepEqual(
-    cardPlace(entry('a', null, { factory: 'bad' }), [...FACTORIES, factoryOn('bad', [], '/store/factories/bad.json is not JSON')]),
+    cardPlace(
+      entry('a', null, { factory: 'bad' }),
+      [...FACTORIES, factoryOn('bad', [], '/store/factories/bad.json is not JSON')],
+      FILE_FACTORY,
+    ),
     {
       why: 'The card names the factory bad, whose file does not read: /store/factories/bad.json is not JSON',
     },

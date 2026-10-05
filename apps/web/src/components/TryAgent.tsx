@@ -140,9 +140,7 @@ export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
           )}
         </div>
       ) : (
-        <p className="text-xs text-neutral-500">
-          Not filed yet: nothing is filed until {code('wf tick')} or {code('wf up')} runs.
-        </p>
+        <p className="text-xs text-neutral-500">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
       )}
     </div>
   );

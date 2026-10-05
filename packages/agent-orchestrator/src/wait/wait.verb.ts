@@ -1,5 +1,5 @@
 /**
- * `wf hold`: hold a run until other runs ship (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused
+ * `nemia hold`: hold a run until other runs ship (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused
  * before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import os from 'node:os';
@@ -13,13 +13,13 @@ import { runStore } from '../record/files.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
-/** What `wf hold` did: the run, and the hold that now stands on it. */
+/** What `nemia hold` did: the run, and the hold that now stands on it. */
 export type Holding = { run: Run; hold: Hold };
 
 /**
- * Hold a run until other runs ship — `wf hold <run> --until <run>…`: while any of them has not shipped, as `wf decide` says it of that run
- * (`parentOf`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in flight
- * runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advance`).
+ * Hold a run until other runs ship — `nemia hold <run> --until <run>…`: while any of them has not shipped, as `nemia decide` says it of
+ * that run (`parentOf`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in
+ * flight runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advance`).
  *
  * Refused before anything is written, exit 2, with what to do instead: an id that is not a run's (`idRefusal`), and one named after
  * `--until`, whose fix keeps the run to hold; a run not there, and what `holdRefusal` refuses — nothing named, a run cancelled, pruned,
@@ -36,12 +36,12 @@ export async function hold(e: Engine, id: string, until: readonly string[], said
   const bad = idRefusal(id, 'hold');
   if (bad) throw new Invalid({ message: bad });
   for (const named of until) {
-    const badUntil = idRefusal(named, 'hold', `wf hold ${id} --until`);
+    const badUntil = idRefusal(named, 'hold', `nemia hold ${id} --until`);
     if (badUntil) throw new Invalid({ message: `--until ${badUntil}` });
   }
   if (!runStore.runs.exists(id))
     throw new Missing({
-      message: `no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`,
+      message: `no such run: ${id}. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --until <runId>.`,
     });
   const run = runStore.runs.read(id);
   const read = new Map(await Promise.all([...new Set(until)].filter((u) => u !== id).map(async (u) => [u, await parentOf(e, u)] as const)));
@@ -73,7 +73,8 @@ export async function hold(e: Engine, id: string, until: readonly string[], said
   if (!put)
     throw new Conflict({
       message:
-        holdRefusal(runStore.runs.read(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`,
+        holdRefusal(runStore.runs.read(id), until, (u) => read.get(u) ?? { shipped: false }, []) ??
+        `${id} is already held: nemia ls ${id}.`,
     });
   return { run: { ...run, hold: put }, hold: put };
 }
@@ -88,7 +89,7 @@ function osUser(): string | undefined {
 }
 
 /**
- * Lift a person's hold by hand — `wf hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
+ * Lift a person's hold by hand — `nemia hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
  * asked again. Refused, exit 2: an id that is not a run's, a run not there, a run nobody holds, and a hold lifted and put again since it
  * was read, which is a person's newer word and stays (`runStore.holds.lift` takes only the hold read, by its `at`).
  */
@@ -96,15 +97,15 @@ export function unhold(id: string): Holding {
   const bad = idRefusal(id, 'hold');
   if (bad) throw new Invalid({ message: bad });
   if (!runStore.runs.exists(id))
-    throw new Missing({ message: `no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.` });
+    throw new Missing({ message: `no such run: ${id}. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --off.` });
   const run = runStore.runs.read(id);
   if (!run.hold)
     throw new Conflict({
-      message: `${id} is not held, so there is no hold to lift. To hold it until other runs ship: wf hold ${id} --until <runId>.`,
+      message: `${id} is not held, so there is no hold to lift. To hold it until other runs ship: nemia hold ${id} --until <runId>.`,
     });
   if (!runStore.holds.lift(id, run.hold.at) && runStore.holds.stands(id))
     throw new Conflict({
-      message: `${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`,
+      message: `${id}'s hold changed as it was lifted: read it again (nemia ls ${id}), then lift it: nemia hold ${id} --off.`,
     });
   return { run, hold: run.hold };
 }

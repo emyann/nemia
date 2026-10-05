@@ -1,7 +1,8 @@
 /**
  * What a step and a run cost, and a step held on its budget, as the board reads them: the engine's `costUsd`, `apiMs` and `toolMs` on
- * `used`, `cost` on a run and on each of its time's totals, `spent`, `budget` and `raise` on a step, the words `wf ls` and `wf decide` say
- * of a step past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the package's words.
+ * `used`, `cost` on a run and on each of its time's totals, `spent`, `budget` and `raise` on a step, the words `nemia ls` and `nemia
+ * decide` say of a step past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the
+ * package's words.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
  * `claude` first on PATH (test/harness.ts).
@@ -62,7 +63,7 @@ const session = (taskId: string, harness: string, from: number, closeout: object
   ]);
 
 /**
- * A check that ran to its end and exited 1: a refusal — on the engine's record, which the api reads and `wf ls` reads (`exitVerdicts`),
+ * A check that ran to its end and exited 1: a refusal — on the engine's record, which the api reads and `nemia ls` reads (`exitVerdicts`),
  * so the two agree.
  */
 const refusedCheck = (taskId: string, from: number) => {
@@ -253,7 +254,7 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-/** What the package's `retry()` refuses `how` for, word for word, given the harness's word as `wf retry` gives it. */
+/** What the package's `retry()` refuses `how` for, word for word, given the harness's word as `nemia retry` gives it. */
 const retryRefuses = async (step: string, how: RetryHow, run = R): Promise<string> => {
   try {
     await retry(engine(), run, step, how, { stopBlocked: true });
@@ -263,7 +264,7 @@ const retryRefuses = async (step: string, how: RetryHow, run = R): Promise<strin
   return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
 };
 
-/** What the package's `round()` refuses, word for word: what `wf round` prints. */
+/** What the package's `round()` refuses, word for word: what `nemia round` prints. */
 const roundRefuses = async (step: string | undefined, budget: number | undefined): Promise<string> => {
   try {
     await round(engine(), R, step, budget);
@@ -273,10 +274,10 @@ const roundRefuses = async (step: string | undefined, budget: number | undefined
   return assert.fail(`round() asked for ${step ?? 'the loop'} (budget ${budget}), and should have refused`);
 };
 
-/** `usedLines`' two lines, without their labels: what `wf decide` prints beside a check. */
+/** `usedLines`' two lines, without their labels: what `nemia decide` prints beside a check. */
 const wordsOf = (usage: object) => usedLines(usage).map((line) => line.replace(/^\w+\s+/, ''));
 
-test("a measured try's cost is on the detail — the engine's costUsd, apiMs and toolMs beside `wf decide`'s words — an unmeasured one is null, never 0, and the run's total is `wf ls`'s", async () => {
+test("a measured try's cost is on the detail — the engine's costUsd, apiMs and toolMs beside `nemia decide`'s words — an unmeasured one is null, never 0, and the run's total is `nemia ls`'s", async () => {
   const run = await detail();
   const tokens = stepOf(run, 'tokens');
   const [used, cost] = wordsOf(USAGE.tokens2);
@@ -330,7 +331,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   assert.deepEqual(
     tokens.spent,
     { usd: 4.25, measured: 2, unmeasured: 0, said: '$4.25' },
-    "what every try cost together, each session once, as wf ls puts it beside the step's word",
+    "what every try cost together, each session once, as nemia ls puts it beside the step's word",
   );
   assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
@@ -343,7 +344,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
     "the run's: every step's tries, ≥ since two of review's sessions have no cost on them",
   );
   assert.ok(Math.abs(usd - 6.35) < 1e-9, String(usd));
-  assert.equal(run.cost.said, words.cost, "as wf ls says it on the run's line");
+  assert.equal(run.cost.said, words.cost, "as nemia ls says it on the run's line");
   assert.deepEqual((await summary()).cost, run.cost, 'the list carries it too');
   assert.deepEqual(
     run.timeline.rounds.map((r) => [r.round, r.cost?.said, r.cost?.measured, r.cost?.unmeasured]),
@@ -366,10 +367,10 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
     { usd: 5, said: '$5', of: null, over: false },
     'its cap is there, and what it cost of it is not known: no of',
   );
-  assert.equal((await list(engine(), runStore.runs.read(FREE))).cost, undefined, '`wf ls` prints no cost for it either');
+  assert.equal((await list(engine(), runStore.runs.read(FREE))).cost, undefined, '`nemia ls` prints no cost for it either');
 });
 
-test("a step over its budget, on the list and on the detail, in `wf ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes", async () => {
+test("a step over its budget, on the list and on the detail, in `nemia ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes", async () => {
   const words = await list(engine(), runStore.runs.read(R));
   const listed = await summary();
   const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
@@ -411,7 +412,7 @@ test("a step over its budget, on the list and on the detail, in `wf ls`'s words 
   assert.equal(implement.raise, null, "implement goes again only with review's round");
 });
 
-test("the decision says what `wf decide` says of steps held on their budget — the OVER BUDGET line, the run's cost — and offers the raise, a try's and a round's", async () => {
+test("the decision says what `nemia decide` says of steps held on their budget — the OVER BUDGET line, the run's cost — and offers the raise, a try's and a round's", async () => {
   const said = await decide(engine(), R);
   const res = await app.request(`/api/runs/${R}/decision`);
   assert.equal(res.status, 200);
@@ -434,11 +435,11 @@ test("the decision says what `wf decide` says of steps held on their budget — 
   );
   assert.deepEqual(
     once.map((c) => c.command),
-    [`wf round ${R} review --budget <amount>`, `wf retry ${R} tokens --budget <amount>`],
+    [`nemia round ${R} review --budget <amount>`, `nemia retry ${R} tokens --budget <amount>`],
   );
 });
 
-test("REFUSED once pruned: steps over their budget are offered no raise — the decision's OVER BUDGET line is `wf decide`'s, says the run was pruned where it said it waits on you, and no step carries a raise", async () => {
+test("REFUSED once pruned: steps over their budget are offered no raise — the decision's OVER BUDGET line is `nemia decide`'s, says the run was pruned where it said it waits on you, and no step carries a raise", async () => {
   const marker = path.join(root, 'runs', `${R}.pruned`);
   const pruned = { at: '2026-09-15T07:00:00.000Z', worktrees: [] };
   write(marker, JSON.stringify(pruned));
@@ -446,15 +447,15 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
     const said = await decide(engine(), R);
     const body = await decision();
     assert.ok('overBudget' in body, JSON.stringify(body));
-    assert.equal(body.overBudget, said.overBudgetLine, 'one function says it, for `wf decide` and for the board');
+    assert.equal(body.overBudget, said.overBudgetLine, 'one function says it, for `nemia decide` and for the board');
     assert.equal(
       body.overBudget,
       'OVER BUDGET: implement ($2.10 of $2), review (held: its round would file implement again, which has cost $2.10 of its $2 budget), tokens ($4.25 of $3)' +
-        '  — nothing more is filed for them, raised or not, since the run was pruned at 2026-09-15T07:00:00.000Z — its worktrees were removed (wf prune); nothing after them ran',
+        '  — nothing more is filed for them, raised or not, since the run was pruned at 2026-09-15T07:00:00.000Z — its worktrees were removed (nemia prune); nothing after them ran',
     );
     assert.deepEqual(said.offers, []);
     assert.deepEqual(
-      body.commands.filter((c) => /^wf (retry|round|accept|approve) /.test(c.command)),
+      body.commands.filter((c) => /^nemia (retry|round|accept|approve) /.test(c.command)),
       [],
       JSON.stringify(body.commands),
     );
@@ -468,10 +469,10 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
     assert.deepEqual(
       run.pruned,
       { ...pruned, artifacts: null },
-      'the marker wf prune --unmerged writes beside the record, which nothing removes: this test takes it back, so the tests after it read R as it was',
+      'the marker nemia prune --unmerged writes beside the record, which nothing removes: this test takes it back, so the tests after it read R as it was',
     );
     assert.deepEqual([run.waitingOnYou, run.steps.map((s) => s.raise)], [[], [null, null, null]]);
-    assert.doesNotMatch(JSON.stringify(run.steps.map((s) => s.note)), /wf (retry|round|accept|approve) /);
+    assert.doesNotMatch(JSON.stringify(run.steps.map((s) => s.note)), /nemia (retry|round|accept|approve) /);
   } finally {
     fs.rmSync(marker);
   }
@@ -502,7 +503,7 @@ test('REFUSED at shipped defaults: a raise another site could make — a page on
 });
 
 test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, below it, a word — is a 400; a budget on a recheck a 422; and a raise not above what the step has cost, or none, a 409 — each in the package's words, and nothing is written", async () => {
-  const command = `wf retry ${R} tokens`;
+  const command = `nemia retry ${R} tokens`;
   for (const budget of [0, -1]) {
     const how: RetryHow = { mode: 'nudge', budget };
     const res = await askTry('tokens', how);
@@ -517,7 +518,9 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
     assert.equal(res.status, 400, JSON.stringify(budget));
     const { error } = (await res.json()) as Refused;
     assert.ok(
-      error.startsWith('`budget` is the cap to raise to, as `wf retry --budget <amount>` takes it: dollars, as a JSON number above zero'),
+      error.startsWith(
+        '`budget` is the cap to raise to, as `nemia retry --budget <amount>` takes it: dollars, as a JSON number above zero',
+      ),
       error,
     );
     assert.ok(error.includes(`This request's was ${JSON.stringify(budget)}`), error);
@@ -564,7 +567,9 @@ test("REFUSED at shipped defaults: a round's budget not above zero, or a word, i
   const word = await askRound({ step: 'review', budget: 'five' });
   assert.equal(word.status, 400);
   assert.ok(
-    ((await word.json()) as Refused).error.startsWith(`\`budget\` is the cap to raise to, as \`wf round ${R} --budget <amount>\` takes it`),
+    ((await word.json()) as Refused).error.startsWith(
+      `\`budget\` is the cap to raise to, as \`nemia round ${R} --budget <amount>\` takes it`,
+    ),
   );
   for (const body of [{ step: 42 }, { step: '' }, ['review']]) {
     const res = await askRound(body);
@@ -573,7 +578,7 @@ test("REFUSED at shipped defaults: a round's budget not above zero, or a word, i
   const named = await askRound({ step: 42 });
   assert.ok(
     ((await named.json()) as Refused).error.startsWith(
-      `\`step\` names the looping step whose loop goes round again, as \`wf round ${R} <step>\` does: a name, or left out for a run with one loop. This request's was 42: \``,
+      `\`step\` names the looping step whose loop goes round again, as \`nemia round ${R} <step>\` does: a name, or left out for a run with one loop. This request's was 42: \``,
     ),
   );
 
@@ -619,16 +624,16 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
   assert.deepEqual(
     run.steps.map(({ name, note }) => ({ name, note })),
     words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
-    'as wf ls has them until the tick files them: notes beside the steps',
+    'as nemia ls has them until the tick files them: notes beside the steps',
   );
   assert.equal(stepOf(run, 'tokens').note, 'try 3 asked (--nudge, --budget 5) — the next tick files it');
-  assert.equal(stepOf(run, 'review').note, 'round 3 asked (wf round --budget 3) — the next tick files implement');
+  assert.equal(stepOf(run, 'review').note, 'round 3 asked (nemia round --budget 3) — the next tick files implement');
   assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
   assert.ok(!run.waitingOnYou.includes('tokens') && !run.waitingOnYou.includes('review'), run.waitingOnYou.join(', '));
   fs.rmSync(asksDir, { recursive: true, force: true });
 });
 
-test('a step past its budget on its own work is raised as `wf decide` offers it: one that signed off blocked, with its answer on the same ask — REFUSED without a raise, or below the spend — and one refused by its check, rechecked with neither', async () => {
+test('a step past its budget on its own work is raised as `nemia decide` offers it: one that signed off blocked, with its answer on the same ask — REFUSED without a raise, or below the spend — and one refused by its check, rechecked with neither', async () => {
   const run = await detail(R2);
   const [palette, lint] = ['palette', 'lint'].map((name) => stepOf(run, name));
   assert.deepEqual(
@@ -642,8 +647,8 @@ test('a step past its budget on its own work is raised as `wf decide` offers it:
   assert.equal(palette.needs, PALETTE_NEEDS, "its question is still the closeout's");
   assert.equal(
     (await decide(engine(), R2)).answering.palette,
-    `to answer it, its cap raised above $1.50:  wf retry ${R2} palette --budget <amount> --message "<answer>"`,
-    'wf decide answers it with the raise and the answer on one ask',
+    `to answer it, its cap raised above $1.50:  nemia retry ${R2} palette --budget <amount> --message "<answer>"`,
+    'nemia decide answers it with the raise and the answer on one ask',
   );
 
   const answer = 'Warm ones.';
@@ -690,7 +695,7 @@ test('a step past its budget on its own work is raised as `wf decide` offers it:
   assert.deepEqual(
     after.steps.map(({ name, note }) => ({ name, note })),
     words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
-    'as wf ls has them until the tick files them: notes beside the steps',
+    'as nemia ls has them until the tick files them: notes beside the steps',
   );
   assert.deepEqual(after.waitingOnYou, [], 'and neither waited on');
   assert.deepEqual(after.waitingOnYou, words.waitingOnYou);

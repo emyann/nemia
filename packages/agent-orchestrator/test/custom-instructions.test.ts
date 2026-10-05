@@ -2,7 +2,7 @@
  * Custom instructions, the second of an agent's four layers: what a person adds to an agent they use without rewriting it, one file per
  * agent name in their store (`<WF_ROOT>/custom-instructions/<agent>.md`). Held here: the order a step is told its layers in — the agent's
  * instructions, then the custom instructions, then the step's own note — proven with layers that say different things; the freeze at
- * `wf start`, proven with an edit after it; that the words never touch a key; and the load's refusals, each beside what still starts.
+ * `nemia start`, proven with an edit after it; that the words never touch a key; and the load's refusals, each beside what still starts.
  * `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
@@ -128,7 +128,7 @@ test("a load from the store gives each step its agent's custom instructions, rea
   }
 });
 
-test('`wf start` freezes the custom instructions with the step: an edit or a removal after it reaches only a later run', () => {
+test('`nemia start` freezes the custom instructions with the step: an edit or a removal after it reaches only a later run', () => {
   const team = teamCopy('wf-custom-freeze-');
   const repo = aRepo();
   customFor('implementer', 'Before: French.\n');

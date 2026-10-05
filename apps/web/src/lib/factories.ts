@@ -102,7 +102,7 @@ export const floorPlace = (factory: Factory): { factory: string; repos: string[]
   if (factory.error !== null) return { why: `The factory ${factory.name}'s file does not read: ${factory.error}` };
   if (!factory.repos.length) {
     return {
-      why: `The factory ${factory.name} names no repository to start a run on: give its file one, or file it again with wf factory rm ${factory.name} and wf factory add ${factory.name} --repo <path>.`,
+      why: `The factory ${factory.name} names no repository to start a run on: give its file one, or file it again with ${factory.commands.rm} and ${factory.commands.add}.`,
     };
   }
   return { factory: factory.name, repos: factory.repos, repo: startRepo(factory, null) };

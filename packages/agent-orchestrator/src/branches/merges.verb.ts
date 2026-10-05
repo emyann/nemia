@@ -21,7 +21,7 @@ export const MERGES: Command<Record<string, StandingMerge>> = {
   writes: false,
   only: {
     side: 'api',
-    why: "the board's decision says whether each branch ahead still merges onto its base; wf decide leaves a trial merge to the person",
+    why: "the board's decision says whether each branch ahead still merges onto its base; nemia decide leaves a trial merge to the person",
   },
   handler: async (_e, args) => mergesOf(String(args.runId ?? ''), Array.isArray(args.branches) ? args.branches : []),
   print: () => [],

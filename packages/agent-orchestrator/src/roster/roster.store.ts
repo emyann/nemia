@@ -1,5 +1,5 @@
 /**
- * The agents of the two places read off disk, as `wf agents` prints them and the api answers them: the places (`agentPlaces`), where an
+ * The agents of the two places read off disk, as `nemia agents` prints them and the api answers them: the places (`agentPlaces`), where an
  * agent's skills are found (`agentSkillsFound`), one agent by name (`findAgent`), one agent read (`agentRead`), every agent of both places
  * (`listAgents`, `agentsRead`), and one agent's card in the shape of an A2A Agent Card (`agentCardRead`). Yours are read in the store
  * `home`, the package's own unless one is given. What a reading holds and how it is printed is `roster.ts`'s.
@@ -63,7 +63,7 @@ export function findAgent(name: string, repo: string, from?: AgentPlace, home = 
           : agentPlaces(repo, home)
               .map((p) => p.dir)
               .join(' and ')
-      }. wf agents lists them.`,
+      }. nemia agents lists them.`,
     );
   }
   if (found.length > 1)

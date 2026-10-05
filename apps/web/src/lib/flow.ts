@@ -65,12 +65,13 @@ const RAIL = { box: 110, height: 20, gap: 16, lane: 6, over: 12, under: 14 };
 /** The open card's tiles (`w-44`), the arrow's room between columns and between lanes, and the room over and under for arcs. */
 export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
 
-/** A run's steps as its flow reads them, off the list's record of it: each one's name, its state and its note. */
+/** A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due. */
 export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { holding?: RunSummary['holding'] }): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
     state: stepState(step.status, run.cancelledAt !== null, run.holding != null),
     note: step.note,
+    roundDue: step.roundDue,
   }));
 
 /**

@@ -17,7 +17,7 @@ import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { steps } from './steps/index.ts';
 import { Engine, StoreRoot } from './store.ts';
-import { builder, remover, workflows } from './workflows/index.ts';
+import { builder, remover, workflows, yours } from './workflows/index.ts';
 
 /**
  * The status each kind of the orchestrator's refusal answers, whichever route it came through: what is asked of is not there (404), the
@@ -71,16 +71,17 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   pasted for them; two writes, guarded as a start is, each through the package's entry `workflows write`.
  * - workflows/remove.ts — a folder of yours removed whole, its version checked, guarded as a start is, through the package's entry
  *   `workflows remove`.
+ * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
  *   back or removed; three writes, guarded as a start is, through the package's entries `agents write` and `agents remove`.
- * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `wf agents custom`'s entry; written and
+ * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
  *   cleared on the routes the table generates from it (commands/routes.ts).
  * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
  *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's entry `skills write`.
- * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `wf inbox`'s and `wf inbox add`'s entries; one dropped and one
- *   queued on the routes the table generates (commands/routes.ts).
- * - runs/runs.ts — the runs listed, one run in full, and what `wf decide` shows of it.
- * - stats/stats.ts — the flow numbers of every run in the store, as `wf stats --json` prints them.
+ * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `nemia inbox`'s and `nemia inbox add`'s entries; one dropped and
+ *   one queued on the routes the table generates (commands/routes.ts).
+ * - runs/runs.ts — the runs listed, one run in full, and what `nemia decide` shows of it.
+ * - stats/stats.ts — the flow numbers of every run in the store, as `nemia stats --json` prints them.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
  *   (`maxRuns`, an `Invalid`).
@@ -91,8 +92,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/pause/now` — what a pause at once (`POST /api/pause` with `now`) would stop, `{ interrupts, cost }`: each step session or
  *   check at work, of a run not called off, but a landing (`{ run, step, kind, taskId }`, a `session` or `check`), and the sentence of
  *   what an interrupted step costs (`nowRead`). Read off one view of the engine, and nothing written.
- * - `GET /api/daemon` — whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process
- *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
+ * - `GET /api/daemon` — whether a nemia up ticks the store, and since when, and when it last passed: read off daemon.json and the process
+ *   table as nemia ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
  *   it free.
  * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
@@ -100,7 +101,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
  * - commands/routes.ts — a person's asks of a run, generated from the package's command table: a try (with answers to its questions,
  *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes. And the
- *   store's pause put and lifted, `wf pause` and `wf resume`'s routes; an inbox card dropped, queued and taken off the queue; and an
+ *   store's pause put and lifted, `nemia pause` and `nemia resume`'s routes; an inbox card dropped, queued and taken off the queue; and an
  *   agent's custom instructions written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
@@ -127,6 +128,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', workflows)
     .route('/', builder)
     .route('/', remover)
+    .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
     .route('/', skills)

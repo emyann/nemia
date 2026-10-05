@@ -595,7 +595,7 @@ test('guide is refused by name, never silently dropped', () => {
   assert.throws(() => fm('implement', 'guide: CLAUDE.md'), /implement: a step may not set `guide` — the harness reads CLAUDE\.md/);
 });
 
-test("REFUSED: `maxAttempts`, retired with the runtime's own — at 1, what it was at by default, and at any count — pointing at `retries:` and `wf retry`", () => {
+test("REFUSED: `maxAttempts`, retired with the runtime's own — at 1, what it was at by default, and at any count — pointing at `retries:` and `nemia retry`", () => {
   for (const value of ['1', '2']) {
     assert.throws(
       () => fm('implement', `maxAttempts: ${value}`),
@@ -608,7 +608,7 @@ test("REFUSED: `maxAttempts`, retired with the runtime's own — at 1, what it w
         );
         assert.match(
           e.message,
-          /`retries: N` files the step again after its check refuses it, and `wf retry <run> <step>` asks for a try of one that failed, was lost or could not start/,
+          /`retries: N` files the step again after its check refuses it, and `nemia retry <run> <step>` asks for a try of one that failed, was lost or could not start/,
         );
         assert.match(e.message, /Delete the line\.$/);
         return true;
@@ -659,7 +659,7 @@ test('`renderStep` writes a context window in one canonical form, whatever the f
   }
 });
 
-test('REFUSED: a context: that is not a number of tokens, by name, saying what to write; a number of tokens loads, and the runtime judges the window at `wf start` (`start-config.test.ts`)', () => {
+test('REFUSED: a context: that is not a number of tokens, by name, saying what to write; a number of tokens loads, and the runtime judges the window at `nemia start` (`start-config.test.ts`)', () => {
   for (const bad of ['lots', '200 k', '1.5M', '200,000', '0', '-1', '200kb', '0k']) {
     assert.throws(
       () => fm('implement', `context: ${bad}`),
@@ -862,7 +862,7 @@ test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside 
   );
 });
 
-test("a codex step's `disallowedTools:` loads as written: whether codex takes a deny list is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+test("a codex step's `disallowedTools:` loads as written: whether codex takes a deny list is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
   assert.deepEqual(fm('review', 'harness: codex\ndisallowedTools: Bash(npm run build)').disallowedTools, ['Bash(npm run build)']);
   assert.deepEqual(fm('review', 'disallowedTools: SendMessage\nharness: codex\nsandbox: read-only').disallowedTools, ['SendMessage']);
 });
@@ -952,7 +952,7 @@ test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, w
   assert.deepEqual(fm('write', 'disallowedTools: Write').disallowedTools, ['Write'], 'the bare name denies the tool itself');
 });
 
-test("a codex step's `allowedTools:` loads as written: whether codex takes an allow list is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+test("a codex step's `allowedTools:` loads as written: whether codex takes an allow list is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
   assert.deepEqual(fm('write', 'harness: codex\nallowedTools: Edit(**)').allowedTools, ['Edit(**)']);
   assert.deepEqual(fm('write', 'allowedTools: Edit(**)\nharness: codex\nsandbox: workspace-write').allowedTools, ['Edit(**)']);
 });
@@ -1094,7 +1094,7 @@ test('a frozen step under the former names is read under the new ones (`asNamed`
   );
 });
 
-test('`wf start` is told which files still write a former name: the steps, then the agents they name, and nothing of a folder on the new names', () => {
+test('`nemia start` is told which files still write a former name: the steps, then the agents they name, and nothing of a folder on the new names', () => {
   assert.deepEqual(
     formerKeysIn('---\nallow: Edit(**)\n# disallow: Bash\n  disallow : SendMessage\n---\nallow: is in the body\n'),
     ['allow', 'disallow'],
@@ -1121,7 +1121,7 @@ test('`wf start` is told which files still write a former name: the steps, then 
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
-test('`wf start` is told which agent a step names still says `systemPrompt:`, with the line it is read as, and nothing of one on `harnessPrompt:`', () => {
+test('`nemia start` is told which agent a step names still says `systemPrompt:`, with the line it is read as, and nothing of one on `harnessPrompt:`', () => {
   assert.equal(
     harnessPromptLine('w/agents/builder.md', 'own'),
     "w/agents/builder.md: `systemPrompt: own` is read as `harnessPrompt: replace`, what becomes of Claude Code's own prompt. The former line is still read; rename it, or save the file from the board, which writes `harnessPrompt:`.",
@@ -1138,7 +1138,7 @@ test('`wf start` is told which agent a step names still says `systemPrompt:`, wi
   assert.deepEqual(formerKeyLines(dir), [harnessPromptLine(path.join(root, 'agents', 'writer.md'), 'own')]);
 });
 
-test("`wf start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {
+test("`nemia start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {
   assert.equal(
     codexModeLine('w/review.md', 'bypassPermissions'),
     "w/review.md: `permissionMode: bypassPermissions` is read as `sandbox: danger-full-access`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes `sandbox:`.",
@@ -1163,7 +1163,7 @@ test("`wf start` is told which codex files still name their sandbox as `permissi
   assert.deepEqual(formerKeyLines(folder({ 'review.md': '---\nharness: codex\nsandbox: read-only\n---\nReview.\n' })), []);
 });
 
-test("an effort loads as written: which efforts a step's harness takes is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+test("an effort loads as written: which efforts a step's harness takes is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
   assert.equal(fm('implement', 'effort: extreme').effort, 'extreme');
   assert.equal(fm('review', 'harness: codex\neffort: ultra').effort, 'ultra');
   assert.equal(fm('review', 'harness: codex\neffort: minimal').effort, 'minimal');
@@ -1236,7 +1236,7 @@ test("harness: banana is refused with the harnesses there are; harness: check is
   for (const h of ['claude', 'codex', 'claude-detached']) assert.equal(fm('x', `harness: ${h}`).harness, h);
 });
 
-test("a permission mode, and a codex step's sandbox, load as written: which words a step's harness takes is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+test("a permission mode, and a codex step's sandbox, load as written: which words a step's harness takes is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
   assert.equal(fm('implement', 'permissionMode: yolo').permissionMode, 'yolo');
   assert.equal(fm('implement', 'permissionMode: read-only').permissionMode, 'read-only');
   assert.equal(fm('review', 'harness: codex\nsandbox: yolo').sandbox, 'yolo');
@@ -1246,7 +1246,7 @@ test("a permission mode, and a codex step's sandbox, load as written: which word
   assert.equal(fm('x', 'permissionMode: manual').permissionMode, 'manual', "the engine's word, Claude Code's manual, is a mode");
 });
 
-test("a codex step's `permissionMode:` loads as its `sandbox:`, whatever the word, wherever the harness line is: the runtime judges the word at `wf start` (`start-config.test.ts`)", () => {
+test("a codex step's `permissionMode:` loads as its `sandbox:`, whatever the word, wherever the harness line is: the runtime judges the word at `nemia start` (`start-config.test.ts`)", () => {
   for (const mode of ['yolo', ...CLAUDE_PERMISSION_MODES.filter((m) => m !== 'bypassPermissions')]) {
     for (const lines of [`harness: codex\npermissionMode: ${mode}`, `permissionMode: ${mode}\nharness: codex`]) {
       const step = fm('review', lines);
@@ -1274,7 +1274,7 @@ test("REFUSED: `sandbox:` on a Claude Code step, the orchestrator's own rule —
   assert.equal(fm('review', 'harness: codex\nsandbox: read-only').sandbox, 'read-only', 'on codex, its own key');
 });
 
-test("`sandbox: bypassPermissions` on codex loads as written: the runtime takes it for Codex's widest sandbox, and judges it at `wf start`", () => {
+test("`sandbox: bypassPermissions` on codex loads as written: the runtime takes it for Codex's widest sandbox, and judges it at `nemia start`", () => {
   assert.equal(fm('review', 'harness: codex\nsandbox: bypassPermissions').sandbox, 'bypassPermissions');
   assert.equal(fm('review', 'harness: codex\nsandbox: danger-full-access').sandbox, 'danger-full-access');
 });
@@ -1383,7 +1383,7 @@ test('`output:` is read at load — the file as the step names it, and the schem
   assert.deepEqual(
     loadWorkflows(dir).find((s) => s.name === 'review')!.output?.schema,
     FINDINGS,
-    'relative to the workflow folder, not to wherever wf start was typed',
+    'relative to the workflow folder, not to wherever nemia start was typed',
   );
 });
 
@@ -1692,7 +1692,7 @@ test('`gate: true` gates a step — its closeout waits for a person — and a st
     refused(
       `gate: ${word}`,
       new RegExp(
-        `^plan: \`gate: ${word}\` is not \`true\`\\. \`gate: true\` holds the step's closeout for a person — wf approve — .* start it with --gate plan\\.$`,
+        `^plan: \`gate: ${word}\` is not \`true\`\\. \`gate: true\` holds the step's closeout for a person — nemia approve — .* start it with --gate plan\\.$`,
       ),
     );
   }
@@ -1859,7 +1859,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
   );
 });
 
-test('`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice; on another harness, or beside a `budget:`, it loads, and the runtime judges it at `wf start` (`start-config.test.ts`)', () => {
+test('`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice; on another harness, or beside a `budget:`, it loads, and the runtime judges it at `nemia start` (`start-config.test.ts`)', () => {
   assert.equal(fm('supervise', 'background: true').background, true);
   assert.equal(fm('supervise', 'harness: claude\nbackground: true').background, true);
   assert.equal(fm('supervise', 'background: false').background, false);
@@ -2148,7 +2148,7 @@ test("REFUSED at load: `retries:` on a step that runs in the repository's checko
       () => fm('ship', lines),
       (e: WorkflowError) =>
         e.exitCode === 2 &&
-        /^ship: `workspace: main` runs the step in the repository's own checkout, and `retries: [01]` would have the run do it again there on its own, on a refusal nobody read\. A step that ends a run is tried again on a person's word: wf retry <run> ship\. Delete the `retries:` line\.$/.test(
+        /^ship: `workspace: main` runs the step in the repository's own checkout, and `retries: [01]` would have the run do it again there on its own, on a refusal nobody read\. A step that ends a run is tried again on a person's word: nemia retry <run> ship\. Delete the `retries:` line\.$/.test(
           e.message,
         ),
       lines,
@@ -2164,7 +2164,7 @@ test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` doe
   assert.equal(
     fm('review', 'harness: codex\nremote: true').remote,
     true,
-    "which harness bridges a session is the engine's to say, at wf start: the parser reads the word on any",
+    "which harness bridges a session is the engine's to say, at nemia start: the parser reads the word on any",
   );
   const refused = (lines: string, pattern: RegExp) =>
     assert.throws(
@@ -2522,7 +2522,7 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
   assert.throws(
     () => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'dontAsk' } as StepDraft),
     said('review', 'dontAsk'),
-    'a Claude Code mode kept by a step moved onto codex is refused too: a file would read it as the sandbox, which the runtime judges at `wf start`',
+    'a Claude Code mode kept by a step moved onto codex is refused too: a file would read it as the sandbox, which the runtime judges at `nemia start`',
   );
   assert.throws(
     () => renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' }),

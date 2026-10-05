@@ -1,7 +1,7 @@
 /**
- * The store's pause on disk: `$WF_ROOT/cordon`, a person's file, `{at, by, why?}`, put by `wf pause` and deleted by `wf resume`. Every
- * pass reads it, as `runStore` composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the next.
- * The file keeps the name it had before the verbs were renamed, so a pause put then still stands and `wf resume` lifts it.
+ * The store's pause on disk: `$WF_ROOT/cordon`, a person's file, `{at, by, why?}`, put by `nemia pause` and deleted by `nemia resume`.
+ * Every pass reads it, as `runStore` composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the
+ * next. The file keeps the name it had before the verbs were renamed, so a pause put then still stands and `nemia resume` lifts it.
  *
  * Beneath the controllers, beside `files.store.ts`, which imports it: it imports no store of runs.
  */
@@ -63,7 +63,7 @@ function osUser(): string | undefined {
 
 /**
  * Pauses the store: writes its file, created only where none is, and answers the pause as written — `by` the name given, else the
- * machine's user. Refuses (`Conflict`) a store already paused, naming who paused it, `wf resume`, and `wf pause --now`.
+ * machine's user. Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
  */
 export function putPause(said: { why?: string; by?: string }, now: Date = new Date()): Pause {
   const by = said.by ?? osUser() ?? 'someone';
@@ -75,7 +75,7 @@ export function putPause(said: { why?: string; by?: string }, now: Date = new Da
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     const stands = readPause();
     throw new Conflict({
-      message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and wf pause --now stops what still finishes under it.`,
+      message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and nemia pause --now stops what still finishes under it.`,
     });
   }
   return pause;
@@ -88,7 +88,7 @@ export function resumePause(): Pause {
     fs.unlinkSync(pauseFile());
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new Missing({ message: 'the store is not paused: there is nothing to resume (wf pause puts one).' });
+    throw new Missing({ message: 'the store is not paused: there is nothing to resume (nemia pause puts one).' });
   }
   return pause ?? { at: '', by: '' };
 }

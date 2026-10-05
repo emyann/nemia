@@ -1,5 +1,5 @@
 /**
- * A gate, from a person's side: the words refused with an approval (`approvalWordsRefusal`), why `wf approve` will not approve a step
+ * A gate, from a person's side: the words refused with an approval (`approvalWordsRefusal`), why `nemia approve` will not approve a step
  * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`). Pure.
  */
 import type { Verdict } from '../check/check.ts';
@@ -48,13 +48,13 @@ export function holdsOpen(
 /**
  * Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty.
  */
-export const approvalWordsRefusal = (message: string | undefined, command = 'wf approve <runId> <step>'): string | null =>
+export const approvalWordsRefusal = (message: string | undefined, command = 'nemia approve <runId> <step>'): string | null =>
   message !== undefined && !message.trim()
     ? `--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. Say what you approve, or on what terms — ${command} --message "<words>" — or leave --message out.`
     : null;
 
 /**
- * Why `wf approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
+ * Why `nemia approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
  *
  * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that
  * is not gated, naming the steps that are; the try it is on already approved — while it may still be sent back, or once it has handed on,
@@ -67,7 +67,7 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'wf 
  * (`notHandedOn`, so the refusal and the gate agree, a looping step that asked for another round among them); and at its gate with its
  * result already on the base branch (`resultOnBase`), where nothing is left to merge.
  *
- * @param asks What people asked for with `wf retry`, and the run has not consumed yet: a send-back already asked for.
+ * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: a send-back already asked for.
  * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.store.ts). Left out, git is
  *   not asked, and the gate alone speaks.
  */
@@ -84,13 +84,13 @@ export function approvalRefusal(
   spendOf: SpendOf = () => undefined,
   standings: readonly BranchStanding[] = [],
 ): string | null {
-  const command = `wf approve ${run.id} ${name}`;
+  const command = `nemia approve ${run.id} ${name}`;
   const words = approvalWordsRefusal(message, command);
   if (words) return words;
   const step = steps.find((s) => s.name === name);
   if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
   if (run.cancelledAt) {
-    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so an approval would never be honoured. Start a new run for the work with wf start.`;
+    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so an approval would never be honoured. Start a new run for the work with nemia start.`;
   }
   const pruned = prunedRefusal(run, 'an approval');
   if (pruned) return pruned;
@@ -100,7 +100,7 @@ export function approvalRefusal(
     const gates = gatesOf(steps, run);
     return (
       `${name} has no gate: what waits on it is filed once it has ${step.check ? 'passed its check' : 'signed off'}, with nobody's approval, so there is nothing to approve. ` +
-      `${gates.length ? `${run.id} is gated at ${gates.join(', ')}.` : `${run.id} is gated at no step.`} A gate is set on a step, \`gate: true\`, or at start: wf start --gate <step>.`
+      `${gates.length ? `${run.id} is gated at ${gates.join(', ')}.` : `${run.id} is gated at no step.`} A gate is set on a step, \`gate: true\`, or at start: nemia start --gate <step>.`
     );
   }
   const n = tryOf(run, name);
@@ -109,13 +109,13 @@ export function approvalRefusal(
   if (given) {
     const approved = `try ${n} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
     if (sendsBack)
-      return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry ${run.id} ${name} --message "<objection>".`;
+      return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry ${run.id} ${name} --message "<objection>".`;
     const after = steps.some((s) => s.after.includes(name));
-    return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: wf ls ${run.id}.`;
+    return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: nemia ls ${run.id}.`;
   }
   const pending = asks.find((a) => a.step === name && a.try === n + 1);
   if (pending && !heard(pending, sendsBack)) {
-    return `try ${n + 1} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${n + 1}, in the run's .asks directory — then approve it, or send it back with words: wf retry ${run.id} ${name} --message "<objection>".`;
+    return `try ${n + 1} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${n + 1}, in the run's .asks directory — then approve it, or send it back with words: nemia retry ${run.id} ${name} --message "<objection>".`;
   }
   if (pending) {
     return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
@@ -133,31 +133,31 @@ export function approvalRefusal(
       const unfinished = notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
       return (
         `${name} is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once ${andList(unfinished)} ${unfinished.length > 1 ? 'have' : 'has'} handed on — ` +
-        `your approval is then what files it, and nothing of it runs before that. See where the run stands: wf ls ${run.id}.`
+        `your approval is then what files it, and nothing of it runs before that. See where the run stands: nemia ls ${run.id}.`
       );
     }
     if (resultOnBase(standings)) {
       return (
         `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. ` +
-        `The run has shipped as git reads it — wf decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: wf cancel ${run.id}.`
+        `The run has shipped as git reads it — nemia decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: nemia cancel ${run.id}.`
       );
     }
   }
   if (status === 'awaiting approval') return null;
-  const then = `Its gate holds once it has signed off${step.check ? ' and passed its check' : ''}: approve it then (wf ls ${run.id}).`;
+  const then = `Its gate holds once it has signed off${step.check ? ' and passed its check' : ''}: approve it then (nemia ls ${run.id}).`;
   const why: Partial<Record<StepStatus, string>> = {
     waiting: `${name} has not signed off yet: it has not been filed. ${then}`,
     running: `${name} has not signed off yet: it is still running. ${then}`,
-    checking: `${name} has signed off, and its check is still due or running: a gated step is verified first, then held. Approve it once its check has passed (wf ls ${run.id}).`,
-    blocked: `${name} has not signed off its work: it signed off blocked, so there is nothing to approve. Answer it: wf retry ${run.id} ${name} --message "<answer>".`,
-    unsigned: `${name} has not signed off: it ended without its closeout, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
-    'failed (check)': `${name} has not passed its check, so its work is not verified and there is nothing to approve. See what the check said: wf decide ${run.id}.`,
-    failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
-    stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
-    denied: `${name} signed off, and its harness denied its try a call, which \`denials: fail\` does not pass on: there is nothing to approve. See what it was denied: wf decide ${run.id}.`,
-    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — wf round ${run.id} ${name} — and approve what a later round hands on, or take the work as it stands and approve that: wf accept ${run.id} ${name} --message "<why>".`,
+    checking: `${name} has signed off, and its check is still due or running: a gated step is verified first, then held. Approve it once its check has passed (nemia ls ${run.id}).`,
+    blocked: `${name} has not signed off its work: it signed off blocked, so there is nothing to approve. Answer it: nemia retry ${run.id} ${name} --message "<answer>".`,
+    unsigned: `${name} has not signed off: it ended without its closeout, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
+    'failed (check)': `${name} has not passed its check, so its work is not verified and there is nothing to approve. See what the check said: nemia decide ${run.id}.`,
+    failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
+    stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
+    denied: `${name} signed off, and its harness denied its try a call, which \`denials: fail\` does not pass on: there is nothing to approve. See what it was denied: nemia decide ${run.id}.`,
+    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — nemia round ${run.id} ${name} — and approve what a later round hands on, or take the work as it stands and approve that: nemia accept ${run.id} ${name} --message "<why>".`,
     verified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
   };
-  return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: wf decide ${run.id}.`;
+  return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: nemia decide ${run.id}.`;
 }

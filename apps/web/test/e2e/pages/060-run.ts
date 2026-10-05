@@ -100,7 +100,7 @@ export default {
     await expectVisible(capped.locator('[data-line="hunk"]'), `${FAKE.capped}'s diff opens on a click, a hunk's header in it`);
     await expectVisible(capped.locator('[data-line="added"]'), `${FAKE.capped}'s diff shows its added lines`);
     await expectVisible(
-      capped.locator('[data-cut]', { hasText: /^\d+ more lines — wf decide prints all$/ }),
+      capped.locator('[data-cut]', { hasText: /^\d+ more lines — the command line's decide prints them all$/ }),
       `${FAKE.capped}'s diff is capped, and says so`,
     );
     const manifest = decide.locator('details[data-diff="package.json"]');
@@ -120,7 +120,7 @@ export default {
       'drop it: the branch deleted, as a line',
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf retry ${FAKE.id} ${FAKE.refused}` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia retry ${FAKE.id} ${FAKE.refused}` }),
       `once more: ${FAKE.refused} tried again, as a line`,
     );
     await expectCount(

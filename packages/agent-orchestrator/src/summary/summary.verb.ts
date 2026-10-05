@@ -1,5 +1,5 @@
 /**
- * Each run's summary, as the board's list gives it (`RunSummary`): its record, its steps judged in `wf ls`'s words (`judge`), its graph,
+ * Each run's summary, as the board's list gives it (`RunSummary`): its record, its steps judged in `nemia ls`'s words (`judge`), its graph,
  * what it cost and how long it has been at work; a run whose task's journal does not read answered off its record alone (`unjudged`). A
  * run at rest is answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of
  * the runs still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and git.
@@ -51,7 +51,7 @@ export type RunSummary = {
   /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a git run. */
   work: string | null;
   brief: string;
-  /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
+  /** The workflow folder the run was started from, as `nemia start` resolved it: its last segment names the workflow. */
   workflowDir: string;
   /** The agent it tried, for a try started from an agent's page (`tryOf`); null for every other run. */
   try: { agent: string } | null;
@@ -64,27 +64,27 @@ export type RunSummary = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what
-   * it kept — for the mark beside its status; null on a run never pruned.
+   * That `nemia prune` removed the run's worktrees, and its files too once `--artifacts` did, in `nemia prune`'s words — what it removed
+   * and what it kept — for the mark beside its status; null on a run never pruned.
    */
   pruned: { said: string } | null;
-  /** The runs this one waits on (`wf start --after`), as the record froze them at start: none for a run started without. */
+  /** The runs this one waits on (`nemia start --after`), as the record froze them at start: none for a run started without. */
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
   /**
-   * The runs a person holds this one until (`wf hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
+   * The runs a person holds this one until (`nemia hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
    * one called off.
    */
   heldUntil: string[];
   /**
    * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
-   * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `wf ls` says it.
+   * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `nemia ls` says it.
    */
   holding: RunHolding | null;
   status: RunStatus;
   /**
-   * What stopped a `failed` run in which no step broke, as `wf decide` and the feed say it: `awaiting approval` for a run at its gate,
+   * What stopped a `failed` run in which no step broke, as `nemia decide` and the feed say it: `awaiting approval` for a run at its gate,
    * `blocked` for one whose step signed off blocked. Null for every other run, one whose step broke among them.
    */
   stoppedOn: RunStoppedOn | null;
@@ -99,8 +99,8 @@ export type RunSummary = {
    */
   moving: boolean;
   /**
-   * What the run has cost so far, every step's tries together, as `wf ls` adds it up on the run's line (`runSpend`); null until a cost was
-   * measured.
+   * What the run has cost so far, every step's tries together, as `nemia ls` adds it up on the run's line (`runSpend`); null until a cost
+   * was measured.
    */
   cost: Spent | null;
   /**
@@ -115,11 +115,14 @@ export type RunSummary = {
    */
   tokens: RunTokens | null;
   /**
-   * `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. `note` is what `wf ls` prints
+   * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
-   * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
+   * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
+   * round is due, which its note words.
    */
-  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
+  steps: Array<
+    { name: string; taskId: string | null; branch: string | null; status: string; note: string | null; roundDue: boolean } & StepNeeds
+  >;
   /** The steps as a graph, as the run's page has it (`runGraph`): the Factory's card draws its flow off it, with no read of the run. */
   graph: RunGraph;
   /**
@@ -128,8 +131,8 @@ export type RunSummary = {
    */
   waitingOnYou: string[];
   /**
-   * `waitingOnYou` as `wf ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and for
-   * a step at its gate, what is asked of you, `approve plan`.
+   * `waitingOnYou` as `nemia ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and
+   * for a step at its gate, what is asked of you, `approve plan`.
    */
   onYou: string[];
   /**
@@ -185,6 +188,7 @@ async function summarize(run: Run, views: Views, reader: Engine, git: BranchRead
       branch: run.steps[name]?.branch ?? null,
       status: judged.words.get(name)!,
       note: judged.notes.get(name) ?? null,
+      roundDue: judged.roundDue.has(name),
       ...needsOf(run, name, views, judged),
     })),
     graph: runGraph(judgedSteps(run, folder), names),
@@ -234,6 +238,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       branch: run.steps[name]?.branch ?? null,
       status: wordOf(run.steps[name]),
       note: null,
+      roundDue: false,
       needs: null,
       blockedByHarness: false,
       waitingFor: null,

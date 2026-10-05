@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { removeRun } from '../lib/api';
 
 /**
- * Remove, on a try's page, asked twice: the first press asks, the second removes the run as `wf rm` does — its record and the folders it
- * worked in — and goes back to Runs, whose list is read again while the run's own record is dropped. The api removes only a try, and
- * refuses one still in flight in the package's words, which are shown here.
+ * Remove, on a try's page, asked twice: the first press asks, the second removes the run as the CLI's `rm` does — its record and the
+ * folders it worked in — and goes back to Runs, whose list is read again while the run's own record is dropped. The api removes only a try,
+ * and refuses one still in flight in the package's words, which are shown here.
  */
 export function RemoveRun({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);

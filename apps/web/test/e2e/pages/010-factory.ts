@@ -134,7 +134,7 @@ export default {
       await expectTexts(ghost.locator('[data-ghost-place]'), [PLACES_SAID[i]], `${card.name}'s ghost says its place (${PLACES_SAID[i]})`);
       await expectTexts(ghost.locator('[data-ghost-title]'), [card.title], `and its first line (${card.title})`);
       await expectTexts(ghost.locator('[data-ghost-workflow]'), [card.workflow], `and its workflow (${card.workflow})`);
-      const repo = card === QUEUE.third ? "wf up's repository" : path.basename(checkout);
+      const repo = card === QUEUE.third ? "the daemon's repository" : path.basename(checkout);
       await expectTexts(ghost.locator('[data-ghost-repo]'), [repo], `and its repository (${repo})`);
       const href = await ghost.getAttribute('href');
       if (href !== `/inbox/${card.name}`)
@@ -182,7 +182,7 @@ export default {
     }
     if (
       !passLines.includes('claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started') ||
-      passLines.at(-1) !== 'Measuring it took 0.40 ms. wf up --stats says the same.'
+      passLines.at(-1) !== 'Measuring it took 0.40 ms.'
     ) {
       throw new Refused(`the pass's title names the harness observed and what measuring took — it says ${JSON.stringify(passTitle)}`);
     }
@@ -343,7 +343,7 @@ export default {
     await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
     await expectVisible(
       ending.locator(
-        `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}"]`,
+        `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — nemia approve ${ENDING.id} ${ENDING.ending}"]`,
         { hasText: `approve to run ${ENDING.ending} on main, or send ${ENDING.back} back` },
       ),
       `its card says what approving its ending does and where a send-back goes, the folder's words on hover`,
@@ -382,7 +382,7 @@ export default {
     await expectVisible(cardOf(page, SHIPPED.id).locator('[data-pruned]', { hasText: /^pruned$/ }), 'and it says it was pruned');
     const prunedSaid = await cardOf(page, SHIPPED.id).locator('[data-pruned]').getAttribute('title');
     if (
-      !/^pruned at \S+ — its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/.test(
+      !/^pruned at \S+ — its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/.test(
         prunedSaid ?? '',
       )
     ) {

@@ -1,6 +1,6 @@
 /**
- * `wf decide`: what a run produced and the choice it leaves a person — its help, its one flag, read off the command line, and the screen it
- * prints.
+ * `nemia decide`: what a run produced and the choice it leaves a person — its help, its one flag, read off the command line, and the screen
+ * it prints.
  */
 import {
   AGENT_FACING,
@@ -55,7 +55,7 @@ import {
 import type { CheckReport, DecideCommand, Decided, GitRun } from '../../runner.ts';
 import { HELP, usage, type Engine } from '../flags.ts';
 
-export const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
+export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
 
 What the run produced, and the choice it leaves you. It reports facts and runs nothing. On a run waiting
 on you, after the run's verdicts and before each step's closeout:
@@ -69,13 +69,13 @@ on you, after the run's verdicts and before each step's closeout:
 and beside each step's check, what its session consumed — used, cost — or that nobody measured it, then
 its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
 long it queued for a slot and how long it ran; after the steps, each round's and the run's totals. Under
-each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
+each step, before its closeout, what a person said to its sessions while they ran (nemia say), with when.
 Under a gated step's name, its gate: approved, when and with what words — or awaiting approval, with the
-wf approve that lets what follows be filed and the wf retry --message that sends it back.
+nemia approve that lets what follows be filed and the nemia retry --message that sends it back.
 
 Last, the result: where each branch stands against the base branch — on it, ahead by N commits, gone —
 and then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose
-what happens when the work is done; that prose is printed with the wf approve that runs it and the wf
+what happens when the work is done; that prose is printed with the nemia approve that runs it and the nemia
 retry --message that sends the work back. A workflow with no such step ends by handing you a branch, and
 the git commands are printed instead: ship it, drop it. Neither is run.
 
@@ -93,19 +93,19 @@ and a file still counts once: in the outermost package on its way, and as a less
 A glob is a path from the repository root: * and ? stay within a directory, ** crosses any number of
 them (a leading **/ crosses none as well), and a trailing / takes everything below.`;
 
-/** `wf decide`'s one flag: `--sensitive`, once, with at least one glob. Anything else is refused before a run is read. */
+/** `nemia decide`'s one flag: `--sensitive`, once, with at least one glob. Anything else is refused before a run is read. */
 export function decideHow(argv: string[]): { sensitive?: string[] } {
   let sensitive: string[] | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg !== '--sensitive')
-      usage(`wf decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (wf decide --help).`);
-    if (sensitive) usage('wf decide takes --sensitive once: put every glob in it, comma-separated, as in --sensitive "src/**,*.json".');
+      usage(`nemia decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (nemia decide --help).`);
+    if (sensitive) usage('nemia decide takes --sensitive once: put every glob in it, comma-separated, as in --sensitive "src/**,*.json".');
     const value = argv[++i];
     const globs = value === undefined || value.startsWith('--') ? [] : parseGlobs(value);
     if (!globs.length)
       usage(
-        '--sensitive takes the globs whose changed files to print in full, comma-separated: wf decide <runId> --sensitive "src/**,*.json".',
+        '--sensitive takes the globs whose changed files to print in full, comma-separated: nemia decide <runId> --sensitive "src/**,*.json".',
       );
     sensitive = globs;
   }
@@ -113,25 +113,26 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
 }
 
 /**
- * `wf decide`: what a run produced and the choice it leaves a person. It refuses a flag before the run, which would otherwise print the
+ * `nemia decide`: what a run produced and the choice it leaves a person. It refuses a flag before the run, which would otherwise print the
  * help and exit 0. Every screen names the files a person gave the run under its line, as its steps were handed them. A run waiting on
- * others (`--after`), held (`wf hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a
+ * others (`--after`), held (`nemia hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a
  * hold beside a wait says that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for,
  * and the tries and rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said
- * there and on the deciding screen. A shipped run whose ending never ran says so, as `wf ls` still shows it at its gate. A pruned run waits
- * on nobody (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read fails
- * with the runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the engine's
- * record, never a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines at most.
- * The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base branch itself
- * (`--no-worktree`), and a folder run is offered `wf rm` alone.
+ * there and on the deciding screen. A shipped run whose ending never ran says so, as `nemia ls` still shows it at its gate. A pruned run
+ * waits on nobody (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read
+ * fails with the runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the
+ * engine's record, never a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines
+ * at most. The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base
+ * branch itself (`--no-worktree`), and a folder run is offered `nemia rm` alone.
  */
 export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   if (rest.includes('--help')) return console.log(DECIDE_HELP);
   if (!rest[0]) return console.log(HELP);
-  if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
+  if (rest[0].startsWith('--'))
+    usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
   const decided = await decide(e, rest[0]).catch(async (err: unknown) => {
-    const unjudged = await unjudgedOf(e, runStore.runs.read(rest[0]), err, 'wf decide');
+    const unjudged = await unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide');
     throw unjudged ? new Error(unjudged.said) : err;
   });
   const { run } = decided;
@@ -205,12 +206,12 @@ function standstill(d: Decided, head: string, steps: Steps, out: HeldOut): Await
 function printWaiting({ run, waiting, holding }: Decided, head: string): void {
   const never = run.hold && (!holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length));
   const alsoHeld = run.hold
-    ? `\n  ${holdWord(holding, run.hold)} as well — ${never ? holdAdvice(run, holding) : `wf hold ${run.id} --off lifts the hold, and not the wait above`}`
+    ? `\n  ${holdWord(holding, run.hold)} as well — ${never ? holdAdvice(run, holding) : `nemia hold ${run.id} --off lifts the hold, and not the wait above`}`
     : '';
   console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}${alsoHeld}`);
 }
 
-/** The screen of a run a person held (`wf hold`): the hold, what still runs and what each blocked step waits for, and how to lift it. */
+/** The screen of a run a person held (`nemia hold`): the hold, what still runs and what each blocked step waits for, and how to lift it. */
 function printHold({ run, decision, holding, waitingOn }: Decided, head: string): void {
   console.log(`${head}\n\n  ${holdWord(holding, run.hold)}`);
   if (decision.kind === 'running' && decision.waiting.length) console.log(`  still running: ${decision.waiting.join(', ')}`);
@@ -242,7 +243,7 @@ function printRunning(d: Decided, waiting: string[], head: string, steps: Steps,
 function printShipped(run: Decided['run'], branches: string[], head: string, steps: Steps): void {
   const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
   const never = unrun
-    ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${run.id}`
+    ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${run.id}`
     : '';
   console.log(`${head}\n\n  shipped — ${branches.join(', ')} is already on ${run.branch}${never}`);
 }
@@ -263,7 +264,7 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
     );
   if (decision.unverified.length)
     console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
-  if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
+  if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (nemia logs ${run.id} <step>)`);
 }
 
 /**
@@ -431,8 +432,8 @@ function printStanding({ run, standings }: Decided, decision: Awaiting, git: Git
 }
 
 /**
- * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `wf rm` for a folder
- * run, or the git commands to ship or drop.
+ * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
+ * folder run, or the git commands to ship or drop.
  */
 function printChoice({ toDecide, commands }: Decided, steps: Steps): void {
   if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands);

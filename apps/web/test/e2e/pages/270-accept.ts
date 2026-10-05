@@ -34,7 +34,7 @@ export default {
     const waiting = page.getByText(`Waiting on you: ${step}`);
 
     await expectVisible(
-      row.locator('code', { hasText: `wf accept ${id} ${step} --message "<why>"` }),
+      row.locator('code', { hasText: `nemia accept ${id} ${step} --message "<why>"` }),
       `the Decide section offers wf accept ${id} ${step} to copy, as wf decide prints it`,
     );
     await expectVisible(reason, `a box for why ${step}'s work is good enough as it stands`);
@@ -88,7 +88,7 @@ export default {
 
     await expectVisible(chip, `with the acceptance taken back, ${step} reads rounds exhausted again`);
     await expectVisible(waiting, `and ${step} is waiting on you again`);
-    await expectVisible(row.locator('code', { hasText: `wf accept ${id} ${step}` }), 'and the Decide section offers wf accept again');
+    await expectVisible(row.locator('code', { hasText: `nemia accept ${id} ${step}` }), 'and the Decide section offers nemia accept again');
     await settled(page);
   },
 } satisfies PageSpec;

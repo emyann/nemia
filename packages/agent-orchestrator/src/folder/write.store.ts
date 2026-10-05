@@ -2,7 +2,7 @@
  * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves, and one of yours removed whole
  * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAround`); and whether a folder holds the workflows the board
  * lists (`isWorkflowsHolder`). A store beside `folder.store.ts`: it imports neither the engine nor a controller. A run that froze its
- * folder at `wf start` is changed by none of it.
+ * folder at `nemia start` is changed by none of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,8 +28,8 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * as a file's (`stepNameRefusal`), no name twice, each step rendered (`renderStep`), and then the folder as it would be, parsed in memory
  * as `loadWorkflows` parses one on disk (`parseFolder`), with the schemas its `output:` lines name read from the folder as they are. So
  * every refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a
- * cycle, a `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the
- * parser — a step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by
+ * cycle, a `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `nemia start` refuses beyond the
+ * parser — a step named for another's check, `remote: true` off `claude` — is still `nemia start`'s to refuse, as for a folder written by
  * hand.
  *
  * Then the `.md` of each step not in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
@@ -48,7 +48,7 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
  * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. Its
  * agents and skills are found where a run of it would look (`lookupRoots`): in `places`, or else the repository its folder is in and the
- * store (`placesAround`). A run is not changed by any of it: it froze its folder at `wf start`.
+ * store (`placesAround`). A run is not changed by any of it: it froze its folder at `nemia start`.
  */
 export function writeWorkflow(
   dir: string,

@@ -11,7 +11,7 @@
  * model's whole window, and one filed with another compacts where the session it continues did not.
  *
  * Walked at shipped defaults, over the tests' team's `dev` (`team.ts`), whose review loops back to implement: a first try, a nudge, an
- * answer to a blocked step (`wf retry --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:`
+ * answer to a blocked step (`nemia retry --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:`
  * of its own. And the run's own nudge
  * to sign off, filed with no person's word when a session ends `unsigned`. `WF_ROOT` is read as the module loads, so it is set before the
  * import.
@@ -67,7 +67,7 @@ function chainDifferences(filed: readonly Filed[]): string[] {
   return out;
 }
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
@@ -231,7 +231,7 @@ for (const name of LOOPED) {
   });
 }
 
-test("REFUSED before the fix, now kept: a `wf retry --model` session is continued on its model — by the answer to it, and by the round after — not on the step's", async () => {
+test("REFUSED before the fix, now kept: a `nemia retry --model` session is continued on its model — by the answer to it, and by the round after — not on the step's", async () => {
   const { id, filed, target } = await walk(path.join(TEAM, 'dev'), { mode: 'fresh', model: 'sonnet' });
   const of = (n: number) => filed.find((f) => f.id === `${id}-${target}-try${n}`)!;
   assert.deepEqual(

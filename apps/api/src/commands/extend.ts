@@ -32,7 +32,7 @@ const ANSWERS = Schema.Array(
   Schema.Struct({ question: Schema.String, chose: Schema.Array(Schema.String), own: Schema.optionalKey(Schema.String) }),
 );
 
-/** `wf retry`'s how, off its arguments as the route decoded them. */
+/** `nemia retry`'s how, off its arguments as the route decoded them. */
 function retryHowOf(args: Args): RetryHow {
   const { mode, model, message, budget } = args;
   return {
@@ -55,7 +55,7 @@ const RETRY: Extension = {
     if (how.model !== undefined && how.mode !== 'fresh') {
       return {
         status: 400,
-        error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${how.mode}".`,
+        error: `\`model\` names the model a new session runs on, as \`nemia retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${how.mode}".`,
       };
     }
     const notAmount = how.budget !== undefined && !(how.budget > 0) ? budgetRefusal(how, commandLine(command, args)) : null;
@@ -77,8 +77,8 @@ const ROUND: Extension = {
 };
 
 /**
- * Rm's: the board removes only a try, a run started from an agent's page (`tryOf`); any other run is a 409 naming `wf rm`, which says what
- * it hands off and what it leaves, since a git run's worktrees and branches are a person's to read before they go.
+ * Rm's: the board removes only a try, a run started from an agent's page (`tryOf`); any other run is a 409 naming `nemia rm`, which says
+ * what it hands off and what it leaves, since a git run's worktrees and branches are a person's to read before they go.
  */
 const RM: Extension = {
   takes: {},
@@ -86,7 +86,7 @@ const RM: Extension = {
     if (tryOf(run, home)) return { args };
     return {
       status: 409,
-      error: `DELETE /api/runs/${run.id}: the board removes only a try, a run started from an agent's page, and ${run.id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${run.id}\`, which says what it hands off and what it leaves.`,
+      error: `DELETE /api/runs/${run.id}: the board removes only a try, a run started from an agent's page, and ${run.id} is a run of ${run.workflowDir}. Remove it with \`nemia rm ${run.id}\`, which says what it hands off and what it leaves.`,
     };
   },
 };

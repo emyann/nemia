@@ -7,11 +7,11 @@ const INPUT =
   'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
 
 /**
- * A new workflow of yours: its name — its folder's — and a first step, a name and what it is told (`POST /api/workflows/yours`). Once
- * made, `onCreated` is told its name, and the page opens its builder. Refused in the api's words: a name taken, or a step the package
- * refuses.
+ * A new workflow of yours, in `folder`, your workflows' folder: its name — its folder's — and a first step, a name and what it is told
+ * (`POST /api/workflows/yours`). Once made, `onCreated` is told its name, and the page opens its builder. Refused in the api's words: a
+ * name taken, or a step the package refuses.
  */
-export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }) {
+export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: (name: string) => void }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -54,8 +54,7 @@ export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }
       <div className="space-y-0.5">
         <h2 className="text-sm font-semibold">New workflow</h2>
         <p className="text-xs text-neutral-500">
-          A folder of yours, under <code className="font-mono">~/.agent-workflows/workflows/</code>, with its first step. Its builder opens
-          once it is made.
+          A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its builder opens once it is made.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

@@ -55,7 +55,7 @@ const folder = (steps: Record<string, string>, extra: Record<string, string> = {
   return dir;
 };
 
-/** `wf start` over a fresh repository, the steps working in its checkout unless `isolate`, each then in a worktree of its own. */
+/** `nemia start` over a fresh repository, the steps working in its checkout unless `isolate`, each then in a worktree of its own. */
 const started = (dir: string, isolate = false): Run => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate });
 
 /**

@@ -77,6 +77,7 @@ const row = (extra: object = {}): RunSummary => ({
       branch: 'wf/r-1/implement',
       status: 'blocked',
       note: 'try 1',
+      roundDue: false,
       needs: 'a decision',
       blockedByHarness: false,
       waitingFor: { words: 'a permission', advice: 'answer it' },

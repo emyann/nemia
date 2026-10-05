@@ -44,7 +44,7 @@ export type Workflow = {
    * `writable: [web]`: the folders of the run's factory this step may write, each by its directory's name. A run in a factory mounts its
    * other repositories read-only for every local step; this step alone is given the ones it names writable, and one that is the run's
    * own repository is its workspace already, and mounts nothing. It widens where the step's writes reach, never what it may do: refused
-   * at load over a fence that writes nothing (`refuseUnwritable`) and on a remote agent, and at `wf start` when a name is no folder
+   * at load over a fence that writes nothing (`refuseUnwritable`) and on a remote agent, and at `nemia start` when a name is no folder
    * of the factory, or two share it (`writableRefusal`), and on a harness that cannot hold a writable mount.
    */
   writable?: string[];
@@ -70,29 +70,29 @@ export type Workflow = {
   skills?: string[];
   harness?: string;
   model?: string;
-  /** How hard the harness should think, in its own words, which the runtime judges for the harness the step runs on at `wf start`. */
+  /** How hard the harness should think, in its own words, which the runtime judges for the harness the step runs on at `nemia start`. */
   effort?: string;
   /**
    * The context window the step's sessions are given, in tokens — written `context: 200k` or `context: 150000`, read once into the
    * number. Past about it Claude Code compacts the conversation and carries on (`--autocompact`, the engine's `contextTokens`); absent,
-   * a session runs on the model's whole window. The runtime refuses at `wf start` a window outside the range the harness takes, and one
+   * a session runs on the model's whole window. The runtime refuses at `nemia start` a window outside the range the harness takes, and one
    * on a harness with no such knob: codex. A step that continues another's session (`resume:`) keeps that session's window
    * (`sessionContext`).
    */
   context?: number;
   /**
-   * Claude Code's permission mode, `--permission-mode`, which the runtime judges for the harness the step runs on at `wf start`. On codex,
-   * whose fence is its sandbox, the line is the former name of `sandbox:`.
+   * Claude Code's permission mode, `--permission-mode`, which the runtime judges for the harness the step runs on at `nemia start`. On
+   * codex, whose fence is its sandbox, the line is the former name of `sandbox:`.
    */
   permissionMode?: string;
   /**
-   * Codex's sandbox, `codex exec -s`, which the runtime judges at `wf start` — `read-only`, `workspace-write`,
+   * Codex's sandbox, `codex exec -s`, which the runtime judges at `nemia start` — `read-only`, `workspace-write`,
    * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
    *
    * On codex the key's former name, `permissionMode:`, is still read in a folder or an agent: a sandbox's word is read as `sandbox:`
-   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `wf start` names the line to rename (`codexModeLine`). The
-   * engine's task calls it `permissionMode`: the tick hands it over under that name (`modeOf`), so a run record that holds a codex step's
-   * sandbox as `permissionMode` is filed with it all the same.
+   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `nemia start` names the line to rename (`codexModeLine`).
+   * The engine's task calls it `permissionMode`: the tick hands it over under that name (`modeOf`), so a run record that holds a codex
+   * step's sandbox as `permissionMode` is filed with it all the same.
    */
   sandbox?: string;
   /**
@@ -129,11 +129,11 @@ export type Workflow = {
   /**
    * `denials: fail`: a try whose session the harness denied a call is not passed on. It signs off as ever, and the step reads `denied` —
    * nothing after it is filed, no check is run on work done without the tool, and it waits on a person — rather than going on with the
-   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `wf start`, so a try the
-   * run filed on its own would be denied the same call again. A person tries it again with `wf retry` (a new session, told what it was
-   * denied, to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials are
-   * recorded and said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make on
-   * purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside
+   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `nemia start`, so a try
+   * the run filed on its own would be denied the same call again. A person tries it again with `nemia retry` (a new session, told what it
+   * was denied, to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials
+   * are recorded and said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make
+   * on purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside
    * `background: true`, whose `claude --bg` session records none either (agent-runtime's open issue 28).
    */
   denials?: 'fail';
@@ -141,7 +141,7 @@ export type Workflow = {
    * `remote: true`: every session of the step is bridged to claude.ai — Claude Code's `--remote-control`, filed as
    * `config.claude.remoteControl` — and listed in the web's agents view, where anyone signed in to the account can drive it from a browser
    * or a phone: type into it, answer its prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what
-   * a step without the line is. Refused at `wf start` on a harness the engine has no such flag for, and on `claude` without
+   * a step without the line is. Refused at `nemia start` on a harness the engine has no such flag for, and on `claude` without
    * `background: true`: only Claude Code's background sessions are bridged, and a job (`claude -p`) opens no bridge.
    */
   remote?: boolean;
@@ -149,7 +149,7 @@ export type Workflow = {
    * `background: true`: every session of the step runs as a Claude Code background session, `claude --bg` — the engine's
    * `config.background` — which never ends on its own, is listed in `claude agents`, and can be attached to and bridged (`remote:`).
    * Without it a `claude` step runs as a job, `claude -p`: it runs its brief to its end and exits, waits on nobody in any permission
-   * mode (a call it may not make is denied and recorded on its attempt), takes `wf say` on its stdin until its result, and keeps a spend
+   * mode (a call it may not make is denied and recorded on its attempt), takes `nemia say` on its stdin until its result, and keeps a spend
    * cap (`budget:`). So the line is for a session that must outlive a brief — the supervisor — and nothing else. Refused on a harness
    * other than `claude`, which has no second way to run, beside `budget:`, which a background session does not keep, and over an agent
    * in any mode but the widest (`fenceRefusal`), since a background session also reads the person's own settings and their allow rules.
@@ -160,7 +160,7 @@ export type Workflow = {
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
-   * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). On `claude` and
+   * try, no round of a loop it is in — until a person raises it (`nemia retry --budget`, `nemia round --budget`). On `claude` and
    * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `config.budgetUsd` too — a
    * harness argument the runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`).
    * Refused on codex, which has none, and beside `background: true`, whose `claude --bg` keeps none either.
@@ -176,9 +176,9 @@ export type Workflow = {
   retries?: number;
   /**
    * `gate: true`: the step's closeout waits for a person before anything after it is filed. Verified first, where it has a `check:`, then
-   * held — `awaiting approval` — until `wf approve` is on disk for the try it is on. Not control flow: the run files nothing on a
-   * condition, it waits for a person's word, as it does at the run boundary. Absent: no gate, as `wf start --gate <step>` can still set one
-   * for a run.
+   * held — `awaiting approval` — until `nemia approve` is on disk for the try it is on. Not control flow: the run files nothing on a
+   * condition, it waits for a person's word, as it does at the run boundary. Absent: no gate, as `nemia start --gate <step>` can still set
+   * one for a run.
    */
   gate?: true;
   /**
@@ -192,14 +192,14 @@ export type Workflow = {
   /**
    * What this step's closeout says beyond the four fields every closeout has, for a step that reads it.
    *
-   * A JSON Schema file beside the step, read by `wf start` and frozen on the run with the rest of the
+   * A JSON Schema file beside the step, read by `nemia start` and frozen on the run with the rest of the
    * step — a schema is part of what the step is judged by, so it lives inside the fence a `check:`
    * does. Its properties are merged into the closeout schema the step is filed with; a closeout that
    * lacks one of them is `unsigned`.
    */
   output?: StepOutput;
   /**
-   * What `wf stats` counts of this step's closeouts, per step and day: each a field its `output:` declares — an array counts its items,
+   * What `nemia stats` counts of this step's closeouts, per step and day: each a field its `output:` declares — an array counts its items,
    * an integer or a number is its value — or `field.flag`, the items of an array `field` whose boolean `flag` is true. Each is checked
    * against the `output:` schema when the step is read (`tallyOf`), and a run is counted by the tally it froze.
    */
@@ -237,21 +237,21 @@ export type StepAgent = {
   given: Partial<Record<StepKey, string>>;
   /**
    * The agent's own instructions, the session's skills and what becomes of Claude Code's own prompt (`harnessPrompt:`), as the step was
-   * resolved: what `wf start` renders for a Claude Code step, which is then told its instructions in Claude Code's prompt and its note
+   * resolved: what `nemia start` renders for a Claude Code step, which is then told its instructions in Claude Code's prompt and its note
    * alone in its brief (`rendersAgent`, `briefBody`). The skills are the agent's, then those the step adds (`Workflow.skills`), each once.
    * Absent on a record without them, whose step is told both in its brief.
    */
   instructions?: string;
   /**
    * The person's custom instructions for the agent (`custom-instructions/<agent>.md` in their store), as the step was resolved and frozen
-   * at `wf start`: told after the agent's instructions and before the step's own note, so a later edit reaches no run already started.
+   * at `nemia start`: told after the agent's instructions and before the step's own note, so a later edit reaches no run already started.
    */
   customInstructions?: string;
   skills?: string[];
   /**
-   * The skills the step's own `skills:` line gives that its agent does not, in the line's order, frozen at `wf start` so the run tells the
-   * agent's skills from the step's: on every step with its own line, empty when each it names is the agent's already, and absent on a step
-   * without one. Read by no session, which is given `skills`.
+   * The skills the step's own `skills:` line gives that its agent does not, in the line's order, frozen at `nemia start` so the run tells
+   * the agent's skills from the step's: on every step with its own line, empty when each it names is the agent's already, and absent on a
+   * step without one. Read by no session, which is given `skills`.
    */
   addedSkills?: string[];
   harnessPrompt?: HarnessPrompt;
@@ -267,7 +267,7 @@ export const DEFAULT_ROUNDS = 3;
  */
 export const LOOP_REPLIES = 'replies';
 
-/** A step's declared output: the file as the step names it, and the schema that file held at `wf start`. */
+/** A step's declared output: the file as the step names it, and the schema that file held at `nemia start`. */
 export type StepOutput = { file: string; schema: OutputSchema };
 
 /** An output schema, checked strict: an object whose every property is required and nothing else allowed. */
@@ -363,10 +363,10 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   retries: COUNTS.retries.counts,
-  gate: "`true`: the step's closeout waits for a person — `wf approve` — before anything after it is filed, verified first where it has a check",
+  gate: "`true`: the step's closeout waits for a person — `nemia approve` — before anything after it is filed, verified first where it has a check",
   output: 'a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`',
   tally:
-    "what `wf stats` counts of the step's closeouts, per day: fields its `output:` declares — an array's items, a number's value — or `field.flag`, an array's items whose boolean flag is true",
+    "what `nemia stats` counts of the step's closeouts, per day: fields its `output:` declares — an array's items, a number's value — or `field.flag`, an array's items whose boolean flag is true",
   loop: "the step to run again when this one's closeout says `again: true`: one it waits on",
   rounds: COUNTS.rounds.counts,
 };
@@ -391,7 +391,7 @@ export const REFUSED: Record<string, string> = {
     ' in that file, and what only this step needs to know belongs in the body',
   maxAttempts:
     'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing' +
-    " to count. Trying again is the run's: `retries: N` files the step again after its check refuses it, and `wf retry <run> <step>`" +
+    " to count. Trying again is the run's: `retries: N` files the step again after its check refuses it, and `nemia retry <run> <step>`" +
     ' asks for a try of one that failed, was lost or could not start (`--nudge` continues its session, `--fresh` starts clean). Delete the line',
 };
 

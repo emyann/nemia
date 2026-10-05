@@ -41,7 +41,7 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-/** A git repository with one commit, as `wf start` reads its HEAD. */
+/** A git repository with one commit, as `nemia start` reads its HEAD. */
 const gitRepo = (prefix: string): string => {
   const repo = scratch(prefix);
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -90,12 +90,12 @@ const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.re
 const post = (url: string, body: unknown) =>
   app.request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-test("REFUSED at shipped defaults: a ?repo= that is neither the api's own nor any factory's is a 422 naming those it may be and `wf factory add` — and nothing of it is listed", async () => {
+test("REFUSED at shipped defaults: a ?repo= that is neither the api's own nor any factory's is a 422 naming those it may be and `nemia factory add` — and nothing of it is listed", async () => {
   const { status, body } = await get<unknown>(`/api/workflows?repo=${encodeURIComponent(stranger)}`);
   assert.equal(status, 422);
   assert.equal(
     said(body),
-    `${stranger}: the api serves its own repository and those of the factories in the store — ${[own, repoR, repoS].join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: wf factory add <name> --repo ${stranger}.`,
+    `${stranger}: the api serves its own repository and those of the factories in the store — ${[own, repoR, repoS].join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: nemia factory add <name> --repo ${stranger}.`,
   );
   assert.ok(!JSON.stringify(body).includes('"x"'), 'the workflow x in it is never listed');
 });
@@ -142,7 +142,7 @@ test('?factory=default is the default factory: the same answer as naming none, a
   assert.equal(status, 422);
   assert.equal(
     said(body),
-    `${stranger}: the api serves its own repository and those of the factories in the store — ${[own, repoR, repoS].join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: wf factory add <name> --repo ${stranger}.`,
+    `${stranger}: the api serves its own repository and those of the factories in the store — ${[own, repoR, repoS].join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: nemia factory add <name> --repo ${stranger}.`,
   );
 });
 
@@ -161,7 +161,7 @@ test("REFUSED at shipped defaults: a repository outside the factory named is a 4
   assert.equal(named.status, 422);
   assert.equal(
     said(named.body),
-    `${own}: the factory pair works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — ?factory=pair&repo=${sorted[0]} — or file a factory on this one: wf factory add <name> --repo ${own}.`,
+    `${own}: the factory pair works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — ?factory=pair&repo=${sorted[0]} — or file a factory on this one: nemia factory add <name> --repo ${own}.`,
   );
   assert.doesNotMatch(said(named.body), /default factory/, "only the factory's own fix");
   const fallen = await get<unknown>('/api/workflows?factory=pair');
@@ -182,7 +182,7 @@ test("`unfilled` names a step a factory's hires leave with no agent, in the pack
   const { body: solo } = await get<WorkflowListing[]>('/api/workflows?factory=solo');
   const steps = loadWorkflows(path.join(repoR, 'workflows', 'alpha'));
   assert.equal(solo[0].unfilled, unfilledRefusal(steps, 'solo', 'alpha'));
-  assert.match(solo[0].unfilled ?? '', /wf factory hire solo <agent> --step alpha\/implement/);
+  assert.match(solo[0].unfilled ?? '', /nemia factory hire solo <agent> --step alpha\/implement/);
   assert.equal(solo[0].steps[0].spec.agent, null);
   assert.equal(solo[0].steps[0].hired, null, 'solo hires no one into it');
 
@@ -360,7 +360,20 @@ test('GET /api/factories serves the default factory first, then each factory by 
       body.map((f) => f.name),
       ['default', 'broken', 'hired', 'pair', 'solo'],
     );
-    assert.deepEqual(body[0], { name: 'default', default: true, repos: [own], workflows: null, hires: {}, error: null });
+    const commandsOf = (name: string) => ({
+      attach: `nemia factory attach ${name} <workflow>`,
+      rm: `nemia factory rm ${name}`,
+      add: `nemia factory add ${name} --repo <path>`,
+    });
+    assert.deepEqual(body[0], {
+      name: 'default',
+      default: true,
+      repos: [own],
+      workflows: null,
+      hires: {},
+      error: null,
+      commands: commandsOf('default'),
+    });
     assert.deepEqual(body[2], {
       name: 'hired',
       default: false,
@@ -368,7 +381,9 @@ test('GET /api/factories serves the default factory first, then each factory by 
       workflows: ['alpha'],
       hires: { 'alpha/implement': 'ada' },
       error: null,
+      commands: commandsOf('hired'),
     });
+    assert.deepEqual(body[1].commands, commandsOf('broken'), 'a file that does not read is filed again by the same lines');
     assert.deepEqual(body[3].repos, [repoR, repoS]);
     assert.equal(body[1].default, false);
     assert.match(body[1].error ?? '', /is not JSON/);

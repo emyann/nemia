@@ -32,7 +32,7 @@ test('`writable:` is read as the folder names it lists, and a step without the l
 
 test("REFUSED at load: a `writable:` name that is not a directory's name — a path, a hidden one — or one given twice", () => {
   const shape =
-    "Each is one of the factory's folders by its directory's name, never a path, comma-separated: `writable: web, docs`; wf factory ls lists the folders.";
+    "Each is one of the factory's folders by its directory's name, never a path, comma-separated: `writable: web, docs`; nemia factory ls lists the folders.";
   assert.equal(said('writable: web/src'), `review: \`writable: web/src\` has \`web/src\`, which is not a directory's name. ${shape}`);
   assert.equal(said('writable: ..'), `review: \`writable: ..\` has \`..\`, which is not a directory's name. ${shape}`);
   assert.equal(said('writable: web, web'), 'review: `writable: web, web` names `web` twice. Name it once.');

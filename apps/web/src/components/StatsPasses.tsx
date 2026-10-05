@@ -49,7 +49,10 @@ export function StatsPasses() {
   );
 }
 
-/** How long the recent passes took: a column per bucket (`data-bucket`, `over` past the last bound) with its count, scaled to the fullest. */
+/**
+ * How long the recent passes took: a column per bucket (`data-bucket`, `over` past the last bound) with its count, scaled to the
+ * fullest.
+ */
 function Histogram({ read }: { read: PassesRead }) {
   const fullest = Math.max(1, ...read.histogram.map((b) => b.count));
   return (

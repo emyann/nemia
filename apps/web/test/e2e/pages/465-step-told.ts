@@ -90,8 +90,9 @@ export default {
    * What a step will be told, on its page, read now. With no factory picked, `dev`'s `review` says its file names no agent, and that
    * FACTORIES' `hiring` hires one into it, linked to the page in that factory; there, the hire is marked hired, and the layers are drawn
    * open, each beside where it is edited — the agent's page, its custom instructions on it, the step's file in the checkout — with the run
-   * of `dev` in that factory among its recent runs, not reached yet. The run's step links back to the step's page in its place, and its
-   * header to its workflow's. The page writes the hire, the agent and the run, and takes them back.
+   * of `dev` in that factory among its recent runs, not reached yet; and its file reads as written, its agent row said to be the hire's.
+   * The run's step links back to the step's page in its place, and its header to its workflow's. The page writes the hire, the agent and
+   * the run, and takes them back.
    */
   name: 'step-told',
   route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
@@ -128,6 +129,10 @@ export default {
         "the step's words live in its file in the checkout",
       );
       await expectVisible(told.locator('[data-layer="task"]', { hasText: 'Then the task' }), 'and the task is left to the brief');
+      const file = page.locator('section[aria-label="The file"]');
+      await expectVisible(file.getByText('Review the change.', { exact: true }), "the file's own words, rendered");
+      await expectCount(file.getByText('You review the change.'), 0, "and not the hire's, which the loader fills the step with");
+      await expectVisible(file.locator('[data-hired-row]'), "and its agent row is said to be the hire's");
       const recent = page.locator(`[data-recent-run="${RECENT.id}"]`);
       await expectVisible(recent.getByText('not reached yet'), `${RECENT.id}, among its recent runs, has not reached it yet`);
       await settled(page);

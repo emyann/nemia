@@ -5968,6 +5968,23 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
   );
 });
 
+test("a step's file draws its own words, never the agent's the loader fills its body with, and says the agent row is the hire's", async () => {
+  const { StepWritten } = await import('../src/components/StepParts.tsx');
+  const hired = await routedWith(
+    createElement(StepWritten, {
+      page: await hiredPage({ body: 'You are the writer.', keys: [{ key: 'agent', value: 'writer', meaning: 'The agent.' }] }),
+    }),
+  );
+  assert.match(hired, /<p[^>]*>Write the note\.<\/p>/, "the step's policy, as its file says it");
+  assert.doesNotMatch(hired, /You are the writer\./, "not the hire's instructions");
+  assert.match(hired, /data-hired-row[^>]*> In hiring, <code>agent<\/code> is its hire, not the file&#x27;s\./);
+  assert.doesNotMatch(
+    await routedWith(createElement(StepWritten, { page: await hiredPage({ factory: null, hired: null }) })),
+    /data-hired-row/,
+    'with no hire, the rows are the file’s',
+  );
+});
+
 test("a step's recent runs link to the step on each run's page, filed or not reached yet; none says so", async () => {
   const { RecentRuns } = await import('../src/components/StepParts.tsx');
   const recentRuns = [

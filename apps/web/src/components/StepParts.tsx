@@ -12,7 +12,9 @@ import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { cn } from '../lib/utils';
 import { AgentLink, RouteLink, SkillLink } from './AgentParts';
+import { AsWritten, KeyTable } from './FilePage';
 import { FactoryTag } from './FactoryTag';
+import { Markdown } from './Markdown';
 import { Told, type LayerHomes } from './Told';
 
 const LINK =
@@ -26,8 +28,8 @@ export function StepAgent({ page }: { page: WorkflowStepPage }) {
   const { from, workflow, step, factory, hired, hiredIn } = page;
   if (factory && hired) {
     return (
-      <p data-step-agent className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
-        Its agent: <AgentLink from={from} name={hired} className="text-neutral-700 dark:text-neutral-300" />
+      <p data-step-agent className="text-xs leading-6 text-neutral-500">
+        Its agent: <AgentLink from={from} name={hired} className="text-neutral-700 dark:text-neutral-300" />{' '}
         <Badge variant="outline" data-hired={factory}>
           hired by {factory}
         </Badge>
@@ -123,6 +125,34 @@ export function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
       return from ? <SkillLink from={from} name={name} /> : name;
     },
   };
+}
+
+/**
+ * The step's file: its own words, rendered — the policy, never the agent's words the loader fills its body with — and every key as the
+ * loader reads them, the `agent` row the hire's where the factory picked hires one; or, with Source, the file as written.
+ */
+export function StepWritten({ page }: { page: WorkflowStepPage }) {
+  return (
+    <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>
+      <Markdown className="text-sm">{page.layers.policy}</Markdown>
+      <KeyTable
+        rows={page.keys}
+        note={
+          <>
+            As the loader reads them, which a run freezes as it starts: <code>after</code> names the step <code>resume</code> names, and a
+            loop that sets no <code>rounds</code> runs 3.
+            {page.factory && page.hired && (
+              <span data-hired-row>
+                {' '}
+                In {page.factory}, <code>agent</code> is its hire, not the file's.
+              </span>
+            )}{' '}
+            Source shows what the file says.
+          </>
+        }
+      />
+    </AsWritten>
+  );
 }
 
 /** What a run of the step will be told, read now: the layers, each beside where it lives (`homesOf`). */

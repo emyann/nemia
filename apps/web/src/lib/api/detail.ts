@@ -221,7 +221,10 @@ const StepFiledSchema = Schema.Struct({
   remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: Schema.NullOr(Schema.String) })),
 }) satisfies Schema.Schema<StepFiled>;
 
-/** Mirrors `RunPage` in apps/api/src/runs/runs.ts: a run in full (`RunDetail`, apps/api/src/detail/detail.ts), and its workflow page's address. */
+/**
+ * Mirrors `RunPage` in apps/api/src/runs/runs.ts: a run in full (`RunDetail`, apps/api/src/detail/detail.ts), and its workflow page's
+ * address.
+ */
 export type RunDetail = {
   id: string;
   brief: string;

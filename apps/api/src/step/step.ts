@@ -1,8 +1,8 @@
 /**
  * A workflow step's page, for the board (`GET /api/workflows/:from/:name/:step`): the step as written and as the loader read it, and what a
  * run of it would be told now, by layer, with where each layer lives — the agent the request's factory hires into it, the factories that
- * hire into it, where each of its skills is found, and its recent runs. And the address of a run's workflow page (`workflowPageOf`), which a
- * run's page links back to: the board builds no address from a store path.
+ * hire into it, where each of its skills is found, and its recent runs. And the address of a run's workflow page (`workflowPageOf`),
+ * which a run's page links back to: the board builds no address from a store path.
  *
  * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its own
  * page's (`toldOf` in detail/told.ts).
@@ -158,7 +158,7 @@ const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
  *   404 for a step the folder does not have. In a factory, the step is read with its hires, and a workflow the factory has not attached
  *   is a 404 in the package's words (`unattachedRefusal`, a `Missing`).
  *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
- *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each Claude Code skill its `skills:` gives a
+ *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each skill its `skills:` gives a
  *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
  *   What a run would be told is read now, never frozen: `layers` as a start would tell them with no task, the agent the factory hires into
  *   the step (`hired`), with no factory the factories that hire into it (`hiredIn`), where each skill is found (`skillsFrom`), and the

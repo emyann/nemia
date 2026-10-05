@@ -1,9 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Skills } from '../components/AgentParts';
-import { AsWritten, KeyTable } from '../components/FilePage';
-import { Markdown } from '../components/Markdown';
-import { RecentRuns, StepAgent, StepTold } from '../components/StepParts';
+import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/StepParts';
 import { stepQuery } from '../lib/api';
 import { pagePlaceOf } from '../lib/factories';
 
@@ -27,8 +25,8 @@ export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
 /**
  * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), with what that agent says
  * it can do (`skills:`), a description of the work that fences nothing; what a run of it will be told, read now, each layer beside where
- * it is edited; its newest runs; then its words, rendered, and every key a step may set with its value and what it means — or, with
- * Source, its file as written. It edits and starts nothing: each layer's home and its workflow's page do.
+ * it is edited; its newest runs; then its file's own words and keys (`StepWritten`). It edits and starts nothing: each layer's home and its
+ * workflow's page do.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
@@ -63,18 +61,7 @@ function StepPage() {
       <StepTold page={page} place={place} />
       <RecentRuns page={page} />
 
-      <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>
-        <Markdown className="text-sm">{page.body}</Markdown>
-        <KeyTable
-          rows={page.keys}
-          note={
-            <>
-              As the loader reads them, which a run freezes as it starts: <code>after</code> names the step <code>resume</code> names, and a
-              loop that sets no <code>rounds</code> runs 3. Source shows what the file says.
-            </>
-          }
-        />
-      </AsWritten>
+      <StepWritten page={page} />
     </article>
   );
 }

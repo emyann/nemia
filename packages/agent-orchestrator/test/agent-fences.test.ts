@@ -27,7 +27,9 @@
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
- * `default` is refused her (`readNemia`).
+ * `auto` is refused her (`readNemia`). Every command of the table that writes is asked of the person by one of her `askTools`, bare and
+ * with an argument, or in each write form where its bare form reads (`WRITE_FORMS`), and no read her allow list stands for is asked or
+ * denied (`unasked`, `askedReads`).
  *
  * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
  * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
@@ -42,7 +44,9 @@ import { filedConfig, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
-import { readNemia } from '../src/nemia/level.store.ts';
+import { readNemia, type Nemia } from '../src/nemia/level.store.ts';
+import { LEVELS } from '../src/nemia/nemia.ts';
+import { TABLE } from '../src/command/commands.verb.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
@@ -961,7 +965,7 @@ test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow 
 });
 
 /** Nemia as her keeper files her: her shipped definition, in the background. */
-const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia', background: true });
+const nemia = (file?: string): Step & Nemia => ({ ...readNemia(file), name: 'nemia', background: true });
 
 test("Nemia is refused git push, a forced branch delete, a kill by name, browser_run_code_unsafe, a merge and gh's merge by her own deny", () => {
   const her = nemia();
@@ -973,7 +977,7 @@ test("Nemia is refused git push, a forced branch delete, a kill by name, browser
     );
 });
 
-test('REFUSED: Nemia without her deny of git push is open on each push, and a mode but default is refused her', () => {
+test('REFUSED: Nemia without her deny of git push is open on each push, and a mode but auto is refused her', () => {
   const her = nemia();
   const bare = { ...her, disallowedTools: her.disallowedTools?.filter((rule) => !rule.startsWith('Bash(git push')) };
   assert.deepEqual(unfenced(bare, {}), [
@@ -983,13 +987,69 @@ test('REFUSED: Nemia without her deny of git push is open on each push, and a mo
   ]);
   const dir = scratch('wf-nemia-mode-');
   const text = fs.readFileSync(path.join(import.meta.dirname, '..', 'nemia', 'nemia.md'), 'utf8');
-  for (const mode of ['dontAsk', 'bypassPermissions', 'acceptEdits']) {
+  for (const mode of ['default', 'dontAsk', 'bypassPermissions', 'acceptEdits']) {
     const file = path.join(dir, `${mode}.md`);
-    fs.writeFileSync(file, text.replace('permissionMode: default', `permissionMode: ${mode}`));
+    fs.writeFileSync(file, text.replace('permissionMode: auto', `permissionMode: ${mode}`));
     assert.throws(
       () => readNemia(file),
-      (err: Error) => err.message.includes(`her permissionMode is ${mode}`) && err.message.endsWith('permissionMode: default.'),
+      (err: Error) => err.message.includes(`her permissionMode is ${mode}`) && err.message.endsWith('permissionMode: auto.'),
       mode,
     );
   }
+});
+
+/** A command of the table, as far as her ask rules read it. */
+type Entry = Pick<(typeof TABLE)[number], 'name' | 'writes' | 'only'>;
+
+/** The write forms of a command whose bare form is a read on her allow list: `nemia level` reads, each level writes. */
+const WRITE_FORMS: Record<string, string[]> = { level: LEVELS.map((level) => `nemia level ${level}`) };
+
+/**
+ * Each call of a command of `table` that writes, served at the command line, that none of her ask rules reaches: the command bare and with
+ * an argument, or its `WRITE_FORMS`.
+ */
+const unasked = (table: readonly Entry[], her: Nemia): string[] =>
+  table
+    .filter((entry) => entry.writes && entry.only?.side !== 'api')
+    .flatMap((entry) => WRITE_FORMS[entry.name] ?? [`nemia ${entry.name}`, `nemia ${entry.name} r-1`])
+    .filter((command) => !her.askTools.some((rule) => reaches(rule, { tool: 'Bash', command })));
+
+/** The calls her `Bash(nemia …)` allow rules stand for: the command itself, or with an argument where the rule takes more. */
+const readsOf = (her: Step): string[] =>
+  (her.allowedTools ?? []).flatMap((rule) => {
+    const read = /^Bash\((nemia [^:)]+)(:\*)?\)$/.exec(rule);
+    return read === null ? [] : [read[2] === undefined ? read[1] : `${read[1]} r-1`];
+  });
+
+/** The reads her allow list stands for (`readsOf`) that an ask or a deny of hers reaches. */
+const askedReads = (her: Step & Nemia): string[] =>
+  readsOf(her).filter((command) =>
+    [...her.askTools, ...(her.disallowedTools ?? [])].some((rule) => reaches(rule, { tool: 'Bash', command })),
+  );
+
+test('every command that writes asks the person by one of her askTools, and no read on her allow list is asked or denied', () => {
+  const her = nemia();
+  assert.deepEqual(unasked(TABLE, her), []);
+  assert.deepEqual(askedReads(her), []);
+  for (const read of ['nemia ls', 'nemia show r-1', 'nemia level', 'nemia memory', 'nemia factory', 'nemia inbox'])
+    assert.ok(readsOf(her).includes(read), read);
+  for (const write of ['nemia level manual', 'nemia approve r-1 design', 'nemia inbox add card', 'wf approve r-1 design', 'ae stop t-1'])
+    assert.ok(
+      her.askTools.some((rule) => reaches(rule, { tool: 'Bash', command: write })),
+      write,
+    );
+});
+
+test('REFUSED: a write command added without an ask rule, an ask rule taken away, and an ask on the bare level are each named', () => {
+  const her = nemia();
+  const frob: Entry = { name: 'frob', writes: true };
+  assert.deepEqual(unasked([...TABLE, frob], her), ['nemia frob', 'nemia frob r-1']);
+  assert.deepEqual(
+    unasked([...TABLE, { ...frob, only: { side: 'api', why: 'the board alone' } }], her),
+    [],
+    'not served at the command line',
+  );
+  const cut = { ...her, askTools: her.askTools.filter((rule) => rule !== 'Bash(nemia approve:*)') };
+  assert.deepEqual(unasked(TABLE, cut), ['nemia approve', 'nemia approve r-1']);
+  assert.deepEqual(askedReads({ ...her, askTools: [...her.askTools, 'Bash(nemia level:*)'] }), ['nemia level']);
 });

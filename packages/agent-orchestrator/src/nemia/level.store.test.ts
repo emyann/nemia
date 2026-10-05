@@ -1,7 +1,7 @@
 /**
  * Her definition and her bin, off the disk: `ownBin` finds the folder whose `nemia` is the package's own, in a workspace and under a
- * global prefix, and passes over another package's; `readNemia` refuses a mode but `auto` and a file with no `askTools:`. A store of its
- * own, since `WF_ROOT` is read as the module loads.
+ * global prefix, and passes over another package's; `readNemia` refuses a file with no `askTools:`, as `test/agent-fences.test.ts`
+ * refuses her a mode but `auto`. A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -59,18 +59,9 @@ test('her shipped definition reads in auto, with her ask rules', () => {
   assert.ok(her.askTools.includes('Bash(nemia approve:*)'), her.askTools.join(', '));
 });
 
-test('REFUSED: a mode but auto, and a definition with no askTools, are refused her', () => {
-  const dir = scratch('wf-nemia-mode-');
+test('REFUSED: a definition with no askTools, or one naming no rule, is refused her', () => {
+  const dir = scratch('wf-nemia-asks-');
   const text = fs.readFileSync(nemiaDefinition(), 'utf8');
-  for (const mode of ['default', 'dontAsk', 'acceptEdits', 'bypassPermissions']) {
-    const file = path.join(dir, `${mode}.md`);
-    fs.writeFileSync(file, text.replace('permissionMode: auto', `permissionMode: ${mode}`));
-    assert.throws(
-      () => readNemia(file),
-      (err: Error) => err.message.includes(`her permissionMode is ${mode}`) && err.message.endsWith('permissionMode: auto.'),
-      mode,
-    );
-  }
   for (const [name, cut] of [
     ['none', text.replace(/^askTools:.*\n/m, '')],
     ['empty', text.replace(/^askTools:.*$/m, 'askTools: ')],

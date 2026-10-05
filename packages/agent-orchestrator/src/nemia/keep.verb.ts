@@ -87,7 +87,11 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
       allowedTools: [...(step.allowedTools ?? []), memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
       background: true,
       mounts: factoryFolders(),
-      ...ownOf({ harness: step.harness, remote: true }, { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA], settings }, () => undefined),
+      ...ownOf(
+        { harness: step.harness, remote: true },
+        { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA], settings },
+        () => undefined,
+      ),
     },
   };
 }

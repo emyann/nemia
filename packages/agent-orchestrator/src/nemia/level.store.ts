@@ -128,8 +128,9 @@ const realOf = (at: string): string | undefined => {
 export function ownBin(root: string = PACKAGE): string | undefined {
   const named = (JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { bin?: { nemia?: unknown } }).bin?.nemia;
   const own = typeof named === 'string' ? realOf(path.join(root, named)) : undefined;
+  if (own === undefined) return undefined;
   let at = realOf(root);
-  while (own !== undefined && at !== undefined) {
+  while (at !== undefined) {
     const found = [path.join(at, 'node_modules', '.bin'), path.join(at, 'bin')].find((bin) => realOf(path.join(bin, 'nemia')) === own);
     if (found !== undefined) return found;
     at = path.dirname(at) === at ? undefined : path.dirname(at);

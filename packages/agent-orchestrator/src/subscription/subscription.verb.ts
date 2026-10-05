@@ -13,6 +13,7 @@ import { feedSize } from '../feed/feed.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService, asked, tried, type TaskView } from '../runtime-client.ts';
 import { dropSubscription, putSubscription } from './subscription.store.ts';
+import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
 import {
   DEFAULT_DIGEST_EVERY,
   DEFAULT_WAKE,
@@ -25,8 +26,19 @@ import {
 /** What `nemia subscribe` answers: the subscription put, under its name. */
 export type Subscribed = { name: string; subscription: Subscription };
 
-/** How a long-lived task is filed for a subscription, as the refusal of any other says it, until Nemia files its own. */
+/** How a long-lived task is filed for a subscription, as the refusal of any other says it; Nemia's own is filed by her keeper. */
 const FILE_IT = 'file it long-lived: AE_ROOT=$WF_ROOT/engine ae file, with restartPolicy: Always and background: true';
+
+/**
+ * The refusal (`Conflict`) of a subscription named `name` given or taken away by hand where the name is Nemia's, which her keeper alone
+ * puts and drops, or undefined.
+ */
+const reservedRefusal = (name: string): Conflict | undefined =>
+  name === NEMIA_SUBSCRIPTION
+    ? new Conflict({
+        message: `the subscription ${name} is Nemia's own, put and taken away by her keeper: nemia level semi-auto gives it, nemia level manual takes it away.`,
+      })
+    : undefined;
 
 /** The words a subscription is asked for in: its name, its task, the wake words given (else the default), and its minutes. */
 const askedOf = (args: Args): { name: string; task: string; wake: string[]; digestEvery: number } => ({
@@ -55,6 +67,8 @@ function taskRefusal(task: string, state: TaskView['state']): Missing | Invalid 
 /** Puts the subscription asked for, its news starting at the feed's end, once the engine says its task is long-lived and open. */
 const subscribe = Effect.fn('subscribe')(function* (args: Args) {
   const { name, task, wake, digestEvery } = askedOf(args);
+  const reserved = reservedRefusal(name);
+  if (reserved) return yield* Effect.fail(reserved);
   const e = yield* EngineService;
   const refused = taskRefusal(task, (yield* asked('view', e.view(task))).state);
   if (refused) return yield* Effect.fail(refused);
@@ -115,6 +129,8 @@ export const UNSUBSCRIBE: Command<{ name: string }> = {
   route: { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 },
   handler: (args) =>
     tried(() => {
+      const reserved = reservedRefusal(String(args.name));
+      if (reserved) throw reserved;
       dropSubscription(String(args.name));
       return { name: String(args.name) };
     }),

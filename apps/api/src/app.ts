@@ -13,6 +13,7 @@ import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, Q
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
+import { nemia } from './nemia/nemia.ts';
 import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
@@ -121,6 +122,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
+ * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her
+ *   level is set on the route the table generates from `nemia level`.
  *
  * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
  * (`answerError`). The two that carry more than a kind are the one exception, answered by their routes with what they carry: an
@@ -166,6 +169,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', steps)
     .route('/', feed)
     .route('/', machines)
+    .route('/', nemia)
     .onError(answerError);
   return { app, runtime };
 }

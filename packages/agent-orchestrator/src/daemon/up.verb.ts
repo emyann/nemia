@@ -13,6 +13,7 @@ import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
+import { keep } from '../nemia/keep.verb.ts';
 
 /**
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
@@ -164,7 +165,7 @@ export const logPass = Effect.fn('logPass')(function* (pass: Pass, was: UpSaid) 
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
  * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
  * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series. On
- * a third it delivers the store's subscriptions to the feed (`deliver`).
+ * a third it delivers the store's subscriptions to the feed (`deliver`), and on a fourth it keeps Nemia at the person's level (`keep`).
  */
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope> =>
   Effect.gen(function* () {
@@ -183,6 +184,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
       ),
     );
     yield* Effect.forkScoped(over(e)(deliver()));
+    yield* Effect.forkScoped(over(e)(keep()));
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {

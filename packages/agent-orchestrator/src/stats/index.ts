@@ -2,3 +2,4 @@
 export { BY_KEYS, keysOf, statsQueryOf } from './stats.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats.ts';
 export { statsLine, statsLines } from './stats-words.ts';
+export { deniedCallsOf } from './discipline.ts';

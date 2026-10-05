@@ -1,7 +1,8 @@
 /**
  * `nemia subscribe` and `nemia unsubscribe` over an engine of the test's: a long-lived task given a subscription from the feed's end, its
- * command line read, and each refusal — a task never filed, one not long-lived, one settled, a name taken, a name that is none, a wake word
- * empty and minutes not above zero. A store of its own, since `WF_ROOT` is read as the module loads.
+ * command line read, and each refusal — a task never filed, one not long-lived, one settled, a name taken, a name that is none, a wake
+ * word empty, minutes not above zero, and Nemia's own name given or taken away by hand. A store of its own, since `WF_ROOT` is read as
+ * the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ import { board } from '../../test/engine-board.ts';
 const ROOT = scratch('wf-subscribe-');
 process.env.WF_ROOT = ROOT;
 const { SUBSCRIBE, UNSUBSCRIBE } = await import('./subscription.verb.ts');
-const { listSubscriptions, readDelivery, writeDelivery } = await import('./subscription.store.ts');
+const { dropSubscription, listSubscriptions, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
 const { parseArgv } = await import('../command/command.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
@@ -105,4 +106,16 @@ test("an unsubscribe removes the subscription, not its deliverer's file; a name 
   assert.equal(readDelivery('gone')?.cursor, 0, "the deliverer's file is its own to drop");
   assert.deepEqual(listSubscriptions(), []);
   assert.match(await refusal(() => typed(UNSUBSCRIBE, ['gone'])), /^no subscription is named gone: nemia subscribe gone <task>/);
+});
+
+test("REFUSED: the name nemia, Nemia's own, given or taken away by hand, naming nemia level; her keeper's stays", async () => {
+  assert.match(await refusal(() => typed(SUBSCRIBE, ['nemia', 'nemia'])), /^the subscription nemia is Nemia's own.*nemia level semi-auto/);
+  assert.deepEqual(listSubscriptions(), [], 'nothing put');
+  putSubscription('nemia', { task: 'nemia', wake: [...DEFAULT_WAKE], digestEvery: 1440, from: 0 });
+  assert.match(await refusal(() => typed(UNSUBSCRIBE, ['nemia'])), /^the subscription nemia is Nemia's own.*nemia level manual/);
+  assert.deepEqual(
+    listSubscriptions().map((s) => s.name),
+    ['nemia'],
+  );
+  dropSubscription('nemia');
 });

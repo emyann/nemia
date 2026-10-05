@@ -70,6 +70,7 @@ const PINNED: Record<string, string[]> = {
     'step',
     'testOps',
     'tick',
+    'trustedFolder',
     'view',
     'viewOfState',
   ],

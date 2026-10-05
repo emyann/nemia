@@ -82,6 +82,12 @@ one writer, stamped with the subscription it is for). A line holding a wake word
 only once `say` resolved, so a line is told at least once, to the harness's inbox: whether the session reads it is the runtime's
 (`agent-runtime/docs/open-issues.md`, #12, #14–#16).
 
+**Nemia**, the store's own agent, is the orchestrator's: a long-lived task the daemon's keeper (`keep` in `src/nemia/keep.verb.ts`,
+forked by `up`) files at `semi-auto` and stops at `manual`, level-triggered off the person's switch (`$WF_ROOT/nemia/level.json`,
+`nemia level`) and her task's view, and subscribes to the feed under the name `nemia`, which no person gives or takes away. What she is
+— her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
+repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control).
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in

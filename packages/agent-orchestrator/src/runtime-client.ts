@@ -53,6 +53,8 @@ export { refusedText } from 'agent-runtime';
  * `nemia retry` ask of a step's filed config before anything is written, and word in the step's keys (`filedRefusal`).
  */
 export { configRefusal } from 'agent-runtime';
+/** Whether a harness trusts a folder to run a background session in: what `nemia level` asks before it lets the keeper file one there. */
+export { trustedFolder } from 'agent-runtime';
 
 /**
  * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's

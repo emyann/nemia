@@ -2215,9 +2215,9 @@ the rest folded into a digest.
 - **`nemia subscribe <name> <task> [--wake <word>]… [--digest-every <minutes>]`** and **`nemia unsubscribe <name>`**, in the command
   table (`src/subscription/subscription.verb.ts`), and on the api as `POST` and `DELETE /api/subscriptions/:name`. The task is read off
   the engine first: one never filed is refused (`Missing`), one not long-lived (`restartPolicy: Always`) is refused (`Invalid`), since its
-  session ends with its turn, and one settled (`Conflict`). The subscription's news starts at the feed's end (`from`). Until Nemia files
-  its own (slice 5b), the subscriber is filed by hand with `ae`: `AE_ROOT=$WF_ROOT/engine ae file`, with `restartPolicy: Always` and
-  `background: true`.
+  session ends with its turn, and one settled (`Conflict`). The subscription's news starts at the feed's end (`from`). Nemia's own is put
+  by her keeper (slice 5b, below); another subscriber is filed by hand with `ae`: `AE_ROOT=$WF_ROOT/engine ae file`, with
+  `restartPolicy: Always` and `background: true`.
 - **Two files a subscription** under `$WF_ROOT/subscriptions/` (`subscription.store.ts`): `<name>.json`, the person's, written once by
   `nemia subscribe`; and `<name>.state.json`, `{ of, cursor, digest, since }`, the deliverer's, its one writer, written whole after each
   line and removed once the person's file is gone. `of` stamps it with the subscription's `task` and `from` (`resumedAt`): a name put
@@ -2244,10 +2244,71 @@ Tested in `src/subscription/subscription.test.ts` (the sort, pinned against `fee
 digest due with no wake, and none before; a restart; the cursor held while `say` fails; an unsubscribe; a name subscribed again; a cut
 feed) and `apps/api/test/subscriptions.test.ts` (201, 400, 404, 409, 422, 403, and a `DELETE` 200 then 404).
 
-## Still to build: Nemia's loop at Manual (Nemia platform slice 5b)
+## Shipped: Nemia at Semi-auto (Nemia platform slice 5b)
 
-The system agent on the long-lived kind of session, woken by its subscription to the feed, bringing each gate and round to the person —
-the intents `nemia-the-system-agent-a-lon-kwf1` and `amend-the-nemia-intent-one-n-y2vp`.
+The store's own agent on a long-lived session, woken by her subscription to the feed, bringing each gate to the person — the intents
+`nemia-the-system-agent-a-lon-kwf1` and `amend-the-nemia-intent-one-n-y2vp`, at the level the owner named Semi-auto: she reads freely,
+and every write she proposes is asked of the person at a prompt, over Remote Control.
+
+- **`nemia level [manual|semi-auto]`** (`src/nemia/level.verb.ts`, also `GET` and `PUT /api/level`) writes the person's switch,
+  `$WF_ROOT/nemia/level.json` (`{ level, since, task }`), its one writer. Bare, it says her level, her task's phase, how to reach her
+  session (`claude attach <8 characters>`, measured, or the web link the session shows) and any allow rule a person gave her at a prompt,
+  read from her folder's local settings. `auto` is refused as to come (slice 6), as is a word that is no level (`Invalid`). `semi-auto`
+  is refused while her folder is not trusted by the harness (`Conflict`), naming the command that trusts it once, by hand: the store
+  never writes the harness's config (`trustedFolder`, the runtime's, read-only).
+- **The keeper** (`keep`, `src/nemia/keep.verb.ts`), forked by `up` beside the deliverer, beats every 5 s and acts on what her
+  machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
+  at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
+  never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
+  `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: default`, with every factory's folders mounted
+  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one.
+- **Her subscription is `nemia`**, with the default wake words and `denied:`, and a digest once a day; `nemia subscribe nemia` and `nemia
+  unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
+- **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in
+  `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
+- **What she is ships in `packages/agent-orchestrator/nemia/`**: `nemia.md` (her instruction, her allow list of read verbs and her deny
+  list: push, a forced branch delete, a merge, a kill by name, a pull request or release by `gh`, `browser_run_code_unsafe`), and her
+  skills `recap`, `bring-a-gate`, `grant-access` and `commission-a-workflow`. A factory's own rules are its instruction (`NEMIA.md`), which she reads
+  before acting there; this repository's is `NEMIA.md` at its root.
+
+Her machine, drawn by its code:
+
+<!-- diagram:nemia:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/nemia/nemia.ts').then((m) => console.log(m.nemiaDiagram()))" -->
+```mermaid
+stateDiagram-v2
+  [*] --> off
+  due --> filed: NO_TASK / file
+  filed --> kept: NOT_SUBSCRIBED / subscribe
+  filed --> stopped: SETTLED_OUTSIDE / nothing
+  kept --> stopped: SETTLED_OUTSIDE / nothing
+  stopped --> stopped: SUBSCRIBED / drop
+  leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
+  off --> due: level semi-auto [trusted] (by person)
+  stopped --> due: level semi-auto [trusted] (by person)
+  leaving --> due: level semi-auto [trusted] (by person)
+  due --> leaving: level manual [always] (by person)
+  filed --> leaving: level manual [always] (by person)
+  kept --> leaving: level manual [always] (by person)
+  stopped --> leaving: level manual [always] (by person)
+```
+<!-- diagram:nemia:end -->
+
+- **A step denied a call says so on its feed line**: a note part `denied: <call> ×<n>, …` (`deniedNote`, `src/feed/feed.ts`), off the
+  denials its task's ended attempts journalled (`deniedCallsOf`), each distinct call counted, at most five named. `denied:` is one of
+  her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
+  stands.
+- **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
+  (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
+  cost (`spend`), counted as a step's are (`taskSpend`).
+
+`commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory
+instruction` is not on her allow list, since its write flags share its prefix.
+
+Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
+`denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted refusal, the filing and its fields, the quota allow, her spend,
+a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, and a tick that says it once),
+`src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
+`default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).
 
 ## Shipped: freeing the space — `wf prune`
 

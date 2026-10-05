@@ -5,6 +5,7 @@ import { FactoryTags } from '../components/FactoryTag';
 import { FavoriteStar } from '../components/FavoriteStar';
 import { Markdown } from '../components/Markdown';
 import { NewWorkflow } from '../components/NewWorkflow';
+import { RemoveWorkflow } from '../components/RemoveWorkflow';
 import { StartRun } from '../components/StartRun';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
@@ -80,10 +81,10 @@ function WorkflowsPage() {
 /**
  * A workflow's card: what it is, its star, which puts it under Favorites, shown for one that does not read too, the factories it is in
  * (`workflowFactories`), each linked to its floor — nothing while they are unread or for one in none — drawn, its steps' pages and a start
- * — or, for one of yours, its builder in their place (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is.
- * The repository's show none, and say why: the api writes nothing into a checkout. The canvas inspects a step in the frame's bar and the
- * builder edits one, never both on one card: Build swaps the one for the other, and closes the bar where it shows a step of this workflow
- * (`useBuilding`).
+ * — or, for one of yours, its builder in their place (`WorkflowBuilder`), and its removal while the builder is closed (`RemoveWorkflow`).
+ * `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api writes nothing into a
+ * checkout. The canvas inspects a step in the frame's bar and the builder edits one, never both on one card: Build swaps the one for the
+ * other, and closes the bar where it shows a step of this workflow (`useBuilding`).
  */
 function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;
@@ -113,15 +114,17 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
               {steps.length} {steps.length === 1 ? 'step' : 'steps'}
             </span>
           )}
+          {from === 'yours' && !building && <span aria-hidden className="ml-auto" />}
           {from === 'yours' && !error && !building && (
             <button
               type="button"
               onClick={build}
-              className="ml-auto rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+              className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
             >
               Build
             </button>
           )}
+          {from === 'yours' && !building && <RemoveWorkflow workflow={workflow} />}
         </div>
         <p className="font-mono text-[11px] break-all text-neutral-500">{dir}</p>
         {from === 'repo' && (

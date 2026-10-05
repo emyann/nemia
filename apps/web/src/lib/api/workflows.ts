@@ -294,3 +294,19 @@ export const saveWorkflow = (
  */
 export const createWorkflow = (name: string, step: StepWritten): Promise<WorkflowSaved> =>
   build('POST', '/api/workflows/yours', { name, step });
+
+/** Mirrors `WorkflowRemoved` in the package: the folder removed, and the files it held, by their path in it. */
+export type WorkflowRemoved = { dir: string; removed: string[] };
+
+/**
+ * Remove a folder of yours whole, against the version it was listed at (apps/api/src/workflows/remove.ts). Rejects with a `WriteRefusal`
+ * in the api's words: a folder changed since it was read (409), or one a run, a queued card or a factory still needs, each named with the
+ * command that frees it (409); and with an `UnreadAnswer` for an answer the board does not read, saying the folder may be gone.
+ */
+export const removeWorkflow = (name: string, version: string): Promise<WorkflowRemoved> =>
+  send(
+    'DELETE',
+    `/api/workflows/yours/${encodeURIComponent(name)}`,
+    Schema.Struct({ dir: Schema.String, removed: Schema.mutable(Schema.Array(Schema.String)) }),
+    { body: { version }, may: 'The folder may be removed: reload the Workflows page before removing it again.' },
+  );

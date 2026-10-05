@@ -333,6 +333,7 @@ const PINNED: Record<string, string[]> = {
     'takenFromLine',
     'takeoverLine',
     'taskSpend',
+    'telemetryLayer',
     'timeline',
     'timelineLines',
     'timelineTotalLines',

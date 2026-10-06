@@ -2160,6 +2160,36 @@ its lease through `/api/daemon`, a second api and a `wf up` refused, SIGTERM wri
 `--no-tick` taking nothing), `apps/web/test/daemon.test.ts` and the e2e's `daemon` page (each holder stalled, and fresh). Starting the
 daemon on demand from the board stays card 4e; stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
 
+## Shipped: the daemon as a login service (Nemia platform slice 8)
+
+After a restart nothing brought the daemon back until a person started it by hand, with its environment typed again. What was built,
+in `src/service/`:
+
+- **`nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]`** writes a systemd user unit on Linux
+  (`~/.config/systemd/user/<name>.service`) or a launchd agent on macOS (`~/Library/LaunchAgents/<name>.plist`), whole, through a hidden
+  file renamed over it, and enables it at login. It runs the same daemon a person starts by hand: the checkout's api, found by the root
+  `package.json`'s `"nemia": { "daemon": "apps/api/src/main.ts" }`, under the node that ran the install, in the api's folder, with
+  `WF_ROOT`, the installer's `PATH` and each `--env` written once. It restarts on failure but not after a refusal (exit 2), counts a stop
+  by a signal as clean, and is stopped by SIGTERM, which writes `stoppedAt` as before. `KillMode=process` (launchd's
+  `AbandonProcessGroup`) signals the daemon alone, so a restart leaves the runtime's detached sessions and checks running.
+- **Refused before anything is written**: WSL without systemd (`Invalid`, naming `/etc/wsl.conf`, `[boot]`, `systemd=true` and
+  `wsl --shutdown`); a store that is not the default without `--name`, or with `--name nemia`; an `--env` with no `=`, a bad key,
+  `WF_ROOT` or `PATH`, a key given twice, or a control character in its value.
+- **Beside a daemon started by hand** it starts nothing and names that pid with its `--take-over <pid>` line. With it, after the pid is
+  confirmed as the lease's (`identity` `same`), it pauses the store, waits out each landing check with no deadline (^C cancels and lifts
+  its pause), sends SIGTERM, waits up to 60 s for the lease to say `stopped` or `gone`, starts the service, waits up to 60 s for it to
+  tick, and resumes only the pause it put. A start that never ticks leaves the store paused and says `nemia resume`.
+- **`nemia service uninstall`** stops, disables and removes it; **`nemia service status`** names the unit's state, the checkout it runs,
+  who holds the lease, and lingering (`loginctl show-user -p Linger`, read only). All three are the CLI's alone; Nemia's fence asks
+  before install and uninstall (`prompts`) and lets status run (`read`).
+
+Tested in `src/service/service.test.ts` (the unit and the plist against golden text, `KillMode=process`, escaping read back, every
+refusal, WSL, the status lines, the landings waited for) and `src/service/service.verb.test.ts` (over a fake machine: install free,
+refused, beside a hand daemon and as its holder; a take-over's order with a landing, a person's pause standing, an interruption, a
+service that never ticks, a daemon that does not stop; uninstall, status and the fence). No test starts a service. Still to come:
+starting the daemon on demand when none holds the lease (no command does today: the only detached start is the git place's), and the
+service pointed at an installed release (slice 9).
+
 ## Shipped: the daemon's log and traces (Nemia platform slice 5, part 1 of 3)
 
 Nemia's loop (slice 5) wakes on what the engine and the workflow layer say. They are to say it once, through Effect, and every reader —

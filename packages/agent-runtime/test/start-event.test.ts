@@ -5,8 +5,9 @@
  * What the tests below rest on:
  * - The worker reads whole lines of the harness's stdout, so a line printed in two writes, a `sleep` between them, reaches it whole;
  *   one printed at once passes these tests just as well, so the sleep can only make a test pass wrongly under load, never fail it.
- * - A start refused leaves its session unread and every other session of the harness read: `observeFor` names it `unread`, and
- *   `observe` leaves it out, saying why as a warning on every look it lasts.
+ * - A start refused leaves its session unread while its process runs, and every other session of the harness read: `observeFor`
+ *   names it `unread`, and `observe` leaves it out; once its process has ended it is read as failed, with no id, so its task
+ *   settles and can be forgotten. Why is said as a warning on every look the run file lasts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +18,9 @@ import { detachedOps, type HarnessSpec, type StartEvent } from '../src/harness/d
 import { codex } from '../src/harness/codex/codex.ts';
 import { CODEX_START } from '../src/harness/codex/stream.ts';
 import { CLAUDE_INIT_START, CLAUDE_RESULT_START, claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
+import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { builtEngine } from './engine.ts';
 import { resultLine, SESSION, stream } from './reader-streams.ts';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
@@ -37,6 +40,15 @@ const printed = (...lines: string[]) => lines.map((l) => `printf '%s\\n' '${l}'`
 /** The run file of the run under `name`, as the worker last wrote it. */
 const runFile = (root: string, name: string): Record<string, unknown> =>
   JSON.parse(fs.readFileSync(path.join(root, 'runs', 'sh', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`), 'utf8'));
+
+/** The run file of the run under `name`, or nothing yet. */
+const runFileOr = (root: string, name: string): Record<string, unknown> => {
+  try {
+    return runFile(root, name);
+  } catch {
+    return {};
+  }
+};
 
 /** Spawns `spec`'s run under `name` and waits for its worker to write an end, then gives back its run file. */
 const ran = async (spec: HarnessSpec, name = 'ae/t/1', root = scratch('ae-start-')) => {
@@ -98,33 +110,73 @@ test('a start line with no newline after it is read at the end of the stream', a
   assert.equal(run.nativeId, SESSION);
 });
 
-test('REFUSED: a start whose id is a number leaves that session unread, and the next one of the harness read', async () => {
+const REFUSAL_WORDS = [
+  /`ae\/bad\/1`/,
+  /line\s+1\s+of\s+its\s+stdout/,
+  /`thread\.started`/,
+  /`thread_id`/,
+  /12345/,
+  /hex\s+and\s+dashes/,
+  /unread\s+while\s+its\s+process\s+runs/,
+  /read\s+as\s+failed/,
+  /`ae forget`/,
+];
+
+test('REFUSED: a start whose id is a number leaves that session unread while its process runs, and the next one of the harness read', async () => {
   const root = scratch('ae-start-');
-  const refused = await ran(sh(printed(threadStarted(12345)), CODEX_START), 'ae/bad/1', root);
-  const good = await ran(sh(printed(threadStarted(THREAD)), CODEX_START), 'ae/good/1', root);
-  assert.deepEqual(refused.run.startRefused, { line: 1, field: 'thread_id', found: '12345' });
-  assert.equal(refused.run.nativeId, undefined);
-  const words = [
-    /`ae\/bad\/1`/,
-    /line\s+1\s+of\s+its\s+stdout/,
-    /`thread\.started`/,
-    /`thread_id`/,
-    /12345/,
-    /hex\s+and\s+dashes/,
-    /deadline/,
-  ];
+  const bad = detachedOps(sh(`${printed(threadStarted(12345))}; sleep 30`, CODEX_START), root);
+  await Effect.runPromise(bad.spawn({ name: 'ae/bad/1', brief: 'x', cwd: root }));
+  const until = performance.now() + 15_000;
+  while (runFileOr(root, 'ae/bad/1').startRefused === undefined) {
+    assert.ok(performance.now() < until, `ae/bad/1 never refused its start: ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  try {
+    const good = await ran(sh(printed(threadStarted(THREAD)), CODEX_START), 'ae/good/1', root);
+    assert.equal(runFile(root, 'ae/bad/1').state, 'working');
 
-  const listed = await warned(good.ops.observe);
-  assert.deepEqual([...listed.value.keys()], ['ae/good/1'], 'the refused session is left out, the other read');
-  assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
-  assert.equal(listed.warnings.length, 1);
-  for (const w of words) assert.match(listed.warnings[0], w);
+    const listed = await warned(good.ops.observe);
+    assert.deepEqual([...listed.value.keys()], ['ae/good/1'], 'the refused session is left out while it runs, the other read');
+    assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
+    assert.equal(listed.warnings.length, 1);
+    for (const w of REFUSAL_WORDS) assert.match(listed.warnings[0], w);
 
-  const asked = await warned(good.ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
-  assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'unread, never read as having no id');
-  assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
-  assert.equal(asked.warnings.length, 1);
-  for (const w of words) assert.match(asked.warnings[0], w);
+    const asked = await warned(good.ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
+    assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'unread while it runs, never read as a live session with no id');
+    assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
+    assert.equal(asked.warnings.length, 1);
+    for (const w of REFUSAL_WORDS) assert.match(asked.warnings[0], w);
+  } finally {
+    await Effect.runPromise(bad.stop('ae/bad/1'));
+  }
+});
+
+test('REFUSED: a start whose id is a number, once its process has ended, reads as failed with no id, and its task settles and is forgotten', async () => {
+  const spec = sh(printed(threadStarted(12345)), CODEX_START);
+  const { ops, run } = await ran(spec, 'ae/bad/1');
+  assert.equal(run.state, 'done', 'the harness itself exited 0');
+  const asked = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
+  assert.deepEqual([...asked.value.unread], []);
+  assert.equal(asked.value.seen.get('ae/bad/1')?.state, 'failed');
+  assert.equal(asked.value.seen.get('ae/bad/1')?.nativeId, undefined);
+  for (const w of REFUSAL_WORDS) assert.match(asked.warnings[0] ?? '', w);
+  assert.equal((await Effect.runPromise(ops.observe)).get('ae/bad/1')?.state, 'failed', 'listed, as failed');
+
+  const root = scratch('ae-start-root-');
+  const engine = builtEngine(Engine.layer({ root, harnesses: { sh: spec }, defaultHarness: 'sh' }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-start-cwd-') }));
+  const until = performance.now() + 20_000;
+  while (!(await Effect.runPromise(engine.view(id))).state.settled) {
+    assert.ok(performance.now() < until, `${id} never settled`);
+    await Effect.runPromise(engine.tick());
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  const { state } = await Effect.runPromise(engine.view(id));
+  assert.equal(state.settled, 'failed');
+  assert.equal(state.attempts[0]?.nativeId ?? null, null, 'recorded with no session id');
+  const forgot = await Effect.runPromise(engine.forget([id], { yes: true }));
+  assert.equal(forgot.forgotten, true);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'runs', 'sh')), [], 'its run files went with it');
 });
 
 test('REFUSED: a start whose id is a string of no id’s shape', async () => {

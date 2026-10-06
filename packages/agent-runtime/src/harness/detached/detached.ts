@@ -151,7 +151,8 @@ export type HarnessSpec = {
 /**
  * A harness's start event, as data the worker reads (`bin/ae-worker.ts`): the first whole line of its stdout that is a JSON object
  * whose own keys hold each of `event`'s values. Its `id` field must be a string of hex and dashes, 16 or more, the session's own id;
- * anything else there, or nothing, refuses the start (`RunFile.startRefused`), and the session is unread.
+ * anything else there, or nothing, refuses the start (`RunFile.startRefused`): the session is unread while its process runs, and
+ * read as failed, with no id, once it has ended.
  */
 export type StartEvent = { event: Readonly<Record<string, string>>; id: string };
 
@@ -246,6 +247,9 @@ export const detachedStateOf = (run: Beaten, now: Instant): SessionState => {
   const word = leased(run, now);
   return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
 };
+
+/** Whether `run` is a session whose start its worker refused (`startRefused`) and whose process still runs: unread until it ends. */
+const refusedAtWork = (run: RunFile, now: Instant): boolean => run.startRefused !== undefined && detachedStateOf(run, now) === 'working';
 
 /** Whether a run is over as of now: anything but `working`, a lease gone included. */
 const overNow = (run: Beaten): boolean => detachedStateOf(run, instantNow()) !== 'working';
@@ -355,7 +359,8 @@ const firstRunFile = (plan: object): string => {
 export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
 /**
- * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, with no
+ * A run's sighting, field for field: its state, `failed` for a run whose start was refused, which is read only once it has ended
+ * (`refusedAtWork`); its closeout the file its harness wrote (`statement`), else what its output says, with no
  * time: the spawn cleared both before it launched the run, so either was written by the run's own process, and the engine keeps
  * it whatever the clock says; its exit code once it has one, never the worker's -1; and what its output says it used, reached
  * and was denied, and the skills it loaded and the files it touched: an empty list kept, since it says they were counted.
@@ -369,7 +374,7 @@ const sightingOf = (
   usage: Usage | undefined,
 ): Sighting => ({
   sessionId: name,
-  state: detachedStateOf(run, now),
+  state: run.startRefused ? 'failed' : detachedStateOf(run, now),
   nativeId: run.nativeId,
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
@@ -381,20 +386,21 @@ const sightingOf = (
 });
 
 /**
- * Why the run under `name` is unread: its harness printed its start event with no id this runtime reads (`startRefused`). Names the
- * run, the line of its stdout, the event, the field and what was there, quoted, and what to do.
+ * Why the run under `name` has no session id: its harness printed its start event with no id this runtime reads (`startRefused`).
+ * Names the run, the line of its stdout, the event, the field and what was there, quoted, what the run is read as, and what to do.
  */
 export const startRefusalOf = (spec: HarnessSpec, name: string, refused: NonNullable<RunFile['startRefused']>): string => {
   const event = Object.values(spec.start?.event ?? {}).join('`/`');
   return (
-    `${spec.name}: \`${name}\` is unread: line ${refused.line} of its stdout is its \`${event}\` start event, and its \`${refused.field}\`` +
-    ` holds ${quote(refused.found)}, where this runtime reads its session's id, a string of hex and dashes, 16 or more. The other` +
-    ` sessions of ${spec.name} are read. Run a ${spec.name} whose start event this runtime reads, or a runtime whose \`start\` on the` +
-    ` \`${spec.name}\` spec reads this one; until then the task waits on it, and a stop asked of it ends it once its deadline has passed.`
+    `${spec.name}: \`${name}\` has no session id: line ${refused.line} of its stdout is its \`${event}\` start event, and its \`${refused.field}\`` +
+    ` holds ${quote(refused.found)}, where this runtime reads its session's id, a string of hex and dashes, 16 or more. It is unread` +
+    ` while its process runs, and read as failed once it has ended; the other sessions of ${spec.name} are read. File the task again` +
+    ` on a ${spec.name} whose start event this runtime reads, or under a runtime whose \`start\` on the \`${spec.name}\` spec reads` +
+    ` this one; once the task has settled, \`ae forget\` lets this session go.`
   );
 };
 
-/** What `look` answers, once why each run it left out for its refused start (`refused`) is said as a warning (`startRefusalOf`). */
+/** What `look` answers, once why each run whose start was refused (`refused`) has no id is said as a warning (`startRefusalOf`). */
 const sayingUnread = <A, E>(spec: HarnessSpec, look: Effect.Effect<{ value: A; refused: readonly Run[] }, E>): Effect.Effect<A, E> =>
   look.pipe(
     Effect.tap(({ refused }) =>
@@ -658,10 +664,11 @@ const startWorker = (file: string, cwd: string): void => {
  *   the process's own, once it has one: the worker writes -1 when there is none — killed by a signal, or never started —
  *   and that is reported as no code, not as a code. A run whose output the spec refuses fails the whole look, in the
  *   spec's words, naming the run and its output file: every session of the harness is unread, never gone. A run whose start
- *   event its worker refused (`startRefused`) is left out, and why is said as a warning (`startRefusalOf`): that session
- *   alone is unread, and the harness's others are read.
+ *   event its worker refused (`startRefused`) is left out while its process runs, and read as `failed`, with no id, once it
+ *   has ended (`refusedAtWork`); why is said as a warning on every look (`startRefusalOf`), and the harness's others are read.
  * - `observeFor`: the same sighting for each name expected that has a run file, and the name `unread` for one whose file is
- *   there and unreadable, or whose start was refused, said as `observe` says it. A refused output fails it as it fails `observe`.
+ *   there and unreadable, or whose start was refused and whose process still runs, said as `observe` says it. A refused output
+ *   fails it as it fails `observe`.
  * - `find`: the run under a name, off its own run file alone, as `detachedFind`; `stop` and `transcript` read by it.
  * - `stop`, in order, for a run that is working:
  *   1. Leaves the stop on disk (`.stop`). The run file exists before the worker has written its own pid, and a stop in
@@ -808,7 +815,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         try: () => {
           const now = instantNow();
           const all = readAll();
-          const read = all.filter(({ run }) => !run.startRefused);
+          const read = all.filter(({ run }) => !refusedAtWork(run, now));
           const value = new Map(read.map(({ name, run }) => [name, sightingAt(name, run, now, () => all)]));
           return { value, refused: all.filter(({ run }) => run.startRefused) };
         },
@@ -830,7 +837,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             for (const { name } of expected) {
               const at = runAt(spec, root, name);
               if (at && 'run' in at && at.run.startRefused) refused.push({ name, run: at.run });
-              if (at && ('unread' in at || at.run.startRefused)) unread.add(name);
+              if (at && ('unread' in at || refusedAtWork(at.run, now))) unread.add(name);
               else if (at) seen.set(name, sightingAt(name, at.run, now, all));
             }
             return { value: { seen, unread } satisfies Observation, refused };

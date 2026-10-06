@@ -1,0 +1,8 @@
+{
+  "name": "nemia-observe-profile",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pyroscope/nodejs": "0.6.4"
+  }
+}

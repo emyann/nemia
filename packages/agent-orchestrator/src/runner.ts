@@ -265,6 +265,8 @@ export {
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
 export type { UpOptions } from './daemon/up.verb.ts';
+export { ensureDaemon, liveDemandHost } from './service/demand.verb.ts';
+export type { DemandHost } from './service/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
 export type {

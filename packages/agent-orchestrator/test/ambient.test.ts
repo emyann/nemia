@@ -2,7 +2,8 @@
  * The package's `test` script loads `test/ambient.ts` into every test file's process, so a test that reads `WF_MAX_RUNS` or
  * `WF_MAX_CONCURRENT` without setting it is refused, whatever the shell or the daemon that runs the check has set. Proven on fixtures run
  * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on
- * a default fails naming the sentinel, and one that deletes the variable first passes.
+ * a default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
+ * store no daemon holds, starts none: the script turns the start off (`NEMIA_DAEMON_START=off`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -92,4 +93,36 @@ test("a test file that deletes the ceiling it reads gets its default, whatever t
     const ran = runFixture(reader, name, expected, true);
     assert.equal(ran.status, 0, `${name}: ${ran.stdout}\n${ran.stderr}`);
   }
+});
+
+test('with the switch the test script puts, a ticking command typed in a test starts no daemon, and says so', () => {
+  const dir = scratch('wf-ambient-');
+  const store = scratch('wf-ambient-store-');
+  const main = pathToFileURL(path.join(PACKAGE, 'src', 'cli', 'main.ts')).href;
+  const file = path.join(dir, 'fixture.test.mjs');
+  fs.writeFileSync(
+    file,
+    [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import fs from 'node:fs';",
+      `process.env.WF_ROOT = ${JSON.stringify(store)};`,
+      "if (process.env.NEMIA_DAEMON_START !== 'off') throw new Error('NEMIA_DAEMON_START is not off: nothing was typed, so no daemon started');",
+      `const { main } = await import('${main}');`,
+      "test('retry', async (t) => {",
+      '  const said = [];',
+      "  t.mock.method(console, 'error', (...a) => said.push(a.join(' ')));",
+      "  await main(['retry', 'no-run', 'implement']).catch(() => undefined);",
+      "  assert.ok(said.some((l) => l.includes('NEMIA_DAEMON_START=off here, so this command starts no daemon')), said.join('\\n'));",
+      `  assert.deepEqual(fs.readdirSync(${JSON.stringify(store)}).filter((f) => f.startsWith('daemon.')), []);`,
+      '});',
+      '',
+    ].join('\n'),
+  );
+  const words = script.trim().split(/\s+/);
+  const flags = words.slice(1, words.indexOf('--test'));
+  const env: Record<string, string | undefined> = { ...process.env, WF_MAX_RUNS: '6', WF_MAX_CONCURRENT: '50' };
+  for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS', 'NEMIA_DAEMON_START']) delete env[key];
+  const ran = spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
+  assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
 });

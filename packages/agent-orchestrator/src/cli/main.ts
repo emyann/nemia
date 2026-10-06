@@ -38,6 +38,9 @@ import {
   currentRelease,
   runningRelease,
   trialRefusal,
+  ensureDaemon,
+  liveDemandHost,
+  type DemandHost,
 } from '../runner.ts';
 import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
@@ -192,15 +195,17 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
 
 /**
  * A command of the table (`TABLE`), run from the command line: its long help printed for `--help` where it has one (`manual`); else its
- * arguments read against its spec — the help printed for too little — then refused by its `check`, and handed to its runner (`RUNS`)
- * where it has one; else to its handler, and the lines it prints of the answer printed.
+ * arguments read against its spec — the help printed for too little — then refused by its `check`; for a command that ticks, the daemon
+ * started where none ticks the store (`ensureDaemon`, over `demand`); then handed to its runner (`RUNS`) where it has one, else to its
+ * handler, and the lines it prints of the answer printed.
  */
-async function commanded(command: Command | Ran, rest: string[], e: Engine): Promise<void> {
+async function commanded(command: Command | Ran, rest: string[], e: Engine, demand: () => DemandHost): Promise<void> {
   if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual);
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
+  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
   const runner = RUNS.get(command.name);
   if (runner || command.handler === undefined) return runner!(args, e);
   const data = await runWith(e, command.handler(args));
@@ -224,10 +229,11 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 
 /**
  * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `given` is
- * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. Refused (`Conflict`) before
- * any command but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
+ * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. `demand` is the machine a
+ * command that ticks starts the daemon on (`ensureDaemon`), which a test hands; else the live one. Refused (`Conflict`) before any command
+ * but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
  */
-export async function main(argv: string[], given?: Engine): Promise<void> {
+export async function main(argv: string[], given?: Engine, demand: () => DemandHost = liveDemandHost): Promise<void> {
   const named = namedIn(argv);
   if (named === undefined) return console.log(HELP);
   const exempt = named.name === 'version' || named.rest.includes('--help');
@@ -235,7 +241,7 @@ export async function main(argv: string[], given?: Engine): Promise<void> {
   if (trial !== null) throw new Conflict({ message: trial });
   const e = given ?? engine();
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
-  if (command) return commanded(command, named.rest, e);
+  if (command) return commanded(command, named.rest, e, demand);
   return VERBS.get(named.name)!(named.rest, e);
 }
 

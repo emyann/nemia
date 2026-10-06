@@ -7,6 +7,10 @@
  * And `WF_DEFAULT_FACTORY_STARTS=1`: most tests start runs in scratch repositories no factory holds, often of cards that name no factory,
  * and the switch lets those starts go to the default factory (`defaultStartsAllowed`). A test of the refusal they meet as shipped deletes
  * it first.
+ *
+ * And `NEMIA_DAEMON_START=off` (`DEMAND_OFF`): a command that ticks, typed in a test on a store no daemon holds, would start the daemon of
+ * this checkout (`ensureDaemon`), and so would a `nemia` child a test spawns with this environment. A test of the start hands `main` a
+ * host of its own and unsets the switch in that host's environment alone.
  */
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
@@ -15,3 +19,4 @@ export const SENTINEL = 'set-it-in-the-test';
 process.env.WF_MAX_RUNS = SENTINEL;
 process.env.WF_MAX_CONCURRENT = SENTINEL;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
+process.env.NEMIA_DAEMON_START = 'off';

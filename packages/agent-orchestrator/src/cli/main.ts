@@ -125,7 +125,7 @@ function upStats(): void {
   const daemon = storeRefusal('tick') !== undefined;
   if (!cost)
     return console.log(
-      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up)'}`,
+      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up; any nemia command that files work starts one too)'}`,
     );
   for (const line of breakdownLines(cost)) console.log(line);
   return console.log(

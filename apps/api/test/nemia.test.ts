@@ -70,7 +70,7 @@ test('once her folder is trusted, semi-auto is set, and read back with the task 
   assert.equal((await asked('PUT', '/api/level', { level: 'manual' })).status, 200);
 });
 
-test("a factory raised for a stretch reads above its default until its end; a raise ended reads as its default; for with no factory a 422", async () => {
+test('a factory raised for a stretch reads above its default until its end; a raise ended reads as its default; for with no factory a 422', async () => {
   addFactory({ name: 'mill', repos: [fs.mkdtempSync(path.join(root, 'mill-'))] });
   const read = await asked('GET', '/api/level');
   assert.deepEqual(

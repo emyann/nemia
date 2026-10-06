@@ -36,7 +36,7 @@ function planted(verb: PlaceVerb, body: string): string {
 const printing = (value: unknown): string => `process.stdout.write(${JSON.stringify(JSON.stringify(value))});\n`;
 
 const REQUESTS: PlaceRequests = {
-  open: { root: '/r' },
+  open: { root: '/r', isolate: true },
   make: { repo: '/r', at: '/w', name: 'wf/x/a', from: 'main', also: [] },
   handoff: { workspace: '/w', step: 'a', why: '' },
   report: { repo: '/r', baseRef: 'b', onto: 'main', branches: ['wf/x/a'], diffOf: [], present: [], atBase: [] },
@@ -147,9 +147,9 @@ test('the script is handed the request with v 1 on stdin, and runs in the skill 
     'open',
     `import fs from 'node:fs';\nconst request = fs.readFileSync(0, 'utf8');\nprocess.stdout.write(JSON.stringify({ repo: request, baseRef: process.cwd(), branch: 'b' }));\n`,
   );
-  const outcome = runPlaceVerb(dir, 'open', { root: '/some/where' });
+  const outcome = runPlaceVerb(dir, 'open', { root: '/some/where', isolate: false });
   assert.ok('answer' in outcome, JSON.stringify(outcome));
-  assert.deepEqual(JSON.parse(outcome.answer.repo), { root: '/some/where', v: 1 });
+  assert.deepEqual(JSON.parse(outcome.answer.repo), { root: '/some/where', isolate: false, v: 1 });
   assert.equal(fs.realpathSync(outcome.answer.baseRef), fs.realpathSync(dir));
 });
 
@@ -400,7 +400,7 @@ function placeWith(verbs: readonly PlaceVerb[], open: string = printing(ANSWERS.
 /** What `openPlace` refuses with, its kind and exit code checked. */
 function openRefused(dir: string, needed: readonly PlaceVerb[] = []): string {
   try {
-    openPlace(dir, '/r', needed);
+    openPlace(dir, '/r', needed, true);
   } catch (err) {
     assert.ok(err instanceof Invalid, `Invalid expected, got ${String(err)}`);
     assert.equal(err.exitCode, 2);
@@ -411,7 +411,7 @@ function openRefused(dir: string, needed: readonly PlaceVerb[] = []): string {
 
 test("openPlace answers open's answer and the place skill it ran, by name and version", () => {
   const dir = placeWith(['open', 'status']);
-  assert.deepEqual(openPlace(dir, '/r', []), { opened: ANSWERS.open, placeSkill: { skill: 'git', version: skillVersion(dir) } });
+  assert.deepEqual(openPlace(dir, '/r', [], true), { opened: ANSWERS.open, placeSkill: { skill: 'git', version: skillVersion(dir) } });
   assert.equal(typeof skillVersion(dir), 'string');
 });
 
@@ -421,16 +421,36 @@ test('REFUSED: openPlace of a place that leaves out a verb the run needs, naming
   assert.ok(said.startsWith(`${path.join(dir, 'place.json')} does not declare land, which `), said);
   assert.ok(!said.includes('status,'), said);
   assert.ok(said.includes('add the verb to `verbs` with its script in scripts/'), said);
-  assert.equal(openPlace(dir, '/r', ['status']).opened.repo, '/r');
+  assert.equal(openPlace(dir, '/r', ['status'], true).opened.repo, '/r');
 });
 
-test("REFUSED: openPlace when open refuses, in the place's words whole; when it is not heard, with why", () => {
+test("REFUSED: openPlace when open refuses, in the place's words whole, and hands open whether the run cuts worktrees", () => {
   const words = '/r is not a git repository: run git init there and commit once, or name a repository with --repo';
   assert.equal(openRefused(placeWith(['open'], printing({ refused: words }))), words);
-  const failed = openRefused(placeWith(['open'], "process.stderr.write('git: not found\\n');\nprocess.exitCode = 3;\n"));
-  assert.ok(failed.startsWith("the place's open was not heard: git: not found"), failed);
-  const unshaped = openRefused(placeWith(['open'], printing({ repo: 1, baseRef: 'abc', branch: 'main' })));
-  assert.ok(unshaped.includes("its answer does not read as open's: `repo` is 1, where "), unshaped);
+  const echoing = placeWith(
+    ['open'],
+    `import fs from 'node:fs';\nconst { isolate } = JSON.parse(fs.readFileSync(0, 'utf8'));\nprocess.stdout.write(JSON.stringify(isolate ? { refused: 'isolated' } : ${JSON.stringify(ANSWERS.open)}));\n`,
+  );
+  assert.equal(openRefused(echoing), 'isolated');
+  assert.deepEqual(openPlace(echoing, '/r', [], false).opened, ANSWERS.open);
+});
+
+test('an open that is not heard is no refusal: openPlace throws a plain Error with why, which a queued card tries again', () => {
+  const unheard = (open: string): Error => {
+    try {
+      openPlace(placeWith(['open'], open), '/r', [], true);
+    } catch (err) {
+      assert.ok(err instanceof Error && !(err instanceof Invalid), `a plain Error expected, got ${String(err)}`);
+      assert.equal((err as { exitCode?: unknown }).exitCode, undefined);
+      return err;
+    }
+    return assert.fail('openPlace opened it');
+  };
+  const failed = unheard("process.stderr.write('git: not found\\n');\nprocess.exitCode = 3;\n");
+  assert.ok(failed.message.startsWith("the place's open was not heard: git: not found"), failed.message);
+  assert.ok(failed.message.endsWith('Nothing was started: start it again'), failed.message);
+  const unshaped = unheard(printing({ repo: 1, baseRef: 'abc', branch: 'main' }));
+  assert.ok(unshaped.message.includes("its answer does not read as open's: `repo` is 1, where "), unshaped.message);
 });
 
 test('REFUSED: openPlace of a folder with no SKILL.md, or no place.json', () => {

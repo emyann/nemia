@@ -1,39 +1,38 @@
 /**
- * Git and a git run's worktrees: the `git` helpers, the starting workspace, a step's worktree cut and merged, what `.worktreeinclude`
- * copies into it and the `node_modules` it is given (`workspace.ts` decides, this applies), and the hand-off commit of what a step left
- * uncommitted.
+ * A git run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read back
+ * only where it was asked for, the `node_modules` it is given (`workspace.ts` decides, this applies), and `gitSays`, the quiet git read
+ * `branches.store.ts` and the tick still make.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
- * artifacts `artifacts.store.ts`'s, both through the `git` helpers here, so this file imports `record.store.ts` alone of those beside it;
- * `nemia rm`'s removal is `forget.verb.ts`'s.
+ * hand-off the place's `handoff`; `nemia rm`'s removal is `forget.verb.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 import { lastLines } from '../check/check.ts';
 import {
   depsPlan,
-  inside,
   isModuleKey,
   lockfilePackages,
   lockfileParting,
-  refusalLines,
   workspaceModules,
-  worktreeInclude,
+  workspacePlan,
   type DepEntry,
   type DepsListing,
   type Installed,
   type Provisioned,
-  type WorktreeInclude,
 } from './workspace.ts';
 import { folderPlace } from '../record/places.store.ts';
-import { isGitRun, type Run } from '../record/record.ts';
-import { workspacePlan } from './workspace.ts';
+import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
-import { countSpawn, execCounted } from '../meter/tally.store.ts';
+import { countSpawn, execCounted, withinEffect } from '../meter/tally.store.ts';
+import { runPlaceVerbAsync } from '../place/place-async.store.ts';
+import { readPlaceJson } from '../place/place.store.ts';
+import type { PlaceRequests } from '../place/place.ts';
 
 /**
  * The real path of a git run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there to
@@ -136,16 +135,6 @@ function installedAt(root: string, lock: unknown): Record<string, Installed | nu
     }
   }
   return installed;
-}
-
-/** Whether git ignores a path in a checkout. `git check-ignore` says no for a tracked path, and for one git has not been told to ignore. */
-function ignored(repo: string, rel: string): boolean {
-  try {
-    execCounted('git', ['check-ignore', '-q', '--', rel], { cwd: repo, stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** Main's `node_modules`, listed for `depsPlan`: names and link targets, nothing below a package. */
@@ -305,72 +294,83 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
   return why ? { tree: 'linked', made, why } : { tree: 'hardlinked', made };
 }
 
-/** `.worktreeinclude` at the root of the main checkout, parsed — or null, when the repository has none. */
-export function readInclude(repo: string): WorktreeInclude | null {
-  const file = path.join(repo, '.worktreeinclude');
-  return fs.existsSync(file) ? worktreeInclude(fs.readFileSync(file, 'utf8')) : null;
+/** The notes a step's `node_modules` gives the run's log: installed with `npm ci`, not provisioned, or linked, not hardlinked. */
+function depsNotes(deps: Provisioned): string[] {
+  if (deps.tree === 'own' && deps.installed)
+    return ['node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed'];
+  if (deps.tree === 'failed') return [`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`];
+  if (deps.tree === 'linked')
+    return [
+      `node_modules: main's packages linked, not hardlinked — ${deps.why ?? 'unknown'}; a fenced step's reads under it leave its worktree and are denied`,
+    ];
+  return [];
 }
 
 /**
- * Copy what `.worktreeinclude` lists from the main checkout into a worktree the run just cut — the
- * gitignored files a repository says a worktree needs, as Claude Code's `--worktree` does. Never
- * `node_modules`: `provisionDeps` makes that, and a copy would cost minutes per step.
- *
- * Read from the main checkout, never from the worktree a step can edit. Only a path git ignores there is
- * copied, as Claude Code's file copies only ignored files: anything else lands in the worktree as an
- * untracked file, and the hand-off's `git add -A` commits it onto the run's branch — a token in a notes
- * file included. Nothing already in the worktree is overwritten, so a second pass copies nothing. What a
- * person should hear comes back as lines for the run's log, never as an error: a path the main checkout
- * does not have is skipped, and one that leads outside the repository — as written, or through a link —
- * or that git does not ignore is refused.
+ * A step's workspace as it was made: where, on what line of work, the paths its merge left conflicted with the place's words for seeing
+ * them (`say.conflicts`), only where there are some, its dependencies, and notes.
  */
-function includeFiles(repo: string, worktree: string): string[] {
-  const include = readInclude(repo);
-  if (!include) return [];
-  const notes = refusalLines(include.refused).map((line) => `.worktreeinclude: refused ${line}`);
-  const root = fs.realpathSync(repo);
-  const absent: string[] = [];
-  for (const rel of include.copy) {
-    const from = path.join(repo, rel);
-    let real: string;
-    try {
-      real = fs.realpathSync(from);
-    } catch {
-      absent.push(rel);
-      continue;
-    }
-    if (!inside(root, real)) {
-      notes.push(`.worktreeinclude: refused "${rel}" leads outside the repository`);
-      continue;
-    }
-    if (!ignored(repo, rel)) {
-      notes.push(`.worktreeinclude: refused "${rel}" is not gitignored — the hand-off would commit it`);
-      continue;
-    }
-    const to = path.join(worktree, rel);
-    try {
-      fs.mkdirSync(path.dirname(to), { recursive: true });
-      fs.cpSync(from, to, { recursive: true, force: false, errorOnExist: false, verbatimSymlinks: true });
-    } catch (err) {
-      notes.push(`.worktreeinclude: could not copy ${rel} — ${(err as Error).message}`);
-    }
+export type Cut = {
+  readonly workspace: string;
+  readonly branch?: string;
+  readonly merge?: { readonly conflicts: readonly string[]; readonly say: string };
+  readonly deps?: Provisioned;
+  readonly notes: readonly string[];
+};
+
+/** A step's workspace made, or why it was not, in words for the run's log. */
+export type CutOutcome = { readonly cut: Cut } | { readonly uncut: string };
+
+/** What the run's log says of step `name`'s workspace: the notes of its cut, or why it was not cut. */
+export const cutNotes = (name: string, made: CutOutcome): string[] =>
+  ('cut' in made ? made.cut.notes : [made.uncut]).map((note) => `${name}: ${note}`);
+
+/** Why a step's workspace was not made. */
+const uncut = (words: string): CutOutcome => ({ uncut: `not cut — ${words}` });
+
+/** Whether `made` is `at` itself, by real path; false where either is not there to resolve. */
+function madeAt(made: string, at: string): boolean {
+  try {
+    return fs.realpathSync(made) === fs.realpathSync(at);
+  } catch {
+    return false;
   }
-  if (absent.length) notes.unshift(`.worktreeinclude: skipped ${absent.join(', ')} — not in the main checkout`);
-  return notes;
 }
 
 /**
- * A git command in `repo`, its stdout trimmed — or it throws, and git's words are on the error: its message carries the command and the
- * stderr git wrote, which is what a failure is said in (`failedWords`, `startQueued`).
- *
- * `stdio` is given so that stderr is read and no more. Handed none, `execFileSync` captures git's stderr *and* writes it to this process's
- * own, and every failed call a pass repeats would print git's `fatal:` on the daemon's terminal.
+ * What the place in `dirOf(run)` answers when asked to cut `request` (`make`, off the event loop): the workspace it made, or why there is
+ * none, in words for the run's log — its refusal, why it was not heard, a place `dirOf` will not name, or an answer that names a workspace
+ * other than `at`, which is read as unread: a step is never filed where nobody cut it.
  */
-export const git = (repo: string, ...args: string[]) =>
-  execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const madeBy = Effect.fn('madeBy')(function* (run: GitRun, dirOf: (run: GitRun) => string, request: PlaceRequests['make']) {
+  let dir: string;
+  try {
+    dir = dirOf(run);
+  } catch (err) {
+    return uncut((err as Error).message);
+  }
+  countSpawn();
+  const outcome = yield* withinEffect('git', runPlaceVerbAsync(dir, 'make', request));
+  if ('refused' in outcome) return uncut(`the place refused: ${outcome.refused}`);
+  if ('unread' in outcome) return uncut(`the place's make was not heard: ${outcome.unread.said}; asked again on the next pass`);
+  if (!madeAt(outcome.answer.workspace, request.at))
+    return uncut(
+      `the place's make answered ${outcome.answer.workspace}, where it was asked for ${request.at}: read as not heard, and asked again on the next pass`,
+    );
+  return { made: outcome.answer, dir } as const;
+});
+
+/** How the place in `dir` says to see a merge's conflicts (`say.conflicts`), or nothing where its `place.json` does not read. */
+function conflictsSaid(dir: string): string {
+  try {
+    return readPlaceJson(dir).say.conflicts;
+  } catch {
+    return '';
+  }
+}
 
 /**
- * The workspace a step runs in, made real.
+ * The workspace a step runs in, made real: `{ cut }`, or `{ uncut }` with why, for the run's log, when the place made none.
  *
  * A folder run's steps work in folders the run makes, and nothing here is git's (`places.store.ts`). Without
  * isolation every step works in the repository itself, which is safe only as `validate` refuses a
@@ -379,104 +379,50 @@ export const git = (repo: string, ...args: string[]) =>
  * checked out there and so in no worktree. Nothing is cut, merged or provisioned, and `validate` keeps
  * any other step from running beside it.
  *
- * `inherit` costs nothing — the step continues where the last one left off. `fork` and `merge`
- * cut a worktree of their own, which is what stops two concurrent steps from editing the same directory.
- * A worktree already on disk is taken up where it stands, as a pass may have cut it and died before
- * filing the step, and `worktree add -b` would refuse its branch on every pass after. A merge that
- * conflicts is left conflicted, markers and all: the step waiting on several others is told in its brief,
- * and resolving it is the job. Failing here instead would throw away work that a person would simply
- * sort out. What `.worktreeinclude` lists and the dependencies are provisioned after the merges, on the
- * merged tree and its lockfile.
+ * `inherit` costs nothing — the step continues where the last one left off. `fork` and `merge` are cut by the run's place, its `make` asked
+ * off the event loop (`runPlaceVerbAsync`) from the place `dirOf` names, for a workspace of their own at
+ * `<HOME>/worktrees/<run>/<step>` on `wf/<run>/<step>`, merged with the line of work of each other step a merge waits on: what stops two
+ * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
+ * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
+ * provisioned after, in the workspace the place made, on the merged tree and its lockfile.
  */
-export async function workspaceFor(
+export const workspaceFor = Effect.fn('workspaceFor')(function* (
   run: Run,
   steps: readonly Workflow[],
   step: Workflow,
-): Promise<{ workspace: string; branch?: string; conflicted: boolean; deps?: Provisioned; notes: string[] }> {
+  dirOf: (run: GitRun) => string,
+) {
   const plan = workspacePlan(steps, step);
-  if (!isGitRun(run)) return { ...folderPlace(runsDir()).make(run, plan, step.name), conflicted: false };
+  const cut = (made: Cut): CutOutcome => ({ cut: made });
+  if (!isGitRun(run)) return cut(folderPlace(runsDir()).make(run, plan, step.name));
   const of = (name: string) => {
     const s = run.steps[name];
     if (!s?.workspace || !s.branch) throw new Error(`${step.name}: ${name} has no workspace yet`);
     return s as { workspace: string; branch: string };
   };
-
-  if (!run.isolate) return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
-
-  if (plan.kind === 'main') return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
-
+  if (!run.isolate || plan.kind === 'main') return cut({ workspace: run.repo, branch: run.branch, notes: [] });
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
-    return { workspace: parent.workspace, branch: parent.branch, conflicted: false, notes: [] };
+    return cut({ workspace: parent.workspace, branch: parent.branch, notes: [] });
   }
-
-  const branch = `wf/${run.id}/${step.name}`;
-  const workspace = path.join(HOME, 'worktrees', run.id, step.name);
-  const from = plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef;
-  fs.mkdirSync(path.dirname(workspace), { recursive: true });
-  if (!fs.existsSync(path.join(workspace, '.git'))) git(run.repo, 'worktree', 'add', '-b', branch, workspace, from);
-
-  let conflicted = false;
-  if (plan.kind === 'merge') {
-    for (const other of plan.also) {
-      try {
-        git(workspace, '-c', 'user.email=wf@local', '-c', 'user.name=wf', 'merge', '--no-edit', of(other).branch);
-      } catch {
-        conflicted = true;
-      }
-    }
-  }
-
-  const notes = includeFiles(run.repo, workspace);
-  const deps = await provisionDeps(run.repo, workspace);
-  if (deps.tree === 'own' && deps.installed)
-    notes.push('node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed');
-  if (deps.tree === 'failed') notes.push(`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`);
-  if (deps.tree === 'linked')
-    notes.push(
-      `node_modules: main's packages linked, not hardlinked — ${deps.why ?? 'unknown'}; a fenced step's reads under it leave its worktree and are denied`,
-    );
-  return { workspace, branch, conflicted, deps, notes };
-}
-
-/**
- * Commit whatever a step left behind, so the workspace it hands on is the workspace it made.
- *
- * Idempotent: a clean tree commits nothing, so this runs on every pass without accumulating
- * commits. Deliberately not a failure if it cannot — a step's real work is already committed by
- * the step itself in the normal case, and losing a run over a git edge case would be worse.
- * Answers with the commit it made, or with git's words when it could not make one — a hook that refused it, a signature that failed — and
- * undefined with nothing to commit: the tick reads neither, and `nemia rm` says both. `when` goes on the commit's message, saying why.
- * The repository's hooks and signing are honoured: a hook may be what keeps a secret off a branch.
- */
-export function handOff(workspace: string, step: string, when = ''): { commit: string } | { error: string } | undefined {
-  const quiet = { cwd: workspace, encoding: 'utf8' as const, stdio: ['ignore', 'pipe', 'pipe'] as Array<'ignore' | 'pipe'> };
-  try {
-    if (!execCounted('git', ['status', '--porcelain'], quiet).trim()) return undefined;
-    execCounted('git', ['add', '-A'], quiet);
-    execCounted(
-      'git',
-      ['-c', 'user.email=wf@local', '-c', 'user.name=wf', 'commit', '-m', `${step}: hand off what was left uncommitted${when}`],
-      quiet,
-    );
-    return { commit: git(workspace, 'rev-parse', 'HEAD') };
-  } catch (err) {
-    return { error: failedWords(err) };
-  }
-}
-
-/**
- * What a failed git command said, for a person: the last lines of its stderr — where git hands on a hook's output, stdout's too — or its
- * exit status.
- */
-function failedWords(err: unknown, lines = 4): string {
-  const { stderr, status } = err as { stderr?: unknown; status?: number | null };
-  const said = (Buffer.isBuffer(stderr) ? stderr.toString('utf8') : typeof stderr === 'string' ? stderr : '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
-}
+  const asked = yield* madeBy(run, dirOf, {
+    repo: run.repo,
+    at: path.join(HOME, 'worktrees', run.id, step.name),
+    name: `wf/${run.id}/${step.name}`,
+    from: plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef,
+    also: plan.kind === 'merge' ? plan.also.map((other) => of(other).branch) : [],
+  });
+  if (!('made' in asked)) return asked;
+  const { made } = asked;
+  const deps = yield* Effect.promise(() => provisionDeps(run.repo, made.workspace));
+  return cut({
+    workspace: made.workspace,
+    branch: made.branch,
+    ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: conflictsSaid(asked.dir) } } : {}),
+    deps,
+    notes: [...made.notes, ...depsNotes(deps)],
+  });
+});
 
 /**
  * Git's output, or undefined when it cannot answer — quietly, as a person reads the screen this

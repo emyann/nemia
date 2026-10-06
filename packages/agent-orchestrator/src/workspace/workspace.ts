@@ -1,8 +1,9 @@
 /**
  * What a fresh worktree needs that git did not give it — the pure half.
  *
- * A worktree holds tracked files only. Two things fill the rest in, both decided here from names and
- * applied by `worktree.store.ts`, which reads the disk this file never touches:
+ * A worktree holds tracked files only. Two things fill the rest in: what `.worktreeinclude` lists, which the run's place copies when it
+ * cuts the worktree (`make`), and its `node_modules`, decided here from names and applied by `worktree.store.ts`, which reads the disk
+ * this file never touches:
  *
  * - **`node_modules`, per worktree.** npm workspaces are links whose real path is the main checkout, so
  *   one link to main's whole tree would have a worktree's apps import main's packages, and a branch's
@@ -18,8 +19,6 @@
  *   match, so a `dontAsk` job is denied `Read`, `Grep` and `ls` under a linked `node_modules` with no
  *   prompt. A hardlink is no path anywhere else: every file's path is inside the worktree, and no data
  *   is copied.
- * - **`.worktreeinclude`**, the gitignored paths a repository says a new worktree needs, the file
- *   Claude Code's `--worktree` reads. `worktreeInclude` parses it.
  *
  * The same file says where a step works (`workspacePlan`, `givenPlan`) and which finished steps hand their work off on a pass
  * (`handOffDue`).
@@ -250,52 +249,6 @@ export function depsLines(deps: Provisioned | undefined): string[] {
   }
   return [];
 }
-
-/** `.worktreeinclude`, read: what to copy, what is provisioned instead, and what is refused and why. */
-export type WorktreeInclude = {
-  copy: string[];
-  /** Listed, but a `node_modules`: `provisionDeps` makes it, because copying one costs minutes per step. */
-  provisioned: string[];
-  refused: Array<{ line: string; why: string }>;
-};
-
-/**
- * Parse `.worktreeinclude`: one gitignored path per line, file or directory, relative to the repository
- * root. Blank lines and `#` comments are skipped. Paths, not patterns — a glob is a name nothing has.
- * A leading `/` anchors a line at the root, as it does in the gitignore syntax of Claude Code's file:
- * `/.env.local` is the repository's `.env.local`, never the machine's root.
- *
- * Refused by name: a path on a drive (`C:\`), one that climbs out of the repository, the repository
- * itself, and `.git`, which in a worktree is a file git owns. Never copied: anything that is or is
- * inside a `node_modules`. Whether git ignores a path is a fact about the checkout, not the text, so the
- * runner asks git at the cut.
- */
-export function worktreeInclude(text: string): WorktreeInclude {
-  const out: WorktreeInclude = { copy: [], provisioned: [], refused: [] };
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const rel = path.posix.normalize(line.replaceAll('\\', '/').replace(/^\/+/, '') || '.').replace(/\/+$/, '');
-    const segments = rel.split('/');
-    const why = /^[A-Za-z]:[\\/]/.test(line)
-      ? 'is absolute'
-      : rel === '..' || rel.startsWith('../')
-        ? 'is outside the repository'
-        : rel === '.' || rel === ''
-          ? 'is the repository itself'
-          : segments[0] === '.git'
-            ? "is git's own"
-            : null;
-    if (why) out.refused.push({ line, why });
-    else if (segments.includes('node_modules')) {
-      if (!out.provisioned.includes(rel)) out.provisioned.push(rel);
-    } else if (!out.copy.includes(rel)) out.copy.push(rel);
-  }
-  return out;
-}
-
-/** A refusal as a person reads it: `"../x" is outside the repository`. */
-export const refusalLines = (refused: WorktreeInclude['refused']): string[] => refused.map((r) => `"${r.line}" ${r.why}`);
 
 /**
  * The steps whose leftovers the run commits on this pass. Pure.

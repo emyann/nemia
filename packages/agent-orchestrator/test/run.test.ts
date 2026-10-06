@@ -648,11 +648,41 @@ test('a step in the checkout is told the one place its files go: the run hands n
   assert.match(artifactsContract(FILES), /Or leave it in this workspace/);
 });
 
-test('a fan-in step is told it is holding merged work, and that conflicts are its job', () => {
+test("a fan-in step is told it is holding merged work, and the conflicts its place's merge left, with the place's words for seeing them", () => {
   const merge: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine them' };
-  const brief = composeBrief(merge, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), merge]);
+  const steps = [step('a'), step('b'), merge];
+  const r = run({ a: 't1', b: 't2', integrate: null });
+  const told = (conflicts: string[]) =>
+    composeBrief(
+      merge,
+      r,
+      steps,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        conflicts,
+        say: 'SAY-CONFLICTS shows them.',
+      },
+    );
+  const brief = told(['src/a.ts', 'src/b.ts']);
   assert.match(brief, /work of a and b has been merged/);
-  assert.match(brief, /yours to resolve/);
+  assert.match(
+    brief,
+    /The merge left conflicts, and they are yours to resolve — that is what a step waiting on several others is for:\n\n- src\/a\.ts\n- src\/b\.ts\n\nSAY-CONFLICTS shows them\./,
+  );
+  for (const clean of [told([]), composeBrief(merge, r, steps)]) {
+    assert.match(clean, /work of a and b has been merged/);
+    assert.doesNotMatch(clean, /conflict/i, 'a merge that left none is told of none');
+  }
 });
 
 test('`slotNeed`: a run is in flight while a task of it is filed and not settled, or it has started and a pass files something — between two steps too; a run with nothing filed and a root ready wants a slot, unless it waits on a run or was called off', () => {

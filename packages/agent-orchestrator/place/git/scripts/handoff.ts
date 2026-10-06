@@ -1,6 +1,6 @@
 /**
- * `handoff`: commit whatever a step left uncommitted in its workspace, so the workspace it hands on is the workspace it made (`handOff` in
- * `src/workspace/worktree.store.ts` does the same). Takes `{ workspace, step, why }`, `why` added to the commit's message; answers
+ * `handoff`: commit whatever a step left uncommitted in its workspace, so the workspace it hands on is the workspace it made; the tick
+ * asks it of every finished step of a git run. Takes `{ workspace, step, why }`, `why` added to the commit's message; answers
  * `{ commit }`, or `{ commit: null }` when nothing is uncommitted, so it may run on every pass. The repository's hooks and signing are
  * honoured: refuses, in git's words, when git will not commit — a hook that refused it, a signature that failed, no repository there.
  */

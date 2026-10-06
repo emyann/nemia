@@ -739,12 +739,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/workspace/workspace.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 24]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/workspace/worktree.store.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }],

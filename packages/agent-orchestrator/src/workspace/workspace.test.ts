@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { depsPlan, lockfileParting, workspaceModules, worktreeInclude, type DepsListing } from './workspace.ts';
+import { depsPlan, lockfileParting, workspaceModules, type DepsListing } from './workspace.ts';
 import type { Run } from '../record/record.ts';
 import { composeBrief } from '../brief/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -74,48 +74,6 @@ test("the plan: workspace packages to the worktree's copy, every other package m
       { kind: 'tree', path: `${nm}/.bin/shim`, from: '/repo/node_modules/.bin/shim' },
     ],
     "far, a file: dependency outside the repository, and alias, a link within node_modules, are no workspace: main's, linked; shim, a bin that is a file, not npm's link to one, is hardlinked like a package",
-  );
-});
-
-test(".worktreeinclude: paths to copy, a leading / anchored at the root as gitignore's is, node_modules set aside, and every line outside the repository refused by name", () => {
-  const text = [
-    '# what a worktree needs',
-    '',
-    '.env.local',
-    'config/local/',
-    './tools/cache.json',
-    '  spaced.txt  ',
-    '.env.local',
-    '/.env.local',
-    'node_modules',
-    'apps/web/node_modules',
-    '../x',
-    'a/../../y',
-    '/etc/hosts',
-    '/../z',
-    'C:\\secrets',
-    '.',
-    '/',
-    '.git',
-    '.git/hooks',
-  ].join('\n');
-  assert.deepEqual(
-    worktreeInclude(text),
-    {
-      copy: ['.env.local', 'config/local', 'tools/cache.json', 'spaced.txt', 'etc/hosts'],
-      provisioned: ['node_modules', 'apps/web/node_modules'],
-      refused: [
-        { line: '../x', why: 'is outside the repository' },
-        { line: 'a/../../y', why: 'is outside the repository' },
-        { line: '/../z', why: 'is outside the repository' },
-        { line: 'C:\\secrets', why: 'is absolute' },
-        { line: '.', why: 'is the repository itself' },
-        { line: '/', why: 'is the repository itself' },
-        { line: '.git', why: "is git's own" },
-        { line: '.git/hooks', why: "is git's own" },
-      ],
-    },
-    "/etc/hosts is the repository's etc/hosts, as a line in a .gitignore would be: nothing outside it",
   );
 });
 

@@ -1157,7 +1157,7 @@ does not have is reported. The first real run lost a reviewer's entire output to
 **Committing is the run's job.** Every brief tells the step that the run commits whatever it leaves,
 and that being unable to commit is not a reason to block. That is not generosity. Codex's sandbox
 keeps git's metadata read-only, and two runs stopped dead because a review — told its artifacts
-*must* be committed — honestly signed off `blocked`, over a `REVIEW.md` that `handOff` then committed
+*must* be committed — honestly signed off `blocked`, over a `REVIEW.md` that the hand-off then committed
 anyway. A repository can still let Codex commit its own work by shipping a rule
 ([`.codex/rules/git-commit.rules`](.codex/rules/git-commit.rules); the engine's README says how and
 why): the run's commit is the floor, not the ceiling.

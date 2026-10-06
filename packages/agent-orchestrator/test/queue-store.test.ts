@@ -897,13 +897,13 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
   );
 });
 
-test('a queued card whose start fails without a refusal — its `.worktreeinclude` a directory, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
+test('a queued card whose start fails without a refusal — its `.worktreeinclude` a link to itself, which its place cannot read, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
   const broken = aRepoWith('dev');
-  fs.mkdirSync(path.join(broken, '.worktreeinclude'));
-  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a directory');
+  fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
+  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
   aCard('behind-c3d4', { workflow: 'dev', repo, queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
 
   const first = await runWith(b.e, tickRun());
@@ -911,15 +911,15 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   assert.deepEqual([first.queue.card, first.queue.again], ['odd-include-a1b2', false]);
   assert.match(
     first.queue.failed,
-    /^EISDIR: illegal operation on a directory/,
-    "a repository whose `.worktreeinclude` is a directory: the start's read of it fails, with no exit code of the package's",
+    /^the place's open was not heard: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
+    "a repository whose `.worktreeinclude` is a link to itself: the place's open cannot read it, and an open not heard is no refusal",
   );
   const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
   assert.deepEqual([written.refused, written.repo, written.why], [false, broken, first.queue.failed]);
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
     listed,
-    / {2}queued 1 of 2 — failed at \S+: EISDIR: illegal operation on a directory.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
+    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
   );
 
   const up = board();
@@ -947,7 +947,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   assert.match(
     named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: EISDIR: illegal operation on a directory.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
   );
   const again = await runWith(b.e, tickRun());
   assert.deepEqual(
@@ -957,10 +957,10 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8')).at, written.at, 'not written again');
 
-  fs.rmSync(path.join(broken, '.worktreeinclude'), { recursive: true });
+  fs.rmSync(path.join(broken, '.worktreeinclude'));
   const cleared = await runWith(b.e, tickRun());
   const [run] = fromCard('odd-include-a1b2');
-  assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id, removed: true }, 'the directory gone: the next pass starts it');
+  assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id, removed: true }, 'the link gone: the next pass starts it');
   const behind = await runWith(b.e, tickRun());
   assert.deepEqual(
     [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],
@@ -1008,8 +1008,8 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
   emptyStore('1');
   const b = board();
   const broken = aRepoWith('dev');
-  fs.mkdirSync(path.join(broken, '.worktreeinclude'));
-  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a directory');
+  fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
+  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
   const before = await runWith(b.e, tickRun());
   assert.ok(
     before.queue && 'failed' in before.queue && !before.queue.again,
@@ -1041,7 +1041,7 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     1,
     `a run holds the one slot, so the daemon's first pass reads no queue, and its second tries the card and fails as the pass above did, \`again\`, never said by this daemon:\n${printed.join('\n')}`,
   );
-  assert.match(named[0], /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: EISDIR: illegal operation on a directory/);
+  assert.match(named[0], /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: ELOOP: too many symbolic links/);
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
   assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);
 });

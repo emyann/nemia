@@ -57,9 +57,12 @@ const written = (): { runs: string[]; dirs: string[] } => {
   };
 };
 
-/** `startRun` of `workflowDir` on `repo`, opening `place` when given: the run's record, or the refusal it failed with. */
-function started(workflowDir: string, repo: string, place?: string) {
-  const program = startRun({ brief: 'add a flag', repo, workflowDir });
+/**
+ * `startRun` of `workflowDir` on `repo`, opening `place` when given, cutting worktrees unless `isolate` is false: the run's record, or the
+ * refusal it failed with.
+ */
+function started(workflowDir: string, repo: string, place?: string, isolate = true) {
+  const program = startRun({ brief: 'add a flag', repo, workflowDir, isolate });
   const exit = Effect.runSyncExit(place ? program.pipe(Effect.provideService(StartPlace, place)) : program);
   if (exit._tag === 'Success') return exit.value;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
@@ -100,18 +103,18 @@ test("REFUSED: a start on a directory that is no repository, in the place's word
   assert.deepEqual(written(), before);
 });
 
-/** A copy of the package's place whose `place.json` declares no `land`. */
-function placeWithoutLand(): string {
+/** A copy of the package's place whose `place.json` declares no `verb`. */
+function placeWithout(verb: string): string {
   const dir = path.join(scratch('wf-start-place-copy-'), 'git');
   fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
   const file = path.join(dir, 'place.json');
   const declared = JSON.parse(fs.readFileSync(file, 'utf8')) as { verbs: string[] };
-  fs.writeFileSync(file, JSON.stringify({ ...declared, verbs: declared.verbs.filter((v) => v !== 'land') }));
+  fs.writeFileSync(file, JSON.stringify({ ...declared, verbs: declared.verbs.filter((v) => v !== verb) }));
   return dir;
 }
 
 test('REFUSED: a place that declares no land, for a workflow whose ending lands on its check, naming land; it starts one that lands nothing', () => {
-  const place = placeWithoutLand();
+  const place = placeWithout('land');
   const repo = aRepo();
   const before = written();
   const said = refusedWith(LANDING, repo, place);
@@ -119,6 +122,21 @@ test('REFUSED: a place that declares no land, for a workflow whose ending lands 
   assert.deepEqual(written(), before);
   const run = started(PLAIN, repo, place);
   assert.deepEqual(run.placeSkill, { skill: 'git', version: skillVersion(place) });
+});
+
+test('REFUSED: a place that declares no make, or no handoff, for a run that cuts a worktree, naming the verb; it starts the same run in place', () => {
+  const repo = aRepo();
+  for (const verb of ['make', 'handoff']) {
+    const place = placeWithout(verb);
+    const before = written();
+    const said = refusedWith(PLAIN, repo, place);
+    assert.ok(
+      said.startsWith(`${path.join(place, 'place.json')} does not declare ${verb}, which this workflow's run asks of its place`),
+      said,
+    );
+    assert.deepEqual(written(), before);
+    assert.deepEqual(started(PLAIN, repo, place, false).placeSkill, { skill: 'git', version: skillVersion(place) });
+  }
 });
 
 /** The processes of the group `pgid` leads, by pid, as `ps` lists them now. */

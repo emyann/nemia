@@ -1,13 +1,13 @@
 ---
 name: bring-what-waits
-description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
+description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
 ---
 # Bring what waits
 
-Three things wait on the person, and only these: a step at its gate, a step's question to them, and a loop out of rounds. Each is
-theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they choose, with
-their words as `--message` where the verb takes it. The verb prompts them as it runs: that prompt is their decision, asked once, since
-they just gave it in chat. When they decline the prompt, ask what they want instead, and run that verb, which prompts again.
+Four things wait on the person, and only these: a step at its gate, a step's question to them, a loop out of rounds, and a step at its
+cap. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
+choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that prompt is their decision, asked
+once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run that verb, which prompts again.
 
 Everything else is yours, and is not brought here: a check that did not finish you run again (`nemia retry <run> <step> --recheck`), a
 check that refused the work you report with its exit code, a hold or a merge you do and say. The `verbs` skill classes every verb.
@@ -72,6 +72,25 @@ Bring it:
 `nemia round` takes no words: the next round's reviewer reads the findings, not the person. Where their answer carries words for the
 step, say so before you run it. Where a step of the loop is over its budget, `nemia round <run> --budget <amount>` raises its cap with
 the round: the raise is theirs, so say it in the recommendation.
+
+## A step at its cap
+
+A step stops at its cap in one of two ways: `budget exhausted`, its harness ended the session at the step's budget before it signed
+off; or `over budget`, its tries have cost more than its budget. `nemia ls` says which, and `nemia decide <run>` prints what it spent and
+the line that raises its cap. A try without a raise is refused, and a raise is the person's.
+
+Bring it:
+
+- **Run and step**: as above.
+- **What it spent**: each try's cost, against the step's cap and the person's line.
+- **Where it stopped**: what the step had done and what is left, from its last closeout or its session's last words.
+- **What finishing would take**: your estimate, and what it rests on — what this step costs in the workflow's runs
+  (`nemia stats --workflow <workflow> --by step`).
+- **Recommendation**: one, with its reason in a sentence:
+  - raise the cap and try again: `nemia retry <run> <step> --budget <amount> --message "<their words>"`, the amount above what its
+    tries have cost;
+  - for a step of a loop whose next round would run past the cap: `nemia round <run> <step> --budget <amount>`, as above;
+  - stop there: `nemia cancel <run>`, which prompts them too.
 
 ## Carry the answer back
 

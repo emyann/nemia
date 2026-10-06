@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { REPO } from './team.ts';
 import { skillFolders, skillRead } from '../src/skills/skills.store.ts';
+import { WAITS_ON_PERSON } from '../src/retry/waits.ts';
 
 const SHIPPED = path.join(import.meta.dirname, '..', 'nemia');
 
@@ -115,4 +116,25 @@ test('each of her skills reads as Claude Code reads her plugin, and the skill br
   assert.ok(!fs.existsSync(path.join(dir, 'bring-a-gate')), 'bring-a-gate is gone');
   const plugin = JSON.parse(fs.readFileSync(path.join(SHIPPED, '.claude-plugin', 'plugin.json'), 'utf8')) as { name?: unknown };
   assert.equal(plugin.name, 'nemia');
+});
+
+/** The section of `bring-what-waits` that brings a step in each status that waits on the person (`WAITS_ON_PERSON`). */
+const BROUGHT_IN: Record<string, string> = {
+  'awaiting approval': 'A step at its gate',
+  blocked: "A step's question to the person",
+  exhausted: 'A loop out of rounds',
+  'over budget': 'A step at its cap',
+  'budget exhausted': 'A step at its cap',
+};
+
+test('each status that waits on the person has a section of bring-what-waits that brings it', () => {
+  const waiting = Object.entries(WAITS_ON_PERSON)
+    .filter(([, waits]) => waits)
+    .map(([status]) => status);
+  assert.deepEqual(waiting.toSorted(), Object.keys(BROUGHT_IN).toSorted(), 'a status that waits on the person is given its section here');
+  const skill = fs.readFileSync(path.join(SHIPPED, 'skills', 'bring-what-waits', 'SKILL.md'), 'utf8');
+  assert.deepEqual(
+    waiting.filter((status) => !skill.includes(`\n## ${BROUGHT_IN[status]}\n`)),
+    [],
+  );
 });

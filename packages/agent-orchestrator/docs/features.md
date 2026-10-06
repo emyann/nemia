@@ -2373,29 +2373,6 @@ fence is derived from the class, with no hand list in `nemia/nemia.md`.
   `--budget` and a retry of a step that waits on the person (`waitsOnPerson`, `src/retry/waits.ts`) are asked, whatever she types around
   them; a retry that waits on no one runs. A hook's ask prompts over every allow, so a "don't ask again" never widens what waits.
 
-## Shipped: her skills — her verbs generated, what waits, a factory, a card
-
-Card B of the third Nemia amendment: what ships with her (`nemia/`) teaches her card A's model. What waits on the person she brings in
-chat with a recommendation, then runs the verb they choose with their words as `--message`, so its prompt is their decision, asked once;
-what prompts, prompts; the rest is hers, on her judgement, and said.
-
-- **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
-  class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
-  *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
-  make it prompt; `out` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
-  (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
-  table, naming the command that regenerates it:
-  `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
-- **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for a step at its gate, a step's question and a loop out of
-  rounds, each naming its read and its answering verbs; `commission-a-workflow` brings a proposal as a card to start, fold or drop;
-  `create-a-factory` makes a whole factory short of a run, drafting its workflows, agents and skills in her own folder for the person to
-  place; `write-a-card` writes a card with the person's words, today's facts, done-when, proof, a first measure, a size from measured
-  costs and where it goes. Her instruction's *Where you stand* says what waits, what prompts and what is hers.
-- **Held**: `test/nemia-shipped.test.ts` refuses "gate" in what ships but for a step's gate, and reads each of her skills as Claude Code
-  would; `test/skills-rendered.test.ts` parses each frontmatter as YAML.
-- **Left to platform phase 7**: the writers of workflows, agents and skills and an agent's try on the CLI (`agents write`, `workflows
-  write`, `skills write`, `agents try`, served on the api alone). When they are served, the verbs skill lists them by itself, and
-  `create-a-factory` is rewritten to use them.
 ## Shipped: a level per factory, and a raise for a stretch (Nemia platform slice 6a)
 
 A factory at Manual is left alone; one at Semi-auto is hers to work. The level is the person's, per factory, and naming no agent.
@@ -2426,6 +2403,31 @@ Tested in `src/level/level.test.ts` (a raise until its end, never at it; the str
 `src/nemia/keep.verb.test.ts` (a raise keeps her, its end passing stops her with no write; an end; the refusals),
 `src/admission/admission.test.ts` and `src/admission/admit.verb.test.ts` (denied below the floor, asked unread, no change above it),
 `src/subscription/deliver.verb.test.ts` (a floored subscription told nothing of a factory below it) and `src/admission/fence.test.ts`.
+
+## Shipped: her skills — her verbs generated, what waits, a factory, a card
+
+Card B of the third Nemia amendment: what ships with her (`nemia/`) teaches her card A's model. What waits on the person she brings in
+chat with a recommendation, then runs the verb they choose with their words as `--message`, so its prompt is their decision, asked once;
+what prompts, prompts; the rest is hers, on her judgement, and said.
+
+- **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
+  class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
+  *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
+  make it prompt; `out` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
+  (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
+  table, naming the command that regenerates it:
+  `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
+- **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for each of what card A's admission counts as waiting on the
+  person (`WAITS_ON_PERSON`) — a step at its gate, a step's question, a loop out of rounds and a step at its cap — each naming its read
+  and its answering verbs; `commission-a-workflow` brings a proposal as a card to start, fold or drop;
+  `create-a-factory` makes a whole factory short of a run, drafting its workflows, agents and skills in her own folder for the person to
+  place; `write-a-card` writes a card with the person's words, today's facts, done-when, proof, a first measure, a size from measured
+  costs and where it goes. Her instruction's *Where you stand* says what waits, what prompts and what is hers.
+- **Held**: `test/nemia-shipped.test.ts` refuses "gate" in what ships but for a step's gate, and reads each of her skills as Claude Code
+  would; `test/skills-rendered.test.ts` parses each frontmatter as YAML.
+- **Left to platform phase 7**: the writers of workflows, agents and skills and an agent's try on the CLI (`agents write`, `workflows
+  write`, `skills write`, `agents try`, served on the api alone). When they are served, the verbs skill lists them by itself, and
+  `create-a-factory` is rewritten to use them.
 
 ## Shipped: freeing the space — `wf prune`
 

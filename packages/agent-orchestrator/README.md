@@ -122,8 +122,9 @@ that landed on their first try, the cost and wall time of a landed run, and per 
 time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it, the
 skills its sessions loaded, each rule its skills declare, kept or broken, and each count its workflow
 declares over its closeouts (`tally:`). It prints tiles — the last 14 days against the 14 before — a
-row per landing check that passed in more than half its deadline, a row per UTC day, a row per step and agent, a row per call a step was refused, a row per skill a step
-loaded, a row per rule a step's skills declare, and a row per day, step and tally.
+row per landing check that passed in more than half its deadline, a row per UTC day, a row per step
+and agent, a row per call a step was refused, a row per skill a step loaded, a row per rule a step's
+skills declare, and a row per day, step and tally.
 
 ```bash
 wf stats                                   # every day since the first try ended, to today

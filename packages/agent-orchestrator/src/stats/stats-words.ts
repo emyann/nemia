@@ -1,7 +1,8 @@
 /**
- * The stats in words (`Stats`, `stats.ts`): the tiles, a row per landing check that passed in more than half its deadline, a row per day, a row per change to what the runs froze, a row per step, a row per
- * call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day and count a step
- * declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`, never 0. Pure.
+ * The stats in words (`Stats`, `stats.ts`): the tiles, a row per landing check that passed in more than half its deadline, a row per
+ * day, a row per change to what the runs froze, a row per step, a row per call a step was refused, a row per skill a step loaded, a row
+ * per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
+ * number with nothing measured under it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
 import type { Health } from '../series/series.ts';
@@ -194,9 +195,10 @@ export function healthLines(h: Health): string[] {
 }
 
 /**
- * What `nemia stats` prints: the tiles, a row per landing check that passed in more than half its deadline, a row per day — per group, with a key — then a row per change to what the runs froze, a row per
- * step, a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
- * declares, the system's health over the days, and the runs left out.
+ * What `nemia stats` prints: the tiles, a row per landing check that passed in more than half its deadline, a row per day — per group,
+ * with a key — then a row per change to what the runs froze, a row per step, a row per call a step was refused, a row per skill a step
+ * loaded, a row per rule its skills declare, a row per day and count a step declares, the system's health over the days, and the runs
+ * left out.
  */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);

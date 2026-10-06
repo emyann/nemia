@@ -708,10 +708,9 @@ What is left:
   have a restarted engine read a feed line the record lacks, which is worse. A hand edit of `tasks/*.jsonl` under a running
   `wf up` is the same — one more reason never to make one — and so is a consumer's `StoreOps` whose `feed` drops an
   append, which its doc now forbids.
-- **An engine's first pass reads the whole feed** to learn where it ends, since a store gives a cursor only by reading
-  (`JournalOps.feed`): 14 MB here, about as much again as the journals. `wf up` pays it once; a one-shot `wf tick` or `ae tick`
-  pays it every time, about half as much again as before (41.6 MB where 27.5 MB was read). The lever, if it matters, is an
-  optional `JournalOps.end()` that answers a cursor at the feed's end, on a line boundary, with no read.
+- ~~**An engine's first pass reads the whole feed**~~ — fixed 2026-10-06: a memo with no cursor keeps nothing to forget, so
+  `forgetNamed` asks the feed from past its end, which the files store answers with the end and no line read
+  (`test/tick-memo.test.ts`, *a fresh engine on the same store*). The feed had grown to 72 MB on this machine.
 - **`wf ls`, `wf decide` and the api's reads still fold every journal they read**: they `view`, not `tick`, and the memo is the
   pass's (agent-orchestrator's features, *What `wf ls` and `/api/runs` still pay*).
 
@@ -746,7 +745,7 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
 - **A stop of a send another process makes** does nothing here: that process's send is its own. The stop is asked again on
   later passes, and a Task the send brings back is then cancelled; the deadline bounds the rest.
 
-### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, five gaps left)
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day; per session for a transcript or an output 2026-10-06, eight gaps left)
 
 The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
 pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
@@ -760,16 +759,24 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
 `src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`.
 
-A `--bg` transcript is read the same way (2026-10-06). One that does not decode (`lines.ts`), and one found and then not read, fails
-the `--bg` `observe`: every background session is unread on that pass, never read as no statement and never `LOST`. A failed read is
-any error the OS gives once the file was found (`EACCES`, `EIO`, or `ENOENT` for a file gone since). A refused decode is kept while
-the transcript is unchanged. A failed read is never kept, so the next pass reads the file again (`TranscriptUnread`,
-`harness/claude/transcript.ts`). A session with no transcript at all still reads as none. The tests are in `test/transcript.test.ts`.
+A `--bg` transcript, and a detached run's output, are read per session (2026-10-06). A transcript line that does not decode
+(`lines.ts`), a transcript found and then not read, and a `codex exec --json` line that does not decode (`stream.ts`) leave that
+session alone unread while it may still run, its harness's other sessions read beside it, never read as no statement and never
+`LOST`; once it has ended, it reads as `failed`, as a refused start does, so its task settles and `stop`, `release` and `forget`
+reach it. Why is said as a warning on every look. A `--bg` session has ended when it is listed finished, or working and idle, and
+its transcript has been unwritten for the quiet floor (`QUIESCENT_AFTER_MS`), or it is listed finished with no transcript time
+(`endedOf`, `harness/claude/bg.ts`); a detached run, once its process is no longer at work (`lookOf`,
+`harness/detached/detached.ts`). A failed read is any error the OS gives once the file was found (`EACCES`, `EIO`, or `ENOENT` for
+a file gone since), never kept, so the next pass reads the file again (`TranscriptUnread`, `harness/claude/transcript.ts`); a
+refused decode is kept while the transcript is unchanged. A session with no transcript at all still reads as none. The tests are
+in `test/transcript.test.ts`, `test/completion.test.ts`, `test/claude-code.test.ts` and `test/unread-session.test.ts`.
 What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
   harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
-  is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before.
+  is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before. A `--bg` session whose transcript cannot
+  be read, while it has not ended, is left out of that `observe` too (it answers only what the look `seen`), so `ae ls` and a view
+  show its task as if its session were not listed, with the warning beside it, until it reads as ended or readable again.
 - **A harness never read again holds its tasks in flight until their deadline.** `UNREAD` ends nothing, by design, so a task with
   no deadline on a harness that is gone for good waits for ever, where before it failed `lost` 30 s after its spawn. A person's
   stop on such a task without a deadline waits too. The board shows it working; `wf up --stats` shows the harness's unread count.
@@ -782,16 +789,33 @@ What is left:
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
   to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
   gap above already leaves too wide. Found in review of the run that made a failed observe say so.
-- **One transcript that cannot be read holds every `--bg` session unread.** A transcript whose decode is refused or whose read
-  keeps failing (a lasting `EACCES`) fails the whole `--bg` listing, so every background session waits unread until its deadline,
-  and one with no deadline waits for ever (the gap above). Reading unread per session needs the runner's `observe` to answer an
-  `Observation`, which it does not.
+- **A busy or blocked `--bg` session whose transcript cannot be read never ends.** `endedOf` (`harness/claude/bg.ts`) ends only a
+  session listed finished, or `working` and not busy; one listed `blocked` (waiting on a prompt, or idle under `--remote-control`,
+  which lists `blocked`, `idle`, with no `waitingFor`) or busy is unread on every pass while its transcript stays unreadable. Its
+  deadline still ends it; with none, its task waits for ever, as on a harness never read again (above).
+- **A stop asked while a `--bg` session is unread sends no `claude stop`.** In `stopping`, `UNREAD` does nothing until the deadline
+  (`decide`), so the stop waits until the session reads as ended — then `failed`, and released (`claude stop`, `claude rm`) — or
+  until the deadline cuts it. A blocked or busy session that stays unread (the gap above) is never stopped, with no deadline.
+- **A long-lived session whose transcript stays unreadable is either restarted on and on, or unread for ever.** Nemia's own
+  long-lived session (`restartPolicy: 'Always'`) is the one at risk, and which of the two it meets depends on how it lists. Listed
+  finished, or `working` and idle, once its transcript has been cold for the floor it reads as `failed`, and `restartOf`
+  (`core/domain.ts`) restarts it after the backoff, continuing the same session; if the restarted session's transcript cannot be
+  read either — a lasting `EACCES` on the folder, or a line that does not decode carried into the conversation it continues — each
+  attempt ends `failed` and is restarted again, the backoff capped at 5 minutes (`RESTART_BACKOFF`), with the warning on every look
+  and nothing that settles the task. Idle under `--remote-control` it lists `blocked`, so it never ends (the gap above): unread on
+  every pass, never restarted, never settled, and a stop never sent, with no deadline. Before this, either session held every
+  background session unread instead. A bound needs a decision: settle a long-lived task whose attempts all end on an unreadable
+  transcript, or restart it cold; and whether an unreadable session idle under `--remote-control` counts as ended.
+- **A detached capture found and not read is read as nothing said.** `saidAt` (`harness/detached/said.ts`) answers nothing when
+  the log stats and its read then fails (`EACCES`, `EIO`), so the run reads as having said nothing rather than unread, as a `--bg`
+  transcript now does (`TranscriptUnread`). The end is read off the run file, so this never makes an attempt `LOST`, but its usage
+  and statement are missing.
 - **`release` still reads a transcript that cannot be read as no usage.** `releaseFrom` (`harness/claude/bg.ts`) reads what a
   session consumed after `claude stop` and answers nothing for any failure, a refused decode or a failed read. The end is on record
   by then, so this never makes a statement absent or an attempt `LOST`, but the end's cost is missing. Retrying the read means
   deciding whether a release whose stop is already done runs again.
 
-### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06)
+### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06, fixed the same day)
 
 A line of `codex exec --json` of a type the runtime reads that `CodexEventSchema` (`harness/codex/stream.ts`) does not decode fails
 the Codex harness's whole look, so every Codex session is unread, by design (issue 35), until the run file whose output it is goes.
@@ -799,10 +823,41 @@ Nothing makes it go: `ae forget` takes only a settled task, refuses a session it
 `service/forget.ts`), and a task with no deadline on that harness never settles — the gap issue 35 names. The one way out today is a
 hand removal of the run, which the repository's rules forbid. The same trap was found, and closed, for a session whose start event
 does not decode, under every detached harness: unread only while its process runs, then read as failed with no id
-(`refusedAtWork`, `harness/detached/detached.ts`), and under Codex its output's refusal of the same line is its alone, read as
-nothing said (`outputFor`), so its harness's other sessions stay read (`test/start-event.test.ts`). Any other refused output is
-not closed here: it is read off a run whose process may have ended, so the same answer — read the run that refused as failed
-once it has ended, and its harness's others as read — is the candidate fix.
+(`lookOf`, `harness/detached/detached.ts`), so its harness's other sessions stay read (`test/start-event.test.ts`). **Fixed
+2026-10-06:** any other refused output is read the same way — the run that refused unread while its process is at work, failed
+once it has ended, its harness's others read, and why said on every look (`lookOf`, `test/unread-session.test.ts`); see the
+*Fixed* table.
+
+### 37. What still reads the whole feed, and the feed's size on disk (2026-10-06)
+
+The feed is never rotated but by a forget (`rotateFeed`), so it grows by every line of every task ever filed: 72 MB on this
+machine on 2026-10-06, with no sealed file, beside 76 MB of journals over 3,935 tasks. A pass reads none of it but what was
+appended since the last (`forgetNamed`, and the orchestrator's `followedFeed`; `agent-orchestrator/src/tick/feed-reads.test.ts`
+holds a restarted tick's passes to the same reads over a feed 20,000 lines longer). What still reads it whole, each once a call,
+and one of them on a pass:
+
+- **`forget` decodes the whole feed to count each task's lines** (`service/forget.ts`, `feed(0)`), every body resolved, for a
+  `feedLines` per task; then the files store rotates it, which reads it once more (`rotateFeed`). It runs on a pass: the
+  orchestrator's `finishForgetting` (`tick/tick.verb.ts`) forgets with `yes` the tasks of a run a person removed (`nemia rm`) once
+  they settled, so the pass that finishes a removal reads the feed whole twice — measured on a fixture, a forget of one task over an
+  89 MB feed read 178 MB in 591 ms, over a 22 MB one 44 MB in 170 ms; about 144 MB on this machine's 72 MB. One pass a removal,
+  not every pass. A count off the raw lines, or a rotation that answers the count, would read it once and decode none; the
+  rotation still reads and rewrites it whole, so only a feed bounded in size bounds that pass.
+- **`sweep` reads the whole feed for the bodies it names** (`feedNaming` in `core/engine/sweep.ts`), as it must before removing one.
+- **`ae feed` from the start** (`src/cli/main.ts`), as asked.
+- **An engine's first pass folds every journal** (76 MB here): what the memo is made of, paid once per engine, and O(tasks).
+
+The size itself is the lever not taken: a feed rotated on a size or an age, its sealed half kept for a cursor from before, would
+keep the disk and those reads bounded. Not changed with the reads, so a store's format stays as it is.
+
+### 38. A `--bg` session's transcript is read whole on a look that keeps no read (2026-10-06, measured, not fixed)
+
+The runtime phase of a pass read 17 files and 3.07 MB at 11:33Z on this machine, from 15 listed `claude` sessions, where it read
+1.45 MB at 11:05Z: it grows with the sessions' length, not with the store. The candidate is `keptReads` (`harness/claude/bg.ts`):
+a closeout or usage read is kept by the transcript's mtime only for a session in a final state (`keep = FINAL.has(s.state)`), and
+`readSessionTranscript` reads the whole file, so a session that is not busy and not final (idle, blocked, a long-lived one between
+turns) has its transcript read whole twice on every pass, for a closeout and for its usage. Keeping the read by mtime for every state,
+or reading from the last byte read as the journals are (`journalReader`), would bound it; not attributed file by file live.
 
 ## Verified live, once
 
@@ -1218,6 +1273,7 @@ harness's cancel and still left a direct caller to ask again.
 | a continuation (`resumeFrom`) whose first spawn the harness refused, `unstartable`, started its next attempt cold, without the session it was filed to continue — with `maxAttempts` above 1 (issue 5) | `resumeTarget` continues the task's `resumeFrom` while every attempt so far ended `unstartable`; an attempt that ran — spawned, or adopted after a crash with no spawn on the record — is judged by the `resume` policy as before (the first version keyed on `spawnedAt`, and an adoption has none; found in review) | engine, 2026-09-22 |
 | with one attempt per start, the runtime continues no attempt, so issue 5's case — an `unstartable` continuation — would start its next try cold | the orchestrator's `continuesFrom` hands a `--nudge` try, a round or a `resume:` step the last attempt's session, or, where the harness never named that one — it could not start, or was lost — the `resumeFrom` it was started with; for a held task's later turn, the session that signed the turn before (`test/run.test.ts`, `test/store.test.ts`, `test/held.test.ts`) | orchestrator, 2026-09-23 (stage 4a part 2) |
 | a check that exited 0 at 607 s of a 600 s deadline settled `failed`, `deadline exceeded`: the pass that recorded its `done` end read it again past the deadline, and the deadline settled first | an end on record is judged by that end; past the deadline, `decide` still stops a live session, cuts an open attempt, settles one the deadline cut, and starts no other attempt | engine, 2026-09-24 |
+| a Codex line that does not decode left every Codex session unread until its run went, and none could be forgotten (issue 36); a `--bg` transcript that could not be read did the same to every background session (issue 35) | the session whose output or transcript cannot be read is unread alone while it may still run, its harness's others read; once ended it reads `failed`, as a refused start does, why said on every look, so its task settles and `stop`, `release` and `forget` reach it | runtime, 2026-10-06 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

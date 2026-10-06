@@ -1,0 +1,47 @@
+## What was asked for
+
+add a flag
+
+## Before you sign off
+
+This must exit 0 in this workspace: `npm test && npm run typecheck && npm run lint`
+
+The run executes it afterwards, where the work is, and nothing that waits on this step starts
+until it does. Do not weaken it to pass it: the command comes from the run, not from this checkout.
+
+## Files for the steps after you
+
+A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.
+
+- Put it in `/art/implement`, and name it in `artifacts` by absolute path. The run made that directory for
+  this step, outside every workspace, so a file there does not ride the branch.
+- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root, such as
+  `RESPONSE.md` or `.e2e/shot.png`. When you finish, the run copies each such file into that directory, at the
+  same path, before it checks your work, so a step that cannot write outside its workspace hands its files over
+  all the same. A file left in the workspace is committed with the rest too, unless git ignores it.
+
+The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute
+path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a
+file that is not there: name each file.
+
+A file whose path passes through `.claude`, a folder a harness reads as its own configuration, is
+refused, and not handed over: the steps after you read your files in a folder of theirs, and would take it as their own.
+
+## When you are finished
+
+Your final answer is a structured closeout, and it is how this run knows you are done. The session
+asks you for it in the required shape when you finish — in Claude Code, by calling the
+`StructuredOutput` tool. There is no file to write.
+
+- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step
+  that reports success it did not have is worse than one that stops and says why.
+- `summary`: one to three sentences on what you did, for the person who decides what ships.
+- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this
+  workspace: when you finish, the run commits whatever you left, so the next step receives it.
+  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is
+  **not** a reason to block. A file you list that does not exist is reported as missing.
+- `needs`: when blocked, what a person has to settle; otherwise `null`.
+- `replies`: `[]`. You were handed no findings this round. If a later round hands you some, you answer each there.
+
+**Give it once, and give it last**, after everything else. The run reads it as your final word
+and may start the next step on it.

@@ -438,7 +438,8 @@ export const codex: HarnessSpec = {
 The start event is where the session's own id is read, by the worker, off whole lines of stdout: the first JSON object whose keys
 hold `event`'s values, its `id` field a string of hex and dashes, 16 or more. A start printed with anything else there is refused
 (`startRefused` on the run file): that session is unread while its process runs, and read as failed, with no id, once it has
-ended, so its task settles and `ae forget` can let it go; the harness's others are read.
+ended, so its task settles and `ae forget` can let it go; the harness's others are read. An output its spec's `readOutput` refuses
+— a `codex exec --json` line that does not decode — is read the same way, with why said as a warning on every look (`lookOf`).
 
 Exit 0 is success, anything else is failure. That is all a generic harness has to say, and it is
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
@@ -1857,9 +1858,12 @@ A Claude Code transcript line is decoded where the runtime reads it (`decodeLine
 it, and the `cost-state`, `agent-name`, `compact_boundary` and response lines read as its usage. Only `type`, and `message` on a `user`
 or `assistant` line, must be there; a field that is there has the shape the runtime reads. A line that does not decode fails the read
 with words naming the transcript, the line, the field, at most 60 characters of what it found, and the fix: the `transcript` verb
-refuses, and a `--bg` `observe` fails with a `RunnerError`, so every background session is unread, never read as having said nothing,
-and the refusal is kept while the transcript is unchanged. A line torn mid-write, one that is no JSON object, and a line of a type the
-reader does not read pass undecoded.
+refuses, and a `--bg` look leaves that session alone unread, never read as having said nothing, its other background sessions read
+beside it; the refusal is kept while the transcript is unchanged. A transcript found and then not read (`TranscriptUnread`) is read
+the same way, and read again on the next look. Once the session has ended — listed finished, or working and idle, its transcript
+unwritten for the quiet floor, or listed finished with no transcript — it reads as `failed`, as a refused start does, with why said
+as a warning on every look, so its task settles and `stop`, `release` and `forget` reach it (`endedOf`, `harness/claude/bg.ts`). A
+line torn mid-write, one that is no JSON object, and a line of a type the reader does not read pass undecoded.
 
 A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
 refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,

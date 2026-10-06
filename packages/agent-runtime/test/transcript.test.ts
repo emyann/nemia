@@ -20,6 +20,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { TranscriptEvent } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
+import { warned } from './warned.ts';
 import type { AsyncRunner } from './promise-runner.ts';
 
 const tmp = (label: string) => scratch(`ae-transcript-${label}-`);
@@ -28,7 +29,7 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
-const { claudeOps } = await import('../src/harness/claude/bg.ts');
+const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg.ts');
 const { asyncOps } = await import('./promise-runner.ts');
 const { RunnerError } = await import('../src/harness/error.ts');
 const { readTranscript } = await import('../src/harness/transcript.ts');
@@ -784,9 +785,9 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 };
 
 /**
- * A fake `claude`: `agents` prints its rows, and `--bg --name <n>` adds one, working and idle, under a new
- * session id; anything else succeeds and does nothing. While `<bin>/agents-fails` exists, `agents` fails,
- * as a registry under contention does. Every call is written down.
+ * A fake `claude`: `agents` prints its rows, `--bg --name <n>` adds one, working and idle, under a new session id, and `rm <id>` drops
+ * the row of the session whose id starts so; anything else succeeds and does nothing. While `<bin>/agents-fails` exists, `agents`
+ * fails, as a registry under contention does. Every call is written down.
  */
 const fakeClaude = () => {
   const bin = tmp('bin');
@@ -808,10 +809,11 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
   fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
 }
+if (args[0] === 'rm') fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows.filter((r) => !r.sessionId.startsWith(args[1]))));
 `,
     { mode: 0o755 },
   );
-  type Row = { name: string; sessionId: string; state: string };
+  type Row = { name: string; sessionId: string; state: string; pid?: number };
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
@@ -1075,27 +1077,48 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
   });
 });
 
-test("REFUSED: a finished background session whose statement's line does not decode fails `observe` at shipped readers, naming the transcript, its line and field", async () => {
-  const sessionId = randomUUID();
-  const lines = claudeLines(sessionId);
-  const call = lines.findIndex((l) => JSON.stringify(l).includes('StructuredOutput'));
-  writeClaude(sessionId, claudeWith(sessionId, call, { timestamp: 'yesterday' }));
-  const bin = tmp('bin');
-  const rows = JSON.stringify([{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background' }]);
-  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\ncat <<'JSON'\n${rows}\nJSON\n`, { mode: 0o755 });
+/**
+ * A `--bg` runner under a scratch root whose transcripts were last written at 0 and whose monotonic clock reads `mono.ms`: a test
+ * steps it past the floor to make a session that cannot be read cold.
+ */
+const steppedOps = () => {
+  const mono = { boot: 'boot-1', ms: 0 };
+  return { mono, ops: claudeOps({ root: tmp('root'), mono: () => mono, transcriptTime: async () => 0 }) };
+};
 
-  const e = await onPath(bin, () =>
-    Effect.runPromise(Effect.flip(claudeOps({ root: tmp('root'), transcriptTime: async () => 0 }).observe)),
-  );
-  assert.ok(e instanceof RunnerError, String(e));
-  assert.equal(e.verb, 'observe');
-  assert.ok(e.message.includes("`ae/t/1`'s transcript cannot be read"), e.message);
-  assert.ok(
-    e.message.includes(
-      `line ${call + 1} of the transcript \`${claudeFile(sessionId)}\` is an \`assistant\` line whose \`timestamp\` is "yesterday"`,
-    ),
-    e.message,
-  );
+/** Rows listing `bad` as `ae/t/1` and `good` as `ae/u/1`, both done and idle. */
+const badAndGood = (bad: string, good: string) => [
+  { name: 'ae/t/1', sessionId: bad, state: 'done', status: 'idle', kind: 'background', startedAt: T0 - 1_000 },
+  { name: 'ae/u/1', sessionId: good, state: 'done', status: 'idle', kind: 'background', startedAt: T0 - 1_000 },
+];
+
+test("REFUSED: a finished background session whose statement's line does not decode, at shipped readers, is unread alone, the other read beside it, and failed once cold, its warning naming the transcript, its line and field", async () => {
+  const [bad, good] = [randomUUID(), randomUUID()];
+  const lines = claudeLines(bad);
+  const call = lines.findIndex((l) => JSON.stringify(l).includes('StructuredOutput'));
+  writeClaude(bad, claudeWith(bad, call, { timestamp: 'yesterday' }));
+  writeClaude(good, jsonl(claudeLines(good)));
+  const { mono, ops } = steppedOps();
+  const words = [
+    "`ae/t/1`'s transcript cannot be read",
+    `line ${call + 1} of the transcript \`${claudeFile(bad)}\` is an \`assistant\` line whose \`timestamp\` is "yesterday"`,
+  ];
+
+  await listing(badAndGood(bad, good), async () => {
+    const first = await warned(ops.observeFor!([{ name: 'ae/t/1' }, { name: 'ae/u/1' }]));
+    assert.deepEqual([...first.value.unread], ['ae/t/1'], 'first seen within the floor: unread, neither there nor gone');
+    assert.deepEqual(first.value.seen.get('ae/u/1')?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
+    assert.equal(first.warnings.length, 1);
+    for (const said of words) assert.ok(first.warnings[0].includes(said), first.warnings[0]);
+
+    mono.ms += QUIESCENT_AFTER_MS;
+    const cold = await warned(ops.observe);
+    assert.equal(cold.value.get('ae/t/1')?.state, 'failed', 'cold for the floor: failed, never completed with no statement');
+    assert.equal(cold.value.get('ae/t/1')?.closeout, undefined);
+    assert.equal(cold.value.get('ae/u/1')?.state, 'completed');
+    assert.equal(cold.warnings.length, 1);
+    for (const said of words) assert.ok(cold.warnings[0].includes(said), cold.warnings[0]);
+  });
 });
 
 /**
@@ -1122,26 +1145,35 @@ const listing = <T>(rows: object[], f: () => Promise<T>) => {
   return onPath(bin, f);
 };
 
-test('REFUSED: a finished background session whose transcript was found and cannot be read fails `observe`, each time, and is read again on the next look; readable again, it gives the statement', async (t: TestContext) => {
-  const sessionId = randomUUID();
-  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
-  const reads = failingReads(t, claudeFile(sessionId));
-  const rows = [{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background', startedAt: T0 - 1_000 }];
-  const ops = claudeOps({ root: tmp('root'), transcriptTime: async () => 0 });
+test('REFUSED: a finished background session whose transcript was found and cannot be read is unread alone, each look, the other read beside it, and is read again on the next look; cold, it reads failed; readable again, it gives the statement', async (t: TestContext) => {
+  const [bad, good] = [randomUUID(), randomUUID()];
+  writeClaude(bad, jsonl(claudeLines(bad)));
+  writeClaude(good, jsonl(claudeLines(good)));
+  const reads = failingReads(t, claudeFile(bad));
+  const { mono, ops } = steppedOps();
+  const expected = [{ name: 'ae/t/1' }, { name: 'ae/u/1' }];
 
-  await listing(rows, async () => {
+  await listing(badAndGood(bad, good), async () => {
     for (const code of ['EACCES', 'EIO', 'ENOENT']) {
       reads.fails(code);
       for (const look of [1, 2]) {
         const before = reads.asked();
-        const e = await Effect.runPromise(Effect.flip(ops.observe));
-        assert.ok(e instanceof RunnerError, String(e));
-        assert.equal(e.verb, 'observe');
-        for (const said of ["`ae/t/1`'s transcript cannot be read", code, claudeFile(sessionId)])
-          assert.ok(e.message.includes(said), `${code}, look ${look}: ${e.message}`);
+        const { value, warnings } = await warned(ops.observeFor!(expected));
+        assert.deepEqual([...value.unread], ['ae/t/1'], `${code}, look ${look}`);
+        assert.equal(value.seen.get('ae/u/1')?.state, 'completed', `${code}, look ${look}: the other session is read`);
+        assert.equal(warnings.length, 1, `${code}, look ${look}`);
+        for (const said of ["`ae/t/1`'s transcript cannot be read", code, claudeFile(bad)])
+          assert.ok(warnings[0].includes(said), `${code}, look ${look}: ${warnings[0]}`);
         assert.ok(reads.asked() > before, `${code}, look ${look}: the transcript is read again, its failure never kept`);
       }
     }
+    mono.ms += QUIESCENT_AFTER_MS;
+    const before = reads.asked();
+    const cold = await warned(ops.observeFor!(expected));
+    assert.equal(cold.value.seen.get('ae/t/1')?.state, 'failed', 'cold for the floor and still not read: failed');
+    assert.ok(cold.warnings[0]?.includes('ENOENT'), cold.warnings.join(' | '));
+    assert.ok(reads.asked() > before, 'read again all the same');
+
     reads.fails(undefined);
     const seen = await Effect.runPromise(ops.observe);
     assert.deepEqual(seen.get('ae/t/1')?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
@@ -1192,5 +1224,118 @@ test('at shipped defaults, a finished background session whose transcript cannot
     assert.notEqual(ended.ended, null, 'ended once read');
     assert.deepEqual(ended.closeout, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
     assert.equal(ended.stated, true);
+  });
+});
+
+/**
+ * An engine over a fake `claude` (`fakeClaude`) whose one harness, `bg`, is the `--bg` runner, reading every transcript as last written
+ * when it was, its wall and monotonic clocks `shift` ahead: a test steps it past the floor to make a session cold.
+ */
+const shiftedEngine = (claude: ReturnType<typeof fakeClaude>) => {
+  const clock = { shift: 0 };
+  const written = new Map<string, number>();
+  const ops = claudeOps({
+    root: tmp('root'),
+    sessionsDir: tmp('sessions'),
+    now: () => Date.now() + clock.shift,
+    mono: () => ({ boot: 'boot-1', ms: performance.now() + clock.shift }),
+    transcriptTime: async (sessionId) => written.get(sessionId),
+  });
+  const engine = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { bg: ops }, defaultHarness: 'bg' }));
+  const transcriptOf = (sessionId: string) => {
+    const now = new Date().toISOString();
+    writeClaude(sessionId, jsonl(claudeLines(sessionId).map((l) => ('timestamp' in l ? { ...l, timestamp: now } : l))));
+    written.set(sessionId, Date.now());
+  };
+  const verbs = () =>
+    fs
+      .readFileSync(path.join(claude.bin, 'calls.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as string[])
+      .filter((a) => a[0] === 'stop' || a[0] === 'rm');
+  return { clock, engine, transcriptOf, verbs };
+};
+
+/** Ticks `engine` until the task `id` has settled, failing after 20 s; answers its state. */
+const settledOf = async (engine: ReturnType<typeof builtEngine>, id: string) => {
+  const deadline = performance.now() + 20_000;
+  for (;;) {
+    const { state } = await Effect.runPromise(engine.view(id));
+    if (state.settled) return state;
+    assert.ok(performance.now() < deadline, `${id} never settled: ${JSON.stringify(state.attempts.at(-1))}`);
+    await Effect.runPromise(engine.tick());
+    await sleep(50);
+  }
+};
+
+/** How many names `report` says a harness left unread. */
+const unreadIn = (report: { observed: Record<string, { unread: number }> }) =>
+  Object.values(report.observed).reduce((n, o) => n + o.unread, 0);
+
+test('REFUSED: a background session whose transcript cannot be read stays in flight and unread while its sibling ends stated; cold, it settles failed, its session stopped and removed, and is forgotten', async (t: TestContext) => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const { clock, engine, transcriptOf, verbs } = shiftedEngine(claude);
+    const file = () => Effect.runPromise(engine.file({ brief: 'Write the word.', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } }));
+    const [bad, good] = [await file(), await file()];
+    await Effect.runPromise(engine.tick());
+    const row = (id: string) => claude.rows().find((r) => r.name === `ae/${id}/1`)!;
+    for (const id of [bad, good]) transcriptOf(row(id).sessionId);
+    const short = row(bad).sessionId.split('-')[0];
+    const reads = failingReads(t, claudeFile(row(bad).sessionId));
+    reads.fails('EACCES');
+    claude.set(row(bad).name, { pid: 999999 });
+    claude.set(row(good).name, { state: 'done' });
+
+    const report = await Effect.runPromise(engine.tick());
+    assert.ok(unreadIn(report) >= 1, JSON.stringify(report.observed));
+    const ended = (await Effect.runPromise(engine.view(good))).state.attempts[0];
+    assert.equal(ended.stated, true, 'the sibling is read on the same pass and ends stated');
+    for (const pass of [1, 2]) {
+      await Effect.runPromise(engine.tick());
+      assert.equal((await Effect.runPromise(engine.view(bad))).state.attempts[0].ended, null, `pass ${pass}: in flight while unread`);
+    }
+
+    clock.shift += QUIESCENT_AFTER_MS;
+    const state = await settledOf(engine, bad);
+    assert.equal(state.settled, 'failed');
+    assert.deepEqual(
+      verbs().filter((v) => v[1] === short),
+      [
+        ['stop', short],
+        ['rm', short],
+      ],
+      'its held process stopped, and the session removed',
+    );
+    assert.equal(
+      claude.rows().some((r) => r.sessionId.startsWith(short)),
+      false,
+      'no longer listed',
+    );
+    assert.equal((await Effect.runPromise(engine.forget([bad], { yes: true }))).forgotten, true);
+  });
+});
+
+test('REFUSED: a stop asked while a background session is unread settles its task once the session reads as ended, and it is forgotten', async (t: TestContext) => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const { clock, engine, transcriptOf } = shiftedEngine(claude);
+    const id = await Effect.runPromise(engine.file({ brief: 'Write the word.', cwd: tmp('cwd') }));
+    await Effect.runPromise(engine.tick());
+    const [row] = claude.rows();
+    transcriptOf(row.sessionId);
+    failingReads(t, claudeFile(row.sessionId)).fails('EIO');
+
+    assert.ok(unreadIn(await Effect.runPromise(engine.tick())) >= 1, 'unread');
+    await Effect.runPromise(engine.stop(id));
+    for (const pass of [1, 2]) {
+      await Effect.runPromise(engine.tick());
+      assert.equal((await Effect.runPromise(engine.view(id))).state.settled, null, `pass ${pass}: unsettled while it is unread`);
+    }
+
+    clock.shift += QUIESCENT_AFTER_MS;
+    assert.ok((await settledOf(engine, id)).settled, 'settled');
+    assert.equal((await Effect.runPromise(engine.forget([id], { yes: true }))).forgotten, true);
   });
 });

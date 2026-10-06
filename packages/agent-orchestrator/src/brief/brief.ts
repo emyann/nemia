@@ -3,7 +3,7 @@
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
 import type { Workflow } from '../step/step.ts';
-import { fenced, placeOf, type Run } from '../record/record.ts';
+import { fenced, isGitRun, placeOf, type GitRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import { handedSection, type ParentCloseout } from './handed.ts';
@@ -29,6 +29,13 @@ import { FENCE_KEYS } from '../workflow/index.ts';
 import { inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
+import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
+
+/**
+ * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
+ * place's own commands (`say`). A folder run's place gives none; a git run's absent `say` sends the step to its place's skill.
+ */
+export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSay };
 
 /**
  * What a step's closeout says of `replies` (`closeoutContract`): owed on a round filed, none on a merge filed — told by the round itself,
@@ -120,8 +127,9 @@ const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly 
  *   nothing is said of them.
  * @param costs For a step whose `reads:` names `costs`: what recent finished runs of its workflow in its factory cost (`costsRead`), read
  *   by file.verb.ts and said among what the step is handed (`costsSection`). Absent, and nothing is said of costs.
- * @param landing For an ending that lands on its check: how its place stages the merge and what it denies (`landingWords`), said in its
- *   contract. Absent, and the contract sends it to its place's skill.
+ * @param place What the run's place says (`BriefPlace`): for an ending that lands on its check, how it stages the merge and what it
+ *   denies (`landingWords`), said in its contract; and the commands a step reads its work and merges its base with. Absent, and the
+ *   contract and the brief send the step to its place's skill.
  * @param merge For a step that waits on several, as its place merged them (`make`): the paths the merge left conflicted, and the place's
  *   sentence of how to see them (`say.conflicts`). Conflicts are named under what is in the workspace; none, and nothing is said of them.
  */
@@ -139,18 +147,18 @@ export function composeBrief(
   checked?: readonly CheckHanded[],
   folders?: FiledFolders,
   costs?: WorkflowCosts,
-  landing?: LandingWords,
+  place: BriefPlace = {},
   merge?: { readonly conflicts: readonly string[]; readonly say: string },
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
-    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, landing) : checkContract(step.check)] : []),
+    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, place.words) : checkContract(step.check)] : []),
     ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
     closeoutContract(step, repliesOf(step, run, steps, round), inFolder),
   ].join('\n');
-  const again = againSection(step, run, steps, closeoutOf, inFolder, retry, round);
+  const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
-  const given = givenSections(step, run, steps, closeoutOf, checked) + again;
+  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again;
   const tree = depsLines(deps);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs);
 
@@ -206,41 +214,12 @@ export function composeBrief(
     if (inHere.length || given.from.length) {
       parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
     }
-  } else if (step.workspace === 'main') {
-    const results = resultSteps(steps)
-      .map((s) => run.steps[s.name]?.branch)
-      .filter((b): b is string => Boolean(b));
-    parts.push(`You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`);
-    if (results.length) {
-      parts.push(
-        `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : "The run's work is"} on ${results.join(' and ')}, cut from \`${run.baseRef}\`:`,
-        '',
-        '```',
-        ...results.flatMap((b) => [`git log --oneline ${run.branch}..${b}`, `git diff ${run.branch}...${b}`]),
-        '```',
-        '',
-      );
-    } else {
-      parts.push(
-        `This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`,
-        '',
-      );
-    }
-    for (const check of step.check ? [] : workChecks(steps))
-      parts.push(`This workflow's check, which its work was judged by: \`${check}\``, '');
-    parts.push(
-      'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
-      'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
-    );
-  } else if (earlier.length) {
+  } else if (step.workspace === 'main' && isGitRun(run)) {
+    parts.push(...endingLook(step, run, steps, earlier, place.say));
+  } else if (earlier.length && isGitRun(run)) {
     parts.push(
       `This workspace has already been worked in by: ${earlier.join(', ')}.`,
-      `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed:`,
-      '',
-      '```',
-      `git diff ${run.baseRef}`,
-      `git status`,
-      '```',
+      ...laterLook(run, place.say),
       '',
       'Judge what is there. You have not been given their reasoning, on purpose — read the change,',
       'not an account of it.',
@@ -250,6 +229,55 @@ export function composeBrief(
 
   parts.push(...(given ? [given] : []), contracts);
   return parts.join('\n');
+}
+
+/**
+ * How a step after others reads what they changed against the run's base: the place's own commands (`say.look`), or, with none, where
+ * its place's skill says them.
+ */
+function laterLook(run: GitRun, say: PlaceSay | undefined): string[] {
+  const lead = `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed`;
+  if (!say) return [`${lead}, ${skillSaid('read')}.`];
+  return [`${lead}:`, '', '```', ...say.look.map((line) => sayFilled(line, { baseRef: run.baseRef })), '```'];
+}
+
+/**
+ * Where a step in the repository's own checkout looks (`workspace: main`): that it is there, the run's result branches and how to read
+ * each against the base — in the place's words (`say.results`), or where its place's skill says them — or that the run cut none; the
+ * workflow's checks, unless it has its own; and that the checkout is the person's.
+ */
+function endingLook(
+  step: Workflow,
+  run: GitRun,
+  steps: readonly Workflow[],
+  earlier: readonly string[],
+  say: PlaceSay | undefined,
+): string[] {
+  const results = resultSteps(steps)
+    .map((s) => run.steps[s.name]?.branch)
+    .filter((b): b is string => Boolean(b));
+  const lead = `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : "The run's work is"} on ${results.join(' and ')}, cut from \`${run.baseRef}\``;
+  const read = say
+    ? [
+        `${lead}:`,
+        '',
+        '```',
+        ...results.flatMap((branch) => say.results.map((line) => sayFilled(line, { base: run.branch, branch }))),
+        '```',
+      ]
+    : [`${lead}. Read each against \`${run.branch}\` ${skillSaid('read')}.`];
+  return [
+    `You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`,
+    ...(results.length
+      ? [...read, '']
+      : [
+          `This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`,
+          '',
+        ]),
+    ...(step.check ? [] : workChecks(steps)).flatMap((check) => [`This workflow's check, which its work was judged by: \`${check}\``, '']),
+    'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
+    'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
+  ];
 }
 
 /**
@@ -279,11 +307,12 @@ function againSection(
   steps: readonly Workflow[],
   closeoutOf: (step: string) => Closeout | undefined,
   inFolder: boolean,
+  say: PlaceSay | undefined,
   retry?: RetryBriefing,
   round?: RoundBriefing,
 ): string {
   if (retry) return retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf);
-  if (round?.merge) return mergeSection(step, round.merge, round.loop, steps);
+  if (round?.merge) return mergeSection(step, round.merge, round.loop, steps, say);
   return round ? roundSection(step, round, steps, closeoutOf, inFolder) : '';
 }
 
@@ -297,13 +326,14 @@ function givenSections(
   steps: readonly Workflow[],
   closeoutOf: (step: string) => Closeout | undefined,
   checked: readonly CheckHanded[] = [],
+  say?: PlaceSay,
 ): string {
   return (
     (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
     checked.map((c) => checkHandedSection(c)).join('') +
     (step.loop
       ? merged(run.steps[step.name])
-        ? mergeReviewSection(step, run, closeoutOf)
+        ? mergeReviewSection(step, run, closeoutOf, say)
         : loopSection(step, run, steps, closeoutOf)
       : '')
   );

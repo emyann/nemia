@@ -1,5 +1,5 @@
 import type { StatsDay, StatsMark } from '../lib/api';
-import { seriesOf, type HeadlineNumber } from '../lib/stats';
+import { columnDrawn, seriesOf, type HeadlineNumber } from '../lib/stats';
 
 /** A day's column across, and the chart's height, in the drawing's own units: it is stretched to the width it is given. */
 const COLUMN = 10;
@@ -105,15 +105,22 @@ function DayColumn({
   changed: readonly StatsMark[] | undefined;
 }) {
   const x = at * COLUMN;
-  const height = value === null ? 0 : (value / scale) * HEIGHT;
+  const drawn = columnDrawn(value, scale);
   return (
     <g data-day={day} data-value={JSON.stringify(value)}>
       <title>{`${day}: ${number.words(value)}${changed ? ` — changed: ${changedWords(changed)}` : ''}`}</title>
       <rect x={x} y={0} width={COLUMN} height={HEIGHT} className="fill-transparent hover:fill-neutral-500/10" />
-      {value !== null && value > 0 && (
-        <rect data-bar x={x + 1} y={HEIGHT - height} width={COLUMN - 2} height={height} className="fill-sky-600 dark:fill-sky-400" />
+      {drawn.kind === 'bar' && (
+        <rect
+          data-bar
+          x={x + 1}
+          y={HEIGHT - drawn.share * HEIGHT}
+          width={COLUMN - 2}
+          height={drawn.share * HEIGHT}
+          className="fill-sky-600 dark:fill-sky-400"
+        />
       )}
-      {value === 0 && (
+      {drawn.kind === 'zero' && (
         <rect data-zero x={x + 1} y={HEIGHT - ZERO} width={COLUMN - 2} height={ZERO} className="fill-sky-600 dark:fill-sky-400" />
       )}
       {changed && (

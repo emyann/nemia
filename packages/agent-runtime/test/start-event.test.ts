@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Logger } from 'effect';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessSpec, type StartEvent } from '../src/harness/detached/detached.ts';
@@ -20,6 +20,7 @@ import { CODEX_START, codexOutput } from '../src/harness/codex/stream.ts';
 import { CLAUDE_INIT_START, CLAUDE_RESULT_START, claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
 import { resultLine, SESSION, stream } from './reader-streams.ts';
 
@@ -63,16 +64,6 @@ const ran = async (spec: HarnessSpec, name = 'ae/t/1', root = scratch('ae-start-
     await new Promise((r) => setTimeout(r, 100));
   }
   assert.fail(`${name} never ended: ${JSON.stringify(runFile(root, name))}`);
-};
-
-/** Runs `look`, keeping every line logged as a warning. */
-const warned = async <A>(look: Effect.Effect<A, unknown>): Promise<{ value: A; warnings: string[] }> => {
-  const warnings: string[] = [];
-  const keeper = Logger.make(({ message, logLevel }) => {
-    if (logLevel === 'Warn') warnings.push((Array.isArray(message) ? message : [message]).join(' '));
-  });
-  const value = await Effect.runPromise(look.pipe(Effect.provide(Logger.layer([keeper]))));
-  return { value, warnings };
 };
 
 const threadStarted = (thread_id: unknown) => JSON.stringify({ type: 'thread.started', thread_id });

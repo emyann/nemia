@@ -141,6 +141,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   failed install is ended by a signal: only the attempt's exit code is a verdict (`attemptVerdict`), never what it printed.
 - **A test that spawns a `wf` child waits on it with `nodeChild`** (`test/child.ts`): for what it says or writes, or its exit, which fails
   the wait at once with its output — never under a deadline, which the CLI's import alone can pass on a loaded machine.
+- **A test waits in its process with `until` (`test/waits.ts`)**, asked on a `bell` its event's source rings or at a pace for a state,
+  its test given `WAITED`: the runner's timeout is its one bound. `DEADLINES` (`test/waits.test.ts`) refuses a hand-written deadline.
 - **`execFileSync` with no `stdio` copies the child's stderr onto yours**: pass `stdio: ['ignore', 'pipe', 'pipe']`.
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every write follows it**: refuse a link by name where a folder's files are
   its own (`writeWorkflow`).

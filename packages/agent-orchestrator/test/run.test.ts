@@ -134,6 +134,7 @@ import {
   type TaskPhase,
 } from '../src/run.ts';
 import type { Held } from '../src/place/place.ts';
+import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
 import {
   CLOSEOUT_SCHEMA,
   closeoutSchemaOf,
@@ -389,8 +390,20 @@ test('a step is told its own prose and the original request', () => {
   assert.match(brief, /add a flag/, 'the spec travels to every step');
 });
 
+/** `step`'s brief in `r`, told the package's place's words for reading the work (`say`). */
+const placed = (s: Workflow, r: Run, steps: readonly Workflow[]): string =>
+  composeBrief(
+    s,
+    r,
+    steps,
+    ...([undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const),
+    {
+      say: readPlaceJson(SHIPPED_PLACE).say,
+    },
+  );
+
 test('a later step is pointed at the workspace and the base ref, not at a transcript', () => {
-  const brief = composeBrief(step('review', ['implement']), run({ implement: 't1', review: null }), STEPS);
+  const brief = placed(step('review', ['implement']), run({ implement: 't1', review: null }), STEPS);
   assert.match(brief, /git diff abc123/, 'it is told how to see what changed');
   assert.match(brief, /implement/, 'and who was here before it');
   assert.match(brief, /not an account of it/, 'and that it is judging the change, not a claim');
@@ -505,7 +518,7 @@ test("an ending step is told where the work is — the branches, not the workspa
       },
     },
   );
-  const brief = composeBrief(ending, r, dev);
+  const brief = placed(ending, r, dev);
   assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
   assert.match(brief, /The work of review is not in this directory: it is on wf\/r-1\/implement, cut from `abc123`:/);
   assert.match(brief, /git log --oneline main\.\.wf\/r-1\/implement/);

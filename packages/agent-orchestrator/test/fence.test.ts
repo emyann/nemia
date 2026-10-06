@@ -14,6 +14,7 @@ import { directoryFence } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
+import { until, WAITED } from './waits.ts';
 
 const ROOT = scratch('wf-fence-');
 process.env.WF_ROOT = ROOT;
@@ -316,50 +317,58 @@ test("REFUSED: a fence held to the directory where an agent's every allow reache
   }
 });
 
-test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
-  const { parseAgent } = await import('../src/workflow.ts');
-  const { renderedFlags } = await import('../src/agents/agents.ts');
-  const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
-  const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
-  const claude = renderedFlags(step, '/runs/r/agents/write');
-  assert.deepEqual(
-    Object.keys(claude ?? {}).sort(),
-    ['appendSystemPromptFile', 'pluginDir', 'settings'],
-    'what the tick files for an agent with instructions, skills and harnessPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
-  );
-  const dir = scratch('wf-fence-auto-');
-  fs.writeFileSync(
-    path.join(dir, 'claude'),
-    [
-      '#!/bin/sh',
-      'case "$1" in',
-      '  agents) echo "[]" ;;',
-      `  *) printf '%s\\n' "$@" > '${path.join(dir, 'args')}'; exit 1 ;;`,
-      'esac',
-      '',
-    ].join('\n'),
-    { mode: 0o755 },
-  );
-  const prev = process.env.PATH;
-  process.env.PATH = `${dir}:${prev}`;
-  try {
-    const e = plainEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
-    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } }));
-    const until = Date.now() + 20_000;
-    while (!(await Effect.runPromise(e.view(id))).state.settled) {
-      assert.ok(Date.now() < until, 'settled');
-      await Effect.runPromise(e.tick());
-      await new Promise((r) => setTimeout(r, 50));
+test(
+  "a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them",
+  WAITED,
+  async (t) => {
+    const { parseAgent } = await import('../src/workflow.ts');
+    const { renderedFlags } = await import('../src/agents/agents.ts');
+    const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
+    const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
+    const claude = renderedFlags(step, '/runs/r/agents/write');
+    assert.deepEqual(
+      Object.keys(claude ?? {}).sort(),
+      ['appendSystemPromptFile', 'pluginDir', 'settings'],
+      'what the tick files for an agent with instructions, skills and harnessPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
+    );
+    const dir = scratch('wf-fence-auto-');
+    fs.writeFileSync(
+      path.join(dir, 'claude'),
+      [
+        '#!/bin/sh',
+        'case "$1" in',
+        '  agents) echo "[]" ;;',
+        `  *) printf '%s\\n' "$@" > '${path.join(dir, 'args')}'; exit 1 ;;`,
+        'esac',
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const prev = process.env.PATH;
+    process.env.PATH = `${dir}:${prev}`;
+    try {
+      const e = plainEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
+      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } }));
+      await until(
+        t,
+        async () => {
+          if ((await Effect.runPromise(e.view(id))).state.settled) return true;
+          await Effect.runPromise(e.tick());
+          return false;
+        },
+        'the fake Claude Code task settled',
+        { everyMs: 50 },
+      );
+    } finally {
+      process.env.PATH = prev;
     }
-  } finally {
-    process.env.PATH = prev;
-  }
-  const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
-  assert.equal(args[args.indexOf('--permission-mode') + 1], fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
-  assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
-  assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
-  assert.equal(
-    args[args.indexOf('--settings') + 1],
-    '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"}}',
-  );
-});
+    const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
+    assert.equal(args[args.indexOf('--permission-mode') + 1], fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
+    assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
+    assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
+    assert.equal(
+      args[args.indexOf('--settings') + 1],
+      '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"}}',
+    );
+  },
+);

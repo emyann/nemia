@@ -18,6 +18,8 @@ import {
   type Landed,
   type Made,
   missingVerbsRefusal,
+  unknownHoleRefusal,
+  unknownHoles,
   type Opened,
   type PlaceAnswers,
   type PlaceDeclared,
@@ -33,7 +35,7 @@ import {
   type Unread,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { skillVersion } from '../folder/folder.store.ts';
+import { PLACE_SKILLS, skillVersion } from '../folder/folder.store.ts';
 import type { GitRun } from '../record/record.ts';
 
 const Strings = Schema.Array(Schema.String);
@@ -174,6 +176,11 @@ const PlaceDeclaredSchema = Schema.Struct({
     commit: Schema.String,
     inspect: Schema.String,
     orphans: Schema.String,
+    results: Strings,
+    merge: Schema.String,
+    mergeUncommitted: Schema.String,
+    showMerge: Schema.String,
+    lastMerge: Schema.String,
   }),
 }) satisfies Schema.Schema<PlaceDeclared>;
 
@@ -372,7 +379,7 @@ export function runPlaceVerb<V extends PlaceVerb>(
 /**
  * The place skill in `skillDir` as its `place.json` declares it, decoded strictly. Refuses (`Invalid`, naming the file and the fix) a
  * file that is not there or not JSON, one whose first wrong field does not read as contract `v` 1 — an unknown verb, a `say` key missing —
- * and a declared verb with no script in `scripts/`.
+ * a declared verb with no script in `scripts/`, and a `say` template naming a hole the code does not fill for its key (`unknownHoles`).
  */
 export function readPlaceJson(skillDir: string): PlaceDeclared {
   const file = path.join(skillDir, 'place.json');
@@ -392,14 +399,16 @@ export function readPlaceJson(skillDir: string): PlaceDeclared {
     throw new Invalid({
       message: `${file} declares ${scriptless.join(', ')}, and scripts/ has no ${scriptless.map((v) => `${v}.ts`).join(', ')}: add the script, or take the verb off \`verbs\``,
     });
+  const [unknown] = unknownHoles(decoded.success.say);
+  if (unknown) throw new Invalid({ message: unknownHoleRefusal(file, unknown.key, unknown.hole) });
   return decoded.success;
 }
 
-/** The git place the package ships, run where a record names no place skill of its own. */
-export const SHIPPED_PLACE = path.join(import.meta.dirname, '..', '..', 'place', 'git');
-
 /** The name a record gives the package's place (`placeSkill.skill`): the one `place: git` resolves to. */
 export const SHIPPED_PLACE_SKILL = 'git';
+
+/** The git place the package ships, run where a record names no place skill of its own. */
+export const SHIPPED_PLACE = path.join(PLACE_SKILLS, SHIPPED_PLACE_SKILL);
 
 /**
  * The directory a git run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one that

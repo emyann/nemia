@@ -234,9 +234,9 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
 
-  const read = (look: RunnerOps['observe']) =>
+  const read = <A, E>(look: Effect.Effect<A, E>) =>
     look.pipe(
-      Effect.map((m): Map<string, Sighting> | undefined => m),
+      Effect.map((m): A | undefined => m),
       Effect.catchCause(() => Effect.succeed(undefined)),
     );
   const seen = (look: RunnerOps['observe']) => read(look).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
@@ -256,10 +256,10 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * its config saying so, and a job whose run file is not there is looked for in the registry too — once its grace is
      * past, the pass reads it lost either way. A job read that failed, or left a name unread, asks the registry.
      *
-     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its
-     * run file there and unreadable, or the registry once asked. A job's name the registry was asked for and does not list,
-     * with its run file not there, is absent. The registry is told what it is told (`observeFor`), so a long-lived attempt's
-     * usage is counted from when the journal says it began.
+     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its run file
+     * there and unreadable, or the registry once asked, or it left the name unread: listed, its transcript unreadable. A job's name the
+     * registry was asked for and does not list, with its run file not there, is absent. The registry is told what it is told
+     * (`observeFor`), so a long-lived attempt's usage is counted from when the journal says it began.
      */
     observeFor: (expected) =>
       job.observeFor!(expected).pipe(
@@ -267,12 +267,12 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
         Effect.catchCause(() => Effect.succeed(undefined)),
         Effect.flatMap((jobs) =>
           !jobs || expected.some((e) => !jobs.seen.has(e.name))
-            ? read(bg.observeFor!(expected).pipe(Effect.map((o) => o.seen))).pipe(Effect.map((sessions) => ({ jobs, sessions })))
-            : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() }),
+            ? read(bg.observeFor!(expected)).pipe(Effect.map((sessions) => ({ jobs, sessions })))
+            : Effect.succeed({ jobs, sessions: { seen: new Map<string, Sighting>(), unread: new Set<string>() } }),
         ),
         Effect.map(({ jobs, sessions }): Observation => {
-          const seen = new Map([...(jobs?.seen ?? []), ...(sessions ?? [])]);
-          const unread = (name: string) => !seen.has(name) && (!jobs || !sessions || jobs.unread.has(name));
+          const seen = new Map([...(jobs?.seen ?? []), ...(sessions?.seen ?? [])]);
+          const unread = (name: string) => !seen.has(name) && (!jobs || !sessions || jobs.unread.has(name) || sessions.unread.has(name));
           return { seen, unread: new Set(expected.map((e) => e.name).filter(unread)) };
         }),
       ),

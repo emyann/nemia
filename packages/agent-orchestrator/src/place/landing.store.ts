@@ -10,6 +10,7 @@ import type { MergeState } from '../ending/ending.ts';
 import type { LandingWords } from '../check/check.ts';
 import { resultTips } from '../branches/branches.store.ts';
 import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import type { PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import { placeDirOf, readPlaceJson, runPlaceVerb } from './place.store.ts';
@@ -131,4 +132,12 @@ export function landingWords(run: Run, step: Workflow, placeDir?: string): Landi
   const declared = readPlaceJson(placeDir ?? placeDirOf(run));
   const branches = Object.keys(resultTips(run)).join(' ') || '<result branch>';
   return { stage: declared.say.stage.replaceAll('{repo}', run.repo).replaceAll('{branches}', branches), denied: declared.denyWhileLanding };
+}
+
+/**
+ * The commands `run`'s place gives its steps' briefs (`say` in its `place.json`): none for a folder run, whose place is not read.
+ * Refuses as `landingDenies` does.
+ */
+export function placeSay(run: Run, placeDir?: string): PlaceSay | undefined {
+  return isGitRun(run) ? readPlaceJson(placeDir ?? placeDirOf(run)).say : undefined;
 }

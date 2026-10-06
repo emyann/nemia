@@ -5,7 +5,9 @@
 import { Layer } from 'effect';
 import type { Event } from '../core/index.ts';
 import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
-import { Admission, type IoCounts, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
+import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
+
+export type { ObserveCount } from '../core/engine/index.ts';
 import { claudeOps, claudeCodeOps } from '../harness/claude/index.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
@@ -169,19 +171,9 @@ export type TickReport = {
 };
 
 /**
- * One harness's observes, counted: how many were made, their wall time in ms, the sessions or run files they listed, and the processes
- * started while they ran (`claude agents` for Claude Code's background sessions; none for a directory of run files). The harnesses of a
- * pass observe at once, so their `ms` can add up to more than the pass's, and a process another harness started in the same moment is
- * counted in both. `unread` is how many of the observes could not read all they were to: one that failed, or one that left an
- * expected name unread (`Observation`) — a harness that keeps failing shows there, where the pass waits on it rather than reading its
- * sessions gone.
- */
-export type ObserveCount = { calls: number; ms: number; listed: number; spawned: number; unread: number };
-
-/**
- * What this engine's reads and spawns have cost since the process started, as running totals: the runtime's own reads and spawns
- * (`IoCounts`, per process), and each harness's observes, whichever call made them — a pass, a `view`, a `transcript` (per engine). A
- * caller that wants one call's cost takes the difference before and after it.
+ * What this engine's reads and spawns have cost, as running totals: the runtime's own reads and spawns (`IoCounts`, per process), and
+ * each harness's observes, whichever call made them — a pass, a `view`, a `transcript` (per engine). Read inside `Engine.tallied`, the
+ * same totals of that program's own work alone. A caller that wants one call's cost takes the difference before and after it.
  */
 export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
 

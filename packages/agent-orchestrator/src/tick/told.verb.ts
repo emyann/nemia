@@ -1,6 +1,6 @@
 /**
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, the harness's own arguments it is filed with (`ownOf`), and
- * what its place says of its landing (`landingTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
+ * what its place says to it (`placeTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
  * the run's folder finds them, and the run's place.
  */
 import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
@@ -12,7 +12,9 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
-import { landingWords } from '../place/landing.store.ts';
+import { landingWords, placeSay } from '../place/landing.store.ts';
+import type { PlaceSay } from '../place/place.ts';
+import { composeBrief } from '../brief/index.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
@@ -48,21 +50,35 @@ export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: Clau
   };
 };
 
-/** What a step's place says of its landing (`landingTold`): its words, undefined for a step that does not land on its check. */
-export type Landing = { readonly words: LandingWords | undefined };
+/**
+ * What a step's place says to it (`placeTold`): how it lands, undefined for a step that does not land on its check (`words`), and its
+ * commands (`say`), undefined for a folder run's step.
+ */
+export type PlaceTold = { readonly words: LandingWords | undefined; readonly say: PlaceSay | undefined };
 
-/** A step as a try files it (`toldOf`), with what its place says of its landing (`Landing`). */
-export type Told = ReturnType<typeof toldOf> & Landing;
+/** A step as a try files it (`toldOf`), with what its place says to it (`PlaceTold`). */
+export type Told = ReturnType<typeof toldOf> & PlaceTold;
 
 /**
- * What `step` of `run` is told and denied by its place (`landingWords`); or undefined, with a note for `step` on `notes` saying why its
- * place gives none (`placeDirOf` or `readPlaceJson` refusing): the step is then not filed, and the pass goes on.
+ * What `step` of `run` is told and denied by its place (`landingWords`, `placeSay`), read from `placeDir` or the run's own place
+ * (`placeDirOf`); or undefined, with a note for `step` on `notes` saying why its place gives none (`placeDirOf` or `readPlaceJson`
+ * refusing): the step is then not filed, and the pass goes on.
  */
-export function landingTold(run: Run, step: Workflow, notes: string[]): Landing | undefined {
+export function placeTold(run: Run, step: Workflow, notes: string[], placeDir?: string): PlaceTold | undefined {
   try {
-    return { words: landingWords(run, step) };
+    return { words: landingWords(run, step, placeDir), say: placeSay(run, placeDir) };
   } catch (err) {
-    notes.push(`${step.name}: not filed, for its place gives it no landing words: ${(err as Error).message}`);
+    notes.push(`${step.name}: not filed, for its place gives it no words: ${(err as Error).message}`);
     return undefined;
   }
+}
+
+/**
+ * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):
+ * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
+ */
+export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[]): string {
+  const told = placeTold(run, step, []) ?? {};
+  const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
+  return composeBrief(step, run, steps, ...none, told);
 }

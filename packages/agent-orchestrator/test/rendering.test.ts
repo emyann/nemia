@@ -12,7 +12,16 @@ import path from 'node:path';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
 import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
 import { autoDropped, modeOf, parseAgent, parseWorkflow, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
-import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/folder/folder.store.ts';
+import {
+  PLACE_SKILLS,
+  agentsFor,
+  agentVersion,
+  isShippedPlace,
+  loadWorkflows,
+  lookupRoots,
+  skillsFor,
+} from '../src/folder/folder.store.ts';
+import { SHIPPED_PLACE } from '../src/place/place.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
@@ -337,6 +346,20 @@ test("a name is looked for in the workflow's own root, then the repository's .cl
   );
 });
 
+test("the package's place skill is found after every place, where none has its name: a place's own `git` comes first", () => {
+  const home = tree({});
+  const repo = tree({});
+  const dir = team('---\nskills: git\n---\nYou build.\n', {});
+  const found = skillsFor(dir, { repo, home });
+  assert.equal(found.at.get('git'), SHIPPED_PLACE);
+  assert.equal(found.looked.at(-1), PLACE_SKILLS);
+  assert.ok(isShippedPlace(SHIPPED_PLACE));
+  const own = team('---\nskills: git\n---\nYou build.\n', { 'workflows/skills/git/SKILL.md': SKILL('git') });
+  const ownGit = path.join(path.dirname(own), 'skills', 'git');
+  assert.equal(skillsFor(own, { repo, home }).at.get('git'), ownGit);
+  assert.equal(isShippedPlace(ownGit), false);
+});
+
 /**
  * A project subagent as Claude Code's /agents wizard writes one: its name, a description with an example, its tools, its model, its
  * colour.
@@ -613,9 +636,13 @@ test('a rendered step whose folder is gone is filed as before 2026-09-25 — the
     /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
     "with no plugin there is nothing to load, so each skill is told whole, read again where a start of the run's folder finds it: the store's",
   );
+  assert.ok(
+    write.brief.includes(`/workflows/skills, ${PLACE_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`),
+    write.brief,
+  );
   assert.match(
     write.brief,
-    /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills\. Sign off blocked if you need it\.\n\n## What was asked for/,
+    /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills, [^\n]*\. Sign off blocked if you need it\.\n\n## What was asked for/,
     'a folder run keeps no repository, so the skill the start found in the one it was typed in is said not to be told, and where it was looked for',
   );
 });

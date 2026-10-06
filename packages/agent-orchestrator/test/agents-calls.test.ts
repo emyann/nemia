@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
 
 const ROOT = scratch('wf-agents-calls-');
@@ -97,17 +98,19 @@ const pass = () => runWith(e, tickRun({ repo: ROOT, memo }));
 /** The task a run's one step is filed as. */
 const taskOf = (runId: string) => readRun(runId).steps.work.taskId!;
 
-/** Passes until the run's step is at work, as its harness lists it. */
-const atWork = async (runId: string) => {
-  const deadline = Date.now() + 20_000;
-  for (;;) {
-    await pass();
-    const taskId = readRun(runId).steps.work?.taskId;
-    if (taskId && (await Effect.runPromise(e.view(taskId))).phase === 'running (working)') return taskId;
-    if (Date.now() > deadline) assert.fail(`${runId}'s step never came to work`);
-    await new Promise((r) => setTimeout(r, 50));
-  }
-};
+/** Passes in test `t`, every 50ms, until the run's step is at work, as its harness lists it; answers its task. */
+const atWork = (t: Waiter, runId: string) =>
+  until(
+    t,
+    async () => {
+      await pass();
+      const taskId = readRun(runId).steps.work?.taskId;
+      if (!taskId) return undefined;
+      return (await Effect.runPromise(e.view(taskId))).phase === 'running (working)' && taskId;
+    },
+    `${runId}'s step at work`,
+    { everyMs: 50 },
+  );
 
 /** One pass, and the `claude agents` calls it made. */
 const counted = async () => {
@@ -122,33 +125,41 @@ let bgRun: Effect.Success<ReturnType<typeof startRun>>;
 /** What the pass judged of a run. */
 const advanced = (done: Awaited<ReturnType<typeof pass>>, runId: string) => done.runs.find((r) => r.run.id === runId);
 
-test('a pass with claude jobs in flight and no background session asks `claude agents` nothing, and advance still reads the step', async () => {
-  await atWork(jobRun.id);
-  const { calls, done } = await counted();
-  assert.equal(calls, 0, 'no `claude agents` for a pass whose claude sessions are all jobs');
-  assert.deepEqual(
-    [advanced(done, jobRun.id)?.status, advanced(done, jobRun.id)?.inFlight],
-    ['running', true],
-    'and the job run is in flight, its step read',
-  );
-  assert.equal(done.cost?.harnesses.claude?.calls, 1, 'claude observed once, its jobs off their run files');
-  assert.equal(done.cost?.harnesses.claude?.spawned, 0, 'the meter says the same: no process to observe claude');
-});
-
-test('a pass with one background session in flight asks `claude agents` once, beside a job — advance adds no observe of its own', async () => {
-  bgRun = await Effect.runPromise(startRun({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') }));
-  const bg = await atWork(bgRun.id);
-  const { calls, done } = await counted();
-  assert.equal(calls, 1, "one `claude agents` for the runtime's observe, and none for the step advance reads");
-  for (const run of [jobRun, bgRun])
+test(
+  'a pass with claude jobs in flight and no background session asks `claude agents` nothing, and advance still reads the step',
+  WAITED,
+  async (t) => {
+    await atWork(t, jobRun.id);
+    const { calls, done } = await counted();
+    assert.equal(calls, 0, 'no `claude agents` for a pass whose claude sessions are all jobs');
     assert.deepEqual(
-      [advanced(done, run.id)?.status, advanced(done, run.id)?.inFlight],
+      [advanced(done, jobRun.id)?.status, advanced(done, jobRun.id)?.inFlight],
       ['running', true],
-      'both runs in flight, each step read',
+      'and the job run is in flight, its step read',
     );
-  assert.equal(done.cost?.harnesses.claude?.spawned, 1);
-  assert.equal((await Effect.runPromise(e.view(bg))).phase, 'running (working)');
-});
+    assert.equal(done.cost?.harnesses.claude?.calls, 1, 'claude observed once, its jobs off their run files');
+    assert.equal(done.cost?.harnesses.claude?.spawned, 0, 'the meter says the same: no process to observe claude');
+  },
+);
+
+test(
+  'a pass with one background session in flight asks `claude agents` once, beside a job — advance adds no observe of its own',
+  WAITED,
+  async (t) => {
+    bgRun = await Effect.runPromise(startRun({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') }));
+    const bg = await atWork(t, bgRun.id);
+    const { calls, done } = await counted();
+    assert.equal(calls, 1, "one `claude agents` for the runtime's observe, and none for the step advance reads");
+    for (const run of [jobRun, bgRun])
+      assert.deepEqual(
+        [advanced(done, run.id)?.status, advanced(done, run.id)?.inFlight],
+        ['running', true],
+        'both runs in flight, each step read',
+      );
+    assert.equal(done.cost?.harnesses.claude?.spawned, 1);
+    assert.equal((await Effect.runPromise(e.view(bg))).phase, 'running (working)');
+  },
+);
 
 test('a background session left running across a restart is observed on the first pass of a fresh engine, and read at work', async () => {
   const bg = taskOf(bgRun.id);
@@ -161,13 +172,17 @@ test('a background session left running across a restart is observed on the firs
   assert.equal((await Effect.runPromise(e.view(taskOf(jobRun.id)))).phase, 'running (working)', 'and the job, off its run file');
 });
 
-test('the board drains', async () => {
+test('the board drains', WAITED, async (t) => {
   fake.end();
   for (const id of [taskOf(jobRun.id), taskOf(bgRun.id)]) await Effect.runPromise(e.stop(id));
-  const deadline = Date.now() + 20_000;
-  while ((await Effect.runPromise(e.list())).views.some((v) => !v.state.settled)) {
-    assert.ok(Date.now() < deadline, 'every task settles');
-    await Effect.runPromise(e.tick());
-    await new Promise((r) => setTimeout(r, 50));
-  }
+  await until(
+    t,
+    async () => {
+      if ((await Effect.runPromise(e.list())).views.every((v) => v.state.settled)) return true;
+      await Effect.runPromise(e.tick());
+      return false;
+    },
+    'every task settled',
+    { everyMs: 50 },
+  );
 });

@@ -17,6 +17,7 @@ import {
   LANDING_CHECK_DEADLINE_SECONDS,
   type CheckHanded,
   type LandingSaid,
+  type LandingWords,
   type Verdict,
 } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
@@ -67,8 +68,7 @@ import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
-import { landingDenies, landingWords } from '../place/landing.store.ts';
-import { toldOf } from './told.verb.ts';
+import { landingTold, toldOf, type Landing, type Told } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -185,6 +185,8 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
+  const landing = landingTold(run, step, notes);
+  if (!landing) return;
   const answers = answersHeld(f, r, step, record);
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
   if (closeRefused) {
@@ -193,7 +195,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   }
   const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
   const briefed = answers ? undefined : (yield* asked('view', f.e.view(taskId))).state.brief;
-  const refused = answers || !briefed ? yield* sendTry(f, r, step, taskId, answers) : undefined;
+  const refused = answers || !briefed ? yield* sendTry(f, r, step, taskId, answers, landing) : undefined;
   if (refused) {
     notes.push(`${r.step}: ${refused}`);
     return;
@@ -214,10 +216,10 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
 });
 
 /**
- * Send a try to the engine: filed as a task of its own, or given as the answer to the task held open (`answers`). Answers with the
- * engine's refusal of the answer, or undefined.
+ * Send a try to the engine, told what its place says of its landing (`words`): filed as a task of its own, or given as the answer to the
+ * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
  */
-const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean) {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: Landing) {
   const { e, run, reads } = f;
   const record = run.steps[r.step];
   const files = artifactsDir(run, r.step);
@@ -228,7 +230,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
-  const told = toldOf(run, step);
+  const told: Told = { ...toldOf(run, step), ...landing };
   const brief = remote
     ? remoteBrief(step, run, reads.steps, closeouts, {
         try: r.try,
@@ -252,7 +254,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        landingWords(run, told.step),
+        told.words,
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -316,7 +318,7 @@ const trySpec = (
   r: Retry,
   step: Workflow,
   record: StepRecord,
-  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: ReturnType<typeof toldOf> },
+  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: Told },
 ): Spec => ({
   id: t.taskId,
   brief: t.brief,
@@ -331,7 +333,7 @@ const trySpec = (
       runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
       inbox: inboxDir(),
       own: t.told.own,
-      landingDenied: () => landingDenies(f.run),
+      landingDenied: () => t.told.words?.denied ?? [],
     }),
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -359,6 +361,9 @@ export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: r
 const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: string[]) {
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
+  const target = stepNamed(f, r.target);
+  const landing = landingTold(run, target, notes);
+  if (!landing) return;
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
   const refused = yield* closeFirst(f, r.target, record.taskId);
@@ -369,8 +374,8 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   looped.push(r.step);
   notes.push(roundFiledNote(r, looping));
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
-    const target = stepNamed(f, r.target);
     const said = {
+      words: landing.words,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
@@ -401,7 +406,7 @@ function roundSpec(
   looping: Workflow,
   target: Workflow,
   taskId: string,
-  said: { landing?: LandingSaid; costs?: WorkflowCosts },
+  said: { words: LandingWords | undefined; landing?: LandingSaid; costs?: WorkflowCosts },
 ): Spec {
   const { run, reads } = f;
   const record = run.steps[r.target];
@@ -430,7 +435,7 @@ function roundSpec(
       undefined,
       filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       said.costs,
-      landingWords(run, told.step),
+      said.words,
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -446,7 +451,7 @@ function roundSpec(
           stepSpend(run, r.target, reads.spendOf),
         ),
         own: told.own,
-        landingDenied: () => landingDenies(run),
+        landingDenied: () => said.words?.denied ?? [],
       }),
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -524,6 +529,8 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
+    const landing = landingTold(run, step, f.notes);
+    if (!landing) continue;
     const place = yield* awaited(() => within('act', () => workspaceFor(run, f.reads.steps, step)));
     f.notes.push(...place.notes.map((note) => `${name}: ${note}`));
     if (!f.mayFile()) break;
@@ -535,6 +542,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       checked,
       closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
       costs: yield* costsFor(f, step, false),
+      words: landing.words,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
@@ -563,6 +571,7 @@ function readySpec(
     checked: readonly CheckHanded[];
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
+    words: LandingWords | undefined;
   },
 ): Spec {
   const { parents, closeoutOf } = said;
@@ -594,7 +603,7 @@ function readySpec(
           said.checked,
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
           said.costs,
-          landingWords(run, told.step),
+          said.words,
         ),
     cwd: place.workspace,
     harness: step.harness,
@@ -608,7 +617,7 @@ function readySpec(
         inbox: inboxDir(),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
-        landingDenied: () => landingDenies(run),
+        landingDenied: () => said.words?.denied ?? [],
       }),
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

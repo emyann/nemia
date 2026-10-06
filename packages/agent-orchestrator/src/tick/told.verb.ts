@@ -1,6 +1,7 @@
 /**
- * A step as the tick tells it (`toldOf`): the step its brief is composed for, and the harness's own arguments it is filed with
- * (`ownOf`). A controller: it reads the run's rendered agent folder and the skills where a start of the run's folder finds them.
+ * A step as the tick tells it (`toldOf`): the step its brief is composed for, the harness's own arguments it is filed with (`ownOf`), and
+ * what its place says of its landing (`landingTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
+ * the run's folder finds them, and the run's place.
  */
 import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
@@ -10,6 +11,8 @@ import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.t
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
+import type { LandingWords } from '../check/check.ts';
+import { landingWords } from '../place/landing.store.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
@@ -44,3 +47,22 @@ export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: Clau
     ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
   };
 };
+
+/** What a step's place says of its landing (`landingTold`): its words, undefined for a step that does not land on its check. */
+export type Landing = { readonly words: LandingWords | undefined };
+
+/** A step as a try files it (`toldOf`), with what its place says of its landing (`Landing`). */
+export type Told = ReturnType<typeof toldOf> & Landing;
+
+/**
+ * What `step` of `run` is told and denied by its place (`landingWords`); or undefined, with a note for `step` on `notes` saying why its
+ * place gives none (`placeDirOf` or `readPlaceJson` refusing): the step is then not filed, and the pass goes on.
+ */
+export function landingTold(run: Run, step: Workflow, notes: string[]): Landing | undefined {
+  try {
+    return { words: landingWords(run, step) };
+  } catch (err) {
+    notes.push(`${step.name}: not filed, for its place gives it no landing words: ${(err as Error).message}`);
+    return undefined;
+  }
+}

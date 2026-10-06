@@ -2883,3 +2883,24 @@ test('REFUSED: a staged merge its place gives no reading of holds the checkout â
   assert.deepEqual(held, { run: staging.id, step: 'ship' }, 'held by the run whose merge nobody can read');
   assert.equal(mergeHead(repo), true);
 });
+
+test('REFUSED: an ending whose place this nemia does not ship is not filed once approved, said in its own note, and the run beside it files its own', async () => {
+  const odd = await atTheGate();
+  const other = await atTheGate();
+  rewritten(odd.id, (record) => {
+    record.placeSkill = { skill: 'svn', version: '1' };
+  });
+  await runWith(odd.e, approveRun(odd.id, 'ship'));
+  await runWith(other.e, approveRun(other.id, 'ship'));
+  const out = await runWith(odd.e, advanceRun(readRun(odd.id)));
+  assert.deepEqual(out.filed, [], 'its ending is not filed');
+  assert.ok(
+    out.notes.some((n) =>
+      n.startsWith(`ship: not filed, for its place gives it no landing words: run ${odd.id} names the place skill svn`),
+    ),
+    out.notes.join('\n'),
+  );
+  assert.equal(readRun(odd.id).steps.ship.taskId, null);
+  assert.deepEqual(odd.filings, [`${odd.id}-implement`]);
+  assert.deepEqual((await runWith(other.e, advanceRun(readRun(other.id)))).filed, ['ship'], 'and the run beside it files its ending');
+});

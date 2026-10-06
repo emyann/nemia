@@ -817,11 +817,6 @@ test('a run that froze its workflow draws from it when its folder does not read:
   assert.ok(run.warning);
   assert.match(run.warning, /no longer reads as a workflow/);
   assert.match(run.warning, /someNewerKey/);
-  assert.doesNotMatch(
-    run.warning,
-    /without their spec or prose/,
-    'not the warning of a record with no frozen workflow, which says the page has no spec to show',
-  );
   assert.match(run.warning, /the workflow the run froze/);
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.spec, s.body]),

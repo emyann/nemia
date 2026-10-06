@@ -59,7 +59,8 @@ served by `nemia admit`. The static rules of an agent that runs `nemia` are deri
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
-next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
+next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come. A person may run it as a login
+service (`nemia service install`, `src/service/`), which runs the same daemon from the checkout and hands the lease over only when told.
 
 **A journal's bodies** are the runtime's storage: each long text of a line kept once, under the sha256 of its text, resolved on every
 read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's

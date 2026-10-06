@@ -671,8 +671,8 @@
     {
       "files": ["packages/agent-orchestrator/src/ending/ending.ts"],
       "rules": {
-        "complexity": ["error", { "max": 36 }],
-        "sonarjs/cognitive-complexity": ["error", 36]
+        "complexity": ["error", { "max": 30 }],
+        "sonarjs/cognitive-complexity": ["error", 33]
       }
     },
     {
@@ -699,14 +699,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/ending/ending.verb.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 16]
+        "max-lines": ["error", { "max": 521, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

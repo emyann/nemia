@@ -834,7 +834,14 @@ const filedOf = (steps: readonly Step[]): Map<string, Filed> =>
         step,
         steps,
         { gates: [] },
-        { model: undefined, budgetUsd: undefined, runArtifacts: RUN_ARTIFACTS, inbox: INBOX, own: {}, landingDenied: () => readPlaceJson(SHIPPED_PLACE).denyWhileLanding },
+        {
+          model: undefined,
+          budgetUsd: undefined,
+          runArtifacts: RUN_ARTIFACTS,
+          inbox: INBOX,
+          own: {},
+          landingDenied: () => readPlaceJson(SHIPPED_PLACE).denyWhileLanding,
+        },
       ),
     ]),
   );

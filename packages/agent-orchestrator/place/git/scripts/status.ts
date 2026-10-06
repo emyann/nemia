@@ -1,5 +1,5 @@
 /**
- * `status`: the checkout an ending lands in, as a pass reads it (`mergeState` in `src/workspace/worktree.store.ts` reads the same). Takes
+ * `status`: the checkout an ending lands in, as a pass reads it (`checkoutStatus` in `src/place/landing.store.ts` asks it). Takes
  * `{ checkout, tips }`, `tips` the run's result branches by name with their commits; answers `{ merging, conflicted, missing, head? }`:
  * whose merge is in progress — `ours` when every commit MERGE_HEAD names is one of `tips` — whether a path is unmerged, the result
  * branches a commit now would leave out, and HEAD. Unmerged paths are read with `ls-files --unmerged`, off the index as it is, never with a

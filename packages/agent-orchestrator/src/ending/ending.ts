@@ -26,10 +26,10 @@ import type { Assessment } from '../tick/assess.ts';
 
 /**
  * The deny list a step is filed with, each try and each round: its own, and `landingDenied` — what its place denies a landing session
- * (`denyWhileLanding`), the commands that commit a staged merge, asked only of an ending that lands on its check. The run commits it, on the
- * check's word; a shipper that committed first would put the merge on the base branch unchecked, and the pass after could only record it
- * as committed before its check ran. A deny is a prefix, not a sandbox, so the brief says it too, and a commit made anyway is recorded as
- * such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list. Pure.
+ * (`denyWhileLanding`), the commands that commit a staged merge, asked only of an ending that lands on its check. The run commits it, on
+ * the check's word; a shipper that committed first would put the merge on the base branch unchecked, and the pass after could only record
+ * it as committed before its check ran. A deny is a prefix, not a sandbox, so the brief says it too, and a commit made anyway is recorded
+ * as such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list. Pure.
  */
 export const filedDenies = (
   step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>,
@@ -73,10 +73,11 @@ export type Landing =
  * read through `merge` (`checkoutStatus`: the place's `status`, a process in a person's own checkout), and only once a landing can be due:
  * never while the step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — the
  * file the place named at `open` is there, read with no process — says a merge is in progress to take back. So an ending that ended
- * blocked with nothing staged is recorded as landing nothing on the first pass that reads it settled (a task the engine does not know reads
- * `running`, and waits), with one `stat` of the checkout and no process, and the merges a person stages there after it — to resolve by hand what stopped it,
- * or a trial merge — are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the
- * checkout and the engine as they are and does the same, so a merge staged by an ending is never left staged once nothing of it runs.
+ * blocked with nothing staged is recorded as landing nothing on the first pass that reads it settled (a task the engine does not know
+ * reads `running`, and waits), with one `stat` of the checkout and no process, and the merges a person stages there after it — to resolve
+ * by hand what stopped it, or a trial merge — are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the
+ * machine's — reads the checkout and the engine as they are and does the same, so a merge staged by an ending is never left staged once
+ * nothing of it runs.
  *
  * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on the pass that files its check,
  * with the merge staged or on HEAD, unless the run is held, which aborts it; nor on a merge that is not this run's (`other`), which is
@@ -103,13 +104,10 @@ export function landingDue(
   staged: boolean,
   merge: () => MergeState | { readonly unread: string },
 ): Landing | undefined {
-  const record = run.steps[step.name];
-  if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
-  const busy = (phase: TaskPhase) => phase === 'pending' || phase === 'running';
-  if (busy(phaseOf(record.taskId))) return undefined;
-  const check = record.check ? phaseOf(record.check.taskId) : undefined;
-  if (check && busy(check)) return undefined;
-  const ended = SETTLED.has(phaseOf(record.taskId)) && (TRIED_FROM.has(own) || own === 'budget exhausted');
+  const settled = landingSettled(step, run, phaseOf);
+  if (!settled) return undefined;
+  const { check } = settled;
+  const ended = SETTLED.has(settled.session) && (TRIED_FROM.has(own) || own === 'budget exhausted');
   const nothing = ended
     ? { act: 'record' as const, landed: { untouched: `${step.name} ended ${own}, and nothing of it was staged` } }
     : undefined;
@@ -147,6 +145,23 @@ export function landingDue(
     refusedBase(head, check, verdict),
   );
 }
+
+/**
+ * The phases of the session and the check (none before it is filed) of `step`, an ending of `run` that lands on its check, once both
+ * have stopped running; undefined while either runs, and for a step that lands nothing or has landed. Pure.
+ */
+const landingSettled = (
+  step: Workflow,
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+): { session: TaskPhase; check: TaskPhase | undefined } | undefined => {
+  const record = run.steps[step.name];
+  if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
+  const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
+  const session = phaseOf(record.taskId);
+  const check = record.check ? phaseOf(record.check.taskId) : undefined;
+  return busy(session) || busy(check) ? undefined : { session, check };
+};
 
 /**
  * The base a landing's check refused the merge on (`refusedOn`): the checkout's HEAD, where the merge was staged, once the check exited

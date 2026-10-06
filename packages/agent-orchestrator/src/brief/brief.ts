@@ -234,8 +234,7 @@ export function composeBrief(
   }
   if (tree.length) parts.push(...(earlier.length ? [''] : []), ...tree);
 
-  if (given) parts.push(given);
-  parts.push(contracts);
+  parts.push(...(given ? [given] : []), contracts);
   return parts.join('\n');
 }
 

@@ -65,7 +65,7 @@ const GIT_SITES: Baseline = {
   'packages/agent-orchestrator/src/merge/merge.verb.ts': { count: 1, cards: ['H'] },
   'packages/agent-orchestrator/src/prune/prune.verb.ts': { count: 6, cards: ['E'] },
   'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 1, cards: ['I1', 'I2'] },
-  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 19, cards: ['F', 'G', 'J'] },
+  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 10, cards: ['F', 'J'] },
 };
 
 /** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */

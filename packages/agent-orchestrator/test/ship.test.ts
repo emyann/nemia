@@ -46,14 +46,20 @@ const {
   toDecideWords,
   runWith,
 } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { readRun, stepsOf, runFile } = await import('../src/record/record.store.ts');
 const { roundOf } = await import('../src/run.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { checkoutParts } = await import('../src/workspace/worktree.store.ts');
 const { SHIPPED_PLACE, runPlaceVerb } = await import('../src/place/place.store.ts');
-const { stagedHere } = await import('../src/place/landing.store.ts');
+const { stagedHere, statusMemo, mergeStaged, landingDenies, landingWords } = await import('../src/place/landing.store.ts');
+const { landEnding, checkoutHold } = await import('../src/ending/ending.verb.ts');
+const { filedDenies } = await import('../src/ending/ending.ts');
+const { landingContract } = await import('../src/check/check.ts');
+const { heldRead } = await import('../src/list/list.verb.ts');
+const { merging } = await import('../src/prune/prune.verb.ts');
+const { taskPhasesRead, closeoutReader, closeoutAsked, spendReader, exitVerdicts } = await import('../src/views/views.verb.ts');
 type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 
@@ -534,11 +540,7 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
 
   git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/a');
   assert.equal(stagedHere(marker), true, 'read off the file open named alone, which is all a pass asks of a checkout with no landing due');
-  assert.deepEqual(
-    status(repo, tips),
-    { merging: 'ours', conflicted: false, missing: ['wf/r/b'], head: base },
-    'one branch of two staged',
-  );
+  assert.deepEqual(status(repo, tips), { merging: 'ours', conflicted: false, missing: ['wf/r/b'], head: base }, 'one branch of two staged');
   assert.equal(status(repo, { 'wf/r/b': b }).merging, 'other', "a merge of a commit that is not one of the run's tips is another's");
   assert.deepEqual(land(repo, { act: 'abort' }), { answer: { aborted: true } });
   assert.equal(git(repo, 'status', '--porcelain'), '');
@@ -2637,4 +2639,218 @@ test("a semantic merge whose check's output the engine cannot give is filed all 
     ),
     brief,
   );
+});
+
+/** A copy of the package's place in a folder of its own, its `status` script replaced by `status` where one is given. */
+function plantedPlace(status?: string): string {
+  const dir = path.join(scratch('wf-ship-place-'), 'git');
+  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
+  if (status !== undefined) fs.writeFileSync(path.join(dir, 'scripts', 'status.ts'), status);
+  return dir;
+}
+
+/** A copy of the package's place whose `status` answers as the package's does, and counts each time it is asked (`asked`). */
+function countedPlace(): { dir: string; asked: () => number } {
+  const dir = plantedPlace();
+  const scripts = path.join(dir, 'scripts');
+  fs.renameSync(path.join(scripts, 'status.ts'), path.join(scripts, 'shipped-status.ts'));
+  const counter = path.join(path.dirname(dir), 'asked.txt');
+  fs.writeFileSync(
+    path.join(scripts, 'status.ts'),
+    `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(counter)}, 'status\\n');\nawait import('./shipped-status.ts');\n`,
+  );
+  const asked = () => (fs.existsSync(counter) ? fs.readFileSync(counter, 'utf8').split('\n').filter(Boolean).length : 0);
+  return { dir, asked };
+}
+
+/** A place whose `status` gives every request `reply`. */
+const answeringPlace = (reply: object): string =>
+  plantedPlace(`import { serve } from './contract.ts';\nserve(() => (${JSON.stringify(reply)}));\n`);
+
+/** A place whose `status` reads no checkout: it exits 1 with its words on stderr. */
+const failingPlace = (): string => plantedPlace(`process.stderr.write('this place cannot read the checkout');\nprocess.exitCode = 1;\n`);
+
+/** What `landEnding` does with the run `id` as the board reads it now, through the place `place`, and the memo it read through. */
+async function landedThrough(e: Engine, id: string, place: string) {
+  const run = readRun(id);
+  const { views, phaseOf } = await runWith(e, taskPhasesRead(run));
+  const memo = statusMemo(place);
+  const verdictOf = exitVerdicts(views, run);
+  return landEnding(run, stepsOf(run), phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views), verdictOf, memo);
+}
+
+/** Rewrite the record of run `id` through `edit`, as a record a nemia before this one wrote, or an odd one, reads. */
+const rewritten = (id: string, edit: (record: Record<string, unknown>) => void): void => {
+  const record = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Record<string, unknown>;
+  edit(record);
+  fs.writeFileSync(runFile(id), JSON.stringify(record, null, 2));
+};
+
+test('an ending lands through its place, end to end: open names the staged-merge file, a stat reads the merge staged, a passing check commits it and a refusing one aborts it, and the checkout is clean both ways', async () => {
+  const passing = await stagedAndSigned();
+  const run = gitRun(readRun(passing.id));
+  assert.equal(run.stagedFile, path.join(passing.repo, '.git', 'MERGE_HEAD'), 'open named the file at `nemia start`, on the record');
+  assert.equal(stagedHere(run), true, 'the merge the shipper staged is read by a stat');
+  passing.settle(passing.checkId, 'succeeded', undefined, 0);
+  await runWith(passing.e, advanceRun(readRun(passing.id)));
+  const head = git(passing.repo, 'rev-parse', 'HEAD');
+  assert.notEqual(head, passing.base, 'committed');
+  assert.equal(git(passing.repo, 'log', '-1', '--format=%B'), MESSAGE.trim(), 'with its message');
+  assert.deepEqual(readRun(passing.id).steps.ship.landed, { commit: head });
+  assert.equal(git(passing.repo, 'status', '--porcelain'), '');
+  assert.equal(stagedHere(gitRun(readRun(passing.id))), false, 'and the stat reads no merge staged');
+
+  const refusing = await stagedAndSigned();
+  assert.equal(stagedHere(gitRun(readRun(refusing.id))), true);
+  refusing.settle(refusing.checkId, 'failed', undefined, 1);
+  await runWith(refusing.e, advanceRun(readRun(refusing.id)));
+  assert.equal(git(refusing.repo, 'rev-parse', 'HEAD'), refusing.base, 'nothing committed');
+  assert.equal(git(refusing.repo, 'status', '--porcelain'), '', 'the merge taken back');
+  assert.equal(stagedHere(gitRun(readRun(refusing.id))), false);
+  assert.deepEqual(readRun(refusing.id).steps.ship.landed, { aborted: 'its check refused the merge (exit 1)', refusedOn: refusing.base });
+});
+
+test('a run started before its place named a staged-merge file reads its checkout through `status`, and lands as any other', async () => {
+  const { repo, id, e, settle, checkId, base } = await stagedAndSigned();
+  rewritten(id, (record) => delete record.stagedFile);
+  assert.equal(stagedHere(gitRun(readRun(id))), undefined, 'a record with no marker');
+  assert.equal(mergeStaged(readRun(id), stepsOf(readRun(id))), true, 'its merge read staged by the place');
+  settle(checkId, 'succeeded', undefined, 0);
+  await runWith(e, advanceRun(readRun(id)));
+  const head = git(repo, 'rev-parse', 'HEAD');
+  assert.notEqual(head, base);
+  assert.deepEqual(readRun(id).steps.ship.landed, { commit: head });
+  assert.equal(git(repo, 'status', '--porcelain'), '');
+  assert.equal(mergeStaged(readRun(id), stepsOf(readRun(id))), false, 'landed, nothing is read staged');
+});
+
+test('REFUSED: a checkout its place gives no reading of is never a verdict — a check passed or refused, nothing is committed or aborted, the record stays unlanded, and the run says why', async () => {
+  const place = failingPlace();
+  for (const [phase, exitCode] of [
+    ['succeeded', 0],
+    ['failed', 1],
+  ] as const) {
+    const { repo, id, e, settle, checkId, base } = await stagedAndSigned();
+    settle(checkId, phase, undefined, exitCode);
+    const out = await landedThrough(e, id, place);
+    assert.equal(out.landed, false, `${phase}: nothing written`);
+    assert.equal(out.notes.length, 1, out.notes.join('\n'));
+    assert.match(out.notes[0], /^ship: the run read no state of its checkout, so it neither commits nor aborts its merge \(/);
+    assert.match(out.notes[0], /this place cannot read the checkout\): the next tick tries again$/, out.notes[0]);
+    assert.equal(mergeHead(repo), true, `${phase}: the merge stays staged`);
+    assert.equal(git(repo, 'rev-parse', 'HEAD'), base);
+    assert.equal(readRun(id).steps.ship.landed, undefined, `${phase}: the record unlanded`);
+  }
+
+  const { repo, id, e, settle, checkId, base } = await stagedAndSigned();
+  settle(checkId, 'succeeded', undefined, 0);
+  assert.equal((await landedThrough(e, id, plantedPlace())).landed, true, "the same pass through the package's place, copied, lands");
+  assert.notEqual(git(repo, 'rev-parse', 'HEAD'), base);
+});
+
+test("REFUSED: a merge its place reads as another's (`merging: 'other'`) is left alone, its check passed or refused", async () => {
+  for (const [phase, exitCode] of [
+    ['succeeded', 0],
+    ['failed', 1],
+  ] as const) {
+    const { repo, id, e, settle, checkId, base } = await stagedAndSigned();
+    settle(checkId, phase, undefined, exitCode);
+    const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], head: base });
+    assert.deepEqual(await landedThrough(e, id, place), { notes: [], landed: false }, phase);
+    assert.equal(mergeHead(repo), true, `${phase}: neither committed nor aborted`);
+    assert.equal(git(repo, 'rev-parse', 'HEAD'), base);
+  }
+});
+
+test('REFUSED: a landing session is denied and told what its place says — a planted place that denies `hg commit` gives exactly that, and no git word', async () => {
+  const place = plantedPlace();
+  const file = path.join(place, 'place.json');
+  const declared = JSON.parse(fs.readFileSync(file, 'utf8')) as { say: Record<string, unknown> };
+  const say = { ...declared.say, stage: 'hg -R {repo} merge {branches}' };
+  fs.writeFileSync(file, JSON.stringify({ ...declared, denyWhileLanding: ['Bash(hg commit:*)'], say }));
+  const { id, repo, branch } = await atTheGate();
+  const run = readRun(id);
+  const ship = stepsOf(run).find((s) => s.name === 'ship')!;
+  const denied = filedDenies(ship, run, () => landingDenies(run, place))!;
+  assert.deepEqual(denied, [...SHIPPER_DENIED, 'Bash(hg commit:*)']);
+  assert.equal(
+    denied.some((d) => d.includes('git commit')),
+    false,
+  );
+  const words = landingWords(run, ship, place)!;
+  assert.deepEqual(words, { stage: `hg -R ${repo} merge ${branch}`, denied: ['Bash(hg commit:*)'] });
+  const told = landingContract(ship.check!, words);
+  assert.ok(told.includes(`\`hg -R ${repo} merge ${branch}\``), told);
+  assert.ok(told.includes('Your fence denies `Bash(hg commit:*)`'), told);
+  assert.doesNotMatch(told, /git (commit|merge)/);
+  const implement = stepsOf(run).find((s) => s.name === 'implement')!;
+  assert.equal(landingWords(run, implement, place), undefined, 'a step that lands nothing is told nothing of it');
+});
+
+test("the place's `status` is asked only where a landing needs it: never of a landed run or a busy ending, once per checkout and run in a pass", async () => {
+  const counted = countedPlace();
+  const done = await stagedAndSigned();
+  done.settle(done.checkId, 'succeeded', undefined, 0);
+  await runWith(done.e, advanceRun(readRun(done.id)));
+  const landed = readRun(done.id);
+  assert.ok(landed.steps.ship.landed);
+  const { stagedFile: _, ...unmarked } = gitRun(landed);
+  const runs = Array.from({ length: 10 }, (_, i) => ({ ...(i % 2 ? landed : unmarked), id: `${landed.id}-${i}` }));
+  assert.deepEqual(await runWith(done.e, heldRead(done.e, runs, statusMemo(counted.dir))), { staged: [], held: [] });
+  assert.equal(counted.asked(), 0, 'a pause read over 10 landed runs, with the marker and without, asks nothing');
+
+  const shared = board();
+  const repo = aRepo();
+  const waiting = await atTheGate({ repo, board: shared });
+  const staging = await atTheGate({ repo, board: shared });
+  await runWith(shared.e, approveRun(staging.id, 'ship'));
+  assert.deepEqual((await runWith(shared.e, advanceRun(readRun(staging.id)))).filed, ['ship']);
+  git(repo, 'merge', '--no-ff', '--no-commit', staging.branch);
+  await runWith(shared.e, approveRun(waiting.id, 'ship'));
+  const run = readRun(waiting.id);
+  const held = (memo: ReturnType<typeof statusMemo>) =>
+    runWith(shared.e, checkoutHold(shared.e, run, stepsOf(run), undefined, process.env, memo));
+  for (const phase of ['pending', 'running'] as const) {
+    shared.settle(`${staging.id}-ship`, phase);
+    assert.deepEqual(await held(statusMemo(counted.dir)), { run: staging.id, step: 'ship' }, `${phase}: held by the ending in it`);
+    assert.deepEqual(await landedThrough(shared.e, staging.id, counted.dir), { notes: [], landed: false });
+    assert.equal(counted.asked(), 0, `${phase}: a busy ending asks nothing`);
+  }
+
+  shared.settle(`${staging.id}-ship`, 'succeeded', BLOCKED);
+  const memo = statusMemo(counted.dir);
+  for (let i = 0; i < 2; i++) {
+    assert.deepEqual(await held(memo), { run: staging.id, step: 'ship' }, 'held by the run whose merge is staged and not landed');
+  }
+  assert.equal(counted.asked(), 1, 'two runs on one checkout, asked twice in a pass, read it once');
+  assert.equal(stagedHere(gitRun(readRun(staging.id))), true);
+});
+
+test('REFUSED: a record whose place this nemia does not ship stops its own landing, never the pass: it lands nothing, holds the checkout, and `nemia rm` and the pause read say so', async () => {
+  const odd = await stagedAndSigned();
+  const other = await stagedAndSigned();
+  rewritten(odd.id, (record) => {
+    record.placeSkill = { skill: 'svn', version: '1' };
+    delete record.stagedFile;
+  });
+  odd.settle(odd.checkId, 'succeeded', undefined, 0);
+  const out = await runWith(odd.e, advanceRun(readRun(odd.id)));
+  assert.ok(
+    out.notes.some((n) => n.startsWith('ship: the run read no state of its checkout') && n.includes('names the place skill svn')),
+    out.notes.join('\n'),
+  );
+  assert.equal(mergeHead(odd.repo), true, 'its merge stays staged');
+  assert.equal(git(odd.repo, 'rev-parse', 'HEAD'), odd.base);
+  assert.equal(readRun(odd.id).steps.ship.landed, undefined);
+  assert.equal(mergeStaged(readRun(odd.id), stepsOf(readRun(odd.id))), true, 'a merge nobody can read is held, never let go');
+  assert.throws(
+    () => merging(readRun(odd.id), stepsOf(readRun(odd.id))),
+    (err: Error) =>
+      err.message.startsWith(`run ${odd.id}: run ${odd.id} names the place skill svn`) && err.message.endsWith('then try again'),
+  );
+
+  await runWith(other.e, heldRead(other.e, [readRun(odd.id), readRun(other.id)]));
+  other.settle(other.checkId, 'succeeded', undefined, 0);
+  await runWith(other.e, advanceRun(readRun(other.id)));
+  assert.ok(readRun(other.id).steps.ship.landed && 'commit' in readRun(other.id).steps.ship.landed!, 'and the run beside it lands');
 });

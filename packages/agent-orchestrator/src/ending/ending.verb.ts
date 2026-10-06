@@ -12,7 +12,7 @@ import type { Workflow } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
 import { endingAsked, landedWords, landingDue, landingOpen } from './ending.ts';
-import { isGitRun, type CloseoutAsked, type Landed, type Run, type TaskPhase } from '../record/record.ts';
+import { isGitRun, type CloseoutAsked, type GitRun, type Landed, type Run, type TaskPhase } from '../record/record.ts';
 import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
@@ -215,23 +215,35 @@ export function landEnding(
   const again = (why: string) => ({ notes: [`${name}: ${why}: the next tick tries again`], landed: false });
   if (due.act === 'wait') return again(`the run read no state of its checkout, so it neither commits nor aborts its merge (${due.why})`);
   if (due.act === 'record') return write(due.landed, landedWords(run, due.landed));
-  const abort = () => {
-    const taken = landThrough(run, { act: 'abort' }, memo);
-    if ('aborted' in taken) return undefined;
-    return 'commit' in taken ? 'the place answered a commit where the run asked an abort' : 'refused' in taken ? taken.refused : taken.unread;
-  };
   if (due.act === 'commit') {
-    const made = landThrough(run, { act: 'commit', message: due.message }, memo);
-    if ('commit' in made) return write(made, `its check passed on the merge, and ${landedWords(run, made)}`);
-    if ('aborted' in made) return again('the place answered an abort where the run asked a commit of its merge');
-    if ('unread' in made) return again(`the run could not commit its merge (${made.unread})`);
-    const why = `the place refused the commit of its merge: ${made.refused}`;
-    const refused = abort();
-    if (refused) return again(`${why}; and the run could not abort the merge either (${refused})`);
-    return write({ aborted: why }, `${why}, so the run aborted the merge; nothing landed on ${run.branch}`);
+    const done = committedThrough(run, due.message, memo);
+    return 'again' in done ? again(done.again) : write(done.landed, done.note);
   }
-  const refused = abort();
+  const refused = abortedThrough(run, memo);
   if (refused) return again(`${due.why}, and the run could not abort its merge (${refused})`);
   const aborted = { aborted: due.why, ...(due.refusedOn ? { refusedOn: due.refusedOn } : {}) };
   return write(aborted, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
+}
+
+/**
+ * Commit the merge staged in `run`'s checkout with `message` through its place (`landThrough`), and abort it where the place refuses the
+ * commit: what to write on the step's record, with its note, or why the next pass tries again.
+ */
+function committedThrough(run: GitRun, message: string, memo?: StatusMemo): { landed: Landed; note: string } | { again: string } {
+  const made = landThrough(run, { act: 'commit', message }, memo);
+  if ('commit' in made) return { landed: made, note: `its check passed on the merge, and ${landedWords(run, made)}` };
+  if ('aborted' in made) return { again: 'the place answered an abort where the run asked a commit of its merge' };
+  if ('unread' in made) return { again: `the run could not commit its merge (${made.unread})` };
+  const why = `the place refused the commit of its merge: ${made.refused}`;
+  const refused = abortedThrough(run, memo);
+  if (refused) return { again: `${why}; and the run could not abort the merge either (${refused})` };
+  return { landed: { aborted: why }, note: `${why}, so the run aborted the merge; nothing landed on ${run.branch}` };
+}
+
+/** Abort the merge staged in `run`'s checkout through its place (`landThrough`): undefined once it has, else why not, in words. */
+function abortedThrough(run: GitRun, memo?: StatusMemo): string | undefined {
+  const taken = landThrough(run, { act: 'abort' }, memo);
+  if ('aborted' in taken) return undefined;
+  if ('commit' in taken) return 'the place answered a commit where the run asked an abort';
+  return 'refused' in taken ? taken.refused : taken.unread;
 }

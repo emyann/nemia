@@ -92,15 +92,14 @@ const GitRecordSchema = Kept({
   stagedFile: Schema.optional(Schema.String),
 });
 
+/** Each of `keys` as a field a record of its kind never holds. */
+const absent = <const K extends string>(...keys: K[]) =>
+  Object.fromEntries(keys.map((k) => [k, Schema.optional(Schema.Undefined)])) as { [P in K]: Schema.optional<typeof Schema.Undefined> };
+
 const FolderRecordSchema = Kept({
   ...runBase,
   place: Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('folder') }), Rest),
-  repo: Schema.optional(Schema.Undefined),
-  baseRef: Schema.optional(Schema.Undefined),
-  branch: Schema.optional(Schema.Undefined),
-  isolate: Schema.optional(Schema.Undefined),
-  placeSkill: Schema.optional(Schema.Undefined),
-  stagedFile: Schema.optional(Schema.Undefined),
+  ...absent('repo', 'baseRef', 'branch', 'isolate', 'placeSkill', 'stagedFile'),
 });
 
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));

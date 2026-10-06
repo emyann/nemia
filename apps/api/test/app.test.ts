@@ -205,6 +205,10 @@ test('runs are read from the workflow store and summarized, with what each step 
     isolate: true,
     brief: 'Do the thing',
     workflowDir: '/code/app/workflows',
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.' },
+      { name: 'review', after: [], body: 'Review it.' },
+    ],
     createdAt: '2026-09-12T00:00:00.000Z',
     steps: { implement: { taskId: 't-1', branch: 'wf/r-1/implement' }, review: { taskId: null } },
   });
@@ -272,7 +276,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           denied: null,
         },
       ],
-      /** No workflow frozen and no folder to read: nothing says what waits on what, so every step is a root, as on the run's page. */
+      /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
       graph: { roots: ['implement', 'review'], edges: [] },
       waitingOnYou: [],
       onYou: [],
@@ -706,16 +710,30 @@ test('a run whose workflow folder is gone still answers, from its record', async
     },
   ]);
 
+  const unjudged = (listing: RunSummary, why: string) => {
+    const said = listing.unreadable ?? '';
+    assert.ok(said.startsWith("r-3's workflow folder does not load, so the board does not judge the run"), why);
+    assert.ok(said.includes(`does not load: no workflow folder at ${gone}`), said);
+    assert.deepEqual([listing.status, listing.moving, listing.waitingOnYou], ['running', true, []], why);
+    assert.deepEqual(
+      listing.steps.map((s) => [s.name, s.status]),
+      [
+        ['implement', 'succeeded'],
+        ['review', 'pending'],
+      ],
+      why,
+    );
+  };
   let [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
-  assert.deepEqual(withoutFolder.steps, withFolder.steps, 'same record, same engine: the same words with the folder as without it');
-  assert.deepEqual(withoutFolder.waitingOnYou, withFolder.waitingOnYou);
+  assert.deepEqual(withFolder.waitingOnYou, ['implement']);
+  unjudged(withoutFolder, 'the list says it as the tick leaves it, unjudged and in flight, its steps off its record');
 
   fs.writeFileSync(path.join(root, 'runs', 'r-2.cancelled'), '2026-09-12T03:00:00.000Z');
   fs.writeFileSync(path.join(root, 'runs', 'r-3.cancelled'), '2026-09-12T03:00:00.000Z');
   [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
   assert.deepEqual(withFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
-  assert.deepEqual(withoutFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
-  assert.deepEqual(withoutFolder.steps, withFolder.steps, 'a called-off step still says how it signed off');
+  assert.equal(withFolder.steps[0].status, 'succeeded · BLOCKED', 'a called-off step still says how it signed off');
+  unjudged(withoutFolder, 'called off, it is still unjudged: the tick reads its steps to stop it');
 });
 
 test('a folder changed since the run started keeps the steps that ran, and names what moved', async () => {
@@ -1395,7 +1413,6 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
     ['r-20', 'failed', null, 'a check refused, so what waits on that step waits for ever: a step broke'],
     ['r-8', 'failed', 'blocked', 'a step signed off blocked, so its follower will never be filed'],
     ['r-2', 'cancelled', null, 'called off, whatever its steps say'],
-    ['r-3', 'cancelled', null, 'called off, and judged from its record, its folder gone'],
   ];
   for (const [id, status, stoppedOn, why] of cases) {
     const summary = await listed(id);
@@ -1403,6 +1420,11 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
     assert.equal(summary.stoppedOn, stoppedOn, `${id} stopped on: ${why}`);
     assert.equal((await detailOf(id)).status, status, `${id} in full: ${why}`);
   }
+  assert.deepEqual(
+    [(await listed('r-3')).status, (await detailOf('r-3')).status],
+    ['running', 'cancelled'],
+    'called off, its folder gone and no workflow frozen: listed as the tick leaves it, unjudged; its page judged from its record',
+  );
 });
 
 test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
@@ -1466,12 +1488,6 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     ['r-5', 'running', true, 'a step queued for a slot'],
     ['r-6', 'running', true, 'a step the folder gained, which the tick would file'],
     ['r-8', 'failed', false, 'a step signed off blocked, and its follower will never be filed'],
-    [
-      'r-26',
-      'failed',
-      false,
-      'a record with no frozen workflow, its folder gone and not called off: its bare review reads as ready, and the tick, which cannot read its steps, files nothing',
-    ],
     ['r-21', 'succeeded', false, 'verified, then done on its own word'],
     ['r-2', 'cancelled', false, 'called off, nothing left running'],
     [
@@ -1487,6 +1503,13 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
     assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
   }
+  const [summary, detail] = [await listed('r-26'), await detailOf('r-26')];
+  assert.deepEqual(
+    [summary.status, summary.moving, detail.status, detail.moving],
+    ['running', true, 'failed', false],
+    'a record with no frozen workflow, its folder gone and not called off: listed as the tick leaves it, unjudged and in flight; its ' +
+      'page judged from its record, where its bare review reads as ready and nothing files it',
+  );
 });
 
 test('a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you', async () => {

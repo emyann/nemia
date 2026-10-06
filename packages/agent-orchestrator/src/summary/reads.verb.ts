@@ -126,7 +126,8 @@ export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warnin
       steps: null,
       warning: run.workflow
         ? `${why} Nothing here is read from it: the steps, their spec, prose and graph are the workflow the run froze at \`nemia start\`, which is what it is judged by.`
-        : `${why} The steps are listed from the run record, without their spec or prose.`,
+        : `${why} The steps are listed from the run record, without their spec or prose, and the tick leaves the run where it is until ` +
+          `the folder loads again, or nemia rm ${run.id}.`,
     };
   }
 }

@@ -8,7 +8,8 @@ import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { unjudgedWord } from '../views/views.verb.ts';
-import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
+import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run, unloadedWords } from '../record/record.ts';
+import { unloadedOf } from '../record/steps.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { prunedKept } from '../prune/prune.ts';
 import { type BranchReader, branchReader } from '../branches/branches.store.ts';
@@ -208,10 +209,10 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
 });
 
 /**
- * A run a task of which does not read, answered off its record: what it asked, where, its steps and their graph, and each step's word off
- * the views that did read — `unreadable` for a step any task of which does not, its check's or an earlier try's among them (`unjudgedWord`)
- * — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and counts it in flight, so it is `running` and
- * moving until the journal reads again.
+ * A run a task of which does not read, or whose unfrozen folder does not load, answered off its record: what it asked, where, its steps
+ * and their graph, and each step's word off the views that did read — `unreadable` for a step any task of which does not, its check's or
+ * an earlier try's among them (`unjudgedWord`) — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and
+ * counts it in flight, so it is `running` and moving until the journal reads, or the folder loads, again.
  */
 function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string): Omit<RunSummary, 'startedAt'> {
   const folder = workflowsOf(run, home).steps;
@@ -261,7 +262,10 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
   };
 }
 
-/** A run judged, or answered off its record (`unjudged`) when a task it reads does not (`judgedUnlessUnreadable`). */
+/**
+ * A run judged, or answered off its record (`unjudged`) when its unfrozen folder does not load, as the tick reads it (`unloadedOf`), in
+ * the folder's words (`unloadedWords`), or when a task it reads does not (`judgedUnlessUnreadable`).
+ */
 const judgedOrNot = Effect.fnUntraced(function* (
   run: Run,
   views: Views,
@@ -270,6 +274,8 @@ const judgedOrNot = Effect.fnUntraced(function* (
   git: BranchReader,
   home: string,
 ) {
+  const folder = unloadedOf(run);
+  if (folder !== undefined) return { unjudged: unjudged(run, views, unreadable, unloadedWords(run.id, folder, 'the board'), home) };
   const one = yield* judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git, home));
   return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable, home) };
 });

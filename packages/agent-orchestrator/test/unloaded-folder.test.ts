@@ -33,6 +33,7 @@ const { main } = await import('../src/cli/main.ts');
 const { readFeed } = await import('../src/feed/feed.store.ts');
 const { REMOVED } = await import('../src/feed/feed.ts');
 const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
+const { judgedNow } = await import('../src/summary/summary.verb.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -189,6 +190,20 @@ test("nemia ls says the run with the folder's words and lists its steps off its 
   assert.ok(
     out.some((l) => l.includes(`→ unreadable: ${bad.id}'s workflow folder does not load, so nemia ls does not judge the run`)),
     out.join('\n'),
+  );
+});
+
+test("the board answers the run unjudged and running, in the folder's words, its steps off its record", async () => {
+  const [one] = await runWith(e, judgedNow(e, ROOT, [readRun(bad.id)]));
+  assert.equal(one.status, 'running');
+  assert.ok(
+    one.unreadable?.startsWith(`${bad.id}'s workflow folder does not load, so the board does not judge the run`),
+    one.unreadable ?? '',
+  );
+  assert.match(one.unreadable ?? '', /work: says no `place:`/);
+  assert.deepEqual(
+    one.steps.map((s) => s.name),
+    ['work'],
   );
 });
 

@@ -27,7 +27,7 @@ const { MEMORY } = await import('./memory.verb.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../folder/folder.store.ts');
-const { addFactory } = await import('../factory/factory.store.ts');
+const { addFactory, factoryNames } = await import('../factory/factory.store.ts');
 const { factoryLevelFile } = await import('../level/level.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
@@ -59,6 +59,12 @@ const trust = (trusted: boolean) =>
     path.join(CONFIG, `.${DEFAULT_HARNESS}.json`),
     JSON.stringify({ projects: { [nemiaDir()]: { hasTrustDialogAccepted: trusted } } }),
   );
+
+/** The factory `pipao` in the store and her folder trusted, as the tests before leave them: a test of a factory's level runs alone too. */
+const withPipao = () => {
+  trust(true);
+  if (!factoryNames().includes('pipao')) addFactory({ name: 'pipao', repos: [fs.mkdtempSync(path.join(ROOT, 'repo-'))] });
+};
 
 /** The message `f` refuses with, at exit 2. */
 const refusal = async (f: () => Promise<unknown>): Promise<string> => {
@@ -200,6 +206,7 @@ test('a task stopped from outside is never filed again, and semi-auto then start
 });
 
 test('REFUSED: a factory write that names no factory, the default one, a raise with no level or stretch, an end with no raise', async () => {
+  withPipao();
   const check = (args: Record<string, string | boolean>) => LEVEL.check?.(args) ?? null;
   assert.match(check({ level: 'semi-auto', for: '2h' }) ?? '', /^--for and --end take the factory raised, --factory <name>/);
   assert.match(check({ factory: 'pipao', end: true, for: '2h' }) ?? '', /give one/);
@@ -225,6 +232,7 @@ test('REFUSED: a factory write that names no factory, the default one, a raise w
 });
 
 test("a factory raised for a stretch keeps her, the store at manual; once the raise's end passes she is stopped, with no write", async (t) => {
+  withPipao();
   await new Promise((resolve) => setTimeout(resolve, 2));
   const raised = await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'semi-auto', for: '1h' }));
   assert.equal(raised.level, 'manual', "the store's own level is untouched");
@@ -250,6 +258,7 @@ test("a factory raised for a stretch keeps her, the store at manual; once the ra
 });
 
 test('a raise ended early stops her at the next beat; a raise to a level the factory has by default is refused', async () => {
+  withPipao();
   const raised = await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'semi-auto', for: '2h' }));
   assert.deepEqual(await beat(), ['file']);
   const ended = await runWith(e, LEVEL.handler({ factory: 'pipao', end: true }));

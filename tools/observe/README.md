@@ -82,7 +82,10 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   range and its `Service`, for a daemon started with the preload. A flame graph sums every pass in its range: read it beside **Passes**
   over the same range, which the links at the top keep.
 - **Passes** — a pass's time from the `pass` spans (TraceQL metrics), its phases from `pass.phase.duration` (the phases are not spans),
-  and the slowest of the latest 500 `pass` and `advancePass` spans, each linked to its trace.
+  and the slowest of the latest 500 `pass` and `advancePass` spans, each linked to its trace. Its tables are span tables
+  (`tableType: "spans"`): a row's Duration is the span's own. A trace lasts as long as the session a pass filed, which joins it
+  (`TRACEPARENT`), so a pass is read from its `pass` span, never from its trace's length: the search API's `durationMs`, and a table of
+  traces, the default, show that length (measured 2026-10-06 on Grafana 13.2.2: a `pass` of 272 ms in a trace of 496 s).
 - **A run** — pick a run: its filings (the runtime's `file` spans, one for each session a step filed), the runtime's appends to its
   journals with their task and kind, and its logs, by step. The orchestrator's `fileReady`, `fileTries`, `fileRounds` and `fileChecks`
   spans carry no run: they are a pass's phases, under its `advancePass`.
@@ -90,8 +93,8 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   telemetry (`a-step-s-session-exports-its-1tan`).
 
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log
-field the code does not emit fails it, and so does a metric the code defines that System does not chart, or a profile type the profiler
-does not send. `agent-orchestrator/test/profile.test.ts` holds the preload: with no endpoint, nothing loaded and nothing opened.
+field the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler
+does not send, a Tempo table naming a span that would show its trace's duration, and a span name both layers emit. `agent-orchestrator/test/profile.test.ts` holds the preload: with no endpoint, nothing loaded and nothing opened.
 
 ## The names, as measured
 
@@ -103,7 +106,8 @@ Read off a daemon exporting to this stack (2026-10-06):
   `job` and `service_name`, both the service's name. The step metrics carry `factory`, `workflow`, `step`, `agent` and `outcome`, the
   phases `phase`, and the api's reads `route`. A run's id is never a label.
 - **Tempo**: the resource attribute `service.name`; the span attributes `run`, `step`, `task`, `kind` and `attempt`, as `span.run` and so
-  on. An `append` made outside a filing (a session's end) carries its task and kind but no run.
+  on. An `append` made outside a filing (a session's end) carries its task and kind but no run. Two spans are named `tick`: the
+  orchestrator's tick and the runtime engine's tick inside it, so a query on `name="tick"` mixes them. Read a pass from `pass`.
 - **Loki**: one stream label, `service_name`; the logs' annotations (`run`, `step`, `word`) and the collector's fields (`trace_id`,
   `span_id`, `severity_text`, `detected_level`) are structured metadata, filtered as `| run="…"`. The daemon exports what it logs at
   `Info`.

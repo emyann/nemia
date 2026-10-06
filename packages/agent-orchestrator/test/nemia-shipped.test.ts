@@ -1,13 +1,17 @@
 /**
  * What ships with Nemia (`nemia/`) is any factory's, never this repository's: her instruction and her skills name no agent of this
  * repository's team, no file of its own and no playbook of its operator, and each skill her instruction and her skills name is one she
- * ships, under `nemia/skills/`, its `name:` its folder's. Its wording is judged by a person, at the gate; this holds only what it names.
+ * ships, under `nemia/skills/`, its `name:` its folder's, read as Claude Code reads her plugin. "Gate" names a step's gate alone
+ * (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Its wording is judged by a person at the landing
+ * step; this holds only what it names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { REPO } from './team.ts';
+import { skillFolders, skillRead } from '../src/skills/skills.store.ts';
+import { WAITS_ON_PERSON } from '../src/retry/waits.ts';
 
 const SHIPPED = path.join(import.meta.dirname, '..', 'nemia');
 
@@ -66,4 +70,71 @@ test('each skill her instruction and her skills name ships under nemia/skills/, 
     if (at) assert.match(text, new RegExp(`^---\\nname: ${at[1]}\\n`), file);
   }
   assert.deepEqual(skillsNamed(new Map([['nemia.md', 'use the `grant-access` skill']])), ['nemia.md: grant-access']);
+});
+
+/** The phrases that name a step's gate: its key, its flag, a step at its gate, any step's gate, a step gated at one. */
+const STEP_GATE = /`gate:`|--gate\b|\bits gate\b|\bstep's gate\b|\bgated at\b/gi;
+
+/**
+ * Where `files` say "gate" of anything but a step's gate (`STEP_GATE`), across line breaks: a line each, `<file>: <the words before it and
+ * the word>`.
+ */
+const gateWordsIn = (files: Map<string, string>): string[] =>
+  [...files].flatMap(([file, text]) => {
+    const flat = text.replace(/\s+/g, ' ').replace(STEP_GATE, (said) => said.replace(/gat/gi, '—'));
+    return [...flat.matchAll(/(?:\S+ ){0,3}\S*\bgat(?:e|es|ed|ing)\b/gi)].map((m) => `${file}: ${m[0]}`);
+  });
+
+test('what ships with Nemia, and this factory\'s instruction to her, say "gate" only for a step\'s gate, but in her generated verbs skill', () => {
+  const files = shipped();
+  files.delete('skills/verbs/SKILL.md');
+  assert.ok(files.has('nemia.md') && files.has('skills/bring-what-waits/SKILL.md'), 'her instruction and her skills are read');
+  files.set('NEMIA.md', fs.readFileSync(path.join(REPO, 'NEMIA.md'), 'utf8'));
+  assert.deepEqual(gateWordsIn(files), []);
+});
+
+test('REFUSED: "gate" said of what is not a step\'s gate is named, across a line break; a step\'s gate is not', () => {
+  const files = new Map([
+    ['NEMIA.md', "His check files cards. Bring each card to the person as a gate. The landing step's gate is the person's."],
+    ['skills/recap/SKILL.md', 'Offer to bring a waiting\ngate, rather than unasked.'],
+    [
+      'skills/bring-what-waits/SKILL.md',
+      "A step at its\ngate: a step's gate, the design step's\ngate, its `gate:`, --gate <step>, a run gated at plan.",
+    ],
+  ]);
+  assert.deepEqual(gateWordsIn(files), ['NEMIA.md: person as a gate', 'skills/recap/SKILL.md: bring a waiting gate']);
+});
+
+test('each of her skills reads as Claude Code reads her plugin, and the skill bring-what-waits replaced is gone', () => {
+  const dir = path.join(SHIPPED, 'skills');
+  const names = skillFolders(dir);
+  assert.ok(names.includes('bring-what-waits') && names.includes('verbs'), `her skills are read: ${names.join(', ')}`);
+  assert.deepEqual(
+    names.map((name) => [name, skillRead(name, path.join(dir, name)).error]).filter(([, error]) => error !== null),
+    [],
+  );
+  assert.ok(!fs.existsSync(path.join(dir, 'bring-a-gate')), 'bring-a-gate is gone');
+  const plugin = JSON.parse(fs.readFileSync(path.join(SHIPPED, '.claude-plugin', 'plugin.json'), 'utf8')) as { name?: unknown };
+  assert.equal(plugin.name, 'nemia');
+});
+
+/** The section of `bring-what-waits` that brings a step in each status that waits on the person (`WAITS_ON_PERSON`). */
+const BROUGHT_IN: Record<string, string> = {
+  'awaiting approval': 'A step at its gate',
+  blocked: "A step's question to the person",
+  exhausted: 'A loop out of rounds',
+  'over budget': 'A step at its cap',
+  'budget exhausted': 'A step at its cap',
+};
+
+test('each status that waits on the person has a section of bring-what-waits that brings it', () => {
+  const waiting = Object.entries(WAITS_ON_PERSON)
+    .filter(([, waits]) => waits)
+    .map(([status]) => status);
+  assert.deepEqual([...waiting].sort(), Object.keys(BROUGHT_IN).sort(), 'a status that waits on the person is given its section here');
+  const skill = fs.readFileSync(path.join(SHIPPED, 'skills', 'bring-what-waits', 'SKILL.md'), 'utf8');
+  assert.deepEqual(
+    waiting.filter((status) => !skill.includes(`\n## ${BROUGHT_IN[status]}\n`)),
+    [],
+  );
 });

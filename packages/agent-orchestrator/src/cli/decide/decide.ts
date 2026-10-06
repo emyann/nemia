@@ -10,14 +10,14 @@ import {
   approvedFirst,
   artifactFiles,
   artifactLines,
-  artifacts,
   artifactsDir,
   branchWord,
   branchesToRead,
+  changesOf,
+  countsLine,
   checkoutLine,
   decideRun,
   runWith,
-  diffStat,
   dueNote,
   fromNote,
   holdAdvice,
@@ -34,17 +34,14 @@ import {
   ownNote,
   prunedKept,
   prunedWords,
-  readArtifact,
   runStore,
   roundDueNote,
   saidLines,
-  sensitiveDiff,
   signoffsSpent,
   slotWord,
   stepsOf,
   timelineLines,
   timelineTotalLines,
-  touchedBy,
   touchedLines,
   tryNote,
   unjudgedOf,
@@ -53,7 +50,7 @@ import {
   waitAdvice,
   waitWord,
 } from '../../runner.ts';
-import type { CheckReport, DecideCommand, Decided, GitRun } from '../../runner.ts';
+import type { BranchChanges, CheckReport, DecideCommand, Decided, GitRun } from '../../runner.ts';
 import { HELP, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
@@ -66,6 +63,9 @@ on you, after the run's verdicts and before each step's closeout:
             the check-affecting ones
   lesson    whether the run changed a file where the next agent reads, or that it wrote nothing there
   in full   the whole diff of the check-affecting files: what a change could edit to make its check pass
+
+each read from the run's place as the screen is read; what the place could not say is said as not known,
+never as no change.
 
 and beside each step's check, what its session consumed — used, cost — or that nobody measured it, then
 its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
@@ -150,10 +150,11 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   printRefusals(run, decision);
   printStops(decided, decision, out.heldOut);
   const git = isGitRun(run) ? run : undefined;
-  if (git) printTouched(git, decision.branches, steps, sensitive);
+  const changes = git ? changesRead(git, decision.branches, steps, sensitive) : undefined;
+  if (changes) printTouched(changes.toRead, sensitive);
   for (const name of namesInOrder(run, steps)) printStep(decided, name, steps);
   printTotals(decided);
-  if (git) printBranches(git, decision.branches);
+  if (changes) printBranches(changes.results);
   printStanding(decided, decision, git);
   printCollisions(decided);
   printChoice(decided, steps);
@@ -313,23 +314,34 @@ function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], 
 }
 
 /**
- * What each branch to read touched, the lesson line, and each branch's files `sensitive` names — the check-affecting ones by default — in
- * full.
+ * What the screen's branches changed, read once from the run's place (`changesOf`), with the diffs of the files `sensitive` names — the
+ * check-affecting ones by default: the branches to read (`branchesToRead`) and the result branches.
  */
-function printTouched(git: GitRun, branches: string[], steps: Steps, sensitive: string[] | undefined): void {
-  const touched = branchesToRead(
+function changesRead(
+  git: GitRun,
+  branches: string[],
+  steps: Steps,
+  sensitive: string[] | undefined,
+): { toRead: BranchChanges[]; results: BranchChanges[] } {
+  const toRead = branchesToRead(
     branches,
     namesInOrder(git, steps).map((name) => git.steps[name].branch),
     git.isolate ? git.branch : undefined,
-  ).map((branch) => ({ branch, radius: touchedBy(git, branch) }));
+  );
+  const read = changesOf(git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
+  const of = (branch: string) => read.find((c) => c.branch === branch)!;
+  return { toRead: toRead.map(of), results: branches.map(of) };
+}
+
+/** What each branch to read touched, the lesson line, and each branch's files `sensitive` names — the check-affecting ones by default — in full. */
+function printTouched(touched: BranchChanges[], sensitive: string[] | undefined): void {
   if (!touched.length) return;
   console.log();
   for (const line of touchedLines(touched)) console.log(`  ${line}`);
   console.log(`  ${lessonLine(touched)}`);
   for (const t of touched) {
     console.log();
-    for (const line of inFullLines(t, sensitive, sensitiveDiff(git, t, sensitive ?? CHECK_AFFECTING), touched.length > 1))
-      console.log(`  ${line}`);
+    for (const line of inFullLines(t, sensitive, t.inFull, touched.length > 1)) console.log(`  ${line}`);
   }
 }
 
@@ -402,21 +414,24 @@ function printTotals({ runCost, timeline }: Decided): void {
   }
 }
 
-/** Each result branch's diff stat against the base, and the top-level markdown files it added (`printNotes`). */
-function printBranches(git: GitRun, branches: string[]): void {
-  for (const branch of branches) {
-    const stat = diffStat(git, branch);
-    console.log(`  ${branch}${stat ? `  —${stat}` : ''}`);
-    printNotes(git, branch);
+/**
+ * Each result branch's counts against the base (`countsLine`), none for a branch that changed no file, or that they are not known; and the
+ * top-level markdown files it added.
+ */
+function printBranches(results: BranchChanges[]): void {
+  for (const c of results) {
+    const counts = 'error' in c.radius ? c.radius.error : countsLine(c.radius);
+    console.log(`  ${c.branch}${counts ? `  — ${counts}` : ''}`);
+    if ('error' in c.notes) {
+      if (!('error' in c.radius)) console.log(`  notes  ${c.notes.error}`);
+    } else printNotes(c.branch, c.notes);
   }
 }
 
 /** The top-level markdown files `branch` added, each under a rule, 120 lines at most, then how to read the rest. */
-function printNotes(git: GitRun, branch: string): void {
-  const notes = artifacts(git, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
-  for (const file of notes) {
-    const text = readArtifact(git, branch, file).trimEnd();
-    const lines = text.split('\n');
+function printNotes(branch: string, notes: readonly { file: string; text: string }[]): void {
+  for (const { file, text } of notes) {
+    const lines = text.trimEnd().split('\n');
     console.log(`\n  ── ${file} ${'─'.repeat(Math.max(0, 64 - file.length))}`);
     for (const l of lines.slice(0, 120)) console.log(`  ${l}`);
     if (lines.length > 120) console.log(`  … ${lines.length - 120} more lines — git show ${branch}:${file}`);

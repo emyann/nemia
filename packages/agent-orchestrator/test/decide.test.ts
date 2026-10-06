@@ -32,21 +32,21 @@ const {
   CHECK_AFFECTING,
   LESSON,
   advanceRun,
+  changesOf,
   consumption,
   decideRun,
   isGitRun,
   lessonLine,
   retryRun,
-  sensitiveDiff,
   startRun,
-  touchedBy,
+  touchedLines,
   runWith,
 } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
-/** A run this file started on a repository, as `touchedBy` and `sensitiveDiff` read one: a git run. */
+/** A run this file started on a repository, as `changesOf` reads one: a git run. */
 const gitRun = (run: Run): GitRun => {
   assert.ok(isGitRun(run), `${run.id} works on a repository`);
   return run;
@@ -387,7 +387,7 @@ test('`nemia decide --help` prints the lists the screen uses, from the one place
   for (const list of [CHECK_AFFECTING, AGENT_FACING, LESSON]) assert.ok(text.includes(list.join(', ')), list.join(', '));
 });
 
-test('what a branch touched is read out of git: a rename at both ends, a binary file, a file in no directory — and a branch that is gone is not read as nothing', async () => {
+test("what a branch touched is the place's report: a rename at both ends, a binary file, a file in no directory, today's lines — and a branch that is gone is not read as nothing", async () => {
   const repo = aRepo();
   const run = gitRun(await Effect.runPromise(startRun({ brief: 'move the test', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/moved', () => {
@@ -397,33 +397,49 @@ test('what a branch touched is read out of git: a rename at both ends, a binary 
     write(repo, 'NOTES', 'one\n');
   });
 
-  const r = touchedBy(run, 'wf/moved');
+  const [moved] = changesOf(run, ['wf/moved']);
+  const r = moved.radius;
   assert.ok(!('error' in r), JSON.stringify(r));
   assert.deepEqual(
     [...r.changes].sort((a, b) => a.path.localeCompare(b.path)),
     [
-      { path: 'logo.png', added: null, removed: null },
-      { path: 'NOTES', added: 1, removed: 0 },
-      { from: 'packages/x/test/add.test.ts', path: 'packages/x/spec/add.test.ts', added: 0, removed: 0 },
+      { path: 'logo.png', status: 'A', added: null, removed: null },
+      { path: 'NOTES', status: 'A', added: 1, removed: 0 },
+      { from: 'packages/x/test/add.test.ts', path: 'packages/x/spec/add.test.ts', status: 'R', added: 0, removed: 0 },
     ],
   );
   assert.deepEqual(
-    r.groups.map((g) => [g.name, g.files, g.binary]),
+    touchedLines([moved]),
     [
-      ['(root)', 2, 1],
-      ['packages/x', 1, 0],
+      'touched  wf/moved',
+      '  (root)      2 files  +1 −0 · 1 binary',
+      '  packages/x  1 file   +0 −0',
+      '  check-affecting  packages/x/test/add.test.ts → packages/x/spec/add.test.ts',
     ],
-    "grouped by the base's workspaces",
+    "grouped by the base's workspaces, a binary file counted with no lines and a rename at both ends, as the lines were",
   );
-  assert.deepEqual(r.checkAffecting, ['packages/x/test/add.test.ts → packages/x/spec/add.test.ts']);
-  const diff = sensitiveDiff(run, { branch: 'wf/moved', radius: r }, CHECK_AFFECTING)!;
-  assert.match(diff, /^rename from packages\/x\/test\/add\.test\.ts$/m, 'both ends asked for, so git shows a rename');
-  assert.match(diff, /^rename to packages\/x\/spec\/add\.test\.ts$/m);
+  assert.equal(typeof moved.inFull, 'string');
+  assert.match(moved.inFull as string, /^rename from packages\/x\/test\/add\.test\.ts$/m, 'asked by its path, the place shows a rename');
+  assert.match(moved.inFull as string, /^rename to packages\/x\/spec\/add\.test\.ts$/m);
 
-  const gone = { branch: 'wf/never', radius: touchedBy(run, 'wf/never') };
-  assert.match('error' in gone.radius ? gone.radius.error : '', /^git could not diff [0-9a-f]{12}\.\.\.wf\/never$/);
-  assert.equal(sensitiveDiff(run, gone, CHECK_AFFECTING), undefined);
+  const [gone] = changesOf(run, ['wf/never']);
+  const notKnown = `what this run changed is not known: the place has no branch wf/never in ${repo}`;
+  assert.deepEqual(gone, { branch: 'wf/never', radius: { error: notKnown }, inFull: { error: notKnown }, notes: { error: notKnown } });
   assert.equal(lessonLine([gone]), 'lesson  not known — wf/never could not be read');
+});
+
+test("a branch that touched a lint config lists it as check-affecting, with its whole diff from the place's diffs", async () => {
+  const repo = aRepo();
+  const run = gitRun(await Effect.runPromise(startRun({ brief: 'quiet a rule', repo, workflowDir: folder(), isolate: false })));
+  branchOff(repo, 'wf/lint', () => {
+    write(repo, '.oxlintrc.json', '{ "rules": { "no-console": "off" } }\n');
+    write(repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b + 0;\n');
+  });
+  const [lint] = changesOf(run, ['wf/lint']);
+  assert.ok(!('error' in lint.radius), JSON.stringify(lint.radius));
+  assert.deepEqual(lint.radius.checkAffecting, ['.oxlintrc.json']);
+  assert.match(lint.inFull as string, /^\+\{ "rules": \{ "no-console": "off" \} \}$/m);
+  assert.doesNotMatch(lint.inFull as string, /add\.ts/, 'a file no glob names is not printed in full');
 });
 
 test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
@@ -434,7 +450,7 @@ test("the lesson line reads the base's workspaces: a package's docs/ is a lesson
     write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n');
     write(repo, 'packages/x/docs/features.md', 'what is left\n');
   });
-  const read = (branch: string) => lessonLine([{ branch, radius: touchedBy(run, branch) }]);
+  const read = (branch: string) => lessonLine(changesOf(run, [branch]));
   assert.equal(read('wf/source-docs'), 'lesson  nothing written where the next agent reads');
   assert.equal(read('wf/package-docs'), 'lesson  packages/x/docs/features.md +1 −0');
 });
@@ -868,7 +884,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   write(repo, 'CLAUDE.md', 'a lesson somebody else wrote\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'another run, merged');
-  const moved = touchedBy(gitRun(readRun(run.id)), 'main');
+  const [{ radius: moved }] = changesOf(gitRun(readRun(run.id)), ['main']);
   assert.ok(
     !('error' in moved) && moved.changes.length === 2,
     `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
@@ -1074,7 +1090,7 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
     '  cost  run not measured',
     '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
     '',
-    '  wf/<id>  —4 files changed, 4 insertions(+), 1 deletion(-)',
+    '  wf/<id>  — 4 files: +4 −1, 1 binary',
     '',
     '  ── CLAUDE.md ───────────────────────────────────────────────────────',
     '  lesson one',
@@ -1117,7 +1133,7 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
     '  cost  run not measured',
     '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
     '',
-    '  wf/<id>  —4 files changed, 4 insertions(+), 1 deletion(-)',
+    '  wf/<id>  — 4 files: +4 −1, 1 binary',
     '',
     '  ── CLAUDE.md ───────────────────────────────────────────────────────',
     '  lesson one',
@@ -1361,7 +1377,7 @@ test("the whole screen of an ending at its gate: the folder's words, approve it 
     '  cost  run not measured',
     '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
     '',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '  merges    wf/<id>/implement merges cleanly onto main',
@@ -1420,7 +1436,7 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
     '  cost  run not measured',
     '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
     '',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '  merges    wf/<id>/implement merges cleanly onto main',
@@ -1462,7 +1478,7 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
     '  cost  run not measured',
     '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
     '',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '',
@@ -1588,12 +1604,12 @@ test('the whole screen of a run on two branches, one with a note longer than the
     '  cost  run not measured',
     '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
     '',
-    '  wf/<id>/docs  —1 file changed, 123 insertions(+)',
+    '  wf/<id>/docs  — 1 file: +123 −0',
     '',
     '  ── NOTES.md ────────────────────────────────────────────────────────',
     ...Array.from({ length: 120 }, (_, i) => `  note ${i + 1}`),
     '  … 3 more lines — git show wf/<id>/docs:NOTES.md',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/docs is ahead of main by 1 commit',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',

@@ -39,6 +39,7 @@ export {
   CHECK_AFFECTING,
   LESSON,
   branchesToRead,
+  countsLine,
   inFullLines,
   lessonLine,
   parseGlobs,
@@ -286,19 +287,15 @@ export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export {
-  artifacts,
   branchReader,
   branchStandings,
-  diffStat,
   headsOf,
   isShipped,
   parentRecord,
-  readArtifact,
   resultBranches,
-  sensitiveDiff,
-  touchedBy,
   type BranchReader,
 } from './branches/branches.store.ts';
+export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';
 export {

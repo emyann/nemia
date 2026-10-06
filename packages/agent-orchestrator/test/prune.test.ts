@@ -915,7 +915,7 @@ test('the whole screen of a pruned run over its budget', async (t) => {
       '  cost  run $3.40',
       '  timeline  run  queued —  ran —  wall not known',
       '',
-      '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+      '  wf/<id>/implement  — 1 file: +1 −0',
       '',
       '  branch    wf/<id>/implement is ahead of main by 1 commit',
       '',

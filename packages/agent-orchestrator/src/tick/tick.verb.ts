@@ -25,7 +25,7 @@ import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { finishingAmong, type Finishing, type PauseStanding } from '../pause/pause.ts';
 import { isGitRun, type Run } from '../record/record.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
 import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
@@ -69,9 +69,10 @@ export type Pass = {
   refused?: RefusedMove[];
   /**
    * Why the runtime left a task out of this pass, or skipped a feed entry, as it said it (`TickReport.unreadable`): a journal holding an
-   * entry no runtime wrote, on every pass while it lasts. And each run a read of whose tasks rejected so (`unreadableJournal`): it is left
-   * out of `runs` and of the feed, judged on no pass until the journal reads, and counted in flight, while every other run advances; its
-   * line carries the runtime's words, said once. Absent when there were none. `nemia up` says each once while it lasts.
+   * entry no runtime wrote, on every pass while it lasts. And each run a read of whose tasks rejected so (`unreadableJournal`), or that
+   * froze no workflow and whose folder does not load (`unloadedFolder`): it is left out of `runs` and of the feed, judged on no pass until
+   * the journal reads or the folder loads, and counted in flight, while every other run advances; its line carries the runtime's words,
+   * said once, or the refusal's. Absent when there were none. `nemia up` says each once while it lasts.
    */
   unreadable?: string[];
   /**
@@ -206,8 +207,9 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
- * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in flight
- * (`judged`). An engine's report that carries no refusals — a test's fake — is read as having none.
+ * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load
+ * (`unloadedFolder`), is left unjudged, out of the feed's `removed` and counted in flight (`judged`); a pause's reads leave it out
+ * (`stepsOrNone`). An engine's report that carries no refusals — a test's fake — is read as having none.
  *
  * Its span says how many runs the store listed (`runs`) and how many of them were answered from memory (`rested`), which make no span of
  * their own: a pass traces what it does, as many spans over many runs at rest as over few.
@@ -247,14 +249,17 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
 /** Each task of `runs` still finishing under the pause (`finishingAmong`), read off the views the runtime reported on the pass. */
 const finishingReported = (runs: readonly Run[], views: readonly TaskView[]): Finishing[] => {
   const reported = new Map(views.map((v) => [v.id, v]));
-  return finishingAmong(runs, (taskId) => reported.get(taskId), stepsOf);
+  return finishingAmong(runs, (taskId) => reported.get(taskId), stepsOrNone);
 };
 
-/** What a pass has judged so far: each run it advanced, and each run it left unjudged with the runtime's words for why. */
-type Judging = { done: Map<string, Advanced>; unjudged: Map<string, string> };
+/** What a pass has judged so far: each run it advanced, and each run it left unjudged with why (`Unjudged`). */
+type Judging = { done: Map<string, Advanced>; unjudged: Map<string, Pick<Unjudged, 'why' | 'by'>> };
 
-/** Why a run was left unjudged: a read of one of its tasks' journals was refused (`unreadableJournal`), in the runtime's words. */
-class Unjudged extends Data.TaggedError('Unjudged')<{ why: string }> {}
+/**
+ * Why a run was left unjudged: a read of one of its tasks' journals was refused (`unreadableJournal`), in the runtime's words, `by` the
+ * `journal`; or it froze no workflow and its folder does not load (`unloadedFolder`), in the refusal's words, `by` the `folder`.
+ */
+class Unjudged extends Data.TaggedError('Unjudged')<{ why: string; by: 'journal' | 'folder' }> {}
 
 /** Every run the memo holds that the store no longer lists taken out of it: a run `nemia rm` forgot. */
 const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
@@ -264,7 +269,7 @@ const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
 
 /**
  * One run of the pass's listing (`PassRead`) judged into `judging` (`advanceResting`), and what it was judged: undefined when a read of its
- * journal was refused, the run then left unjudged with the runtime's words for why.
+ * journal was refused or its unfrozen folder does not load, the run then left unjudged with why (`Unjudged`).
  */
 const judged = (e: Engine, judging: Judging, pass: PassRead, run: Run, resting: RestingPass | undefined, slot?: RunSlot) =>
   advanceResting(e, run, pass, resting, slot).pipe(
@@ -272,9 +277,9 @@ const judged = (e: Engine, judging: Judging, pass: PassRead, run: Run, resting: 
       judging.done.set(run.id, advanced);
       return advanced;
     }),
-    Effect.catchTag('Unjudged', ({ why }) =>
+    Effect.catchTag('Unjudged', ({ why, by }) =>
       Effect.sync(() => {
-        judging.unjudged.set(run.id, why);
+        judging.unjudged.set(run.id, { why, by });
         return undefined;
       }),
     ),
@@ -317,7 +322,7 @@ const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging): Effect.
 /**
  * The pass as reported, with why the feed was not written (`feedErrorOf`): each run judged in the store's order, the queue's card, and
  * the runtime's refused moves and unreadable journals — the runtime's line for a cause a run was left unjudged for said once, on the
- * run's line.
+ * run's line — and each run left out because its unfrozen folder does not load, in the refusal's words.
  */
 const passOf = (
   report: TickReport,
@@ -327,10 +332,14 @@ const passOf = (
   feedError: string | undefined,
 ): Pass => {
   const refused = report.refused ?? [];
-  const causes = new Set(judging.unjudged.values());
+  const causes = new Set([...judging.unjudged.values()].filter((u) => u.by === 'journal').map((u) => u.why));
   const unreadable = [
     ...(report.unreadable ?? []).filter((why) => !causes.has(why)),
-    ...[...judging.unjudged].map(([id, why]) => `${id} is not advanced while a task it reads is unreadable: ${why}`),
+    ...[...judging.unjudged].map(([id, { why, by }]) =>
+      by === 'journal'
+        ? `${id} is not advanced while a task it reads is unreadable: ${why}`
+        : `${id} is not advanced while its workflow folder does not load: ${why}`,
+    ),
   ];
   return {
     runs: runs.flatMap((run) => judging.done.get(run.id) ?? []),
@@ -407,14 +416,17 @@ const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMem
 
 /**
  * A run's full pass (`advancePass`), the pass's reads (`PassRead`) handed on: what it advanced, what holds it out of rest, and what it
- * rests on. Fails with `Unjudged` where a read of one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the
- * pass refused, and dies of anything else.
+ * rests on. Fails with `Unjudged` where a read of one of its tasks' journals was refused (`unreadableJournal`), or where it froze no
+ * workflow and its folder does not load (`unloadedFolder`); with a refusal where the pass refused, and dies of anything else.
  */
 const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRead, slot?: RunSlot) {
   const exit = yield* Effect.exit(advancePass(e, run, slot, pass).pipe(over(e)));
   if (Exit.isSuccess(exit)) return exit.value;
-  const why = unreadableJournal(Cause.squash(exit.cause));
-  return why === undefined ? yield* Effect.failCause(exit.cause) : yield* new Unjudged({ why });
+  const err = Cause.squash(exit.cause);
+  const journal = unreadableJournal(err);
+  if (journal !== undefined) return yield* new Unjudged({ why: journal, by: 'journal' });
+  const folder = unloadedFolder(err);
+  return folder === undefined ? yield* Effect.failCause(exit.cause) : yield* new Unjudged({ why: folder, by: 'folder' });
 });
 
 /**

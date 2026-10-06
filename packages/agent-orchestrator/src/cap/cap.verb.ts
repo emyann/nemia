@@ -11,7 +11,7 @@ import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf, unloadedFolder } from '../record/steps.store.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import { maxRuns } from '../config/config.store.ts';
 import {
@@ -78,8 +78,9 @@ const needOf = Effect.fnUntraced(function* (
 /**
  * The cap on runs in flight, and the runs it counts and holds (`Slots`): every run of `runs` read as a pass reads it, between passes, over
  * one look at the harnesses (`e.list` of every run's tasks) — what `nemia ls`, `nemia decide`, the repository's checkout and the board's
- * ceilings say. Nothing read with no cap. A record whose workflow does not read is left out, as nothing of it could be filed; a run a task
- * of which does not read, its own or a run's it waits on, is counted in flight (`UNJUDGED`).
+ * ceilings say. Nothing read with no cap. A run a task of which does not read, its own or a run's it waits on, or whose unfrozen folder
+ * does not load (`unloadedFolder`), is counted in flight (`UNJUDGED`), as the pass counts it; a record whose workflow does not read for
+ * any other reason is left out, as nothing of it could be filed.
  *
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
  * any pass has written it, `WF_MAX_RUNS` of `env` (`maxRuns`, refused by name when it is not a count). The runs the runs wait on are read
@@ -102,7 +103,8 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
     let steps: Workflow[];
     try {
       steps = stepsOf(run);
-    } catch {
+    } catch (err) {
+      if (unloadedFolder(err) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
       continue;
     }
     let need: { inFlight: boolean; wants: boolean } = UNJUDGED;

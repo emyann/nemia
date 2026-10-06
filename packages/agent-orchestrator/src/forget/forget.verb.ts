@@ -26,6 +26,7 @@ import {
   type Forgot,
 } from './forget.ts';
 import { HOME, lstatOf, stepsOf } from '../record/record.store.ts';
+import { UnloadedFolder } from '../record/steps.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { readPlaceJson, readRunPlace, runPlaceVerb, RunPlace, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
@@ -142,7 +143,7 @@ function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
   try {
     return { steps: stepsOf(run) };
   } catch (err) {
-    return { unfrozen: (err as Error).message };
+    return { unfrozen: err instanceof UnloadedFolder ? err.why : (err as Error).message };
   }
 }
 

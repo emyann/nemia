@@ -1847,6 +1847,11 @@ next pass that reads it. A harness's `unread` crosses the A2A seam beside its Ta
 something unread is counted (`ObserveCount.unread`, which `wf up --stats` prints). The full `observe`, which views and verbs read, still
 reads an unread harness as nothing.
 
+A session left unread alone — a `--bg` transcript or a detached run's output or start event that does not decode, while it runs — is
+said why, in its harness's words, on the `Observation` that left it so (`unreadWhy`, by name, across the A2A seam too), and on its task's
+view (`TaskView.unreadWhy`) for a task not settled, off the pass's look, `list`'s and `view`'s. Rebuilt on every look and kept by none:
+the first look that reads the session drops it, and the full `observe` says none. The warning is still logged on every look.
+
 What `claude agents --all --json` prints is decoded where it is read (`registryOf`, `harness/claude/registry.ts`). A row is ours when it
 is an object named `ae/` with a `state` key; another program's row, an interactive session's (no `state`) and an element that is no object
 are skipped unread. Each row of ours is decoded by `RegistryRowSchema`: a non-empty `sessionId` and `state`, and `status`, `waitingFor`,
@@ -2092,6 +2097,7 @@ of pure code sits beside it.
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
+| `src/harness/detached/looked.ts` | what a detached look at the names it was told found: each sighting, the names left unread and why each was (`unreadWhy`), and every warning to log |
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |

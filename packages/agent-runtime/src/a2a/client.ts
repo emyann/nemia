@@ -143,7 +143,9 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionTranscript(params, new ServerCallContext());
   }
 
-  observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[]; unread: string[]; why: string[] }> {
+  observeSessions(params: {
+    expected: readonly ExpectedSession[];
+  }): Promise<{ tasks: Task[]; unread: string[]; why: string[]; unreadWhy?: Record<string, string> }> {
     return this.handler.observeSessions(params, new ServerCallContext());
   }
 
@@ -205,6 +207,22 @@ const outputThrough =
   (transport: InProcessTransport) =>
   (name: string, stream: 'stdout' | 'stderr', lastBytes?: number): Effect.Effect<string | undefined, RunnerError> =>
     call('output', () => transport.sessionOutput({ name, stream, lastBytes })).pipe(Effect.map((r) => r.output ?? undefined));
+
+/**
+ * What the driver left unread (`observeSessions`), and why each session alone was: only words that are a string, for a name among
+ * `unread`. An answer without them, a driver's from before they were answered, is none.
+ */
+const unreadOf = (
+  unread: readonly string[],
+  why: readonly string[],
+  said: Record<string, unknown> | undefined,
+): Omit<Observation, 'seen'> => {
+  const names = new Set(unread);
+  const unreadWhy = new Map(
+    Object.entries(said ?? {}).flatMap(([name, words]) => (names.has(name) && typeof words === 'string' ? [[name, words] as const] : [])),
+  );
+  return { unread: names, ...(why.length ? { why } : {}), ...(unreadWhy.size ? { unreadWhy } : {}) };
+};
 
 /** The verbs the card offers that ask the transport alone, each left off when the card does not list its method. */
 const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessTransport): Partial<RunnerOps> => ({
@@ -322,10 +340,10 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Observation, RunnerError> =>
     Effect.gen(function* () {
       const seen = new Map<string, Sighting>();
-      const { tasks, unread, why } = yield* call('observe', () => transport.observeSessions({ expected }));
+      const { tasks, unread, why, unreadWhy: said } = yield* call('observe', () => transport.observeSessions({ expected }));
       yield* sightingsOf('observe', tasks, seen);
       names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
-      return { seen, unread: new Set(unread), ...(why.length ? { why } : {}) };
+      return { seen, ...unreadOf(unread, why, said) };
     });
 
   const stop = (sessionId: string): Effect.Effect<void, RunnerError> =>

@@ -545,7 +545,8 @@ const countsFromOf = (expected: readonly ExpectedSession[]): Map<string, number>
  *    attempt no longer listed goes with it, so a released session is not read again.
  *
  * Seen, each session read; unread, each whose transcript cannot be read while it runs (`reportedOf`), why said as a warning on
- * every look. Fails only when the listing itself cannot be read: it is every session's.
+ * every look and answered by name (`unreadWhy`) off this look's reports alone. Fails only when the listing itself cannot be read: it
+ * is every session's.
  */
 const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<string, number>): Effect.Effect<Observation, RunnerError> =>
   sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
@@ -560,10 +561,14 @@ const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<str
       return Effect.forEach([...m], ([name, l]) => reportedOf(x, name, l), { concurrency: 'unbounded' });
     }),
     Effect.tap((reports) => Effect.forEach(reports, (r) => (r.warning ? Effect.logWarning(r.warning) : Effect.void), { discard: true })),
-    Effect.map((reports) => ({
-      seen: new Map(reports.flatMap((r) => (r.sighting ? [[r.name, r.sighting] as const] : []))),
-      unread: new Set(reports.flatMap((r) => (r.sighting ? [] : [r.name]))),
-    })),
+    Effect.map((reports): Observation => {
+      const unreadWhy = new Map(reports.flatMap((r) => (!r.sighting && r.warning ? [[r.name, r.warning] as const] : [])));
+      return {
+        seen: new Map(reports.flatMap((r) => (r.sighting ? [[r.name, r.sighting] as const] : []))),
+        unread: new Set(reports.flatMap((r) => (r.sighting ? [] : [r.name]))),
+        ...(unreadWhy.size ? { unreadWhy } : {}),
+      };
+    }),
   );
 
 /**

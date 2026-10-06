@@ -301,6 +301,10 @@ test('REFUSED: observeFor keeps the name of a background session the registry li
     assert.deepEqual(o.unread, new Set(['ae/b/1']), 'the registry answered, and left it unread');
     assert.deepEqual([...o.seen.keys()], ['ae/g/1']);
     assert.deepEqual(o.seen.get('ae/g/1')?.closeout, { payload: { outcome: 'done' }, at: 5 });
+    assert.deepEqual([...(o.unreadWhy?.keys() ?? [])], ['ae/b/1'], 'why it alone is unread, kept through the jobs and the registry');
+    for (const said of ["`ae/b/1`'s transcript cannot be read", 'whose `timestamp` is "yesterday"']) {
+      assert.ok(o.unreadWhy?.get('ae/b/1')?.includes(said), o.unreadWhy?.get('ae/b/1'));
+    }
   } finally {
     f.restore();
   }

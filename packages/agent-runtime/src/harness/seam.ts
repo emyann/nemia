@@ -131,9 +131,16 @@ export type ExpectedSession = { name: string; harness?: string; since?: number }
  * in `unread` is neither there nor gone: nobody looked. Kept apart from `seen` because the pass reads an absence as the session
  * gone — it forgets a finished one it was letting go, and ends an attempt past its grace `lost` — and a look that failed is not
  * an absence. `why` is what each part of the look that failed said, one sentence each, in the harness's words; absent when every
- * part read. Said for a person, never decided on.
+ * part read. `unreadWhy` is why one session alone was unread, by its name, in the harness's words: every name in it is in `unread`,
+ * built by the look that answers it and kept by none; absent when no session alone was left unread. Said for a person, never decided
+ * on.
  */
-export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string>; why?: readonly string[] };
+export type Observation = {
+  seen: Map<string, Sighting>;
+  unread: ReadonlySet<string>;
+  why?: readonly string[];
+  unreadWhy?: ReadonlyMap<string, string>;
+};
 
 /**
  * The seam itself, as a plain value.
@@ -283,6 +290,26 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
 };
 
 /**
+ * Each harness's observation merged into one, and `owner` told which harness reported each session id. Takes the observations by
+ * harness name; returns every sighting, every unread name, what failed (`why`) after its harness's name, and why each session alone
+ * was unread (`unreadWhy`) as its harness said it.
+ */
+const merged = (results: readonly (readonly [string, Observation])[], owner: Map<string, string>): Observation => {
+  const seen = new Map<string, Sighting>();
+  const unread = new Set<string>();
+  for (const [harness, o] of results) {
+    for (const [sessionName, sighting] of o.seen) {
+      seen.set(sessionName, sighting);
+      owner.set(sighting.sessionId, harness);
+    }
+    for (const name of o.unread) unread.add(name);
+  }
+  const why = results.flatMap(([harness, o]) => (o.why ?? []).map((words) => `harness \`${harness}\`: ${words}`));
+  const unreadWhy = new Map(results.flatMap(([, o]) => [...(o.unreadWhy ?? [])]));
+  return { seen, unread, ...(why.length ? { why } : {}), ...(unreadWhy.size ? { unreadWhy } : {}) };
+};
+
+/**
  * One runner over `harnesses`, a task routed to the harness it names, or to `fallback` when it names none.
  *
  * A task that names a harness this engine does not have — one it was filed on by an engine that had it, such as a remote
@@ -294,7 +321,8 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
  * harness whose look failed is unread — nothing listed, and every name it was to find there not looked for — so one
  * harness being unreachable blinds the engine neither to the others nor to the fact that it could not look: read as an
  * empty listing, a failed look would have the pass read each session on it gone. What each harness's look said failed (`why`:
- * its failure's words, or the words of the parts of it that failed) is kept, each sentence after the harness's name.
+ * its failure's words, or the words of the parts of it that failed) is kept, each sentence after the harness's name, and why each
+ * session alone was unread (`unreadWhy`) is kept as its harness said it; a harness whose look failed says none.
  *
  * Which harness runs which session (`owner`) is learned from the last observation: `stop`, `logs` and `release` are given
  * a session id and nothing else, and a session id means something different to each harness. It is never persisted — a
@@ -342,26 +370,15 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
         return read.pipe(
           Effect.map((o) => [name, o] as const),
           Effect.catchCause((cause) =>
-            Effect.succeed([name, { seen: new Map<string, Sighting>(), unread: new Set(expected), why: [causeWords(cause)] }] as const),
+            Effect.succeed<readonly [string, Observation]>([
+              name,
+              { seen: new Map<string, Sighting>(), unread: new Set(expected), why: [causeWords(cause)] },
+            ]),
           ),
         );
       },
       { concurrency: 'unbounded' },
-    ).pipe(
-      Effect.map((results): Observation => {
-        const seen = new Map<string, Sighting>();
-        const unread = new Set<string>();
-        for (const [harness, o] of results) {
-          for (const [sessionName, sighting] of o.seen) {
-            seen.set(sessionName, sighting);
-            owner.set(sighting.sessionId, harness);
-          }
-          for (const name of o.unread) unread.add(name);
-        }
-        const why = results.flatMap(([harness, o]) => (o.why ?? []).map((words) => `harness \`${harness}\`: ${words}`));
-        return { seen, unread, ...(why.length ? { why } : {}) };
-      }),
-    );
+    ).pipe(Effect.map((results) => merged(results, owner)));
 
   const listing = (ops: RunnerOps) => ops.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
 

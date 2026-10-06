@@ -732,8 +732,10 @@ test('REFUSED: a session whose transcript cannot be read reads as failed only on
       if (c.as === 'unread') {
         assert.deepEqual([...value.unread], ['ae/t-1/1'], what);
         assert.equal(value.seen.size, 0, what);
+        assert.deepEqual([...(value.unreadWhy ?? [])], [['ae/t-1/1', warnings[0]]], `${what}: why it is unread, by its name`);
         continue;
       }
+      assert.equal(value.unreadWhy, undefined, `${what}: read as failed, so not unread, and no words of why it is`);
       const seen = value.seen.get('ae/t-1/1');
       assert.equal(seen?.state, 'failed', what);
       assert.equal(seen?.pid, 4242, `${what}: its process kept, for release to stop`);
@@ -743,6 +745,37 @@ test('REFUSED: a session whose transcript cannot be read reads as failed only on
     } finally {
       restore();
     }
+  }
+});
+
+test('REFUSED: why a session alone is unread is answered by the look that left it unread, beside a session read, and by no look after the one that reads it', async () => {
+  const restore = withFakeClaude(twoDone);
+  try {
+    let t = 10 * QUIESCENT_AFTER_MS;
+    let written = t - 2_000;
+    let cause: string | undefined = 'line 2 of the transcript is a `user` line whose `timestamp` is "yesterday"';
+    const ops = bgOps({
+      now: () => t,
+      transcriptTime: async () => written,
+      closeoutFrom: async (sessionId) => {
+        if (sessionId === 's-1' && cause) throw new Error(cause);
+        return { payload: { outcome: 'done' }, at: 5 };
+      },
+    });
+    const expected = [{ name: 'ae/t-1/1' }, { name: 'ae/t-2/1' }];
+    const first = await warned(ops.observeFor!(expected));
+    assert.deepEqual([...(first.value.unreadWhy?.keys() ?? [])], ['ae/t-1/1'], 'the session read beside it has no words');
+    for (const w of unreadWords(cause)) assert.match(first.value.unreadWhy!.get('ae/t-1/1')!, w);
+    assert.equal(first.warnings.length, 1, 'and the warning is still said');
+
+    cause = undefined;
+    t += 1_000;
+    written = t - 500;
+    const read = await warned(ops.observeFor!(expected));
+    assert.deepEqual([...read.value.unread], [], 'readable now');
+    assert.equal(read.value.unreadWhy, undefined, 'the look that reads it says no words of the last');
+  } finally {
+    restore();
   }
 });
 

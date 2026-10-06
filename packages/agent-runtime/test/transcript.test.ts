@@ -1435,3 +1435,39 @@ test(
     });
   },
 );
+
+test("REFUSED: at shipped defaults, a background task whose transcript does not decode carries why on its task's view — the pass's, list's and view's — in the harness's words, and loses it on the first look that reads the transcript", async () => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { background: true } }));
+    await Effect.runPromise(engine.tick());
+    const [row] = claude.rows();
+    assert.equal(row.state, 'working', 'listed working and idle, its transcript fresh: it has not ended');
+    const lines = claudeLines(row.sessionId);
+    const call = lines.findIndex((l) => JSON.stringify(l).includes('StructuredOutput'));
+    writeClaude(row.sessionId, claudeWith(row.sessionId, call, { timestamp: 'yesterday' }));
+    const words = [`\`ae/${id}/1\`'s transcript cannot be read`, `is an \`assistant\` line whose \`timestamp\` is "yesterday"`];
+
+    const pass = (await Effect.runPromise(engine.tick())).views.find((v) => v.id === id);
+    const listed = (await Effect.runPromise(engine.list([id]))).views[0];
+    const viewed = await Effect.runPromise(engine.view(id));
+    for (const [where, v] of [
+      ['pass', pass],
+      ['list', listed],
+      ['view', viewed],
+    ] as const) {
+      assert.equal(v?.state.settled, null, `${where}: unread, never settled`);
+      for (const said of words) assert.ok(v?.unreadWhy?.includes(said), `${where}: ${v?.unreadWhy}`);
+    }
+
+    writeClaude(row.sessionId, jsonl(lines.slice(0, call)));
+    const later = new Date(fs.statSync(claudeFile(row.sessionId)).mtimeMs + 5_000);
+    fs.utimesSync(claudeFile(row.sessionId), later, later);
+    const read = (await Effect.runPromise(engine.tick())).views.find((v) => v.id === id);
+    assert.ok(read, 'still in flight');
+    assert.equal(Object.hasOwn(read, 'unreadWhy'), false, `the pass that reads it says nothing: ${read.unreadWhy}`);
+    assert.equal(Object.hasOwn((await Effect.runPromise(engine.list([id]))).views[0], 'unreadWhy'), false, 'nor does list');
+    assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'unreadWhy'), false, 'nor does view');
+  });
+});

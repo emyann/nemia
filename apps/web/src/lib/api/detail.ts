@@ -150,6 +150,8 @@ export type StepSpec = {
    * gate holds before it is filed and whose approval is what files it (`endsTheRun`). Null for every other step.
    */
   workspace: string | null;
+  /** `folder` for a step that works in a folder the run makes, with no git repository (`place: folder`); null for one on a repository. */
+  place: string | null;
   resume: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
@@ -171,6 +173,7 @@ const StepSpecSchema = Schema.Struct({
   context: Schema.NullOr(Schema.Number),
   after: StringsSchema,
   workspace: Schema.NullOr(Schema.String),
+  place: Schema.NullOr(Schema.String),
   resume: Schema.NullOr(Schema.String),
   permissionMode: Schema.NullOr(Schema.String),
   sandbox: Schema.NullOr(Schema.String),

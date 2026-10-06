@@ -22,7 +22,7 @@ import { asyncOps } from './promise-runner.ts';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * A harness shaped as the orchestrator's `check`: a command and nothing else — no `find`, no `nativeIdPattern` — run by the engine's
+ * A harness shaped as the orchestrator's `check`: a command and nothing else — no `find`, no `start` — run by the engine's
  * detached worker. It prints a line and exits 3, unless its cwd holds `hold`, where it waits (bounded) until the file is gone.
  */
 const check: HarnessSpec = {

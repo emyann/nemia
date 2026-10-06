@@ -13,7 +13,7 @@ import { type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteNameOf } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig } from '../filed/filed.ts';
-import { budgetUsdFor } from '../status/status.ts';
+import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/file.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
@@ -28,7 +28,9 @@ import { inputRefusal, type InputFile } from './inputs.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
-import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
+import { readInclude } from '../workspace/worktree.store.ts';
+import { SHIPPED_PLACE, openPlace } from '../place/place.store.ts';
+import type { PlaceVerb } from '../place/place.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
@@ -70,7 +72,7 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * before the first run is started. Refused:
  * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
  *   unfilled or fill twice (`stepsIn`);
- * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that
+ * - with `isolate: false` (`--no-worktree`): a team that says `place: folder`, which has no base branch to work on in place; one that
  *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
  *   does not have into the branch it stands on;
  * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
@@ -91,7 +93,7 @@ export function stepsToStart(
   if (!isolate && isFolderTeam(steps)) {
     throw new Invalid({
       message:
-        `--no-worktree: this workflow's steps say \`workspace: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
+        `--no-worktree: this workflow's steps say \`place: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
         `Start it without --no-worktree.`,
     });
   }
@@ -183,6 +185,9 @@ export type ConfigRefused = (
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
 export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });
 
+/** The place skill's directory a git run is opened with at start (`openPlace`): the package's own place, unless a layer gives another. */
+export const StartPlace = Context.Reference<string>('orchestrator/StartPlace', { defaultValue: () => SHIPPED_PLACE });
+
 /**
  * The first step whose `harness: a2a:<name>` names an agent the store's `a2a-agents.json` does not give the engine, refused with the fix,
  * or undefined. Read here, before the run is written, since the engine would otherwise refuse the filing on the first pass, with the run on
@@ -241,7 +246,7 @@ type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'context'
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
-  `--repo ${repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
+  `--repo ${repo}: this workflow's steps say \`place: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
   `Start it without --repo, or start a workflow whose steps work on a repository.`;
 
 /**
@@ -343,19 +348,33 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
   return run;
 });
 
-/** A git run's record on `repo`, on the branch checked out there (`makeWorkspace`): fails with an `--after`'s refusal (`afterRefusal`). */
+/**
+ * The verbs a git run's place must declare for this build to run `steps` through it: `status` and `land` when an ending lands on its check
+ * (`landsOnCheck`), else none.
+ */
+export const placeVerbsNeeded = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): PlaceVerb[] =>
+  steps.some((step) => landsOnCheck(step, run)) ? ['status', 'land'] : [];
+
+/**
+ * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
+ * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`).
+ */
 const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
-  const { workspace, baseRef, branch } = yield* tried(() => makeWorkspace(repo));
+  const placeDir = yield* StartPlace;
+  const needed = placeVerbsNeeded(told.workflow ?? [], told);
+  const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed));
+  const { baseRef, branch } = opened;
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, parentRecord));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,
     repo,
-    workspace,
+    workspace: repo,
     baseRef,
     isolate,
     ...told,
     branch,
+    placeSkill,
     steps,
     createdAt: new Date().toISOString(),
   };
@@ -432,7 +451,7 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * (`nemia start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  *
- * A team that says `workspace: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
+ * A team that says `place: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
  * run's own directory in the store is its workspace, each step's folder made beneath it when the step is filed (`folderPlace`).
  *
  * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `nemia ls`, `nemia decide` and the

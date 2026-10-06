@@ -42,7 +42,7 @@ export const tryText = (name: string, version: string, fence: TryFence): string 
   [
     '---',
     `${VERSION_LINE}${version}`,
-    'workspace: folder',
+    'place: folder',
     `agent: ${name}`,
     `budget: ${TRY_BUDGET}`,
     `permissionMode: ${fence.permissionMode}`,

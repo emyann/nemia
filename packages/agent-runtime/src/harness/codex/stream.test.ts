@@ -35,9 +35,10 @@ test('a stream decodes into the events the runtime reads, in order, each as Code
   assert.ok('events' in read, 'wrong' in read ? read.wrong : '');
   assert.deepEqual(
     read.events.map((e) => e.type),
-    ['turn.started', 'item.started', 'item.completed', 'turn.completed'],
+    ['thread.started', 'turn.started', 'item.started', 'item.completed', 'turn.completed'],
   );
-  const [, started, , turn] = read.events;
+  const [thread, , started, , turn] = read.events;
+  assert.deepEqual(thread, THREAD);
   assert.deepEqual(started?.type === 'item.started' && started.item, { id: 'item_1', type: 'command_execution' });
   assert.deepEqual(turn?.type === 'turn.completed' && turn.usage, USED);
 });
@@ -58,7 +59,7 @@ test('a line of a type the runtime does not read, or no JSON object, passes unde
     ),
   );
   assert.ok('events' in read, 'wrong' in read ? read.wrong : '');
-  assert.deepEqual(read.events, [{ type: 'turn.started' }], 'a torn last line is passed over, as a write caught mid-way');
+  assert.deepEqual(read.events, [THREAD, { type: 'turn.started' }], 'a torn last line is passed over, as a write caught mid-way');
 });
 
 test('REFUSED: each field the runtime reads that is not what Codex prints, by its line, its event and its field', () => {
@@ -70,6 +71,8 @@ test('REFUSED: each field the runtime reads that is not what Codex prints, by it
     [completed({ ...USED, cache_write_input_tokens: 1.5 }), 'usage.cache_write_input_tokens'],
     [completed({ ...USED, reasoning_output_tokens: null }), 'usage.reasoning_output_tokens'],
     [{ type: 'item.completed' }, 'item'],
+    [{ type: 'thread.started', thread_id: 1 }, 'thread_id'],
+    [{ type: 'thread.started' }, 'thread_id'],
     [item('started', { id: '', type: 'agent_message' }), 'item.id'],
     [item('completed', { id: 'item_1', type: 3 }), 'item.type'],
   ] as const) {
@@ -101,6 +104,13 @@ test('a refused value is quoted to 60 characters, however large', () => {
   const message = wrong(stream(TURN, completed({ ...USED, input_tokens: huge })));
   assert.ok(message.includes(`is "${'x'.repeat(59)}…, where`), message);
   assert.ok(message.length < 500, `${message.length} characters`);
+});
+
+test('REFUSED: a thread.started whose thread_id is a number, by its line and its field', () => {
+  assert.match(
+    wrong(stream({ type: 'thread.started', thread_id: 1 }, TURN)),
+    /^line 2 of the `codex exec --json` stream is a `thread\.started` event whose `thread_id` is 1, where Codex prints /,
+  );
 });
 
 test('codexOutput refuses a stream that does not decode by throwing its words, and reads one that does as ever', () => {

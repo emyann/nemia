@@ -122,8 +122,9 @@ that landed on their first try, the cost and wall time of a landed run, and per 
 time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it, the
 skills its sessions loaded, each rule its skills declare, kept or broken, and each count its workflow
 declares over its closeouts (`tally:`). It prints tiles — the last 14 days against the 14 before — a
-row per UTC day, a row per step and agent, a row per call a step was refused, a row per skill a step
-loaded, a row per rule a step's skills declare, and a row per day, step and tally.
+row per landing check that passed in more than half its deadline, a row per UTC day, a row per step
+and agent, a row per call a step was refused, a row per skill a step loaded, a row per rule a step's
+skills declare, and a row per day, step and tally.
 
 ```bash
 wf stats                                   # every day since the first try ended, to today
@@ -148,6 +149,13 @@ wf stats --json                            # what GET /api/stats answers
   ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
   non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval.
+- **A landing check that passed in more than half its deadline is named**, with what to do: measure
+  the passing landing checks again, then change `LANDING_CHECK_DEADLINE_SECONDS` and its JSDoc
+  (`src/check/check.ts`). A landing check is the check of a step the run lands on (`workspace: main`
+  with a `check:`); its time is spawned to ended, and its deadline the one its task was filed with, so
+  an older task is judged by its own. A check refused or unfinished, a round's check, and one at half
+  its deadline or less say nothing. `--line` ends with how many of the last 14 days there were, where
+  any.
 - **A refused call counts where the harness records it**: every call each ended attempt of a try's
   own session was denied, one per call, on a step that runs `claude -p` (`claude` or
   `claude-detached`). `denied` is their mean per measured try (`0.5/try`); a step's row sums them,

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Context, Effect, Layer } from 'effect';
+import type { Running } from 'agent-orchestrator';
 
 /** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
@@ -72,9 +73,11 @@ export type Capabilities = {
 export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 
 /**
- * The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — and its own checkout otherwise.
+ * The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — else, where the api runs an
+ * install (`running`), the repository it was built from, and its own checkout otherwise.
  */
-export const repoOf = (env: NodeJS.ProcessEnv): string => path.resolve(env.HKB_REPO?.trim() || HOME_REPO);
+export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string =>
+  path.resolve(env.HKB_REPO?.trim() || (running?.kind === 'install' ? running.source : HOME_REPO));
 
 /** How long a server has to start and list its tools before it is reported as not answering. */
 export const ASK_MS = 15_000;

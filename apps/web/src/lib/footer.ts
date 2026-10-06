@@ -3,7 +3,7 @@
  * short, and which of them a phone keeps; the pause says its own (`pauseWords`). Each short form fits the bar's one line, and its whole
  * sentence is its `title`. Pure: the time is handed in, the browser's own on the page.
  */
-import type { Daemon, Quota, RunSummary } from './api';
+import type { Daemon, Quota, RunSummary, Version } from './api';
 import { daemonSentence, daemonWords } from './daemon.ts';
 import { inFlight } from './factory.ts';
 import type { FeedStatus } from './feed.ts';
@@ -38,6 +38,21 @@ export const atWorkWords = (work: AtWork): { text: string; title: string } => ({
   text: `${counted(work.runs, 'run')} · ${counted(work.sessions, 'session')}`,
   title: `${counted(work.runs, 'run')} in flight, and ${counted(work.sessions, 'session')} working or checking, across every factory.`,
 });
+
+/**
+ * The version and the code serving the board, in short — `v1.0.0 · v1.2.0` for an install of that tag, `v1.0.0 · checkout` for a
+ * checkout, the version alone where the api says neither — and as a sentence naming the folder it runs from.
+ */
+export function versionWords(version: Version): { text: string; title: string } {
+  const named = `Nemia's orchestrator, version ${version.version}`;
+  const release = version.release;
+  if (release === undefined) return { text: `v${version.version}`, title: named };
+  if (release.kind === 'checkout')
+    return { text: `v${version.version} · checkout`, title: `${named}, run from the checkout at ${release.root}` };
+  const tag = release.tag ?? 'install';
+  const commit = release.commit ? ` (${release.commit.slice(0, 7)})` : '';
+  return { text: `v${version.version} · ${tag}`, title: `${named}, the installed release ${tag}${commit} at ${release.root}` };
+}
 
 /** How the daemon's dot is drawn: it ticks, it may be taken over, nothing ticks, or nothing is read yet. */
 export type DaemonTone = 'ok' | 'warn' | 'down' | 'reading';

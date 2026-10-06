@@ -1,11 +1,12 @@
 /**
- * The stats in words (`Stats`, `stats.ts`): the tiles, a row per day, a row per change to what the runs froze, a row per step, a row per
- * call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day and count a step
- * declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`, never 0. Pure.
+ * The stats in words (`Stats`, `stats.ts`): the tiles, a row per landing check that passed in more than half its deadline, a row per
+ * day, a row per change to what the runs froze, a row per step, a row per call a step was refused, a row per skill a step loaded, a row
+ * per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
+ * number with nothing measured under it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
 import type { Health } from '../series/series.ts';
-import type { Group, Headline, Stats, StepRow } from './stats.ts';
+import type { Group, Headline, SlowLanding, Stats, StepRow } from './stats.ts';
 import type { Mark } from './marks.ts';
 import type { TallyCell } from '../tally/tally.ts';
 
@@ -51,6 +52,22 @@ function tileLines(g: Group): string[] {
   return [
     `last 14 days (${last.from} → ${last.to}), against the 14 before (${before.from} → ${before.to})`,
     ...table(Object.keys(now).map((name) => [`  ${name}`, now[name], `(${then[name]})`])),
+  ];
+}
+
+/**
+ * A row per landing check that passed in more than half the deadline its task was filed with (`SlowLanding`), under a line saying what
+ * to do: its day, run, step and try, its run time, that deadline and the share; none where no check did.
+ */
+function slowLandingLines(slow: readonly SlowLanding[]): string[] {
+  if (!slow.length) return [];
+  return [
+    'landing checks over half their deadline: measure the passing landing checks again, then change LANDING_CHECK_DEADLINE_SECONDS and ' +
+      'its JSDoc (src/check/check.ts)',
+    ...table([
+      ['day', 'run', 'step', 'try', 'ran', 'deadline', 'share'],
+      ...slow.map((x) => [x.day, x.run, x.step, String(x.try), durationWord(x.checkMs), durationWord(x.deadlineMs), percent(x.share)]),
+    ]),
   ];
 }
 
@@ -178,9 +195,10 @@ export function healthLines(h: Health): string[] {
 }
 
 /**
- * What `nemia stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per
- * step, a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
- * declares, the system's health over the days, and the runs left out.
+ * What `nemia stats` prints: the tiles, a row per landing check that passed in more than half its deadline, a row per day — per group,
+ * with a key — then a row per change to what the runs froze, a row per step, a row per call a step was refused, a row per skill a step
+ * loaded, a row per rule its skills declare, a row per day and count a step declares, the system's health over the days, and the runs
+ * left out.
  */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
@@ -188,6 +206,7 @@ export function statsLines(s: Stats): string[] {
   return [
     ...(filtered.length ? [`only ${filtered.join(', ')}`] : []),
     ...tileLines(s.all),
+    ...(s.all.slowLandings.length ? ['', ...slowLandingLines(s.all.slowLandings)] : []),
     '',
     s.from ? `${s.from} → ${s.to}` : 'no try has ended, and no run has finished',
     ...groups,
@@ -202,7 +221,20 @@ export function statsLines(s: Stats): string[] {
   ];
 }
 
-/** The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets. */
+/** How many landing checks of the last 14 days passed in more than half their deadline, in words; none where none did. */
+function slowLandingWord(s: Stats): string {
+  const { from, to } = s.all.tiles.last;
+  const n = s.all.slowLandings.filter((x) => x.day >= from && x.day <= to).length;
+  if (!n) return '';
+  return n === 1
+    ? ', 1 landing check over half its deadline: measure again'
+    : `, ${n} landing checks over half their deadline: measure again`;
+}
+
+/**
+ * The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets, and how many landing checks
+ * of the last 14 days passed in more than half their deadline, where any did.
+ */
 export function statsLine(s: Stats): string {
   const now = wordsOf(s.all.tiles.last);
   const then = wordsOf(s.all.tiles.before);
@@ -210,6 +242,7 @@ export function statsLine(s: Stats): string {
   return (
     `stats, last 14 days (the 14 before): ${was('runs')} runs finished, ${was('landed')} landed, ${was('first try')} on the first try, ` +
     `${was('rounds')} rounds, ${was('cost/landed')} and ${was('time/landed')} per landed run, ${was('tries')} tries, ` +
-    `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied, ${was('skills')} skills loaded`
+    `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied, ${was('skills')} skills loaded` +
+    slowLandingWord(s)
   );
 }

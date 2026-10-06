@@ -2,7 +2,7 @@ import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, VERSION } from 'agent-orchestrator';
+import { feedHubLayer, leaseRelease, runningRelease, VERSION } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -42,13 +42,24 @@ export const answerError: ErrorHandler = (err, c) => {
   return c.json({ error: err.message }, 500);
 };
 
+/** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, not its source; a checkout's folder. */
+const RELEASE = leaseRelease(runningRelease());
+
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
  * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
  * kept nothing yet (`ReadMemo`), and the hub the feed's lines are published to as the process's daemon writes them (`feedHubLayer`).
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
-  Layer.mergeAll(ApiConfig.layer(env), Engine.live, StoreRoot.live, McpAsker.live, QuotaAsker.live, ReadMemo.live, feedHubLayer());
+  Layer.mergeAll(
+    ApiConfig.layer(env, runningRelease()),
+    Engine.live,
+    StoreRoot.live,
+    McpAsker.live,
+    QuotaAsker.live,
+    ReadMemo.live,
+    feedHubLayer(),
+  );
 
 /**
  * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or
@@ -61,7 +72,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * (`OWN` in test/served.test.ts).
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
- * - `GET /api/version` — `{ version }`, the orchestrator's package version (`VERSION`): what the board's bottom bar says.
+ * - `GET /api/version` — `{ version, release }`, the orchestrator's package version (`VERSION`) and the code the api runs (`RELEASE`), a
+ *   checkout or an install: what the board's bottom bar says.
  * - factories/factories.ts — the factories a request may be answered in, each with its repositories, workflows and hires. Every route is
  *   answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused
  *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
@@ -138,7 +150,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       await next();
     })
     .get('/api/health', (c) => c.json({ ok: true }))
-    .get('/api/version', (c) => c.json({ version: VERSION }))
+    .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>
       served(c, async ({ e, env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { e, env, home, asker: mcp }))),
     )

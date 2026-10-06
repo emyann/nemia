@@ -425,7 +425,7 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
     'supervise: Bash(git branch --delete --force wf/r-1/implement)',
   ]);
   assert.deepEqual(
-    unfenced({ ...bare, background: undefined, workspace: 'folder' }),
+    unfenced({ ...bare, background: undefined, workspace: undefined, place: 'folder' }),
     [],
     'the same step as a job in a folder the run made reads only the settings shipped here, where no allow reaches a forced delete',
   );

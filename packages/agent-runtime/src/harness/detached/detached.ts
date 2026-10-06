@@ -31,6 +31,7 @@ import { readTranscript } from '../transcript.ts';
 import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
 import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
+import { quote } from '../../core/quote.ts';
 import { outputIn, type SaidMemo } from './said.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
@@ -49,11 +50,10 @@ export type HarnessSpec = {
    */
   prepare?: (r: SpawnRequest) => Partial<HarnessIO>;
   /**
-   * A regex with one capture group, matched against the harness's output, that finds ITS session
-   * id — what a later task resumes, and what `transcript.file` is given. Optional: the name is the key,
-   * this is just a handle.
+   * How the harness's start event decodes, the one place its own session id is read from: what a later task resumes, and what
+   * `transcript.file` is given (`StartEvent`). Absent, a run keeps no id: the name is the key, the id just a handle.
    */
-  nativeIdPattern?: string;
+  start?: StartEvent;
   /**
    * What this harness cannot be asked for, as a sentence that names what to write instead — or
    * `undefined` when it can do what the task says. Permission modes and efforts are its own words,
@@ -149,6 +149,14 @@ export type HarnessSpec = {
 };
 
 /**
+ * A harness's start event, as data the worker reads (`bin/ae-worker.ts`): the first whole line of its stdout that is a JSON object
+ * whose own keys hold each of `event`'s values. Its `id` field must be a string of hex and dashes, 16 or more, the session's own id;
+ * anything else there, or nothing, refuses the start (`RunFile.startRefused`): the session is unread while its process runs, and
+ * read as failed, with no id, once it has ended.
+ */
+export type StartEvent = { event: Readonly<Record<string, string>>; id: string };
+
+/**
  * Where a harness that can take a structured final answer should put it.
  *
  * Chosen by the runner, per run, OUTSIDE the workspace: anything written inside a step's worktree
@@ -240,6 +248,9 @@ export const detachedStateOf = (run: Beaten, now: Instant): SessionState => {
   return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
 };
 
+/** Whether `run` is a session whose start its worker refused (`startRefused`) and whose process still runs: unread until it ends. */
+const refusedAtWork = (run: RunFile, now: Instant): boolean => run.startRefused !== undefined && detachedStateOf(run, now) === 'working';
+
 /** Whether a run is over as of now: anything but `working`, a lease gone included. */
 const overNow = (run: Beaten): boolean => detachedStateOf(run, instantNow()) !== 'working';
 
@@ -294,6 +305,11 @@ const RunFileSchema = Schema.StructWithRest(
     inputAt: Schema.optional(Schema.Finite),
     /** The harness printed the line that closes its input, and the worker ended its stdin: words said now reach nobody. */
     inputClosed: Schema.optional(Schema.Literal(true)),
+    /**
+     * The harness printed its start event (`HarnessSpec.start`) with no id there: the 1-based `line` of its stdout, the `field`
+     * read, and what was `found` in it, as JSON cut at 200 characters, or `nothing`. The run is unread (`startRefusalOf`).
+     */
+    startRefused: Schema.optional(Schema.Struct({ line: Schema.Finite, field: Schema.String, found: Schema.String })),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -343,7 +359,8 @@ const firstRunFile = (plan: object): string => {
 export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
 /**
- * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, with no
+ * A run's sighting, field for field: its state, `failed` for a run whose start was refused, which is read only once it has ended
+ * (`refusedAtWork`); its closeout the file its harness wrote (`statement`), else what its output says, with no
  * time: the spawn cleared both before it launched the run, so either was written by the run's own process, and the engine keeps
  * it whatever the clock says; its exit code once it has one, never the worker's -1; and what its output says it used, reached
  * and was denied, and the skills it loaded and the files it touched: an empty list kept, since it says they were counted.
@@ -357,7 +374,7 @@ const sightingOf = (
   usage: Usage | undefined,
 ): Sighting => ({
   sessionId: name,
-  state: detachedStateOf(run, now),
+  state: run.startRefused ? 'failed' : detachedStateOf(run, now),
   nativeId: run.nativeId,
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
@@ -367,6 +384,46 @@ const sightingOf = (
   ...(output?.read.skills ? { skills: output.read.skills } : {}),
   ...(output?.read.files ? { files: output.read.files } : {}),
 });
+
+/**
+ * What the output of the run under `name` says (`told`), for its sighting; a refusal of it fails the look, in words naming the run
+ * and `log`, its output's file. A run whose start was refused (`startRefused`) is read as failed, and its output's refusal, often
+ * of that same start event, is its alone: read as nothing said, so the look reads it and the harness's other runs.
+ */
+const outputFor = (
+  name: string,
+  run: RunFile,
+  told: { read: HarnessOutput } | { wrong: string } | undefined,
+  log: string,
+): { read: HarnessOutput } | undefined => {
+  if (!told || 'read' in told) return told;
+  if (run.startRefused) return undefined;
+  throw new Error(`\`${name}\`'s output, ${log}, cannot be read: ${told.wrong}`);
+};
+
+/**
+ * Why the run under `name` has no session id: its harness printed its start event with no id this runtime reads (`startRefused`).
+ * Names the run, the line of its stdout, the event, the field and what was there, quoted, what the run is read as, and what to do.
+ */
+export const startRefusalOf = (spec: HarnessSpec, name: string, refused: NonNullable<RunFile['startRefused']>): string => {
+  const event = Object.values(spec.start?.event ?? {}).join('`/`');
+  return (
+    `${spec.name}: \`${name}\` has no session id: line ${refused.line} of its stdout is its \`${event}\` start event, and its \`${refused.field}\`` +
+    ` holds ${quote(refused.found)}, where this runtime reads its session's id, a string of hex and dashes, 16 or more. It is unread` +
+    ` while its process runs, and read as failed once it has ended; the other sessions of ${spec.name} are read. File the task again` +
+    ` on a ${spec.name} whose start event this runtime reads, or under a runtime whose \`start\` on the \`${spec.name}\` spec reads` +
+    ` this one; once the task has settled, \`ae forget\` lets this session go.`
+  );
+};
+
+/** What `look` answers, once why each run whose start was refused (`refused`) has no id is said as a warning (`startRefusalOf`). */
+const sayingUnread = <A, E>(spec: HarnessSpec, look: Effect.Effect<{ value: A; refused: readonly Run[] }, E>): Effect.Effect<A, E> =>
+  look.pipe(
+    Effect.tap(({ refused }) =>
+      Effect.forEach(refused, ({ name, run }) => Effect.logWarning(startRefusalOf(spec, name, run.startRefused!)), { discard: true }),
+    ),
+    Effect.map(({ value }) => value),
+  );
 
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
 const inboxFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.inbox.jsonl`);
@@ -536,6 +593,23 @@ const forgetRunOf =
     });
   };
 
+/**
+ * A detached runner's `transcript`, for a spec that keeps one: read from the harness's own record, found by the run's `nativeId`
+ * off its own run file; a name with no run file is taken for that id itself.
+ */
+const transcriptOf =
+  (spec: HarnessSpec, root: string, reader: NonNullable<HarnessSpec['transcript']>): NonNullable<RunnerOps['transcript']> =>
+  (sessionId, after) =>
+    Effect.tryPromise({
+      try: async () => {
+        const hit = runNamed(spec, root, sessionId);
+        const nativeId = hit ? hit.run.nativeId : sessionId;
+        return readTranscript(nativeId ? reader.file(nativeId) : undefined, after, reader.events);
+      },
+      catch: (cause) =>
+        new RunnerError({ verb: 'transcript', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
+    });
+
 /** The verbs of a detached runner over the files beside a run's: its streams (`outputOps`), and `forget`. */
 const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({ ...outputOps(spec, dir), forget: forgetRunOf(spec, root) });
 
@@ -600,14 +674,18 @@ const startWorker = (file: string, cwd: string): void => {
  *   Every step runs before the worker is launched, or is the launch: whatever threw, no session is running under the
  *   name, and the spawn is refused.
  * - `observe`: a sighting per run file, whose `sessionId` is the run's name, this runner's handle. `nativeId` is the
- *   harness's own, scraped from its output by the worker — present only once the harness has printed it, which is why
- *   resume is best-effort for this kind of harness and exact for one with a registry. The closeout is the file the harness
+ *   harness's own, read by the worker from its start event (`HarnessSpec.start`) — present only once the harness has printed
+ *   it, which is why resume is best-effort for this kind of harness and exact for one with a registry. The closeout is the file the harness
  *   wrote its answer to, when it wrote one (`statementOf`), otherwise what its output says (`outputOf`). The exit code is
  *   the process's own, once it has one: the worker writes -1 when there is none — killed by a signal, or never started —
  *   and that is reported as no code, not as a code. A run whose output the spec refuses fails the whole look, in the
- *   spec's words, naming the run and its output file: every session of the harness is unread, never gone.
+ *   spec's words, naming the run and its output file: every session of the harness is unread, never gone. A run whose start
+ *   event its worker refused (`startRefused`) is left out while its process runs, and read as `failed`, with no id, once it
+ *   has ended (`refusedAtWork`), whatever its output's refusal (`outputFor`); why is said as a warning on every look
+ *   (`startRefusalOf`), and the harness's others are read.
  * - `observeFor`: the same sighting for each name expected that has a run file, and the name `unread` for one whose file is
- *   there and unreadable. A refused output fails it as it fails `observe`.
+ *   there and unreadable, or whose start was refused and whose process still runs, said as `observe` says it. A refused output
+ *   fails it as it fails `observe`.
  * - `find`: the run under a name, off its own run file alone, as `detachedFind`; `stop` and `transcript` read by it.
  * - `stop`, in order, for a run that is working:
  *   1. Leaves the stop on disk (`.stop`). The run file exists before the worker has written its own pid, and a stop in
@@ -624,7 +702,7 @@ const startWorker = (file: string, cwd: string): void => {
  * - `output` (a spec with `streams`): one stream of the run under a name, whole or its last bytes, read from its own file
  *   alone; `undefined` when there is none, a run spawned before the spec kept streams among them.
  * - `transcript` (a spec with `transcript`): the conversation, from the harness's own record, found by the harness's own
- *   id — the run's `nativeId`, which the worker reads off what the harness prints, so until it has printed one there is
+ *   id — the run's `nativeId`, which the worker reads off the harness's start event, so until it has printed one there is
  *   nothing to read. A name with no run file is taken for that id itself: the id an attempt's end was recorded with,
  *   which is what the engine asks by once the run file is gone.
  * - `say` (a spec with `input`, `sayTo`): words for a running session, appended to its inbox as the line its harness reads,
@@ -691,26 +769,12 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       : lessCarried(usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)));
 
   const sightingAt = (name: string, run: RunFile, now: Instant, all: () => readonly Run[]): Sighting => {
-    const output = outputOf(name, run);
-    if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
+    const output = outputFor(name, run, outputOf(name, run), logFile(name));
     return sightingOf(name, run, now, statementOf(name), output, usageOf(run, output?.read.usage, all));
   };
 
   const observeError = (cause: unknown) =>
     new RunnerError({ verb: 'observe', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` });
-
-  const transcriptOf =
-    (reader: NonNullable<HarnessSpec['transcript']>): NonNullable<RunnerOps['transcript']> =>
-    (sessionId, after) =>
-      Effect.tryPromise({
-        try: async () => {
-          const hit = find(sessionId);
-          const nativeId = hit ? hit.run.nativeId : sessionId;
-          return readTranscript(nativeId ? reader.file(nativeId) : undefined, after, reader.events);
-        },
-        catch: (cause) =>
-          new RunnerError({ verb: 'transcript', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
-      });
 
   return {
     spawn: (asked) =>
@@ -748,7 +812,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             ...(env ? { env } : {}),
             ...(spec.streams ? { streams } : {}),
             stopFile: stopFile(r.name),
-            nativeIdPattern: spec.nativeIdPattern,
+            ...(spec.start ? { start: spec.start } : {}),
             ...(spec.resumeCostCarried && r.resumeFrom
               ? { resumeFrom: r.resumeFrom, carried: carriedBy(readAll(), r.resumeFrom, Date.now(), r.name) }
               : {}),
@@ -761,32 +825,42 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),
 
-    observe: Effect.try({
-      try: () => {
-        const now = instantNow();
-        const all = readAll();
-        return new Map(all.map(({ name, run }) => [name, sightingAt(name, run, now, () => all)]));
-      },
-      catch: observeError,
-    }),
-
-    observeFor: (expected) =>
+    observe: sayingUnread(
+      spec,
       Effect.try({
-        try: (): Observation => {
+        try: () => {
           const now = instantNow();
-          let listing: Run[] | undefined;
-          const all = () => (listing ??= readAll());
-          const seen = new Map<string, Sighting>();
-          const unread = new Set<string>();
-          for (const { name } of expected) {
-            const at = runAt(spec, root, name);
-            if (at && 'unread' in at) unread.add(name);
-            else if (at) seen.set(name, sightingAt(name, at.run, now, all));
-          }
-          return { seen, unread };
+          const all = readAll();
+          const read = all.filter(({ run }) => !refusedAtWork(run, now));
+          const value = new Map(read.map(({ name, run }) => [name, sightingAt(name, run, now, () => all)]));
+          return { value, refused: all.filter(({ run }) => run.startRefused) };
         },
         catch: observeError,
       }),
+    ),
+
+    observeFor: (expected) =>
+      sayingUnread(
+        spec,
+        Effect.try({
+          try: () => {
+            const now = instantNow();
+            let listing: Run[] | undefined;
+            const all = () => (listing ??= readAll());
+            const seen = new Map<string, Sighting>();
+            const unread = new Set<string>();
+            const refused: Run[] = [];
+            for (const { name } of expected) {
+              const at = runAt(spec, root, name);
+              if (at && 'run' in at && at.run.startRefused) refused.push({ name, run: at.run });
+              if (at && ('unread' in at || refusedAtWork(at.run, now))) unread.add(name);
+              else if (at) seen.set(name, sightingAt(name, at.run, now, all));
+            }
+            return { value: { seen, unread } satisfies Observation, refused };
+          },
+          catch: observeError,
+        }),
+      ),
 
     stop: (sessionId) =>
       Effect.try({
@@ -814,7 +888,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       }),
 
     ...runFileOps(spec, root, dir),
-    ...(spec.transcript ? { transcript: transcriptOf(spec.transcript) } : {}),
+    ...(spec.transcript ? { transcript: transcriptOf(spec, root, spec.transcript) } : {}),
     ...(spec.input ? { say: sayTo(spec, root, spec.input) } : {}),
   };
 };

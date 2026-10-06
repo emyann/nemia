@@ -23,22 +23,22 @@ import { countRecord, readText, within } from '../meter/tally.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
+/** A struct of `fields` that keeps every key it does not name, so a record written back loses none. */
+const Kept = <const F extends Schema.Struct.Fields>(fields: F) => Schema.StructWithRest(Schema.Struct(fields), Rest);
+
 const Strings = Schema.mutable(Schema.Array(Schema.String));
 
 const TaskRef = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String }), Rest);
 
 /** A try a step had before the one it is on (`EarlierTry`), as any version of the tick writes one. */
-const EarlierTrySchema = Schema.StructWithRest(
-  Schema.Struct({
-    taskId: Schema.String,
-    check: Schema.optional(TaskRef),
-    then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'back']),
-    model: Schema.optional(Schema.String),
-    budget: Schema.optional(Schema.Finite),
-    paused: Schema.optional(Schema.Literal(true)),
-  }),
-  Rest,
-);
+const EarlierTrySchema = Kept({
+  taskId: Schema.String,
+  check: Schema.optional(TaskRef),
+  then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'back']),
+  model: Schema.optional(Schema.String),
+  budget: Schema.optional(Schema.Finite),
+  paused: Schema.optional(Schema.Literal(true)),
+});
 
 const LandedSchema = Schema.Union([
   Schema.StructWithRest(Schema.Struct({ commit: Schema.String }), Rest),
@@ -46,18 +46,15 @@ const LandedSchema = Schema.Union([
   Schema.StructWithRest(Schema.Struct({ untouched: Schema.String }), Rest),
 ]);
 
-const StepRecordSchema = Schema.StructWithRest(
-  Schema.Struct({
-    taskId: Schema.NullOr(Schema.String),
-    workspace: Schema.optional(Schema.String),
-    branch: Schema.optional(Schema.String),
-    check: Schema.optional(TaskRef),
-    tries: Schema.optional(Schema.mutable(Schema.Array(EarlierTrySchema))),
-    handedOff: Schema.optional(Schema.String),
-    landed: Schema.optional(LandedSchema),
-  }),
-  Rest,
-);
+const StepRecordSchema = Kept({
+  taskId: Schema.NullOr(Schema.String),
+  workspace: Schema.optional(Schema.String),
+  branch: Schema.optional(Schema.String),
+  check: Schema.optional(TaskRef),
+  tries: Schema.optional(Schema.mutable(Schema.Array(EarlierTrySchema))),
+  handedOff: Schema.optional(Schema.String),
+  landed: Schema.optional(LandedSchema),
+});
 
 /**
  * A run's record as any version of the tick writes it: `Run`, with the person's files it composes on read
@@ -84,29 +81,25 @@ const runBase = {
   createdAt: Schema.String,
 };
 
-const GitRecordSchema = Schema.StructWithRest(
-  Schema.Struct({
-    ...runBase,
-    place: Schema.optional(Schema.Undefined),
-    repo: Schema.String,
-    baseRef: Schema.String,
-    branch: Schema.String,
-    isolate: Schema.Boolean,
-  }),
-  Rest,
-);
+const GitRecordSchema = Kept({
+  ...runBase,
+  place: Schema.optional(Schema.Undefined),
+  repo: Schema.String,
+  baseRef: Schema.String,
+  branch: Schema.String,
+  isolate: Schema.Boolean,
+  placeSkill: Schema.optional(Schema.StructWithRest(Schema.Struct({ skill: Schema.String, version: Schema.String }), Rest)),
+});
 
-const FolderRecordSchema = Schema.StructWithRest(
-  Schema.Struct({
-    ...runBase,
-    place: Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('folder') }), Rest),
-    repo: Schema.optional(Schema.Undefined),
-    baseRef: Schema.optional(Schema.Undefined),
-    branch: Schema.optional(Schema.Undefined),
-    isolate: Schema.optional(Schema.Undefined),
-  }),
-  Rest,
-);
+const FolderRecordSchema = Kept({
+  ...runBase,
+  place: Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('folder') }), Rest),
+  repo: Schema.optional(Schema.Undefined),
+  baseRef: Schema.optional(Schema.Undefined),
+  branch: Schema.optional(Schema.Undefined),
+  isolate: Schema.optional(Schema.Undefined),
+  placeSkill: Schema.optional(Schema.Undefined),
+});
 
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));
 
@@ -434,17 +427,14 @@ const RoundAskFileSchema = Schema.StructWithRest(
   Schema.Struct({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) }),
   Rest,
 );
-const RetryAskFileSchema = Schema.StructWithRest(
-  Schema.Struct({
-    mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
-    model: Schema.optionalKey(Schema.NonEmptyString),
-    message: Schema.optionalKey(Said),
-    budget: Schema.optionalKey(Dollars),
-    interrupted: Schema.optionalKey(Schema.NonEmptyString),
-    at: Schema.optionalKey(Schema.Unknown),
-  }),
-  Rest,
-);
+const RetryAskFileSchema = Kept({
+  mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
+  model: Schema.optionalKey(Schema.NonEmptyString),
+  message: Schema.optionalKey(Said),
+  budget: Schema.optionalKey(Dollars),
+  interrupted: Schema.optionalKey(Schema.NonEmptyString),
+  at: Schema.optionalKey(Schema.Unknown),
+});
 
 /** An ask file's JSON, or why it cannot be read. */
 export function heldIn(file: string): { read: unknown } | { unreadable: string } {

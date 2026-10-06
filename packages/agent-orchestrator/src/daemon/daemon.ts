@@ -65,7 +65,12 @@ export type DaemonFile = {
   procStart?: number;
   /** Written as it stops on a signal or a failure: a clean stop frees the store even when the pid is later reused. */
   stoppedAt?: string;
+  /** The code it runs, written as it takes the store (`leaseRelease`); absent from a daemon started before releases. */
+  release?: LeaseRelease;
 };
+
+/** The code a daemon runs, as its lease records it: a checkout or an install, its folder, and an install's tag and commit. */
+export type LeaseRelease = { kind: 'checkout' | 'install'; root: string; tag?: string; commit?: string };
 
 /**
  * What the process table says of the file's pid, as the caller finds it: the process that wrote the file (`same` — the pid alive and

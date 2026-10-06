@@ -4194,6 +4194,7 @@ test('REFUSED at `nemia start --after`, on either side, when a folder run is inv
     baseRef: undefined,
     branch: undefined,
     isolate: undefined,
+    placeSkill: undefined,
   };
   const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = {
     'a-1': { record: record('a-1') },
@@ -4202,12 +4203,12 @@ test('REFUSED at `nemia start --after`, on either side, when a folder run is inv
   const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
   assert.equal(
     afterRefusal(['n-1'], { repo: '/repo', branch: 'main' }, parentOf),
-    "--after n-1: n-1 is a folder run (workspace: folder), which never ships onto a branch, so this run would wait for ever. When n-1's work is done, start it without --after n-1.",
+    "--after n-1: n-1 is a folder run (place: folder), which never ships onto a branch, so this run would wait for ever. When n-1's work is done, start it without --after n-1.",
   );
   for (const id of ['a-1', 'n-1', 'x-9']) {
     assert.equal(
       afterRefusal([id], { place: { kind: 'folder' } }, parentOf),
-      `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`,
+      `--after ${id}: this run's team works in folders (place: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`,
       `${id}: a folder run's own --after is refused whatever it names: a git run, a folder run, or no run at all`,
     );
   }
@@ -9195,7 +9196,7 @@ test("the run's sign-off nudge is told in its owner's words, pinned — the tool
 test("a folder run is briefed on folders, never on git: a chain continues its parent's folder, a fork and a fan-in are told where the steps before them worked, and a new session is told what it left is still here", () => {
   const f = (name: string, after: string[] = [], rest: Partial<Workflow> = {}): Workflow => ({
     ...step(name, after),
-    workspace: 'folder',
+    place: 'folder',
     ...rest,
   });
   const write = f('write');

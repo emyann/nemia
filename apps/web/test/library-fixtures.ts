@@ -116,6 +116,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   resume: null,
   input: ['review'],
   workspace: 'main',
+  place: null,
   writable: [],
   reads: [],
   slot: 'none',
@@ -203,7 +204,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
 /** The builder's form: a key of each shape, an agent of yours, and the keys a remote step refuses. */
 export const keyForm = (extra: Partial<KeyForm> = {}): KeyForm => ({
   keys: [
-    { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main', 'folder'], byHarness: null },
+    { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main'], byHarness: null },
     { key: 'slot', meaning: 'Whether the run takes a slot.', kind: 'choice', choices: ['none'], byHarness: null },
     { key: 'effort', meaning: 'How hard it thinks.', kind: 'harness-word', choices: null, byHarness: { claude: ['low', 'high'] } },
   ],

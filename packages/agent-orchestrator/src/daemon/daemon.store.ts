@@ -34,6 +34,7 @@ import {
   type HolderKind,
   type Identity,
   type Instant,
+  type LeaseRelease,
   type Monotonic,
 } from './daemon.ts';
 import { Conflict } from '../refusal/refusal.ts';
@@ -200,6 +201,14 @@ const DaemonFileSchema = Schema.Struct({
   beatMono: Schema.optionalKey(MonotonicSchema),
   procStart: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   stoppedAt: Schema.optionalKey(When),
+  release: Schema.optionalKey(
+    Schema.Struct({
+      kind: Schema.Literals(['checkout', 'install']),
+      root: Schema.String,
+      tag: Schema.optionalKey(Schema.String),
+      commit: Schema.optionalKey(Schema.String),
+    }),
+  ),
 });
 
 /** The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
@@ -318,6 +327,22 @@ function writeDaemon(file: DaemonFile): void {
 /** What `takeStore` took: the file this daemon now holds the store by, and where the store stood before it. */
 export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
 
+/** The lease this process writes as a daemon of kind `by`, started at `now`, with the release it runs where it is given. */
+function leaseOf(every: number, cwd: string, by: HolderKind, now: Instant, release: LeaseRelease | undefined): DaemonFile {
+  const procStart = procStartOf(process.pid);
+  return {
+    pid: process.pid,
+    by,
+    startedAt: new Date(now.at).toISOString(),
+    ...(now.mono ? { startedMono: now.mono } : {}),
+    cwd,
+    every,
+    passedAt: null,
+    ...(procStart !== undefined ? { procStart } : {}),
+    ...(release !== undefined ? { release } : {}),
+  };
+}
+
 /**
  * A daemon takes the store, as the kind it is (`by`): refused by name, exit 2, while another daemon of either kind ticks it, in the words
  * for the kind that asks (`holdRefusal`); otherwise the file names this process and its kind.
@@ -329,25 +354,17 @@ export function takeStore({
   every,
   cwd,
   by,
+  release,
   now = instantNow(),
 }: {
   every: number;
   cwd: string;
   by: HolderKind;
+  release?: LeaseRelease;
   now?: Instant;
 }): TakenStore {
   fs.mkdirSync(HOME, { recursive: true });
-  const procStart = procStartOf(process.pid);
-  const held: DaemonFile = {
-    pid: process.pid,
-    by,
-    startedAt: new Date(now.at).toISOString(),
-    ...(now.mono ? { startedMono: now.mono } : {}),
-    cwd,
-    every,
-    passedAt: null,
-    ...(procStart !== undefined ? { procStart } : {}),
-  };
+  const held = leaseOf(every, cwd, by, now, release);
   for (let tries = 0; ; tries++) {
     const replaced = daemonStanding(now);
     const holder = holderAgainst(replaced, process.pid);

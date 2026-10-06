@@ -345,7 +345,7 @@
     {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
-        "complexity": ["error", { "max": 25 }]
+        "complexity": ["error", { "max": 22 }]
       }
     },
     {
@@ -699,7 +699,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 534, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -857,7 +857,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 168, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 165, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

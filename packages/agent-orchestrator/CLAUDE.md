@@ -26,7 +26,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 
 ## Keys, agents and folders
 
-- **A key added to `STEP_KEYS` has four sites outside the package**: `KINDS` in `apps/api/src/workflows/builder.ts`, `WorkflowStepSpec` and
+- **A key added to `STEP_KEYS` has four sites outside the package**: `KINDS` in `apps/api/src/workflows/words.ts`, `WorkflowStepSpec` and
   `specOf` in `apps/api/src/workflows/workflows.ts`, the web's mirror with `UNSET` (`apps/web/src/lib/builder.ts`), and its schemas with
   `StepKeySchema` (`apps/web/src/lib/api/library.ts`), which refuses a key it does not list.
 - **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), `formerStepFields` and the agent's

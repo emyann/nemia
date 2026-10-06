@@ -45,15 +45,21 @@ export type GitRun = RunBase & {
   branch: string;
   /** Whether each step gets a worktree of its own. False only for `--no-worktree`. */
   isolate: boolean;
+  /**
+   * The place skill the run's verbs run from, by name and `skillVersion` digest, as `nemia start` opened it. Absent, the run's place is
+   * the package's own (`placeDirOf`).
+   */
+  placeSkill?: { skill: string; version: string };
 };
 
-/** A run of a team whose every step says `workspace: folder`: no repository, no base, no branch, no worktrees. */
+/** A run of a team whose every step says `place: folder`: no repository, no base, no branch, no worktrees. */
 export type FolderRun = RunBase & {
   place: { kind: 'folder' };
   repo?: undefined;
   baseRef?: undefined;
   branch?: undefined;
   isolate?: undefined;
+  placeSkill?: undefined;
 };
 
 /** The kinds of workspace a run's steps work in: `git`, which a record without `place` is, and `folder`. */

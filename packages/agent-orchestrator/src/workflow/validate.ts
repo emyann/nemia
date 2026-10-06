@@ -3,17 +3,17 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { LOOP_REPLIES, type Workflow, WorkflowError } from '../step/step.ts';
+import { LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/step.ts';
 import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 
 /**
- * Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does
+ * Whether a team works in folders the run makes, with no git repository (`place: folder`): every step says it, or none does
  * (`validate`).
  */
-export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean =>
-  steps.length > 0 && steps.every((s) => s.workspace === 'folder');
+export const isFolderTeam = (steps: readonly Pick<Workflow, 'place'>[]): boolean =>
+  steps.length > 0 && steps.every((s) => stepPlace(s) === 'folder');
 
 /**
  * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
@@ -108,19 +108,19 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
 }
 
 /**
- * The one way a team cannot work in folders (`workspace: folder`): some of its steps do not say so.
+ * The one way a team cannot work in folders (`place: folder`): some of its steps do not say so.
  *
  * A run is of one kind — a git run, whose steps work on branches of one repository, or a folder run, which needs no repository — and the
- * kind is the run's, frozen on its record at start (`place`). A step without the line is a git step, so a team that says it on some steps
- * and not on others would be both. Refused, rather than one of the two guessed.
+ * kind is the run's, frozen on its record at start (`place`). A step without the line is a git step (`stepPlace`), so a team that says it
+ * on some steps and not on others would be both. Refused, rather than one of the two guessed.
  */
 function validateFolder(steps: readonly Workflow[]): void {
-  const folder = steps.filter((s) => s.workspace === 'folder').map((s) => s.name);
-  const not = steps.filter((s) => s.workspace !== 'folder').map((s) => s.name);
+  const folder = steps.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
+  const not = steps.filter((s) => stepPlace(s) !== 'folder').map((s) => s.name);
   if (!folder.length || !not.length) return;
   throw new WorkflowError(
-    `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`workspace: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'do' : 'does'} not — every step of a team says workspace: folder, or none does.` +
-      ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Add the line to ${not.join(', ')}, or delete it from ${folder.join(', ')}.`,
+    `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`place: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'work' : 'works'} on a repository, as \`place: git\` — every step of a team says \`place: folder\`, or none does.` +
+      ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Write \`place: folder\` on ${not.join(', ')}, or \`place: git\` on ${folder.join(', ')}.`,
   );
 }
 
@@ -165,7 +165,7 @@ function validateFolderMode(steps: readonly Workflow[]): void {
     ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
     : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${given}\`, which can stop and ask a person to approve something`;
   throw new WorkflowError(
-    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
+    `${asking.name}: \`place: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
       ' — a read or a write outside the folder can, and an unattended background session then waits for ever on a prompt nobody answers.' +
       ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${unasking[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
       " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",

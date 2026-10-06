@@ -47,7 +47,7 @@ export type InboxStart = {
   from?: string;
   /**
    * The repository, over the card's `repo:`: named by a person at start (`nemia start <card> --repo`), and refused as `start()` refuses it
-   * for a team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team
+   * for a team that says `place: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team
    * takes it as it takes the directory `nemia start` is typed in, and never looks at it.
    */
   repo?: string;

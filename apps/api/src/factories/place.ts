@@ -6,7 +6,16 @@
  * one to name. A factory is read from the store (`readFactory`), never written: `nemia factory` is the one writer of its file.
  */
 import path from 'node:path';
-import { DEFAULT_FACTORY, factoryRepo, Invalid, outsideRefusal, readFactories, readFactory, type Factory } from 'agent-orchestrator';
+import {
+  DEFAULT_FACTORY,
+  factoryRepo,
+  Invalid,
+  outsideRefusal,
+  readFactories,
+  readFactory,
+  type Factory,
+  type Running,
+} from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 
 /** What a request is answered in: its repository, and its factory, none for the default factory. */
@@ -19,9 +28,9 @@ export type PlaceQuery = { factory: string | undefined; repo: string | undefined
  * Every repository a request in the default factory may name, each as `path.resolve` spells it, named once: the api's own (`repoOf`),
  * then those of each factory in the store whose file reads, in the order `readFactories` lists them.
  */
-export function knownRepos(env: NodeJS.ProcessEnv): string[] {
+export function knownRepos(env: NodeJS.ProcessEnv, running?: Running): string[] {
   const named = readFactories().flatMap((listing) => ('error' in listing ? [] : listing.repos.map((repo) => path.resolve(repo))));
-  return [...new Set([repoOf(env), ...named])];
+  return [...new Set([repoOf(env, running), ...named])];
 }
 
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
@@ -52,16 +61,16 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
  *
  * Throws each refusal as the package's kind, so `app.onError` answers it by that kind.
  */
-export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv): Place {
+export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv, running?: Running): Place {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
   if (query.factory === undefined || query.factory === DEFAULT_FACTORY) {
-    if (named === undefined) return { repo: repoOf(env), factory: undefined };
-    const known = knownRepos(env);
+    if (named === undefined) return { repo: repoOf(env, running), factory: undefined };
+    const known = knownRepos(env, running);
     if (!known.includes(named)) throw unknownRepo(named, known);
     return { repo: named, factory: undefined };
   }
   const factory = readFactory(query.factory);
-  const repo = path.resolve(factoryRepo(factory, named, repoOf(env)));
+  const repo = path.resolve(factoryRepo(factory, named, repoOf(env, running)));
   if (outsideRefusal(factory, repo) !== undefined) throw outsideRepo(factory, repo);
   return { repo, factory };
 }

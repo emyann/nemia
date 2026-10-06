@@ -1,6 +1,6 @@
 /**
  * A place's verbs heard (`runPlaceVerb`) and its declaration read (`readPlaceJson`), against scripts planted in a scratch skill: each of
- * the nine answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
+ * the twelve answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
  * refusal; a non-zero exit, a signal, a stdout that is not JSON or is empty, a script past its deadline and one that is not there are
  * each unread, with their words; a script past its deadline leaves nothing it started running, children deaf to SIGTERM killed, gone
  * and named; and a `place.json` that does not read as the contract is refused, naming the file and the field.
@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PLACE_DEADLINE_MS, PLACE_VERBS, type PlaceAnswers, type PlaceOutcome, type PlaceRequests, type PlaceVerb } from './place.ts';
-import { SHIPPED_PLACE, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
+import { SHIPPED_PLACE, openPlace, placeDirOf, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
+import { skillVersion } from '../folder/folder.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { running } from '../../test/running.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -44,6 +45,8 @@ const REQUESTS: PlaceRequests = {
   land: { checkout: '/r', act: 'abort' },
   inventory: { repo: '/r', under: '/w', prefix: 'wf/x/' },
   remove: { repo: '/r', workspaces: [], branches: [] },
+  export: { repo: '/r', tag: 'v1', into: '/i' },
+  seal: { tree: '/i' },
 };
 
 const ANSWERS: PlaceAnswers = {
@@ -81,6 +84,8 @@ const ANSWERS: PlaceAnswers = {
     branches: [{ branch: 'wf/x/a', merged: false }],
   },
   remove: { removed: ['/w'], left: [{ path: '/v', said: 'locked' }], deleted: ['wf/x/a'], kept: [{ branch: 'wf/x/b', said: 'unmerged' }] },
+  export: { commit: 'abc' },
+  seal: { removed: true },
 };
 
 /** `verb` run on a skill whose script prints `value`. */
@@ -330,4 +335,71 @@ test('REFUSED: a verb declared with no script in scripts/', () => {
     refusedWith(declaring({ ...DECLARED, verbs: ['open', 'status', 'land'] })),
     /declares land, and scripts\/ has no land\.ts: add the script, or take the verb off `verbs`/,
   );
+});
+
+test("placeDirOf answers the package's place for a record that names none and for one that names git", () => {
+  assert.equal(placeDirOf({ id: 'r' }), SHIPPED_PLACE);
+  assert.equal(placeDirOf({ id: 'r', placeSkill: { skill: 'git', version: 'x' } }), SHIPPED_PLACE);
+});
+
+test('REFUSED: placeDirOf of a record that names a place skill this nemia does not ship', () => {
+  assert.throws(
+    () => placeDirOf({ id: 'r', placeSkill: { skill: 'svn', version: 'x' } }),
+    (err: unknown) =>
+      err instanceof Invalid &&
+      err.exitCode === 2 &&
+      err.message === 'run r names the place skill svn, and this nemia ships only git: read its store with the nemia that started it',
+  );
+});
+
+/** A place skill that declares `verbs`, with a SKILL.md, a script for each verb, and `open`'s script `open` (an answer by default). */
+function placeWith(verbs: readonly PlaceVerb[], open: string = printing(ANSWERS.open)): string {
+  const dir = declaring({ ...DECLARED, verbs }, verbs);
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: git\n---\n');
+  fs.writeFileSync(path.join(dir, 'scripts', 'open.ts'), open);
+  return dir;
+}
+
+/** What `openPlace` refuses with, its kind and exit code checked. */
+function openRefused(dir: string, needed: readonly PlaceVerb[] = []): string {
+  try {
+    openPlace(dir, '/r', needed);
+  } catch (err) {
+    assert.ok(err instanceof Invalid, `Invalid expected, got ${String(err)}`);
+    assert.equal(err.exitCode, 2);
+    return err.message;
+  }
+  return assert.fail('openPlace opened it');
+}
+
+test("openPlace answers open's answer and the place skill it ran, by name and version", () => {
+  const dir = placeWith(['open', 'status']);
+  assert.deepEqual(openPlace(dir, '/r', []), { opened: ANSWERS.open, placeSkill: { skill: 'git', version: skillVersion(dir) } });
+  assert.equal(typeof skillVersion(dir), 'string');
+});
+
+test('REFUSED: openPlace of a place that leaves out a verb the run needs, naming the verb and its place.json; the same place asked none opens', () => {
+  const dir = placeWith(['open', 'status']);
+  const said = openRefused(dir, ['status', 'land']);
+  assert.ok(said.startsWith(`${path.join(dir, 'place.json')} does not declare land, which `), said);
+  assert.ok(!said.includes('status,'), said);
+  assert.ok(said.includes('add the verb to `verbs` with its script in scripts/'), said);
+  assert.equal(openPlace(dir, '/r', ['status']).opened.repo, '/r');
+});
+
+test("REFUSED: openPlace when open refuses, in the place's words whole; when it is not heard, with why", () => {
+  const words = '/r is not a git repository: run git init there and commit once, or name a repository with --repo';
+  assert.equal(openRefused(placeWith(['open'], printing({ refused: words }))), words);
+  const failed = openRefused(placeWith(['open'], "process.stderr.write('git: not found\\n');\nprocess.exitCode = 3;\n"));
+  assert.ok(failed.startsWith("the place's open was not heard: git: not found"), failed);
+  const unshaped = openRefused(placeWith(['open'], printing({ repo: 1, baseRef: 'abc', branch: 'main' })));
+  assert.ok(unshaped.includes("its answer does not read as open's: `repo` is 1, where "), unshaped);
+});
+
+test('REFUSED: openPlace of a folder with no SKILL.md, or no place.json', () => {
+  const dir = placeWith(['open']);
+  fs.rmSync(path.join(dir, 'SKILL.md'));
+  assert.equal(openRefused(dir), `${dir} has no SKILL.md, so it is no skill to run a place from: write its SKILL.md there`);
+  fs.rmSync(path.join(dir, 'place.json'));
+  assert.match(openRefused(dir), /place\.json is not there/);
 });

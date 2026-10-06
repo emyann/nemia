@@ -27,7 +27,8 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../runner.ts');
-const { parsePassCost, recentFile, recentPasses, recordRecentPass } = await import('./daemon.store.ts');
+const { parseDaemonFile, parsePassCost, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
+  await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
 const { main } = await import('../cli/main.ts');
 
@@ -113,6 +114,7 @@ const read = () =>
     startedMono?: { boot: string; ms: number };
     passedMono?: { boot: string; ms: number };
     beatMono?: { boot: string; ms: number };
+    release?: { kind: string; root: string; tag?: string; commit?: string };
   };
 
 const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
@@ -229,6 +231,23 @@ test("the beat writes only its own daemon's file: not over another holder, not a
   clear();
   beat(self);
   assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
+});
+
+test('the lease keeps the release its daemon runs: written as it takes the store, kept through a pass, a beat and its stop', () => {
+  clear();
+  const release = { kind: 'install', root: path.join(ROOT, 'releases', 'v1'), tag: 'v1', commit: 'abcdef1234567890' } as const;
+  const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api', release });
+  assert.deepEqual(read().release, release, 'as it takes the store');
+  const next = passed(held);
+  assert.deepEqual(read().release, release, 'after a pass');
+  beat(next);
+  assert.deepEqual(read().release, release, 'after a beat');
+  releaseStore(next);
+  assert.deepEqual(parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.release, release, 'after its stop, as the reader decodes it');
+  clear();
+  takeStore({ every: 4000, cwd: '/here', by: 'api' });
+  assert.equal('release' in read(), false, 'a daemon given no release writes none');
+  clear();
 });
 
 test('REFUSED at shipped defaults: `nemia up` with an interval daemon.json cannot hold — before the store is taken, and no pass run', async () => {

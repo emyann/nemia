@@ -64,13 +64,12 @@ const LISTS: Record<string, string> = {
   pid: 'an integer greater than 0, or nothing',
 };
 
-/** The first field of `row` the schema refused, and what is there instead of what Claude Code lists, in words. */
+/** The first field of `row` the schema refused, what is there or that nothing is, and what Claude Code lists there, in words. */
 const rowWords = (row: Ours, error: Schema.SchemaError): string => {
   const [first] = formatter(error.issue).issues;
   const key = String((first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p))[0]);
-  const what =
-    first?.message === 'Missing key' ? 'is missing' : `is ${shown(row[key])}, where Claude Code lists ${LISTS[key] ?? 'another value'}`;
-  return `${COMMAND} lists \`${row.name}\`, a session of ours, and its \`${key}\` ${what}. ${UNREAD}`;
+  const found = first?.message === 'Missing key' ? 'is missing' : `is ${shown(row[key])}`;
+  return `${COMMAND} lists \`${row.name}\`, a session of ours, and its \`${key}\` ${found}, where Claude Code lists ${LISTS[key] ?? 'another value'}. ${UNREAD}`;
 };
 
 /**

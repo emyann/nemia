@@ -1421,7 +1421,7 @@ test('a row is held while it lists a process, which it names with its bridge: an
   }
 });
 
-test('every row a real `claude agents --all --json` printed decodes as ours, and one with no `state` is still no session of ours', async () => {
+test('every row a real `claude agents --all --json` printed decodes as ours — the finished rows (blocked, done, stopped, failed) and a live background row read on Claude Code 2.1.291 (done, busy, a pid, no waitingFor) — and one with no `state` is still no session of ours', async () => {
   const listing: Record<string, unknown>[] = JSON.parse(
     fs.readFileSync(new URL('./fixtures/claude-agents-listing.json', import.meta.url), 'utf8'),
   );
@@ -1437,6 +1437,13 @@ test('every row a real `claude agents --all --json` printed decodes as ours, and
       listing.some((r) => !Object.hasOwn(r, 'state')),
       'the fixture holds an interactive row',
     );
+    const live = seen.get('ae/listed/6');
+    assert.ok(live, 'the live background row is read');
+    assert.equal(live.state, 'completed');
+    assert.equal(live.busy, true);
+    assert.equal(live.held, true);
+    assert.equal(live.pid, 285997);
+    assert.equal(live.waitingFor, undefined);
   } finally {
     restore();
   }
@@ -1460,7 +1467,7 @@ const refusalOf = async (out: string) => {
 test('a row of ours with a field Claude Code does not list so refuses the whole listing, naming the row, the field and the fix', async () => {
   const long = 'x'.repeat(5000);
   const cases: [Record<string, unknown>, string, RegExp][] = [
-    [{ sessionId: undefined }, 'sessionId', /`sessionId` is missing/],
+    [{ sessionId: undefined }, 'sessionId', /`sessionId` is missing, where Claude Code lists a non-empty string\./],
     [{ sessionId: '' }, 'sessionId', /`sessionId` is "", where/],
     [{ state: '' }, 'state', /`state` is "", where/],
     [{ state: 7 }, 'state', /`state` is 7, where Claude Code lists a non-empty string/],

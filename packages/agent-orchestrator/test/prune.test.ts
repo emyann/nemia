@@ -34,6 +34,7 @@ const {
   runWith,
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { RunPlace, SHIPPED_PLACE } = await import('../src/place/place.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -323,6 +324,28 @@ test('REFUSED at shipped defaults: a worktree on no branch, holding a commit no 
     `${locked.wt} is locked (on a stick), and git will not remove it — unlock it if nothing needs it: git -C ${locked.repo} worktree unlock ${locked.wt}.`,
   );
   assert.ok(fs.existsSync(locked.wt) && !under('runs', `${locked.run.id}.pruned`));
+});
+
+/** A copy of the package's place whose `inventory` says `said` on stderr and exits 1, as a place that cannot read its repository does. */
+function placeUnread(said: string): string {
+  const dir = path.join(scratch('wf-prune-place-'), 'git');
+  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'scripts', 'inventory.ts'), `process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
+  return dir;
+}
+
+test('REFUSED at shipped defaults: a place whose inventory exits 1 refuses `nemia prune` as not read, never as nothing left to prune — its worktree stays and the run is not marked pruned', async () => {
+  const b = board();
+  const { run, repo, wt } = await aFinished(b, { merged: true });
+  const planted = placeUnread('the inventory broke');
+  const refused = await runWith(b.e, prune(run.id, { yes: true }).pipe(Effect.provideService(RunPlace, () => planted)));
+  assert.equal(refused.kind, 'refused');
+  assert.equal(
+    refused.refusal,
+    `its place's inventory of what it left in ${repo} was not heard — the inventory broke; nothing was touched, as nothing says what is there: nemia prune ${run.id} again once the place reads it`,
+  );
+  assert.ok(fs.existsSync(wt) && worktreesOf(repo).includes(fs.realpathSync(wt)) && !under('runs', `${run.id}.pruned`));
+  assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned', 'the shipped place reads it');
 });
 
 test('REFUSED at shipped defaults: a hand-off still owed — a step settled and no pass since — until a tick has handed it off', async () => {

@@ -291,6 +291,13 @@ export const waitingOf =
     views.get(taskId)?.waitingFor;
 
 /**
+ * Why the runtime could not read a task's session alone, in its own words (`TaskView.unreadWhy`), off its view already read: what one
+ * line of its output said that did not decode. Null for no view, and for a task whose session was read, settled or never started, and
+ * on the first look that reads it: the runtime says it afresh on every look, and nothing here keeps it.
+ */
+export const unreadOf = (view: TaskView | undefined): string | null => view?.unreadWhy ?? null;
+
+/**
  * A session's web link, as a person opens it from a browser or a phone: `url` where it is up, else null and `why` says what keeps it
  * down; `why` is null where `url` is set.
  */

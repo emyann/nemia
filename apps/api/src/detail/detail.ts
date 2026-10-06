@@ -338,6 +338,7 @@ export type RunDetail = {
     waitingFor: StepNeeds['waitingFor'];
     approve: StepNeeds['approve'];
     denied: StepNeeds['denied'];
+    sessionUnread: StepNeeds['sessionUnread'];
     /**
      * Its gate, awaiting approval or approved (`StepGate`); null for a step with none. Judged by the workflow the run is: a step it does
      * not have is gated only where the run was started with its gate.
@@ -757,9 +758,7 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
  */
 function askedModelOf(record: StepRecord | undefined): string | null {
   const tries = record?.tries ?? [];
-  let i = tries.length - 1;
-  while (i >= 0 && tries[i].then === 'recheck') i--;
-  return tries[i]?.model ?? null;
+  return [...tries].reverse().find((t) => t.then !== 'recheck')?.model ?? null;
 }
 
 /**

@@ -1,16 +1,29 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { levelQuery, nemiaFactQuery, nemiaMemoryQuery, putLevel, type Level, type NemiaLevel } from '../lib/api';
-import { offeredLevel, PRUNE_WORDS, sessionOf, spendWords } from '../lib/nemia';
+import {
+  levelQuery,
+  nemiaFactQuery,
+  nemiaMemoryQuery,
+  putLevel,
+  type FactoryLevel,
+  type Level,
+  type LevelAsk,
+  type NemiaLevel,
+} from '../lib/api';
+import { DEFAULT_NAME } from '../lib/factories';
+import { factoryWords, levelWord, offeredLevel, PRUNE_WORDS, RAISE_STRETCHES, sessionOf, spendWords } from '../lib/nemia';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { CopyButton } from './CopyButton';
 
 /**
- * Nemia, the store's own agent, on the Settings page: her level with its switch, her session's state, how to reach it, what her sessions
+ * Nemia, the store's own agent, on the Settings page: the store's level with its switch, each factory's level with its default and a
+ * raise for a stretch, her session's state, how to reach it, what her sessions
  * cost and what a person allowed her, then her memory, read-only. A write sets what the section shows from the api's answer and reads her
  * level again; a refusal is shown in the api's words.
  */
@@ -18,16 +31,17 @@ export function NemiaSettings() {
   const queryClient = useQueryClient();
   const { data, error } = useQuery(levelQuery);
   const write = useMutation({
-    mutationFn: (level: Level) => putLevel(level),
+    mutationFn: (ask: LevelAsk) => putLevel(ask),
     onSuccess: (now) => {
       queryClient.setQueryData(levelQuery.queryKey, now);
       void queryClient.invalidateQueries({ queryKey: levelQuery.queryKey, exact: true });
     },
   });
-  const ask = (level: Level) => {
+  const ask = (level: LevelAsk) => {
     write.reset();
     write.mutate(level);
   };
+  const askLevel = (level: Level) => ask({ level });
   return (
     <section aria-label="Nemia" data-nemia-section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -40,14 +54,15 @@ export function NemiaSettings() {
       </div>
       {data ? (
         <>
-          <LevelPart nemia={data} pending={write.isPending} onAsk={ask} />
+          <LevelPart nemia={data} pending={write.isPending} onAsk={askLevel} />
+          <FactoriesPart factories={data.factories} pending={write.isPending} onAsk={ask} />
           {write.error && (
             <div data-nemia-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
               <p className="text-sm font-medium text-destructive">Not set:</p>
               <p className="font-mono text-xs break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
             </div>
           )}
-          <SessionPart nemia={data} pending={write.isPending} onAsk={ask} />
+          <SessionPart nemia={data} pending={write.isPending} onAsk={askLevel} />
           <ReachPart reach={data.reach} />
           <SpendPart nemia={data} />
         </>
@@ -89,11 +104,123 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
       </div>
       <p className="text-xs text-muted-foreground">
         {nemia.level === 'semi-auto'
-          ? 'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. Off, Manual stops her session at its next beat.'
-          : 'Manual: no session of hers is kept. On, Semi-auto files her one at the keeper’s next beat.'}
+          ? 'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. Off, Manual stops her session at its next beat, unless a factory is still above Manual.'
+          : 'Manual: no session of hers is kept unless a factory is above Manual. On, Semi-auto files her one at the keeper’s next beat.'}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>
     </Part>
+  );
+}
+
+/**
+ * Each factory's level: she works on one at Semi-auto, and one at Manual is left alone, its runs and its lines not hers. The default
+ * factory's is the store's, set above; each other has its default and a raise for a stretch, which ends by itself.
+ */
+function FactoriesPart({
+  factories,
+  pending,
+  onAsk,
+}: {
+  factories: readonly FactoryLevel[];
+  pending: boolean;
+  onAsk: (ask: LevelAsk) => void;
+}) {
+  const now = useNow(60_000);
+  return (
+    <Part heading="Factories" data-nemia-factories>
+      <p className="text-xs text-muted-foreground">
+        She works on a factory at Semi-auto; one at Manual is left alone, its runs and its news not hers. Raise one for a stretch: it goes
+        back to its default by itself once the stretch ends.
+      </p>
+      <ul className="flex flex-col gap-2">
+        {factories.map((row) => (
+          <li key={row.factory}>
+            <FactoryRow row={row} now={new Date(now)} pending={pending} onAsk={onAsk} />
+          </li>
+        ))}
+      </ul>
+    </Part>
+  );
+}
+
+/**
+ * One factory's level, its words, and what a person sets of it: its default by a switch, a raise to Semi-auto for a chosen stretch where
+ * its default is Manual, and the end of a raise in force. The default factory's level is the store's, set by the switch above.
+ */
+function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date; pending: boolean; onAsk: (ask: LevelAsk) => void }) {
+  const id = useId();
+  const [stretch, setStretch] = useState<string>(RAISE_STRETCHES[0]);
+  const byDefault = row.factory === DEFAULT_NAME;
+  return (
+    <div data-factory-level={row.factory} data-level={row.level} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-sm">{row.factory}</span>
+        <Badge variant={row.level === 'semi-auto' ? 'default' : 'secondary'}>{levelWord(row.level)}</Badge>
+        {row.raise !== null && (
+          <Badge variant="outline" data-factory-raised>
+            Raised
+          </Badge>
+        )}
+      </div>
+      <p data-factory-words className="text-xs text-muted-foreground">
+        {factoryWords(row, byDefault, now)}
+      </p>
+      {!byDefault && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-2">
+            <Switch
+              id={id}
+              size="sm"
+              isSelected={row.default === 'semi-auto'}
+              isDisabled={pending}
+              onChange={(on) => onAsk({ level: on ? 'semi-auto' : 'manual', factory: row.factory })}
+            />
+            <label htmlFor={id} data-factory-default className="cursor-pointer text-sm">
+              Semi-auto by default
+            </label>
+          </div>
+          {row.raise !== null ? (
+            <Button
+              variant="outline"
+              size="sm"
+              data-factory-end
+              isDisabled={pending}
+              onPress={() => onAsk({ factory: row.factory, end: true })}
+            >
+              End the raise
+            </Button>
+          ) : (
+            row.default === 'manual' && (
+              <div className="flex items-center gap-2">
+                <Select aria-label="Raise for" value={stretch} onChange={(key) => setStretch(String(key))} isDisabled={pending}>
+                  <SelectTrigger size="sm" data-factory-stretch className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {RAISE_STRETCHES.map((word) => (
+                        <SelectItem key={word} id={word}>
+                          {word}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-factory-raise
+                  isDisabled={pending}
+                  onPress={() => onAsk({ level: 'semi-auto', factory: row.factory, for: stretch })}
+                >
+                  Raise to Semi-auto
+                </Button>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

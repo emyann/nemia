@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOf } from './admission.ts';
+import { admissionOf, type Scope } from './admission.ts';
 import { TABLE } from '../command/commands.verb.ts';
 
 /** The state the fixtures read: `r`'s step `gate` awaits approval, `check` failed its check, and no other run is there. */
@@ -61,4 +61,57 @@ test('the person reads why: the line, and what it answers', () => {
 test('the class decides, not the name: a table that classes approve as hers lets it through', () => {
   const table = TABLE.map((c) => (c.name === 'approve' ? { ...c, nemia: 'hers' as const } : c));
   assert.equal(admissionOf({ tool: 'Bash', input: { command: 'nemia approve r gate' }, cwd: '/w' }, table, waitOf), undefined);
+});
+
+/** A floor of semi-auto over the store of the fixtures: `r` and `s` in pipao, at manual; `t` in hkb, at semi-auto; `gone` unread. */
+const SCOPE: Scope = {
+  floor: 'semi-auto',
+  runOf: (runId) =>
+    runId === 'gone' ? undefined : runId === 't' ? { factory: 'hkb', level: 'semi-auto' } : { factory: 'pipao', level: 'manual' },
+  factoryOf: (factory) => (factory === 'hkb' ? 'semi-auto' : 'manual'),
+};
+
+/** Admission's answer for a shell line under `scope`. */
+const scopedAnswer = (command: string, scope: Scope = SCOPE) =>
+  admissionOf({ tool: 'Bash', input: { command }, cwd: '/w' }, TABLE, waitOf, scope);
+
+test('REFUSED: a call that acts on a run or a factory below the floor is denied, whatever its class, on any part of the line', () => {
+  for (const line of [
+    'nemia approve r gate',
+    'nemia show r',
+    'nemia rm t r',
+    'nemia start ./brief.md --factory pipao',
+    'nemia level semi-auto --factory pipao --for 2h',
+    'nemia factory rm pipao',
+    'nemia factory instruct pipao --clear',
+    'nemia factory instruction pipao --store',
+    'nemia factory fire pipao --step build/plan',
+    'nemia show t && nemia hold s',
+    'nemia show r 2>/dev/null',
+  ])
+    assert.equal(scopedAnswer(line)?.decision, 'deny', line);
+  assert.equal(
+    scopedAnswer('nemia hold r')?.reason,
+    "nemia hold r acts on r of the factory pipao, at manual: below semi-auto, it is left alone. Raising it is the person's: nemia level semi-auto --factory pipao [--for <duration>].",
+  );
+});
+
+test('REFUSED to name a factory unscoped: every factory verb but the one that files a new factory takes it under the key admission reads', () => {
+  const unscoped = TABLE.filter((e) => e.name.startsWith('factory ') && e.name !== 'factory add')
+    .filter((e) => (e.spec?.positionals.length ?? 0) > 0 && e.spec?.positionals[0].key !== 'factory')
+    .map((e) => e.name);
+  assert.deepEqual(unscoped, []);
+});
+
+test('every factory at the floor or above: the scope answers as no scope does', () => {
+  const open: Scope = { floor: 'semi-auto', runOf: () => ({ factory: 'hkb', level: 'semi-auto' }), factoryOf: () => 'semi-auto' };
+  for (const line of ['nemia approve r gate', 'nemia show r', 'nemia retry r check --recheck', 'nemia start x.md --factory hkb', 'ls'])
+    assert.deepEqual(scopedAnswer(line, open), admissionOf({ tool: 'Bash', input: { command: line }, cwd: '/w' }, TABLE, waitOf), line);
+  assert.equal(scopedAnswer('nemia show t'), undefined, 'a run of a factory above the floor is hers to read');
+});
+
+test('REFUSED to pass unread: a run that does not read, and a scoped command whose words do not parse, are asked', () => {
+  assert.match(scopedAnswer('nemia show gone')?.reason ?? '', /names gone, which does not read/);
+  assert.equal(scopedAnswer('nemia show gone')?.decision, 'ask');
+  assert.equal(scopedAnswer('nemia show t --frob')?.decision, 'ask');
 });

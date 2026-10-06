@@ -14,6 +14,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService, asked, tried, type TaskView } from '../runtime-client.ts';
 import { dropSubscription, putSubscription } from './subscription.store.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
+import { LEVELS, type Level } from '../level/level.ts';
 import {
   DEFAULT_DIGEST_EVERY,
   DEFAULT_WAKE,
@@ -40,12 +41,16 @@ const reservedRefusal = (name: string): Conflict | undefined =>
       })
     : undefined;
 
-/** The words a subscription is asked for in: its name, its task, the wake words given (else the default), and its minutes. */
-const askedOf = (args: Args): { name: string; task: string; wake: string[]; digestEvery: number } => ({
+/**
+ * The words a subscription is asked for in: its name, its task, the wake words given (else the default), its minutes, and the level its
+ * runs' factories are at least at (`atLeast`), where given.
+ */
+const askedOf = (args: Args): { name: string; task: string; wake: string[]; digestEvery: number; atLeast?: string } => ({
   name: String(args.name ?? ''),
   task: String(args.task ?? ''),
   wake: Array.isArray(args.wake) && args.wake.length ? [...(args.wake as readonly string[])] : [...DEFAULT_WAKE],
   digestEvery: typeof args.digestEvery === 'number' ? args.digestEvery : DEFAULT_DIGEST_EVERY,
+  ...(typeof args.atLeast === 'string' ? { atLeast: args.atLeast } : {}),
 });
 
 /**
@@ -66,13 +71,19 @@ function taskRefusal(task: string, state: TaskView['state']): Missing | Invalid 
 
 /** Puts the subscription asked for, its news starting at the feed's end, once the engine says its task is long-lived and open. */
 const subscribe = Effect.fn('subscribe')(function* (args: Args) {
-  const { name, task, wake, digestEvery } = askedOf(args);
+  const { name, task, wake, digestEvery, atLeast } = askedOf(args);
   const reserved = reservedRefusal(name);
   if (reserved) return yield* Effect.fail(reserved);
   const e = yield* EngineService;
   const refused = taskRefusal(task, (yield* asked('view', e.view(task))).state);
   if (refused) return yield* Effect.fail(refused);
-  const subscription: Subscription = { task, wake, digestEvery, from: feedSize() };
+  const subscription: Subscription = {
+    task,
+    wake,
+    digestEvery,
+    from: feedSize(),
+    ...(atLeast === undefined ? {} : { scope: { atLeast: atLeast as Level } }),
+  };
   yield* tried(() => putSubscription(name, subscription));
   return { name, subscription } satisfies Subscribed;
 });
@@ -80,7 +91,7 @@ const subscribe = Effect.fn('subscribe')(function* (args: Args) {
 /** `nemia subscribe`: a long-lived task given a subscription to the feed (`subscribe`). */
 export const SUBSCRIBE: Command<Subscribed> = {
   name: 'subscribe',
-  usage: '<name> <task> [--wake <word>]... [--digest-every <minutes>]',
+  usage: '<name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]',
   help: [
     "give the engine's long-lived task <task> a subscription to the feed,",
     'named <name>, from its end: a line holding a wake word is said to it at',
@@ -88,6 +99,8 @@ export const SUBSCRIBE: Command<Subscribed> = {
     'after --digest-every minutes (default 60) with none.',
     "--wake: a word that wakes it, once for each (default: the feed's words",
     'for a wait on a person). Refused for a task not long-lived.',
+    "--at-least: only the lines of runs whose factory's level is at least",
+    `this (${LEVELS.join(', ')}), read as each line is delivered.`,
   ],
   spec: {
     positionals: [
@@ -97,6 +110,12 @@ export const SUBSCRIBE: Command<Subscribed> = {
     flags: [
       { flag: '--wake', kind: 'text', key: 'wake', many: true, takes: `--wake takes a word that wakes the subscriber: ${SUBSCRIBE_FORM}.` },
       { flag: '--digest-every', kind: 'amount', key: 'digestEvery', takes: 'the minutes a digest waits for a wake', form: SUBSCRIBE_FORM },
+      {
+        flag: '--at-least',
+        kind: 'name',
+        key: 'atLeast',
+        takes: `--at-least takes a level, one of ${LEVELS.join(', ')}: ${SUBSCRIBE_FORM}.`,
+      },
     ],
     unknown: (arg) => `nemia subscribe does not take ${arg}: ${SUBSCRIBE_FORM}.`,
     missing: `nemia subscribe takes the subscription's name and the task it tells: ${SUBSCRIBE_FORM}.`,

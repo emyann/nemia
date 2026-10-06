@@ -78,6 +78,14 @@ test("a long-lived task is subscribed from the feed's end, told by the default w
   await typed(UNSUBSCRIBE, ['own']);
 });
 
+test('a subscription given a floor is scoped by it; REFUSED: a floor that is no level, before anything is put', async () => {
+  await typed(SUBSCRIBE, ['floored', 'nemia', '--at-least', 'semi-auto']);
+  assert.deepEqual(listSubscriptions().find((s) => s.name === 'floored')?.subscription.scope, { atLeast: 'semi-auto' });
+  await typed(UNSUBSCRIBE, ['floored']);
+  assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '--at-least', 'auto'])), /^--at-least takes a level/);
+  assert.deepEqual(listSubscriptions(), [], 'nothing put');
+});
+
 test('REFUSED: a task never filed, one not long-lived and one settled, each naming how a long-lived task is filed', async () => {
   assert.match(
     await refusal(() => typed(SUBSCRIBE, ['a', 'nowhere'])),

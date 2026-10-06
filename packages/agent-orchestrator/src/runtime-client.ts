@@ -34,6 +34,7 @@ import { maxConcurrent } from './config/config.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
+import { otlpOf } from './telemetry/telemetry.ts';
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
@@ -89,7 +90,7 @@ export const HARNESSES = {
 
 /**
  * The harnesses the daemon asks for their quota (`up`): each of the engine's that is a subscription of its own, so none that counts in
- * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process.
+ * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process, and no span.
  */
 export const quotaHarnesses = (): string[] =>
   Object.entries(HARNESSES)
@@ -108,13 +109,26 @@ export const quotaHarnesses = (): string[] =>
  * `nemia ls`, `nemia up`, `nemia rm`, the api — works on. It is `nemia start` that refuses a step naming what was left out, in the file's
  * words. A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at
  * work on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
+ *
+ * When the process exports its own telemetry (`otlpOf`), the engine is handed the same collector, and each session it starts exports
+ * there too, tagged with the labels its task was filed with (`stepLabels`).
  */
 export const engine = (): Engine => {
   const read = readRemote();
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`nemia: ${why} ${LEFT_OUT}`);
   const harnesses = { ...HARNESSES, ...remote };
-  return engineOf(RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses, credentials, missingCredential, ...storeAdmission() }));
+  const otlp = otlpOf(process.env);
+  return engineOf(
+    RuntimeEngine.layer({
+      root: path.join(HOME, 'engine'),
+      harnesses,
+      credentials,
+      missingCredential,
+      ...storeAdmission(),
+      ...(otlp ? { telemetry: { endpoint: otlp.url } } : {}),
+    }),
+  );
 };
 
 /**

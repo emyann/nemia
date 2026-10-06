@@ -7,7 +7,7 @@
  * A line is one series over one span: its start `t`, its series `s`, its labels `l`, how many samples `n`, their `sum`, `min`, `max` and
  * `last`, and for a histogram the counts of its buckets `b` with `p50` and `p95` — exact for a minute, to the bucket for a merged span.
  */
-import { PASS_BOUNDS, PHASES, READ_BOUNDS, type RecentPass } from '../meter/meter.ts';
+import { PASS_BOUNDS, PHASES, READ_BOUNDS, type RecentPass } from '../meter/index.ts';
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
 export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window'] as const;

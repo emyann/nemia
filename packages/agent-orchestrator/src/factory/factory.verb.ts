@@ -314,7 +314,7 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   usage: '<name>',
   help: ["remove a factory's file, and the instruction the store keeps for it"],
   spec: {
-    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+    positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
     flags: [],
     unknown: (arg) => `nemia factory rm removes one factory, and ${arg} is a second: nemia factory rm <name>, once per factory.`,
     missing: 'nemia factory rm takes the name of the factory to remove, as nemia factory ls lists it: nemia factory rm <name>.',
@@ -324,12 +324,12 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   only: WRITTEN_HERE,
   handler: (args) =>
     tried(() => {
-      const name = textOf(args, 'name');
+      const name = textOf(args, 'factory');
       const { file } = removeFactory(name);
       return { file, instruction: removeInstructionFolder(name) };
     }),
   print: ({ file, instruction }, args) => [
-    `${textOf(args, 'name')}  removed — ${file}`,
+    `${textOf(args, 'factory')}  removed — ${file}`,
     ...(instruction === null ? [] : [`instruction removed: ${instruction}`]),
   ],
 };

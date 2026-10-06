@@ -14,6 +14,7 @@ import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { KeptDelivery, Subscription } from './subscription.ts';
+import { LEVELS } from '../level/level.ts';
 
 /** The store whose subscriptions these are, read once as the package loads, as `record.store.ts` reads its `HOME`. */
 const ROOT = wfRoot();
@@ -40,6 +41,7 @@ const SubscriptionSchema = Schema.StructWithRest(
     wake: Schema.Array(Schema.String.check(Schema.isNonEmpty())),
     digestEvery: Schema.Finite.check(Schema.isGreaterThan(0)),
     from: Bytes,
+    scope: Schema.optionalKey(Schema.Struct({ atLeast: Schema.Literals(LEVELS) })),
   }),
   Rest,
 );
@@ -130,8 +132,8 @@ export function listSubscriptions(said: (line: string) => void = sayOnce): Array
       said(`nemia: the subscription ${subscriptionFile(name)} ${read.error}: it is not delivered (nemia unsubscribe ${name} removes it).`);
       return [];
     }
-    const { task, wake, digestEvery, from } = read.value;
-    return [{ name, subscription: { task, wake: [...wake], digestEvery, from } }];
+    const { task, wake, digestEvery, from, scope } = read.value;
+    return [{ name, subscription: { task, wake: [...wake], digestEvery, from, ...(scope ? { scope: { atLeast: scope.atLeast } } : {}) } }];
   });
 }
 

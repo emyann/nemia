@@ -20,7 +20,7 @@ import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-agent-');
 process.env.WF_ROOT = ROOT;
-const { AgentWriteError, agentSkillsFound, removeAgent, writeAgent } = await import('../src/runner.ts');
+const { addFactory, AgentWriteError, agentSkillsFound, removeAgent, writeAgent } = await import('../src/runner.ts');
 
 const STORE = path.join(ROOT, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
@@ -253,6 +253,25 @@ test('a write is refused outside the two places the board lists agents from, and
   refused(() => removeAgent(elsewhere, 'scribe', { version: 'x' }), /is not the store's agents\//);
   writeAgent(elsewhere, scribe, { version: null, anywhere: true });
   assert.ok(fs.existsSync(path.join(elsewhere, 'scribe.md')));
+});
+
+test('REFUSED at shipped defaults: an agent written into the workflows/ of a checkout no factory names; written once one names it, or the caller does as `repo`', () => {
+  fresh();
+  const checkout = scratch('wf-agent-checkout-');
+  fs.mkdirSync(path.join(checkout, '.git'));
+  const agents = path.join(checkout, 'workflows', 'agents');
+  fs.mkdirSync(agents, { recursive: true });
+  refused(
+    () => writeAgent(agents, scribe, { version: null }),
+    /agents is not the store's agents\/ .* nor a repository's the store knows .* give its repository to a factory \(nemia factory add <name> --repo <repo>\)/,
+  );
+  assert.equal(fs.existsSync(path.join(agents, 'scribe.md')), false, 'a .git beside it makes no repository known');
+  writeAgent(agents, scribe, { version: null, repo: checkout });
+  assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), 'the repository the caller names');
+  fs.rmSync(path.join(agents, 'scribe.md'));
+  addFactory({ name: 'agent-known', repos: [checkout] });
+  writeAgent(agents, scribe, { version: null });
+  assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
 });
 
 test('a write through a link is refused by name', () => {

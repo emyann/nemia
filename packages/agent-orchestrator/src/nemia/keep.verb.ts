@@ -1,8 +1,8 @@
 /**
- * The keeper of Nemia: each beat, the person's level read again (`readLevel`), her task read off the engine and her subscription off the
- * store, and what is owed done (`nemiaDue`) — her task filed long-lived, her subscription put once it is open, both taken away at
- * `manual`. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from
- * outside is never filed again.
+ * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store,
+ * and what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open
+ * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so. Level-triggered: it
+ * carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
  */
@@ -31,7 +31,18 @@ import {
 import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
-import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, nemiaSettings, type HerTask, type NemiaAct } from './nemia.ts';
+import { levelsNow } from '../level/levels.verb.ts';
+import {
+  NEMIA_DIGEST_EVERY,
+  NEMIA_FLOOR,
+  NEMIA_SUBSCRIPTION,
+  NEMIA_WAKE,
+  nemiaDue,
+  nemiaSettings,
+  type HerSubscription,
+  type HerTask,
+  type NemiaAct,
+} from './nemia.ts';
 
 /** What the keeper did, each act counted once done. */
 export const NEMIA_ACTS = Metric.counter('nemia.acts', {
@@ -80,7 +91,8 @@ const factoryFolders = (): Mount[] => {
  * Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition; with
  * her fence derived from the command table (`nemiaFence`), less each prompt the person allowed in her folder (`widened`, `promptAllows`),
  * the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the harness's settings, and her admission
- * (`nemia admit`) asked before each of her shell calls. A prompt allowed while she runs is widened the next time she is filed.
+ * (`nemia admit`, with her floor) asked before each of her shell calls. A prompt allowed while she runs is widened the next time she is
+ * filed.
  */
 export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
@@ -102,7 +114,10 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
       permissionMode: step.permissionMode,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
       allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
-      callAdmission: { command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit'], tools: ['Bash'] },
+      callAdmission: {
+        command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit', '--at-least', NEMIA_FLOOR],
+        tools: ['Bash'],
+      },
       background: true,
       mounts: factoryFolders(),
       ...ownOf(
@@ -122,7 +137,13 @@ const act = (e: Engine, id: string, owed: NemiaAct) =>
     if (owed === 'file') yield* asked('file', e.file(nemiaSpec(id)));
     if (owed === 'stop') yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
     if (owed === 'subscribe')
-      putSubscription(NEMIA_SUBSCRIPTION, { task: id, wake: [...NEMIA_WAKE], digestEvery: NEMIA_DIGEST_EVERY, from: feedSize() });
+      putSubscription(NEMIA_SUBSCRIPTION, {
+        task: id,
+        wake: [...NEMIA_WAKE],
+        digestEvery: NEMIA_DIGEST_EVERY,
+        from: feedSize(),
+        scope: { atLeast: NEMIA_FLOOR },
+      });
     if (owed === 'drop' && listSubscriptions().some((s) => s.name === NEMIA_SUBSCRIPTION)) dropSubscription(NEMIA_SUBSCRIPTION);
     yield* Metric.update(NEMIA_ACTS, 1);
   });
@@ -135,14 +156,19 @@ const herTask = (e: Engine, id: string | undefined) =>
     return state.filedAt ? ({ settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask) : undefined;
   });
 
-/** One beat: the level, her task and her subscription read, and each act owed done in order. Answers the acts done. */
+/** Her subscription as the keeper reads it: the task it tells and whether it carries her floor, or undefined where there is none. */
+const herSubscription = (): HerSubscription | undefined => {
+  const sub = listSubscriptions().find((s) => s.name === NEMIA_SUBSCRIPTION)?.subscription;
+  return sub === undefined ? undefined : { task: sub.task, scoped: sub.scope?.atLeast === NEMIA_FLOOR };
+};
+
+/** One beat: the levels, her task and her subscription read, and each act owed done in order. Answers the acts done. */
 export const keepOnce = Effect.fn('keepOnce')(function* () {
   const e = yield* EngineService;
-  const level = readLevel();
-  const id = level?.task;
+  const id = readLevel()?.task;
+  const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
   const task = yield* herTask(e, id);
-  const subscribedTo = listSubscriptions().find((s) => s.name === NEMIA_SUBSCRIPTION)?.subscription.task;
-  const owed = nemiaDue(level, task, subscribedTo);
+  const owed = nemiaDue({ above, ...(id === undefined ? {} : { task: id }) }, task, herSubscription());
   for (const one of owed) if (id !== undefined || one === 'drop') yield* act(e, id ?? '', one);
   return owed;
 });

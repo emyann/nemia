@@ -9,6 +9,7 @@ import { awaitsAdmission, fold, verbTakes, type Input, type State } from '../dom
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
+import { labelsRefusalOf } from '../labels.ts';
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
@@ -30,6 +31,10 @@ export type Filing = {
   restartPolicy?: 'Always';
   /** Which waiting task a free slot goes to first, higher first: a whole number in int32. See the `filed` event. */
   priority?: number;
+  /** The layer above's labels, said beside the task's id by its sessions' telemetry (`labelsRefusalOf`). See the `filed` event. */
+  labels?: Record<string, string>;
+  /** The trace context of the span that filed the task: set by the engine that exports, never by its caller. See the `filed` event. */
+  traceparent?: string;
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -81,7 +86,7 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
  * 3. a retired key (`RETIRED_KEYS`), present at any value: asked of the spec as handed in, untyped, since a caller built
  *    from JSON or against an older `TaskSpec` still sends them;
  * 4. a `deadlineSeconds` that is not seconds above 0, an empty `resumeFrom`, a `holdOpen` that is not `true`, a `queued`
- *    that is not a boolean, and a `priority` that is not a whole number in int32;
+ *    that is not a boolean, a `priority` that is not a whole number in int32, and `labels` it cannot carry (`labelsRefusalOf`);
  * 5. what a long-lived task cannot honour (`restartRefusalOf`).
  *
  * Checked by `file` itself, so no caller journals what the loop cannot use. A journalled task is a promise the loop
@@ -108,7 +113,7 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
   }
-  return priorityRefusalOf(spec.priority) ?? partsRefusalOf(spec) ?? restartRefusalOf(spec);
+  return priorityRefusalOf(spec.priority) ?? labelsRefusalOf(spec.labels) ?? partsRefusalOf(spec) ?? restartRefusalOf(spec);
 };
 
 /** Why a task's `briefParts` cannot be its brief's, or `undefined`: anything but a list of texts, or texts that do not join into it. */
@@ -176,6 +181,8 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
       queued: spec.queued === true,
       ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
       ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
+      ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
+      ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
     },
     spec.briefParts,
   );

@@ -127,6 +127,8 @@ const Filed = event('filed', {
   priority: Schema.optional(Schema.NullOr(Schema.Finite)),
   holdOpen: Schema.optional(Schema.Literal(true)),
   restartPolicy: Schema.optional(Schema.Literal('Always')),
+  labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  traceparent: Schema.optional(Schema.String),
 });
 
 /** A moment on the monotonic clock, as the engine stamps an attempt's start, spawn and end, and a gap (`Monotonic`, `core/clock.ts`). */

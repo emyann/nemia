@@ -2,7 +2,9 @@
  * Nemia on the api, through the entries of the package's command table and the package's refusals (`REFUSAL_STATUS`): `GET /api/level`
  * says where she is, `manual` where no level was ever set; `PUT /api/level` refuses `semi-auto` with a 409 while her folder is not
  * trusted, naming the command that trusts it, a word that is no level with a 422, each before anything is written, and sets it once the
- * folder is trusted; `GET /api/nemia/memory` lists her facts, and `/:fact` prints one, a fact she does not keep its 404.
+ * folder is trusted; it raises a factory for a stretch and ends the raise, and refuses `for` with no factory with a 422; `GET
+ * /api/level` lists each factory's level, the default factory first; `GET /api/nemia/memory` lists her facts, and `/:fact` prints one, a
+ * fact she does not keep its 404.
  *
  * At shipped defaults, over the harness's scratch store (`root`) and its Claude Code folder (`config`), and an engine of the test's on
  * which no task is filed.
@@ -13,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { engine } from 'agent-orchestrator';
+import { addFactory, engine } from 'agent-orchestrator';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 
@@ -66,6 +68,32 @@ test('once her folder is trusted, semi-auto is set, and read back with the task 
   assert.match(String(set.body.task), /^nemia-\d+$/);
   assert.equal(JSON.parse(fs.readFileSync(LEVEL_FILE, 'utf8')).level, 'semi-auto');
   assert.equal((await asked('PUT', '/api/level', { level: 'manual' })).status, 200);
+});
+
+test('a factory raised for a stretch reads above its default until its end; a raise ended reads as its default; for with no factory a 422', async () => {
+  addFactory({ name: 'mill', repos: [fs.mkdtempSync(path.join(root, 'mill-'))] });
+  const read = await asked('GET', '/api/level');
+  assert.deepEqual(
+    (read.body.factories as Array<{ factory: string }>).map((f) => f.factory),
+    ['default', 'mill'],
+  );
+  const raised = await asked('PUT', '/api/level', { level: 'semi-auto', factory: 'mill', for: '2h' });
+  assert.equal(raised.status, 200);
+  const mill = (raised.body.factories as Array<{ factory: string; level: string; raise: { until: string } | null }>)[1];
+  assert.equal(mill.level, 'semi-auto');
+  assert.ok(Date.parse(mill.raise?.until ?? '') > Date.now() + 7_000_000, 'raised for two hours');
+  const loose = await asked('PUT', '/api/level', { level: 'semi-auto', for: '2h' });
+  assert.equal(loose.status, 422);
+  assert.match(String(loose.body.error), /^--for and --end take the factory raised/);
+  const ended = await asked('PUT', '/api/level', { factory: 'mill', end: true });
+  assert.equal(ended.status, 200);
+  assert.deepEqual((ended.body.factories as Array<{ level: string; raise: unknown }>)[1], {
+    factory: 'mill',
+    level: 'manual',
+    default: 'manual',
+    own: null,
+    raise: null,
+  });
 });
 
 test("her memory: the facts she keeps by name, one fact's words, and a fact she does not keep a 404 naming those she does", async () => {

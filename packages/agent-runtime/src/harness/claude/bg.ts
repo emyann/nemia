@@ -18,12 +18,22 @@ import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionState, Sighting, Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
-import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './transcript.ts';
+import {
+  claudeTranscriptEvents,
+  lastStructuredOutput,
+  readSessionTranscript,
+  renderTranscript,
+  transcriptFile,
+  TranscriptUnread,
+  transcriptUsage,
+} from './transcript.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllowArgs, claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
+import { telemeteredFlags } from './telemetry.ts';
+import { withoutTelemetry } from '../telemetry.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
-import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
+import { countSpawn } from '../../core/engine/tally.ts';
 import type { Monotonic } from '../../core/clock.ts';
 import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError, refusedOsError } from '../error.ts';
@@ -182,7 +192,9 @@ const attemptOf = (name: string, s: Sighting, startedAt: number | undefined, cou
 /**
  * A runner's kept reads (`Kept`), over its clock and its two readers: `statementOf` and `usageOf` read an attempt's closeout
  * and usage through them, and `prune` lets go of every attempt not in the set it is given. A read that throws — a transcript
- * refused (`lines.ts`) — is kept as a value is, and thrown again while the transcript is unchanged, not read again.
+ * refused (`lines.ts`) — is kept as a value is, and thrown again while the transcript is unchanged, not read again; a transcript
+ * found and not read (`TranscriptUnread`) is thrown and never kept, and lets go of what was kept for the attempt, so the next look
+ * reads it again.
  */
 const keptReads = (
   now: () => number,
@@ -208,6 +220,10 @@ const keptReads = (
         (value) => ({ value }),
         (refused: unknown) => ({ refused }),
       );
+      if ('refused' in got && got.refused instanceof TranscriptUnread) {
+        kept.delete(attempt);
+        throw got.refused;
+      }
       kept.set(attempt, { read: got, readAt, mtime: written });
     }
     if ('refused' in got) throw got.refused;
@@ -265,32 +281,22 @@ const sdkTranscriptTime = async (sessionId: string) => {
   }
 };
 
-/** A session's transcript, found and read, with where it is; `undefined` with no transcript, or when it cannot be read. */
-const transcriptText = async (sessionId: string) => {
-  const file = transcriptFile(sessionId);
-  if (!file) return undefined;
-  try {
-    return { file, text: await readTextAsync(file) };
-  } catch {
-    return undefined;
-  }
-};
-
 /**
- * A session's closing statement, read off its transcript (`lastStructuredOutput`), or `undefined` with no transcript or no read.
- * Throws the refusal of a transcript whose lines do not decode.
+ * A session's closing statement, read off its transcript (`lastStructuredOutput`), or `undefined` with no transcript. Throws the
+ * refusal of a transcript whose lines do not decode, and a `TranscriptUnread` when one found cannot be read.
  */
 const transcriptCloseout = async (sessionId: string) => {
-  const read = await transcriptText(sessionId);
+  const read = await readSessionTranscript(sessionId);
   return read && lastStructuredOutput(read.text, read.file);
 };
 
 /**
  * The last StructuredOutput call a session made, read off its transcript (`lastStructuredOutput`): `null` for none, and `undefined`
- * with no transcript, no read, or a call with no id. Throws the refusal of a transcript whose lines do not decode.
+ * with no transcript or a call with no id. Throws the refusal of a transcript whose lines do not decode, and a `TranscriptUnread`
+ * when one found cannot be read.
  */
 const transcriptLastCall = async (sessionId: string): Promise<ParentCall | undefined> => {
-  const read = await transcriptText(sessionId);
+  const read = await readSessionTranscript(sessionId);
   if (!read) return undefined;
   const said = lastStructuredOutput(read.text, read.file);
   if (!said) return { lastCall: null };
@@ -298,11 +304,11 @@ const transcriptLastCall = async (sessionId: string): Promise<ParentCall | undef
 };
 
 /**
- * What a session consumed since `since`, read off its transcript (`transcriptUsage`), or `undefined` with no transcript or no read.
- * Throws the refusal of a transcript whose lines do not decode.
+ * What a session consumed since `since`, read off its transcript (`transcriptUsage`), or `undefined` with no transcript. Throws the
+ * refusal of a transcript whose lines do not decode, and a `TranscriptUnread` when one found cannot be read.
  */
 const transcriptUsageSince = async (sessionId: string, since: number) => {
-  const read = await transcriptText(sessionId);
+  const read = await readSessionTranscript(sessionId);
   return read && transcriptUsage(read.text, since, read.file);
 };
 
@@ -481,7 +487,7 @@ export const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
   '--name',
   r.name,
   ...fenceFlags(r.config),
-  ...claudeFlagsOf(admittedFlags(r.config)),
+  ...claudeFlagsOf(telemeteredFlags(admittedFlags(r.config), r)),
   '--permission-mode',
   r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...mcpArgs,
@@ -598,8 +604,8 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
 
 /**
  * `reportOf`, failing with a `RunnerError` for `observe` when a read of the session's transcript throws — its lines do not decode
- * (`lines.ts`): a statement or usage the transcript holds and the runtime cannot read is no absence, so the whole listing fails and
- * each background session is unread.
+ * (`lines.ts`), or it was found and not read (`TranscriptUnread`): a statement or usage the transcript holds and the runtime cannot
+ * read is no absence, so the whole listing fails and each background session is unread.
  */
 const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt?: number; countFrom?: number }) =>
   Effect.tryPromise({
@@ -819,18 +825,23 @@ const refusedSpawn = (err: Error) => (err as NodeJS.ErrnoException).syscall?.sta
 const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
     countSpawn();
-    const child = execFile(cmd, args, { cwd: o.cwd, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resume(
-        err
-          ? Effect.fail(
-              new RunnerError({
-                verb: o.verb,
-                message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
-                ...(refusedSpawn(err) ? { refused: true } : {}),
-              }),
-            )
-          : Effect.succeed(stdout),
-      );
-    });
+    const child = execFile(
+      cmd,
+      args,
+      { cwd: o.cwd, env: withoutTelemetry(process.env), maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        resume(
+          err
+            ? Effect.fail(
+                new RunnerError({
+                  verb: o.verb,
+                  message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
+                  ...(refusedSpawn(err) ? { refused: true } : {}),
+                }),
+              )
+            : Effect.succeed(stdout),
+        );
+      },
+    );
     return Effect.sync(() => child.kill());
   });

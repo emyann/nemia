@@ -3,12 +3,13 @@
  * from the orchestrator's facts alone — her level, her task, whether it is filed, the lines that reach it, whether it was stopped — and
  * never from the runtime's phase, which is shown as it came.
  */
-import type { Level, NemiaLevel, Spend } from './api/nemia.ts';
+import type { FactoryLevel, Level, NemiaLevel, Spend } from './api/nemia.ts';
+import { clockWord } from './quota.ts';
 import { dollars } from './stats.ts';
 
 /**
- * Her session's state, as the board says it: off, none kept; leaving, Manual asked of a session still reached, which the keeper stops;
- * not filed yet; filed and starting, not yet reachable; up, reached; and stopped from outside, not filed again.
+ * Her session's state, as the board says it: off, none kept; leaving, no factory left above Manual with a session still reached, which
+ * the keeper stops; not filed yet; filed and starting, not yet reachable; up, reached; and stopped from outside, not filed again.
  */
 export type SessionKind = 'off' | 'leaving' | 'not-filed' | 'starting' | 'up' | 'stopped';
 
@@ -29,12 +30,33 @@ export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string
 }
 
 /** The state alone, in the order `sessionOf` judges it. */
-function kindOf({ level, task, phase, reach, stopped }: NemiaLevel): SessionKind {
+function kindOf(nemia: NemiaLevel): SessionKind {
+  const { task, phase, reach, stopped } = nemia;
   if (stopped) return 'stopped';
   if (task === null) return 'off';
-  if (level === 'manual') return reach.length ? 'leaving' : 'off';
+  if (!anyAbove(nemia)) return reach.length ? 'leaving' : 'off';
   if (phase === null) return 'not-filed';
   return reach.length ? 'up' : 'starting';
+}
+
+/** Whether she is kept: the store's level, or any factory's in force, above Manual. */
+export const anyAbove = ({ level, factories }: Pick<NemiaLevel, 'level' | 'factories'>): boolean =>
+  level !== 'manual' || factories.some((row) => row.level !== 'manual');
+
+/** The stretches a person raises a factory for, as the api takes them, the first offered first. */
+export const RAISE_STRETCHES = ['2h', '8h', '1d', '7d'] as const;
+
+/** A level as the board says it. */
+export const levelWord = (level: Level): string => (level === 'semi-auto' ? 'Semi-auto' : 'Manual');
+
+/**
+ * A factory's level in words at `now`, named the store's own when it is the default factory (`byDefault`): a raise with its end, said as
+ * `clockWord` says a time, and the default after it; else whose default it is.
+ */
+export function factoryWords(row: FactoryLevel, byDefault: boolean, now: Date): string {
+  const whose = byDefault ? "the store's level, for runs in no factory" : row.own === null ? "the store's" : 'its own';
+  if (row.raise !== null) return `Raised until ${clockWord(new Date(row.raise.until), now)}, then ${levelWord(row.default)} (${whose}).`;
+  return `${levelWord(row.default)} by default (${whose}).`;
 }
 
 /** The level a person's switch writes, from where she is: Manual from Semi-auto, Semi-auto from Manual. */

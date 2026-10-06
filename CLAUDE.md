@@ -177,4 +177,7 @@ What the `create-an-agent` skill, being generic, does not say here:
   reporter beside spec, and `report.ts`; held by `agent-orchestrator/test/test-costs.test.ts` and `suite.test.ts`.
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
+- `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
+  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and its four dashboards held to the code's names by
+  `agent-orchestrator/test/observe.test.ts`.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

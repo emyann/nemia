@@ -12,7 +12,7 @@
  * Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set before the
  * import; where Codex keeps rollouts is read when one is looked for, so `CODEX_HOME` is set once, for the whole file.
  */
-import { test } from 'node:test';
+import { type TestContext, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -1096,4 +1096,101 @@ test("REFUSED: a finished background session whose statement's line does not dec
     ),
     e.message,
   );
+});
+
+/**
+ * `fs.promises.readFile`, as the runtime reads a transcript through it (`readTextAsync`), failing on demand for one file: rejected
+ * as the OS rejects it with the code `fails` gives, or read as it is while that gives `undefined`. `asked` counts that file's reads.
+ */
+const failingReads = (t: TestContext, file: string) => {
+  let code: string | undefined;
+  let asked = 0;
+  const readFile = fs.promises.readFile.bind(fs.promises);
+  t.mock.method(fs.promises, 'readFile', (async (...args: Parameters<typeof readFile>) => {
+    if (args[0] !== file) return readFile(...args);
+    asked++;
+    if (code === undefined) return readFile(...args);
+    throw Object.assign(new Error(`${code}: cannot read, open '${file}'`), { code, syscall: 'open', path: file });
+  }) as typeof readFile);
+  return { fails: (c: string | undefined) => (code = c), asked: () => asked };
+};
+
+/** A fake `claude` whose `agents` lists `rows`, on PATH while `f` runs. */
+const listing = <T>(rows: object[], f: () => Promise<T>) => {
+  const bin = tmp('bin');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\ncat <<'JSON'\n${JSON.stringify(rows)}\nJSON\n`, { mode: 0o755 });
+  return onPath(bin, f);
+};
+
+test('REFUSED: a finished background session whose transcript was found and cannot be read fails `observe`, each time, and is read again on the next look; readable again, it gives the statement', async (t: TestContext) => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
+  const reads = failingReads(t, claudeFile(sessionId));
+  const rows = [{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background', startedAt: T0 - 1_000 }];
+  const ops = claudeOps({ root: tmp('root'), transcriptTime: async () => 0 });
+
+  await listing(rows, async () => {
+    for (const code of ['EACCES', 'EIO', 'ENOENT']) {
+      reads.fails(code);
+      for (const look of [1, 2]) {
+        const before = reads.asked();
+        const e = await Effect.runPromise(Effect.flip(ops.observe));
+        assert.ok(e instanceof RunnerError, String(e));
+        assert.equal(e.verb, 'observe');
+        for (const said of ["`ae/t/1`'s transcript cannot be read", code, claudeFile(sessionId)])
+          assert.ok(e.message.includes(said), `${code}, look ${look}: ${e.message}`);
+        assert.ok(reads.asked() > before, `${code}, look ${look}: the transcript is read again, its failure never kept`);
+      }
+    }
+    reads.fails(undefined);
+    const seen = await Effect.runPromise(ops.observe);
+    assert.deepEqual(seen.get('ae/t/1')?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
+  });
+});
+
+test('a background session with no transcript at all still reads as none: no statement, no usage, and no read asked', async (t: TestContext) => {
+  const sessionId = randomUUID();
+  const reads = failingReads(t, claudeFile(sessionId));
+  reads.fails('EACCES');
+  const rows = [{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background', startedAt: Date.now() }];
+  const seen = await listing(rows, () => Effect.runPromise(claudeOps({ root: tmp('root'), transcriptTime: async () => 0 }).observe));
+  const sighting = seen.get('ae/t/1');
+  assert.ok(sighting, 'listed');
+  assert.equal(sighting.closeout, undefined);
+  assert.equal(sighting.usage, undefined);
+  assert.equal(reads.asked(), 0);
+});
+
+test('at shipped defaults, a finished background session whose transcript cannot be read stays in flight and unread, never unsigned; read on the next pass, it ends stated', async (t: TestContext) => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+    const id = await Effect.runPromise(
+      engine.file({ brief: 'Write the word.', cwd: tmp('cwd'), config: { background: true }, closeoutSchema: { type: 'object' } }),
+    );
+    await Effect.runPromise(engine.tick());
+    const [row] = claude.rows();
+    assert.equal(row?.name, `ae/${id}/1`, 'spawned');
+    const now = new Date().toISOString();
+    writeClaude(row.sessionId, jsonl(claudeLines(row.sessionId).map((l) => ('timestamp' in l ? { ...l, timestamp: now } : l))));
+    const reads = failingReads(t, claudeFile(row.sessionId));
+    claude.set(row.name, { state: 'done' });
+
+    for (const code of ['EACCES', 'EIO', 'ENOENT']) {
+      reads.fails(code);
+      const report = await Effect.runPromise(engine.tick());
+      const attempt = (await Effect.runPromise(engine.view(id))).state.attempts[0];
+      assert.equal(attempt.ended, null, `${code}: still in flight`);
+      assert.equal(attempt.reason, null, `${code}: no end`);
+      const unread = Object.values(report.observed).reduce((n, o) => n + o.unread, 0);
+      assert.ok(unread >= 1, `${code}: the observe is unread: ${JSON.stringify(report.observed)}`);
+    }
+
+    reads.fails(undefined);
+    await Effect.runPromise(engine.tick());
+    const ended = (await Effect.runPromise(engine.view(id))).state.attempts[0];
+    assert.notEqual(ended.ended, null, 'ended once read');
+    assert.deepEqual(ended.closeout, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
+    assert.equal(ended.stated, true);
+  });
 });

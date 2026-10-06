@@ -2,7 +2,8 @@
  * The keeper and `nemia level` over an engine board of the test's: her task filed long-lived in her folder, by her shipped definition and
  * the person's custom words, with the daemon's own bin first on her path, her fence derived from the table, her admission, and a deny
  * on the store but her folder;
- * subscribed once it is open; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed at manual.
+ * subscribed once it is open, with her floor; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed
+ * at manual, and once a factory's raise passes its end, with no write.
  * And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own, since `WF_ROOT` is read as
  * the module loads.
  */
@@ -26,7 +27,8 @@ const { MEMORY } = await import('./memory.verb.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../folder/folder.store.ts');
-const { addFactory } = await import('../factory/factory.store.ts');
+const { addFactory, factoryNames } = await import('../factory/factory.store.ts');
+const { factoryLevelFile } = await import('../level/level.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
 const { nemiaFence } = await import('../admission/index.ts');
@@ -57,6 +59,12 @@ const trust = (trusted: boolean) =>
     path.join(CONFIG, `.${DEFAULT_HARNESS}.json`),
     JSON.stringify({ projects: { [nemiaDir()]: { hasTrustDialogAccepted: trusted } } }),
   );
+
+/** The factory `pipao` in the store and her folder trusted, as the tests before leave them: a test of a factory's level runs alone too. */
+const withPipao = () => {
+  trust(true);
+  if (!factoryNames().includes('pipao')) addFactory({ name: 'pipao', repos: [fs.mkdtempSync(path.join(ROOT, 'repo-'))] });
+};
 
 /** The message `f` refuses with, at exit 2. */
 const refusal = async (f: () => Promise<unknown>): Promise<string> => {
@@ -152,7 +160,7 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   for (const rule of fence.allow) assert.ok((spec.config.allowedTools as string[]).includes(rule), `${rule} allowed`);
   assert.deepEqual(
     spec.config.callAdmission,
-    { command: [path.join(bin, 'nemia'), 'admit'], tools: ['Bash'] },
+    { command: [path.join(bin, 'nemia'), 'admit', '--at-least', 'semi-auto'], tools: ['Bash'] },
     "her shell calls admitted by the daemon's own nemia",
   );
   assert.equal(own.appendSystemPromptFile, promptFile());
@@ -165,6 +173,7 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
     [['nemia', set.task]],
   );
   assert.ok(listSubscriptions()[0].subscription.wake?.includes('denied:'), "a step's denied calls wake her");
+  assert.deepEqual(listSubscriptions()[0].subscription.scope, { atLeast: 'semi-auto' }, 'told of no factory left alone');
   assert.deepEqual(await beat(), [], 'level-triggered: nothing filed again');
   assert.equal(b.filings.filter((id) => id === set.task).length, 1);
   const status = await runWith(e, LEVEL.handler({}));
@@ -196,6 +205,77 @@ test('a task stopped from outside is never filed again, and semi-auto then start
   assert.deepEqual(await beat(), []);
 });
 
+test('REFUSED: a factory write that names no factory, the default one, a raise with no level or stretch, an end with no raise', async () => {
+  withPipao();
+  const check = (args: Record<string, string | boolean>) => LEVEL.check?.(args) ?? null;
+  assert.match(check({ level: 'semi-auto', for: '2h' }) ?? '', /^--for and --end take the factory raised, --factory <name>/);
+  assert.match(check({ factory: 'pipao', end: true, for: '2h' }) ?? '', /give one/);
+  assert.match(
+    check({ factory: 'pipao', for: '2h' }) ?? '',
+    /--for takes the level the factory is raised to: nemia level semi-auto --factory pipao/,
+  );
+  assert.match(check({ factory: 'pipao', level: 'manual', end: true }) ?? '', /--end takes no level/);
+  assert.match(check({ factory: 'default', level: 'semi-auto' }) ?? '', /: nemia level semi-auto\.$/);
+  for (const stretch of ['0h', '-1h', '2x', '8d'])
+    assert.match(check({ factory: 'pipao', level: 'semi-auto', for: stretch }) ?? '', /is not one/, stretch);
+  assert.equal(check({ factory: 'pipao', level: 'semi-auto', for: '90m' }), null);
+  assert.match(
+    await refusal(() => runWith(e, LEVEL.handler({ factory: 'nope', level: 'semi-auto', for: '1h' }))),
+    /^no factory is named nope: nemia factory ls/,
+  );
+  assert.match(await refusal(() => runWith(e, LEVEL.handler({ factory: 'pipao', end: true }))), /^pipao has no raise in force to end/);
+  assert.match(
+    await refusal(() => runWith(e, LEVEL.handler({ factory: 'pipao', level: 'manual', for: '1h' }))),
+    /^pipao is at manual by default, so a raise to manual raises nothing/,
+  );
+  assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, 'nothing written');
+});
+
+test("a factory raised for a stretch keeps her, the store at manual; once the raise's end passes she is stopped, with no write", async (t) => {
+  withPipao();
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  const raised = await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'semi-auto', for: '1h' }));
+  assert.equal(raised.level, 'manual', "the store's own level is untouched");
+  const pipao = raised.factories.find((row) => row.factory === 'pipao');
+  assert.equal(pipao?.level, 'semi-auto');
+  assert.equal(pipao.default, 'manual');
+  const until = pipao.raise?.until ?? '';
+  assert.ok(Date.parse(until) > Date.now() + 3_500_000, 'raised for an hour');
+  assert.ok(LEVEL.print(raised, {}).includes(`  pipao: semi-auto until ${until}, then manual (the store's)`));
+  assert.deepEqual(await beat(), ['file']);
+  assert.deepEqual(await beat(), ['subscribe']);
+  assert.deepEqual(await beat(), []);
+  const written = [levelFile(), factoryLevelFile('pipao')].map((f) => fs.readFileSync(f, 'utf8'));
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 2 * 3_600_000 });
+  assert.deepEqual(await beat(), ['stop', 'drop'], 'none above manual once the raise has passed');
+  assert.deepEqual(
+    [levelFile(), factoryLevelFile('pipao')].map((f) => fs.readFileSync(f, 'utf8')),
+    written,
+    'level-triggered: the raise reads as gone, with no write',
+  );
+  const after = await runWith(e, LEVEL.handler({}));
+  assert.deepEqual(after.factories.find((row) => row.factory === 'pipao')?.raise, null);
+});
+
+test('a raise ended early stops her at the next beat; a raise to a level the factory has by default is refused', async () => {
+  withPipao();
+  const raised = await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'semi-auto', for: '2h' }));
+  assert.deepEqual(await beat(), ['file']);
+  const ended = await runWith(e, LEVEL.handler({ factory: 'pipao', end: true }));
+  assert.equal(ended.task, raised.task, 'the task stays named, for the keeper to stop');
+  assert.deepEqual(ended.factories.find((row) => row.factory === 'pipao')?.raise, null);
+  assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, 'a factory with no level of its own follows the store');
+  assert.deepEqual(await beat(), ['stop']);
+  await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'semi-auto' }));
+  assert.deepEqual(await beat(), ['file'], "a factory's own default above manual keeps her");
+  assert.match(
+    await refusal(() => runWith(e, LEVEL.handler({ factory: 'pipao', level: 'semi-auto', for: '1h' }))),
+    /^pipao is at semi-auto by default/,
+  );
+  await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'manual' }));
+  assert.deepEqual(await beat(), ['stop']);
+});
+
 test('nemia memory lists her facts and prints one; a fact she does not keep is refused, naming those she does', async () => {
   fs.mkdirSync(memoryDir(), { recursive: true });
   fs.writeFileSync(path.join(memoryDir(), 'feed-cursor'), '1234\n');
@@ -209,4 +289,20 @@ test('nemia memory lists her facts and prints one; a fact she does not keep is r
     await refusal(() => runWith(e, MEMORY.handler({ fact: '../level.json' }))),
     /no fact named \.\.\/level\.json: she keeps feed-cursor/,
   );
+});
+
+test("REFUSED: a factory's raise or default above manual while her folder is not trusted, the store at manual; nothing written", async () => {
+  withPipao();
+  fs.rmSync(levelFile(), { force: true });
+  fs.rmSync(factoryLevelFile('pipao'), { force: true });
+  trust(false);
+  for (const ask of [
+    { factory: 'pipao', level: 'semi-auto', for: '1h' },
+    { factory: 'pipao', level: 'semi-auto' },
+  ]) {
+    assert.match(await refusal(() => runWith(e, LEVEL.handler(ask))), /is not trusted/, JSON.stringify(ask));
+    assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, `${JSON.stringify(ask)} writes no factory's file`);
+    assert.equal(readLevel(), undefined, `${JSON.stringify(ask)} names no task`);
+  }
+  trust(true);
 });

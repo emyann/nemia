@@ -40,7 +40,7 @@ export default {
       if (!(await shown.textContent())?.includes(error))
         throw new Refused(`in the api's words — it says ${JSON.stringify(await shown.textContent())}`);
       await expectVisible(section.locator('[data-nemia-level="manual"]'), 'her level stays Manual');
-      if (await section.getByRole('switch', { name: 'Semi-auto' }).isChecked()) throw new Refused('the switch stays off');
+      if (await section.getByRole('switch', { name: 'Semi-auto', exact: true }).isChecked()) throw new Refused('the switch stays off');
       if (fs.existsSync(levelFile)) throw new Refused(`no level is written — ${levelFile} is there`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `nemia-untrusted-refused-${await themeOf(refused)}.png`));

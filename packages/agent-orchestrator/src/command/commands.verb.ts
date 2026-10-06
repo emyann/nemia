@@ -52,6 +52,7 @@ import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 import { LEVEL } from '../nemia/level.verb.ts';
 import { MEMORY } from '../nemia/memory.verb.ts';
+import { SERVICES } from '../service/service.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -541,6 +542,7 @@ export const COMMANDS: readonly Command[] = [
   UNSUBSCRIBE,
   LEVEL,
   MEMORY,
+  ...SERVICES,
   ...WORKFLOW_ENTRIES,
 ];
 

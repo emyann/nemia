@@ -8,12 +8,14 @@
  */
 import { feedLineWords, type FeedLine } from '../feed/feed.ts';
 import { elapsedMs, type Instant } from '../daemon/daemon.ts';
+import { LEVELS, type Level } from '../level/level.ts';
 
 /**
  * A subscription as a person asked for it: the task told (`task`), the words that wake it (`wake`), the minutes a digest waits for a wake
- * (`digestEvery`), and the byte of the feed its news starts from (`from`), the feed's size when it was asked for.
+ * (`digestEvery`), the byte of the feed its news starts from (`from`), the feed's size when it was asked for, and its `scope`: the level
+ * a run's factory is at least at for its lines to be carried, absent where every line is.
  */
-export type Subscription = { task: string; wake: string[]; digestEvery: number; from: number };
+export type Subscription = { task: string; wake: string[]; digestEvery: number; from: number; scope?: { atLeast: Level } };
 
 /**
  * Where the deliverer is with a subscription: the byte of the feed it has delivered or folded every line before (`cursor`), the routine
@@ -94,7 +96,7 @@ export const digestDue = (since: Instant | undefined, everyMinutes: number, now:
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 /** The usage the refusals of a subscription end on. */
-export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>]';
+export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]';
 
 /** Why `name` is no subscription's name, or undefined where it is one. Pure. */
 export const subscriptionNameRefusal = (name: string): string | undefined =>
@@ -104,22 +106,26 @@ export const subscriptionNameRefusal = (name: string): string | undefined =>
       `${SUBSCRIBE_FORM}.`;
 
 /**
- * Why a subscription asked for is refused before anything is read: a name that is none (`subscriptionNameRefusal`), a wake word empty, or
- * minutes not above zero — or undefined. Pure.
+ * Why a subscription asked for is refused before anything is read: a name that is none (`subscriptionNameRefusal`), a wake word empty,
+ * minutes not above zero, or a floor that is no level — or undefined. Pure.
  */
 export function subscribeRefusalOf({
   name,
   wake,
   digestEvery,
+  atLeast,
 }: {
   name: string;
   wake: readonly string[];
   digestEvery?: number;
+  atLeast?: string;
 }): string | undefined {
   const named = subscriptionNameRefusal(name);
   if (named) return named;
   if (wake.some((w) => !w.trim())) return `--wake takes a word that wakes the subscriber, and one given is empty: ${SUBSCRIBE_FORM}.`;
   if (digestEvery !== undefined && !(Number.isFinite(digestEvery) && digestEvery > 0))
     return `--digest-every takes the minutes a digest waits for a wake, above zero, and ${digestEvery} is not: ${SUBSCRIBE_FORM}.`;
+  if (atLeast !== undefined && !(LEVELS as readonly string[]).includes(atLeast))
+    return `--at-least takes a level, one of ${LEVELS.join(', ')}, and ${JSON.stringify(atLeast)} is none: ${SUBSCRIBE_FORM}.`;
   return undefined;
 }

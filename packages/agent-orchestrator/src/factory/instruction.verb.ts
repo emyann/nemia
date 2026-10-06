@@ -69,7 +69,7 @@ const PATH: Flag = {
 
 /** `nemia factory instruction`'s spec: the factory's name, then `--path`, `--store` or `--clear`. */
 const INSTRUCTION_SPEC: Spec = {
-  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
   flags: [PATH, { flag: '--store', kind: 'switch', key: 'store' }, { flag: '--clear', kind: 'switch', key: 'clear' }],
   unknown: (arg) =>
     `nemia factory instruction takes one factory's name, then --path <path>, --store or --clear, not ${arg}: nemia factory instruction <name> [--path <path> | --store | --clear].`,
@@ -121,7 +121,7 @@ function readLines(data: FactoryInstruction): string[] {
  * (`setInstruction`). Refused, writing nothing: as `FACTORY_INSTRUCTION` says.
  */
 function placed(args: Args): FactoryInstruction {
-  const name = textOf(args, 'name') ?? '';
+  const name = textOf(args, 'factory') ?? '';
   refuseDefault(name, 'instruction');
   const asked = placeAsked(args);
   if (asked !== undefined) setInstruction({ factory: name, at: asked.at });
@@ -149,12 +149,12 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
   route: [
     {
       method: 'GET',
-      path: '/api/factories/:name/instruction',
+      path: '/api/factories/:factory/instruction',
       status: 200,
       hand: 'a read of a command that writes: the api serves it by a route of its own, which calls the same handler',
     },
-    { method: 'PUT', path: '/api/factories/:name/instruction', status: 200, sets: { clear: false } },
-    { method: 'DELETE', path: '/api/factories/:name/instruction', status: 200, sets: { clear: true } },
+    { method: 'PUT', path: '/api/factories/:factory/instruction', status: 200, sets: { clear: false } },
+    { method: 'DELETE', path: '/api/factories/:factory/instruction', status: 200, sets: { clear: true } },
   ],
   handler: (args) => tried(() => placed(args)),
   print(data, args) {
@@ -175,7 +175,7 @@ const FILE: Flag = {
 
 /** `nemia factory instruct`'s spec: the factory's name, then `--file` or `--clear`; and the words, which a body alone carries. */
 const INSTRUCT_SPEC: Spec = {
-  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
   flags: [
     FILE,
     { flag: '--clear', kind: 'switch', key: 'clear' },
@@ -214,8 +214,8 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
   writes: true,
   nemia: 'prompts',
   route: [
-    { method: 'PUT', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: false } },
-    { method: 'DELETE', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: true } },
+    { method: 'PUT', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: false } },
+    { method: 'DELETE', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: true } },
   ],
   handler: (args) => tried(() => instructed(args)),
   print(data) {
@@ -230,7 +230,7 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
  * writing nothing: as `FACTORY_INSTRUCT` says.
  */
 function instructed(args: Args): Instructed {
-  const name = textOf(args, 'name') ?? '';
+  const name = textOf(args, 'factory') ?? '';
   refuseDefault(name, 'instruct');
   const before = factoryInstruction(name);
   if (!before.store)

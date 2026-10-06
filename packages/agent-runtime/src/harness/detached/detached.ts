@@ -26,6 +26,7 @@ import type { Denial, Sighting, Usage, SessionState } from '../../core/index.ts'
 import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
 import { forgetFiles } from '../forget.ts';
+import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
 import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
@@ -37,7 +38,7 @@ export type HarnessSpec = {
   name: string;
   /**
    * The command that runs a brief to completion. Exit 0 is success; anything else is failure. `env`, when given, is laid over
-   * the worker's own environment for this process alone.
+   * the worker's own environment for this process alone: the engine's, less its telemetry (`withoutTelemetry`).
    */
   command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[]; env?: Record<string, string> };
   /**
@@ -539,6 +540,17 @@ const forgetRunOf =
 const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({ ...outputOps(spec, dir), forget: forgetRunOf(spec, root) });
 
 /**
+ * Starts the detached worker on the run file `file`, in `cwd`, and lets it go: in its own process group, its streams closed, in the
+ * engine's environment less its telemetry (`withoutTelemetry`), which a runner hands a session itself.
+ */
+const startWorker = (file: string, cwd: string): void => {
+  const child = spawn(process.execPath, [WORKER, file], { detached: true, stdio: 'ignore', cwd, env: withoutTelemetry(process.env) });
+  child.on('error', () => {});
+  child.unref();
+  countSpawn();
+};
+
+/**
  * The runner of a detached harness: a worker per session (`bin/ae-worker.ts`), and the directory `runs/<spec's name>`
  * under `root` as its registry, read fresh every pass, the same shape as `claude agents`. Beside each run file: the
  * harness's output (`.log`), what was read of it once the run was over (`.said`, `harness/detached/said.ts`), its closeout
@@ -744,14 +756,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           };
           fs.writeFileSync(runFile(r.name), firstRunFile(plan));
 
-          const child = spawn(process.execPath, [WORKER, runFile(r.name)], {
-            detached: true,
-            stdio: 'ignore',
-            cwd: r.cwd,
-          });
-          child.on('error', () => {});
-          child.unref();
-          countSpawn();
+          startWorker(runFile(r.name), r.cwd);
         },
         catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),

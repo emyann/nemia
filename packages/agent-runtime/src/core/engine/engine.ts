@@ -29,7 +29,8 @@ import type { Monotonic } from '../clock.ts';
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
 import { configForTurn } from '../../harness/args.ts';
-import { Runner, type ExpectedSession } from '../../harness/seam.ts';
+import { Runner, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
+import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { CEILING_INSTEAD } from './filing.ts';
@@ -216,6 +217,25 @@ const endFacts = (seen: Sighting | undefined) => ({
 });
 
 /**
+ * What a harness is asked to start for attempt `n` of task `taskId`, named `name`: its brief (or the words that nudge it), folder,
+ * harness and configuration for its turn, the session it continues, and the labels its telemetry says, the task's id among them.
+ */
+const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
+  const attempt = state.attempts.find((a) => a.n === n);
+  return {
+    name,
+    brief: attempt?.nudge ?? state.brief,
+    cwd: state.cwd,
+    harness: state.harness,
+    config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
+    closeoutSchema: state.closeoutSchema,
+    resumeFrom: attempt?.resumeFrom,
+    resource: { ...state.labels, [TASK_LABEL]: taskId },
+    traceparent: state.traceparent,
+  };
+};
+
+/**
  * A step, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `step`'s door does not
  * take. Folds the task's journal, asks `decide` for one action, and carries it out. The actions, in the order an attempt
  * meets them:
@@ -272,21 +292,10 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
       break;
 
     case 'spawn': {
-      const attempt = state.attempts.find((a) => a.n === action.attempt);
-      const failed = yield* runner
-        .spawn({
-          name: action.name,
-          brief: attempt?.nudge ?? state.brief,
-          cwd: state.cwd,
-          harness: state.harness,
-          config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
-          closeoutSchema: state.closeoutSchema,
-          resumeFrom: attempt?.resumeFrom,
-        })
-        .pipe(
-          Effect.as(undefined),
-          Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
-        );
+      const failed = yield* runner.spawn(spawnRequestOf(taskId, state, action.name, action.attempt)).pipe(
+        Effect.as(undefined),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+      );
       if (failed?.refused) {
         const end = spawnRefused(state, action.attempt, failed.message, move);
         if (end.do !== 'record-end') return end;
@@ -411,6 +420,12 @@ const settleOn = Effect.fn('settleOn')(function* (
 /** What a release the harness refused answers, in `releaseFinished`: told apart from every answer a release gives. */
 const REFUSED = Symbol('refused');
 
+/** A runner that can let a finished session go (`RunnerOps.release`). */
+type Releasing = RunnerOps & Required<Pick<RunnerOps, 'release'>>;
+
+/** Whether `runner` can let a finished session go: one without `release` keeps every session it lists. */
+const releases = (runner: RunnerOps): runner is Releasing => runner.release !== undefined;
+
 /**
  * Let the harness go of the sessions a task has finished with: every attempt whose end is on the
  * record and whose session the harness still lists. I/O applied to what the journal already says,
@@ -439,25 +454,46 @@ const REFUSED = Symbol('refused');
  * what it consumed; and one whose harness could not be read this pass (`unread`), released nothing: it may still be there,
  * and dropped from the memo's look on one failed read, a release the harness refused would never be asked again. A session
  * let go of and listed ended says nothing more on any pass, and is looked for no more.
+ *
+ * Traced only where it asks the harness (`letGo`, a span named `releaseFinished`): a task with no finished session in the
+ * observation makes no span, so a pass over many settled tasks traces as much as one over few.
  */
-const releaseFinished = Effect.fn('releaseFinished')(function* (
+const releaseFinished = Effect.fnUntraced(function* (
   state: Releasable,
   observed: ReadonlyMap<string, Sighting>,
   unread: ReadonlySet<string>,
 ) {
   const runner = yield* Runner;
+  let listed = false;
+  if (!releases(runner)) return { wrote: false, listed };
+  const finished: Array<{ attempt: Releasable['attempts'][number]; session: Sighting }> = [];
+  for (const attempt of state.attempts) {
+    if (attempt.ended === null && (state.settled === null || attempt.nativeId === null)) continue;
+    const name = nameFor(state.taskId, attempt.n);
+    const session = observed.get(name);
+    if (session) finished.push({ attempt, session });
+    else if (unread.has(name)) listed = true;
+  }
+  if (!finished.length) return { wrote: false, listed };
+  const released = yield* letGo(state, finished, runner);
+  return { wrote: released.wrote, listed: listed || released.listed };
+});
+
+/**
+ * Each of a task's finished sessions the harness still lists, `finished` in attempt order, let go by `runner`, and what each
+ * consumed written down where it says more than the record (`releaseFinished`): traced, annotated with the task, since it asks
+ * the harness. Says whether it wrote a `measured`, and whether a session can still move: its release refused, or listed at work.
+ */
+const letGo = Effect.fn('releaseFinished')(function* (
+  state: Releasable,
+  finished: ReadonlyArray<{ attempt: Releasable['attempts'][number]; session: Sighting }>,
+  runner: Releasing,
+) {
+  yield* Effect.annotateCurrentSpan({ task: state.taskId });
   const journal = yield* Journal;
   let wrote = false;
   let listed = false;
-  if (!runner.release) return { wrote, listed };
-  for (const attempt of state.attempts) {
-    const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
-    const name = nameFor(state.taskId, attempt.n);
-    const session = finished ? observed.get(name) : undefined;
-    if (!session) {
-      if (finished && unread.has(name)) listed = true;
-      continue;
-    }
+  for (const { attempt, session } of finished) {
     const released = yield* runner.release(session, state.config ?? {}).pipe(Effect.catchTag('RunnerError', () => Effect.succeed(REFUSED)));
     if (released === REFUSED || atWorkState(session.state)) listed = true;
     const measured = typeof released === 'object' ? released : session.usage;
@@ -538,13 +574,9 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
 
 /**
  * The memo's proof, in `verify` alone: a skipped task folded all the same, and decided, as the pass would have without the
- * memo. A difference fails the pass, naming the task, rather than being mended quietly.
+ * memo. A difference fails the pass, naming the task, rather than being mended quietly. Untraced: it runs for every kept task.
  */
-const verifyKept = Effect.fn('verifyKept')(function* (
-  kept: Releasable,
-  observed: ReadonlyMap<string, Sighting>,
-  unread: ReadonlySet<string>,
-) {
+const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
   const decided = decide(fresh, closedOut(fresh, observed), nowFor(unread), yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
@@ -603,6 +635,8 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
  *    pass reports is what `view` reads after it.
  * 6. It drops from the memo every task the store no longer lists.
  * 7. It admits the queued tasks the ceiling has room for (`admitWaiting`), which the next pass starts.
+ *
+ * Its span says how many tasks the store listed (`tasks`) and how many the memo kept (`kept`): a kept task makes no span of its own.
  */
 export const tick = Effect.fn('tick')(function* () {
   const refused = tickRefusalOf([...arguments]);
@@ -632,9 +666,11 @@ export const tick = Effect.fn('tick')(function* () {
   const views: TaskView[] = [];
   const running: Record<string, number> = {};
   const stalled: RefusedMove[] = [];
+  let keptCount = 0;
   for (const id of ids) {
     const kept = memo?.settled.get(id);
     if (kept) {
+      keptCount++;
       if (memo!.verify) yield* verifyKept(kept, observed, unread);
       const { listed } = yield* releaseFinished(kept, observed, unread);
       if (listed) memo!.listed.add(id);
@@ -666,6 +702,7 @@ export const tick = Effect.fn('tick')(function* () {
     for (const id of memo.listed) if (!memo.settled.has(id)) memo.listed.delete(id);
   }
 
+  yield* Effect.annotateCurrentSpan({ tasks: ids.length, kept: keptCount });
   return {
     tasks: ids.length,
     actions: taken.filter((a) => a.do !== 'nothing').length,

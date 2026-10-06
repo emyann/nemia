@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ADMISSION_DECISIONS, type Admission, type AdmissionAnswer, type AdmissionCall } from '../admission.ts';
 import type { SpawnRequest } from '../seam.ts';
+import { withoutTelemetry } from '../telemetry.ts';
 import { settingsObject, type ClaudeFlags } from './vocabulary.ts';
 
 /** The runtime's own CLI, run by the node that runs this runtime: the hook's command, whatever the session's `PATH` holds. */
@@ -52,7 +53,12 @@ export type AdmissionRun = { status: number | null; stdout: string; failed: bool
 
 /** Runs admission's command with the call on its stdin, bounded (`ADMISSION_BOUND_MS`). */
 const runAdmission = (command: string[], call: string): AdmissionRun => {
-  const ran = spawnSync(command[0], command.slice(1), { input: call, encoding: 'utf8', timeout: ADMISSION_BOUND_MS });
+  const ran = spawnSync(command[0], command.slice(1), {
+    input: call,
+    encoding: 'utf8',
+    timeout: ADMISSION_BOUND_MS,
+    env: withoutTelemetry(process.env),
+  });
   return { status: ran.status, stdout: ran.stdout ?? '', failed: ran.error !== undefined };
 };
 

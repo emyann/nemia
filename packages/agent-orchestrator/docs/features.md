@@ -2160,6 +2160,36 @@ its lease through `/api/daemon`, a second api and a `wf up` refused, SIGTERM wri
 `--no-tick` taking nothing), `apps/web/test/daemon.test.ts` and the e2e's `daemon` page (each holder stalled, and fresh). Starting the
 daemon on demand from the board stays card 4e; stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
 
+## Shipped: the daemon as a login service (Nemia platform slice 8)
+
+After a restart nothing brought the daemon back until a person started it by hand, with its environment typed again. What was built,
+in `src/service/`:
+
+- **`nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]`** writes a systemd user unit on Linux
+  (`~/.config/systemd/user/<name>.service`) or a launchd agent on macOS (`~/Library/LaunchAgents/<name>.plist`), whole, through a hidden
+  file renamed over it, and enables it at login. It runs the same daemon a person starts by hand: the checkout's api, found by the root
+  `package.json`'s `"nemia": { "daemon": "apps/api/src/main.ts" }`, under the node that ran the install, in the api's folder, with
+  `WF_ROOT`, the installer's `PATH` and each `--env` written once. It restarts on failure but not after a refusal (exit 2), counts a stop
+  by a signal as clean, and is stopped by SIGTERM, which writes `stoppedAt` as before. `KillMode=process` (launchd's
+  `AbandonProcessGroup`) signals the daemon alone, so a restart leaves the runtime's detached sessions and checks running.
+- **Refused before anything is written**: WSL without systemd (`Invalid`, naming `/etc/wsl.conf`, `[boot]`, `systemd=true` and
+  `wsl --shutdown`); a store that is not the default without `--name`, or with `--name nemia`; an `--env` with no `=`, a bad key,
+  `WF_ROOT` or `PATH`, a key given twice, or a control character in its value.
+- **Beside a daemon started by hand** it starts nothing and names that pid with its `--take-over <pid>` line. With it, after the pid is
+  confirmed as the lease's (`identity` `same`), it pauses the store, waits out each landing check with no deadline (^C cancels and lifts
+  its pause), sends SIGTERM, waits up to 60 s for the lease to say `stopped` or `gone`, starts the service, waits up to 60 s for it to
+  tick, and resumes only the pause it put. A start that never ticks leaves the store paused and says `nemia resume`.
+- **`nemia service uninstall`** stops, disables and removes it; **`nemia service status`** names the unit's state, the checkout it runs,
+  who holds the lease, and lingering (`loginctl show-user -p Linger`, read only). All three are the CLI's alone; Nemia's fence asks
+  before install and uninstall (`prompts`) and lets status run (`read`).
+
+Tested in `src/service/service.test.ts` (the unit and the plist against golden text, `KillMode=process`, escaping read back, every
+refusal, WSL, the status lines, the landings waited for) and `src/service/service.verb.test.ts` (over a fake machine: install free,
+refused, beside a hand daemon and as its holder; a take-over's order with a landing, a person's pause standing, an interruption, a
+service that never ticks, a daemon that does not stop; uninstall, status and the fence). No test starts a service. Still to come:
+starting the daemon on demand when none holds the lease (no command does today: the only detached start is the git place's), and the
+service pointed at an installed release (slice 9).
+
 ## Shipped: the daemon's log and traces (Nemia platform slice 5, part 1 of 3)
 
 Nemia's loop (slice 5) wakes on what the engine and the workflow layer say. They are to say it once, through Effect, and every reader —
@@ -2288,13 +2318,16 @@ stateDiagram-v2
   kept --> stopped: SETTLED_OUTSIDE / nothing
   stopped --> stopped: SUBSCRIBED / drop
   leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
-  off --> due: level semi-auto [trusted] (by person)
-  stopped --> due: level semi-auto [trusted] (by person)
-  leaving --> due: level semi-auto [trusted] (by person)
-  due --> leaving: level manual [always] (by person)
-  filed --> leaving: level manual [always] (by person)
-  kept --> leaving: level manual [always] (by person)
-  stopped --> leaving: level manual [always] (by person)
+  due --> off: RAISE_ENDED / nothing
+  filed --> leaving: RAISE_ENDED / nothing
+  kept --> leaving: RAISE_ENDED / nothing
+  off --> due: level (a factory above manual) [trusted] (by person)
+  stopped --> due: level (a factory above manual) [trusted] (by person)
+  leaving --> due: level (a factory above manual) [trusted] (by person)
+  due --> leaving: level (none above manual) [always] (by person)
+  filed --> leaving: level (none above manual) [always] (by person)
+  kept --> leaving: level (none above manual) [always] (by person)
+  stopped --> leaving: level (none above manual) [always] (by person)
 ```
 <!-- diagram:nemia:end -->
 
@@ -2363,6 +2396,36 @@ what prompts, prompts; the rest is hers, on her judgement, and said.
 - **Left to platform phase 7**: the writers of workflows, agents and skills and an agent's try on the CLI (`agents write`, `workflows
   write`, `skills write`, `agents try`, served on the api alone). When they are served, the verbs skill lists them by itself, and
   `create-a-factory` is rewritten to use them.
+## Shipped: a level per factory, and a raise for a stretch (Nemia platform slice 6a)
+
+A factory at Manual is left alone; one at Semi-auto is hers to work. The level is the person's, per factory, and naming no agent.
+
+- **A level per factory** (`src/level/`): each factory's default, `manual` or `semi-auto`, in its own file `factories/<name>/level.json`
+  (`level.store.ts`), written by `nemia level <level> --factory <name>` alone and removed with the factory. A factory with none follows
+  the store's level, `nemia/level.json`, read as before and never migrated, which is also the default factory's (runs started in none);
+  `nemia level <level>` sets it, and `--factory default` is refused, naming that command.
+- **A raise for a stretch**: `nemia level semi-auto --factory <name> --for <duration>` (`90m`, `2h`, `1d`, up to `7d`) raises it until a
+  moment written in the file, and `--end` ends it early. Level-triggered: a raise past its end reads as its default, with no write
+  (`raiseAt`, `levelOf`, `src/level/level.ts`). Refused: a raise to the default or below it (`Invalid`), an end with no raise in force
+  (`Conflict`), no such factory (`Missing`), and `--for`/`--end` given without a factory, together, or with the wrong level (`Invalid`).
+- **A factory at Manual is left alone**, by two generic primitives: a subscription's floor, `scope: {atLeast}` (`nemia subscribe
+  --at-least <level>`), whose deliverer passes a line of a run whose factory is below it, read as each line comes (`carries`,
+  `deliver.verb.ts`); and admission's floor, `nemia admit --at-least <level>`, which denies a call naming a run (`runId`) or a factory
+  (`factory`) below it, saying the raise is the person's, and asks a call whose run does not read or whose words do not parse
+  (`Scope`, `src/admission/admission.ts`). Nemia's keeper puts both at `semi-auto` (`NEMIA_FLOOR`).
+- **Her session follows the levels**: kept while any factory, the default included, is above `manual`, and stopped at the keeper's next
+  beat once none is (`Keeping`, `nemiaDue`); a subscription of hers without her floor is put again with it. The verb that puts a factory
+  above `manual` names a fresh task where none is open, asking first whether her folder is trusted.
+- **`nemia level`** says each factory's level, its default and whose it is, and a raise with its end; `GET /api/level` answers them as
+  `factories`, and `PUT /api/level` takes `factory`, `for` and `end`. The board's Settings page shows them, one row per factory, and sets
+  a default, raises a factory for a stretch and ends a raise.
+
+Turning her on again files her afresh, with the new admission and subscription: a session filed before this slice keeps the old ones.
+
+Tested in `src/level/level.test.ts` (a raise until its end, never at it; the stretches; what a write asks), `src/level/level.store.test.ts`,
+`src/nemia/keep.verb.test.ts` (a raise keeps her, its end passing stops her with no write; an end; the refusals),
+`src/admission/admission.test.ts` and `src/admission/admit.verb.test.ts` (denied below the floor, asked unread, no change above it),
+`src/subscription/deliver.verb.test.ts` (a floored subscription told nothing of a factory below it) and `src/admission/fence.test.ts`.
 
 ## Shipped: freeing the space — `wf prune`
 
@@ -5619,3 +5682,20 @@ Not agent-orchestrator features, listed so nothing is lost:
   (Kubernetes: a pod's `priorityClassName`). Tests: two pending tasks, the later-filed one alphabetically first, the
   earlier admitted; a higher priority admitted before an older lower one. agent-orchestrator then: `priority` on every
   filing after a run's first step, and the run cap (§3) unchanged.
+
+## Shipped: the daemon exports its metrics over OTLP (2026-10-06)
+
+The side Grafana charts what the daemon keeps of its passes and what the tick knows of each step:
+
+- **`OtlpMetrics` beside the tracer and the logger** in `telemetryLayer`, under the same service and resource, to
+  `<endpoint>/v1/metrics` (`metricsUrl`), only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set: every metric in the process's registry,
+  cumulative, every 10 s and once more as the process ends.
+- **The steps' metrics** (`STEP_METRICS`, `src/meter/meter.verb.ts`), recorded by the tick after its pass off what each run's full pass
+  read of the tasks the feed said settled (`settledIn`, `settledFacts`): a session's cost, tokens and time, the tries by outcome, the
+  checks by verdict, the rounds granted and exhausted, the calls denied — by factory, workflow, step, agent and outcome alone
+  (`boundedAttributes`). The README lists them with their Prometheus names, measured.
+
+Tested in `src/telemetry/telemetry.test.ts` (a scratch collector posted `pass.duration` at `/v1/metrics`; none posted without an endpoint;
+a collector that does not answer costs no program), `src/meter/step.test.ts` (the facts, the five attributes, a run's id refused),
+`src/rest/rest.test.ts` and `src/rest/resting.test.ts` (each settle named by one read alone) and `test/step-metrics.test.ts` (a step
+settled with a cost recorded once over four passes of the real runtime, with no run's id).

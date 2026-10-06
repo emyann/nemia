@@ -11,7 +11,7 @@ import { Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { metricsHourDays, metricsMinuteDays } from '../config/config.store.ts';
 import { countRead } from '../meter/tally.store.ts';
-import { RECENT_KEPT, type RecentPass } from '../meter/meter.ts';
+import { RECENT_KEPT, type RecentPass } from '../meter/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   dayOf,

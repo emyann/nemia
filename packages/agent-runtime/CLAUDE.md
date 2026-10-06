@@ -101,6 +101,10 @@ owns what*.
   harness's `command`.
 - **A stream-json line is parsed for its `type`, never matched at its start** (`closesOn` in `bin/ae-worker.ts`): a job reading
   `--input-format stream-json` exits only when its stdin ends.
+- **A detached session's id is read by the worker from its spec's `start` event, on whole stdout lines** (`readers`, `bin/ae-worker.ts`);
+  one that does not decode is `startRefused`, and that session alone is unread (`startRefusalOf`, `test/start-event.test.ts`). Measured
+  2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first under
+  `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
 
 ## A2A and remote agents
 

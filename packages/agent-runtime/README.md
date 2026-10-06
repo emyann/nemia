@@ -422,7 +422,7 @@ process of a boot shares. The lease is measured on `beat` when it was written in
 The other way round, the run file removed is a stop: `stop` finds the worker by it, so a worker whose run file is gone,
 alone or with its store, ends its harness and exits at its next write, and never writes the file again (open issue 32).
 
-**Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
+**Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional start event, and
 optionally the words it refuses, a reader of what it prints, and where it keeps its conversation. Given to
 `Engine.layer`, it may name a `pool` to share the engine's ceiling with another harness (*Queued and admitted*):
 
@@ -431,9 +431,13 @@ export const codex: HarnessSpec = {
   name: 'codex',
   command: (r) => ({ cmd: 'codex', args: ['exec', '--json', '-C', r.cwd, ..., r.brief] }),
   refuses: (task) => /* a sentence when the task asks for a sandbox or effort Codex lacks */,
-  nativeIdPattern: '"(?:thread_id|session_id)"\\s*:\\s*"([0-9a-f-]{16,})"',
+  start: { event: { type: 'thread.started' }, id: 'thread_id' },
 }
 ```
+
+The start event is where the session's own id is read, by the worker, off whole lines of stdout: the first JSON object whose keys
+hold `event`'s values, its `id` field a string of hex and dashes, 16 or more. A start printed with anything else there is refused
+(`startRefused` on the run file): that session is unread, and the harness's others are read.
 
 Exit 0 is success, anything else is failure. That is all a generic harness has to say, and it is
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,

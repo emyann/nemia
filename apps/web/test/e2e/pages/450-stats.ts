@@ -147,7 +147,7 @@ async function byStepLayout(page: Page): Promise<'side by side' | 'stacked'> {
   throw new Refused(`the step tables neither sit side by side nor stack — ${JSON.stringify({ skills, denials })}`);
 }
 
-/** The page on a phone's screen, photographed whole: nothing wider than the screen, every tile read whole; then the window put back. */
+/** The page on a phone's screen, photographed whole with every day's mark: nothing wider than the screen, every tile read whole; then the window put back. */
 async function onPhone(page: Page): Promise<void> {
   const size = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -212,6 +212,8 @@ export default {
     expectSeedMark(all, 'over every day');
     await expectCharts(page, all, 'over every day');
     await expectChanged(page, all, 'over every day');
+    await photograph(page, path.join(OUT, `stats-all-${await themeOf(page)}.png`), { fullPage: true });
+    await onPhone(page);
 
     await expectCount(page.locator('[data-filter="factory"]'), 0, "the page has no factory picker: the sidebar's picks it");
     const factory = FACTORIES.hiring.name;
@@ -231,6 +233,5 @@ export default {
     const ofFactory = await served(page, `ofFactory=${encodeURIComponent(factory)}`);
     await expectCharts(page, ofFactory, `over every day of ${factory}`);
     await expectChanged(page, ofFactory, `over every day of ${factory}`);
-    await onPhone(page);
   },
 } satisfies PageSpec;

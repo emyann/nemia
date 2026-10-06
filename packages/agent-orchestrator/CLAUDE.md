@@ -14,6 +14,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A place skill's scripts (`place/git/scripts/`) are standalone**: node's built-ins and erasable TypeScript only (`placeBreaks` in
   `test/boundary.test.ts`), run by the package only through `runPlaceVerb` (`src/place/place.store.ts`); a verb declared in
   `place.json` has its script (`readPlaceJson`).
+- **A git call belongs to the place (`runPlaceVerb`), never to `src`**: `test/git-calls.test.ts` refuses a `'git'` spawn, a call of `git`
+  or `gitSays`, and a `.git` or `MERGE_HEAD` path in `packages/*/src` and `apps/*/src`, holding today's per file (`GIT_SITES`, each
+  naming its cards): lower a count in the commit that removes one, and add none.
 - **A harness's word or a team name in `src` or `bin` is refused by `test/words.test.ts`**, which holds today's per file
   (`HARNESS_WORDS`, `TEAM_NAMES`, each naming its card or move): lower a count in the commit that removes one, and add none.
 - **The command is `nemia` in every printed word; a `wf` said in `src` or `bin` is refused by `test/cli-name.test.ts`**, but a value

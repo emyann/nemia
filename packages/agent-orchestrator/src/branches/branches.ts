@@ -15,6 +15,8 @@ import type { Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { Shipped } from '../decide/decide.ts';
+import type { BranchStood } from '../place/place.ts';
 
 /**
  * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
@@ -72,6 +74,14 @@ export function tipsSeen(
   }
   return changed ? tips : undefined;
 }
+
+/**
+ * Whether a branch has landed on its base, read off where the place's `standing` says it stands: the yes `isShipped` says when it is on
+ * its base — `true` with work past its run's base, `'unchanged'` with none or where git could not tell — and false otherwise, or where
+ * nothing was read. Pure.
+ */
+export const shippedOver = (stood: BranchStood | undefined): Shipped =>
+  stood?.onBase !== 'yes' ? false : stood.pastBase === true ? true : 'unchanged';
 
 /**
  * One file a branch changed, as the place's `report` counts it (`ChangedFile`). A rename keeps where it came `from`.

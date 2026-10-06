@@ -71,6 +71,21 @@ test('REFUSED: a Codex run at work whose stream does not decode is unread alone:
   assert.equal(asked.value.seen.get('ae/good/1')?.state, 'completed');
   assert.equal(asked.warnings.length, 1);
   for (const w of refusalWords(log)) assert.match(asked.warnings[0], w);
+  assert.deepEqual([...(asked.value.unreadWhy ?? [])], [['ae/bad/1', asked.warnings[0]]], 'why, by its name, and none for the run read');
+});
+
+test('REFUSED: why a Codex run at work is unread is answered by the look that left it unread, and by no look after the one that reads its stream', async () => {
+  const dir = scratch('ae-unread-');
+  const log = codexRun(dir, 'ae/bad/1', 'working', BAD);
+  const ops = detachedOps(codex, dir);
+  const unread = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
+  for (const w of refusalWords(log)) assert.match(unread.value.unreadWhy?.get('ae/bad/1') ?? '', w);
+
+  fs.writeFileSync(log, ['Reading additional input from stdin...', ...GOOD.map((l) => JSON.stringify(l))].join('\n'));
+  const read = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
+  assert.deepEqual([...read.value.seen.keys()], ['ae/bad/1'], 'its stream decodes now');
+  assert.equal(read.value.unreadWhy, undefined, 'and nothing of the last look is said');
+  assert.equal(read.warnings.length, 0);
 });
 
 test('REFUSED: a Codex run whose stream does not decode, once ended, reads as failed, its exit code and statement kept, nothing of its output, and why said on every look', async () => {
@@ -95,6 +110,7 @@ test('REFUSED: a Codex run whose stream does not decode, once ended, reads as fa
   assert.deepEqual([...asked.value.unread], []);
   assert.deepEqual(asked.value.seen.get('ae/bad/1'), failed);
   assert.equal(asked.warnings.length, 1);
+  assert.equal(asked.value.unreadWhy, undefined, 'read as failed, so not unread, and no words of why it is');
 });
 
 /** A harness that runs each task's brief as an `sh` script, whose output is read as Codex's. */
@@ -163,3 +179,57 @@ test('a stop asked while a session is unread settles its task once its process h
   assert.ok(state.settled, 'settled');
   assert.equal((await Effect.runPromise(engine.forget([id], { yes: true }))).forgotten, true);
 });
+
+test(
+  "REFUSED: a task at work whose output does not decode carries why on its task's view — the pass's, list's and view's — and loses it on the first look that reads its output",
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-unread-root-');
+    const engine = builtEngine(Engine.layer({ root, harnesses: { sh: scripted }, defaultHarness: 'sh' }));
+    const cwd = scratch('ae-unread-cwd-');
+    const marker = path.join(cwd, 'go');
+    const id = await Effect.runPromise(
+      engine.file({ brief: `${printing(BAD)}; timeout 60 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`, cwd }),
+    );
+    try {
+      let pass: TaskView | undefined;
+      await until(
+        t,
+        async () => {
+          pass = (await Effect.runPromise(engine.tick())).views.find((v) => v.id === id);
+          return pass?.unreadWhy !== undefined;
+        },
+        () => `${id} said unread: ${JSON.stringify(pass)}`,
+        { everyMs: 100 },
+      );
+      const log = path.join(root, 'runs', 'sh', `ae_${id.replace(/[^a-zA-Z0-9]+/g, '_')}_1.log`);
+      const listed = (await Effect.runPromise(engine.list([id]))).views[0];
+      const viewed = await Effect.runPromise(engine.view(id));
+      for (const [where, v] of [
+        ['pass', pass],
+        ['list', listed],
+        ['view', viewed],
+      ] as const) {
+        assert.equal(v?.state.settled, null, `${where}: unread, never settled`);
+        for (const w of [
+          /`ae\/[^`]+\/1`/,
+          new RegExp(log.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+          /`usage\.input_tokens`/,
+          /`ae forget`/,
+        ]) {
+          assert.match(v?.unreadWhy ?? '', w, where);
+        }
+      }
+
+      fs.writeFileSync(log, GOOD.map((l) => JSON.stringify(l)).join('\n'));
+      const read = (await Effect.runPromise(engine.tick())).views.find((v) => v.id === id);
+      assert.ok(read, 'still at work');
+      assert.equal(Object.hasOwn(read, 'unreadWhy'), false, `the pass that reads it says nothing: ${read.unreadWhy}`);
+      assert.equal(Object.hasOwn((await Effect.runPromise(engine.list([id]))).views[0], 'unreadWhy'), false, 'nor does list');
+      assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'unreadWhy'), false, 'nor does view');
+    } finally {
+      fs.writeFileSync(marker, '');
+    }
+    await settled(t, engine, [id]);
+  },
+);

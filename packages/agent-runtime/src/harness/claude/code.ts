@@ -211,6 +211,10 @@ type Read<A> = { value: A; why?: undefined } | { value?: undefined; why: string 
 /** The registry's part of a look that never asked it: nothing listed, nothing unread, nothing failed. */
 const NOTHING_ASKED: Read<Observation> = { value: { seen: new Map<string, Sighting>(), unread: new Set<string>() } };
 
+/** Why each of `names` was unread, as the reads that answered said it (`Observation.unreadWhy`), the registry's words last. */
+const unreadWhyIn = (names: ReadonlySet<string>, ...reads: (Observation | undefined)[]): Map<string, string> =>
+  new Map(reads.flatMap((o) => [...(o?.unreadWhy ?? [])].filter(([name]) => names.has(name))));
+
 /** Whether a session id is a job's: the name the engine gave it, where a background session's is Claude Code's own. */
 export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undefined;
 
@@ -267,7 +271,8 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * there and unreadable, or the registry once asked, or it left the name unread: listed, its transcript unreadable. A job's name the
      * registry was asked for and does not list, with its run file not there, is absent. The registry is told what it is told
      * (`observeFor`), so a long-lived attempt's usage is counted from when the journal says it began. What a failed read said is
-     * kept (`why`): a registry row of ours that does not decode, in the words that name the row, its field and the fix.
+     * kept (`why`): a registry row of ours that does not decode, in the words that name the row, its field and the fix; and why
+     * each session alone was unread (`unreadWhy`), as the job read or the registry's said it, for a name still unread.
      */
     observeFor: (expected) =>
       read(job.observeFor!(expected)).pipe(
@@ -280,7 +285,9 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
           const seen = new Map([...(jobs?.seen ?? []), ...(sessions?.seen ?? [])]);
           const unread = (name: string) => !seen.has(name) && (!jobs || !sessions || jobs.unread.has(name) || sessions.unread.has(name));
           const why = [j.why, ...(jobs?.why ?? []), s.why, ...(sessions?.why ?? [])].filter((w) => w !== undefined);
-          return { seen, unread: new Set(expected.map((e) => e.name).filter(unread)), ...(why.length ? { why } : {}) };
+          const names = new Set(expected.map((e) => e.name).filter(unread));
+          const unreadWhy = unreadWhyIn(names, jobs, sessions);
+          return { seen, unread: names, ...(why.length ? { why } : {}), ...(unreadWhy.size ? { unreadWhy } : {}) };
         }),
       ),
 

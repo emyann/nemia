@@ -333,6 +333,8 @@ export type RunDetail = {
     approve: string | null;
     /** As on `RunSummary`: what the harness denied its current try, the calls and the line that names them. */
     denied: StepNeeds['denied'];
+    /** As on `RunSummary`: why the runtime could not read its session alone, in its words; null where it read it. */
+    sessionUnread: StepNeeds['sessionUnread'];
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
     /** For a looping step a person ended out of rounds (the CLI's `accept`), their acceptance of the try it is on; else null. */

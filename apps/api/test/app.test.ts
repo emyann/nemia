@@ -271,6 +271,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           waitingFor: null,
           approve: null,
           denied: null,
+          sessionUnread: null,
         },
         {
           name: 'review',
@@ -284,6 +285,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           waitingFor: null,
           approve: null,
           denied: null,
+          sessionUnread: null,
         },
       ],
       /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
@@ -475,6 +477,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     waitingFor: null,
     approve: null,
     denied: null,
+    sessionUnread: null,
     gate: null,
     accepted: null,
     lastLine: null,
@@ -547,6 +550,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       waitingFor: null,
       approve: null,
       denied: null,
+      sessionUnread: null,
       gate: null,
       accepted: null,
       lastLine: null,
@@ -699,6 +703,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     waitingFor: null,
     approve: null,
     denied: null,
+    sessionUnread: null,
     gate: null,
     accepted: null,
     lastLine: null,
@@ -1053,7 +1058,20 @@ test('each step says how many attempts it has had, when the latest began, and ho
 
   assert.deepEqual(
     Object.keys((await listed('r-7')).steps[0]),
-    ['name', 'taskId', 'branch', 'status', 'note', 'roundDue', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied'],
+    [
+      'name',
+      'taskId',
+      'branch',
+      'status',
+      'note',
+      'roundDue',
+      'needs',
+      'blockedByHarness',
+      'waitingFor',
+      'approve',
+      'denied',
+      'sessionUnread',
+    ],
     'the list carries the note `nemia ls` prints beside a step, and what a person has to know to act on it',
   );
   assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');

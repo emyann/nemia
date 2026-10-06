@@ -38,6 +38,7 @@ const step = (name: string, status: string, over: Partial<Step> = {}): Step =>
     waitingFor: null,
     approve: null,
     denied: null,
+    sessionUnread: null,
     lastLine: null,
     asked: null,
     check: null,

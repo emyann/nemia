@@ -14,6 +14,7 @@ import { file, requestStop } from '../src/core/engine/filing.ts';
 import { tick } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { HarnessHandler } from '../src/a2a/handler.ts';
+import { ServerCallContext } from '@a2a-js/sdk/server';
 import {
   closeoutArtifact,
   closeoutOf,
@@ -876,4 +877,51 @@ test("observeFor through the seam carries what a failed part of the driver's loo
   assert.deepEqual(failed.unread, new Set(['ae/t-1/1']));
   why = [];
   assert.equal(Object.hasOwn(await Effect.runPromise(runner.observeFor!(expected)), 'why'), false);
+});
+
+test('observeFor through the seam carries why the driver left one session alone unread, by its name, and none once the driver reads it', async () => {
+  let unreadWhy: Map<string, string> | undefined = new Map([['ae/t-1/1', "claude --bg: `ae/t-1/1`'s transcript cannot be read"]]);
+  const ops: RunnerOps = {
+    ...testOps({ sessions: new Map() }),
+    observeFor: (expected) =>
+      Effect.sync(() => ({
+        seen: new Map(),
+        unread: new Set(unreadWhy ? expected.map((e) => e.name) : []),
+        ...(unreadWhy ? { unreadWhy } : {}),
+      })),
+  };
+  const handler = new HarnessHandler('fake', ops, async () => []);
+  const expected = [
+    { name: 'ae/t-1/1', harness: 'fake' },
+    { name: 'ae/t-2/1', harness: 'fake' },
+  ];
+  const answered = await handler.observeSessions({ expected }, new ServerCallContext());
+  assert.deepEqual(answered.unreadWhy, { 'ae/t-1/1': "claude --bg: `ae/t-1/1`'s transcript cannot be read" }, 'answered as an object');
+
+  const runner = a2aOps('fake', ops, async () => []);
+  const unread = await Effect.runPromise(runner.observeFor!(expected));
+  assert.deepEqual(unread.unreadWhy, new Map([['ae/t-1/1', "claude --bg: `ae/t-1/1`'s transcript cannot be read"]]), 'and a Map again');
+  unreadWhy = undefined;
+  assert.equal(Object.hasOwn(await Effect.runPromise(runner.observeFor!(expected)), 'unreadWhy'), false, 'read: no words');
+});
+
+test('REFUSED: observeFor through the seam keeps only words that are a string, for a name the driver left unread, and an answer without them is none', async (t) => {
+  const ops: RunnerOps = {
+    ...testOps({ sessions: new Map() }),
+    observeFor: (expected) => Effect.sync(() => ({ seen: new Map(), unread: new Set(expected.map((e) => e.name)) })),
+  };
+  const expected = [
+    { name: 'ae/t-1/1', harness: 'fake' },
+    { name: 'ae/t-2/1', harness: 'fake' },
+  ];
+  let answer: Record<string, unknown> | undefined = { 'ae/t-1/1': 'its output cannot be read', 'ae/t-2/1': 7, 'ae/t-3/1': 'not expected' };
+  const unread = expected.map((e) => e.name);
+  t.mock.method(HarnessHandler.prototype, 'observeSessions', async () =>
+    answer === undefined ? { tasks: [], unread, why: [] } : { tasks: [], unread, why: [], unreadWhy: answer },
+  );
+  const runner = a2aOps('fake', ops, async () => []);
+  const kept = await Effect.runPromise(runner.observeFor!(expected));
+  assert.deepEqual(kept.unreadWhy, new Map([['ae/t-1/1', 'its output cannot be read']]), 'a number, and a name not unread, dropped');
+  answer = undefined;
+  assert.equal(Object.hasOwn(await Effect.runPromise(runner.observeFor!(expected)), 'unreadWhy'), false, "an older driver's answer");
 });

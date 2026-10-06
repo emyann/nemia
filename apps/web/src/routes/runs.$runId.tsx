@@ -5,7 +5,7 @@ import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
-import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, when } from '../components/Facts';
+import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, unreadRows, when } from '../components/Facts';
 import { StepPageLink } from '../components/StepParts';
 import { StepPolicy, Told } from '../components/Told';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
@@ -241,9 +241,10 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  *
  * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
  * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a permission
- * rule names it, which is what its work may be short of; what its current try consumed, in the CLI `decide`'s words, `not measured` where
- * nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt cache marked; and what
- * every try has cost together, and of its cap where it has one, red once past it.
+ * rule names it, which is what its work may be short of; why the runtime could not read its session alone, where it could not, in its
+ * words — neither working nor gone, which its status does not say; what its current try consumed, in the CLI `decide`'s words,
+ * `not measured` where nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt
+ * cache marked; and what every try has cost together, and of its cap where it has one, red once past it.
  *
  * A folder step's files: what it left in its folder, which is the whole of what it made — the files its closeout named and the ones it
  * forgot to, each with its size, a text file readable in a tab, and what the api serves by no name, a directory or a link, by its path — so
@@ -304,6 +305,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
           ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
           ...(step.denied ? ([['denied', deniedRow(step.denied.calls)]] satisfies Array<[string, ReactNode]>) : []),
+          ...unreadRows(step.sessionUnread),
           ['used', step.used?.used],
           ['cost', step.used?.cost],
           ...readRows(step.used),

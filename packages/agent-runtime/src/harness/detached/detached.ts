@@ -23,7 +23,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage, SessionState } from '../../core/index.ts';
-import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
 import { forgetFiles } from '../forget.ts';
 import { withoutTelemetry } from '../telemetry.ts';
@@ -33,6 +33,7 @@ import { instantNow } from '../../core/engine/now.ts';
 import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
 import { quote } from '../../core/quote.ts';
 import { outputIn, type SaidMemo } from './said.ts';
+import { lookedFor } from './looked.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -706,7 +707,8 @@ const startWorker = (file: string, cwd: string): void => {
  *   for a refused start, and nothing its output says for a refused output. Why is said as a warning on every look
  *   (`startRefusalOf`, `outputRefusalOf`), and the harness's others are read.
  * - `observeFor`: the same sighting for each name expected that has a run file, and the name `unread` for one whose file is
- *   there and unreadable, or whose start or output was refused and whose process still runs, said as `observe` says it.
+ *   there and unreadable, or whose start or output was refused and whose process still runs, said as `observe` says it and
+ *   answered by name (`unreadWhy`).
  * - `find`: the run under a name, off its own run file alone, as `detachedFind`; `stop` and `transcript` read by it.
  * - `stop`, in order, for a run that is working:
  *   1. Leaves the stop on disk (`.stop`). The run file exists before the worker has written its own pid, and a stop in
@@ -865,17 +867,13 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             const now = instantNow();
             let listing: Run[] | undefined;
             const all = () => (listing ??= readAll());
-            const seen = new Map<string, Sighting>();
-            const unread = new Set<string>();
-            const warnings: string[] = [];
-            for (const { name } of expected) {
-              const at = runAt(spec, root, name);
-              const { sighting, warning } = at && 'run' in at ? lookAt(name, at.run, now, all) : {};
-              if (warning) warnings.push(warning);
-              if (sighting) seen.set(name, sighting);
-              else if (at) unread.add(name);
-            }
-            return { value: { seen, unread } satisfies Observation, warnings };
+            return lookedFor(
+              expected.map((e) => e.name),
+              (name) => {
+                const at = runAt(spec, root, name);
+                return !at ? undefined : 'run' in at ? lookAt(name, at.run, now, all) : {};
+              },
+            );
           },
           catch: observeErrorOf(spec),
         }),

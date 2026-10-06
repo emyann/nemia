@@ -34,7 +34,7 @@ import {
   type Trials,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { skillVersion } from '../folder/folder.store.ts';
+import { PLACE_SKILLS, skillVersion } from '../folder/folder.store.ts';
 import type { GitRun } from '../record/record.ts';
 
 const Strings = Schema.Array(Schema.String);
@@ -359,11 +359,11 @@ export function readPlaceJson(skillDir: string): PlaceDeclared {
   return decoded.success;
 }
 
-/** The git place the package ships, run where a record names no place skill of its own. */
-export const SHIPPED_PLACE = path.join(import.meta.dirname, '..', '..', 'place', 'git');
-
 /** The name a record gives the package's place (`placeSkill.skill`): the one `place: git` resolves to. */
 export const SHIPPED_PLACE_SKILL = 'git';
+
+/** The git place the package ships, run where a record names no place skill of its own. */
+export const SHIPPED_PLACE = path.join(PLACE_SKILLS, SHIPPED_PLACE_SKILL);
 
 /**
  * The directory a git run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one that

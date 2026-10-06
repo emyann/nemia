@@ -213,6 +213,24 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
   assert.deepEqual(gitAsked(), []);
 });
 
+test("REFUSED: a folder team whose agent is given the git place's skill, which has no repository to act on — before anything is written", async () => {
+  const team = path.join(ROOT, 'workflows', 'gitted-note');
+  fs.mkdirSync(team, { recursive: true });
+  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'clerk.md'), '---\ndescription: Writes notes.\nskills: git\n---\nWrite.\n');
+  fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\nagent: clerk\n---\nwrite the note\n');
+  const before = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+  const refused = await rejection(() => Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: team })));
+  assert.equal(refused.exitCode, 2);
+  assert.match(
+    refused.message,
+    /^write: its agent is given the skill `git`, the git place's, and this workflow's steps say `place: folder`/,
+  );
+  assert.match(refused.message, /Take `git` off the agent's `skills:`/);
+  assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), before, 'nothing was written');
+  assert.deepEqual(gitAsked(), []);
+});
+
 test('a git team is still a git run: from a directory that is no repository, it is refused by git', async () => {
   const GIT_TEAM = path.join(ROOT, 'workflows', 'plain');
   fs.mkdirSync(GIT_TEAM, { recursive: true });

@@ -22,6 +22,7 @@ import {
   agentSkillsFound,
   COMMANDS,
   givenSkills as givenRead,
+  isShippedPlace,
   listAgents,
   loadAgents,
   SkillWriteError,
@@ -142,7 +143,8 @@ function yourAgentsSkills(home: string): Array<[string, string[]]> {
 
 /**
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
- * in yours alone — then what Nemia ships, each marked where an agent of yours already finds a skill of its name. A name both of one
+ * in yours alone — then what Nemia ships, each marked where an agent of yours already finds a skill of its name. A place skill the
+ * package ships (`isShippedPlace`), which an agent finds where no place has its name, is in neither of the first two. A name both of one
  * repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is listed
  * in yours with the package's refusal as its `error`.
  */
@@ -159,7 +161,7 @@ export async function listSkills(
     { from: 'yours', dir: librarySkills(home), skills: [] },
     { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] },
   ];
-  const sorted = [...found.at].sort(([a], [b]) => a.localeCompare(b));
+  const sorted = [...found.at].filter(([, at]) => typeof at !== 'string' || !isShippedPlace(at)).sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) => (at instanceof WorkflowError ? path.join(places[0].dir, name) : at);
   const shippedNames = skillFolders(shipped);
   const reads = await readsOf(e, [...sorted.map(dirOf), ...shippedNames.map((name) => path.join(shipped, name))]);

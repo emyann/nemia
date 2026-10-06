@@ -14,6 +14,7 @@ import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { PlaceSay } from '../place/place.ts';
+import { composeBrief } from '../brief/brief.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
@@ -70,4 +71,14 @@ export function placeTold(run: Run, step: Workflow, notes: string[], placeDir?: 
     notes.push(`${step.name}: not filed, for its place gives it no words: ${(err as Error).message}`);
     return undefined;
   }
+}
+
+/**
+ * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):
+ * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
+ */
+export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[]): string {
+  const told = placeTold(run, step, []) ?? {};
+  const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
+  return composeBrief(step, run, steps, ...none, told);
 }

@@ -20,7 +20,7 @@ const { addFactory } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
 const { writeLevel } = await import('../nemia/level.store.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
-const { dropRule } = await import('../auto/auto.store.ts');
+const { confirmedFile, dropRule } = await import('../auto/auto.store.ts');
 
 const fake = board();
 const e = engineOf(fake.layer);
@@ -98,7 +98,7 @@ settled('g-refused-check', undefined, 1);
 const decidedAtAuto = async (command: string) =>
   (await runWith(e, admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia', ROOT)))?.decision;
 
-test('at auto, an approval the default allows is given unasked; at semi-auto, on a refused check, or with the default dropped, asked', async () => {
+test('at auto, an approval the default allows is given unasked; at semi-auto, on a refused check, with the default dropped, or a list unread, asked', async () => {
   assert.equal(await decided('nemia approve g-auto build', 'none'), 'ask', 'no rules handed, the approval is asked');
   assert.equal(await decidedAtAuto('nemia approve g-auto build'), undefined);
   assert.equal(await decidedAtAuto('nemia approve g-semi build'), 'ask', 'the same state at semi-auto');
@@ -107,6 +107,8 @@ test('at auto, an approval the default allows is given unasked; at semi-auto, on
   assert.equal(await decidedAtAuto('nemia auto confirm nemia default'), 'ask');
   dropRule(ROOT, 'nemia', 'default', new Date('2026-10-06T09:00:00.000Z'));
   assert.equal(await decidedAtAuto('nemia approve g-auto build'), 'ask', 'nothing in force');
+  fs.writeFileSync(confirmedFile(ROOT, 'nemia'), '{');
+  assert.equal(await decidedAtAuto('nemia approve g-auto build'), 'ask', 'a list that does not read lets nothing through');
 });
 
 test('REFUSED: --auto naming no agent', () => {

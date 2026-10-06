@@ -13,6 +13,52 @@ const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; lab
   { place: 'folder', label: 'In folders the run makes', hint: 'each step in a folder of its own, with no git repository' },
 ];
 
+/** The places a person chooses a new workflow's steps to work in, as radios under `name`: `place` checked, none while it is null. */
+function PlaceChoice({
+  name,
+  place,
+  onChange,
+}: {
+  name: string;
+  place: WorkflowStepSpec['place'];
+  onChange: (place: NonNullable<WorkflowStepSpec['place']>) => void;
+}) {
+  return (
+    <fieldset className="space-y-1">
+      <legend className="block text-xs font-medium">Where its steps work</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {PLACES.map((p) => (
+          <label
+            key={p.place}
+            className="grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded border border-neutral-300 px-2 py-1.5 text-sm has-checked:border-neutral-500 has-checked:bg-neutral-50 dark:border-neutral-700 dark:has-checked:border-neutral-400 dark:has-checked:bg-neutral-900"
+          >
+            <input
+              type="radio"
+              name={name}
+              value={p.place}
+              checked={place === p.place}
+              onChange={() => onChange(p.place)}
+              className="mt-1"
+            />
+            <span className="font-medium">{p.label}</span>
+            <span className="col-start-2 text-xs text-neutral-500">{p.hint}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Why the api made nothing: `message`, its words. */
+function Refused({ message }: { message: string }) {
+  return (
+    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not made. The api refused it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
+    </div>
+  );
+}
+
 /**
  * A new workflow of yours, in `folder`, your workflows' folder: its name — its folder's — and a first step, a name, what it is told and
  * where it works, which a person chooses (`POST /api/workflows/yours`). Once made, `onCreated` is told its name, and the board opens its page with its builder. Refused in the
@@ -99,30 +145,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
         </label>
         <textarea id={ids.body} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
       </div>
-      <fieldset className="space-y-1">
-        <legend className="block text-xs font-medium">Where its steps work</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {PLACES.map((p) => (
-            <label
-              key={p.place}
-              className="flex cursor-pointer items-start gap-2 rounded border border-neutral-300 px-2 py-1.5 text-sm has-checked:border-neutral-500 has-checked:bg-neutral-50 dark:border-neutral-700 dark:has-checked:border-neutral-400 dark:has-checked:bg-neutral-900"
-            >
-              <input
-                type="radio"
-                name={ids.place}
-                value={p.place}
-                checked={place === p.place}
-                onChange={() => setPlace(p.place)}
-                className="mt-1"
-              />
-              <span className="space-y-0.5">
-                <span className="block font-medium">{p.label}</span>
-                <span className="block text-xs text-neutral-500">{p.hint}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <PlaceChoice name={ids.place} place={place} onChange={setPlace} />
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="submit"
@@ -142,12 +165,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
           Cancel
         </button>
       </div>
-      {create.isError && (
-        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Not made. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{create.error.message}</p>
-        </div>
-      )}
+      {create.isError && <Refused message={create.error.message} />}
     </form>
   );
 }

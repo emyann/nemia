@@ -116,7 +116,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type (`satisfies Schema.Schema<T>`), which the barrel
   never exports (`export type *`): every key the board reads required, an unknown key dropped. `satisfies` misses a schema narrower than
   its type (a word left out, a `null` refused, a `?` key required) and a `Schema.Any`: read the schema against the type. A read that passes
-  no schema — a GET by bare `fetch`, a `get` of `Schema.Unknown` — is refused by `unschemedReads` (`test/read.test.ts`).
+  no schema — a GET by bare `fetch`, a `get` of `Schema.Unknown` — is refused by `unschemedReads` (`test/read.test.ts`). A wrapper that
+  hands its schema parameter to `get` or `send` is held at its callers in its file; one it cannot follow (no name, exported) is refused.
 - A write sends with `send` (`lib/api/read.ts`) through a schema beside its answer's type, with `may` words saying what to look at before
   sending it again; an answer that does not decode is an `UnreadAnswer`, never a refusal. `unschemedReads` refuses any `fetch` outside
   read.ts: a fetch that is no api call gets an exemption of its own in that test, with its reason.

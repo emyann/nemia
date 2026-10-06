@@ -72,7 +72,7 @@ export function failedWords(err: unknown, lines = 4): string {
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  return said.length ? said.slice(-lines).join(' / ') : `git exited ${status ?? 'on a signal'}`;
+  return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
 }
 
 /** Git run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws with git's words when git fails. */

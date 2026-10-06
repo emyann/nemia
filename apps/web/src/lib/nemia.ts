@@ -62,8 +62,15 @@ export function factoryWords(row: FactoryLevel, byDefault: boolean, now: Date): 
   return `${levelWord(row.default)} by default (${whose}).`;
 }
 
-/** The level a person's switch writes, from where she is: Manual from Semi-auto, Semi-auto from Manual. */
-export const offeredLevel = ({ level }: Pick<NemiaLevel, 'level'>): Level => (level === 'semi-auto' ? 'manual' : 'semi-auto');
+/** The level the Semi-auto switch writes, from where she is: Manual from above it, Semi-auto from Manual. */
+export const offeredLevel = ({ level }: Pick<NemiaLevel, 'level'>): Level => (level === 'manual' ? 'semi-auto' : 'manual');
+
+/** The level the Auto switch writes, from where she is: Semi-auto from Auto, Auto from below it. */
+export const autoOffered = ({ level }: Pick<NemiaLevel, 'level'>): Level => (level === 'auto' ? 'semi-auto' : 'auto');
+
+/** The levels a factory is raised to over its default `level`, lowest first: none over Auto. */
+export const raisesOver = (level: Level): readonly Level[] =>
+  level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : [];
 
 /** What her sessions cost, as her level's own line says it: each counted as it ends, her open one not yet. */
 export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>

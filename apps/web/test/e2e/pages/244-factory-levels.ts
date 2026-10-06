@@ -22,8 +22,9 @@ export default {
   /**
    * Each factory's level on the store's Settings, her folder trusted: every factory reads Manual, the default one's set by the store's
    * switch alone; a factory raised to Semi-auto for the stretch offered first reads raised, with its end, and keeps her session; its raise
-   * ended, it reads Manual again and her session off; its default switched to Semi-auto offers no raise, and switched back. The trust,
-   * her folder and the factory's level file are written by the page and taken back after.
+   * ended, it reads Manual again and her session off; its default switched to Semi-auto offers a raise to Auto alone, which reads Auto
+   * until ended; its default switched to Auto offers none, and both switched back. The trust, her folder and the factory's level file are
+   * written by the page and taken back after.
    */
   name: 'factory-levels',
   route: '/settings',
@@ -61,7 +62,18 @@ export default {
       await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'and her session off, no factory above Manual');
       await wrote(page, row.locator('[data-factory-default]'), `${factory}'s default is switched to Semi-auto`);
       await expectVisible(row.and(page.locator('[data-level="semi-auto"]')), `${factory} reads Semi-auto by default`);
-      if (await row.locator('[data-factory-raise]').count()) throw new Refused('a factory at Semi-auto by default offers no raise');
+      if (await row.locator('[data-factory-raise]').count()) throw new Refused('a factory at Semi-auto by default offers no raise to it');
+      await wrote(page, row.locator('[data-factory-raise-auto]'), `${factory} is raised to Auto for a stretch`);
+      await expectVisible(row.and(page.locator('[data-level="auto"]')), `${factory} reads Auto`);
+      await expectVisible(row.locator('[data-factory-raised]'), 'raised over its default');
+      await wrote(page, row.locator('[data-factory-end]'), 'the raise to Auto is ended');
+      await expectVisible(row.and(page.locator('[data-level="semi-auto"]')), `${factory} reads Semi-auto again`);
+      await wrote(page, row.locator('[data-factory-auto-default]'), `${factory}'s default is switched to Auto`);
+      await expectVisible(row.and(page.locator('[data-level="auto"]')), `${factory} reads Auto by default`);
+      if (await row.locator('[data-factory-raise], [data-factory-raise-auto]').count())
+        throw new Refused('a factory at Auto by default offers no raise');
+      await wrote(page, row.locator('[data-factory-auto-default]'), `${factory}'s default is switched back to Semi-auto`);
+      await expectVisible(row.and(page.locator('[data-level="semi-auto"]')), `${factory} reads Semi-auto by default again`);
       await wrote(page, row.locator('[data-factory-default]'), `${factory}'s default is switched back`);
       await expectVisible(row.and(page.locator('[data-level="manual"]')), `${factory} reads Manual once more`);
     } finally {

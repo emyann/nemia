@@ -15,7 +15,16 @@ import {
   type NemiaMemory,
 } from '../src/lib/api/nemia.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import { factoryWords, offeredLevel, PRUNE_WORDS, RAISE_STRETCHES, sessionOf, spendWords } from '../src/lib/nemia.ts';
+import {
+  autoOffered,
+  factoryWords,
+  offeredLevel,
+  PRUNE_WORDS,
+  RAISE_STRETCHES,
+  raisesOver,
+  sessionOf,
+  spendWords,
+} from '../src/lib/nemia.ts';
 
 /** Where she is, as the api answers it: off, never set, unless `over` says otherwise. */
 const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
@@ -102,9 +111,19 @@ test('the phase is never read: any word there judges the same', () => {
   for (const phase of ['running', 'settled', 'whatever']) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
 });
 
-test('the switch offers Manual from Semi-auto, and Semi-auto from Manual', () => {
+test('the Semi-auto switch offers Manual from above it and Semi-auto from Manual; the Auto switch, Semi-auto from Auto, else Auto', () => {
   assert.equal(offeredLevel({ level: 'semi-auto' }), 'manual');
+  assert.equal(offeredLevel({ level: 'auto' }), 'manual');
   assert.equal(offeredLevel({ level: 'manual' }), 'semi-auto');
+  assert.equal(autoOffered({ level: 'auto' }), 'semi-auto');
+  assert.equal(autoOffered({ level: 'semi-auto' }), 'auto');
+  assert.equal(autoOffered({ level: 'manual' }), 'auto');
+});
+
+test('a factory is raised to each level over its default, lowest first, and to none over Auto', () => {
+  assert.deepEqual([...raisesOver('manual')], ['semi-auto', 'auto']);
+  assert.deepEqual([...raisesOver('semi-auto')], ['auto']);
+  assert.equal(raisesOver('auto').length, 0);
 });
 
 test('her spend says one session or several, and names the unmeasured ones only when there are some', () => {

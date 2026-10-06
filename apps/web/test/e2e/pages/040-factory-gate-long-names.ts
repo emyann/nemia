@@ -46,6 +46,7 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()): strin
   for (const step of workflow) {
     const keys = [
       `harness: ${step.harness}`,
+      'place: git',
       ...(step.after.length ? [`after: ${step.after.join(', ')}`] : []),
       ...(step.workspace ? ['workspace: main', 'gate: true'] : []),
     ];

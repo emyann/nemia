@@ -40,8 +40,8 @@ export default {
     try {
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'README.md'), `# ${GOING}\n\nA workflow the e2e removes from its card.\n`);
-      fs.writeFileSync(path.join(dir, 'plan.md'), '---\nharness: claude\n---\nWrite PLAN.md.\n');
-      fs.writeFileSync(path.join(dir, 'build.md'), '---\nafter: plan\n---\nBuild what PLAN.md says.\n');
+      fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
+      fs.writeFileSync(path.join(dir, 'build.md'), '---\nplace: git\nafter: plan\n---\nBuild what PLAN.md says.\n');
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       const listed = page.locator(`section[aria-label="Workflow ${GOING}"]`);

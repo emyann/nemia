@@ -300,7 +300,7 @@ export default {
       fs.mkdirSync(crewDir, { recursive: true });
       fs.writeFileSync(
         path.join(crewDir, 'build.md'),
-        `---\nagent: ${agent}\ncheck: npm test\ndisallowedTools: Bash(rm:*)\n---\nMind the cache.\n`,
+        `---\nplace: git\nagent: ${agent}\ncheck: npm test\ndisallowedTools: Bash(rm:*)\n---\nMind the cache.\n`,
       );
       const { problems } = watch(crewed);
       await open(crewed, crew);
@@ -384,15 +384,22 @@ export default {
       await form.getByRole('textbox', { name: 'Workflow name' }).fill(name);
       await form.getByRole('textbox', { name: 'First step' }).fill('plan');
       await form.getByRole('textbox', { name: 'What it is told' }).fill(plan);
+      const make = form.getByRole('button', { name: 'Make it' });
+      if (!(await make.isDisabled()))
+        throw new Refused('the form makes nothing until a person chooses where the steps work: none is chosen');
+      await expectCount(form.getByRole('radio', { checked: true }), 0, 'neither place chosen for them');
+      await photograph(form, path.join(OUT, `builder-new-unchosen-${await themeOf(page)}.png`));
+      await form.getByRole('radio', { name: /^On a repository's branches/ }).check();
+      await photograph(form, path.join(OUT, `builder-new-chosen-${await themeOf(page)}.png`));
       const [created] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows/yours', {
           timeout: WAIT_MS,
         }),
-        form.getByRole('button', { name: 'Make it' }).click(),
+        make.click(),
       ]);
       if (created.status() !== 201)
         throw new Refused(`the api makes the workflow — it answered ${created.status()}: ${await created.text()}`);
-      if (JSON.stringify(filesIn(made)) !== JSON.stringify([['plan.md', `${plan}\n`]]))
+      if (JSON.stringify(filesIn(made)) !== JSON.stringify([['plan.md', `---\nplace: git\n---\n${plan}\n`]]))
         throw new Refused(`the new folder is its first step — ${made} holds ${JSON.stringify(filesIn(made))}`);
 
       const builder = card(page, name).locator(`section[data-builder="${name}"]`);
@@ -468,9 +475,9 @@ export default {
           `GET /api/workflows reads the folder as it was built, as a start would read it — it read ${JSON.stringify(read)}`,
         );
       const files = [
-        ['implement.md', `---\nafter: plan\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n${implement}\n`],
+        ['implement.md', `---\nafter: plan\nplace: git\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n${implement}\n`],
         ['implement.schema.json', `${PASTED}\n`],
-        ['plan.md', `${plan}\n`],
+        ['plan.md', `---\nplace: git\n---\n${plan}\n`],
       ];
       if (JSON.stringify(filesIn(made)) !== JSON.stringify(files))
         throw new Refused(`the folder's files are the steps as built — ${made} holds ${JSON.stringify(filesIn(made))}`);

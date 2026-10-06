@@ -125,7 +125,7 @@ function writeRun(root: string): string[] {
   ];
   for (const step of steps) {
     const after = step.after.length ? `after: ${step.after.join(', ')}\n` : '';
-    write(path.join(dir, `${step.name}.md`), `---\nharness: claude\n${after}output: open.schema.json\n---\nDo ${step.name}.\n`);
+    write(path.join(dir, `${step.name}.md`), `---\nplace: git\nharness: claude\n${after}output: open.schema.json\n---\nDo ${step.name}.\n`);
   }
   write(
     path.join(dir, 'open.schema.json'),

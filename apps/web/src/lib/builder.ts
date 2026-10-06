@@ -170,19 +170,43 @@ export function nameRefusal(steps: readonly DraftStep[], name: string): string |
   return null;
 }
 
-/** A step added: its name and what it is told, every key unset. The draft as it was, for a name refused (`nameRefusal`). */
+/**
+ * A step added: its name and what it is told, every key unset but its place, the one the draft's steps say — every step of a workflow
+ * says the same — or none in a draft that says none. The draft as it was, for a name refused (`nameRefusal`).
+ */
 export function addStep(steps: readonly DraftStep[], name: string, body: string): DraftStep[] {
   if (nameRefusal(steps, name)) return [...steps];
+  const place = steps.find((s) => s.spec.place !== null)?.spec.place ?? null;
   return [
     ...steps,
     {
       name,
-      spec: { ...UNSET, after: [], input: [], skills: [], writable: [], reads: [], disallowedTools: [], allowedTools: [], tally: [] },
+      spec: {
+        ...UNSET,
+        place,
+        after: [],
+        input: [],
+        skills: [],
+        writable: [],
+        reads: [],
+        disallowedTools: [],
+        allowedTools: [],
+        tally: [],
+      },
       body,
       own: null,
       schema: null,
     },
   ];
+}
+
+/**
+ * A new workflow's first step: its name, what it is told, and where it works, every other key unset. Null until each is given: a step
+ * says its place, and none is chosen for a person.
+ */
+export function firstStep(name: string, body: string, place: WorkflowStepSpec['place']): StepWritten | null {
+  if (!name.trim() || !body.trim() || place === null) return null;
+  return { name, spec: { ...UNSET, place }, body, own: null };
 }
 
 /** A step removed, and every key of another step that names it: `after`, `input`, `resume`, and `loop` with its rounds. */

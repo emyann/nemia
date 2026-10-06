@@ -132,7 +132,13 @@ test('each command is served on the api where it was before the table, the lift 
         ],
       ],
       ['cancel', 'cli'],
-      ['hold', { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } }],
+      [
+        'hold',
+        [
+          { method: 'POST', path: '/api/runs/:runId/hold', status: 200, sets: { off: false } },
+          { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
+        ],
+      ],
       ['rm', { method: 'DELETE', path: '/api/runs/:runId', status: 200 }],
       ['prune', { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } }],
       ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],

@@ -17,6 +17,7 @@ import { StartedFrom } from '../components/TryTag';
 import { FavoriteStar } from '../components/FavoriteStar';
 import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
+import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
 import { loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
@@ -146,6 +147,7 @@ function Run({ run }: { run: RunDetail }) {
           )}
           <StartedFrom run={run} />
           {run.try && <RemoveRun id={run.id} />}
+          <HoldRun run={run} />
           <PruneRun run={run} />
         </div>
       </header>

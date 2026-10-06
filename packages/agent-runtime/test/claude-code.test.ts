@@ -1301,7 +1301,7 @@ const countingOps = (f: ReturnType<typeof fake>, rows: object[], writtenAt?: num
   return { ops, asked };
 };
 
-test("a long-lived attempt's usage is counted from the start a pass is told of, by its look and by its release — though a view's look comes between", async () => {
+test("a long-lived attempt's usage is counted from the start a pass is told of, by its look and by its release — though a full listing comes between", async () => {
   const f = fake();
   try {
     const startedAt = Date.now() - 60_000;
@@ -1318,6 +1318,150 @@ test("a long-lived attempt's usage is counted from the start a pass is told of, 
     assert.ok(
       asked.every(([, from]) => from === since),
       "a view's look between, told nothing, keeps it for a session still listed, and never counts from the row's start",
+    );
+  } finally {
+    f.restore();
+  }
+});
+
+const OTHER_ID = '5e551011-0000-4000-8000-00000000000d';
+
+/**
+ * The pass's look told each session's start, then `between`, then the release of each `released`: each release must read its spend
+ * from the start the pass was told, whatever `between` named or left out.
+ */
+const raced = async (
+  rows: object[],
+  told: ReadonlyArray<{ name: string; since: number }>,
+  between: ReadonlyArray<{ name: string; since?: number }>,
+  released: ReadonlyArray<{ sessionId: string; since: number }>,
+) => {
+  const f = fake();
+  try {
+    const { ops, asked } = countingOps(f, rows);
+    await Effect.runPromise(ops.observeFor!(told.map((t) => ({ ...t, harness: 'claude' }))));
+    await Effect.runPromise(ops.observeFor!(between.map((b) => ({ ...b, harness: 'claude' }))));
+    for (const r of released) {
+      await Effect.runPromise(ops.release!({ sessionId: r.sessionId, state: 'working' }, {}));
+      assert.deepEqual(asked.at(-1), [r.sessionId, r.since], `${r.sessionId}'s release reads its spend from the start the pass was told`);
+    }
+  } finally {
+    f.restore();
+  }
+};
+
+test("a long-lived attempt's release counts from the start the pass was told, though a view's look of every attempt, told no start, comes between", async () => {
+  const startedAt = Date.now() - 60_000;
+  const since = startedAt - 3_600_000;
+  await raced(
+    [bgRow('ae/r/2', 'working', 'idle', startedAt)],
+    [{ name: 'ae/r/2', since }],
+    [{ name: 'ae/r/1' }, { name: 'ae/r/2' }],
+    [{ sessionId: BG_ID, since }],
+  );
+});
+
+test("a long-lived attempt's release counts from the start the pass was told, though `forget`'s look of the attempts' names comes between", async () => {
+  const startedAt = Date.now() - 60_000;
+  const since = startedAt - 3_600_000;
+  await raced(
+    [bgRow('ae/r/2', 'working', 'idle', startedAt)],
+    [{ name: 'ae/r/2', since }],
+    ['ae/r/1', 'ae/r/2'].map((name) => ({ name })),
+    [{ sessionId: BG_ID, since }],
+  );
+});
+
+test("a long-lived attempt's release counts from the start the pass was told, though a look for another task's session comes between", async () => {
+  const startedAt = Date.now() - 60_000;
+  const since = startedAt - 3_600_000;
+  await raced(
+    [bgRow('ae/r/2', 'working', 'idle', startedAt), { ...bgRow('ae/o/1', 'working', 'idle', startedAt), sessionId: OTHER_ID }],
+    [{ name: 'ae/r/2', since }],
+    [{ name: 'ae/o/1' }],
+    [{ sessionId: BG_ID, since }],
+  );
+});
+
+test("a restarted long-lived task's earlier attempt keeps its start when a look names only its last", async () => {
+  const startedAt = Date.now() - 60_000;
+  const first = startedAt - 7_200_000;
+  const last = startedAt - 3_600_000;
+  await raced(
+    [{ ...bgRow('ae/r/1', 'working', 'idle', startedAt), sessionId: OTHER_ID }, bgRow('ae/r/2', 'working', 'idle', startedAt)],
+    [
+      { name: 'ae/r/1', since: first },
+      { name: 'ae/r/2', since: last },
+    ],
+    [{ name: 'ae/r/2', since: last }],
+    [
+      { sessionId: OTHER_ID, since: first },
+      { sessionId: BG_ID, since: last },
+    ],
+  );
+});
+
+test("through the engine, a stopped long-lived attempt's spend is read from its journalled start though the task is viewed between the pass's look and its release", async () => {
+  const f = fake();
+  try {
+    const { Engine } = await import('../src/index.ts');
+    const { builtEngine } = await import('./engine.ts');
+    const root = tmp('root');
+    const asked: Array<[string, number]> = [];
+    let exited = false;
+    const ops = claudeOps({
+      root,
+      transcriptTime: async () => Date.now(),
+      closeoutFrom: async () => undefined,
+      usageFrom: async (sessionId: string, since: number) => {
+        asked.push([sessionId, since]);
+        return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
+      },
+    });
+    const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
+    let view = (): Effect.Effect<unknown, unknown> => Effect.void;
+    const viewed: typeof ops = {
+      ...ops,
+      observeFor: (expected) =>
+        ops.observeFor!(expected).pipe(
+          Effect.tap(() => (expected.some((x) => x.since !== undefined) ? Effect.ignore(view()) : Effect.void)),
+        ),
+      release: (session, task) => {
+        const from = asked.length;
+        exited = true;
+        return ops.release!(session, task).pipe(
+          Effect.tap((measured) => Effect.sync(() => released.push({ asked: asked.slice(from), measured }))),
+        );
+      },
+    };
+    const e = builtEngine(Engine.layer({ root, harnesses: { bg: viewed } }));
+    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: f.dir, harness: 'bg', restartPolicy: 'Always' }));
+    view = () => e.view(id);
+    const name = await until(async () => {
+      await Effect.runPromise(e.tick());
+      return f.read('bg-args')?.[2];
+    }, 'the session spawned');
+    const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0].startedAt);
+    const listing = (state: string) =>
+      fs.writeFileSync(
+        path.join(f.dir, 'agents.json'),
+        JSON.stringify([{ ...bgRow(name, state, 'idle', begun + 3_600_000), pid: process.pid }]),
+      );
+    listing('working');
+    await Effect.runPromise(e.tick());
+    await Effect.runPromise(e.stop(id));
+    await Effect.runPromise(e.tick());
+    listing('stopped');
+    const release = await until(async () => {
+      await Effect.runPromise(e.tick());
+      return released[0];
+    }, 'the session released');
+    assert.deepEqual(release.asked, [[BG_ID, begun]], "the release reads the spend from the attempt's journalled start, not its row's");
+    const entries = (await Effect.runPromise(e.feed(0))).entries.filter((x) => x.taskId === id).map((x) => x.event);
+    assert.deepEqual(
+      entries.flatMap((x) => (x.kind === 'measured' ? [x.usage] : [])),
+      [release.measured],
+      'what the release read is journalled as the attempt measured',
     );
   } finally {
     f.restore();

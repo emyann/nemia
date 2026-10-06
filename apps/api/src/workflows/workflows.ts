@@ -80,10 +80,12 @@ export type WorkflowStepSpec = {
   resume: string | null;
   input: string[];
   /**
-   * `workspace: main`: the step runs in the repository's own checkout; `folder`: in a folder the run makes, in a run with no repository.
-   * Null for a step without the line.
+   * `place: folder`: the step works in a folder the run makes, in a run with no repository; `git`: on branches of a repository. Null for a
+   * step without the line, which works on a repository.
    */
-  workspace: 'main' | 'folder' | null;
+  place: 'git' | 'folder' | null;
+  /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line. */
+  workspace: 'main' | null;
   /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */
   writable: string[];
   /** What of the store the step reads and never writes (`reads:`), each by its name (`inbox`, `costs`): empty where it reads none. */
@@ -157,7 +159,7 @@ export type WorkflowListing = {
   graph: RunGraph;
   schemas: string[];
   /**
-   * Whether every step says `workspace: folder` (`isFolderTeam`): a team that works in folders the run makes and never looks at a
+   * Whether every step says `place: folder` (`isFolderTeam`): a team that works in folders the run makes and never looks at a
    * repository. What the board reads to file a card for it without a `repo:`, and to say where a run of it does its work. False for a
    * folder that does not load, which has no steps to ask.
    */
@@ -453,16 +455,22 @@ const listsOf = (step: Workflow) => ({
   tally: step.tally ?? [],
 });
 
+/** Where a step works and what it waits on, each null where the step does not say it. */
+const wiringOf = (step: Workflow) => ({
+  after: step.after,
+  resume: step.resume ?? null,
+  place: step.place ?? null,
+  workspace: step.workspace ?? null,
+  slot: step.slot ?? null,
+});
+
 export const specOf = (step: Workflow): WorkflowStepSpec => ({
   ...listsOf(step),
+  ...wiringOf(step),
   harness: step.harness ?? null,
   model: step.model ?? null,
   effort: step.effort ?? null,
   context: step.context ?? null,
-  after: step.after,
-  resume: step.resume ?? null,
-  workspace: step.workspace ?? null,
-  slot: step.slot ?? null,
   agent: step.agent?.name ?? null,
   permissionMode: step.permissionMode ?? null,
   sandbox: step.sandbox ?? null,

@@ -154,6 +154,8 @@ export type StepSpec = {
    * approval.
    */
   workspace: string | null;
+  /** `folder` for a step that works in a folder the run makes, with no git repository (`place: folder`); null for one on a repository. */
+  place: string | null;
   resume: string | null;
   /**
    * Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`, but for a codex step frozen before the
@@ -567,6 +569,7 @@ const specOf = (step: Workflow): StepSpec => ({
   context: step.context ?? null,
   after: step.after,
   workspace: step.workspace ?? null,
+  place: step.place ?? null,
   resume: step.resume ?? null,
   permissionMode: step.permissionMode ?? null,
   sandbox: step.sandbox ?? null,

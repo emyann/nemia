@@ -79,6 +79,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   after: [],
   resume: null,
   input: [],
+  place: null,
   workspace: null,
   writable: [],
   reads: [],

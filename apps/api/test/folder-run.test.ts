@@ -113,9 +113,21 @@ test("a folder run's detail has no repository, base, branch or isolation — whe
   const res = await app.request('/api/runs/f-notes');
   assert.equal(res.status, 200);
   const run = (await res.json()) as Record<string, unknown> & {
-    steps: { name: string; workspace: string | null; branch: string | null; note: string | null; status: string }[];
+    steps: {
+      name: string;
+      workspace: string | null;
+      branch: string | null;
+      note: string | null;
+      status: string;
+      spec: { place: string | null; workspace: string | null };
+    }[];
   };
   assert.deepEqual([run.repo, run.baseRef, run.branch, run.isolate, run.place], [null, null, null, null, 'folder']);
+  assert.deepEqual(
+    [run.steps[0].spec.place, run.steps[0].spec.workspace],
+    ['folder', null],
+    'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`',
+  );
   assert.equal(run.work, work, 'the one thing a person needs to find what it made, where a git run has a repository and a branch');
   const [write] = run.steps;
   assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
@@ -181,7 +193,7 @@ test('REFUSED: POST /api/inbox files a card for a folder team with a repository 
   });
   assert.equal(refused.status, 422);
   const { error } = (await refused.json()) as { error: string };
-  assert.match(error, /^--repo .*: this card's workflow has steps that say `workspace: folder`/);
+  assert.match(error, /^--repo .*: this card's workflow has steps that say `place: folder`/);
   assert.match(error, /File the card without a repository, or name a workflow whose steps work on one\.$/);
   assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');
 });

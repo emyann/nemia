@@ -218,21 +218,66 @@ const SAY: RouteWords = {
   failed: (_at, said) => said,
 };
 
-/** A person's hold lifted, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `nemia hold --off`. */
+/** The body `POST …/hold` takes: `nemia hold`'s `--until`, given once for each run, `--why` and `--by`, as JSON. */
+const HOLD_PUT_SHAPE = '`{ "until": ["<runId>", ...], "why"?: "<words>", "by"?: "<name>" }`';
+
+/** The flag of `nemia hold` each key of `POST …/hold`'s body is. */
+const HOLD_FLAGS = { until: '--until', why: '--why', by: '--by' } as const;
+
+/**
+ * Why `POST /api/runs/<runId>/hold`'s body is not one (400), by the first thing its schema refused: every key it does not take, named at
+ * once, and `off` pointed at the lift; a key it takes, sent as what it is not.
+ */
+const holdWords =
+  (runId: string) =>
+  ({ path: [key], kind, input }: BodyIssue, body: unknown): string => {
+    const route = `POST /api/runs/${runId}/hold`;
+    if (kind === 'excess' && typeof body === 'object' && body !== null) {
+      const unknown = Object.keys(body).filter((k) => !Object.hasOwn(HOLD_FLAGS, k));
+      const off = unknown.includes('off')
+        ? ` A hold is lifted with \`DELETE /api/runs/${runId}/hold\`, as \`nemia hold ${runId} --off\` lifts it.`
+        : '';
+      return `${route} does not take ${unknown.map((k) => `\`${k}\``).join(', ')}: it takes ${HOLD_PUT_SHAPE}, as \`nemia hold\` takes --until, --why and --by.${off}`;
+    }
+    if (key === 'until')
+      return `${route} takes \`until\` as a list of run ids, each \`nemia hold\`'s --until, and this request sent ${JSON.stringify(input)}: ${HOLD_PUT_SHAPE}.`;
+    if (key === 'why' || key === 'by')
+      return `${route} takes \`${key}\` as text — \`nemia hold\`'s ${HOLD_FLAGS[key]} — or left out, and this request sent ${JSON.stringify(input)}: ${HOLD_PUT_SHAPE}.`;
+    return `${route} takes a JSON object: ${HOLD_PUT_SHAPE}.`;
+  };
+
+/**
+ * A person's hold put (`POST`) or lifted (`DELETE`), as the guard's refusals word each, its body — the put's strict, every key it does not
+ * take named; the lift's none — and a failure that is no refusal, naming the `nemia hold` that does the same.
+ */
 const HOLD: RouteWords = {
-  shape: '`{}`',
-  guard: ({ runId }) => ({
-    route: `DELETE /api/runs/${runId}/hold`,
-    does: "lifts a run's hold",
-    forAnother: 'lift one',
-    why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
-    reach: "lift it on the board's run page",
-    instead: "Lift it on the board's run page, or with `nemia hold <run> --off`",
-    shape: '`{}`',
-  }),
-  issue: () => () => 'DELETE …/hold takes no body: `{}`.',
-  failed: ({ runId }, said) =>
-    `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`nemia hold ${runId} --off\`.`,
+  shape: HOLD_PUT_SHAPE,
+  guard: ({ runId, method }) =>
+    method === 'DELETE'
+      ? {
+          route: `DELETE /api/runs/${runId}/hold`,
+          does: "lifts a run's hold",
+          forAnother: 'lift one',
+          why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
+          reach: "lift it on the board's run page",
+          instead: "Lift it on the board's run page, or with `nemia hold <run> --off`",
+          shape: '`{}`',
+        }
+      : {
+          route: `POST /api/runs/${runId}/hold`,
+          does: 'holds a run until other runs ship',
+          forAnother: 'hold one',
+          why: 'a held run has nothing more of it filed, and nothing of it asked of a person, until every run it waits on has shipped',
+          reach: "put it on the board's run page",
+          instead: "Put it on the board's run page, or with `nemia hold <run> --until <runId>`",
+          shape: HOLD_PUT_SHAPE,
+        },
+  issue: ({ runId, method }) => (method === 'DELETE' ? () => 'DELETE …/hold takes no body: `{}`.' : holdWords(runId)),
+  failed: ({ runId, method }, said) =>
+    method === 'DELETE'
+      ? `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`nemia hold ${runId} --off\`.`
+      : `POST /api/runs/${runId}/hold: ${runId} was not held — ${said}. Hold it with \`nemia hold ${runId} --until <runId>\`.`,
+  strict: true,
 };
 
 /** The body `POST /api/pause` takes: `nemia pause`'s flags, as JSON, `now` its `--now`, which the route acts on as `--yes` does. */

@@ -2,8 +2,9 @@
  * The agent files: where `nemia start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`),
  * the version of each skill it rendered (`renderedSkillVersions`), the rules each declares (`renderedSkillRules`) and the paths of its work
  * (`renderedSkillApplies`), and a skill read again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page
- * writes — an agent and the files beside it (`writeAgent`, `removeAgent`, refused as `AgentWriteError`). What a folder holds is
- * `agents.ts`'s; this writes and reads it, and the agents of the two places the board lists them from are read in `roster.store.ts`.
+ * writes — an agent and the files beside it (`writeAgent`, `removeAgent`, refused as `Missing`, `Conflict` or `Invalid`). What a folder
+ * holds is `agents.ts`'s; this writes and reads it, and the agents of the two places the board lists them from are read in
+ * `roster.store.ts`.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
@@ -36,6 +37,7 @@ import { agentUsers, agentVersion, preloads, readSkillRules, skillsFor, skillVer
 import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
+import { Conflict, Missing } from '../refusal/refusal.ts';
 
 /**
  * Where `nemia start` renders a step's agent for Claude Code (`agents.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and
@@ -160,18 +162,16 @@ export function skillsAgain(step: Workflow, skills: SkillsFound): SkillAgain[] {
 }
 
 /**
- * A refusal of an agent's write, in the package's words, and what kind it is: `missing` for an agent that is not there, `stale` for one
- * that changed since it was read, `exists` for a name another agent has, `in-use` for one steps still name — `users` says which, as
- * `<workflow>/<step>` — and `refused` for the rest: a place, a name, a key or a value the parser refuses.
+ * A write or a removal of an agent refused, in the package's words: `words` thrown as `Missing` for an agent that is not there, as
+ * `Conflict` for one changed since it was read, a name another agent has, or one steps still name — `users` says which, as
+ * `<workflow>/<step>` — and as a `WorkflowError`, an `Invalid`, for the rest: a place, a name, a key or a value the parser refuses.
+ * Nothing is thrown for no words.
  */
-export class AgentWriteError extends WorkflowError {
-  readonly why: 'missing' | 'stale' | 'exists' | 'in-use' | 'refused';
-  readonly users: string[];
-  constructor(message: string, why: AgentWriteError['why'] = 'refused', users: string[] = []) {
-    super(message);
-    this.why = why;
-    this.users = users;
-  }
+function refuse(words: string | undefined, kind?: typeof Missing | typeof Conflict, users?: readonly string[]): void {
+  if (!words) return;
+  if (kind === Missing) throw new Missing({ message: words });
+  if (kind === Conflict) throw new Conflict({ message: words, ...(users && { users }) });
+  throw new WorkflowError(words);
 }
 
 /** What `writeAgent` did: the agent as it now reads, its version, and its files by name — written, and removed. */
@@ -267,9 +267,6 @@ export function writeAgent(
   }: { version: string | null; from?: string; schema?: AgentSidecar | null; anywhere?: boolean; repo?: string },
 ): AgentWritten {
   const at = path.resolve(dir);
-  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => {
-    if (why) throw new AgentWriteError(why, kind, users);
-  };
   if (Object.hasOwn(rest, 'card'))
     refuse('`card` is not written with an agent: its card is generated from its skills. Send the agent without it.');
   refuse(agentPlaceRefusal(at, anywhere, repo));
@@ -287,30 +284,30 @@ export function writeAgent(
   const versionOf = (n: string) => agentVersion(at, n, skillsAt(at, repo));
   if (version === null) {
     if (fs.existsSync(file(name)))
-      refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, 'exists');
+      refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, Conflict);
   } else {
     const now = versionOf(old);
     if (now === null)
       refuse(
         `${AGENTS_FOLDER}/${old}.md is not there: it was removed since it was read. Write it as a new agent to have it back.`,
-        'missing',
+        Missing,
       );
     if (now !== version)
       refuse(
         `${AGENTS_FOLDER}/${old}.md changed since it was read (version ${version}, now ${now}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`,
-        'stale',
+        Conflict,
       );
   }
   if (renamed) {
     if (fs.existsSync(file(name)) && !sameFile(file(name), file(old)))
       refuse(
         `${AGENTS_FOLDER}/${name}.md is there already, and renaming ${old} to it would write over it. Give ${old} another name.`,
-        'exists',
+        Conflict,
       );
     const users = agentUsers(path.dirname(at), old);
-    if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), 'in-use', users);
+    if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), Conflict, users);
     const theirs = repoUsers(at, old, repo);
-    if (theirs.length) refuse(inUseByRepo(old, theirs, repo!, `renaming it to ${name}`), 'in-use', theirs);
+    if (theirs.length) refuse(inUseByRepo(old, theirs, repo!, `renaming it to ${name}`), Conflict, theirs);
   }
   const text = renderAgent(draft);
   const given = SIDECARS.map((kind) => ({ ...kind, sidecar: schema ?? null, named: frontmatterKey(text, kind.key) }));
@@ -411,25 +408,22 @@ export function removeAgent(
   { version, anywhere = false, repo }: { version: string; anywhere?: boolean; repo?: string },
 ): { dir: string; removed: string[] } {
   const at = path.resolve(dir);
-  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => {
-    if (why) throw new AgentWriteError(why, kind, users);
-  };
   refuse(agentPlaceRefusal(at, anywhere, repo));
   refuse(agentNameRefusal(name));
   const file = path.join(at, `${name}.md`);
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink())
     refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
   const now = agentVersion(at, name, skillsAt(at, repo));
-  if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, 'missing');
+  if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, Missing);
   if (now !== version)
     refuse(
       `${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`,
-      'stale',
+      Conflict,
     );
   const users = agentUsers(path.dirname(at), name);
-  if (users.length) refuse(inUse(name, users, 'removing it'), 'in-use', users);
+  if (users.length) refuse(inUse(name, users, 'removing it'), Conflict, users);
   const theirs = repoUsers(at, name, repo);
-  if (theirs.length) refuse(inUseByRepo(name, theirs, repo!, 'removing it'), 'in-use', theirs);
+  if (theirs.length) refuse(inUseByRepo(name, theirs, repo!, 'removing it'), Conflict, theirs);
   const read = (f: string) => {
     try {
       return fs.readFileSync(path.join(at, f), 'utf8');

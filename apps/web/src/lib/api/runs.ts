@@ -225,6 +225,35 @@ export const liftHold = (id: string): Promise<{ id: string; lifted: true }> =>
     may: "The hold may be lifted: look at the run's page before lifting it again.",
   });
 
+/** Mirrors `Hold` in agent-orchestrator: when a person put a hold, the runs it waits on, why, and who put it. */
+export type Hold = { at: string; until: string[]; why?: string; by?: string };
+
+/** What a hold put answers: the run, and the hold as the package wrote it. */
+export type Held = { id: string; lifted: false; hold: Hold };
+
+/** Decodes a `Held`: `why` and `by` absent where the hold has none. */
+const HeldSchema = Schema.Struct({
+  id: Schema.String,
+  lifted: Schema.Literal(false),
+  hold: Schema.Struct({
+    at: Schema.String,
+    until: StringsSchema,
+    why: Schema.optionalKey(Schema.String),
+    by: Schema.optionalKey(Schema.String),
+  }),
+}) satisfies Schema.Schema<Held>;
+
+/**
+ * Hold a run until the runs `until` names ship, as the CLI's `hold <run> --until <run>… --why <words>` holds it, `why` sent only where it
+ * says something; who put it is the user the api runs as. Rejects with the api's refusal in full — the package's words for a run it will
+ * not hold, or a run to wait on it will not take — or its own about the request.
+ */
+export const putHold = (id: string, until: readonly string[], why: string): Promise<Held> =>
+  send('POST', `/api/runs/${encodeURIComponent(id)}/hold`, HeldSchema, {
+    body: { until, ...(why.trim() ? { why } : {}) },
+    may: 'The run may be held: look at its page before holding it again.',
+  });
+
 /**
  * What a prune gives back beyond the run's worktrees, as the CLI's `prune` takes it: `--artifacts`, its files; `--unmerged`, a run nobody
  * merged.

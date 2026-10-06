@@ -12,7 +12,6 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
-  AgentWriteError,
   agentRead,
   agentSkillsFound,
   COMMANDS,
@@ -100,9 +99,6 @@ export type AgentCardAnswer = { card: AgentCardShape; servedOverA2A: false; why:
 
 /** What a write of an agent answers with: the agent as it now reads, and its files by name — written, and removed. */
 export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
-
-/** A refused write: the package's words, and the steps that still name the agent when that is why. */
-export type AgentRefused = { error: string; users: string[] };
 
 const DRAFT =
   '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "harnessPrompt"?: "keep" | "no-coding" | "replace", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
@@ -233,17 +229,6 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
   };
 }
 
-/**
- * A write of an agent the package refused, as the api answers it, with the nodes that still name the agent: one not there is 404; stale,
- * taken or still named is 409; a key or a value it refused, 422. Null for an error that is not an `AgentWriteError`, which the route throws
- * on to `app.onError` (app.ts): the parser's refusals, a `WorkflowError`, are answered by their kind there.
- */
-function refusalOf(err: unknown): { body: AgentRefused; status: 404 | 409 | 422 } | null {
-  if (!(err instanceof AgentWriteError)) return null;
-  const status = err.why === 'missing' ? 404 : err.why === 'refused' ? 422 : 409;
-  return { body: { error: err.message, users: err.users }, status };
-}
-
 /** The name in a path, refused in the package's words before anything is read, or the agents folder of `from`. */
 function placeOf(from: string, name: string | null, route: string, repo: string, home: string): { dir: string } | Refusal {
   if (from !== 'repo' && from !== 'yours')
@@ -265,8 +250,8 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
 /**
  * The agents' routes. A name in a path is refused in the package's words (400) before a file is read, so none reaches outside the folder,
  * and a place that is neither `repo` nor `yours` is 400 (`placeOf`). Each write is guarded (guard.ts) and writes only yours (`yoursOnly`:
- * 403 for the repository's); a write the package refuses has `refusalOf`'s statuses, and any other refusal is answered by its kind
- * (`app.onError`).
+ * 403 for the repository's); a write or a removal the package refuses is answered by its kind (`app.onError`), and a `Conflict` over an
+ * agent steps still name with those steps, as `users`.
  *
  * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, the package's `inFactory`), read from disk on each
  *   request, so an agent a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the
@@ -421,40 +406,34 @@ export const agents = new Hono<ApiEnv>()
           },
           422,
         );
-      try {
-        const agent = listedAgent('yours', place.dir, name, repo, home);
-        if (!agent) return c.json({ error: noAgentWords('yours', name, place.dir) }, 404);
-        if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
-        if (agent.untried) return c.json({ error: agent.untried.why }, 422);
-        const theirs = agent.given.filter((skill) => skill.from === 'repo');
-        if (theirs.length) {
-          const copies = theirs
-            .map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills(home))}\``)
-            .join(', ');
-          return c.json(
-            {
-              error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`,
-            },
-            422,
-          );
-        }
-        const tries = runStore.runs.list().filter((run) => tryOf(run, home)?.agent === name);
-        const moving = (await runWith(e, judgedNow(e, home, tries))).find((run) => run.moving);
-        if (moving)
-          return c.json(
-            {
-              error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.`,
-            },
-            409,
-          );
-        const workflowDir = tryFolder(name, agent.version, agent.keys, home);
-        const run = (await runWith(e, TRY.handler({ from, name, dir: workflowDir, brief: brief.trim() }, undefined, home))) as AgentTried;
-        return c.json({ id: run.id } satisfies AgentTried, 201);
-      } catch (err) {
-        const answer = refusalOf(err);
-        if (answer) return c.json(answer.body, answer.status);
-        throw err;
+      const agent = listedAgent('yours', place.dir, name, repo, home);
+      if (!agent) return c.json({ error: noAgentWords('yours', name, place.dir) }, 404);
+      if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
+      if (agent.untried) return c.json({ error: agent.untried.why }, 422);
+      const theirs = agent.given.filter((skill) => skill.from === 'repo');
+      if (theirs.length) {
+        const copies = theirs
+          .map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills(home))}\``)
+          .join(', ');
+        return c.json(
+          {
+            error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`,
+          },
+          422,
+        );
       }
+      const tries = runStore.runs.list().filter((run) => tryOf(run, home)?.agent === name);
+      const moving = (await runWith(e, judgedNow(e, home, tries))).find((run) => run.moving);
+      if (moving)
+        return c.json(
+          {
+            error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.`,
+          },
+          409,
+        );
+      const workflowDir = tryFolder(name, agent.version, agent.keys, home);
+      const run = (await runWith(e, TRY.handler({ from, name, dir: workflowDir, brief: brief.trim() }, undefined, home))) as AgentTried;
+      return c.json({ id: run.id } satisfies AgentTried, 201);
     }),
   )
   .delete('/api/agents/:from/:name', (c) =>
@@ -481,13 +460,7 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
-      try {
-        return c.json(await runWith(e, REMOVE.handler({ from, name, dir: place.dir, version, repo }, undefined, home)));
-      } catch (err) {
-        const answer = refusalOf(err);
-        if (answer) return c.json(answer.body, answer.status);
-        throw err;
-      }
+      return c.json(await runWith(e, REMOVE.handler({ from, name, dir: place.dir, version, repo }, undefined, home)));
     }),
   );
 
@@ -495,15 +468,16 @@ export const agents = new Hono<ApiEnv>()
 type AgentAt = { from: string; dir: string; repo: string; home: string };
 
 /**
- * `writeAgent`, through the table's `agents write` (`WRITE`), answered: the agent as it now reads, or its `AgentWriteError` with its
- * status. `version` is what the agent was read at, none for a new one, and `name` the one it is renamed from. Throws any other error.
+ * `writeAgent`, through the table's `agents write` (`WRITE`), answered: the agent as it now reads, with its status. `version` is what the
+ * agent was read at, none for a new one, and `name` the one it is renamed from. Throws what the package refuses, which `app.onError`
+ * answers by its kind, and any other error.
  */
 async function saved(
   e: Engine['Service'],
   { from, dir, repo, home }: AgentAt,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
   ok: 200 | 201,
-): Promise<{ body: AgentSaved | AgentRefused; status: 200 | 201 | 404 | 409 | 422 }> {
+): Promise<{ body: AgentSaved; status: 200 | 201 }> {
   const args = {
     from,
     dir,
@@ -513,15 +487,9 @@ async function saved(
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  try {
-    const done = (await runWith(e, WRITE.handler(args, undefined, home))) as AgentWritten;
-    return {
-      body: { agent: listedAgent('yours', done.dir, done.agent.name, repo, home)!, written: done.written, removed: done.removed },
-      status: ok,
-    };
-  } catch (err) {
-    const answer = refusalOf(err);
-    if (!answer) throw err;
-    return answer;
-  }
+  const done = (await runWith(e, WRITE.handler(args, undefined, home))) as AgentWritten;
+  return {
+    body: { agent: listedAgent('yours', done.dir, done.agent.name, repo, home)!, written: done.written, removed: done.removed },
+    status: ok,
+  };
 }

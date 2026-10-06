@@ -1,6 +1,7 @@
 /**
- * What a run established, as the api judges it (apps/api/src/runs/judged.ts): where it stands, who it waits on, what it cost, what to
- * decide. Each type has its schema beside it, which `get` decodes the api's answer with.
+ * What a run established, as agent-orchestrator judges it and the api answers it on a run's summary and detail (`GET /api/runs`,
+ * `GET /api/runs/:id`): where it stands, who it waits on, what it cost, what to decide. Each type has its schema beside it, which `get`
+ * decodes the api's answer with.
  */
 import { Schema } from 'effect';
 
@@ -16,20 +17,20 @@ export type PlaceKind = 'repository' | 'folder';
 /** Decodes a `PlaceKind`. */
 export const PlaceKindSchema = Schema.Literals(['repository', 'folder']) satisfies Schema.Schema<PlaceKind>;
 
-/** Mirrors `RunStatus` in apps/api/src/runs/judged.ts: where `assess` puts the run. */
+/** Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 /** Decodes a `RunStatus`. */
 export const RunStatusSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled']) satisfies Schema.Schema<RunStatus>;
 
-/** Mirrors `RunStoppedOn` in apps/api/src/runs/judged.ts: what stopped a `failed` run no step broke, as the CLI's `decide` says it. */
+/** Mirrors `RunStoppedOn` in agent-orchestrator: what stopped a `failed` run no step broke, as the CLI's `decide` says it. */
 export type RunStoppedOn = 'awaiting approval' | 'blocked';
 
 /** Decodes a `RunStoppedOn`. */
 export const RunStoppedOnSchema = Schema.Literals(['awaiting approval', 'blocked']) satisfies Schema.Schema<RunStoppedOn>;
 
 /**
- * Mirrors `RunToDecide` in apps/api/src/runs/judged.ts: what a person has to decide about a run's result, the fifth reason a run waits on
+ * Mirrors `RunToDecide` in agent-orchestrator: what a person has to decide about a run's result, the fifth reason a run waits on
  * one — `approve`, the gate on its last step, with `step`, `filed` whether it has run, and `says`, what it would do, the first line of the
  * step's own note (null where it has none, and for a gated step that has signed off, whose closeout is what to read); or `result`, result
  * branches ahead of the base that nothing in the workflow merges.
@@ -70,7 +71,7 @@ export const RunToDecideSchema = Schema.Union([
 ]) satisfies Schema.Schema<RunToDecide>;
 
 /**
- * Mirrors `Spent` in apps/api/src/runs/judged.ts: what sessions cost, as the package adds it up — the dollars of the attempts that ended
+ * Mirrors `Spent` in agent-orchestrator: what sessions cost, as the package adds it up — the dollars of the attempts that ended
  * with a cost on them, how many did and how many ended with none — and `said`, its word for it: `$4.20`, or `≥$4.20` where an ended attempt
  * has no cost on it.
  */
@@ -131,7 +132,7 @@ export const RunTokensSchema = Schema.Struct({
 }) satisfies Schema.Schema<RunTokens>;
 
 /**
- * Mirrors `RunWaiting` in apps/api/src/runs/judged.ts: what a run started `--after` still waits on, in the package's words. `runs` are each
+ * Mirrors `RunWaiting` in agent-orchestrator: what a run started `--after` still waits on, in the package's words. `runs` are each
  * run not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what the CLI's `ls` prints on its
  * roots — `waiting on a-1x2y (cancelled)` — and `advice` the line the CLI's `decide` prints under it; `onYou` whether a person has to act.
  */
@@ -155,7 +156,7 @@ export const RunWaitingSchema = Schema.Struct({
 }) satisfies Schema.Schema<RunWaiting>;
 
 /**
- * Mirrors `RunHolding` in apps/api/src/runs/judged.ts: a person's hold on a run (the CLI's `hold <run> --until <run>`), in the package's
+ * Mirrors `RunHolding` in agent-orchestrator: a person's hold on a run (the CLI's `hold <run> --until <run>`), in the package's
  * words. `at` is when it was put; `runs` each run it names that has not shipped, and why one never will without a person — or, in the
  * moment every one has shipped and the next tick has not yet lifted the hold, each of them `shipped`. `word` is what the CLI's `ls` prints
  * (`held until a-1x2y ships`), `advice` the line the CLI's `decide` prints under it, which names the CLI's `hold <run> --off`; `onYou`
@@ -190,7 +191,7 @@ export const RunHoldingSchema = Schema.Struct({
 }) satisfies Schema.Schema<RunHolding>;
 
 /**
- * Mirrors `StepNeeds` in apps/api/src/runs/judged.ts. `needs`: the closeout's, for a step whose current try signed off blocked.
+ * Mirrors `StepNeeds` in agent-orchestrator. `needs`: the closeout's, for a step whose current try signed off blocked.
  * `blockedByHarness`: whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. `waitingFor`:
  * what that harness says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null
  * where the harness said nothing, and on the list as on the detail, since it costs no read of its own. What that session said last is on a

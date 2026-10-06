@@ -129,10 +129,19 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
 }
 
 /**
+ * A step's body, drawn above its fold only where its run froze no layers (`layers` null): there it is all the record says of the step's
+ * own words. Nothing where layers were frozen, since the fold draws each of the body's words by layer, and nothing for an empty body.
+ */
+export function StepBody({ body, layers }: { body: string | null; layers: StepLayers | null }) {
+  if (layers !== null || !body) return null;
+  return <Markdown className="text-sm">{body}</Markdown>;
+}
+
+/**
  * The step's policy, drawn open at its gate: its own words, the skills it adds and the fence lines it tightens, then what it was told
  * before — its agent's instructions, and the person's custom instructions where there are any — over which it wins where they conflict,
- * and where every layer is. Nothing for a step with no agent, whose own words are all it was told and are drawn as its body, nor for a
- * run that froze no layers (`layers` null).
+ * and where every layer is. Nothing for a step with no agent, whose own words are all it was told and are its policy layer in the fold,
+ * nor for a run that froze no layers (`layers` null).
  */
 export function StepPolicy({ layers }: { layers: StepLayers | null }) {
   const agent = layers?.agent ?? null;

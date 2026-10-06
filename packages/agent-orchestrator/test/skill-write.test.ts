@@ -15,7 +15,8 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-write-');
 process.env.WF_ROOT = ROOT;
-const { addFactory, writeSkill, SkillWriteError } = await import('../src/runner.ts');
+const { addFactory, writeSkill, isRefusal } = await import('../src/runner.ts');
+type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const LIBRARY = path.join(ROOT, 'workflows', 'skills');
 const AGENTS = path.join(ROOT, 'workflows', 'agents');
@@ -47,12 +48,12 @@ function snapshot(dir: string): Record<string, string> {
 const hidden = (dir: string): string[] =>
   fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).filter((p) => path.basename(p).startsWith('.')) : [];
 
-/** `fn` refused with a `SkillWriteError` of kind `why`, whose message passes `said`, and the library as it was. */
-function refuses(fn: () => unknown, why: string, said: RegExp): void {
+/** `fn` refused as the kind `tag`, whose message passes `said`, and the library as it was. */
+function refuses(fn: () => unknown, tag: Refusal['_tag'], said: RegExp): void {
   const before = snapshot(LIBRARY);
   assert.throws(fn, (err: unknown) => {
-    assert.ok(err instanceof SkillWriteError, `a SkillWriteError, not ${String(err)}`);
-    assert.equal(err.why, why, err.message);
+    assert.ok(isRefusal(err), `a refusal, not ${String(err)}`);
+    assert.equal(err._tag, tag, err.message);
     assert.match(err.message, said);
     return true;
   });
@@ -200,7 +201,7 @@ test('a skill is made in the library, read by the store, and refused a second ti
   assert.deepEqual(hidden(LIBRARY), []);
   refuses(
     () => writeSkill(LIBRARY, { ...DRAFT, description: 'Something else.' }, { version: null }),
-    'exists',
+    'Conflict',
     /skills\/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it\./,
   );
 });
@@ -208,32 +209,32 @@ test('a skill is made in the library, read by the store, and refused a second ti
 test('a name that is not a folder-safe id is refused, and nothing is made', () => {
   fresh();
   for (const name of ['../escape', 'Upper', 'two words', 'trailing-', '', 'a'.repeat(65)]) {
-    refuses(() => writeSkill(LIBRARY, { ...DRAFT, name }, { version: null }), 'refused', /skill/);
+    refuses(() => writeSkill(LIBRARY, { ...DRAFT, name }, { version: null }), 'Invalid', /skill/);
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'escape')), false);
 });
 
 test('a frontmatter the card reader refuses is refused, and nothing is made or changed', () => {
   fresh();
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, description: '' }, { version: null }), 'refused', /has no `description:`/);
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, tags: [] }, { version: null }), 'refused', /`tags` is an empty list/);
+  refuses(() => writeSkill(LIBRARY, { ...DRAFT, description: '' }, { version: null }), 'Invalid', /has no `description:`/);
+  refuses(() => writeSkill(LIBRARY, { ...DRAFT, tags: [] }, { version: null }), 'Invalid', /`tags` is an empty list/);
   const { version } = writeSkill(LIBRARY, DRAFT, { version: null });
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, examples: [] }, { version }), 'refused', /`examples` is an empty list/);
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, title: 'a\nb' }, { version }), 'refused', /`title` holds a line break/);
+  refuses(() => writeSkill(LIBRARY, { ...DRAFT, examples: [] }, { version }), 'Invalid', /`examples` is an empty list/);
+  refuses(() => writeSkill(LIBRARY, { ...DRAFT, title: 'a\nb' }, { version }), 'Invalid', /`title` holds a line break/);
 });
 
 test('a place that is not a skills folder beside the workflows is refused, and a link is never written through', () => {
   fresh();
-  refuses(() => writeSkill(path.join(ROOT, 'workflows', 'elsewhere'), DRAFT, { version: null }), 'refused', /is not a folder of skills/);
+  refuses(() => writeSkill(path.join(ROOT, 'workflows', 'elsewhere'), DRAFT, { version: null }), 'Invalid', /is not a folder of skills/);
   refuses(
     () => writeSkill(path.join(scratch('wf-skill-nowhere-'), 'skills'), DRAFT, { version: null }),
-    'refused',
+    'Invalid',
     /is not the store's skills\/ .* Write it to one of the two/,
   );
   const outside = scratch('wf-skill-outside-');
   fs.mkdirSync(LIBRARY, { recursive: true });
   fs.symlinkSync(outside, path.join(LIBRARY, 'linked'));
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, name: 'linked' }, { version: null }), 'refused', /is a link/);
+  refuses(() => writeSkill(LIBRARY, { ...DRAFT, name: 'linked' }, { version: null }), 'Invalid', /is a link/);
   assert.deepEqual(fs.readdirSync(outside), []);
 });
 
@@ -243,7 +244,7 @@ test('REFUSED at shipped defaults: a skill written into the workflows/ of a chec
   const library = path.join(checkout, 'workflows', 'skills');
   refuses(
     () => writeSkill(library, DRAFT, { version: null }),
-    'refused',
+    'Invalid',
     /skills is not the store's skills\/ .* nor a repository's the store knows .* give its repository to a factory \(nemia factory add <name> --repo <repo>\)/,
   );
   assert.equal(fs.existsSync(path.join(library, DRAFT.name)), false, 'a .git beside it makes no repository known');
@@ -260,19 +261,19 @@ test('a change is written at the version it was read at, and refused once the sk
   assert.match(read('tidy-notes'), /\n---\nNew body\.\n$/);
   refuses(
     () => writeSkill(LIBRARY, { ...DRAFT, body: 'Lost.' }, { version }),
-    'stale',
+    'Conflict',
     /changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)\. Read it again/,
   );
   fs.writeFileSync(path.join(LIBRARY, 'tidy-notes', 'reference.md'), 'more');
   refuses(
     () => writeSkill(LIBRARY, { name: 'tidy-notes', preload: true }, { version: changed.version }),
-    'stale',
+    'Conflict',
     /changed since it was read/,
   );
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, name: 'gone' }, { version }), 'missing', /skills\/gone is not in .*: it was removed/);
+  refuses(() => writeSkill(LIBRARY, { ...DRAFT, name: 'gone' }, { version }), 'Missing', /skills\/gone is not in .*: it was removed/);
   refuses(
     () => writeSkill(LIBRARY, { name: 'new-one', preload: true }, { version: null }),
-    'refused',
+    'Invalid',
     /is a change of `preload:` alone, and there is no skill to change/,
   );
 });

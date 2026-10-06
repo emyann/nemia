@@ -2,7 +2,7 @@
  * What the CLI's verbs and runners share: the help, a verb's shape, a usage refusal, a person's yes.
  */
 import readline from 'node:readline/promises';
-import { Invalid, TABLE, helpOf, type engine } from '../runner.ts';
+import { CLI_VERBS, Invalid, TABLE, helpOf, type engine } from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
@@ -17,8 +17,7 @@ export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias 
 export const HELP = `nemia — run a workflow of agent steps
 
 ${helpOf(TABLE)}
-  nemia decide <runId> [--sensitive <globs>]
-                               what the run produced, and the choice it leaves you (nemia decide --help)
+${helpOf(CLI_VERBS)}
 
 A workflow is a folder of markdown files. One file is one step:
 

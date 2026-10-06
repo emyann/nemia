@@ -2,7 +2,7 @@
  * What the board's skill picker and skill page read and write: one skill folder read (`skillRead`), the skills an agent gives, each read
  * where a start finds it (`givenSkills`), the skill folders of a folder of skills (`skillFolders`), the first of several that has a skill
  * (`skillDirIn`), a SKILL.md's text (`skillText`); a skill copied whole from another folder of skills (`copySkill`), and a skill made or
- * changed (`writeSkill`), each write refused as `SkillWriteError`.
+ * changed (`writeSkill`), each write refused as `Missing`, `Conflict` or `Invalid`.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run
  * is changed by none of it: it froze its folder, and its agents' skills, at `nemia start`.
@@ -16,6 +16,7 @@ import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraf
 import { skillVersion } from '../folder/folder.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
+import { Conflict, Missing } from '../refusal/refusal.ts';
 
 /** One skill folder read now: its card entry, or null with `error` saying why no agent can be given it; and what it costs a turn. */
 export type SkillRead = {
@@ -104,18 +105,6 @@ export function skillText(dir: string): string {
   }
 }
 
-/**
- * A write of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), a skill that changed
- * since it was read (`stale`), or anything else judged.
- */
-export class SkillWriteError extends WorkflowError {
-  readonly why: 'missing' | 'exists' | 'stale' | 'refused';
-  constructor(message: string, why: SkillWriteError['why'] = 'refused') {
-    super(message);
-    this.why = why;
-  }
-}
-
 /** What `copySkill` did: the skill's folder where it now is, and its files by their path in it. */
 export type SkillCopied = { dir: string; name: string; written: string[] };
 
@@ -142,7 +131,7 @@ export function copySkill(from: string, to: string, name: string, { anywhere = f
   if (!fs.lstatSync(skillFile, { throwIfNoEntry: false })?.isFile()) {
     refuse(
       `${path.resolve(from)} has no skill named ${name}: a skill is a folder holding a SKILL.md, and ${skillFile} is not there.`,
-      'missing',
+      Missing,
     );
   }
   const files = (fs.readdirSync(source, { recursive: true }) as string[]).sort();
@@ -157,7 +146,7 @@ export function copySkill(from: string, to: string, name: string, { anywhere = f
   if (fs.lstatSync(target, { throwIfNoEntry: false })) {
     refuse(
       `${SKILLS_FOLDER}/${name} is there already, in ${at}, and a copy would write over it. Give it as it is, or remove that folder first.`,
-      'exists',
+      Conflict,
     );
   }
 
@@ -174,8 +163,15 @@ export function copySkill(from: string, to: string, name: string, { anywhere = f
   return { dir: target, name, written };
 }
 
-const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): void => {
-  if (why) throw new SkillWriteError(why, kind);
+/**
+ * A copy or a write of a skill refused, in the package's words: `words` thrown as `Missing` for a skill not there, as `Conflict` for a name
+ * already taken or a skill that changed since it was read, and as a `WorkflowError`, an `Invalid`, for anything else judged. Nothing is
+ * thrown for no words.
+ */
+const refuseSkill = (words: string | undefined, kind?: typeof Missing | typeof Conflict): void => {
+  if (!words) return;
+  if (kind) throw new kind({ message: words });
+  throw new WorkflowError(words);
 };
 
 /**
@@ -210,12 +206,12 @@ export type SkillWritten = { dir: string; name: string; version: string; written
  * version is digested into the version of every agent that gives it (`agentVersion`), so a change of it is a change of every one of them.
  *
  * Judged whole before a byte is written, each refusal by name: the place and the name as a copy judges them (`judgeSkillPlace`); a SKILL.md
- * that is not a file of the folder's own — a link — which the write would follow; for a skill made, a name already taken (`exists`), and a
- * change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`missing`) and one whose files moved
- * since the version was read (`stale`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words. A skill
- * whose SKILL.md does not read may be written — that is how it is mended — so only what is written must read. A skill made is written in a
- * hidden folder beside where it goes and renamed into place, and a change through a hidden file beside SKILL.md, so a write that fails
- * leaves no half a skill.
+ * that is not a file of the folder's own — a link — which the write would follow; for a skill made, a name already taken (a `Conflict`),
+ * and a change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`Missing`) and one whose files
+ * moved since the version was read (a `Conflict`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words,
+ * an `Invalid` as the rest are. A skill whose SKILL.md does not read may be written — that is how it is mended — so only what is written
+ * must read. A skill made is written in a hidden folder beside where it goes and renamed into place, and a change through a hidden file
+ * beside SKILL.md, so a write that fails leaves no half a skill.
  */
 export function writeSkill(
   to: string,
@@ -237,7 +233,7 @@ export function writeSkill(
     try {
       return whole ? renderSkill(change, was) : withPreload(file, was ?? '', change.preload);
     } catch (err) {
-      throw new SkillWriteError(err instanceof Error ? err.message : String(err));
+      throw new WorkflowError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -249,7 +245,7 @@ export function writeSkill(
     if (fs.lstatSync(target, { throwIfNoEntry: false })) {
       refuseSkill(
         `${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it.`,
-        'exists',
+        Conflict,
       );
     }
     const text = rendered();
@@ -265,10 +261,10 @@ export function writeSkill(
     }
   } else {
     if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile())
-      refuseSkill(`${named} is not in ${at}: it was removed. Write it again as a new skill.`, 'missing');
+      refuseSkill(`${named} is not in ${at}: it was removed. Write it again as a new skill.`, Missing);
     const now = skillVersion(target);
     if (now !== version)
-      refuseSkill(`${named} changed since it was read (version ${version}, now ${now}). Read it again before changing it.`, 'stale');
+      refuseSkill(`${named} changed since it was read (version ${version}, now ${now}). Read it again before changing it.`, Conflict);
     const text = rendered(fs.readFileSync(file, 'utf8'));
     const staging = path.join(target, `.SKILL.md.writing-${process.pid}-${Date.now()}`);
     try {

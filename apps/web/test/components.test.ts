@@ -59,7 +59,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
-const { StepPolicy, Told } = await import('../src/components/Told.tsx');
+const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
@@ -6390,6 +6390,21 @@ test("at a gate, the step's policy is drawn open: its words, the skills it adds,
     '',
     'a step with no agent has no policy over one',
   );
+});
+
+/** `StepBody` drawn as a server draws it. */
+const bodyMarkup = (body: string | null, layers: StepLayers | null): string =>
+  renderToStaticMarkup(createElement(StepBody, { body, layers }));
+
+test("REFUSED: a step whose run froze its layers draws no body above its fold, which says each of the body's words by layer", () => {
+  assert.equal(bodyMarkup('You are the writer.\n\nBe terse.\n\nWrite the note.', LAYERS), '', "an agent's step");
+  assert.equal(bodyMarkup('Read the note.', { ...LAYERS, agent: null, instructions: null, custom: null }), '', 'a step with no agent');
+});
+
+test('a step whose run froze no layers draws its body, all the record says of its words; an empty body draws nothing', () => {
+  assert.match(bodyMarkup('Write the **note**.', null), /<div data-markdown="true"[^>]*><p[^>]*>Write the <strong>note<\/strong>\.<\/p>/);
+  assert.equal(bodyMarkup(null, null), '');
+  assert.equal(bodyMarkup('', null), '');
 });
 
 /** `StepForm` for one step of `writer`'s, inside a router, with the listing's layers `layers`: its agent, a policy key and a wiring key. */

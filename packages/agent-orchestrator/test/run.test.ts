@@ -2764,7 +2764,7 @@ test('REFUSED where it would not be honoured: `nemia decide` gives a blocked ste
   assert.deepEqual(answerLines(STEPS, r, { kind: 'running', waiting: ['implement'] }, p, blocked, asked), {}, 'none for a run still going');
 });
 
-/** `findings`, strict — what `workflows/review.schema.json` declares. */
+/** `findings`, strict — as the tests' team's `test/fixtures/team/agents/review.schema.json` declares it. */
 const FINDINGS: OutputSchema = {
   type: 'object',
   properties: {
@@ -3168,7 +3168,7 @@ test("`nemia decide` tells apart why a declared file is missing — each refusal
   assert.deepEqual(artifactLines(FILES, [], []), [], 'nothing missing and no files: nothing to say');
 });
 
-/** `findings` and `again`: what a looping review declares, as `workflows/review.schema.json` does. */
+/** `findings` and `again`: what a looping review declares, as the tests' team's `test/fixtures/team/agents/review.schema.json` does. */
 const LOOPING: OutputSchema = {
   ...FINDINGS,
   properties: { ...FINDINGS.properties, again: { type: 'boolean' } },

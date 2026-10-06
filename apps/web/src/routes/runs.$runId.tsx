@@ -7,7 +7,7 @@ import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
 import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, unreadRows, when } from '../components/Facts';
 import { StepPageLink } from '../components/StepParts';
-import { StepPolicy, Told } from '../components/Told';
+import { StepBody, StepPolicy, Told } from '../components/Told';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { RunGone } from '../components/RunGone';
@@ -17,6 +17,7 @@ import { StartedFrom } from '../components/TryTag';
 import { FavoriteStar } from '../components/FavoriteStar';
 import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
+import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
 import { loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
@@ -146,6 +147,7 @@ function Run({ run }: { run: RunDetail }) {
           )}
           <StartedFrom run={run} />
           {run.try && <RemoveRun id={run.id} />}
+          <HoldRun run={run} />
           <PruneRun run={run} />
         </div>
       </header>
@@ -239,6 +241,9 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
 /**
  * One step's section: its state, its spec, its check, what it is told, its facts, its files, then its gate or what it handed on.
  *
+ * What it is told is said once: where its run froze its layers, by layer in the fold (`Told`) alone, its agent's instructions, the
+ * person's custom instructions, its policy and its task; where it froze none, its body (`StepBody`) above the fold of its brief whole.
+ *
  * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
  * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a permission
  * rule names it, which is what its work may be short of; why the runtime could not read its session alone, where it could not, in its
@@ -294,7 +299,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       {step.check && <Check check={step.check} />}
 
-      {step.body && <Markdown className="text-sm">{step.body}</Markdown>}
+      <StepBody body={step.body} layers={step.layers} />
 
       <Told told={step.told} layers={step.layers} parts={step.taskParts} filed={step.taskId !== null} />
       <StepPageLink page={run.workflowPage} step={step.name} />

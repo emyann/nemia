@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { ReadRefusal, send, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
-import { liftHold, pruneRun, removeRun } from '../src/lib/api/runs.ts';
+import { liftHold, pruneRun, putHold, removeRun } from '../src/lib/api/runs.ts';
 import { acceptLoop, approveStep, askRound, askTry, sayToStep } from '../src/lib/api/asks.ts';
 import { dropCard, fileCard, queueCard } from '../src/lib/api/inbox.ts';
 import { AgentRefusal, createAgent, removeAgent, tryAgent, type AgentDraft } from '../src/lib/api/agents.ts';
@@ -138,6 +138,32 @@ test("REFUSED: runs — a prune whose left is a count, a removal whose removed i
   const refused = await rejection(removeRun('r-1'));
   assert.ok(refused instanceof WriteRefusal && refused.status === 409, String(refused));
   assert.equal(refused.message, 'r-1 is still running: cancel it first.');
+});
+
+test('runs: a hold is put with the runs it waits on and its why, a blank why not sent, and resolves with the hold the api wrote', async (t) => {
+  const hold = { at: '2026-10-06T12:00:00.000Z', until: ['a-1', 'b-2'], why: 'conflicts', by: 'ann' };
+  const sent = answering(t, { id: 'r-1', lifted: false, hold, file: '/runs/r-1.hold' });
+  assert.deepEqual(await putHold('r 1', ['a-1', 'b-2'], 'conflicts'), { id: 'r-1', lifted: false, hold });
+  assert.deepEqual(
+    [sent[0]?.url, sent[0]?.init?.method, sent[0]?.init?.body],
+    ['/api/runs/r%201/hold', 'POST', '{"until":["a-1","b-2"],"why":"conflicts"}'],
+  );
+  const blank = answering(t, { id: 'r-1', lifted: false, hold: { at: 'now', until: ['a-1'] } });
+  assert.deepEqual(await putHold('r-1', ['a-1'], '  '), { id: 'r-1', lifted: false, hold: { at: 'now', until: ['a-1'] } });
+  assert.equal(blank[0]?.init?.body, '{"until":["a-1"]}');
+});
+
+test("REFUSED: runs — a hold answered as lifted, or without the runs it waits on, is unread; a refusal in the package's words", async (t) => {
+  answering(t, { id: 'r-1', lifted: true, hold: { at: 'now', until: ['a-1'] } });
+  const lifted = await rejection(putHold('r-1', ['a-1'], ''));
+  assert.ok(lifted instanceof UnreadAnswer && lifted.message.includes('at lifted, the value is true'), String(lifted));
+  answering(t, { id: 'r-1', lifted: false, hold: { at: 'now' } });
+  const bare = await rejection(putHold('r-1', ['a-1'], ''));
+  assert.ok(bare instanceof UnreadAnswer && bare.message.includes('before holding it again.'), String(bare));
+  answering(t, { error: 'r-1 waits on a-1, and a-1 already waits on r-1.' }, 409);
+  const refused = await rejection(putHold('r-1', ['a-1'], ''));
+  assert.ok(refused instanceof WriteRefusal && refused.status === 409, String(refused));
+  assert.equal(refused.message, 'r-1 waits on a-1, and a-1 already waits on r-1.');
 });
 
 test("REFUSED: asks — an approval whose time is a number; the api's 422 kept word for word", async (t) => {

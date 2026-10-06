@@ -13,14 +13,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { agentNameRefusal, parseAgent, renderAgent, WorkflowError, type Agent, type AgentDraft } from '../src/workflow.ts';
+import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
 import { agentUsers, agentVersion, loadAgents, loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-agent-');
 process.env.WF_ROOT = ROOT;
-const { addFactory, AgentWriteError, agentSkillsFound, removeAgent, writeAgent } = await import('../src/runner.ts');
+const { addFactory, agentSkillsFound, isRefusal, removeAgent, writeAgent } = await import('../src/runner.ts');
+type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const STORE = path.join(ROOT, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
@@ -45,8 +46,8 @@ function snapshot(dir: string): Record<string, string> {
   );
 }
 
-/** `fn` refused with a message `pattern` matches, and the store as it was. */
-function refused(fn: () => unknown, pattern: RegExp, why?: string): InstanceType<typeof AgentWriteError> {
+/** `fn` refused as the kind `tag`, with a message `pattern` matches, and the store as it was. */
+function refused(fn: () => unknown, pattern: RegExp, tag: Refusal['_tag'] = 'Invalid'): Refusal {
   const before = snapshot(STORE);
   let caught: unknown;
   try {
@@ -54,14 +55,11 @@ function refused(fn: () => unknown, pattern: RegExp, why?: string): InstanceType
   } catch (err) {
     caught = err;
   }
-  assert.ok(
-    caught instanceof WorkflowError,
-    `expected a refusal matching ${pattern}, got ${caught === undefined ? 'none' : String(caught)}`,
-  );
+  assert.ok(isRefusal(caught), `expected a refusal matching ${pattern}, got ${caught === undefined ? 'none' : String(caught)}`);
   assert.match(caught.message, pattern);
-  if (why !== undefined) assert.equal((caught as InstanceType<typeof AgentWriteError>).why, why);
+  assert.equal(caught._tag, tag, caught.message);
   assert.deepEqual(snapshot(STORE), before, 'a refused write leaves the store as it was');
-  return caught as InstanceType<typeof AgentWriteError>;
+  return caught;
 }
 
 /** An agent's draft: `skills:` is the agent's own line, carried as the file writes it; what the agent can do is generated from it. */
@@ -173,9 +171,9 @@ test('an edit carries the version it read, and a stale one is refused', () => {
   refused(
     () => writeAgent(AGENTS, scribe, { version }),
     /^agents\/scribe\.md changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)/,
-    'stale',
+    'Conflict',
   );
-  refused(() => removeAgent(AGENTS, 'scribe', { version }), /^agents\/scribe\.md changed since it was read/, 'stale');
+  refused(() => removeAgent(AGENTS, 'scribe', { version }), /^agents\/scribe\.md changed since it was read/, 'Conflict');
 });
 
 test("with `repo`, a write's and a removal's version is read with the skills a start there finds, as the board lists it", () => {
@@ -198,14 +196,14 @@ test("with `repo`, a write's and a removal's version is read with the skills a s
   refused(
     () => writeAgent(AGENTS, courier, { version: agentVersion(AGENTS, 'courier')!, repo }),
     /^agents\/courier\.md changed since it was read/,
-    'stale',
+    'Conflict',
   );
   const saved = writeAgent(AGENTS, { ...courier, description: 'Carries notes on.' }, { version: listed!, repo });
   fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: pass-a-note\ndescription: Hands a note along.\n---\nHand it on.\n');
   refused(
     () => removeAgent(AGENTS, 'courier', { version: saved.version, repo }),
     /^agents\/courier\.md changed since it was read/,
-    'stale',
+    'Conflict',
   );
   const now = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo))!;
   assert.deepEqual(removeAgent(AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
@@ -213,9 +211,13 @@ test("with `repo`, a write's and a removal's version is read with the skills a s
 
 test('a new agent over one that is there, and an edit of one that is not, are refused', () => {
   fresh();
-  refused(() => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version: null }), /^agents\/reviewer\.md is there already/, 'exists');
-  refused(() => writeAgent(AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'missing');
-  refused(() => removeAgent(AGENTS, 'scribe', { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'missing');
+  refused(
+    () => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version: null }),
+    /^agents\/reviewer\.md is there already/,
+    'Conflict',
+  );
+  refused(() => writeAgent(AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
+  refused(() => removeAgent(AGENTS, 'scribe', { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
 });
 
 test("a write refuses what the parser refuses, in the parser's words", () => {
@@ -315,14 +317,14 @@ test('a remove or a rename of an agent a step still names is refused, naming the
   const err = refused(
     () => removeAgent(AGENTS, 'reviewer', { version: reviewer }),
     /^agents\/reviewer\.md is named by a step beside it — dev\/review — and removing it would leave it naming an agent that is not there/,
-    'in-use',
+    'Conflict',
   );
-  assert.deepEqual(err.users, ['dev/review']);
+  assert.deepEqual(err._tag === 'Conflict' && err.users, ['dev/review']);
   const reviewerAgent = loadAgents(AGENTS).get('reviewer') as Agent;
   refused(
     () => writeAgent(AGENTS, { ...draftOf(reviewerAgent), name: 'critic' }, { version: reviewer, from: 'reviewer' }),
     /^agents\/reviewer\.md is named by a step beside it — dev\/review — and renaming it to critic would/,
-    'in-use',
+    'Conflict',
   );
   fs.mkdirSync(path.join(STORE, 'broken'));
   fs.writeFileSync(path.join(STORE, 'broken', 'a.md'), '---\n  agent : reviewer\nafter: nowhere\n---\nx\n');
@@ -331,7 +333,7 @@ test('a remove or a rename of an agent a step still names is refused, naming the
     ['broken/a', 'dev/review'],
     "a folder that does not load still counts: its step is broken by the agent's going all the same, and `agent : x` names x",
   );
-  refused(() => removeAgent(AGENTS, 'reviewer', { version: reviewer }), /named by 2 steps beside it — broken\/a, dev\/review/, 'in-use');
+  refused(() => removeAgent(AGENTS, 'reviewer', { version: reviewer }), /named by 2 steps beside it — broken\/a, dev\/review/, 'Conflict');
 });
 
 test('a rename writes the new file and removes the old; onto another agent it is refused', () => {
@@ -340,7 +342,7 @@ test('a rename writes the new file and removes the old; onto another agent it is
   refused(
     () => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version, from: 'scribe' }),
     /^agents\/reviewer\.md is there already, and renaming scribe to it/,
-    'exists',
+    'Conflict',
   );
   refused(
     () => writeAgent(AGENTS, { ...scribe, name: 'x' }, { version: null, from: 'scribe' }),

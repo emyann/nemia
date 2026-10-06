@@ -1,7 +1,6 @@
 /**
  * The git `.claude/settings.json` allows every session in this checkout, and so the whole of the git a `dontAsk` planner or reviewer
- * may run: git's read-only verbs, and nothing that writes, runs a program or moves a ref (`workflows/dev/README.md`, *What git a fenced
- * step may run*).
+ * may run: git's read-only verbs, and nothing that writes, runs a program or moves a ref: `READS`.
  *
  * An allow rule matches by prefix, so the fence is the list itself: a `Bash(git …)` allow that is not on `READS` fails, and `READS` is held
  * against the verbs that write, run a program or reach past the step's own directory, so the list cannot grow one either.

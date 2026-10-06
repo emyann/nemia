@@ -154,7 +154,10 @@ it: a finished run judged at rest on a full pass is answered from its memo while
 its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest/rest.ts`, `restMemo` in
 `src/tick/tick.verb.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
 restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
-(`WF_VERIFY_REST`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
+(`WF_VERIFY_REST`). Beside it, on the same memo, the pass's `standing` keeps what it last read of each result branch against
+its run's `baseRef`, keyed by two commit ids — the commit judged and the `baseRef` — so a fact that never goes stale; the place believes it
+only while the branch's commit is still the one judged, and a restart asks every `baseRef` once (`StandingMemo` in
+`src/standing/standing.verb.ts`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
 while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
 `src/stats/stats.verb.ts`), and the board's list of runs one more: each finished run's summary, while its record, its files in the
 store, its tasks on the feed and its branches' tips stand (`RestingMemo` in `src/rest/resting.verb.ts`, read by the list's `runs` entry

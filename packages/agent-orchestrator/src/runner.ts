@@ -292,17 +292,8 @@ export { branchStandings, parentRecord, resultBranches, type BranchReader } from
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/rest.ts';
-export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';
-export {
-  copySkill,
-  givenSkills,
-  skillDirIn,
-  skillFolders,
-  skillRead,
-  skillText,
-  SkillWriteError,
-  writeSkill,
-} from './skills/skills.store.ts';
+export { removeAgent, writeAgent } from './agents/agents.store.ts';
+export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { readPlaceJson, runPlaceVerb } from './place/place.store.ts';
 export { briefNow } from './tick/told.verb.ts';
 export type {
@@ -428,7 +419,7 @@ export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './fac
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
-export { CLI, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
+export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';

@@ -231,8 +231,8 @@ test("a read the api refused still rejects in the api's words and status, not as
 });
 
 /**
- * What `unschemedReads` found: a line per read or write that passes no schema, how many reads through `get` pass one (`schemed`), and how
- * many writes through `send` do (`sent`).
+ * What `unschemedReads` found: a line per read or write that passes no schema, how many reads through `get` or a wrapper of it pass one
+ * (`schemed`), and how many writes through `send` or a wrapper of it do (`sent`).
  */
 type ReadScan = { faults: string[]; schemed: number; sent: number };
 
@@ -258,9 +258,22 @@ const isWrite = (call: ts.CallExpression) => {
   );
 };
 
-/** Whether `schema` decodes nothing: `Schema.Unknown` or `Schema.Any`, which take any answer as read. */
-const decodesNothing = (schema: ts.Expression | undefined) =>
-  !schema || (ts.isPropertyAccessExpression(schema) && ['Unknown', 'Any'].includes(schema.name.text));
+/** `argument` without the parentheses, casts and assertions around it (`(x)`, `x as T`, `x!`, `x satisfies T`), as a scan reads it. */
+const bare = (argument: ts.Expression | undefined): ts.Expression | undefined =>
+  argument &&
+  (ts.isParenthesizedExpression(argument) ||
+  ts.isAsExpression(argument) ||
+  ts.isTypeAssertionExpression(argument) ||
+  ts.isNonNullExpression(argument) ||
+  ts.isSatisfiesExpression(argument)
+    ? bare(argument.expression)
+    : argument);
+
+/** Whether `argument` decodes nothing: `Schema.Unknown` or `Schema.Any`, which take any answer as read, however cast. */
+const decodesNothing = (argument: ts.Expression | undefined) => {
+  const schema = bare(argument);
+  return !schema || (ts.isPropertyAccessExpression(schema) && ['Unknown', 'Any'].includes(schema.name.text));
+};
 
 /** The names `seam` of read.ts (`get` or `send`) is bound to in `source`: the seam's own, or what `import { get as … }` calls it. */
 function readNames(source: ts.SourceFile, seam: 'get' | 'send'): Set<string> {
@@ -274,14 +287,123 @@ function readNames(source: ts.SourceFile, seam: 'get' | 'send'): Set<string> {
   return names;
 }
 
+/**
+ * A function a read or write is called through, by the name `source` calls it: read.ts's `get` or `send`, or a wrapper that hands its
+ * schema on to one (`wraps`). `word` names it in a fault, `kind` says whether it reads or writes, and `at` is the index of its schema
+ * argument.
+ */
+type Seam = { word: string; kind: 'get' | 'send'; at: number; wraps: boolean };
+
+/** Whether `name` binds `text`: as the name itself (`plain`), or anywhere inside an object or array pattern. */
+const binds = (name: ts.BindingName, text: string): 'plain' | 'destructured' | undefined => {
+  if (ts.isIdentifier(name)) return name.text === text ? 'plain' : undefined;
+  const inner = name.elements.some((e) => !ts.isOmittedExpression(e) && binds(e.name, text) !== undefined);
+  return inner ? 'destructured' : undefined;
+};
+
+/**
+ * The function around `call` whose parameters bind `text`, the nearest first: the function, the index of the parameter, and whether that
+ * parameter is the name itself or destructured. Undefined when no function around the call takes `text` as a parameter.
+ */
+function bindingParameter(call: ts.CallExpression, text: string) {
+  for (let node: ts.Node = call.parent; !ts.isSourceFile(node); node = node.parent) {
+    if (!ts.isFunctionLike(node)) continue;
+    for (const [index, p] of node.parameters.entries()) {
+      const how = binds(p.name, text);
+      if (how) return { fn: node, index, how };
+    }
+  }
+  return undefined;
+}
+
+/** The name `fn` has of its own in its file, and its declaration: a function declaration's, or the variable an arrow or function is. */
+function ownName(fn: ts.SignatureDeclaration): { name: string; declaration: ts.Declaration } | undefined {
+  if (ts.isFunctionDeclaration(fn)) return fn.name && { name: fn.name.text, declaration: fn };
+  if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return undefined;
+  const at = fn.parent;
+  return ts.isVariableDeclaration(at) && at.initializer === fn && ts.isIdentifier(at.name)
+    ? { name: at.name.text, declaration: at }
+    : undefined;
+}
+
+/** Whether `name`, declared at `declaration`, leaves its file: an `export` on it, an `export { … }` or an `export default` of it. */
+function exported({ name, declaration }: { name: string; declaration: ts.Declaration }, source: ts.SourceFile): boolean {
+  if (ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Export) return true;
+  return source.statements.some(
+    (s) =>
+      (ts.isExportAssignment(s) && ts.isIdentifier(s.expression) && s.expression.text === name) ||
+      (ts.isExportDeclaration(s) &&
+        !s.moduleSpecifier &&
+        s.exportClause !== undefined &&
+        ts.isNamedExports(s.exportClause) &&
+        s.exportClause.elements.some((e) => (e.propertyName ?? e.name).text === name)),
+  );
+}
+
+/**
+ * Where a call of `seam` takes its schema from, when that schema is a parameter of a function around it: the wrapper the scan follows,
+ * by its name and the index of that parameter, or `'unfollowed'` for a function it cannot follow (no name of its own, exported, or the
+ * parameter destructured). Undefined when the schema is no parameter.
+ */
+function handedOn(call: ts.CallExpression, seam: Seam, source: ts.SourceFile): { wrapper: string; at: number } | 'unfollowed' | undefined {
+  const schema = bare(call.arguments[seam.at]);
+  if (!schema || !ts.isIdentifier(schema)) return undefined;
+  const bound = bindingParameter(call, schema.text);
+  if (!bound) return undefined;
+  const own = ownName(bound.fn);
+  if (bound.how !== 'plain' || !own || exported(own, source)) return 'unfollowed';
+  return { wrapper: own.name, at: bound.index };
+}
+
+/** The seam `node` calls, when it is a call of one by name. */
+const seamOf = (node: ts.Node, seams: ReadonlyMap<string, Seam>) =>
+  ts.isCallExpression(node) && ts.isIdentifier(node.expression) ? seams.get(node.expression.text) : undefined;
+
+/**
+ * The seams of `source`: the names read.ts's `get` and `send` are bound to, and every wrapper of one, of a wrapper of one, and so on, that
+ * hands a schema parameter on to it, with its schema at that parameter's index.
+ */
+function seamsOf(source: ts.SourceFile): Map<string, Seam> {
+  const seams = new Map<string, Seam>();
+  for (const name of readNames(source, 'get')) seams.set(name, { word: 'get', kind: 'get', at: 1, wraps: false });
+  for (const name of readNames(source, 'send')) seams.set(name, { word: 'send', kind: 'send', at: 2, wraps: false });
+  for (let grew = true; grew;) {
+    grew = false;
+    const visit = (node: ts.Node): void => {
+      const seam = seamOf(node, seams);
+      const from = seam && ts.isCallExpression(node) ? handedOn(node, seam, source) : undefined;
+      if (seam && typeof from === 'object' && !seams.has(from.wrapper)) {
+        seams.set(from.wrapper, { word: from.wrapper, kind: seam.kind, at: from.at, wraps: true });
+        grew = true;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return seams;
+}
+
+/**
+ * Whether `name` is a function used as a value: anywhere but the callee of a call, its own declaration's name, or a property's name
+ * (`api.write`, `{ write: … }`), as an alias, a property's value or an argument is.
+ */
+function usedAsValue(name: ts.Identifier): boolean {
+  const at = name.parent;
+  if (ts.isCallExpression(at) && at.expression === name) return false;
+  if ((ts.isVariableDeclaration(at) || ts.isFunctionDeclaration(at)) && at.name === name) return false;
+  return !((ts.isPropertyAccessExpression(at) || ts.isPropertyAssignment(at)) && at.name === name);
+}
+
 const GET_FIX = 'decode the read through `get(path, schema)` (lib/api/read.ts), with a schema beside its type';
 const SEND_FIX = 'decode the answer through `send(method, path, schema, how)` (lib/api/read.ts), with a schema beside its type';
 
 /**
  * Every read or write in `texts` (a file's path under src/ to its text) that passes no schema: any `fetch` outside read.ts, a GET or a
  * write; a `get` of read.ts with no schema or one that decodes nothing, a `send` of read.ts the same by its third argument, and any
- * `getUndecoded`. Each fault names the file and the line, and says to decode through `get(path, schema)` or `send(method, path, schema,
- * how)`.
+ * `getUndecoded`. A wrapper in the same file that hands its schema parameter on to `get` or `send` is held the same at each of its calls,
+ * by that argument, and its call inside is counted nowhere; a schema parameter handed on from a function the scan cannot follow — no name
+ * of its own, exported, or destructured — is refused where it is handed on, and a wrapper used as a value where it is so used. Each fault
+ * names the file and the line, and says to decode through `get(path, schema)` or `send(method, path, schema, how)`.
  */
 export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
   const scan: ReadScan = { faults: [], schemed: 0, sent: 0 };
@@ -293,8 +415,7 @@ export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
       true,
       file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
-    const gets = readNames(source, 'get');
-    const sends = readNames(source, 'send');
+    const seams = seamsOf(source);
     const fault = (node: ts.Node, what: string, fix: string) =>
       scan.faults.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: ${what}: ${fix}`);
     const visit = (node: ts.Node): void => {
@@ -303,17 +424,26 @@ export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
         if (isWrite(node)) fault(node, 'a write by fetch reads its answer undecoded', SEND_FIX);
         else fault(node, 'a GET by fetch reads an answer undecoded', GET_FIX);
       }
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && gets.has(node.expression.text)) {
-        if (decodesNothing(node.arguments[1]))
-          fault(node, 'a get that passes no schema, or one that decodes nothing, reads an answer undecoded', GET_FIX);
-        else scan.schemed += 1;
-      }
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && sends.has(node.expression.text)) {
-        if (decodesNothing(node.arguments[2]))
-          fault(node, 'a send that passes no schema, or one that decodes nothing, reads its answer undecoded', SEND_FIX);
-        else scan.sent += 1;
+      const seam = seamOf(node, seams);
+      if (seam && ts.isCallExpression(node)) judge(node, seam);
+      const named = ts.isIdentifier(node) ? seams.get(node.text) : undefined;
+      if (named?.wraps && ts.isIdentifier(node) && usedAsValue(node)) {
+        const [answer, fix] = named.kind === 'get' ? ['an answer', GET_FIX] : ['its answer', SEND_FIX];
+        fault(node, `a ${named.word} used as a value is a wrapper the scan cannot follow, and reads ${answer} undecoded`, fix);
       }
       ts.forEachChild(node, visit);
+    };
+    const judge = (call: ts.CallExpression, seam: Seam) => {
+      const [answer, fix] = seam.kind === 'get' ? ['an answer', GET_FIX] : ['its answer', SEND_FIX];
+      const from = handedOn(call, seam, source);
+      if (typeof from === 'object') return;
+      if (from === 'unfollowed') {
+        const cannot = 'whose schema is a parameter of a function the scan cannot follow (no name of its own, exported, or destructured)';
+        fault(call, `a ${seam.word} ${cannot} reads ${answer} undecoded`, fix);
+      } else if (decodesNothing(call.arguments[seam.at]))
+        fault(call, `a ${seam.word} that passes no schema, or one that decodes nothing, reads ${answer} undecoded`, fix);
+      else if (seam.kind === 'get') scan.schemed += 1;
+      else scan.sent += 1;
     };
     visit(source);
   }
@@ -400,6 +530,160 @@ test('a get and a send with their schema, and the fetch inside read.ts, are no u
     ['lib/api/d.ts', "import { get, send } from '@tanstack/whatever';\nexport const d = () => [get('/api/x'), send('POST', '/x')];"],
   ]);
   assert.deepEqual(unschemedReads(texts), { faults: [], schemed: 1, sent: 1 });
+});
+
+/** A file's wrapper of `send`, as agents.ts writes one: its schema is its third parameter, handed on to `send`. */
+const AGENT_WRITE = [
+  "import { send } from './read.ts';",
+  "import { Schema } from 'effect';",
+  'const agentWrite = <T>(method: string, route: string, schema: Schema.Decoder<T>, body: unknown) =>',
+  "  send(method, route, schema, { body, may: 'M.' });",
+].join('\n');
+
+test('REFUSED: a wrapper that hands its schema to send, called with Schema.Unknown and with Schema.Any, at each call', () => {
+  const texts = new Map([
+    [
+      'lib/api/w.ts',
+      `${AGENT_WRITE}
+export const a = (route: string, body: unknown) => agentWrite('DELETE', route, Schema.Unknown, body);
+export const b = () => agentWrite('PUT', '/api/x', Schema.Any, {});`,
+    ],
+    [
+      'lib/api/o.ts',
+      `import { send } from './read.ts';
+const outer = <T>(schema: Schema.Decoder<T>) => agentWrite('POST', '/api/y', schema, {});
+${AGENT_WRITE.split('\n').slice(1).join('\n')}
+export const c = () => outer(Schema.Unknown);`,
+    ],
+  ]);
+  const { faults } = unschemedReads(texts);
+  assert.deepEqual(
+    faults.map((f) => f.slice(0, f.indexOf(': decode'))),
+    [
+      'lib/api/w.ts:5: a agentWrite that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/w.ts:6: a agentWrite that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/o.ts:6: a outer that passes no schema, or one that decodes nothing, reads its answer undecoded',
+    ],
+  );
+  assert.ok(
+    faults.every((f) => f.endsWith(`: ${SEND_FIX}`)),
+    faults.join('\n'),
+  );
+});
+
+test('REFUSED: a function that hands its schema to get, called with no schema', () => {
+  const texts = new Map([
+    [
+      'lib/api/r.ts',
+      `import { get } from './read.ts';
+function read<T>(path: string, schema: Schema.Decoder<T>) {
+  return get(path, schema);
+}
+export const r = () => read('/api/x');`,
+    ],
+  ]);
+  assert.deepEqual(unschemedReads(texts), {
+    faults: [`lib/api/r.ts:5: a read that passes no schema, or one that decodes nothing, reads an answer undecoded: ${GET_FIX}`],
+    schemed: 0,
+    sent: 0,
+  });
+});
+
+test('REFUSED: a schema cast, parenthesised or asserted on its way to send, by a wrapper or its caller', () => {
+  const texts = new Map([
+    [
+      'lib/api/c.ts',
+      `import { send } from './read.ts';
+import { Schema } from 'effect';
+const cast = <T>(route: string, schema: Schema.Decoder<T>) => send('PUT', route, (schema as Schema.Decoder<T>), how);
+export const a = () => cast('/api/x', Schema.Unknown);
+export const b = () => cast('/api/x', Schema.Any as never);
+const sure = <T>(schema: Schema.Decoder<T>) => send('PUT', '/api/x', schema!, how);
+export const c = () => sure((Schema.Unknown));
+export const d = () => send('POST', '/api/x', Schema.Unknown satisfies unknown, how);`,
+    ],
+  ]);
+  const { faults } = unschemedReads(texts);
+  assert.deepEqual(
+    faults.map((f) => f.slice(0, f.indexOf(': decode'))),
+    [
+      'lib/api/c.ts:4: a cast that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/c.ts:5: a cast that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/c.ts:7: a sure that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/c.ts:8: a send that passes no schema, or one that decodes nothing, reads its answer undecoded',
+    ],
+  );
+});
+
+test('REFUSED: a wrapper used as a value, by an alias, a property or a shorthand, where it is used', () => {
+  const texts = new Map([
+    [
+      'lib/api/u.ts',
+      `${AGENT_WRITE}
+const w = agentWrite;
+export const x = () => w('DELETE', '/api/x', Schema.Unknown, {});
+const api = { write: agentWrite };
+export const y = () => api.write('PUT', '/api/x', Schema.Any, {});
+export const z = { agentWrite };`,
+    ],
+  ]);
+  const value = 'a agentWrite used as a value is a wrapper the scan cannot follow, and reads its answer undecoded';
+  assert.deepEqual(unschemedReads(texts), {
+    faults: [`lib/api/u.ts:5: ${value}: ${SEND_FIX}`, `lib/api/u.ts:7: ${value}: ${SEND_FIX}`, `lib/api/u.ts:9: ${value}: ${SEND_FIX}`],
+    schemed: 0,
+    sent: 0,
+  });
+});
+
+test('a wrapper that hands its schema to get or send, called with a named schema, is no fault and counts one read or write', () => {
+  const texts = new Map([
+    ['lib/api/w.ts', `${AGENT_WRITE}\nexport const a = () => agentWrite('PUT', '/api/x', AgentSavedSchema, {});`],
+    [
+      'lib/api/r.ts',
+      `import { get } from './read.ts';
+function read<T>(path: string, schema: Schema.Decoder<T>) {
+  return get(path, schema);
+}
+export const r = () => read('/api/x', XSchema);`,
+    ],
+  ]);
+  assert.deepEqual(unschemedReads(texts), { faults: [], schemed: 1, sent: 1 });
+});
+
+test('REFUSED: a schema parameter handed to get or send from a function the scan cannot follow', () => {
+  const texts = new Map([
+    [
+      'lib/api/x.ts',
+      `import { send } from './read.ts';
+export const write = <T>(schema: Schema.Decoder<T>) => send('POST', '/api/x', schema, how);`,
+    ],
+    ['lib/api/y.ts', "import { get } from './read.ts';\nexport const y = () => [XSchema].map((schema) => get('/api/x', schema));"],
+    [
+      'lib/api/z.ts',
+      `import { send } from './read.ts';
+const w = ({ schema }: { schema: Schema.Decoder<unknown> }) => send('POST', '/api/x', schema, how);
+export const z = () => w({ schema: XSchema });`,
+    ],
+    [
+      'lib/api/v.ts',
+      `import { send } from './read.ts';
+function put<T>(schema: Schema.Decoder<T>) {
+  return send('PUT', '/api/v', schema, how);
+}
+export { put };`,
+    ],
+  ]);
+  const cannot = 'whose schema is a parameter of a function the scan cannot follow (no name of its own, exported, or destructured)';
+  assert.deepEqual(unschemedReads(texts), {
+    faults: [
+      `lib/api/x.ts:2: a send ${cannot} reads its answer undecoded: ${SEND_FIX}`,
+      `lib/api/y.ts:2: a get ${cannot} reads an answer undecoded: ${GET_FIX}`,
+      `lib/api/z.ts:2: a send ${cannot} reads its answer undecoded: ${SEND_FIX}`,
+      `lib/api/v.ts:3: a send ${cannot} reads its answer undecoded: ${SEND_FIX}`,
+    ],
+    schemed: 0,
+    sent: 0,
+  });
 });
 
 /** Every `.ts` and `.tsx` under `dir`, by its path from src/. */

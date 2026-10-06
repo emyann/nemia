@@ -52,6 +52,14 @@ test('REFUSED: each kind thrown in a mounted router is answered its status, in i
   }
 });
 
+test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
+  const thrown = new Conflict({ message: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] });
+  assert.deepEqual(await answered(thrown), {
+    status: 409,
+    body: { error: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] },
+  });
+});
+
 test('REFUSED: an Error carrying exitCode 2 by hand is no refusal — a 500, said on stderr — and so is any other error; an HTTPException answers its own', async (t) => {
   const byHand = await quietly(t, () => answered(Object.assign(new Error('refused by hand.'), { exitCode: 2 })));
   assert.deepEqual(byHand, { answer: { status: 500, body: { error: 'refused by hand.' } }, said: 1 });

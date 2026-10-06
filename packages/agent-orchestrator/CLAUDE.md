@@ -124,6 +124,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **The tick reads git through one `standing` a repository, place and base a pass** (`passStanding`, `standingReader`): a question it
   did not ask is `unread`, never asked again, so a new git read in the pass belongs in the ask (`asksOf`), held by
   `test/pass-reads.test.ts`.
+- **The pass tells `standing` what it last read of each branch (`known`, `StandingMemo`)**: a `baseRef` is listed only for a branch told
+  nothing, so a column added to the listing comes back on every pass unless the hint covers it (`test/standing.test.ts`).
 - **Only the tick writes `standing.json`**: a reader off the tick (`nemia ls`, the board's list) reads it (`standingSnapshot`), and a
   person's one-off verb asks the place live (`standingNow`, `standingLive`); neither runs git through a reader of its own.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).

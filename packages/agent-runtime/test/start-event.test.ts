@@ -151,6 +151,43 @@ test(
 );
 
 test(
+  'REFUSED: a start whose id is a number is why its session is unread, by its name, while its process runs, and on no look once it has ended',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-start-');
+    const marker = path.join(root, 'go');
+    const script = `${printed(threadStarted(12345))}; timeout 30 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`;
+    const ops = detachedOps(sh(script, CODEX_START), root);
+    await Effect.runPromise(ops.spawn({ name: 'ae/bad/1', brief: 'x', cwd: root }));
+    try {
+      await until(
+        t,
+        () => runFileOr(root, 'ae/bad/1').startRefused !== undefined,
+        () => `ae/bad/1 refused its start: its run file is ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`,
+        { everyMs: 100 },
+      );
+      const working = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
+      assert.deepEqual([...working.value.unread], ['ae/bad/1']);
+      assert.deepEqual([...(working.value.unreadWhy ?? [])], [['ae/bad/1', working.warnings[0]]], 'why, by its name, as it is warned');
+      for (const w of REFUSAL_WORDS) assert.match(working.value.unreadWhy?.get('ae/bad/1') ?? '', w);
+    } finally {
+      fs.writeFileSync(marker, '');
+    }
+    await until(
+      t,
+      () => runFileOr(root, 'ae/bad/1').state !== 'working',
+      () => `ae/bad/1 ended: its run file is ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`,
+      { everyMs: 100 },
+    );
+    const ended = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
+    assert.equal(ended.value.seen.get('ae/bad/1')?.state, 'failed');
+    assert.deepEqual([...ended.value.unread], []);
+    assert.equal(ended.warnings.length, 1, 'the refusal is still warned');
+    assert.equal(ended.value.unreadWhy, undefined, 'read as failed, so not unread, and no words of why it is');
+  },
+);
+
+test(
   'REFUSED: a start whose id is a number, once its process has ended, reads as failed with no id, and its task settles and is forgotten',
   WAITED,
   async (t) => {

@@ -847,7 +847,7 @@ test("an unchecked step's hand-off stops once the step after it works in the sam
   );
 });
 
-/** A strict `findings` schema, as `workflows/review.schema.json` has it. */
+/** A strict `findings` schema, as the tests' team's `test/fixtures/team/agents/review.schema.json` has it. */
 const FINDINGS = {
   type: 'object',
   properties: {
@@ -1656,7 +1656,7 @@ test('`nemia retry` takes one way to try, and `--model` with a name — anything
   }
 });
 
-/** `findings` and `again`, as `workflows/review.schema.json` declares them. */
+/** `findings` and `again`, as the tests' team's `test/fixtures/team/agents/review.schema.json` declares them. */
 const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { type: 'boolean' } }, required: ['findings', 'again'] };
 
 /**

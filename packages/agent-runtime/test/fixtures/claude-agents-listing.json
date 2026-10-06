@@ -43,5 +43,16 @@
     "sessionId": "cb203301-c3e3-4ea7-b8e4-bc767b4ffa15",
     "name": "ae/listed/5",
     "status": "busy"
+  },
+  {
+    "pid": 285997,
+    "id": "b1132587",
+    "cwd": "/work/6",
+    "kind": "background",
+    "startedAt": 1791247875328,
+    "sessionId": "b1132587-a141-4884-acd8-e44ffdca315b",
+    "name": "ae/listed/6",
+    "status": "busy",
+    "state": "done"
   }
 ]

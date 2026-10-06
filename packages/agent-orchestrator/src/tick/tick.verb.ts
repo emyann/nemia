@@ -32,7 +32,7 @@ import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../d
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
-import { headsFor, passStanding, standingReader } from '../standing/standing.verb.ts';
+import { freshStandingMemo, headsFor, passStanding, standingReader, type StandingMemo } from '../standing/standing.verb.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
@@ -235,7 +235,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
-  const standing = yield* passStanding(runs);
+  const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = {
     ...passRead(e, runs, process.env, standing),
     ...(resting?.memo.settled ? { settled: resting.memo.settled } : {}),
@@ -371,7 +371,9 @@ const passOf = (
  * `cursor`, where on the engine's feed the memo has read to: every task of every run appends to it (the runtime's journal), so an event for
  * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed. And `settled`, the
  * tasks the last read of the feed said settled (`settledIn`): a run with one is judged in full on the pass, which reads its facts
- * (`StepFact`), and its answer is kept without them, so a run answered from memory records none again.
+ * (`StepFact`), and its answer is kept without them, so a run answered from memory records none again. And `standing`, what the pass's
+ * `standing` last read of each result branch against its run's `baseRef` (`StandingMemo`), which the place believes only while the branch's
+ * commit is the one it was read of.
  *
  * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and reads
  * and judges every run afresh, and no verb, `nemia ls` or the api reads it. While a run's stamp holds, the pass is handed the memo's run in
@@ -381,10 +383,11 @@ export type RestMemo = {
   cursor?: number;
   runs: Map<string, { stamp: string; run: Run; tipped: string[]; advanced: Omit<Advanced, 'run' | 'facts'> }>;
   settled?: ReadonlySet<string>;
+  standing: StandingMemo;
 };
 
 /** A memo that holds nothing: what a daemon starts with, and what a test hands each pass to play a restart. */
-export const freshRestMemo = (): RestMemo => ({ runs: new Map() });
+export const freshRestMemo = (): RestMemo => ({ runs: new Map(), standing: freshStandingMemo() });
 
 /** Each engine's memo: one engine is one daemon's (`nemia up` makes one for all its passes), and one a test builds starts with none. */
 const memos = new WeakMap<Engine, RestMemo>();

@@ -131,14 +131,18 @@ test('followedFeed names each task settled since its last read, once; REFUSED: n
   feed.push({ taskId: 'now-review-1', event: { kind: 'ended' } });
   await runWith(e, followedFeed(e, memo));
   assert.deepEqual([...memo.settled!], ['now-work-1']);
-  await runWith(e, followedFeed(e, memo));
-  assert.deepEqual([...memo.settled!], [], 'a settle is named by one read alone');
   feed.push({ taskId: 'now-review-1', event: { kind: 'settled' } });
   broken = true;
   try {
     assert.equal(await runWith(e, followedFeed(e, memo)), false);
-    assert.deepEqual([...memo.settled!], [], 'a read that failed names none');
+    assert.deepEqual([...memo.settled!], [], 'a read that failed names none, not even what the read before it named');
   } finally {
     broken = false;
   }
+  await runWith(e, followedFeed(e, memo));
+  feed.push({ taskId: 'next-work-1', event: { kind: 'settled' } });
+  await runWith(e, followedFeed(e, memo));
+  assert.deepEqual([...memo.settled!], ['next-work-1']);
+  await runWith(e, followedFeed(e, memo));
+  assert.deepEqual([...memo.settled!], [], 'a settle is named by one read alone');
 });

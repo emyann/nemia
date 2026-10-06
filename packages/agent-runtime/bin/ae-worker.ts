@@ -7,7 +7,7 @@
  * and outlives the engine that started it, so anything clever in here is a thing that breaks
  * while nobody is watching.
  *
- * Its whole contract is the run file: `{ state, pid, heartbeatAt, beat, nativeId }`, rewritten as the
+ * Its whole contract is the run file: `{ state, pid, heartbeatAt, beat, nativeId, startRefused }`, rewritten as the
  * session moves and on a timer. The heartbeat is what makes "the worker was killed" observable —
  * a stopped session and a stalled one are indistinguishable on disk without it. That is the cost
  * of owning a registry, and owning a registry is the cost of being harness-agnostic.
@@ -44,10 +44,17 @@
  * the heartbeat, within five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine
  * is what it is for.
  *
+ * The harness's own id for its session (`nativeId`) is read from its start event (`HarnessSpec.start`): the first whole line of its
+ * stdout that is a JSON object whose own keys hold each of `start.event`'s values. Lines before it are passed over, so a key of the
+ * same name on another line is never taken for it, and stderr is not read for it. Its `start.id` field must be an id, a string of hex
+ * and dashes, 16 or more: otherwise the start is refused, `startRefused` naming the line, the field and what was there, and its session
+ * is unread, never read as having no id. A stream that ends with no start event keeps no id and no refusal: its harness never started a
+ * session.
+ *
  * The harness's environment is the worker's, with the plan's `env` over it. Its stdout and stderr both go to the log, in the order
  * they arrive; with `streams`, each also goes whole to a file of its own, the one place a reader finds one apart from the other.
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, nativeIdPattern?, input?, inputAt? }
+ * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -61,7 +68,7 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   env?: Record<string, string>;
   streams?: { stdout: string; stderr: string };
   stopFile?: string;
-  nativeIdPattern?: string;
+  start?: { event: Record<string, string>; id: string };
   pid?: number;
   input?: { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
   inputAt?: number;
@@ -89,6 +96,7 @@ let status = {
   heartbeatAt: new Date().toISOString(),
   beat: beatNow(),
   nativeId: undefined as string | undefined,
+  startRefused: undefined as { line: number; field: string; found: string } | undefined,
   exitCode: undefined as number | undefined,
   /** A harness started here has closed nothing yet, whatever the one before it did. */
   inputClosed: undefined as true | undefined,
@@ -192,8 +200,8 @@ if (!plan.pid && plan.stopFile && fs.existsSync(plan.stopFile)) {
  * 2. Every `INBOX_MS`, each whole line appended to the inbox past `inputAt` is written on, once `inputAt` says it has been; a
  *    line still being appended waits, and no inbox yet is nothing said. The inbox is cut into lines by bytes: a newline byte
  *    is never part of another character in UTF-8.
- * 3. The harness's stdout is read a line at a time, each parsed as JSON for `closesOn` — its `key` holding `value` — and
- *    never matched at its start. At the first such line `inputClosed` goes on the run file, so a word said from then on is
+ * 3. The harness's stdout is read a whole line at a time (`readers`), each parsed as JSON for `closesOn` — its own `key` holding
+ *    `value` — and never matched at its start. At the first such line `inputClosed` goes on the run file, so a word said from then on is
  *    refused rather than appended for nobody, and then stdin is ended: a harness that reads its stdin for more, as a job
  *    reading `--input-format stream-json` does, exits only once it ends.
  *
@@ -229,20 +237,68 @@ const endFiles = (done: () => void) => {
   for (const file of files) file.end(() => --left === 0 && done());
 };
 
-/** The harness's own id, found in its output when it prints one: needed only to resume its session; the run's name is the key. */
-const nativeId = plan.nativeIdPattern ? new RegExp(plan.nativeIdPattern) : null;
-const scan = (chunk: Buffer) => {
-  if (!log.writableEnded) log.write(chunk);
-  if (nativeId && !status.nativeId) {
-    const m = nativeId.exec(chunk.toString());
-    if (m?.[1]) write({ nativeId: m[1] });
+/**
+ * What reads the harness's stdout a whole line at a time: each is handed every line in order, as text, with its number from 1, and
+ * answers whether it reads on. Lines are cut on the newline byte, which is never part of another character in UTF-8, so the edge of a
+ * chunk splits neither a line nor a character; the last line, when no newline follows it, is handed at the stream's end, which comes
+ * before the drain that writes the run's end. Registered before the log is written, so what a line says is on the run file before the
+ * line is in the log.
+ */
+let readers: Array<(line: string, at: number) => boolean> = [];
+let held: Buffer[] = [];
+let lineAt = 0;
+const hand = (bytes: Buffer) => {
+  const line = bytes.toString('utf8');
+  lineAt++;
+  readers = readers.filter((read) => read(line, lineAt));
+};
+child.stdout!.on('data', (chunk: Buffer) => {
+  if (!readers.length) return;
+  let from = 0;
+  for (let nl = chunk.indexOf(0x0a); nl !== -1; nl = chunk.indexOf(0x0a, from)) {
+    hand(Buffer.concat([...held, chunk.subarray(from, nl)]));
+    held = [];
+    from = nl + 1;
   }
+  if (from < chunk.length) held.push(chunk.subarray(from));
+});
+child.stdout!.on('end', () => {
+  if (held.length && readers.length) hand(Buffer.concat(held));
+  held = [];
+});
+/** The JSON object `line` holds, or `undefined` for a line that holds none. */
+const objectIn = (line: string): Record<string, unknown> | undefined => {
+  try {
+    const o = JSON.parse(line) as unknown;
+    return typeof o === 'object' && o !== null && !Array.isArray(o) ? (o as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+/** What an id of a harness's own is: hex and dashes, 16 or more, the whole of the field. */
+const ID = /^[0-9a-f-]{16,}$/;
+const start = plan.start;
+if (start) {
+  readers.push((line, at) => {
+    const o = objectIn(line);
+    if (!o || !Object.entries(start.event).every(([k, v]) => Object.hasOwn(o, k) && o[k] === v)) return true;
+    const id = Object.hasOwn(o, start.id) ? o[start.id] : undefined;
+    if (typeof id === 'string' && ID.test(id)) write({ nativeId: id });
+    else {
+      const found = Object.hasOwn(o, start.id) ? JSON.stringify(id).slice(0, 200) : 'nothing';
+      write({ startRefused: { line: at, field: start.id, found } });
+    }
+    return false;
+  });
+}
+const toLog = (chunk: Buffer) => {
+  if (!log.writableEnded) log.write(chunk);
 };
 const keep = (file: fs.WriteStream | undefined) => (chunk: Buffer) => {
   if (file && !file.writableEnded) file.write(chunk);
 };
-child.stdout!.on('data', scan);
-child.stderr!.on('data', scan);
+child.stdout!.on('data', toLog);
+child.stderr!.on('data', toLog);
 child.stdout!.on('data', keep(whole?.stdout));
 child.stderr!.on('data', keep(whole?.stderr));
 
@@ -287,24 +343,14 @@ if (input) {
   inbox.unref?.();
 
   const { key, value } = input.closesOn;
-  let pending = '';
-  const closes = (line: string) => {
-    try {
-      const o = JSON.parse(line) as Record<string, unknown> | null;
-      return typeof o === 'object' && o !== null && o[key] === value;
-    } catch {
-      return false;
-    }
-  };
-  child.stdout!.on('data', (chunk: Buffer) => {
-    if (stdin.writableEnded) return;
-    pending += chunk.toString('utf8');
-    const lines = pending.split('\n');
-    pending = lines.pop()!;
-    if (!lines.some(closes)) return;
+  readers.push((line) => {
+    if (stdin.writableEnded) return false;
+    const o = objectIn(line);
+    if (!o || !Object.hasOwn(o, key) || o[key] !== value) return true;
     clearInterval(inbox);
     write({ inputClosed: true });
     stdin.end();
+    return false;
   });
 }
 

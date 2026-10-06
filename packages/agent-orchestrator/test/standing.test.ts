@@ -227,7 +227,7 @@ test('REFUSED: standing of no repository, and against a base git cannot read; un
 const BASES = 340;
 const BRANCHES = 560;
 
-/** What becomes of the result branch `i` of `manyBases()`: one in twenty each unmerged, gone and with nothing of its own, the rest merged. */
+/** What becomes of the result branch `i` of `manyBases()`: one in twenty each unmerged, gone and unchanged, the rest merged. */
 const kindOf = (i: number) => (['unmerged', 'gone', 'unchanged'] as const)[i % 20] ?? 'merged';
 
 /**

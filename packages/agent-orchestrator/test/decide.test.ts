@@ -315,6 +315,26 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
 });
 
+test('a place whose report is not heard: `nemia decide` says what the run changed is not known — touched, the lesson, in full and the branch — never that it changed nothing', async (t) => {
+  const { run, branch, e } = await awaiting();
+  const before = process.env.PATH;
+  process.env.PATH = scratch('wf-decide-no-git-');
+  let lines: string[];
+  try {
+    lines = await screen(t, e, run.id);
+  } finally {
+    process.env.PATH = before;
+  }
+  const unknown = "what this run changed is not known: the place's report was not heard: ";
+  const said = (prefix: string) => lines.filter((l) => l.startsWith(`${prefix}${unknown}`));
+  assert.equal(said(`  touched  ${branch}  —  `).length, 1, `with no git to run, the place's report exits 1:\n${lines.join('\n')}`);
+  assert.equal(said(`  ${branch}  — `).length, 1, "the branch's counts are not known, never none");
+  assert.ok(lines.includes(`  lesson  not known — ${branch} could not be read`), lines.join('\n'));
+  assert.ok(!lines.some((l) => /touched nothing|^\s+\(root\)/.test(l)), 'nothing is said as changed or unchanged');
+  const inFull = indexOf(lines, /^  ── in full: the check-affecting files/);
+  assert.ok(lines[inFull + 1]?.startsWith(unknown), `its files in full are not known either: ${lines[inFull + 1]}`);
+});
+
 test("`nemia decide` and `nemia ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {
   const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];

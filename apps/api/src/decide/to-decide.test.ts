@@ -3,7 +3,7 @@
  * the ending step's gate with the command that approves it, or a result branch nobody merged — and the facts under the result on
  * `GET /api/runs/:runId/decision`: where each branch stands, and how much it changed.
  *
- * The words are the package's (`toDecide`, `toDecideWords`, `branchWord`, `diffStat`), and the branches are read off a real repository.
+ * The words are the package's (`toDecide`, `toDecideWords`, `branchWord`, `countsLine`), and the branches are read off a real repository.
  * Every `git` the api runs is noted, so a test can say which runs one is asked about: the list is polled every five seconds.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
@@ -435,7 +435,7 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
         where: 'ahead',
         commits: 1,
         said: `${branch} is ahead of main by 1 commit`,
-        stat: '1 file changed, 1 insertion(+)',
+        stat: '1 file: +1 −0',
         merge: { clean: true, said: 'merges cleanly onto main' },
       },
     ],

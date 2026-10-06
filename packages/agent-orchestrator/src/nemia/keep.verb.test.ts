@@ -85,7 +85,8 @@ test('REFUSED: semi-auto while her folder is not trusted, naming the command tha
     assert.ok(said.includes(`mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`), said);
     assert.equal(readLevel(), undefined);
   }
-  assert.match(LEVEL.check?.({ level: 'auto' }) ?? '', /^auto is not built yet/);
+  assert.equal(LEVEL.check?.({ level: 'auto' }), null);
+  assert.match(LEVEL.check?.({ level: 'on' }) ?? '', /^"on" is no level/);
   assert.equal(LEVEL.check?.({ level: 'manual' }), null);
   assert.equal(await beat().then((owed) => owed.length), 0, 'no level set owes nothing');
 });

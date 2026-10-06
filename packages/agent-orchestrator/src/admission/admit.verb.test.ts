@@ -62,6 +62,6 @@ test('REFUSED: a call on a run of a factory at manual, or on the factory, is den
 });
 
 test('REFUSED: a floor that is no level', () => {
-  assert.equal(ADMIT.check?.({ atLeast: 'auto' }), '"auto" is no level: nemia admit [--at-least manual|semi-auto].');
+  assert.equal(ADMIT.check?.({ atLeast: 'on' }), '"on" is no level: nemia admit [--at-least manual|semi-auto|auto].');
   assert.equal(ADMIT.check?.({ atLeast: 'semi-auto' }), null);
 });

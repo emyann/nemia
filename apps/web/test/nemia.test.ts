@@ -141,7 +141,7 @@ test('her level reads back what the api answered, a key it does not read dropped
 test("each factory's level reads back; REFUSED: a factory at a level the board has no word for, and a row with no raise", async (t) => {
   answering(t, { ...up, factories: [raised] });
   assert.deepEqual((await readLevel()).factories, [raised]);
-  answering(t, { ...up, factories: [{ ...raised, level: 'auto' }] });
+  answering(t, { ...up, factories: [{ ...raised, level: 'on' }] });
   await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.level/.test(err.message));
   const { raise: _raise, ...noRaise } = raised;
   answering(t, { ...up, factories: [noRaise] });
@@ -152,7 +152,7 @@ test("each factory's level reads back; REFUSED: a factory at a level the board h
 });
 
 test('REFUSED: a level the board has no word for, and an answer with no reach', async (t) => {
-  answering(t, { ...up, level: 'auto' });
+  answering(t, { ...up, level: 'on' });
   await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at level/.test(err.message));
   const { reach: _reach, ...noReach } = up;
   answering(t, noReach);

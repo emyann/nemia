@@ -29,7 +29,7 @@ test("a factory's level file round-trips, and one with neither a level nor a rai
 
 test('REFUSED: a level file that does not read, naming the file, its wrong field and the command that writes it again', () => {
   fs.mkdirSync(path.join(ROOT, 'factories', 'hkb'), { recursive: true });
-  fs.writeFileSync(factoryLevelFile('hkb'), JSON.stringify({ level: 'auto', since: '2026-10-06T08:00:00.000Z' }));
+  fs.writeFileSync(factoryLevelFile('hkb'), JSON.stringify({ level: 'on', since: '2026-10-06T08:00:00.000Z' }));
   assert.throws(
     () => readFactoryLevel('hkb'),
     (err: Error) =>

@@ -46,8 +46,11 @@ export const anyAbove = ({ level, factories }: Pick<NemiaLevel, 'level' | 'facto
 /** The stretches a person raises a factory for, as the api takes them, the first offered first. */
 export const RAISE_STRETCHES = ['2h', '8h', '1d', '7d'] as const;
 
+/** Each level as the board says it. */
+const LEVEL_WORDS: Record<Level, string> = { manual: 'Manual', 'semi-auto': 'Semi-auto', auto: 'Auto' };
+
 /** A level as the board says it. */
-export const levelWord = (level: Level): string => (level === 'semi-auto' ? 'Semi-auto' : 'Manual');
+export const levelWord = (level: Level): string => LEVEL_WORDS[level];
 
 /**
  * A factory's level in words at `now`, named the store's own when it is the default factory (`byDefault`): a raise with its end, said as

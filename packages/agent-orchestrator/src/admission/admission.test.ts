@@ -82,6 +82,10 @@ test('REFUSED: a call that acts on a run or a factory below the floor is denied,
     'nemia rm t r',
     'nemia start ./brief.md --factory pipao',
     'nemia level semi-auto --factory pipao --for 2h',
+    'nemia factory rm pipao',
+    'nemia factory instruct pipao --clear',
+    'nemia factory instruction pipao --store',
+    'nemia factory fire pipao --step build/plan',
     'nemia show t && nemia hold s',
     'nemia show r 2>/dev/null',
   ])
@@ -90,6 +94,13 @@ test('REFUSED: a call that acts on a run or a factory below the floor is denied,
     scopedAnswer('nemia hold r')?.reason,
     "nemia hold r acts on r of the factory pipao, at manual: below semi-auto, it is left alone. Raising it is the person's: nemia level semi-auto --factory pipao [--for <duration>].",
   );
+});
+
+test('REFUSED to name a factory unscoped: every factory verb but the one that files a new factory takes it under the key admission reads', () => {
+  const unscoped = TABLE.filter((e) => e.name.startsWith('factory ') && e.name !== 'factory add')
+    .filter((e) => (e.spec?.positionals.length ?? 0) > 0 && e.spec?.positionals[0].key !== 'factory')
+    .map((e) => e.name);
+  assert.deepEqual(unscoped, []);
 });
 
 test('every factory at the floor or above: the scope answers as no scope does', () => {

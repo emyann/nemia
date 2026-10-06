@@ -132,14 +132,14 @@ test('REFUSED: two places at once, by the check, before anything is read or writ
     main(['factory', 'instruction', 'pipao', '--path', 'X.md', '--store'], NO_ENGINE),
     refusedWith('Invalid', /takes one of --path, --store and --clear/),
   );
-  assert.equal(FACTORY_INSTRUCTION.check!({ name: 'pipao', clear: false }) !== null, true, 'a put that names no place is refused');
+  assert.equal(FACTORY_INSTRUCTION.check!({ factory: 'pipao', clear: false }) !== null, true, 'a put that names no place is refused');
   assert.deepEqual(fs.readFileSync(recordOf('pipao')), before);
 });
 
 test("REFUSED: words for an instruction kept in the factory's folder — Conflict, naming the file, and no store folder made", async () => {
   const repo = filed();
   await assert.rejects(
-    runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ name: 'pipao', words: 'x', clear: false })),
+    runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
     refusedWith(
       'Conflict',
       new RegExp(`read from ${path.join(repo, 'NEMIA.md')}.*nemia factory instruction pipao --store\\. Nothing was written\\.$`),
@@ -147,7 +147,7 @@ test("REFUSED: words for an instruction kept in the factory's folder — Conflic
   );
   assert.ok(!fs.existsSync(storeFolder('pipao')), 'no store folder');
   setInstruction({ factory: 'pipao', at: { store: true } });
-  const written = await runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ name: 'pipao', words: '  Ship small.  ', clear: false }));
+  const written = await runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }));
   assert.equal(written.words, 'Ship small.\n');
   assert.equal(fs.readFileSync(path.join(storeFolder('pipao'), 'NEMIA.md'), 'utf8'), 'Ship small.\n');
 });
@@ -226,11 +226,11 @@ test('nemia factory rm removes the store folder after the record and says so; wi
 
 test('REFUSED: the default factory, by both verbs, as a Conflict', async () => {
   await assert.rejects(
-    runWith(NO_ENGINE, FACTORY_INSTRUCTION.handler({ name: 'default' })),
+    runWith(NO_ENGINE, FACTORY_INSTRUCTION.handler({ factory: 'default' })),
     refusedWith('Conflict', /nemia factory instruction does not take it/),
   );
   await assert.rejects(
-    runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ name: 'default', words: 'x', clear: false })),
+    runWith(NO_ENGINE, FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false })),
     refusedWith('Conflict', /nemia factory instruct does not take it/),
   );
 });

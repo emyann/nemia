@@ -19,7 +19,7 @@ const ADD = entry('factory add');
 /** A factory's lines: `nemia factory attach <name> <workflow>`, `nemia factory rm <name>`, `nemia factory add <name> --repo <path>`. */
 const commandsOf = (name: string): FactoryCommands => ({
   attach: commandLine(ATTACH, { factory: name }),
-  rm: commandLine(RM, { name }),
+  rm: commandLine(RM, { factory: name }),
   add: commandLine(ADD, { name }, { repos: '<path>' }),
 });
 

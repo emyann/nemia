@@ -11,8 +11,8 @@ import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
- * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire names, and the request's
- * `method` and `path`, as a refusal says the route.
+ * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire or an instruction names,
+ * and the request's `method` and `path`, as a refusal says the route.
  */
 export type Named = {
   readonly runId: string;
@@ -481,14 +481,14 @@ const INSTRUCT_PUT_SHAPE = '`{ "words": "<what the factory\'s runs are told>" }`
  * The route of a factory's instruction `at` names, as a refusal says it: `PUT /api/factories/<name>/instruction`, and `…/words` for its
  * text.
  */
-const instructionRoute = ({ method, name }: Named, words: boolean): string =>
-  `${method} /api/factories/${name}/instruction${words ? '/words' : ''}`;
+const instructionRoute = ({ method, factory }: Named, words: boolean): string =>
+  `${method} /api/factories/${factory}/instruction${words ? '/words' : ''}`;
 
 /** A name in a factory's instruction's route that is no factory's, in the package's words, before anything is read. */
 const factoryNamed =
   (words: boolean) =>
   (at: Named): string | null => {
-    const wrong = factoryNameRefusal(at.name);
+    const wrong = factoryNameRefusal(at.factory);
     return wrong === undefined ? null : `${instructionRoute(at, words)}: ${wrong}`;
   };
 

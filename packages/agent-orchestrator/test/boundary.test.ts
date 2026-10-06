@@ -91,11 +91,17 @@ function kinds(sources: Sources): Record<Kind, string[]> {
 const beneathCli = (sources: Sources): string[] => kinds(sources).CONTROLLER.filter((f) => !isCli(f));
 
 /** The bottom of the store's tree: they import no store file. */
-const STORE_BOTTOM = ['src/record/places.store.ts', 'src/folder/folder.store.ts', 'src/meter/tally.store.ts', 'src/config/config.store.ts'];
+const STORE_BOTTOM = [
+  'src/record/places.store.ts',
+  'src/agents/custom-file.store.ts',
+  'src/meter/tally.store.ts',
+  'src/config/config.store.ts',
+];
 
 /**
- * The store files another store file may import, each with the store files it may import itself: the bottom, then a run's steps on the
- * folders (`steps.store.ts`), the run store on them and the store's pause on the bottom, the factories on the run store, and the run
+ * The store files another store file may import, each with the store files it may import itself: the bottom, the read of a person's
+ * custom instructions among it, then the folders on that read (`folder.store.ts`), a run's steps on the folders (`steps.store.ts`), the
+ * run store on them and the store's pause on the bottom, the factories on the run store, and the run
  * store's files on them (`runStore`), the run's place on the folders (`place.store.ts`) and its verbs run off the event loop on it
  * (`place-async.store.ts`), then a step's workspace, cut by the place, a workflow folder written on the factories too, and where a run
  * looks and a place's workflow folders (`lookup.store.ts`) on both; what a branch changed, as the place says, on the place
@@ -105,11 +111,12 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/folder/folder.store.ts'
  */
 const STORE_SHARED: Record<string, readonly string[]> = {
   'src/record/places.store.ts': [],
-  'src/folder/folder.store.ts': [],
+  'src/agents/custom-file.store.ts': [],
   'src/meter/tally.store.ts': [],
   'src/config/config.store.ts': [],
+  'src/folder/folder.store.ts': ['src/agents/custom-file.store.ts'],
   'src/record/steps.store.ts': ['src/folder/folder.store.ts'],
-  'src/record/record.store.ts': [...STORE_BOTTOM, 'src/record/steps.store.ts'],
+  'src/record/record.store.ts': [...STORE_BOTTOM, 'src/folder/folder.store.ts', 'src/record/steps.store.ts'],
   'src/pause/pause.store.ts': STORE_BOTTOM,
   'src/factory/factory.store.ts': ['src/record/record.store.ts'],
   'src/record/files.store.ts': ['src/record/record.store.ts', 'src/pause/pause.store.ts'],
@@ -643,10 +650,20 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/branches/branches.store.ts is a store file and imports src/runner.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/record/record.store.ts')), [
-    'src/folder/folder.store.ts imports src/record/record.store.ts, which the tree does not let it: it is the bottom, and imports no store file',
+    'src/folder/folder.store.ts imports src/record/record.store.ts, which the tree does not let it: of the store it imports src/agents/custom-file.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/folder/write.store.ts')), [
-    'src/folder/folder.store.ts imports src/folder/write.store.ts, which the tree does not let it: it is the bottom, and imports no store file',
+    'src/folder/folder.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/agents/custom-file.store.ts',
+  ]);
+  assert.ok('src/agents/custom-file.store.ts' in packageSources());
+  assert.deepEqual(treeBreaks(adding('src/agents/custom-file.store.ts', 'src/agents/custom.store.ts')), [
+    'src/agents/custom-file.store.ts imports src/agents/custom.store.ts, which the tree does not let it: it is the bottom, and imports no store file',
+  ]);
+  assert.deepEqual(treeBreaks(adding('src/agents/custom-file.store.ts', 'src/folder/folder.store.ts')), [
+    'src/agents/custom-file.store.ts imports src/folder/folder.store.ts, which the tree does not let it: it is the bottom, and imports no store file',
+  ]);
+  assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/agents/custom.store.ts')), [
+    'src/folder/folder.store.ts imports src/agents/custom.store.ts, which the tree does not let it: of the store it imports src/agents/custom-file.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/write.store.ts', 'src/workspace/worktree.store.ts')), [
     'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/folder/folder.store.ts, src/factory/factory.store.ts',
@@ -655,13 +672,13 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/factory/factory.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/skills/skills.store.ts', 'src/agents/agents.store.ts')), [
-    'src/skills/skills.store.ts imports src/agents/agents.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/place/place-async.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
+    'src/skills/skills.store.ts imports src/agents/agents.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/agents/custom-file.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/place/place-async.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/record/files.store.ts', 'src/workspace/worktree.store.ts')), [
     'src/record/files.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/pause/pause.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/record/record.store.ts', 'src/workspace/worktree.store.ts')), [
-    'src/record/record.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/steps.store.ts',
+    'src/record/record.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/agents/custom-file.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts',
   ]);
   assert.ok('src/place/place.store.ts' in packageSources());
   assert.deepEqual(treeBreaks(adding('src/place/place.store.ts', 'src/branches/branches.store.ts')), [
@@ -680,10 +697,13 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/agents.store.ts is a store file and imports src/tick/tick.verb.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/inbox/inbox.store.ts')), [
-    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/place/place-async.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
+    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/agents/custom-file.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/place/place-async.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
   ]);
   assert.deepEqual(treeBreaks(unimported('src/agents/agents.store.ts')), [
     "src/agents/agents.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
+  ]);
+  assert.deepEqual(treeBreaks(unimported('src/agents/custom-file.store.ts')), [
+    "src/agents/custom-file.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
   ]);
   assert.deepEqual(treeBreaks(unimported('src/daemon/daemon.store.ts')), [
     "src/daemon/daemon.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",

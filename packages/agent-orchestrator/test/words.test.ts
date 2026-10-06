@@ -191,7 +191,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/stats/discipline.ts': { count: 10, card: 'u42s' },
   'packages/agent-orchestrator/src/status/status.ts': { count: 11, card: 'u42s' },
   'packages/agent-orchestrator/src/step/step.ts': { count: 78, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 15, ...MOVES.render },
+  'packages/agent-orchestrator/src/tick/told.verb.ts': { count: 15, ...MOVES.render },
   'packages/agent-orchestrator/src/views/views.verb.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/workflow.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/fence.ts': { count: 1, ...MOVES.knobs },

@@ -11,7 +11,7 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
 import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/status.ts';
-import { toldOf } from '../tick/file.verb.ts';
+import { toldOf } from '../tick/told.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
 import { artifactsDir, stepsOf } from '../record/record.store.ts';

@@ -2,13 +2,13 @@
  * What a pass files, and what it files a step with: the tries due (`fileTries`), the rounds (`fileRounds`), the checks (`fileChecks`) and
  * the ready steps (`fileReady`), in the order `advanceRun` calls them, each under the id the run derives and asking the store first
  * whether it may file (`mayFileOf`), a nudge answering a task held open through `answerHeld` (`held.verb.ts`); the fields of a filing
- * that only a local harness reads (`localFields`), and the step as it is told (`toldOf`); what its roots are handed of other runs is
- * `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * that only a local harness reads (`localFields`), the step as it is told (`toldOf`, told.verb.ts); what its roots are handed of other runs
+ * is `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { asked, awaited, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
+import { asked, awaited, over, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
@@ -58,12 +58,8 @@ import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } f
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
-import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
+import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
-import { placesOf } from '../folder/lookup.store.ts';
-import { skillsFor } from '../folder/folder.store.ts';
-import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { noteFiledCheck, within } from '../meter/tally.store.ts';
 import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
@@ -72,6 +68,7 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { landingDenies, landingWords } from '../place/landing.store.ts';
+import { toldOf } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -81,40 +78,6 @@ import { landingDenies, landingWords } from '../place/landing.store.ts';
  */
 export const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> =>
   isRemoteHarness(step.harness) ? {} : fields();
-
-/**
- * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
- * `nemia start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent —
- * is filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
- * `renderedIn`) — gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its
- * start, so its brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to
- * claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag,
- * first among its others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the
- * directory Codex's trust extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config
- * lists; a folder run has no repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one
- * whose repository is no longer there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a
- * try and a round each spread into its `config`.
- */
-export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
-  const dir = agentFilesDir(run, step.name);
-  const told =
-    rendersAgent(step) && !renderedIn(dir, step)
-      ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
-      : step;
-  return { step: told, own: ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)) };
-}
-
-/**
- * The harness's own arguments a step is filed with (`toldOf`), off the flags its agent rendered to and its repository's real path, which
- * is asked only of a step whose harness takes it. Pure but for `repoOf`.
- */
-export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
-  const repo = step.harness === 'codex' ? repoOf() : undefined;
-  return {
-    claude: step.remote ? { remoteControl: true as const, ...rendered } : rendered,
-    ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
-  };
-};
 
 /** A task as the engine is asked to file it (`e.file`). */
 type Spec = Parameters<Engine['file']>[0];

@@ -15,7 +15,7 @@ import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig } from '../filed/filed.ts';
 import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
-import { ownOf } from '../tick/file.verb.ts';
+import { ownOf } from '../tick/told.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
 import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';

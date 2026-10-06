@@ -16,9 +16,11 @@ const waitOf = (runId: string, step: string): string | undefined =>
 /** Admission's decision for a shell line, or undefined for none. */
 const decided = (command: string, tool = 'Bash') => admissionOf({ tool, input: { command }, cwd: '/w' }, TABLE, waitOf)?.decision;
 
-test('REFUSED to run unasked: an approval, a round, an accept, and a retry of what waits on the person or raises a cap, each asked', () => {
+test('REFUSED to run unasked: an approval, a round and an accept whatever waits, and a retry of what waits on the person or raises a cap, each asked', () => {
   for (const line of [
     'nemia approve r gate',
+    'nemia approve r check',
+    'nemia accept r check',
     'nemia round r',
     'nemia accept r',
     'nemia retry r gate --message "go"',

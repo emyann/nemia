@@ -1,6 +1,6 @@
 /**
  * The keeper and `nemia level` over an engine board of the test's: her task filed long-lived in her folder, by her shipped definition and
- * the person's custom words, with the daemon's own bin first on her path and an ask on every write in the store but her memory;
+ * the person's custom words, with the daemon's own bin first on her path, her fence derived from the table, her admission, and a deny on the store but her folder;
  * subscribed once it is open; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed at manual.
  * And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own, since `WF_ROOT` is read as
  * the module loads.
@@ -131,7 +131,10 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   assert.ok(fence.deny.includes('Bash(nemia tick:*)') && fence.deny.includes('Bash(nemia up:*)'));
   assert.ok(denies.includes(`Edit(/${path.join(ROOT, 'brand-new')}/**)`), 'a folder the store gained is denied');
   assert.ok(denies.includes(`Edit(/${path.join(ROOT, 'daemon.json')})`), 'a file at the store top is denied');
-  assert.ok(denies.includes(`Edit(/${levelFile()})`) && denies.includes(`Edit(/${promptFile()})`), 'her level and her instruction are denied');
+  assert.ok(
+    denies.includes(`Edit(/${levelFile()})`) && denies.includes(`Edit(/${promptFile()})`),
+    'her level and her instruction are denied',
+  );
   assert.deepEqual(
     [...settings.permissions.ask, ...denies].filter((rule) => rule.startsWith(`Edit(/${nemiaDir()}`)),
     [`Edit(/${levelFile()})`, `Edit(/${promptFile()})`],

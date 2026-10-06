@@ -48,8 +48,8 @@ async function photographPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * Nemia's section on the store's Settings, her folder trusted: the switch writes Semi-auto, and her session reads not filed yet, naming
-   * its task, since the e2e's api keeps no keeper; her memory lists the seeded facts and opens one; the switch then writes Manual and her
+   * Nemia's section on the store's Settings, her folder trusted: the switch writes Semi-auto, which says it asks what waits on you, and her
+   * session reads not filed yet, naming its task, since the e2e's api keeps no keeper; her memory lists the seeded facts and opens one; the switch then writes Manual and her
    * session reads off. The trust, the facts and the level are written by the page and taken back after.
    */
   name: 'nemia',
@@ -74,6 +74,10 @@ export default {
       await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
       await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'her session reads not filed yet');
       await expectVisible(section.locator('[data-nemia-task]', { hasText: on.task }), 'naming its task');
+      await expectVisible(
+        section.getByText('what waits on you waits for your answer'),
+        'Semi-auto asks what waits on you, not every write',
+      );
       await expectMemory(section);
       await settled(page);
       await photograph(page, path.join(OUT, `nemia-on-${await themeOf(page)}.png`), { fullPage: true });

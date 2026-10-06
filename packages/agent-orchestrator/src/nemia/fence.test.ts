@@ -34,7 +34,9 @@ test('her fence is derived from the classes: reads, her writes and answers run u
 });
 
 test('REFUSED to run unasked: a command reclassed as a prompt asks, and one reclassed out is denied, by its class alone', () => {
-  const fence = nemiaFence(TABLE.map((c) => (c.name === 'hold' ? { ...c, nemia: 'prompts' as const } : c.name === 'ls' ? { ...c, nemia: 'out' as const } : c)));
+  const fence = nemiaFence(
+    TABLE.map((c) => (c.name === 'hold' ? { ...c, nemia: 'prompts' as const } : c.name === 'ls' ? { ...c, nemia: 'out' as const } : c)),
+  );
   assert.ok(fence.ask.includes('Bash(nemia hold:*)'));
   assert.ok(fence.deny.includes('Bash(nemia ls:*)'));
   assert.ok(!fence.allow.some((r) => r.startsWith('Bash(nemia hold') || r.startsWith('Bash(nemia ls')));

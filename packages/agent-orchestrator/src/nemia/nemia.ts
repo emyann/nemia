@@ -10,7 +10,10 @@
 import path from 'node:path';
 import { DEFAULT_WAKE } from '../subscription/subscription.ts';
 
-/** The levels a person sets: `manual`, her session stopped; `semi-auto`, her session kept, every write she proposes asked of the person. */
+/**
+ * The levels a person sets: `manual`, her session stopped; `semi-auto`, her session kept, what waits on the person asked of them, and a
+ * write that cannot be undone or changes their settings or a factory.
+ */
 export const LEVELS = ['manual', 'semi-auto'] as const;
 
 /** A level a person sets. */

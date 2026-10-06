@@ -17,7 +17,8 @@ import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-skill-copy-');
 process.env.WF_ROOT = ROOT;
-const { copySkill, SkillWriteError } = await import('../src/runner.ts');
+const { copySkill, isRefusal } = await import('../src/runner.ts');
+type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const SHIPPED = path.join(TEAM, 'skills');
 const LIBRARY = path.join(ROOT, 'workflows', 'skills');
@@ -36,12 +37,12 @@ function snapshot(dir: string): Record<string, string> {
   );
 }
 
-/** `fn` refused with a `SkillWriteError` of kind `why`, whose message passes `said`, and the library as it was. */
-function refuses(fn: () => unknown, why: string, said: RegExp): void {
+/** `fn` refused as the kind `tag`, whose message passes `said`, and the library as it was. */
+function refuses(fn: () => unknown, tag: Refusal['_tag'], said: RegExp): void {
   const before = snapshot(LIBRARY);
   assert.throws(fn, (err: unknown) => {
-    assert.ok(err instanceof SkillWriteError, `a SkillWriteError, not ${String(err)}`);
-    assert.equal(err.why, why, err.message);
+    assert.ok(isRefusal(err), `a refusal, not ${String(err)}`);
+    assert.equal(err._tag, tag, err.message);
     assert.match(err.message, said);
     return true;
   });
@@ -84,7 +85,7 @@ test('a copy is refused where the library has the name already, and the library 
   fs.writeFileSync(path.join(LIBRARY, name, 'SKILL.md'), '---\ndescription: mine\n---\nMine.\n');
   refuses(
     () => copySkill(SHIPPED, LIBRARY, name),
-    'exists',
+    'Conflict',
     new RegExp(`^skills/${name} is there already, in ${LIBRARY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}, and a copy would write over it\\.`),
   );
 });
@@ -93,13 +94,13 @@ test("a copy is refused for a skill the source does not have, and for a name tha
   fs.rmSync(LIBRARY, { recursive: true, force: true });
   refuses(
     () => copySkill(SHIPPED, LIBRARY, 'no-such-skill'),
-    'missing',
+    'Missing',
     /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/,
   );
   for (const bad of ['../agents', 'Review', 'a_b', '.hidden', '', 'x'.repeat(65)]) {
     refuses(
       () => copySkill(SHIPPED, LIBRARY, bad),
-      'refused',
+      'Invalid',
       /is not a skill's name: a skill is a folder in skills\/, named in lowercase words joined by dashes/,
     );
   }
@@ -110,8 +111,8 @@ test("a copy is refused for a skill the source does not have, and for a name tha
 test('a copy is refused for a skill whose SKILL.md does not read as a card entry: no agent could be given it', () => {
   fs.rmSync(LIBRARY, { recursive: true, force: true });
   const from = source({ bare: '# Bare\n\nNo frontmatter.\n', undescribed: '---\nname: undescribed\n---\nNothing said.\n' });
-  refuses(() => copySkill(from, LIBRARY, 'bare'), 'refused', /SKILL\.md has no frontmatter/);
-  refuses(() => copySkill(from, LIBRARY, 'undescribed'), 'refused', /SKILL\.md has no `description:`/);
+  refuses(() => copySkill(from, LIBRARY, 'bare'), 'Invalid', /SKILL\.md has no frontmatter/);
+  refuses(() => copySkill(from, LIBRARY, 'undescribed'), 'Invalid', /SKILL\.md has no `description:`/);
 });
 
 test('a copy is refused for a skill holding a link, and for a skill that is one: a copy would follow it out of the skill', () => {
@@ -120,11 +121,11 @@ test('a copy is refused for a skill holding a link, and for a skill that is one:
   const outside = scratch('wf-skill-outside-');
   fs.writeFileSync(path.join(outside, 'secret.txt'), "not the skill's");
   fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(from, 'linking', 'notes.txt'));
-  refuses(() => copySkill(from, LIBRARY, 'linking'), 'refused', /notes\.txt is a link/);
+  refuses(() => copySkill(from, LIBRARY, 'linking'), 'Invalid', /notes\.txt is a link/);
   fs.mkdirSync(path.join(outside, 'real'));
   fs.writeFileSync(path.join(outside, 'real', 'SKILL.md'), '---\ndescription: Real.\n---\nBody.\n');
   fs.symlinkSync(path.join(outside, 'real'), path.join(from, 'linked'));
-  refuses(() => copySkill(from, LIBRARY, 'linked'), 'refused', /linked is a link/);
+  refuses(() => copySkill(from, LIBRARY, 'linked'), 'Invalid', /linked is a link/);
 });
 
 test('a copy is refused into a folder that is not a skills/ the board lists, unless anywhere', () => {
@@ -132,13 +133,12 @@ test('a copy is refused into a folder that is not a skills/ the board lists, unl
   const name = fs.readdirSync(SHIPPED).sort()[0];
   assert.throws(
     () => copySkill(SHIPPED, elsewhere, name),
-    (err: unknown) =>
-      err instanceof SkillWriteError && err.why === 'refused' && /is not the store's skills\/ .* nor a repository's/.test(err.message),
+    (err: unknown) => isRefusal(err) && err._tag === 'Invalid' && /is not the store's skills\/ .* nor a repository's/.test(err.message),
   );
   assert.equal(fs.existsSync(elsewhere), false, 'nothing is made there');
   assert.throws(
     () => copySkill(SHIPPED, path.join(ROOT, 'workflows', 'agents'), name),
-    (err: unknown) => err instanceof SkillWriteError && /is not a folder of skills/.test(err.message),
+    (err: unknown) => isRefusal(err) && err._tag === 'Invalid' && /is not a folder of skills/.test(err.message),
   );
   assert.equal(copySkill(SHIPPED, elsewhere, name, { anywhere: true }).dir, path.join(elsewhere, name), 'written with anywhere');
 });

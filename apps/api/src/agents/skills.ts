@@ -25,7 +25,6 @@ import {
   isShippedPlace,
   listAgents,
   loadAgents,
-  SkillWriteError,
   skillDirIn,
   skillFolders,
   skillsFor,
@@ -429,17 +428,8 @@ function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: st
 }
 
 /**
- * A write of a skill the package refused, as the api answers it: one not there is 404; taken or stale is 409; the rest, 422. Throws any
- * error that is not a `SkillWriteError` on to `app.onError` (app.ts), which answers a refusal by its kind and anything else a 500.
- */
-function writeRefused(err: unknown): Refusal {
-  if (!(err instanceof SkillWriteError)) throw err;
-  return { status: err.why === 'missing' ? 404 : err.why === 'exists' || err.why === 'stale' ? 409 : 422, error: err.message };
-}
-
-/**
  * A skill of yours written into the library through the table's `skills write` (`WRITE`), and answered as its page reads it now. `name`
- * is the skill's name on the path, none for a skill made.
+ * is the skill's name on the path, none for a skill made. Throws what the package refuses, which `app.onError` answers by its kind.
  */
 async function written(
   e: Engine['Service'],
@@ -447,8 +437,7 @@ async function written(
   { version, name }: { version: string | null; name?: string },
   repo: string,
   home: string,
-): Promise<{ status: 200 | 201; body: SkillSaved } | Refusal | { status: 500; error: string }> {
-  let wrote: SkillWritten;
+): Promise<{ status: 200 | 201; body: SkillSaved } | { status: 500; error: string }> {
   const args = {
     from: 'yours',
     library: librarySkills(home),
@@ -456,11 +445,7 @@ async function written(
     ...(version !== null && { version }),
     ...(name !== undefined && { name }),
   };
-  try {
-    wrote = (await runWith(e, WRITE.handler(args))) as SkillWritten;
-  } catch (err) {
-    return writeRefused(err);
-  }
+  const wrote = (await runWith(e, WRITE.handler(args))) as SkillWritten;
   const detail = await skillDetail(e, 'yours', wrote.name, repo, home);
   if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
   return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
@@ -474,8 +459,7 @@ const repoRefusal = (route: string, name: string | null, repo: string, home: str
 
 /**
  * The skills' routes. Each write is guarded (guard.ts) and writes only your library: 403 for the repository's (`repoRefusal`), 400 for
- * any other place; a write the package refuses is answered as `written` and `writeRefused` say, and any other refusal by its kind
- * (`app.onError`).
+ * any other place; a write the package refuses is answered by its kind (`app.onError`).
  *
  * - `GET /api/skills` — every skill by place (`listSkills`), read from disk on each request, so a skill a person has just written lists as
  *   it is now.
@@ -544,13 +528,7 @@ export const skills = new Hono<ApiEnv>()
         return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
       }
       if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
-      let copied: SkillCopied;
-      try {
-        copied = (await runWith(e, WRITE.handler({ from, library, copy: name, shipped: SHIPPED_SKILLS }))) as SkillCopied;
-      } catch (err) {
-        const answer = writeRefused(err);
-        return c.json({ error: answer.error }, answer.status);
-      }
+      const copied = (await runWith(e, WRITE.handler({ from, library, copy: name, shipped: SHIPPED_SKILLS }))) as SkillCopied;
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);

@@ -32,11 +32,13 @@ export const REFUSAL_STATUS = { Missing: 404, Conflict: 409, Invalid: 422 } as c
 
 /**
  * What the api answers an error a route threw: a refusal of the orchestrator's (`isRefusal`, by its class) its status in `REFUSAL_STATUS`,
- * `{ error }` in its words; an `HTTPException` its own response; anything else a 500, `{ error }` its message, said on stderr — an `Error`
- * carrying `exitCode` 2 by hand among them, since only a kind says what a refusal is.
+ * `{ error }` in its words, and `users` beside it where a `Conflict` names the steps that hold what was asked of; an `HTTPException` its
+ * own response; anything else a 500, `{ error }` its message, said on stderr — an `Error` carrying `exitCode` 2 by hand among them, since
+ * only a kind says what a refusal is.
  */
 export const answerError: ErrorHandler = (err, c) => {
-  if (isRefusal(err)) return c.json({ error: err.message }, REFUSAL_STATUS[err._tag]);
+  if (isRefusal(err))
+    return c.json({ error: err.message, ...(err._tag === 'Conflict' && err.users && { users: err.users }) }, REFUSAL_STATUS[err._tag]);
   if (err instanceof HTTPException) return err.getResponse();
   console.error(err);
   return c.json({ error: err.message }, 500);
@@ -138,9 +140,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   level is set on the route the table generates from `nemia level`.
  *
  * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
- * (`answerError`). The two that carry more than a kind are the one exception, answered by their routes with what they carry: an
- * `AgentWriteError`, with the steps that name the agent (`refusalOf`, agents/agents.ts), and a `SkillWriteError` (`writeRefused`,
- * agents/skills.ts). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
+ * (`answerError`). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);

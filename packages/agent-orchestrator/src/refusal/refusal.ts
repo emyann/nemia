@@ -14,8 +14,9 @@ export class Missing extends TaggedError('Missing')<{ readonly message: string }
 
 /**
  * What is asked is well formed, and the state of a run or of the store forbids it: a step already approved, a store another process holds.
+ * `users` names the steps, as `<workflow>/<step>`, that still hold what is asked of, where that is why: an agent a step still names.
  */
-export class Conflict extends TaggedError('Conflict')<{ readonly message: string }> {
+export class Conflict extends TaggedError('Conflict')<{ readonly message: string; readonly users?: readonly string[] }> {
   readonly exitCode = 2;
 }
 

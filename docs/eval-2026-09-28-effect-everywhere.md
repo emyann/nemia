@@ -412,9 +412,10 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
    face `tick`, its pass metered through `meteredPass`, the meter still a module global, and an unreadable journal a value,
    never a failure. `wf up` stays on the face; switching it to yield the program is a card of its own.
 8. **The api's errors.** One mapping from the union to statuses (under B, checked by the compiler), `app.onError` for the
-   rest, and the 6 `messageOf` copies gone. Landed under B. Left for a card of its own: the authoring errors that carry a
-   `why` beside their kind (`AgentWriteError`, `SkillWriteError`, each an `Invalid` today) are still answered by their
-   routes; moving each `why` onto `Missing` or `Conflict` puts them in the table too.
+   rest, and the 6 `messageOf` copies gone. Landed under B. The authoring errors that carried a `why` beside their kind
+   (`AgentWriteError`, `SkillWriteError`) followed, in a card of their own: each `why` is thrown as its kind (`missing` a
+   `Missing`; `stale`, `exists` and `in-use` a `Conflict`; `refused` an `Invalid`), an in-use `Conflict` carries the steps that
+   still name the agent as `users`, which `answerError` answers beside the words, and the routes' own mappings are gone.
 9. **The api's resources.** The feed as a `Stream` over the watch, `quota.ts`'s child and `capabilities.ts`'s MCP ask under
    `acquireRelease` and `Effect.timeout`. Landed under B: `feedEvents`, `usageAsk` and `serverAsk`, each let go on one path and a test
    of each that interrupts it or runs out its time. The asks requests share are still shared, and a request's going interrupts only

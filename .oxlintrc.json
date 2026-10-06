@@ -303,12 +303,6 @@
     // Each file over a limit today, at its own ceiling: its measure, rule by rule, and nothing higher. Lint refuses the file that grows;
     // packages/agent-orchestrator/test/limits.test.ts refuses a ceiling above the measure, and holds each file's count of offenders.
     {
-      "files": ["apps/api/src/agents/agents.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
-      }
-    },
-    {
       "files": ["apps/api/src/capabilities/capabilities.ts"],
       "rules": {
         "complexity": ["error", { "max": 21 }],
@@ -545,7 +539,7 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 138, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 41 }],
         "sonarjs/cognitive-complexity": ["error", 59]
       }

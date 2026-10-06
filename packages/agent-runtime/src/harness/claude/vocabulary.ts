@@ -200,10 +200,11 @@ export const claudeAllowArgs = (config: SpawnRequest['config']): string[] => {
  * A character a permission rule cannot carry in a path, `Read(//<path>/**)` or `Edit(//<path>/**)`: a glob's `*`, `?` or `[` widens the
  * rule to a sibling, and `]` with it; a backslash escapes the character after it, so the rule misses its own folder and names the one
  * without it; a parenthesis is refused by the runtime's own grammar of a rule (`RULE`, `harness/args.ts`), though Claude Code reads one;
- * and a whitespace other than a space is not measured. Measured on Claude Code 2.1.291 (2026-10-06), `claude -p` in `dontAsk` given
+ * and a whitespace other than a space is not measured. Measured on Claude Code 2.1.291, `claude -p` in `dontAsk` given
  * `--allowedTools 'Edit(**),Read(//<dir>/**)'` as one argument: a space, a comma and braces are carried inside the parentheses, in an
- * allow and in a deny alike, and a folder named with them is read and its sibling is not; `my*wf` let `my-other-wf` be read, `my?wf` and
- * `my[ab]wf` let `myawf`, and `my\xwf` let `myxwf` and not itself. An escape is read: `my\*wf` let `my*wf` and not `my-other-wf`.
+ * allow and in a deny alike, so a folder named with them is read and its sibling is not; a folder named with `*`, `?` or `[ab]` let a
+ * sibling the glob matches be read, and one named with a backslash before a letter let the sibling without the backslash be read, and
+ * not itself. An escape is read: a rule naming `\*` let the folder named with the `*` be read, and not its sibling.
  */
 export const CLAUDE_UNRULED = /[()*?[\]\\\t\n\v\f\r]/;
 

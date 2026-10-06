@@ -131,7 +131,7 @@ test('each status that waits on the person has a section of bring-what-waits tha
   const waiting = Object.entries(WAITS_ON_PERSON)
     .filter(([, waits]) => waits)
     .map(([status]) => status);
-  assert.deepEqual(waiting.toSorted(), Object.keys(BROUGHT_IN).toSorted(), 'a status that waits on the person is given its section here');
+  assert.deepEqual([...waiting].sort(), Object.keys(BROUGHT_IN).sort(), 'a status that waits on the person is given its section here');
   const skill = fs.readFileSync(path.join(SHIPPED, 'skills', 'bring-what-waits', 'SKILL.md'), 'utf8');
   assert.deepEqual(
     waiting.filter((status) => !skill.includes(`\n## ${BROUGHT_IN[status]}\n`)),

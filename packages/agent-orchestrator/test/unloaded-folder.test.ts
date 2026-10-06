@@ -172,16 +172,29 @@ test('a run whose unfrozen folder is gone is left out of the pass the same, its 
   );
 });
 
-test('under a pause, a pass over a run whose folder does not load finishes, its finishing tasks and held checks read without it', async (t) => {
+test('under a pause, a pass and `nemia ls` over a run at work whose folder stops loading finish, its finishing tasks read without it', async (t) => {
+  const working = await started('at work when its folder goes');
+  for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
+  const taskId = readRun(working.id).steps.work.taskId!;
+  assert.match((await Effect.runPromise(e.view(taskId))).phase, /^running/, 'its step at work before its folder goes');
+  unfrozen(working.id, path.join(ROOT, 'no-folder-at-work'));
   putPause({ why: 'a test pauses', by: 'ann' });
   t.after(() => resumePause());
+
   const pass = await runWith(e, tickRun({ repo: ROOT }));
   assert.ok(pass.pause, 'the pass read the pause');
   assert.ok(
-    pass.unreadable?.some((w) => w.startsWith(LEFT_OUT(bad.id))),
+    pass.unreadable?.some((w) => w.startsWith(LEFT_OUT(working.id))),
     JSON.stringify(pass.unreadable),
   );
-  assert.ok(!pass.pause.finishing.some((f) => f.run === bad.id));
+  assert.ok(!pass.pause.finishing.some((f) => f.run === working.id));
+
+  const { out, threw } = await printedBy(t, ['ls']);
+  assert.equal(threw, undefined);
+  assert.ok(
+    out.some((l) => l.includes(`→ unreadable: ${working.id}'s workflow folder does not load, so nemia ls does not judge the run`)),
+    out.join('\n'),
+  );
 });
 
 test("nemia ls says the run with the folder's words and lists its steps off its record, and fails nothing", async (t) => {

@@ -136,16 +136,19 @@ test('REFUSED: a wait that says what it waits for by a function says it as it st
   assert.deepEqual(stuck.said, ['never came: c1 succeeded; c1 running (working)']);
 
   const unsaid = waiter(of);
-  const failing = until(
+  let still: unknown;
+  void until(
     unsaid.t,
     () => false,
     () => {
       throw new Error('the journal does not read');
     },
-  ).catch((e: unknown) => e);
+  ).catch((e: unknown) => {
+    still = e;
+  });
   unsaid.abort();
-  const still = await failing;
-  assert.ok(still instanceof Error);
+  await turn();
+  assert.ok(still instanceof Error, 'failed at the abort, though what it waits for could not be said');
   assert.equal(still.message, 'never came: (the wait could not say what: the journal does not read)', 'it fails all the same');
 });
 

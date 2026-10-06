@@ -86,9 +86,13 @@ function refusal(fn: () => unknown): string {
 const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
 
-/** A team of one step `build` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
+/** A team of one step `build` on `place: git` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
 const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
-  path.join(tree({ 'workflows/team/build.md': step, 'workflows/agents/builder.md': agent, ...files }), 'workflows', 'team');
+  path.join(
+    tree({ 'workflows/team/build.md': step.replace(/^---\n/, '---\nplace: git\n'), 'workflows/agents/builder.md': agent, ...files }),
+    'workflows',
+    'team',
+  );
 
 test("an agent gives skills by name and says what becomes of Claude Code's prompt, each its own line, read and written back", () => {
   const a = parseAgent(
@@ -531,7 +535,10 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
     'nothing to render: an agent with no instructions, no skills and the default prompt',
   );
   assert.equal(
-    renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': '---\nplace: git\n---\nJust a step.\n' }), 'workflows', 'team'))[0], dir),
+    renderedFlags(
+      loadWorkflows(path.join(tree({ 'workflows/team/build.md': '---\nplace: git\n---\nJust a step.\n' }), 'workflows', 'team'))[0],
+      dir,
+    ),
     undefined,
     'nothing to render: a step with no agent',
   );
@@ -681,7 +688,7 @@ test("a git run's step whose folder is gone is told a skill from the run's repos
   );
   git('add', '-A');
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'skills');
-  const dir = storeTeam('lost-git', { write: '---\nagent: scribe\n---\nWrite about tides.\n' });
+  const dir = storeTeam('lost-git', { write: '---\nplace: git\nagent: scribe\n---\nWrite about tides.\n' });
   const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
   fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
   const { e, filed } = board();
@@ -716,10 +723,14 @@ test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and th
     return args[args.indexOf('-s') + 1];
   };
   for (const sandbox of CODEX_SANDBOXES) {
-    assert.equal(sandboxOf(`---\nharness: codex\nsandbox: ${sandbox}\n---\nreview it\n`), sandbox);
-    assert.equal(sandboxOf(`---\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`), sandbox, `the former line, ${sandbox}`);
+    assert.equal(sandboxOf(`---\nplace: git\nharness: codex\nsandbox: ${sandbox}\n---\nreview it\n`), sandbox);
+    assert.equal(
+      sandboxOf(`---\nplace: git\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`),
+      sandbox,
+      `the former line, ${sandbox}`,
+    );
   }
-  assert.equal(sandboxOf('---\nharness: codex\npermissionMode: bypassPermissions\n---\nreview it\n'), 'danger-full-access');
+  assert.equal(sandboxOf('---\nplace: git\nharness: codex\npermissionMode: bypassPermissions\n---\nreview it\n'), 'danger-full-access');
   const { args } = codex.command({
     name: 'review',
     brief: 'b',

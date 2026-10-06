@@ -26,7 +26,7 @@ const agentsOf = (files: Record<string, string>): Agents =>
 
 /** The step `name` written with `lines` as its frontmatter, resolved with `agents`. */
 const stepOf = (agents: Agents, lines: string, name = 'build'): Workflow =>
-  parseWorkflow(name, `---\n${lines}\n---\nDo it.\n`, undefined, agents);
+  parseWorkflow(name, `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
 
 /** What `fn` was refused with: a `WorkflowError`'s message, or a failed assertion when it was not refused. */
 function refusal(fn: () => unknown): string {
@@ -233,10 +233,12 @@ test('REFUSED at shipped defaults: the same widening on an agent a factory hires
   fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nplace: git\nagent: ada\n---\n');
   const folder = path.join(dir, 'dev');
   const written = refusal(() =>
-    writeWorkflow(folder, [{ name: 'build', after: [], agent: 'ada', tools: ['Read', 'Bash'], body: '' }], undefined, { anywhere: true }),
+    writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'ada', tools: ['Read', 'Bash'], body: '' }], undefined, {
+      anywhere: true,
+    }),
   );
   holds(written, 'build', 'tools: Read, Bash', '`Bash`', 'ada');
-  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nagent: ada\n---\n', 'nothing written');
+  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: ada\n---\n', 'nothing written');
 });
 
 test("REFUSED at shipped defaults: `background: true` over an agent in any mode but the widest, which the person's own allow rules would widen", () => {
@@ -281,10 +283,12 @@ test("REFUSED at shipped defaults: `background: true` over an agent in any mode 
   fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nplace: git\nagent: ada\n---\n');
   const folder = path.join(dir, 'dev');
   const written = refusal(() =>
-    writeWorkflow(folder, [{ name: 'build', after: [], agent: 'ada', background: true, body: '' }], undefined, { anywhere: true }),
+    writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'ada', background: true, body: '' }], undefined, {
+      anywhere: true,
+    }),
   );
   holds(written, 'build', 'background: true', '`dontAsk`', 'ada');
-  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nagent: ada\n---\n', 'nothing written');
+  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: ada\n---\n', 'nothing written');
 });
 
 test("REFUSED: a fence held to the directory where an agent's every allow reaches outside it, and each one given loads over its agent", () => {

@@ -29,7 +29,7 @@ const agentsOf = (files: Record<string, string>): Agents =>
 
 /** The step `name` written with `lines` as its frontmatter, resolved with `agents`. */
 const stepOf = (agents: Agents, lines: string, name = 'build'): Workflow =>
-  parseWorkflow(name, `---\n${lines}\n---\nDo it.\n`, undefined, agents);
+  parseWorkflow(name, `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
 
 /** What `fn` was refused with: a `WorkflowError`'s message, or a failed assertion when it was not refused. */
 function refusal(fn: () => unknown): string {
@@ -68,9 +68,13 @@ test('a step never takes a skill from its agent: naming a few of them still give
 test("a step is written back with its own `skills:` line as it wrote it, never its agent's, and reads back as the same step", () => {
   const step = stepOf(AGENTS, 'agent: ada\nskills: beta, gamma');
   const text = renderStep(step);
-  assert.equal(text, '---\nagent: ada\nskills: beta, gamma\n---\nDo it.\n');
+  assert.equal(text, '---\nplace: git\nagent: ada\nskills: beta, gamma\n---\nDo it.\n');
   assert.ok(isDeepStrictEqual(parseWorkflow('build', text, undefined, AGENTS), step), text);
-  assert.equal(renderStep(stepOf(AGENTS, 'agent: ada')), '---\nagent: ada\n---\nDo it.\n', 'a step that adds none writes no line');
+  assert.equal(
+    renderStep(stepOf(AGENTS, 'agent: ada')),
+    '---\nplace: git\nagent: ada\n---\nDo it.\n',
+    'a step that adds none writes no line',
+  );
 });
 
 /** Holds a fence refusal to its parts: the step and its line, the skill, the agent's file, the rule and both fixes. */
@@ -122,12 +126,14 @@ test('REFUSED at shipped defaults: the same skill added over a factory hire, and
   const folder = path.join(dir, 'dev');
   holds(
     refusal(() =>
-      writeWorkflow(folder, [{ name: 'build', after: [], agent: 'tooled', skills: ['look'], body: '' }], undefined, { anywhere: true }),
+      writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'tooled', skills: ['look'], body: '' }], undefined, {
+        anywhere: true,
+      }),
     ),
     'look',
     'tooled',
   );
-  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nagent: tooled\n---\n', 'nothing written');
+  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: tooled\n---\n', 'nothing written');
 });
 
 test('REFUSED: `skills:` on a step with no agent, naming the fix; the same file over a factory hire loads', () => {
@@ -177,19 +183,19 @@ function teamWith(text: string): string {
 }
 
 test('REFUSED: a skill the step adds that no place has, naming every place looked in and the fix; one the team has loads', () => {
-  const root = teamWith('---\nagent: implementer\nskills: no-such-skill\n---\n');
+  const root = teamWith('---\nplace: git\nagent: implementer\nskills: no-such-skill\n---\n');
   const said = refusal(() => loadWorkflows(path.join(root, 'dev')));
   assert.ok(said.startsWith('implement: `skills: no-such-skill` adds the skill `no-such-skill`, and no skills folder has it'), said);
   for (const looked of skillsFor(path.join(root, 'dev')).looked) assert.ok(said.includes(looked), `names ${looked}: ${said}`);
   assert.ok(said.includes("take `no-such-skill` off this step's `skills:`"), said);
 
-  const found = teamWith('---\nagent: implementer\nskills: review-a-change\n---\n');
+  const found = teamWith('---\nplace: git\nagent: implementer\nskills: review-a-change\n---\n');
   const step = loadWorkflows(path.join(found, 'dev')).find((s) => s.name === 'implement')!;
   assert.deepEqual(step.agent?.skills, ['implement-a-change', 'review-a-change']);
 });
 
 test("`nemia start` freezes the step's own line and the session's list, renders the added skill and names it; a later edit changes nothing", async () => {
-  const root = teamWith('---\nagent: implementer\nskills: review-a-change\n---\n');
+  const root = teamWith('---\nplace: git\nagent: implementer\nskills: review-a-change\n---\n');
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });

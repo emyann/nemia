@@ -197,7 +197,10 @@ test('agents/ is beside the workflow folders, and is not one of them: workflowsI
 });
 
 test('REFUSED at shipped defaults: a workflow named agents — loaded, named bare, or written', () => {
-  const repo = workflows({ 'workflows/dev/implement.md': '---\nplace: git\n---\nImplement it.\n', 'workflows/agents/implementer.md': 'Implement it.\n' });
+  const repo = workflows({
+    'workflows/dev/implement.md': '---\nplace: git\n---\nImplement it.\n',
+    'workflows/agents/implementer.md': 'Implement it.\n',
+  });
   const folder = path.join(repo, 'workflows', 'agents');
   const loaded = refusal(() => loadWorkflows(folder));
   assert.equal(
@@ -210,7 +213,7 @@ test('REFUSED at shipped defaults: a workflow named agents — loaded, named bar
 
   const before = fs.readFileSync(path.join(folder, 'implementer.md'), 'utf8');
   const written = refusal(() =>
-    writeWorkflow(folder, [{ name: 'implement', after: [], body: 'Implement it.' }], undefined, { anywhere: true }),
+    writeWorkflow(folder, [{ name: 'implement', after: [], place: 'git', body: 'Implement it.' }], undefined, { anywhere: true }),
   );
   assert.ok(written.startsWith(`${folder} is agents/, the folder of the agents`), written);
   assert.deepEqual(fs.readdirSync(folder), ['implementer.md'], 'nothing written');
@@ -244,7 +247,7 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
     build.agent,
     {
       name: 'implementer',
-      keys: ['after', 'model', 'check'],
+      keys: ['after', 'place', 'model', 'check'],
       body: 'Build the parser first.',
       given: { harness: 'claude', effort: 'high', context: '200k', disallowedTools: 'SendMessage' },
       instructions: 'Implement what you are asked.',
@@ -285,9 +288,14 @@ const hire = (agent: string, step = 'implement') => ({ agent, factory: 'pipao', 
 
 test('a step whose file names no agent, hired one, is resolved exactly as if its file said `agent:` it', () => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
-  const text = '---\nmodel: sonnet\n---\nBuild the parser first.\n';
+  const text = '---\nplace: git\nmodel: sonnet\n---\nBuild the parser first.\n';
   const hired = parseWorkflow('implement', text, undefined, agents, undefined, hire('implementer'));
-  const written = parseWorkflow('implement', '---\nplace: git\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n', undefined, agents);
+  const written = parseWorkflow(
+    'implement',
+    '---\nplace: git\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n',
+    undefined,
+    agents,
+  );
   assert.deepEqual(hired, written);
   assert.equal(hired.agent?.name, 'implementer');
   assert.equal(hired.body, 'Implement what you are asked.\n\nBuild the parser first.');
@@ -377,28 +385,35 @@ test('REFUSED at shipped defaults: a broken agent, only when a step names it, na
 
 test("renderStep writes a resolved step as its file was: `agent:`, the step's own keys and its own note — never the agent's", () => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
-  const text = '---\nafter: plan\nresume: plan\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n';
+  const text = '---\nafter: plan\nresume: plan\nplace: git\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n';
   const build = parseWorkflow('build', text, undefined, agents);
   const rendered = renderStep(build);
-  assert.equal(rendered, '---\nafter: plan\nresume: plan\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n');
+  assert.equal(rendered, '---\nafter: plan\nresume: plan\nplace: git\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n');
   assert.deepEqual(parseWorkflow('build', rendered, undefined, agents), build, 'it reads back as the same step');
-  assert.equal(renderStep(parseWorkflow('build', '---\nplace: git\nagent: implementer\n---\n', undefined, agents)), '---\nagent: implementer\n---\n\n');
+  assert.equal(
+    renderStep(parseWorkflow('build', '---\nplace: git\nagent: implementer\n---\n', undefined, agents)),
+    '---\nplace: git\nagent: implementer\n---\n\n',
+  );
 
   assert.equal(
     renderStep({ ...build, effort: 'low', after: ['plan', 'lint'] }),
-    '---\nafter: plan, lint\nresume: plan\nagent: implementer\nmodel: sonnet\neffort: low\n---\nBuild the parser first.\n',
+    '---\nafter: plan, lint\nresume: plan\nplace: git\nagent: implementer\nmodel: sonnet\neffort: low\n---\nBuild the parser first.\n',
     "a key the step did not set, changed since it was read, is the step's own now — never dropped for being the agent's",
   );
   const derived = parseWorkflow('build', '---\nresume: plan\nplace: git\nagent: implementer\n---\n', undefined, agents);
   assert.deepEqual(derived.after, ['plan']);
   assert.equal(
     renderStep(derived),
-    '---\nresume: plan\nagent: implementer\n---\n\n',
+    '---\nresume: plan\nplace: git\nagent: implementer\n---\n\n',
     "an after: the parser made of resume: is not written as the step's",
   );
 
-  const draft = renderStep({ name: 'build', after: [], agent: 'implementer', model: 'sonnet', body: 'Build it.' });
-  assert.equal(draft, '---\nagent: implementer\nmodel: sonnet\n---\nBuild it.\n', 'a draft naming its agent is its own keys and note');
+  const draft = renderStep({ name: 'build', after: [], place: 'git', agent: 'implementer', model: 'sonnet', body: 'Build it.' });
+  assert.equal(
+    draft,
+    '---\nplace: git\nagent: implementer\nmodel: sonnet\n---\nBuild it.\n',
+    'a draft naming its agent is its own keys and note',
+  );
 });
 
 test('writeWorkflow resolves against the agents beside the folder, keeps a file that reads as its step, and refuses an agent there is not', () => {
@@ -413,12 +428,12 @@ test('writeWorkflow resolves against the agents beside the folder, keeps a file 
   assert.deepEqual(written.steps, steps);
 
   const unknown = refusal(() =>
-    writeWorkflow(folder, [{ name: 'build', after: [], agent: 'builder', body: 'Build it.' }], undefined, { anywhere: true }),
+    writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'builder', body: 'Build it.' }], undefined, { anywhere: true }),
   );
   assert.ok(unknown.startsWith('build: `agent: builder` is not an agent here. The agents are: implementer'), unknown);
   assert.equal(
     fs.readFileSync(path.join(folder, 'build.md'), 'utf8'),
-    '---\n# the implementer, cheaper\nagent: implementer\nmodel: sonnet\n---\n',
+    '---\nplace: git\n# the implementer, cheaper\nagent: implementer\nmodel: sonnet\n---\n',
     'nothing written',
   );
 });
@@ -443,7 +458,7 @@ test('a codex agent names its sandbox as `sandbox:`, and one that says `permissi
   const own = parseWorkflow('review', '---\nplace: git\nagent: reviewer\npermissionMode: read-only\n---\n', undefined, agents);
   assert.deepEqual(
     [own.sandbox, own.permissionMode, own.agent?.keys],
-    ['read-only', undefined, ['sandbox']],
+    ['read-only', undefined, ['place', 'sandbox']],
     "a step on codex by its agent's line, whose own line names the sandbox the former way: read as its own sandbox:",
   );
 });
@@ -465,13 +480,17 @@ test("REFUSED at shipped defaults: `sandbox:` on an agent or a step that runs on
     implementer: '---\nharness: claude\npermissionMode: dontAsk\n---\nImplement.\n',
     reviewer: '---\nharness: codex\nsandbox: read-only\n---\nReview.\n',
   });
-  const moved = refusal(() => parseWorkflow('build', '---\nplace: git\nagent: implementer\nharness: codex\neffort: high\n---\n', undefined, agents));
+  const moved = refusal(() =>
+    parseWorkflow('build', '---\nplace: git\nagent: implementer\nharness: codex\neffort: high\n---\n', undefined, agents),
+  );
   assert.ok(
     moved.startsWith('build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude'),
     `a Claude Code agent's mode, taken by a step that runs on codex by its own line, cannot be compared with a sandbox: ${moved}`,
   );
   assert.ok(
-    refusal(() => parseWorkflow('review', '---\nplace: git\nagent: reviewer\nharness: claude\n---\n', undefined, agents)).includes(onClaude),
+    refusal(() => parseWorkflow('review', '---\nplace: git\nagent: reviewer\nharness: claude\n---\n', undefined, agents)).includes(
+      onClaude,
+    ),
     "a codex agent's sandbox, taken by a step that runs on Claude Code by its own line, is refused",
   );
   assert.ok(
@@ -489,9 +508,9 @@ test("REFUSED at shipped defaults: a step that runs a fenced agent on the other 
   });
   for (const line of ['permissionMode: read-only', 'sandbox: read-only']) {
     assert.ok(
-      refusal(() => parseWorkflow('build', `---\nplace: git\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, agents)).startsWith(
-        'build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude',
-      ),
+      refusal(() =>
+        parseWorkflow('build', `---\nplace: git\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, agents),
+      ).startsWith('build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude'),
       `${line}: a sandbox cannot be compared with the agent's mode`,
     );
     const step = parseWorkflow('build', `---\nplace: git\nagent: mover\nharness: codex\n${line}\n---\n`, undefined, agents);
@@ -500,9 +519,13 @@ test("REFUSED at shipped defaults: a step that runs a fenced agent on the other 
       ['codex', 'read-only', undefined],
       `${line}: the sandbox is read under its former name, permissionMode:, as under sandbox:`,
     );
-    assert.deepEqual(step.agent?.keys, ['harness', 'sandbox'], line);
+    assert.deepEqual(step.agent?.keys, ['place', 'harness', 'sandbox'], line);
     assert.deepEqual(step.agent?.given, {}, `${line}: the agent gives the step nothing`);
-    assert.equal(renderStep(step), '---\nagent: mover\nharness: codex\nsandbox: read-only\n---\n\n', `${line}: written back as its own`);
+    assert.equal(
+      renderStep(step),
+      '---\nplace: git\nagent: mover\nharness: codex\nsandbox: read-only\n---\n\n',
+      `${line}: written back as its own`,
+    );
   }
   assert.ok(
     refusal(() =>
@@ -530,9 +553,14 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   });
   const folder = path.join(dir, 'dev');
   const said = refusal(() =>
-    writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', permissionMode: 'read-only', body: '' }], undefined, {
-      anywhere: true,
-    }),
+    writeWorkflow(
+      folder,
+      [{ name: 'review', after: [], place: 'git', agent: 'reviewer', permissionMode: 'read-only', body: '' }],
+      undefined,
+      {
+        anywhere: true,
+      },
+    ),
   );
   assert.ok(
     said.startsWith('review: `permissionMode: read-only` on a step that runs on codex is the former name of `sandbox:` there') &&
@@ -540,9 +568,14 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
     said,
   );
   const kept = refusal(() =>
-    writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', permissionMode: 'dontAsk', body: '' }], undefined, {
-      anywhere: true,
-    }),
+    writeWorkflow(
+      folder,
+      [{ name: 'review', after: [], place: 'git', agent: 'reviewer', permissionMode: 'dontAsk', body: '' }],
+      undefined,
+      {
+        anywhere: true,
+      },
+    ),
   );
   assert.ok(
     kept.startsWith('review: `permissionMode: dontAsk` on a step that runs on codex is the former name of `sandbox:` there') &&
@@ -550,13 +583,13 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
       !kept.includes('`sandbox: dontAsk`'),
     `a Claude Code mode kept by a step moved onto codex is refused as the sandbox a file would read it as: ${kept}`,
   );
-  assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nagent: reviewer\n---\n', 'nothing written');
-  writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', sandbox: 'read-only', body: '' }], undefined, {
+  assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nplace: git\nagent: reviewer\n---\n', 'nothing written');
+  writeWorkflow(folder, [{ name: 'review', after: [], place: 'git', agent: 'reviewer', sandbox: 'read-only', body: '' }], undefined, {
     anywhere: true,
   });
   assert.equal(
     fs.readFileSync(path.join(folder, 'review.md'), 'utf8'),
-    '---\nagent: reviewer\nsandbox: read-only\n---\n\n',
+    '---\nplace: git\nagent: reviewer\nsandbox: read-only\n---\n\n',
     'sent under its own name, it is written',
   );
 });
@@ -578,7 +611,7 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
   assert.equal(build.body, 'Implement what you are asked.\n\nBuild it.');
   assert.deepEqual(build.agent, {
     name: 'implementer',
-    keys: [],
+    keys: ['place'],
     body: 'Build it.',
     given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallowedTools: 'SendMessage' },
     instructions: 'Implement what you are asked.',

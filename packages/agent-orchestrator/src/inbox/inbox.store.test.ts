@@ -63,7 +63,7 @@ const aRepoWith = (...workflows: string[]): string => {
   git('commit', '-q', '--allow-empty', '-m', 'base');
   for (const name of workflows) {
     fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
-    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `implement it, on ${name}\n`);
+    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `---\nplace: git\n---\nimplement it, on ${name}\n`);
   }
   return repo;
 };

@@ -63,7 +63,7 @@ function refusal(dir: string, write: () => unknown): string {
   return assert.fail(`${dir} was written, and should have been refused`);
 }
 
-const step = (name: string, more: Partial<StepDraft> = {}): StepDraft => ({ name, after: [], body: `${name} it`, ...more });
+const step = (name: string, more: Partial<StepDraft> = {}): StepDraft => ({ name, after: [], place: 'git', body: `${name} it`, ...more });
 
 test("a workflow's steps written back as they were leave every file as it was — comments included — and read back as the steps", () => {
   const dir = devIn('as-it-was');
@@ -103,7 +103,7 @@ test('a step changed is rendered and written, a step unchanged keeps its file, a
     before['review.schema.json'],
     "a schema in the folder is the folder's, and no write of the steps touches it",
   );
-  assert.equal(fs.readFileSync(path.join(dir, 'docs.md'), 'utf8'), '---\nafter: implement\nmodel: sonnet\n---\ndocs it\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'docs.md'), 'utf8'), '---\nafter: implement\nplace: git\nmodel: sonnet\n---\ndocs it\n');
   assert.deepEqual(
     loadWorkflows(dir).map((s) => s.name),
     ['implement', 'docs'],

@@ -18,7 +18,7 @@ const AGENTS: Agents = new Map([
 
 /** The step `name` written with `lines` as its frontmatter and `note` as its own words, resolved with the agents above. */
 const stepOf = (lines: string, note = 'Build it.', name = 'build'): Workflow =>
-  parseWorkflow(name, `---\n${lines}\n---\n${note}\n`, undefined, AGENTS);
+  parseWorkflow(name, `---\nplace: git\n${lines}\n---\n${note}\n`, undefined, AGENTS);
 
 /** A run of `steps`, none filed, asked for `brief`. */
 const runOf = (steps: readonly Workflow[], brief = 'add a flag'): GitRun => ({

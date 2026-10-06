@@ -7233,7 +7233,7 @@ test(
     fs.writeFileSync(writer, fs.readFileSync(writer, 'utf8').replace('description:', 'skills: noting\ndescription:'));
     const cases: Array<[string, Parameters<typeof startRun>[0], RegExp]> = [
       ['an input', { brief: 'unreadable', repo: aRepo(), workflowDir: folder(), inputs: [input] }, /^--input: the run's files could/],
-      ['a skill', { brief: 'unrendered', workflowDir: team }, /^the steps' agents could not be rendered into /],
+      ['a skill', { brief: 'unrendered', repo: ROOT, workflowDir: team }, /^the steps' agents could not be rendered into /],
     ];
     for (const [what, opts, said] of cases) {
       const before = fs.readdirSync(s.runsDir()).sort();

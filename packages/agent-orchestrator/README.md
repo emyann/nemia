@@ -2313,6 +2313,11 @@ the record, as `.cancelled` is. `wf hold` writes it, the tick removes it when it
 hold it read: one put again since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
 is held until says so and names the `wf hold … --off` that lets it go.
 
+The board puts the same hold and lifts it, from a run's page: Hold… picks the runs of its repository to
+wait on and takes a why, and Lift… lifts it. Its `by` is the OS user the api runs as. The api serves them
+as `POST /api/runs/<id>/hold`, `{ "until": ["<run>", …], "why"?: "<words>", "by"?: "<name>" }`, and
+`DELETE /api/runs/<id>/hold`: the same file, refused in the same words as `wf hold`.
+
 `wf hold` refuses the following before anything is written, and names the fix for each:
 
 - no `--until`, `--until` and `--off` together, a flag it does not take, or `--until` with no run

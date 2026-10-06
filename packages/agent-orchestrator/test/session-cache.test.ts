@@ -263,7 +263,10 @@ test("a loop's target that declares an `output:` of its own keeps one schema too
     '---\nplace: git\ncheck: npm test\nmodel: opus\neffort: high\noutput: implement.schema.json\n---\nimplement it\n',
   );
   fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(notes));
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\n---\nreview it\n');
+  fs.writeFileSync(
+    path.join(dir, 'review.md'),
+    '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\n---\nreview it\n',
+  );
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
   const { filed } = await walk(dir);
   assert.deepEqual(chainDifferences(filed), []);

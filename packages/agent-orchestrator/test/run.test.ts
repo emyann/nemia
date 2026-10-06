@@ -8125,7 +8125,12 @@ const LANDS = "Land this run's result on the base branch: stage the merge of its
 const landing = (note: string): Workflow[] => [
   step('implement'),
   step('review', ['implement']),
-  parseWorkflow('land', `---\nafter: review\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`, undefined, new Map([['otto', OTTO]])),
+  parseWorkflow(
+    'land',
+    `---\nafter: review\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`,
+    undefined,
+    new Map([['otto', OTTO]]),
+  ),
 ];
 const atOtto = (land: string | null = null) =>
   run({}, { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, land: { taskId: land } } });

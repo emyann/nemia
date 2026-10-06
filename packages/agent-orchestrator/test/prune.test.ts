@@ -59,7 +59,10 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`, whose closeout names a file it leaves in its workspace — with a `budget:`, when given one. */
 const oneStep = (budget?: number) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${budget === undefined ? '' : `budget: ${budget}\n`}---\nimplement it\n`);
+  fs.writeFileSync(
+    path.join(dir, 'implement.md'),
+    `---\nplace: git\n${budget === undefined ? '' : `budget: ${budget}\n`}---\nimplement it\n`,
+  );
   return dir;
 };
 

@@ -155,7 +155,10 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
     'the paragraph after the title, and not the one after it',
   );
 
-  const lower = folder({ 'readme.md': '---\ntitle: ui\n---\nA change a person will see.\n', 'implement.md': '---\nplace: git\n---\nImplement it.\n' });
+  const lower = folder({
+    'readme.md': '---\ntitle: ui\n---\nA change a person will see.\n',
+    'implement.md': '---\nplace: git\n---\nImplement it.\n',
+  });
   assert.deepEqual(
     loadWorkflows(lower).map((s) => s.name),
     ['implement'],
@@ -174,7 +177,11 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
 
 test('a workflow README is read whole, in any case, and none is null', () => {
   const whole = '# dev\n\nImplement what was asked, then review it.\n\nMore about it.\n';
-  assert.equal(workflowReadme(folder({ 'README.md': whole, 'implement.md': '---\nplace: git\n---\nImplement it.\n' })), whole, 'every paragraph, the title too');
+  assert.equal(
+    workflowReadme(folder({ 'README.md': whole, 'implement.md': '---\nplace: git\n---\nImplement it.\n' })),
+    whole,
+    'every paragraph, the title too',
+  );
   const bom = String.fromCharCode(0xfeff);
   assert.equal(
     workflowReadme(folder({ 'readme.md': `${bom}A change a person will see.\n`, 'implement.md': '---\nplace: git\n---\nImplement it.\n' })),
@@ -1853,7 +1860,11 @@ test('`place:` is required: REFUSED at load, a step that names none, naming both
     'a folder whose other step says a place is refused for the missing line, not for two kinds of step',
   );
   assert.deepEqual(
-    [fm('write', 'place: git').place, fm('write', 'place: folder').place, parseWorkflow('write', '---\nworkspace: folder\n---\nDo it.\n').place],
+    [
+      fm('write', 'place: git').place,
+      fm('write', 'place: folder').place,
+      parseWorkflow('write', '---\nworkspace: folder\n---\nDo it.\n').place,
+    ],
     ['git', 'folder', 'folder'],
   );
 });

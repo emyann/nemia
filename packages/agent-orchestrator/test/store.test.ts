@@ -4691,7 +4691,10 @@ const plannedFolder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'planned-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\n---\nplan it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\nloop: implement\noutput: review.schema.json\n---\nreview it\n');
+  fs.writeFileSync(
+    path.join(dir, 'review.md'),
+    '---\nafter: implement\nplace: git\nloop: implement\noutput: review.schema.json\n---\nreview it\n',
+  );
   fs.writeFileSync(
     path.join(dir, 'review.schema.json'),
     JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),

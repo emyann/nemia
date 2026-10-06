@@ -794,7 +794,10 @@ test("REFUSED: an ending led by an agent that says `You are …` — `nemia deci
   const atGate = async (note: string) => {
     const dir = fs.mkdtempSync(path.join(team, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-    fs.writeFileSync(path.join(dir, 'land.md'), `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`);
+    fs.writeFileSync(
+      path.join(dir, 'land.md'),
+      `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`,
+    );
     const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
     const { e, settle } = board();
     await runWith(e, advanceRun(readRun(run.id)));

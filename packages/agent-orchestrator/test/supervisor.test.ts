@@ -38,7 +38,8 @@ const aRepo = (): string => {
 /** A folder of steps written from their frontmatter and a one-line body. */
 const folderOf = (steps: Record<string, string>): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  for (const [name, front] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
+  for (const [name, front] of Object.entries(steps))
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
   return dir;
 };
 

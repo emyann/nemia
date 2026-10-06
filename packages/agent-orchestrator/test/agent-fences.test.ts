@@ -236,7 +236,8 @@ const stepOf = (agent: string): Step => loadWorkflows(TEAM_DEV).find((step) => s
 /** A folder of steps written from their frontmatter and a one-line body, beside no agents. */
 const folderOf = (steps: Record<string, string>): string => {
   const dir = scratch('wf-fences-folder-');
-  for (const [name, front] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
+  for (const [name, front] of Object.entries(steps))
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
   return dir;
 };
 

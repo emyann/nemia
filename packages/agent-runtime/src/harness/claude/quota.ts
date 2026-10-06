@@ -8,6 +8,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import os from 'node:os';
 import { Effect, Exit } from 'effect';
 import type { HarnessQuota, QuotaLimit } from '../seam.ts';
+import { withoutTelemetry } from '../telemetry.ts';
 
 /** How long an ask may take before it is given up on, and its process ended. */
 export const QUOTA_TIMEOUT_MS = 15_000;
@@ -175,10 +176,10 @@ const answered = (child: ChildProcessWithoutNullStreams, id: string): Effect.Eff
 
 /**
  * Ask Claude Code for the plan's usage: start `command` (`claude` on PATH, `USAGE_ARGS`) in the system's temporary directory, in this
- * process's environment without a session's keys (`usageEnv`), write one `get_usage` request with an id of its own, and read its stdout
- * for the control_response with that id. The process is taken in the ask's scope and let go as it closes (`letGo`), whatever ends it: an
- * outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never fails: every way it can go is a
- * `HarnessQuota`, and no `claude` on PATH is `missing`.
+ * process's environment without a session's keys (`usageEnv`) or its telemetry (`withoutTelemetry`), write one `get_usage` request with
+ * an id of its own, and read its stdout for the control_response with that id. The process is taken in the ask's scope and let go as it
+ * closes (`letGo`), whatever ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never
+ * fails: every way it can go is a `HarnessQuota`, and no `claude` on PATH is `missing`.
  */
 export const claudeQuota = ({
   command = 'claude',
@@ -187,7 +188,9 @@ export const claudeQuota = ({
   Effect.suspend(() => {
     const id = `usage-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     return Effect.acquireRelease(
-      Effect.sync(() => spawn(command, USAGE_ARGS, { cwd: os.tmpdir(), env: usageEnv(process.env), stdio: ['pipe', 'pipe', 'pipe'] })),
+      Effect.sync(() =>
+        spawn(command, USAGE_ARGS, { cwd: os.tmpdir(), env: withoutTelemetry(usageEnv(process.env)), stdio: ['pipe', 'pipe', 'pipe'] }),
+      ),
       (child, exit) => letGo(child, Exit.isSuccess(exit)),
     ).pipe(
       Effect.flatMap((child) => answered(child, id)),

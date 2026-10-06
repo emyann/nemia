@@ -38,7 +38,7 @@ fs.writeFileSync(
   [
     '#!/bin/sh',
     `echo "args $*" >> '${calls}'`,
-    `echo "env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_PID=\${CLAUDE_PID-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
+    `echo "env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_PID=\${CLAUDE_PID-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN-unset} OTEL_EXPORTER_OTLP_ENDPOINT=\${OTEL_EXPORTER_OTLP_ENDPOINT-unset} TRACEPARENT=\${TRACEPARENT-unset} CLAUDE_CODE_ENABLE_TELEMETRY=\${CLAUDE_CODE_ENABLE_TELEMETRY-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
     `case "$(cat '${mode}')" in`,
     '  silent) exec sleep 30 ;;',
     "  exit) echo 'claude: the harness was told to fail' >&2; exit 3 ;;",
@@ -164,6 +164,27 @@ test("REFUSED: the ask starts claude in print mode without the user's settings, 
     '-p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ',
     "started without the user's settings, their plugins, hooks and skills' sync, without MCP servers, and writing no session",
   );
+});
+
+test("REFUSED: the ask's claude inherits none of the engine's telemetry, so it exports nothing as the engine's process", async () => {
+  const own = {
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9/the-engine-own',
+    TRACEPARENT: '00-ffffffffffffffffffffffffffffffff-ffffffffffffffff-01',
+    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+  };
+  usageAnswer(recorded('plan'));
+  const before = { ...process.env };
+  Object.assign(process.env, own);
+  try {
+    assert.deepEqual(await Effect.runPromise(claudeQuota()), PLAN);
+  } finally {
+    for (const key of Object.keys(own)) {
+      if (before[key] === undefined) delete process.env[key];
+      else process.env[key] = before[key];
+    }
+  }
+  const ran = lastEnv();
+  assert.deepEqual([ran.OTEL_EXPORTER_OTLP_ENDPOINT, ran.TRACEPARENT, ran.CLAUDE_CODE_ENABLE_TELEMETRY], ['unset', 'unset', 'unset']);
 });
 
 test('REFUSED: an answer to another request — or a line that is not one — is not taken for this one', async () => {

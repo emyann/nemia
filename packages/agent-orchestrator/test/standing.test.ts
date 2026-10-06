@@ -13,6 +13,7 @@ import path from 'node:path';
 import { runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { shippedOver } from '../src/branches/branches.ts';
+import { knownOf } from '../src/standing/standing.verb.ts';
 import { scratch } from './scratch.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
 
@@ -353,4 +354,21 @@ test('REFUSED: standing told what it last read of a branch in any shape but { ti
     unread.unread.said,
     `the request's \`branches[0]\` is ${JSON.stringify(told)}, where { branch, tip?, baseRef, known?: { tip, pastBase } } is asked`,
   );
+});
+
+test('REFUSED: what standing read of a branch is kept only against a baseRef that is a commit id, and its pastBase only of one judged', () => {
+  const at = { branch: 'wf/r/a', onBase: 'yes', ahead: 0 } as const;
+  const id = 'a'.repeat(40);
+  assert.deepEqual(knownOf({ branch: 'wf/r/a', baseRef: NOWHERE }, { ...at, tip: id, pastBase: true }), { tip: id, pastBase: true });
+  assert.equal(knownOf({ branch: 'wf/r/a', baseRef: 'main' }, { ...at, tip: id, pastBase: true }), undefined, 'main moves');
+  assert.equal(knownOf({ branch: 'wf/r/a', baseRef: NOWHERE }, undefined), undefined, 'nothing read of it');
+  assert.deepEqual(
+    knownOf({ branch: 'wf/r/g', tip: 'HEAD~1', baseRef: NOWHERE }, { ...at, tip: null, pastBase: true }),
+    { tip: null, pastBase: null },
+    'a recorded tip that is a name',
+  );
+  assert.deepEqual(knownOf({ branch: 'wf/r/g', tip: id, baseRef: NOWHERE }, { ...at, tip: null, pastBase: false }), {
+    tip: id,
+    pastBase: false,
+  });
 });

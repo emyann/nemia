@@ -20,6 +20,7 @@ const PINNED: Record<string, string[]> = {
     'BY_KEYS',
     'CHECK_AFFECTING',
     'CLI',
+    'CLI_VERBS',
     'COMMANDS',
     'Conflict',
     'DAEMON_FILE',

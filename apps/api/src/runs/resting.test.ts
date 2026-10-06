@@ -328,6 +328,16 @@ test("a branch tip that moves is judged afresh once a pass reads it: the base br
   );
 });
 
+test('REFUSED: a finished run whose branches no pass has read is not kept, and is one to decide once a pass reads them', async () => {
+  aFinishedRun('r-unread');
+  await list();
+  assert.ok(!resting.runs.has('r-unread'), 'where its branch stands is unread: nothing to keep it against');
+  assert.equal((await unverified(() => listed('r-unread')))?.toDecide ?? null, null, 'unread decides nothing');
+  await aPass();
+  assert.equal((await unverified(() => listed('r-unread')))?.toDecide?.kind, 'git', 'read by the pass: ahead of the base');
+  assert.ok(resting.runs.has('r-unread'), 'and kept, against the tips the pass read');
+});
+
 test('a run removed from the store leaves the memo', async () => {
   aFinishedRun('r-gone');
   await aPass();

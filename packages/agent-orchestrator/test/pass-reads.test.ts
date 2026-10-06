@@ -40,7 +40,9 @@ const { passParents, reportedEngine } = await import('../src/views/views.verb.ts
 const { metered } = await import('../src/meter/tally.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
-const { readStanding } = await import('../src/standing/standing.store.ts');
+const { readStanding, standingFile } = await import('../src/standing/standing.store.ts');
+const { runsListed } = await import('../src/list/list.verb.ts');
+const { lsLines } = await import('../src/list/list.ts');
 const { NOTHING_READ, standingReader, standingSnapshot } = await import('../src/standing/standing.verb.ts');
 const { statusMemo } = await import('../src/place/landing.store.ts');
 const { RunPlace } = await import('../src/place/place.store.ts');
@@ -301,6 +303,21 @@ test("a pass's one standing for the repository asks of a finished run, a pruned 
     0,
     'read off standing.json',
   );
+});
+
+test('nemia ls reads where branches stand off standing.json and starts no process; with none, it says not read, never a verdict', async () => {
+  const { b } = await theStore();
+  await onePass(b);
+  const spawned = async () => {
+    const { value, tallies } = await metered(() => runWith(b.e, runsListed()));
+    return { lines: lsLines(value, Date.now()).join('\n'), spawned: Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0) };
+  };
+  assert.equal((await spawned()).spawned, 0, 'read off the snapshot');
+  fs.rmSync(standingFile());
+  const { lines, spawned: none } = await spawned();
+  assert.equal(none, 0, 'no snapshot, and still no process');
+  assert.match(lines, /where branches stand: not read/);
+  for (const verdict of ['shipped', ' is on ', 'ahead of', 'is gone']) assert.ok(!lines.includes(verdict), `nemia ls says ${verdict}`);
 });
 
 test("a run's asks are listed once a read, and each file in them read once", async () => {

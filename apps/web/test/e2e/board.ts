@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectCount, expectTexts, expectVisible, idle, Refused, WAIT_MS, watch } from './checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { DIAMOND } from './seed.ts';
 import { API, photographing, store } from './world.ts';
 
@@ -125,7 +125,10 @@ export const themeOf = (page: Page): Promise<string> =>
 
 /**
  * Takes a picture of a page or of what a locator finds into `file`, with every CSS animation stilled for the shot and played again after
- * it: an agent's face, which moves at all times, is drawn at rest with its eyes open, the same in every run. `fullPage` as Playwright's.
+ * it: an agent's face, which moves at all times, is drawn at rest with its eyes open, the same in every run. `fullPage` as Playwright's,
+ * but a page taller than its window is taken in a window as tall as the page (`grownToPage`), so its sticky header and footer and its fixed
+ * sidebar are drawn once, where a person sees them, never where the window was; the window and the scroll are put back after the shot,
+ * whether it was taken or refused. A page that fits its window, and a locator, are taken as Playwright takes them.
  * Takes none, and writes nothing, unless the page being visited is pictured (`photographing`) or the picture is taken `always`: a
  * failure's.
  */
@@ -135,7 +138,62 @@ export async function photograph(
   { always = false, ...options }: { fullPage?: boolean; always?: boolean } = {},
 ): Promise<void> {
   if (!photographing && !always) return;
-  await target.screenshot({ ...options, path: file, animations: 'disabled' });
+  const putBack = options.fullPage && 'viewportSize' in target ? await grownToPage(target, file) : undefined;
+  try {
+    await target.screenshot({ ...options, path: file, animations: 'disabled' });
+  } finally {
+    await putBack?.();
+  }
+}
+
+/** The tallest window a picture is taken in: Chromium draws no texture taller, and a page past it is taken as Playwright takes it. */
+export const TALLEST_WINDOW = 16_384;
+
+/** How tall `page`'s document is, measured as Playwright measures a full-page picture. */
+const pageHeight = (page: Page): Promise<number> =>
+  page.evaluate(() => {
+    const { body, documentElement: root } = document;
+    return Math.max(body.scrollHeight, root.scrollHeight, body.offsetHeight, root.offsetHeight, body.clientHeight, root.clientHeight);
+  });
+
+/** Resolves once `page` has drawn two more frames: what a resize or a scroll changes is laid out and painted. */
+const twoFrames = (page: Page): Promise<void> =>
+  page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+
+/**
+ * Grows `page`'s window to the height of its document, measured again after each growth until it holds still (three tries at most: a
+ * part as tall as the window grows with it), and waits for the floor to settle. Resolves with what puts the window's size and the scroll
+ * back, or with nothing, having changed nothing, when the page fits its window, has none, or is taller than `TALLEST_WINDOW`: that last
+ * is said on the log with `file`'s name, since its picture shows the frame where the window was.
+ */
+async function grownToPage(page: Page, file: string): Promise<(() => Promise<void>) | undefined> {
+  const size = page.viewportSize();
+  let height = await pageHeight(page);
+  if (!size || height <= size.height) return undefined;
+  if (height > TALLEST_WINDOW) {
+    console.log(
+      `e2e: ${path.basename(file)} is taken in its own window: its page is ${height} px tall, over the ${TALLEST_WINDOW} px a window can be`,
+    );
+    return undefined;
+  }
+  const scrolled = await page.evaluate(() => window.scrollY);
+  const putBack = async () => {
+    await page.setViewportSize(size);
+    await page.evaluate((y) => scrollTo(0, y), scrolled);
+    await twoFrames(page);
+  };
+  try {
+    for (let tries = 0; tries < 3 && height !== page.viewportSize()?.height; tries++) {
+      await page.setViewportSize({ width: size.width, height: Math.min(height, TALLEST_WINDOW) });
+      await twoFrames(page);
+      height = await pageHeight(page);
+    }
+    await settled(page);
+  } catch (err) {
+    await putBack();
+    throw err;
+  }
+  return putBack;
 }
 
 /** A face's idle loops, as Blobatar's stylesheet names them: it breathes, bobs, blinks and glances. */

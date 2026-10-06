@@ -48,6 +48,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's and is overwritten.
 - Take every picture with `photograph` (`board.ts`), which stills every animation for the shot: an agent's face moves at all times.
   `e2e-pictures.test.ts` refuses a bare `.screenshot(`.
+- Chromium takes a full-page picture in the window's size, drawing the sticky header and footer and the fixed sidebar where the window
+  was: `photograph` takes a page taller than its window in a window as tall as the page, then puts both back (`photograph.test.ts`).
 - A page run against the old code proves only its first failing assertion: to prove each new one, skip the earlier ones in a throwaway
   edit, run, and put the page back.
 - The store is in `/tmp`, which a boot can empty under a running check: when a failure says the store is gone (`storeGone`), run again.

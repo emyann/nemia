@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Metric, type Duration } from 'effect';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
-import { ownOf } from '../tick/file.verb.ts';
+import { ownOf } from '../tick/told.verb.ts';
 import { factoryMounts } from '../factory/factory.ts';
 import type { Mount } from '../record/record.ts';
 import { readFactories } from '../factory/factory.store.ts';

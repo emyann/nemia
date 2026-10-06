@@ -1826,21 +1826,24 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
   `LANDING_CHECK_DEADLINE_SECONDS` (longer than a round's: the e2e runs on the merged tree), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
-  `landEnding` in `ending/ending.verb.ts` acts), commits the merge with the message on exit 0 (`git commit -F -`) or runs
-  `git merge --abort` on anything else: a refusal, a check that did not finish, a message left blank, a merge that
+  `landEnding` in `ending/ending.verb.ts` acts through the place's `land`), commits the merge with the message on exit 0 or
+  aborts it on anything else: a refusal, a check that did not finish, a message left blank, a merge that
   conflicts or leaves out a result branch, a run cancelled or held first, or the session ending any way but `done`.
   The step reads `checking` until then, `verified ✓` once the commit is made, and `failed ✗ check (…)` or `failed`
   once the merge is aborted, and its record keeps which (`landed: {commit}` or `{aborted}`), which `wf ls` words on the
-  step's line — the commit, or why none was made — and the board with it. The session is filed denied `git commit` and
-  `git merge --continue` beside its own `disallowedTools:` (`filedDenies`), so it cannot commit the merge before the
-  check; a deny is a prefix, and a merge run without `--no-commit` would still commit, which the pass after records as
+  step's line — the commit, or why none was made — and the board with it. The session is filed denied what its place's `place.json` names
+  (`denyWhileLanding`; git's: `git commit` and `git merge --continue`) beside its own `disallowedTools:` (`filedDenies`), so it cannot
+  commit the merge before the check; a deny is a prefix, and a merge run without `--no-commit` would still commit, which the pass after records as
   committed before its check ran. The parser refuses such an ending on codex, which takes no deny list. A job cannot hold its
   turn open for a suite that runs twenty minutes; the run can, and a check that did not finish is not a verdict, so
   it lands nothing — `wf decide` offers `wf retry <run> ship`, which merges and checks again, never `--recheck`,
   since the merge it checked is gone. While the landing is owed, the checkout stays the run's (next bullets) and
-  `wf rm` refuses it. **Level-triggered**: a `MERGE_HEAD` on the base branch with no ship running is read off disk
-  on each pass; git is spawned in that checkout only once a landing can be due — the session and its check settled,
-  and a merge staged or a check to act on — and never takes its index lock (`ls-files --unmerged`, not `git diff`). A merge that is not this run's — its heads are not the result branches — is never touched. This
+  `wf rm` refuses it. **Level-triggered**: a merge staged on the base branch with no ship running is read on each pass by a
+  `stat` of the file the place named at `open` (`stagedFile`, git's `MERGE_HEAD`; `stagedHere` in `place/landing.store.ts`), and,
+  for a run started before its place named one, by the place's `status`; `status` is asked of that checkout only once a landing can be
+  due — the session and its check settled, and a merge staged or a check to act on — and git's never takes its index lock
+  (`ls-files --unmerged`, not `git diff`). A `status` the place refuses or does not answer is no verdict: nothing is committed or
+  aborted, and the run says why. A merge that is not this run's — its heads are not the result branches — is never touched. This
   run's is committed only on the word of an exit 0 already recorded, and aborted otherwise; after a restart, a commit
   already on the base branch is recorded as landed, and a merge a person aborted by hand is recorded with the
   check's words. An ending that stopped on its own word — blocked, unsigned, failed — with nothing staged is written

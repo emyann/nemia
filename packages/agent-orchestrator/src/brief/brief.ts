@@ -21,7 +21,7 @@ import {
 } from './brief-sections.ts';
 import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
 import { mergeReviewSection, mergeSection } from '../merge/merge.ts';
-import { checkContract, checkHandedSection, landingContract, type CheckHanded } from '../check/check.ts';
+import { checkContract, checkHandedSection, landingContract, type CheckHanded, type LandingWords } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
@@ -108,6 +108,8 @@ const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?:
  *   nothing is said of them.
  * @param costs For a step whose `reads:` names `costs`: what recent finished runs of its workflow in its factory cost (`costsRead`), read
  *   by file.verb.ts and said among what the step is handed (`costsSection`). Absent, and nothing is said of costs.
+ * @param landing For an ending that lands on its check: how its place stages the merge and what it denies (`landingWords`), said in its
+ *   contract. Absent, and the contract sends it to its place's skill.
  */
 export function composeBrief(
   step: Workflow,
@@ -123,10 +125,11 @@ export function composeBrief(
   checked?: readonly CheckHanded[],
   folders?: FiledFolders,
   costs?: WorkflowCosts,
+  landing?: LandingWords,
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
-    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check) : checkContract(step.check)] : []),
+    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, landing) : checkContract(step.check)] : []),
     ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
     closeoutContract(step, repliesOf(step, run, steps, round), inFolder),
   ].join('\n');
@@ -231,8 +234,7 @@ export function composeBrief(
   }
   if (tree.length) parts.push(...(earlier.length ? [''] : []), ...tree);
 
-  if (given) parts.push(given);
-  parts.push(contracts);
+  parts.push(...(given ? [given] : []), contracts);
   return parts.join('\n');
 }
 

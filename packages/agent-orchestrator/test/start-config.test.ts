@@ -19,7 +19,7 @@ const { configRefused, startRun, StartRefusal, stepsToStart } = await import('..
 const { startPlan } = await import('../src/plan/plan.verb.ts');
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 const { configRefusal } = await import('../src/runtime-client.ts');
-const { LANDING_DENIED } = await import('../src/ending/ending.ts');
+const { SHIPPED_PLACE, readPlaceJson } = await import('../src/place/place.store.ts');
 
 /** A folder of `implement`, with `own` among its keys, and its ending `ship`, which lands on its check once approved, with `ending`. */
 function folder(name: string, own = 'effort: high', ending = 'gate: true'): string {
@@ -71,7 +71,7 @@ test("REFUSED: a step's value its harness refuses, named by the line it comes fr
 test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone, as no line of it gave the deny list', () => {
   const steps = stepsToStart(GATED, true, places).map((s) => (s.name === 'ship' ? { ...s, harness: 'codex' } : s));
   const why = configRefused(steps, places, []);
-  assert.equal(why, `ship: ${configRefusal('codex', { disallowedTools: [...LANDING_DENIED] })}`);
+  assert.equal(why, `ship: ${configRefusal('codex', { disallowedTools: [...readPlaceJson(SHIPPED_PLACE).denyWhileLanding] })}`);
 });
 
 test("REFUSED: a gate given at start makes an ending land on its check, and its harness's refusal of the deny list follows it", () => {

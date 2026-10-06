@@ -1,16 +1,15 @@
 /**
  * The git place the package ships (`place/git/`), its real scripts run through `runPlaceVerb` against scratch repositories: each verb's
  * answer, a refusal and an unread outcome, and a verb held past its deadline by a hook or a filter, which leaves neither running nor a
- * lock behind. `place.json` decodes, declares exactly the verbs `scripts/` holds, and denies a landing session what `LANDING_DENIED`
- * denies today. Git runs with no user or system configuration and a fixed identity, so a machine's hooks, default branch or signing
- * change nothing here.
+ * lock behind. `place.json` decodes, declares exactly the verbs `scripts/` holds, and denies a landing session the two commands that
+ * commit a staged merge. Git runs with no user or system configuration and a fixed identity, so a machine's hooks, default branch or
+ * signing change nothing here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { LANDING_DENIED } from '../src/ending/ending.ts';
 import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
 import { running } from './running.ts';
@@ -88,6 +87,13 @@ function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceO
   return outcome.answer;
 }
 
+/** The file `open` names for a merge staged in the checkout `root`, or a failure where it names none. */
+function stagedOf(root: string): string {
+  const { staged } = answerOf(run('open', { root }));
+  assert.ok(staged !== undefined, `open named no staged-merge file for ${root}`);
+  return staged;
+}
+
 /** The words of a refusal, or a failure naming what it was instead. */
 function refusalOf(outcome: PlaceOutcome<PlaceVerb>): string {
   assert.ok('refused' in outcome, `a refusal expected, got ${JSON.stringify(outcome)}`);
@@ -100,7 +106,7 @@ function unreadOf(outcome: PlaceOutcome<PlaceVerb>): string {
   return outcome.unread.said;
 }
 
-test('place.json decodes, declares exactly the verbs scripts/ holds, and denies a landing what LANDING_DENIED does', () => {
+test('place.json decodes, declares exactly the verbs scripts/ holds, and denies a landing the commands that commit its merge', () => {
   const declared = readPlaceJson(GIT_SKILL);
   const scripts = fs
     .readdirSync(path.join(GIT_SKILL, 'scripts'))
@@ -119,7 +125,7 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     'status',
     'trial',
   ]);
-  assert.deepEqual(declared.denyWhileLanding, LANDING_DENIED);
+  assert.deepEqual(declared.denyWhileLanding, ['Bash(git commit:*)', 'Bash(git merge --continue:*)']);
 });
 
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
@@ -135,9 +141,45 @@ test('a request that does not carry v 1 is refused by every script, exit 2, befo
   }
 });
 
-test('open answers the repository as given, the commit HEAD is at, and the branch it is on', () => {
+test('open answers the repository as given, the commit HEAD is at, the branch it is on, and the file a staged merge is named in', () => {
   const dir = repository();
-  assert.deepEqual(answerOf(run('open', { root: dir })), { repo: dir, baseRef: git(dir, 'rev-parse', 'HEAD'), branch: 'main' });
+  assert.deepEqual(answerOf(run('open', { root: dir })), {
+    repo: dir,
+    baseRef: git(dir, 'rev-parse', 'HEAD'),
+    branch: 'main',
+    staged: path.join(dir, '.git', 'MERGE_HEAD'),
+  });
+});
+
+test("open names a linked worktree's own staged-merge file, under the git directory its .git file names, and no other's", () => {
+  const dir = repository();
+  branched(dir, 'wf/x/a', 'g', 'theirs\n');
+  const tree = path.join(scratch('wf-git-skill-tree-'), 'w');
+  git(dir, 'worktree', 'add', '-q', '-b', 'ship', tree, 'main');
+  const staged = stagedOf(tree);
+  assert.ok(!staged.startsWith(tree), `the file is not under the worktree's folder: ${staged}`);
+  assert.notEqual(staged, stagedOf(dir));
+  assert.equal(fs.existsSync(staged), false);
+  git(tree, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
+  assert.equal(fs.existsSync(staged), true, 'there exactly while a merge is staged in that worktree');
+  git(tree, 'merge', '--abort');
+  assert.equal(fs.existsSync(staged), false);
+});
+
+test("the place's stage words, run as said with the checkout and the branches filled, stage a merge its status reads as ours", () => {
+  const dir = repository();
+  const a = branched(dir, 'wf/x/a', 'f', 'a\n');
+  const b = branched(dir, 'wf/x/b', 'g', 'b\n');
+  const said = readPlaceJson(GIT_SKILL).say.stage.replaceAll('{repo}', dir).replaceAll('{branches}', 'wf/x/a wf/x/b');
+  const ran = spawnSync('sh', ['-c', said], { env: ENV, encoding: 'utf8' });
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': a, 'wf/x/b': b } })), {
+    merging: 'ours',
+    conflicted: false,
+    missing: [],
+    head: git(dir, 'rev-parse', 'HEAD'),
+  });
+  assert.equal(fs.existsSync(stagedOf(dir)), true, "and open's file says it");
 });
 
 test('REFUSED: open on no directory, on a directory that is no repository, and on a repository with no commit', () => {

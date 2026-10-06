@@ -134,7 +134,6 @@ export {
   filedDenies,
   gateRefusal,
   landedWords,
-  LANDING_DENIED,
   landingDue,
   landingOpen,
   merges,

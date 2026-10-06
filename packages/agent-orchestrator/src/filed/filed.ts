@@ -9,27 +9,34 @@ import { handedMounts } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 
 /**
- * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow
- * the run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues
- * (`sessionContext`), its deny list with an ending's (`filedDenies`), its allow list with an ending's read of the run's artifacts folder
- * (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start), writable where the step's `writable:` names
- * one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): the artifacts folder of each step it comes after,
- * read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`; the key left out with none, and the
- * harness's own arguments (`own`) last. The runtime judges no budget: `budgetUsd` is the harness's own cap, and whether the step went
- * over is this package's (`ownStatus`). Pure.
+ * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the
+ * run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues (`sessionContext`), its
+ * deny list with what the run's place denies an ending (`filedDenies`, `t.landingDenied`, asked of an ending alone), its allow list with
+ * an ending's read of the run's artifacts folder (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start),
+ * writable where the step's `writable:` names one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): the
+ * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`;
+ * the key left out with none, and the harness's own arguments (`own`) last. The runtime judges no budget: `budgetUsd` is the harness's own
+ * cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
   step: Workflow,
   steps: readonly Workflow[],
   run: Pick<Run, 'gates' | 'mounts'>,
-  t: { model: string | undefined; budgetUsd: number | undefined; runArtifacts: string; inbox: string; own: Own },
+  t: {
+    model: string | undefined;
+    budgetUsd: number | undefined;
+    runArtifacts: string;
+    inbox: string;
+    own: Own;
+    landingDenied: () => readonly string[];
+  },
 ) => ({
   model: t.model,
   effort: step.effort,
   contextTokens: sessionContext(step, steps),
   permissionMode: modeOf(step),
   tools: step.tools,
-  disallowedTools: filedDenies(step, run),
+  disallowedTools: filedDenies(step, run, t.landingDenied),
   allowedTools: filedAllows(step, t.runArtifacts),
   background: step.background,
   budgetUsd: t.budgetUsd,

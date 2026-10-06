@@ -100,9 +100,9 @@ export type AskName = { kind: 'retry' | 'round' | 'merge'; step: string; n: numb
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
  * @param verb The verb the fixes name: `nemia prune` is held by every reason `nemia rm` is (`pruneRefusal`), and its fixes end in `nemia
  * prune`.
- * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.store.ts), for an ending that lands on
- *   its check: one staged and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the
- *   engine say holds it.
+ * @param merging Whose merge is in progress in the repository's checkout, as the run's place reads it (`merging` in prune.verb.ts), for an
+ *   ending that lands on its check: one staged and not landed holds the run (`landingOpen`). Left out, the place is not asked, and only
+ *   what the record and the engine say holds it.
  * @param command The command its fixes name, when it is more than `nemia <verb> <id>`: a prune's, with the flags it was given
  * (`pruneAgain`).
  */
@@ -240,7 +240,7 @@ function unlandedEnding(f: Forgetting, live: readonly string[]): Workflow | unde
     ending &&
     !live.length &&
     steps &&
-    landingOpen(ending, run, ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf), phaseOf, merging);
+    landingOpen(ending, run, ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf), phaseOf, () => merging);
   return unlanded ? ending : undefined;
 }
 

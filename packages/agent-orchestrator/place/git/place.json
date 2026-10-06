@@ -9,6 +9,7 @@
     "drop": "git -C {repo} branch -D {branches}",
     "conflicts": "`git status` shows them.",
     "unlock": "git -C {repo} worktree unlock {path}",
+    "stage": "git -C {repo} merge --no-ff --no-commit {branches}",
     "attach": "git -C {path} switch -c <branch>",
     "commit": "git -C {path} commit",
     "inspect": "git -C {path} status",

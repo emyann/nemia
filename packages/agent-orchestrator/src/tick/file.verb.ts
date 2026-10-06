@@ -2,13 +2,13 @@
  * What a pass files, and what it files a step with: the tries due (`fileTries`), the rounds (`fileRounds`), the checks (`fileChecks`) and
  * the ready steps (`fileReady`), in the order `advanceRun` calls them, each under the id the run derives and asking the store first
  * whether it may file (`mayFileOf`), a nudge answering a task held open through `answerHeld` (`held.verb.ts`); the fields of a filing
- * that only a local harness reads (`localFields`), and the step as it is told (`toldOf`); what its roots are handed of other runs is
- * `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * that only a local harness reads (`localFields`), the step as it is told (`toldOf`, told.verb.ts); what its roots are handed of other runs
+ * is `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { asked, awaited, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
+import { asked, awaited, over, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
@@ -17,6 +17,7 @@ import {
   LANDING_CHECK_DEADLINE_SECONDS,
   type CheckHanded,
   type LandingSaid,
+  type LandingWords,
   type Verdict,
 } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
@@ -58,12 +59,8 @@ import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } f
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
-import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
+import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
-import { placesOf } from '../folder/lookup.store.ts';
-import { skillsFor } from '../folder/folder.store.ts';
-import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { noteFiledCheck, within } from '../meter/tally.store.ts';
 import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
@@ -71,6 +68,7 @@ import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
+import { landingTold, toldOf, type Landing, type Told } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -80,40 +78,6 @@ import { stepLabels } from '../telemetry/telemetry.ts';
  */
 export const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> =>
   isRemoteHarness(step.harness) ? {} : fields();
-
-/**
- * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
- * `nemia start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent —
- * is filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
- * `renderedIn`) — gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its
- * start, so its brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to
- * claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag,
- * first among its others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the
- * directory Codex's trust extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config
- * lists; a folder run has no repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one
- * whose repository is no longer there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a
- * try and a round each spread into its `config`.
- */
-export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
-  const dir = agentFilesDir(run, step.name);
-  const told =
-    rendersAgent(step) && !renderedIn(dir, step)
-      ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
-      : step;
-  return { step: told, own: ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)) };
-}
-
-/**
- * The harness's own arguments a step is filed with (`toldOf`), off the flags its agent rendered to and its repository's real path, which
- * is asked only of a step whose harness takes it. Pure but for `repoOf`.
- */
-export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
-  const repo = step.harness === 'codex' ? repoOf() : undefined;
-  return {
-    claude: step.remote ? { remoteControl: true as const, ...rendered } : rendered,
-    ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
-  };
-};
 
 /** A task as the engine is asked to file it (`e.file`). */
 type Spec = Parameters<Engine['file']>[0];
@@ -221,6 +185,8 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
+  const landing = landingTold(run, step, notes);
+  if (!landing) return;
   const answers = answersHeld(f, r, step, record);
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
   if (closeRefused) {
@@ -229,7 +195,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   }
   const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
   const briefed = answers ? undefined : (yield* asked('view', f.e.view(taskId))).state.brief;
-  const refused = answers || !briefed ? yield* sendTry(f, r, step, taskId, answers) : undefined;
+  const refused = answers || !briefed ? yield* sendTry(f, r, step, taskId, answers, landing) : undefined;
   if (refused) {
     notes.push(`${r.step}: ${refused}`);
     return;
@@ -250,10 +216,10 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
 });
 
 /**
- * Send a try to the engine: filed as a task of its own, or given as the answer to the task held open (`answers`). Answers with the
- * engine's refusal of the answer, or undefined.
+ * Send a try to the engine, told what its place says of its landing (`words`): filed as a task of its own, or given as the answer to the
+ * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
  */
-const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean) {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: Landing) {
   const { e, run, reads } = f;
   const record = run.steps[r.step];
   const files = artifactsDir(run, r.step);
@@ -264,7 +230,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
-  const told = toldOf(run, step);
+  const told: Told = { ...toldOf(run, step), ...landing };
   const brief = remote
     ? remoteBrief(step, run, reads.steps, closeouts, {
         try: r.try,
@@ -288,6 +254,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         yield* costsFor(f, step, Boolean(resumeFrom)),
+        told.words,
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -351,7 +318,7 @@ const trySpec = (
   r: Retry,
   step: Workflow,
   record: StepRecord,
-  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: ReturnType<typeof toldOf> },
+  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: Told },
 ): Spec => ({
   id: t.taskId,
   brief: t.brief,
@@ -366,6 +333,7 @@ const trySpec = (
       runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
       inbox: inboxDir(),
       own: t.told.own,
+      landingDenied: () => t.told.words?.denied ?? [],
     }),
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -393,6 +361,9 @@ export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: r
 const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: string[]) {
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
+  const target = stepNamed(f, r.target);
+  const landing = landingTold(run, target, notes);
+  if (!landing) return;
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
   const refused = yield* closeFirst(f, r.target, record.taskId);
@@ -403,8 +374,8 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   looped.push(r.step);
   notes.push(roundFiledNote(r, looping));
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
-    const target = stepNamed(f, r.target);
     const said = {
+      words: landing.words,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
@@ -435,7 +406,7 @@ function roundSpec(
   looping: Workflow,
   target: Workflow,
   taskId: string,
-  said: { landing?: LandingSaid; costs?: WorkflowCosts },
+  said: { words: LandingWords | undefined; landing?: LandingSaid; costs?: WorkflowCosts },
 ): Spec {
   const { run, reads } = f;
   const record = run.steps[r.target];
@@ -464,6 +435,7 @@ function roundSpec(
       undefined,
       filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       said.costs,
+      said.words,
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -479,6 +451,7 @@ function roundSpec(
           stepSpend(run, r.target, reads.spendOf),
         ),
         own: told.own,
+        landingDenied: () => said.words?.denied ?? [],
       }),
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -556,6 +529,8 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
+    const landing = landingTold(run, step, f.notes);
+    if (!landing) continue;
     const place = yield* awaited(() => within('act', () => workspaceFor(run, f.reads.steps, step)));
     f.notes.push(...place.notes.map((note) => `${name}: ${note}`));
     if (!f.mayFile()) break;
@@ -567,6 +542,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       checked,
       closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
       costs: yield* costsFor(f, step, false),
+      words: landing.words,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
@@ -595,6 +571,7 @@ function readySpec(
     checked: readonly CheckHanded[];
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
+    words: LandingWords | undefined;
   },
 ): Spec {
   const { parents, closeoutOf } = said;
@@ -626,6 +603,7 @@ function readySpec(
           said.checked,
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
           said.costs,
+          said.words,
         ),
     cwd: place.workspace,
     harness: step.harness,
@@ -639,6 +617,7 @@ function readySpec(
         inbox: inboxDir(),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
+        landingDenied: () => said.words?.denied ?? [],
       }),
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

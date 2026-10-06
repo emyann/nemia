@@ -121,8 +121,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **What `engine()` reads, it reads without throwing** (`readRemote`): a bad file is left out and said on stderr.
 - **A task journal that does not read stops its own run, never the pass**: `pass` in `tick/tick.verb.ts` leaves the run unjudged, in
   flight and out of the feed's `removed` (`unreadableJournal`); `test/unreadable-journal.test.ts` walks it on the runtime itself.
-- **The ending's check is the run's**: the shipper stages the merge; the tick commits on the check's exit 0 or aborts (`landingDue`),
-  level-triggered off `MERGE_HEAD`, reading conflicts with `ls-files --unmerged` (never `git diff`, which takes the index lock). A landed
+- **The ending's check is the run's**: the shipper stages the merge; the tick commits on the check's exit 0 or aborts (`landingDue`)
+  through the place's `land`, level-triggered off the place's `status`, asked only where `landingOpen` holds, and the `stat` of the file
+  `open` named (`stagedHere`, `place/landing.store.ts`); an unread `status` is never a verdict. A landed
   ending keeps no pictures of the merged tree but those its closeout names (`dropLandedPictures`).
 
 ## Checks and worktrees

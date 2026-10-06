@@ -304,6 +304,7 @@ const DECLARED = {
     drop: 'd',
     conflicts: 'c',
     unlock: 'u',
+    stage: 'st',
     attach: 'a',
     commit: 'm',
     inspect: 'i',

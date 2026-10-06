@@ -15,7 +15,7 @@ import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig } from '../filed/filed.ts';
 import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
-import { ownOf } from '../tick/file.verb.ts';
+import { ownOf } from '../tick/told.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
 import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -29,7 +29,7 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { readInclude } from '../workspace/worktree.store.ts';
-import { SHIPPED_PLACE, openPlace } from '../place/place.store.ts';
+import { SHIPPED_PLACE, openPlace, readPlaceJson } from '../place/place.store.ts';
 import type { PlaceVerb } from '../place/place.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -148,6 +148,9 @@ export const configRefused = (
   written: Readonly<Record<string, string>> = {},
 ): string | undefined => refusedStep(steps, places, gates, written, [])?.why;
 
+/** What the package's place denies a landing session (`denyWhileLanding`), as an ending's first filing is denied it. */
+const shippedDenies = (): readonly string[] => readPlaceJson(SHIPPED_PLACE).denyWhileLanding;
+
 /** `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`). */
 function refusedStep(
   steps: readonly Workflow[],
@@ -163,7 +166,7 @@ function refusedStep(
       step,
       steps,
       { gates: [...gates], ...(mounts.length ? { mounts: [...mounts] } : {}) },
-      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own },
+      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own, landingDenied: shippedDenies },
     );
     const former = written[step.name];
     const lines = (field: string) =>
@@ -363,7 +366,7 @@ const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run
   const placeDir = yield* StartPlace;
   const needed = placeVerbsNeeded(told.workflow ?? [], told);
   const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed));
-  const { baseRef, branch } = opened;
+  const { baseRef, branch, staged } = opened;
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, parentRecord));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
@@ -375,6 +378,7 @@ const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run
     ...told,
     branch,
     placeSkill,
+    ...(staged === undefined ? {} : { stagedFile: staged }),
     steps,
     createdAt: new Date().toISOString(),
   };

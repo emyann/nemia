@@ -45,8 +45,12 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   seal: 120_000,
 };
 
-/** What `open` answers at `nemia start`: the repository, the commit a run starts from, and the line of work it is on. */
-export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string };
+/**
+ * What `open` answers at `nemia start`: the repository, the commit a run starts from, the line of work it is on, and, where the place
+ * names one, `staged`: the absolute path of the file whose presence says a merge is staged in that checkout, which the code reads with a
+ * `stat` and no process (`stagedHere`).
+ */
+export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly staged?: string };
 
 /**
  * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for its brief.
@@ -223,7 +227,19 @@ export type PlaceOutcome<V extends PlaceVerb> =
   | { readonly unread: Unread };
 
 /** The keys of `place.json`'s `say`: the sentences the code prints that name a place's own commands, as templates with `{name}` holes. */
-export const PLACE_SAYS = ['look', 'readResult', 'ship', 'drop', 'conflicts', 'unlock', 'attach', 'commit', 'inspect', 'orphans'] as const;
+export const PLACE_SAYS = [
+  'look',
+  'readResult',
+  'ship',
+  'drop',
+  'conflicts',
+  'unlock',
+  'stage',
+  'attach',
+  'commit',
+  'inspect',
+  'orphans',
+] as const;
 
 /**
  * What a place skill's `place.json` declares: the contract's version, the verbs its scripts answer, the tools a landing session is denied,

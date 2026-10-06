@@ -4208,6 +4208,7 @@ test('REFUSED at `nemia start --after`, on either side, when a folder run is inv
     branch: undefined,
     isolate: undefined,
     placeSkill: undefined,
+    stagedFile: undefined,
   };
   const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = {
     'a-1': { record: record('a-1') },
@@ -9548,6 +9549,28 @@ test('REFUSED: landingDue aborts a merge it is not to commit — a check that re
   );
 });
 
+test('REFUSED: landingDue neither commits nor aborts on a checkout its place gave no reading of: it waits, and says why', () => {
+  const unread = { unread: "the place's status was not heard: timed out" };
+  const at = (own: StepStatus, check: TaskPhase | undefined, verdict?: Verdict, r = atLanding()) => {
+    const { check: _filed, ...unfiled } = r.steps.ship;
+    return landingDue(
+      LANDER,
+      check ? r : { ...r, steps: { ...r.steps, ship: unfiled } },
+      own,
+      phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', ...(check ? { 't-ship-check': check } : {}) }),
+      'Add a flag',
+      verdict,
+      true,
+      () => unread,
+    );
+  };
+  const wait = { act: 'wait', why: unread.unread };
+  assert.deepEqual(at('checking', 'succeeded', 0), wait, 'a passed check commits nothing it cannot read');
+  assert.deepEqual(at('checking', 'failed', 1), wait, 'a refused check aborts nothing it cannot read');
+  assert.deepEqual(at('blocked', undefined), wait, 'an ending that did not sign off done aborts nothing it cannot read');
+  assert.deepEqual(at('checking', 'succeeded', 0, atLanding({ cancelledAt: '2026-01-01T01:00:00Z' })), wait, 'nor a run called off');
+});
+
 test('REFUSED: landingDue reads no git where no landing can be due — its session or its check in flight, or an ending that did not sign off done with nothing staged', () => {
   const read = (r: Run, own: StepStatus, ship: TaskPhase, check: TaskPhase | undefined, staged: boolean) => {
     const { check: _filed, ...unfiled } = r.steps.ship;
@@ -9645,7 +9668,7 @@ test('ownStatus reads an ending that lands on its check off the landing: checkin
 
 test('landingOpen holds the checkout from the filing to the landing, and lets go once landed', () => {
   const open = (r: Run, own: StepStatus, ship: TaskPhase, check: TaskPhase | undefined, merging: MergeState['merging']) =>
-    landingOpen(LANDER, r, own, phases({ 't-ship': ship, ...(check ? { 't-ship-check': check } : {}) }), merging);
+    landingOpen(LANDER, r, own, phases({ 't-ship': ship, ...(check ? { 't-ship-check': check } : {}) }), () => merging);
   assert.equal(open(atLanding(), 'running', 'running', undefined, 'none'), true, 'its session works');
   assert.equal(open(atLanding(), 'checking', 'succeeded', 'running', 'ours'), true, 'its check runs');
   assert.equal(open(atLanding(), 'checking', 'succeeded', 'succeeded', 'ours'), true, 'settled, and not yet landed');

@@ -250,7 +250,7 @@ test('the same store paused: once the pass after the pause has read every run wi
   assert.equal((await measured()).rested, 200, 'and once it is lifted, as before');
 });
 
-test('the same store, the memo emptied before every pass as a restarted daemon has it: every finished run is read again, and git asked for each', async () => {
+test('the same store, the memo emptied before every pass as a restarted daemon has it: every finished run is read again, git no more', async () => {
   const [none, , twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
   const fresh = await measured(freshRestMemo());
   assert.equal(fresh.rested, 0, 'nothing answered from memory');
@@ -258,9 +258,10 @@ test('the same store, the memo emptied before every pass as a restarted daemon h
     journals(fresh) >= journals(none) + 200,
     `each of the 200 finished runs' tasks read (${journals(fresh)} reads, against ${journals(twoHundred)})`,
   );
-  assert.ok(
-    gits(fresh) >= gits(none) + 6,
-    `each of the six runs whose tips are read asks git on its own (${gits(fresh)} processes, against ${gits(twoHundred)})`,
+  assert.equal(
+    gits(fresh),
+    gits(twoHundred),
+    "the six runs whose tips are read ask no git of their own: their tips are read off the heads of the pass's one `standing` a repository",
   );
   assert.equal(
     journals(await measured()),

@@ -1,7 +1,7 @@
 /**
- * `standing`: where a repository's result branches stand against the base branch they land on, as a pass of the tick reads it. Takes
- * `{ repo, branches: [{ branch, tip?, baseRef }], base }`; answers `Standing`: `heads`, every branch of the repository and its commit, and
- * for each branch asked of, in the order asked, its tip, whether it is within `base` (`onBase`), whether the commit asked of holds work past
+ * `standing`: where a repository's result branches stand against the base branch they land on, as a pass of the tick reads it. Takes `{
+ * repo, branches: [{ branch, tip?, baseRef }], base }`; answers `Standing`: `heads`, every branch of the repository and its commit, and for
+ * each branch asked of, in the order asked, its tip, whether it is within `base` (`onBase`), whether the commit asked of holds work past
  * its run's `baseRef` (`pastBase`), and how many commits it is ahead of `base`.
  *
  * A branch git has is asked of by its name, and git's no about it is final. A branch git no longer has reads `tip: null` and is asked of by

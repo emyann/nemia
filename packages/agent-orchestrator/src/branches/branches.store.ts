@@ -116,6 +116,11 @@ export type BranchReader = {
    * so a branch that moves between the answer and the key is read as moved. Empty where git would not list them.
    */
   heads: (repo: string) => ReadonlyMap<string, string>;
+  /**
+   * Why where the run's result branches stand was not read, where a reader read it once for many questions and could not
+   * (`standingReader`): none of them has shipped, and the reader says so. Undefined where it was read, or where the reader asks as it goes.
+   */
+  unread?: (run: GitRun) => string | undefined;
 };
 
 const countOf = (said: string | undefined) => {

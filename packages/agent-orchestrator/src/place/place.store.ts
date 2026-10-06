@@ -83,7 +83,8 @@ const ChangesSchema = Schema.Struct({
   atBase: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
 }) satisfies Schema.Schema<Changes>;
 
-const StandingSchema = Schema.Struct({
+/** What `standing` answers (`Standing`), as `heard` decodes it, and as `standing.json` keeps each answer (`standing.store.ts`). */
+export const StandingSchema = Schema.Struct({
   heads: Schema.Record(Schema.String, Schema.String),
   branches: Schema.Array(
     Schema.Struct({

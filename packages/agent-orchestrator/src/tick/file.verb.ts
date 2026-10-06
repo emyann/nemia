@@ -58,7 +58,7 @@ import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } f
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, cutNotes, gitSays, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
+import { checkoutParts, cutNotes, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
 import { RunPlace } from '../place/place.store.ts';
@@ -111,10 +111,19 @@ export type Closer = {
 
 /**
  * One pass's filing: the engine, which files each brief with its parts beside it (`inParts`, given by `advancePass`), the run, what
- * the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), and the
- * pass's notes, which each filing adds to in the order it runs.
+ * the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), the
+ * pass's notes, which each filing adds to in the order it runs, and `heads`, every branch of the run's repository and its commit as the
+ * pass read them, undefined where it did not.
  */
-export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[] };
+export type Filing = {
+  e: Engine;
+  run: Run;
+  reads: PassReads;
+  closer: Closer;
+  mayFile: () => boolean;
+  notes: string[];
+  heads?: () => Readonly<Record<string, string>> | undefined;
+};
 
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
 const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);
@@ -515,13 +524,12 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
 
 /**
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
- * that waited on runs, on the pass that files its roots, moves its base to its branch as it stands; and a run that waited on runs or was
- * handed runs as context reads what they concluded (`handedOf`).
+ * that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it (`Filing.heads`), and keeps it
+ * where the pass did not; and a run that waited on runs or was handed runs as context reads what they concluded (`handedOf`).
  */
 export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean) {
   const { e, run } = f;
-  if (ready.length && starting && run.after?.length && isGitRun(run))
-    run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
+  if (ready.length && starting && run.after?.length && isGitRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run) : undefined;
   const filed: string[] = [];
   const dirOf = yield* RunPlace;

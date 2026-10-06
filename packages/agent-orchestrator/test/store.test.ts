@@ -5941,7 +5941,7 @@ test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-comm
     'a hook that speaks on stdout alone: git hands it on as its own stderr',
   );
   fs.writeFileSync(hook, '#!/bin/sh\nexit 3\n', { mode: 0o755 });
-  assert.equal((await runWith(b.e, forgetRun(p.run.id))).left[0].uncommitted, 'it exited 1', "one that says nothing: git's exit status");
+  assert.equal((await runWith(b.e, forgetRun(p.run.id))).left[0].uncommitted, 'git exited 1', "one that says nothing: git's exit status");
 
   fs.rmSync(hook);
   gitIn(p.wt, 'commit', '-q', '-m', 'the flag, committed by a person');

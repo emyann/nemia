@@ -252,3 +252,7 @@ export function missingVerbsRefusal(file: string, declared: PlaceDeclared, neede
  */
 export const sayFilled = (template: string, holes: Readonly<Record<string, string>>): string =>
   template.replace(/\{(\w+)\}/g, (hole: string, name: string) => (Object.hasOwn(holes, name) ? holes[name] : hole));
+
+/** What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure. */
+export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>
+  'refused' in outcome ? outcome.refused : outcome.unread.said;

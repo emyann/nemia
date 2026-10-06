@@ -1,24 +1,26 @@
 /**
  * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is
- * touched; and the words `nemia rm` shares with it — a path as git names a worktree (`resolved`), what git said when it refused
- * (`gitWords`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
+ * touched, and removing through the run's place (`runPlaceVerb`); and what `nemia rm` shares with it — a path as git names a worktree
+ * (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
  * (`runtime-client.ts`); it never stops anything.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { EngineService } from '../runtime-client.ts';
+import { EngineService, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import type { MergeState } from '../ending/ending.ts';
-import { pruneAgain, pruneRefusal, type Pruning } from './prune.ts';
-import { filesPrunedWords, isGitRun, namesInOrder, type Pruned, type Run } from '../record/record.ts';
+import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
+import { filesPrunedWords, isGitRun, namesInOrder, type GitRun, type Pruned, type Run } from '../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
-import { decision, type Decision } from '../decide/decide.ts';
-import { forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type AskName } from '../forget/forget.ts';
+import { decision } from '../decide/decide.ts';
+import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, runWorktrees, type AskName } from '../forget/forget.ts';
 import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { gitSays, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
+import { mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
+import { readRunPlace, RunPlace, runPlaceVerb, type RunPlaceRead } from '../place/place.store.ts';
+import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { resultTips, shippedOf, standingsOf } from '../branches/branches.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../tick/advance.verb.ts';
@@ -42,21 +44,25 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
  * rendered (`agents/`), the check logs and the engine's journals, each small and each read by `nemia decide` or the board — which say the
  * files were removed where they would list them, as the api's file route does (410).
  *
+ * What the run left is read first by its place (`inventory`, from the place `RunPlace` names): one refused or not heard is no answer,
+ * never an empty one, and the prune is refused in those words (`inventoryUnread`), touching nothing.
+ *
  * Read as `nemia rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run,
  * a run not over, anything that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is
- * locked, on no branch with something a removal would leave on none, or holds a change no commit has — or whose status git cannot read. No
+ * locked, on no branch with something a removal would leave on none, or holds a change no commit has — or whose status does not read. No
  * other run is asked: one waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its
  * worktrees; for its files it is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
  *
- * The worktrees are the run's as git lists them: a directory already gone is git's to forget (`git worktree prune`), not a removal, and a
+ * The worktrees are the run's as its place lists them: a directory already gone is git's to forget (the place's `remove` prunes), not a
+ * removal, and a
  * run with no worktree left answers `nothing`, and says why. A link as the files directory is removed as a link, and read as nothing to
  * give back.
  *
  * Without `yes`, nothing is touched: each worktree and what removing it frees on disk (`diskBytes`: a worktree's `node_modules` is main's
  * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it,
  * the run is marked pruned first (`runStore.runs.prune`), its files counted as gone when they are to go, so that a pass or the api
- * reading it while its worktrees go reads it pruned and files nothing (`advance`); then git removes each worktree — never `--force`, so
- * a file that turned up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under
+ * reading it while its worktrees go reads it pruned and files nothing (`advance`); then the place's `remove` takes the worktrees — never
+ * forced, so a file that turned up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under
  * `artifacts`, removed and never followed, what would not go said and counted out of what was freed; and the marker is written again with
  * what was removed. The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a
  * run never pruned before, as it was on one that was. The tick never calls this.
@@ -76,58 +82,93 @@ const pruning = Effect.fn('prune')(function* (
   if (!isGitRun(run)) return { id, kind: 'refused', refusal: folder!, ...none } satisfies Pruning;
 
   const within = resolved(path.join(HOME, 'worktrees', id));
-  let steps: Workflow[] | undefined;
+  const steps = frozenSteps(run);
+  const place = readRunPlace(run, (yield* RunPlace)(run), within);
+  if (!('inventory' in place))
+    return { id, kind: 'refused', refusal: inventoryUnread('prune', id, run.repo, place), ...none } satisfies Pruning;
+  const listed = placeWorktrees(run, steps, within, place).filter((w) => !(w.prunable && w.locked === undefined));
+  const filesDir = path.join(runsDir(), id, 'artifacts');
+  const files = artifacts && lstatOf(filesDir)?.isDirectory() ? filesDir : undefined;
+  if (!listed.length && !files) return nothingLeft(run, place, { yes, artifacts });
+
+  const judged = yield* judgedOf(e, run, steps, { unmerged, artifacts });
+  const worktreeFacts = listed.map((w) => pruneFact(run, place, w));
+  const refusal = pruneRefusal(run, { ...judged, worktrees: worktreeFacts, files: Boolean(files) }, { unmerged, artifacts });
+  if (refusal) return { id, kind: 'refused', refusal, ...none } satisfies Pruning;
+
+  const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));
+  const kept = files ? { path: files, bytes: diskBytes(files) } : undefined;
+  if (!yes) return { id, kind: 'prunable', worktrees, ...(kept ? { artifacts: kept } : {}), left: [] } satisfies Pruning;
+  return removeAll(run, place, within, worktrees, kept, unmerged);
+});
+
+/** A run's frozen steps, or none when its workflow does not read: the run is judged without them. */
+function frozenSteps(run: Run): Workflow[] | undefined {
   try {
-    steps = stepsOf(run);
-  } catch {}
+    return stepsOf(run);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The run's worktrees inside `within` as its place's inventory read them (`runWorktrees`), the record's paths read as git names them. */
+function placeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, within: string, place: RunPlaceRead) {
   const recorded = {
     ...run,
     steps: Object.fromEntries(
       Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st]),
     ),
   };
-  const listed = runWorktrees(
-    recorded,
-    namesInOrder(run, steps ?? []),
-    within,
-    parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''),
-  ).worktrees.filter((w) => !(w.prunable && w.locked === undefined));
-  const filesDir = path.join(runsDir(), id, 'artifacts');
-  const files = artifacts && lstatOf(filesDir)?.isDirectory() ? filesDir : undefined;
-  if (!listed.length && !files) {
-    const worktrees =
-      run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts)
-        ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (nemia prune)`
-        : !run.isolate
-          ? `it cut no worktree — it worked in ${run.repo} itself`
-          : 'no worktree of it is left';
-    const nothing = !artifacts
-      ? worktrees
-      : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
-    if (yes && run.pruned) gitSays(run.repo, 'worktree', 'prune');
-    return { id, kind: 'nothing', nothing, ...none } satisfies Pruning;
-  }
+  return runWorktrees(recorded, namesInOrder(run, steps ?? []), within, place.inventory.workspaces).worktrees;
+}
 
+/**
+ * Why a run with no worktree left — nor, under `--artifacts`, a files directory — has nothing to prune; with `yes` on a run pruned
+ * before, the place's `remove` of nothing, which prunes git's list of worktrees whose directory is gone.
+ */
+function nothingLeft(run: GitRun, place: RunPlaceRead, { yes, artifacts }: { yes: boolean; artifacts: boolean }): Pruning {
+  const worktrees =
+    run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts)
+      ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (nemia prune)`
+      : !run.isolate
+        ? `it cut no worktree — it worked in ${run.repo} itself`
+        : 'no worktree of it is left';
+  const nothing = !artifacts
+    ? worktrees
+    : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
+  if (yes && run.pruned) runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: [], branches: [] });
+  return { id: run.id, kind: 'nothing', nothing, worktrees: [], left: [] };
+}
+
+/**
+ * Whether the run is over, what holds it as `nemia rm` would be held (`forgetRefusal`, worded for prune) and the hand-offs owed, once
+ * what a pass filed and never wrote down is adopted onto it; none of it, for a run whose workflow does not read.
+ */
+const judgedOf = Effect.fn('prune.judged')(function* (
+  e: Engine,
+  run: GitRun,
+  steps: Workflow[] | undefined,
+  flags: { unmerged: boolean; artifacts: boolean },
+) {
+  const judged: Pick<PruneFacts, 'decided' | 'held' | 'owed'> = { decided: undefined, held: null, owed: [] };
+  if (!steps) return judged;
   const { views, phaseOf } = yield* taskPhasesRead(run);
-  const { asks, rounds } = runStore.asks.read(id);
+  const { asks, rounds } = runStore.asks.read(run.id);
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
-  let decided: Decision['kind'] | undefined;
-  let held: string | null = null;
-  let owed: string[] = [];
-  if (steps) {
-    yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
-    yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
-    yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
-    for (const { name, taskId } of yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
-      run.steps[name] = { ...run.steps[name], taskId };
-    }
-    decided = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind;
-    const askAt = (a: AskName) => runStore.asks.where(id, a);
-    const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
-    held = forgetRefusal(
+  yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
+  yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
+  yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
+  for (const { name, taskId } of yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
+    run.steps[name] = { ...run.steps[name], taskId };
+  }
+  const askAt = (a: AskName) => runStore.asks.where(run.id, a);
+  const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
+  return {
+    decided: decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind,
+    held: forgetRefusal(
       steps,
       run,
       phaseOf,
@@ -142,31 +183,41 @@ const pruning = Effect.fn('prune')(function* (
       standings,
       'prune',
       merging(run, steps),
-      pruneAgain(id, { unmerged, artifacts }),
-    );
-    owed = handOffOwed(steps, run, phaseOf);
-  }
-  const facts = listed.map((w) => {
-    const status = w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
-    const changes = (status ?? '')
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => line.slice(3));
-    const onBranch =
-      w.detached && w.head && w.locked === undefined
-        ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim())
-        : false;
-    const hold = heldWorktree(w, { clean: status !== undefined && !changes.length, onBranch });
-    const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
-    return { path: w.path, ...hold, ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
-  });
-  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts, files: Boolean(files) }, { unmerged, artifacts });
-  if (refusal) return { id, kind: 'refused', refusal, ...none } satisfies Pruning;
+      pruneAgain(run.id, flags),
+    ),
+    owed: handOffOwed(steps, run, phaseOf),
+  };
+});
 
-  const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));
-  const kept = files ? { path: files, bytes: diskBytes(files) } : undefined;
-  if (!yes) return { id, kind: 'prunable', worktrees, ...(kept ? { artifacts: kept } : {}), left: [] } satisfies Pruning;
+/**
+ * One worktree as `pruneRefusal` judges it, from what the place's inventory read: its hold (`heldWorktree`), each change it holds
+ * uncommitted — and that its status did not read, where it is not locked — and the place's command for it (`say`).
+ */
+function pruneFact(run: GitRun, place: RunPlaceRead, w: Held): PruneFacts['worktrees'][number] {
+  const hold = heldWorktree(w);
+  const fix = !hold
+    ? sayFilled(place.say.inspect, { path: w.path })
+    : 'locked' in hold
+      ? sayFilled(place.say.unlock, { repo: run.repo, path: w.path })
+      : sayFilled(place.say.attach, { path: w.path });
+  const unread = w.locked === undefined && w.clean === null ? ['(its status could not be read)'] : [];
+  const changes = [...(w.changes ?? []), ...unread];
+  return { path: w.path, ...hold, ...(changes.length ? { changes } : {}), fix };
+}
 
+/**
+ * Prune the run: marked first, its files counted as gone when they are to go; then the place's `remove` of `worktrees`, never forced,
+ * which prunes git's list; `within` once empty; the files under `--artifacts`; and the marker written again with what went, or taken
+ * back when nothing did.
+ */
+function removeAll(
+  run: GitRun,
+  place: RunPlaceRead,
+  within: string,
+  worktrees: ReadonlyArray<{ path: string; bytes: number }>,
+  kept: { path: string; bytes: number } | undefined,
+  unmerged: boolean,
+): Pruning {
   const now = new Date().toISOString();
   const at = worktrees.length || !run.pruned ? now : run.pruned.at;
   const before = run.pruned?.worktrees ?? [];
@@ -180,47 +231,56 @@ const pruning = Effect.fn('prune')(function* (
         ? { artifacts: filesBefore }
         : {}),
   });
-  runStore.runs.prune(id, marker([], kept?.bytes));
-  const removed: Array<{ path: string; bytes: number }> = [];
-  const left: Pruning['left'] = [];
-  for (const w of worktrees) {
-    try {
-      execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-      removed.push(w);
-    } catch (err) {
-      left.push({ path: w.path, git: gitWords(err) });
-    }
-  }
-  gitSays(run.repo, 'worktree', 'prune');
+  runStore.runs.prune(run.id, marker([], kept?.bytes));
+  const { removed, left } = removeWorktrees(run, place, worktrees);
   try {
     fs.rmdirSync(within);
   } catch {}
-  let freed: number | undefined;
-  if (kept) {
-    try {
-      fs.rmSync(kept.path, { recursive: true, force: true });
-      freed = kept.bytes;
-    } catch (err) {
-      freed = Math.max(0, kept.bytes - diskBytes(kept.path));
-      left.push({ path: kept.path, files: (err as Error).message.split('\n')[0] });
-    }
-  }
-  const filesWent = freed !== undefined && (freed > 0 || !lstatOf(kept!.path));
-  if (!removed.length && !filesWent) {
-    runStore.runs.prune(id, run.pruned);
-  } else {
-    runStore.runs.prune(id, marker(removed, filesWent ? freed : undefined));
-  }
+  const files = kept ? removeFiles(kept) : undefined;
+  if (files?.left) left.push(files.left);
+  const filesWent = files !== undefined && (files.freed > 0 || !lstatOf(kept!.path));
+  runStore.runs.prune(run.id, !removed.length && !filesWent ? run.pruned : marker(removed, filesWent ? files.freed : undefined));
   return {
-    id,
+    id: run.id,
     kind: 'pruned',
     worktrees: removed,
-    ...(filesWent ? { artifacts: { path: kept!.path, bytes: freed! } } : {}),
+    ...(filesWent ? { artifacts: { path: kept!.path, bytes: files.freed } } : {}),
     left,
     at,
     ...(unmerged ? { unmerged: true as const } : {}),
-  } satisfies Pruning;
-});
+  };
+}
+
+/** The place's `remove` of `worktrees`: those it removed, and those it left, in git's words, or every one, when it did not answer. */
+function removeWorktrees(run: GitRun, place: RunPlaceRead, worktrees: ReadonlyArray<{ path: string; bytes: number }>) {
+  const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: worktrees.map((w) => w.path), branches: [] });
+  if (!('answer' in outcome)) {
+    const said = unansweredWords(outcome);
+    return { removed: [], left: worktrees.map((w): Pruning['left'][number] => ({ path: w.path, unread: said })) };
+  }
+  const gone = new Set(outcome.answer.removed);
+  return {
+    removed: worktrees.filter((w) => gone.has(w.path)),
+    left: outcome.answer.left.map((l): Pruning['left'][number] => ({
+      path: l.path,
+      git: l.said,
+      fix: sayFilled(place.say.inspect, { path: l.path }),
+    })),
+  };
+}
+
+/** Remove the run's files directory, and answer what it freed, and what would not go when not all of it did. */
+function removeFiles(kept: { path: string; bytes: number }): { freed: number; left?: Pruning['left'][number] } {
+  try {
+    fs.rmSync(kept.path, { recursive: true, force: true });
+    return { freed: kept.bytes };
+  } catch (err) {
+    return {
+      freed: Math.max(0, kept.bytes - diskBytes(kept.path)),
+      left: { path: kept.path, files: (err as Error).message.split('\n')[0] },
+    };
+  }
+}
 
 /**
  * What removing a directory frees on disk, in bytes, as `du` counts it: a link as a link, and a file hardlinked from `beside` not at all
@@ -253,9 +313,3 @@ export function resolved(p: string): string {
     return parent === p ? p : path.join(resolved(parent), path.basename(p));
   }
 }
-
-/** What git said when it refused, in one line: the first of its stderr, or of the error. */
-export const gitWords = (err: unknown): string => {
-  const { stderr, message } = err as { stderr?: string; message?: string };
-  return (stderr?.trim() || message || String(err)).split('\n')[0];
-};

@@ -1,13 +1,12 @@
 /**
  * Forgetting a run that is over (`forgetRun`, `nemia rm`): it reads a run as `cancelRun` does, adopting what a pass filed and never wrote
- * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime
+ * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through the run's place (`runPlaceVerb`). A controller, reaching the runtime
  * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with `runWith`.
  * It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs nothing and is settled as it signed: no
  * pass reads the run again to close it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
@@ -19,19 +18,19 @@ import {
   forgetRefusal,
   heldWorktree,
   idRefusal,
-  parseWorktrees,
+  inventoryUnread,
   runWorktrees,
   type AskName,
   type BranchFate,
   type ForgetHow,
-  type GitWorktree,
   type Forgot,
 } from './forget.ts';
 import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { gitSays, handOff } from '../workspace/worktree.store.ts';
+import { readPlaceJson, readRunPlace, runPlaceVerb, RunPlace, type RunPlaceRead } from '../place/place.store.ts';
+import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { standingsOf } from '../branches/branches.store.ts';
-import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
+import { merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -61,14 +60,19 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * and go with its record: no worktree, no branch, and no git asked. A git run goes in an order `nemia rm` can finish when it is interrupted
  * and run again:
  *
- * 1. **Its worktrees, through git**: each git lists inside `worktrees/<id>` (`runWorktrees`), by its real path, so the run's directory and
- *    the record's are read the same way (`resolved`). One whose directory is gone, or is no worktree git can read, and is not locked, is
- *    pruned. What one holds uncommitted is committed first under its step's name, as the hand-off does — a failed or stopped step's work
- *    lives only there — and what git ignores is not work. Then `git worktree remove`, never with `--force`, and `git worktree prune`. A
+ * 0. **What it left, read by its place** (`inventory`, from the place `RunPlace` names), before anything is written: its worktrees inside
+ *    `worktrees/<id>` and its branches under `wf/<id>/`. An inventory refused or not heard is no answer, never an empty one: the run is
+ *    refused in those words (`inventoryUnread`), and nothing is touched.
+ * 1. **Its worktrees, through its place**: each the inventory lists (`runWorktrees`), by its real path, so the run's directory and the
+ *    record's are read the same way (`resolved`). One whose directory is gone, or is no worktree git can read, and is not locked, is
+ *    pruned. What one holds uncommitted is committed first under its step's name by the place's `handoff` — a failed or stopped step's
+ *    work lives only there — and what git ignores is not work. Then one `remove` of them all, never forced, which prunes git's list. A
  *    worktree git will not remove — locked, still dirty, on no branch with something a removal would leave on none (`heldWorktree`), or
- *    whose hand-off git refuses — is left as it is, and said why; so is a directory in `worktrees/<id>` git does not know. Then the run is
- *    `held`, and nothing else is removed, so its record is there for `nemia rm` to find it by once a person has dealt with them.
- * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as git says it, or forced.
+ *    whose hand-off git refuses — is left as it is, and said why with the place's command for it (its `say`); so is one whose verb did
+ *    not answer, and a directory in `worktrees/<id>` git does not know. Then the run is `held`, and nothing else is removed, so its record
+ *    is there for `nemia rm` to find it by once a person has dealt with them.
+ * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as the inventory read it —
+ *    never one a hand-off just committed onto — or forced; through the place's `remove`.
  * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
  *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`).
  * 4. **Its tasks, through the engine** (`forgetTasks`): every task its record names (`runTasks`, the adopted ones among them) was written
@@ -92,30 +96,38 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const refusal = yield* tried(() => refusalOf(id, f));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
+  const dirOf = yield* RunPlace;
+  const read = isGitRun(run) ? yield* tried(() => readRunPlace(run, dirOf(run), dir)) : undefined;
+  if (isGitRun(run) && read && !('inventory' in read))
+    return { ...said, kind: 'refused', refusal: inventoryUnread('rm', id, run.repo, read), ...nothing() } satisfies Forgot;
+  const place = read && 'inventory' in read ? read : undefined;
   const taskIds = forgottenIds(run);
   yield* tried(() => runStore.forgetting.write(id, taskIds));
   yield* closeWaitingTasks(e, run, f.views);
-  if (!isGitRun(run)) {
+  if (!isGitRun(run) || !place) {
     const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
     return { ...said, folder: true, kind: 'forgotten', ...nothing(), files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
   }
-  const worktrees = yield* tried(() => removeWorktrees(run, steps, dir));
+  const worktrees = yield* tried(() => removeWorktrees(run, steps, dir, place));
   if (worktrees.left.length) {
     yield* tried(() => runStore.forgetting.lift(id));
     return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot;
   }
-  const branches = yield* tried(() => deleteBranches(id, run, how));
+  const branches = yield* tried(() => deleteBranches(run, how, place, worktrees.handedOff));
   const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
   return { ...said, kind: 'forgotten', ...worktrees, branches, files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
 });
 
 /**
- * A run whose record is gone: what is left under its id removed and named, `worktrees/<id>` named as orphaned, never removed, and the
+ * A run whose record is gone: what is left under its id removed and named, `worktrees/<id>` named as orphaned, never removed, with what
+ * to do in the words of the place `RunPlace` names for a record that names none (`orphans`), and the
  * engine's tasks a `nemia rm` cut short or left waiting wrote down (`runStore.forgetting`) forgotten now (`forgetTasks`).
  */
 const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: string) {
   const files = yield* tried(() => removeKeyed(id, undefined));
-  const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true }] : [];
+  const dirOf = yield* RunPlace;
+  const orphans = () => readPlaceJson(dirOf({ id })).say.orphans;
+  const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true, fix: yield* tried(orphans) }] : [];
   const taskIds = yield* tried(() => runStore.forgetting.read(id));
   const engine = taskIds ? { engine: yield* forgetTasks(id, taskIds) } : {};
   const forgot: Forgot = { id, kind: 'missing', ...nothing(), files, left, ...engine };
@@ -210,10 +222,10 @@ function refusalOf(id: string, f: Forgetting): string | null {
 }
 
 /**
- * Remove a git run's worktrees through git (`runWorktrees`, `removeWorktree`), then prune git's list, and answer what was removed, handed
- * off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
+ * Remove a git run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and answer
+ * what was removed, handed off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
  */
-function removeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, dir: string): Worktrees {
+function removeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
   const within = resolved(dir);
   const recorded = {
     ...run,
@@ -221,56 +233,50 @@ function removeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, di
       Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st]),
     ),
   };
-  const { worktrees, unlisted } = runWorktrees(
-    recorded,
-    namesInOrder(run, steps ?? []),
-    within,
-    parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''),
-  );
+  const { worktrees, unlisted } = runWorktrees(recorded, namesInOrder(run, steps ?? []), within, place.inventory.workspaces);
   const done: Worktrees = { removed: [], handedOff: [], gone: unlisted.filter((p) => !lstatOf(p)), left: [] };
-  for (const w of worktrees) removeWorktree(run, w, done);
-  if (worktrees.length) gitSays(run.repo, 'worktree', 'prune');
+  const removing = worktrees.filter((w) => handWorktree(run, place, w, done));
+  if (worktrees.length) removeListed(run, place, removing, done);
   for (const at of strays(within)) if (!done.left.some((l) => l.path === at)) done.left.push({ path: at, unknown: true });
   return done;
 }
 
 /**
- * Remove one of a git run's worktrees, adding to `done`: one git can prune and nobody locked is gone, or pruned; one held
- * (`heldWorktree`), or whose hand-off git refuses, is left, as is one `git worktree remove` refuses; otherwise what it holds uncommitted is
- * handed off first, then it is removed.
+ * Whether one of a git run's worktrees is to be removed, adding to `done` what is not: one git can prune and nobody locked is gone, or
+ * pruned by the `remove`; one held (`heldWorktree`) is left with the place's command for it; one not clean is handed off first, and left
+ * when its hand-off is refused, uncommitted, or does not answer.
  */
-function removeWorktree(run: GitRun, w: GitWorktree & { step: string }, done: Worktrees): void {
+function handWorktree(run: GitRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees): boolean {
   if (w.prunable && w.locked === undefined) {
     if (!lstatOf(w.path)) done.gone.push(w.path);
-    return;
+    return false;
   }
-  const hold = heldWorktree(w, onNoBranch(run, w));
+  const hold = heldWorktree(w);
   if (hold) {
-    done.left.push({ path: w.path, ...hold });
-    return;
+    const fix =
+      'locked' in hold ? sayFilled(place.say.unlock, { repo: run.repo, path: w.path }) : sayFilled(place.say.attach, { path: w.path });
+    done.left.push({ path: w.path, ...hold, fix });
+    return false;
   }
-  const handed = handOff(w.path, w.step, ', before its run was forgotten');
-  if (handed && 'error' in handed) {
-    done.left.push({ path: w.path, step: w.step, uncommitted: handed.error });
-    return;
-  }
-  if (handed) done.handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit: handed.commit });
-  try {
-    execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    done.removed.push(w.path);
-  } catch (err) {
-    done.left.push({ path: w.path, git: gitWords(err) });
-  }
+  if (w.clean === true) return true;
+  const handed = runPlaceVerb(place.dir, 'handoff', { workspace: w.path, step: w.step, why: ', before its run was forgotten' });
+  if ('refused' in handed)
+    done.left.push({ path: w.path, step: w.step, uncommitted: handed.refused, fix: sayFilled(place.say.commit, { path: w.path }) });
+  else if ('unread' in handed) done.left.push({ path: w.path, step: w.step, unread: { verb: 'handoff', said: handed.unread.said } });
+  else if (handed.answer.commit)
+    done.handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit: handed.answer.commit });
+  return 'answer' in handed;
 }
 
-/** For a worktree on no branch that nobody locked: whether it is clean, and whether its HEAD is on a branch; neither, for any other. */
-function onNoBranch(run: GitRun, w: GitWorktree): { clean: boolean; onBranch: boolean } {
-  const status = w.detached && w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
-  const onBranch =
-    w.detached && w.head && w.locked === undefined
-      ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim())
-      : false;
-  return { clean: status !== undefined && !status.trim(), onBranch };
+/** Remove `removing` through the place's `remove`, never forced, adding to `done` what went and what git would not remove, in its words. */
+function removeListed(run: GitRun, place: RunPlaceRead, removing: readonly Held[], done: Worktrees): void {
+  const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: removing.map((w) => w.path), branches: [] });
+  if (!('answer' in outcome)) {
+    for (const w of removing) done.left.push({ path: w.path, unread: { verb: 'remove', said: unansweredWords(outcome) } });
+    return;
+  }
+  done.removed.push(...outcome.answer.removed);
+  for (const l of outcome.answer.left) done.left.push({ path: l.path, git: l.said, fix: sayFilled(place.say.inspect, { path: l.path }) });
 }
 
 /** What is still in `within`, the run's worktrees' directory, by path: none when it is gone. */
@@ -283,30 +289,31 @@ function strays(within: string): string[] {
 }
 
 /**
- * Delete the branches of the git run `id`, as asked (`branchFates`): those git has under `wf/<id>/`, merged into the run's base branch
- * as git says it, or forced. One git refuses to delete is kept, in git's words.
+ * Delete the git run's branches, as asked (`branchFates`): those its place's inventory read under `wf/<id>/`, merged into the run's base
+ * branch as it read them — never one `handedOff` just committed onto, which the base has not — or forced, through the place's `remove`.
+ * One git refuses to delete is kept, in git's words; all of them, when the `remove` does not answer.
  */
-function deleteBranches(id: string, run: GitRun, how: ForgetHow): BranchFate[] {
-  const listed = (gitSays(run.repo, 'for-each-ref', '--format=%(refname)', `refs/heads/wf/${id}/`) ?? '')
-    .split('\n')
-    .filter(Boolean)
-    .map((ref) => ref.replace(/^refs\/heads\//, ''));
-  const merged = (branch: string): boolean => {
-    try {
-      execFileSync('git', ['merge-base', '--is-ancestor', `refs/heads/${branch}`, run.branch], { cwd: run.repo, stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  return branchFates(run, listed, merged, how).map((b): BranchFate => {
-    if (!b.deleted) return b;
-    try {
-      execFileSync('git', ['branch', '-D', b.branch], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-      return b;
-    } catch (err) {
-      return { branch: b.branch, deleted: false, why: { git: gitWords(err) } };
-    }
+function deleteBranches(run: GitRun, how: ForgetHow, place: RunPlaceRead, handedOff: Forgot['handedOff']): BranchFate[] {
+  const read = place.inventory.branches;
+  const handedOnto = new Set(handedOff.map((h) => h.branch));
+  const merged = (branch: string): boolean => !handedOnto.has(branch) && read.some((b) => b.branch === branch && b.merged);
+  const fates = branchFates(
+    run,
+    read.map((b) => b.branch),
+    merged,
+    how,
+  );
+  const doomed = fates.filter((b) => b.deleted).map((b) => b.branch);
+  if (!doomed.length) return fates;
+  const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: [], branches: doomed });
+  const kept = new Map<string, BranchFate['why']>(
+    'answer' in outcome
+      ? outcome.answer.kept.map((k) => [k.branch, { git: k.said }])
+      : doomed.map((branch) => [branch, { unread: unansweredWords(outcome) }]),
+  );
+  return fates.map((b): BranchFate => {
+    const why = kept.get(b.branch);
+    return b.deleted && why ? { branch: b.branch, deleted: false, why } : b;
   });
 }
 

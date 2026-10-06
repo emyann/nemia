@@ -2,7 +2,7 @@
  * Pruning a finished run: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`)
  * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`). Pure.
  */
-import { andList, isGitRun, prunedWords, type Pruned, type Run } from '../record/record.ts';
+import { andList, isGitRun, prunedWords, type GitRun, type Pruned, type Run } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import type { Decision } from '../decide/decide.ts';
@@ -46,14 +46,14 @@ export function heldRefusal(run: Run, what: string): string | null {
  * What `nemia prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `nemia decide`
  * says (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `nemia rm` would not
  * forget it (`forgetRefusal`, worded for `nemia prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in advance.verb.ts);
- * and each worktree git lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch
- * (`heldWorktree`), and each change `git status --porcelain` lists in it.
+ * and each worktree its place lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch
+ * (`heldWorktree`), each change it holds uncommitted, and `fix`, the place's command for it (its `say`).
  */
 export type PruneFacts = {
   decided: Decision['kind'] | undefined;
   held: string | null;
   owed: readonly string[];
-  worktrees: ReadonlyArray<{ path: string; locked?: string; detached?: string; changes?: readonly string[] }>;
+  worktrees: ReadonlyArray<{ path: string; locked?: string; detached?: string; changes?: readonly string[]; fix?: string }>;
   /** Whether this prune would remove the run's files directory (`--artifacts`, and one is there). */
   files?: boolean;
 };
@@ -110,39 +110,37 @@ export function pruneRefusal(
   } else if (facts.held) {
     said.push(facts.held.replace(/\.$/, ''));
   }
-  if (facts.decided === 'awaiting' && !agreed && !facts.held && !run.isolate) {
-    said.push(
-      `it finished on ${run.branch} itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: ${pruneAgain(id, { unmerged: true, artifacts })}`,
-    );
-  } else if (facts.decided === 'awaiting' && !agreed && !facts.held) {
-    said.push(
-      `it finished and is not merged into ${run.branch}: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: ${pruneAgain(id, { unmerged: true, artifacts })}`,
-    );
-  }
+  if (facts.decided === 'awaiting' && !agreed && !facts.held) said.push(unmergedRefusal(run, artifacts));
   if (facts.owed.length) {
     const one = facts.owed.length === 1;
     said.push(
       `${andList(facts.owed)} ${one ? 'is' : 'are'} still to be handed off — a pass commits what ${one ? 'it' : 'they'} left, and collects ${one ? 'its' : 'their'} files, from the worktree: let a tick run (nemia tick), then ${again}`,
     );
   }
-  for (const w of facts.worktrees) {
-    if (w.locked !== undefined) {
-      said.push(
-        `${w.path} is locked${w.locked ? ` (${w.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${run.repo} worktree unlock ${w.path}`,
-      );
-    } else if (w.detached !== undefined) {
-      said.push(
-        `${w.path} is on no branch — its HEAD is detached${w.detached ? ` at ${w.detached.slice(0, 7)}` : ''} — and removing it would leave what it holds on none: put it on one (git -C ${w.path} switch -c <branch>), then ${again}`,
-      );
-    } else if (w.changes?.length) {
-      const shown = w.changes.slice(0, 3).join(', ');
-      const more = w.changes.length > 3 ? ` and ${w.changes.length - 3} more` : '';
-      said.push(
-        `${w.path} holds changes no commit has (${shown}${more}), and they would be lost with it: commit them on its branch, or discard them (git -C ${w.path} status), then ${again}`,
-      );
-    }
-  }
+  said.push(...facts.worktrees.flatMap((w) => worktreeRefusal(w, again) ?? []));
   return said.length ? `${said.join('; ')}.` : null;
+}
+
+/** Why `nemia prune` waits on a run that finished and nobody has decided: its branch, or the repository it worked in, is what is read. Pure. */
+function unmergedRefusal(run: GitRun, artifacts: boolean): string {
+  const again = pruneAgain(run.id, { unmerged: true, artifacts });
+  return run.isolate
+    ? `it finished and is not merged into ${run.branch}: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: ${again}`
+    : `it finished on ${run.branch} itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: ${again}`;
+}
+
+/** Why `nemia prune` keeps one worktree — locked, on no branch, or holding changes — with the place's command for it, or undefined. Pure. */
+function worktreeRefusal(w: PruneFacts['worktrees'][number], again: string): string | undefined {
+  if (w.locked !== undefined) {
+    return `${w.path} is locked${w.locked ? ` (${w.locked})` : ''}, and git will not remove it — unlock it if nothing needs it${w.fix ? `: ${w.fix}` : ''}`;
+  }
+  if (w.detached !== undefined) {
+    return `${w.path} is on no branch — its HEAD is detached${w.detached ? ` at ${w.detached.slice(0, 7)}` : ''} — and removing it would leave what it holds on none: put it on one${w.fix ? ` (${w.fix})` : ''}, then ${again}`;
+  }
+  if (!w.changes?.length) return undefined;
+  const shown = w.changes.slice(0, 3).join(', ');
+  const more = w.changes.length > 3 ? ` and ${w.changes.length - 3} more` : '';
+  return `${w.path} holds changes no commit has (${shown}${more}), and they would be lost with it: commit them on its branch, or discard them${w.fix ? ` (${w.fix})` : ''}, then ${again}`;
 }
 
 /**
@@ -151,7 +149,8 @@ export function pruneRefusal(
  *   refused   `pruneRefusal` said why, and nothing was touched
  *   nothing   no worktree of it is left to remove — nor, under `--artifacts`, a files directory — and `nothing` says why
  *   prunable  what `nemia prune --yes` would remove: each worktree, with what it holds on disk, and under `--artifacts` its files directory
- *   pruned    those removed, and the run marked pruned; `left`, each git would not remove when asked, in its words, and the files
+ *   pruned    those removed, and the run marked pruned; `left`, each git would not remove when asked, in its words, with the place's
+ *             command to look in it (`fix`); each left because the place's `remove` did not answer (`unread`, why); and the files
  *             directory when what was in it did not all go
  */
 export type Pruning = {
@@ -162,7 +161,7 @@ export type Pruning = {
   worktrees: Array<{ path: string; bytes: number }>;
   /** The run's files directory (`runs/<id>/artifacts/`), under `--artifacts`: what it holds, or on `pruned` what its removal freed. */
   artifacts?: { path: string; bytes: number };
-  left: Array<{ path: string; git: string } | { path: string; files: string }>;
+  left: Array<{ path: string; git: string; fix?: string } | { path: string; unread: string } | { path: string; files: string }>;
   /** When the run was pruned, on `pruned`. */
   at?: string;
   /**
@@ -204,8 +203,10 @@ function storeLines(p: Pruning): string[] {
     ...each,
     ...p.left.map((l) =>
       'git' in l
-        ? `   kept ${l.path}: git would not remove it — ${l.git}; look in it before anything is forced: git -C ${l.path} status`
-        : `   kept what is left in ${l.path}: ${l.files} — what is still there is kept, and read as it is; ${pruneAgain(p.id, { unmerged: p.unmerged, artifacts: true })} removes it once it can be`,
+        ? `   kept ${l.path}: git would not remove it — ${l.git}; look in it before anything is forced${l.fix ? `: ${l.fix}` : ''}`
+        : 'unread' in l
+          ? `   kept ${l.path}: the place's remove did not answer — ${l.unread}; ${pruneAgain(p.id, { unmerged: p.unmerged, artifacts: Boolean(p.artifacts) })} once it does`
+          : `   kept what is left in ${l.path}: ${l.files} — what is still there is kept, and read as it is; ${pruneAgain(p.id, { unmerged: p.unmerged, artifacts: true })} removes it once it can be`,
     ),
   ];
 }

@@ -865,7 +865,12 @@ test('pruneLines and sizeOf say what a person reads', () => {
   assert.equal(sizeOf(3 * 1024 ** 3), '3.00 GB');
   assert.equal(sizeOf(1536 * 1024), '1.5 MB');
   assert.deepEqual(
-    pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [{ path: '/w/a', bytes: 2048 }], left: [{ path: '/w/b', git: 'fatal: nope' }] }),
+    pruneLines({
+      id: 'r-1',
+      kind: 'pruned',
+      worktrees: [{ path: '/w/a', bytes: 2048 }],
+      left: [{ path: '/w/b', git: 'fatal: nope', fix: 'git -C /w/b status' }],
+    }),
     [
       'r-1  pruned: removed 1 worktree, 2.0 KB freed; its record, branches and files are kept',
       '   /w/a  2.0 KB',

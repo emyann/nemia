@@ -7,7 +7,7 @@
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema, SchemaIssue } from 'effect';
+import { Context, Result, Schema, SchemaIssue } from 'effect';
 import {
   PLACE_CONTRACT,
   PLACE_DEADLINE_MS,
@@ -357,6 +357,29 @@ export function placeDirOf(run: Pick<GitRun, 'id' | 'placeSkill'>): string {
   throw new Invalid({
     message: `run ${run.id} names the place skill ${skill}, and this nemia ships only ${SHIPPED_PLACE_SKILL}: read its store with the nemia that started it`,
   });
+}
+
+/** Where a run's place verbs run from once it is started (`nemia rm`, `nemia prune`): `placeDirOf`, unless a layer gives another. */
+export const RunPlace = Context.Reference<(run: Pick<GitRun, 'id' | 'placeSkill'>) => string>('orchestrator/RunPlace', {
+  defaultValue: () => placeDirOf,
+});
+
+/** A started git run's place as `nemia rm` and `nemia prune` read it: where its verbs run, its `say`, and what its inventory read. */
+export type RunPlaceRead = { readonly dir: string; readonly say: PlaceDeclared['say']; readonly inventory: Inventory };
+
+/**
+ * What the place in `placeDir` reads the git run left (`inventory`): its worktrees inside `under` and its branches under `wf/<id>/`,
+ * merged or not into its base branch, with the place's `say` (`readPlaceJson`, which refuses one that does not read) — or the outcome
+ * that is no answer: refused, or not heard. Never an empty inventory in its place.
+ */
+export function readRunPlace(
+  run: Pick<GitRun, 'id' | 'repo' | 'branch'>,
+  placeDir: string,
+  under: string,
+): RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }> {
+  const say = readPlaceJson(placeDir).say;
+  const read = runPlaceVerb(placeDir, 'inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch });
+  return 'answer' in read ? { dir: placeDir, say, inventory: read.answer } : read;
 }
 
 /** What `openPlace` answers: the repository `open` read, and the place skill it ran, as a record names it. */

@@ -18,6 +18,8 @@ import {
   type Landed,
   type Made,
   missingVerbsRefusal,
+  unknownHoleRefusal,
+  unknownHoles,
   type Opened,
   type PlaceAnswers,
   type PlaceDeclared,
@@ -173,6 +175,11 @@ const PlaceDeclaredSchema = Schema.Struct({
     commit: Schema.String,
     inspect: Schema.String,
     orphans: Schema.String,
+    results: Strings,
+    merge: Schema.String,
+    mergeUncommitted: Schema.String,
+    showMerge: Schema.String,
+    lastMerge: Schema.String,
   }),
 }) satisfies Schema.Schema<PlaceDeclared>;
 
@@ -327,7 +334,7 @@ export function runPlaceVerb<V extends PlaceVerb>(
 /**
  * The place skill in `skillDir` as its `place.json` declares it, decoded strictly. Refuses (`Invalid`, naming the file and the fix) a
  * file that is not there or not JSON, one whose first wrong field does not read as contract `v` 1 — an unknown verb, a `say` key missing —
- * and a declared verb with no script in `scripts/`.
+ * a declared verb with no script in `scripts/`, and a `say` template naming a hole the code does not fill for its key (`unknownHoles`).
  */
 export function readPlaceJson(skillDir: string): PlaceDeclared {
   const file = path.join(skillDir, 'place.json');
@@ -347,6 +354,8 @@ export function readPlaceJson(skillDir: string): PlaceDeclared {
     throw new Invalid({
       message: `${file} declares ${scriptless.join(', ')}, and scripts/ has no ${scriptless.map((v) => `${v}.ts`).join(', ')}: add the script, or take the verb off \`verbs\``,
     });
+  const [unknown] = unknownHoles(decoded.success.say);
+  if (unknown) throw new Invalid({ message: unknownHoleRefusal(file, unknown.key, unknown.hole) });
   return decoded.success;
 }
 

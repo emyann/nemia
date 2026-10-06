@@ -239,18 +239,75 @@ export const PLACE_SAYS = [
   'commit',
   'inspect',
   'orphans',
+  'results',
+  'merge',
+  'mergeUncommitted',
+  'showMerge',
+  'lastMerge',
 ] as const;
+
+/** A key of `place.json`'s `say`. */
+export type SayKey = (typeof PLACE_SAYS)[number];
+
+/** The keys of `say` that are a list of lines, each line a template: the others are one line. */
+export const SAY_LISTS = ['look', 'results'] as const;
+
+/**
+ * The holes the code fills in each `say` template: `look` the commit a step's work started from, `results` each result branch and the
+ * base it lands on, `merge` and `mergeUncommitted` the commit a round merges in, `showMerge` and `lastMerge` none.
+ */
+export const SAY_HOLES: Readonly<Record<SayKey, readonly string[]>> = {
+  look: ['baseRef'],
+  readResult: ['repo', 'baseRef', 'branch'],
+  ship: ['repo', 'branch'],
+  drop: ['repo', 'branches'],
+  conflicts: [],
+  unlock: ['repo', 'path'],
+  stage: ['repo', 'branches'],
+  attach: ['path'],
+  commit: ['path'],
+  inspect: ['path'],
+  orphans: [],
+  results: ['base', 'branch'],
+  merge: ['sha'],
+  mergeUncommitted: ['sha'],
+  showMerge: [],
+  lastMerge: [],
+};
+
+/** What a place's `say` holds: each list key a list of templates, each other key one template. */
+export type PlaceSay = { readonly [K in (typeof SAY_LISTS)[number]]: readonly string[] } & {
+  readonly [K in Exclude<SayKey, (typeof SAY_LISTS)[number]>]: string;
+};
 
 /**
  * What a place skill's `place.json` declares: the contract's version, the verbs its scripts answer, the tools a landing session is denied,
- * and the sentences the code prints for it (`look` a list of lines, each other one line).
+ * and the sentences the code prints for it (`PlaceSay`).
  */
 export type PlaceDeclared = {
   readonly v: typeof PLACE_CONTRACT;
   readonly verbs: readonly PlaceVerb[];
   readonly denyWhileLanding: readonly string[];
-  readonly say: { readonly look: readonly string[] } & { readonly [K in Exclude<(typeof PLACE_SAYS)[number], 'look'>]: string };
+  readonly say: PlaceSay;
 };
+
+/**
+ * The holes `say` names that the code does not fill for their key (`SAY_HOLES`), each as `{ key, hole }` in the order of `PLACE_SAYS`:
+ * such a hole would be printed as written. Empty when every one is filled. Pure.
+ */
+export function unknownHoles(say: PlaceSay): readonly { readonly key: SayKey; readonly hole: string }[] {
+  return PLACE_SAYS.flatMap((key) => {
+    const templates: readonly string[] = typeof say[key] === 'string' ? [say[key]] : say[key];
+    const named = templates.flatMap((template) => [...template.matchAll(/\{(\w+)\}/g)].map((found) => found[1]));
+    return [...new Set(named)].filter((hole) => !SAY_HOLES[key].includes(hole)).map((hole) => ({ key, hole }));
+  });
+}
+
+/** Why a `say` template of `file` names a hole the code does not fill for its key (`unknownHoles`), with the fix. Pure. */
+export function unknownHoleRefusal(file: string, key: SayKey, hole: string): string {
+  const allowed = SAY_HOLES[key].length ? SAY_HOLES[key].map((h) => `{${h}}`).join(', ') : 'no hole';
+  return `${file}: \`say.${key}\` names {${hole}}, a hole the code does not fill: ${key} may name ${allowed}; write the rest as the place's own words`;
+}
 
 /**
  * Why the place declared in `file` cannot serve a run: the verbs of `needed` its `declared` verbs leave out, each named, with the fix.

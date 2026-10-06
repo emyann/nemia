@@ -290,3 +290,19 @@ test('nemia memory lists her facts and prints one; a fact she does not keep is r
     /no fact named \.\.\/level\.json: she keeps feed-cursor/,
   );
 });
+
+test("REFUSED: a factory's raise or default above manual while her folder is not trusted, the store at manual; nothing written", async () => {
+  withPipao();
+  fs.rmSync(levelFile(), { force: true });
+  fs.rmSync(factoryLevelFile('pipao'), { force: true });
+  trust(false);
+  for (const ask of [
+    { factory: 'pipao', level: 'semi-auto', for: '1h' },
+    { factory: 'pipao', level: 'semi-auto' },
+  ]) {
+    assert.match(await refusal(() => runWith(e, LEVEL.handler(ask))), /is not trusted/, JSON.stringify(ask));
+    assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, `${JSON.stringify(ask)} writes no factory's file`);
+    assert.equal(readLevel(), undefined, `${JSON.stringify(ask)} names no task`);
+  }
+  trust(true);
+});

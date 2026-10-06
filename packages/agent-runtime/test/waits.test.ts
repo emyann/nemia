@@ -194,7 +194,6 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   },
   'test/live.test.ts': { count: 15, not: "AE_LIVE only: a real harness's turns, which spend money" },
   'test/budget.test.ts': { count: 1, not: 'to convert' },
-  'test/codex-agent.test.ts': { count: 1, not: 'to convert' },
   'test/feed-rotation.test.ts': { count: 1, not: 'to convert' },
   'test/fixtures/leak-failing.ts': { count: 1, not: 'to convert' },
   'test/fixtures/leak-unguarded.ts': { count: 1, not: 'to convert' },

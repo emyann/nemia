@@ -710,7 +710,7 @@ test("an agent of yours a step of the repository's workflows is given — the re
   fs.writeFileSync(path.join(AGENTS, 'lender.md'), '---\ndescription: Lent to the repository.\n---\nDo it.\n');
   const lent = path.join(repo, 'workflows', 'lent');
   fs.mkdirSync(lent, { recursive: true });
-  fs.writeFileSync(path.join(lent, 'borrow.md'), '---\nagent: lender\n---\nBorrow it.\n');
+  fs.writeFileSync(path.join(lent, 'borrow.md'), '---\nplace: git\nagent: lender\n---\nBorrow it.\n');
   const own = path.join(repo, '.claude', 'agents', 'lender.md');
   try {
     const lender = (await listed()).find((a) => a.from === 'yours' && a.name === 'lender')!;

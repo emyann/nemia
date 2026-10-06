@@ -347,7 +347,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
   input: 'the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on',
   place:
-    '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository, what a step without the line does',
+    '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository. Every step says one; none is the default',
   workspace:
     "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   writable:

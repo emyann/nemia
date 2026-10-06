@@ -105,8 +105,8 @@ const workflowFolder = (files: Record<string, string>) => {
 
 /** Two steps, the second reviewing the first. */
 const workflowDir = workflowFolder({
-  'implement.md': '---\nharness: codex\nmodel: gpt-5\ndeadlineSeconds: 600\n---\nImplement the thing.\n',
-  'review.md': '---\nafter: implement\n---\nReview what implement did.\n',
+  'implement.md': '---\nplace: git\nharness: codex\nmodel: gpt-5\ndeadlineSeconds: 600\n---\nImplement the thing.\n',
+  'review.md': '---\nafter: implement\nplace: git\n---\nReview what implement did.\n',
 });
 
 const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] };
@@ -431,7 +431,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       context: null,
       after: [],
       workspace: null,
-      place: null,
+      place: 'git',
       resume: null,
       permissionMode: null,
       sandbox: null,
@@ -506,7 +506,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
         context: null,
         after: ['implement'],
         workspace: null,
-        place: null,
+        place: 'git',
         resume: null,
         permissionMode: null,
         sandbox: null,
@@ -720,8 +720,8 @@ test('a run whose workflow folder is gone still answers, from its record', async
 
 test('a folder changed since the run started keeps the steps that ran, and names what moved', async () => {
   const changed = workflowFolder({
-    'original.md': 'Do the original thing.\n',
-    'review.md': '---\nafter: original\n---\nReview it.\n',
+    'original.md': '---\nplace: git\n---\nDo the original thing.\n',
+    'review.md': '---\nafter: original\nplace: git\n---\nReview it.\n',
   });
   settledTask('t-6', blocked);
   writeRun({
@@ -731,7 +731,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     steps: { original: { taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original' }, review: { taskId: null } },
   });
   fs.renameSync(path.join(changed, 'original.md'), path.join(changed, 'replacement.md'));
-  fs.writeFileSync(path.join(changed, 'review.md'), '---\nafter: replacement\n---\nReview it.\n');
+  fs.writeFileSync(path.join(changed, 'review.md'), '---\nafter: replacement\nplace: git\n---\nReview it.\n');
 
   const run = await detailOf('r-6');
   assert.ok(run.warning, "a step renamed after the run started: the folder still reads as a workflow, only not this run's");
@@ -875,8 +875,8 @@ const frozenGraph = {
 
 test('a run that froze its workflow draws from it when its folder does not read: spec, prose, what a step would be told, and the graph', async () => {
   const newer = workflowFolder({
-    'implement.md': '---\nharness: claude\nsomeNewerKey: yes\n---\nImplement it.\n',
-    'review.md': '---\nafter: implement\nloop: implement\n---\nReview it.\n',
+    'implement.md': '---\nplace: git\nharness: claude\nsomeNewerKey: yes\n---\nImplement it.\n',
+    'review.md': '---\nafter: implement\nplace: git\nloop: implement\n---\nReview it.\n',
   });
   writeRun({
     ...r2,
@@ -956,8 +956,8 @@ test('a run frozen with a step of the former key `maxAttempts: 2` still reads, a
 
 test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
   const edited = workflowFolder({
-    'implement.md': '---\nharness: codex\n---\nImplement it, edited.\n',
-    'review.md': '---\nharness: claude\n---\nReview it, edited.\n',
+    'implement.md': '---\nplace: git\nharness: codex\n---\nImplement it, edited.\n',
+    'review.md': '---\nplace: git\nharness: claude\n---\nReview it, edited.\n',
   });
   writeRun({
     ...r2,
@@ -992,9 +992,9 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
 
 test('a run that froze its workflow shows only its steps: one its folder gained since is named in the warning, and neither listed nor drawn', async () => {
   const grown = workflowFolder({
-    'implement.md': 'Implement it.\n',
-    'review.md': '---\nafter: implement\n---\nReview it.\n',
-    'docs.md': 'Write it down.\n',
+    'implement.md': '---\nplace: git\n---\nImplement it.\n',
+    'review.md': '---\nafter: implement\nplace: git\n---\nReview it.\n',
+    'docs.md': '---\nplace: git\n---\nWrite it down.\n',
   });
   writeRun({
     ...r2,
@@ -1301,7 +1301,7 @@ function seedChecks() {
      */
     workflowDir: workflowFolder(
       Object.fromEntries(
-        r20Steps.map((s) => [`${s.name}.md`, `${s.after.length ? `---\nafter: ${s.after.join(', ')}\n---\n` : ''}${s.body}\n`]),
+        r20Steps.map((s) => [`${s.name}.md`, `---\n${s.after.length ? `after: ${s.after.join(', ')}\n` : ''}place: git\n---\n${s.body}\n`]),
       ),
     ),
     steps: {

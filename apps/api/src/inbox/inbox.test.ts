@@ -55,11 +55,11 @@ const startedFrom = (id: string, card: string): string =>
 
 /** The repository's `dev`, yours `mine`, and `both`, which each has. */
 const dev = path.join(repo, 'workflows', 'dev');
-write(path.join(dev, 'implement.md'), 'Implement it.\n');
+write(path.join(dev, 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 const mine = path.join(root, 'workflows', 'mine');
-write(path.join(mine, 'plan.md'), 'Write PLAN.md.\n');
-write(path.join(repo, 'workflows', 'both', 'implement.md'), 'Implement it.\n');
-write(path.join(root, 'workflows', 'both', 'implement.md'), 'Implement it my way.\n');
+write(path.join(mine, 'plan.md'), '---\nplace: git\n---\nWrite PLAN.md.\n');
+write(path.join(repo, 'workflows', 'both', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
+write(path.join(root, 'workflows', 'both', 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
 
 const inbox = path.join(root, 'inbox');
 const cards = (): string[] => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
@@ -391,7 +391,7 @@ test("REFUSED at shipped defaults: a filing of the wrong shape is a 400 in the a
   const unknown = await file({ body: 'An idea', workflow: 'nope' });
   assert.equal(unknown.status, 404);
   assert.ok(((await unknown.json()) as Refused).error.startsWith("No workflow 'nope' in "));
-  write(path.join(repo, 'workflows', '.draft', 'implement.md'), 'Implement it.\n');
+  write(path.join(repo, 'workflows', '.draft', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
   assert.equal(
     (await file({ body: 'An idea', workflow: '.draft' })).status,
     404,

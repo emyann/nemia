@@ -1408,13 +1408,14 @@ test("through the engine, a stopped long-lived attempt's spend is read from its 
     const { builtEngine } = await import('./engine.ts');
     const root = tmp('root');
     const asked: Array<[string, number]> = [];
+    let exited = false;
     const ops = claudeOps({
       root,
       transcriptTime: async () => Date.now(),
       closeoutFrom: async () => undefined,
       usageFrom: async (sessionId: string, since: number) => {
         asked.push([sessionId, since]);
-        return { turns: asked.length };
+        return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
       },
     });
     const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
@@ -1427,6 +1428,7 @@ test("through the engine, a stopped long-lived attempt's spend is read from its 
         ),
       release: (session, task) => {
         const from = asked.length;
+        exited = true;
         return ops.release!(session, task).pipe(
           Effect.tap((measured) => Effect.sync(() => released.push({ asked: asked.slice(from), measured }))),
         );

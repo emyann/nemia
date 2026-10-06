@@ -51,6 +51,9 @@ function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): number {
   return ms;
 }
 
+/** How long one task ran, off the engine's view of it: the union of its turns that ended (`ranIn`), a turn still running left out. */
+export const ranMs = (view: TaskClock): number => unionMs(ranIn(view).flatMap((s) => (s.to === null ? [] : [{ from: s.from, to: s.to }])));
+
 /**
  * A run's time at work (`AtWork`), off the engine's views of its tasks: every step's, every check's, every earlier try's (`runTasks`).
  * `views` may hold other runs' tasks too, and a task it does not hold — one the engine has no record of — ran nothing. Pure.

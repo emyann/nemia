@@ -139,9 +139,16 @@ export const runSlots = Effect.fn('runSlots')(function* (
 /**
  * What one pass reads once for every run it judges, and hands each: its one listing of the store (`runs`); the runs the cap holds over it
  * (`runSlots`), read on the first claim on a checkout that asks for them and kept for the rest of the pass, a read that failed asked again;
- * and the runs others wait on (`Parents`). Made by the pass and dropped with it: the next reads the world again.
+ * and the runs others wait on (`Parents`); and the tasks the engine's feed said settled since the pass before (`settled`, `followedFeed`),
+ * which the metrics record once (`settledFacts`), absent where the pass read no feed. Made by the pass and dropped with it: the next reads
+ * the world again.
  */
-export type PassRead = { runs: readonly Run[]; slots: Effect.Effect<Map<string, RunSlot>, Refusal>; parents: Parents };
+export type PassRead = {
+  runs: readonly Run[];
+  slots: Effect.Effect<Map<string, RunSlot>, Refusal>;
+  parents: Parents;
+  settled?: ReadonlySet<string>;
+};
 
 /** What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it. */
 export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv = process.env): PassRead => {

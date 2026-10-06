@@ -2,7 +2,8 @@
  * A step is filed the artifacts folder of each step it comes after, read-only (`handedMounts`), under the store's `runs/`, and a step
  * whose `reads:` names the inbox the inbox (`readsMounts`): a store whose path no permission rule can carry refuses `nemia start` of
  * either on Claude Code, in the store's words (`storeRootRefusal`), before anything is written and before the runtime's words about a
- * mount the person never wrote. A workflow of one step, handed nothing and reading no store folder, starts there.
+ * mount the person never wrote; so does a step in the checkout, filed a read of its run's artifacts folder, before the runtime's words
+ * about a rule list. A workflow of one step, handed nothing and reading no store folder, starts there.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads; its path holds a `(`.
  */
@@ -88,5 +89,20 @@ test("REFUSED at shipped defaults: a store no permission rule can carry refuses 
     message = (err as Error).message;
   }
   assert.equal(message, storeWords('argus', 'the inbox'));
+  assert.deepEqual(runs(), before, 'nothing was written');
+});
+
+test("REFUSED at shipped defaults: a step in the checkout, under a store whose path holds a `(`, is refused in the store's words, never the runtime's about a rule list or a mount", async () => {
+  const before = runs();
+  let failed: (Error & { _tag?: string; exitCode?: number }) | undefined;
+  try {
+    await Effect.runPromise(startRun({ brief: 'ship it', repo: aRepo(), workflowDir: folderOf({ ship: 'workspace: main' }) }));
+  } catch (err) {
+    failed = err as Error & { _tag?: string; exitCode?: number };
+  }
+  assert.equal(failed?._tag, 'Invalid', failed?.message);
+  assert.equal(failed?.exitCode, 2);
+  assert.equal(failed?.message, storeWords('ship', "a read of its run's artifacts folder"));
+  assert.doesNotMatch(failed?.message ?? '', /is not a list of permission rules|Mount a folder/);
   assert.deepEqual(runs(), before, 'nothing was written');
 });

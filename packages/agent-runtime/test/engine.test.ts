@@ -1761,3 +1761,50 @@ test('a task on a harness this engine does not have is never spawned on the fall
     `neither there nor gone, so not ended: ${JSON.stringify(awayEvents)}`,
   );
 });
+
+test("a harness whose look fails outright is said on the pass's report, after its name, and the other harnesses are read: on that pass alone", async () => {
+  const claudeSessions = new Map<string, Sighting>();
+  const codexSessions = new Map<string, Sighting>();
+  let failing = false;
+  let partWhy: string[] = [];
+  const codex = testOps({ sessions: codexSessions });
+  const layer = Layer.mergeAll(
+    Journal.test(),
+    Runner.layer(
+      composite(
+        {
+          claude: flakyHarness(claudeSessions, () => failing),
+          codex: {
+            ...codex,
+            observeFor: () =>
+              Effect.sync(() => ({ seen: new Map(codexSessions), unread: new Set<string>(), ...(partWhy.length ? { why: partWhy } : {}) })),
+          },
+        },
+        'claude',
+      ),
+    ),
+    tickMemoLayer({ verify: true }),
+  );
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const mine = await run(file({ ...spec, harness: 'claude' }));
+  const other = await run(file({ ...spec, harness: 'codex' }));
+  assert.deepEqual((await run(tick())).unobserved, [], 'every harness read: nothing said');
+
+  failing = true;
+  partWhy = ['its transcripts folder cannot be listed'];
+  const failed = await run(tick());
+  assert.deepEqual(failed.unobserved, [
+    'harness `claude`: claude agents: timed out',
+    'harness `codex`: its transcripts folder cannot be listed',
+  ]);
+  assert.equal(failed.views.find((v) => v.id === other)?.phase, 'running (working)', "the other harness's session is read");
+  assert.equal(failed.actions, 0, 'and nothing is done on the unread name');
+  assert.ok(
+    failed.views.some((v) => v.id === mine),
+    'which is neither there nor gone',
+  );
+
+  failing = false;
+  partWhy = [];
+  assert.deepEqual((await run(tick())).unobserved, [], 'the next pass that reads says nothing: nothing is kept from the last');
+});

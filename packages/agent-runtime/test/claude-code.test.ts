@@ -30,6 +30,7 @@ const { asyncOps } = await import('./promise-runner.ts');
 const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg.ts');
 const { quietFileOf, sightingOf } = await import('../src/harness/claude/quiet.ts');
 const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
+const { registryOf } = await import('../src/harness/claude/registry.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 const BG_ID = '5e551011-0000-4000-8000-00000000000b';
@@ -380,6 +381,37 @@ test('a row of ours `claude agents` lists that does not decode leaves that name 
     const fixed = await Effect.runPromise(ops.observeFor!(expected));
     assert.equal(fixed.seen.get('ae/b/1')?.sessionId, BG_ID);
     assert.deepEqual(fixed.unread, new Set());
+  } finally {
+    f.restore();
+  }
+});
+
+test("a row of ours `claude agents` lists that does not decode is said on the pass's report, in the registry's words for the row and its field, and on no pass after it decodes", async () => {
+  const f = fake();
+  try {
+    const { Engine } = await import('../src/index.ts');
+    const { builtEngine } = await import('./engine.ts');
+    const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
+    const id = await Effect.runPromise(e.file({ brief: 'go', cwd: f.dir, config: { background: true } }));
+    const started = await Effect.runPromise(e.tick());
+    assert.deepEqual(started.unobserved, [], 'nothing to say while the registry reads');
+    assert.equal(f.read('bg-args')?.includes(`ae/${id}/1`), true, 'the session was started in the background');
+
+    const listing = JSON.stringify([{ name: `ae/${id}/1`, state: 'working', status: 'busy' }]);
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), listing);
+    const refused = await Effect.runPromise(e.tick());
+    const words = registryOf(listing);
+    assert.ok('wrong' in words && words.wrong.includes(`lists \`ae/${id}/1\`, a session of ours, and its \`sessionId\` is missing`));
+    assert.deepEqual(refused.unobserved, [`harness \`claude\`: ${words.wrong}`], "the registry's words, naming the harness");
+    assert.equal(refused.observed.claude?.unread, 1, 'and the name is unread');
+    assert.equal(refused.actions, 0, 'with nothing done on an unread name');
+
+    fs.writeFileSync(
+      path.join(f.dir, 'agents.json'),
+      JSON.stringify([{ name: `ae/${id}/1`, sessionId: BG_ID, state: 'working', status: 'busy' }]),
+    );
+    const fixed = await Effect.runPromise(e.tick());
+    assert.deepEqual(fixed.unobserved, [], 'a listing that decodes leaves nothing said, nothing kept from the pass before');
   } finally {
     f.restore();
   }

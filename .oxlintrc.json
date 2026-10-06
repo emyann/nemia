@@ -783,8 +783,8 @@
     {
       "files": ["packages/agent-runtime/src/core/engine/engine.ts"],
       "rules": {
-        "complexity": ["error", { "max": 34 }],
-        "sonarjs/cognitive-complexity": ["error", 53]
+        "complexity": ["error", { "max": 33 }],
+        "sonarjs/cognitive-complexity": ["error", 52]
       }
     },
     {

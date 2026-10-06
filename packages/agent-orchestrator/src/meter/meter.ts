@@ -35,6 +35,7 @@ export type HarnessCost = { calls: number; ms: number; listed: number; spawned: 
  * pass, and composing this after it and writing it down — so that the meter's own cost is measured too. `rested` is the runs the pass
  * answered from its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them. Beside the time, what the pass saw
  * (`Seen`): the runs the store listed to it, the tasks the runtime reported on its pass, and the sessions of those queued and admitted.
+ * `unobserved` is why the runtime could not read a harness on the pass (`Pass.unobserved`), written only when it could not.
  */
 export type PassCost = Seen & {
   at: string;
@@ -46,6 +47,7 @@ export type PassCost = Seen & {
   spawned: number;
   overheadMs: number;
   rested: number;
+  unobserved?: readonly string[];
 };
 
 /**

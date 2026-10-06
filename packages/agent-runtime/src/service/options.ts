@@ -158,6 +158,10 @@ export type TaskSpec = {
  * `unreadable` says why each task whose journal did not read was left out of the pass, naming its file, the entry and the field —
  * on every report while it lasts, as a refusal is — and each feed entry no runtime wrote that the pass skipped, on the report of
  * the pass that met it. Every other task is moved all the same. Empty on a healthy board.
+ *
+ * `unobserved` says why a harness's look failed this pass, one sentence each, naming the harness and in its words (a registry row
+ * that does not decode names the row, its field and the fix): on every report while it lasts, on none after. The names that look
+ * was to find are unread (`observed`'s `unread` counts it), and no rule reads the words. Empty on a healthy board.
  */
 export type TickReport = {
   tasks: number;
@@ -168,6 +172,7 @@ export type TickReport = {
   observed: Record<string, ObserveCount>;
   refused: RefusedMove[];
   unreadable: string[];
+  unobserved: string[];
 };
 
 /**

@@ -30,7 +30,7 @@ import type { Monotonic } from '../clock.ts';
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
 import { bridgeOfTask, configForTurn } from '../../harness/args.ts';
-import { Runner, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
+import { Runner, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
 import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
@@ -609,6 +609,16 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
 });
 
 /**
+ * The pass's one look at the harnesses: told what to look for (`observeFor`), or listing everything when the runner cannot be told,
+ * which reads every name; and what each failed part of the look said (`Observation.why`), as the pass reports it.
+ */
+const lookAt = (runner: RunnerOps, expected: readonly ExpectedSession[]) =>
+  (runner.observeFor
+    ? runner.observeFor(expected)
+    : runner.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: ALL_READ })))
+  ).pipe(Effect.map((o) => ({ ...o, unobserved: [...(o.why ?? [])] })));
+
+/**
  * One pass over every task on the board. This is the whole daemon.
  *
  * Each task is stepped in the order `journal.list` gives, against one observation of every harness. A task filed unqueued
@@ -621,6 +631,9 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
  *
  * `unreadable` says why each task whose journal did not read was left out of this pass — it is said on every pass it lasts, as a
  * refused move is — and each feed entry the pass skipped, said once, on the pass whose read met it.
+ *
+ * `unobserved` says why each part of the pass's one look at the harnesses failed (`Observation.why`), naming the harness: on every
+ * pass while it lasts, off that pass's look alone. Nothing decides on it.
  *
  * `refused` is every move the lifecycle had no edge for this pass: the task, the state it was read in and the
  * event it was handed. Such a task does nothing and is asked again on the next pass, where the same refusal comes back
@@ -672,9 +685,7 @@ export const tick = Effect.fn('tick')(function* () {
     else folded.set(id, fold(id, read.events));
   }
   const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
-  const { seen: observed, unread } = yield* runner.observeFor
-    ? runner.observeFor(expectedOf(lookedFor))
-    : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ })));
+  const { seen: observed, unread, unobserved } = yield* lookAt(runner, expectedOf(lookedFor));
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -724,6 +735,7 @@ export const tick = Effect.fn('tick')(function* () {
     views: yield* admitWaiting(views),
     refused: stalled,
     unreadable,
+    unobserved,
   };
 });
 

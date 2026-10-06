@@ -861,3 +861,19 @@ test("the Effect door keeps the transcript: a2aRunner's Runner reads it through 
     'a driver that keeps no conversation: its card lists no sessionTranscript, and Runner has no transcript',
   );
 });
+
+test("observeFor through the seam carries what a failed part of the driver's look said, and says nothing once every part reads", async () => {
+  let why: string[] = ['the registry is busy'];
+  const ops: RunnerOps = {
+    ...testOps({ sessions: new Map() }),
+    observeFor: (expected) =>
+      Effect.sync(() => ({ seen: new Map(), unread: new Set(expected.map((e) => e.name)), ...(why.length ? { why } : {}) })),
+  };
+  const runner = a2aOps('fake', ops, async () => []);
+  const expected = [{ name: 'ae/t-1/1', harness: 'fake' }];
+  const failed = await Effect.runPromise(runner.observeFor!(expected));
+  assert.deepEqual(failed.why, ['the registry is busy']);
+  assert.deepEqual(failed.unread, new Set(['ae/t-1/1']));
+  why = [];
+  assert.equal(Object.hasOwn(await Effect.runPromise(runner.observeFor!(expected)), 'why'), false);
+});

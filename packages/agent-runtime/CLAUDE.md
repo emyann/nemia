@@ -95,6 +95,10 @@ owns what*.
 - **A Codex `exec --json` line of a type the runtime reads is decoded by `CodexEventSchema` (`harness/codex/stream.ts`)**: one that
   does not decode leaves that session alone unread while its process runs and failed once it has ended (`lookOf`, `detached.ts`),
   never gone. A field the runtime starts reading is added to the schema; any other line passes undecoded.
+- **A `claude -p` line of a kind the runtime reads is decoded by `PRINTED` (`harness/claude/print.ts`)**: a `result`, a `system`
+  `permission_denied` or `init`, an `assistant` line's `tool_use` blocks. One that does not decode refuses the output: that session alone
+  is unread while its process runs and failed once it has ended (`lookOf`), never read with no answer. A field the runtime starts
+  reading is added to the schema; any other line passes undecoded.
 - **A Claude Code transcript line of a kind the runtime reads is decoded by `LINES` (`harness/claude/lines.ts`), by the reader that
   reads it**: one that does not decode leaves that `--bg` session alone unread until it has ended, then failed (`endedOf`,
   `harness/claude/bg.ts`), or refuses the `transcript` verb, never read as absent; so does a transcript found and not read

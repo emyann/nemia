@@ -20,7 +20,7 @@ import type { HarnessOutput, HarnessSpec } from './detached.ts';
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
  */
-export const SAID_VERSION = 4;
+export const SAID_VERSION = 5;
 
 /**
  * The former versions whose kept output the shipped readers would read the same but for the fields they have added since:
@@ -28,13 +28,13 @@ export const SAID_VERSION = 4;
  * capture read before they were. A version leaves this list the moment a reader changes what one of its fields says, or
  * stops saying one: the digest pin catches a reader that reads otherwise, never a version wrongly left here.
  */
-export const SAID_EXTENDED: readonly number[] = [1, 2, 3];
+export const SAID_EXTENDED: readonly number[] = [1, 2, 3, 4];
 
 /**
  * The digest of what the shipped readers read of the streams in `test/reader-streams.ts`: a reader that reads otherwise fails
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
  */
-export const SAID_DIGEST = 'fd635ab12f5dc55bdf1ede187a7d8a59518be5dfb430ee23799e934443ff4a3c';
+export const SAID_DIGEST = 'f5bfcb068f89ee4e9f657a5cce81e44608ca006285d4b4ee0c757d89057210ac';
 
 /** What a capture is known by: its size and mtime, as `fs.statSync` gives them. */
 export type SaidKey = { size: number; mtimeMs: number };

@@ -1866,6 +1866,17 @@ unwritten for the quiet floor, or listed finished with no transcript — it read
 as a warning on every look, so its task settles and `stop`, `release` and `forget` reach it (`endedOf`, `harness/claude/bg.ts`). A
 line torn mid-write, one that is no JSON object, and a line of a type the reader does not read pass undecoded.
 
+What `claude -p` prints is decoded where the runtime reads it (`printedLinesOf`, `harness/claude/print.ts`): a `result` line, a
+`system` line of subtype `permission_denied` or `init`, and an `assistant` line with its `tool_use` blocks, each by its schema in
+`PRINTED`. Every field the readers read may be absent, and an absent one means what it always has; a field that is there has the shape
+the runtime reads: a cost or an API time a number of 0 or more, a token count an integer, `permission_denials` a list whose entries name
+their tool, a call's id and tool non-empty strings. An output with one such line that does not decode is refused as a whole, in words
+naming the line, its kind, the field, at most 60 characters of what it found, and the fix: that session alone is unread while its
+process runs and failed once it has ended (`lookOf`, `harness/detached/detached.ts`), never a job that said nothing. Stderr captured
+beside it, a line torn mid-write, and a line of any other type or subtype pass undecoded. Measured 2026-10-06 over the store's 2,346
+kept captures (2,392 `result`, 962 `permission_denied` and 2,416 `init` lines, 78,605 `tool_use` blocks): none refused, each read as
+before.
+
 A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
 refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,
 neither there nor gone, and followed again by an engine that has the harness; a spawn is refused (`unstartable`, in words that name the
@@ -2079,6 +2090,7 @@ of pure code sits beside it.
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
+| `src/harness/claude/print.ts` | the lines of `claude -p`'s output the runtime reads (`PRINTED`), decoded, and why an output is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration, read under its guards (`claudeRegistration`) and found by name |
 | `src/harness/claude/bridge.ts` | a `--bg` session's Remote Control link, off its registration's `bridgeSessionId` (`claudeBridge`), or why there is none |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
@@ -2092,7 +2104,7 @@ of pure code sits beside it.
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
-| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
+| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, decoded by `print.ts` or refused, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's methods (`SESSION_METHODS`), `forgetSession` among them, holding nothing — every answer read afresh off the harness and the journal |

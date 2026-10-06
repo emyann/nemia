@@ -168,6 +168,10 @@ const STREAMS = [
   SKILLS_STREAM,
   SKILLS_STREAM.split('\n').slice(1).join('\n'),
   FILES_STREAM,
+  resultLine({ duration_api_ms: null }),
+  [stream.init, JSON.stringify({ ...JSON.parse(stream.denied('toolu_b', 'Bash')), tool_use_id: 7 }), resultLine({})].join('\n'),
+  [stream.init, stream.calls(['toolu_b', 'Bash', { command: 'ls' }]).replace('"toolu_b"', '5'), resultLine({})].join('\n'),
+  [JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 }), resultLine({})].join('\n'),
 ];
 
 const CODEX = [

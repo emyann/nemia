@@ -833,12 +833,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/harness/detached/output.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 19]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/mcp.ts"],
       "rules": {
         "complexity": ["error", { "max": 26 }],

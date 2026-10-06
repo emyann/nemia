@@ -80,18 +80,86 @@ export function writeLevel(level: LevelFile): void {
   fs.renameSync(hidden, levelFile());
 }
 
+/** Her definition as a step is read, with her ask rules: every call that asks the person first, outranking what her mode allows. */
+export type Nemia = Workflow & { askTools: string[] };
+
 /**
- * Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`). Refused
- * (`Invalid`): a mode but `default`, under which a write she proposes is not asked of the person.
+ * Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`); and her
+ * ask rules (`askTools:`, a line only she takes, read out before the rest). Refused (`Invalid`): a mode but `auto`, and an `askTools:`
+ * missing or naming no rule, without which a write she proposes is not asked of the person.
  */
-export function readNemia(file: string = nemiaDefinition()): Workflow {
-  const agent = parseAgent('nemia', fs.readFileSync(file, 'utf8'));
-  const step = stepFrom('nemia/nemia.md', agent.keys, agent.body, undefined);
-  if (step.permissionMode !== 'default')
+export function readNemia(file: string = nemiaDefinition()): Nemia {
+  const text = fs.readFileSync(file, 'utf8');
+  const asked = /^askTools:(.*)\n/m.exec(text);
+  const askTools = (asked?.[1] ?? '')
+    .split(',')
+    .map((rule) => rule.trim())
+    .filter(Boolean);
+  if (!askTools.length)
     throw new Invalid({
-      message: `${file}: her permissionMode is ${step.permissionMode ?? 'not set'}, and at semi-auto every write she proposes is asked of the person: permissionMode: default.`,
+      message: `${file}: her askTools: names no rule, and every write she proposes is asked of the person by one: askTools: Bash(nemia approve:*), …`,
     });
-  return step;
+  const agent = parseAgent('nemia', asked === null ? text : text.replace(asked[0], ''));
+  const step = stepFrom('nemia/nemia.md', agent.keys, agent.body, undefined);
+  if (step.permissionMode !== 'auto')
+    throw new Invalid({
+      message: `${file}: her permissionMode is ${step.permissionMode ?? 'not set'}, and she reads unasked while her askTools ask the person each write: permissionMode: auto.`,
+    });
+  return { ...step, askTools };
+}
+
+/** The package she ships in: its `package.json` names its `nemia`. */
+const PACKAGE = path.join(import.meta.dirname, '..', '..');
+
+/** A path's real path, or undefined where it is not there. */
+const realOf = (at: string): string | undefined => {
+  try {
+    return fs.realpathSync(at);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The folder whose `nemia` is the package `root`'s own bin: from the package's real path up, at each folder its `node_modules/.bin` (a
+ * checkout, a local install), then its `bin` (a global prefix), the first whose `nemia` resolves to the file the package's `package.json`
+ * names. Undefined where none does: a `nemia` that is another package's is passed over.
+ */
+export function ownBin(root: string = PACKAGE): string | undefined {
+  const named = (JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { bin?: { nemia?: unknown } }).bin?.nemia;
+  const own = typeof named === 'string' ? realOf(path.join(root, named)) : undefined;
+  if (own === undefined) return undefined;
+  let at = realOf(root);
+  while (at !== undefined) {
+    const found = [path.join(at, 'node_modules', '.bin'), path.join(at, 'bin')].find((bin) => realOf(path.join(bin, 'nemia')) === own);
+    if (found !== undefined) return found;
+    at = path.dirname(at) === at ? undefined : path.dirname(at);
+  }
+  return undefined;
+}
+
+/**
+ * The ask rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, and
+ * on her level and her instruction, the two files of her folder she does not own. Read at each filing, so a folder the store gains is
+ * asked at the next.
+ */
+export function storeAsks(root: string = ROOT): string[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(root).sort();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    names = [];
+  }
+  const own = path.basename(nemiaDir());
+  return [
+    ...names
+      .filter((name) => name !== own)
+      .map((name) => path.join(root, name))
+      .map((at) => (fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ? `Edit(/${at}/**)` : `Edit(/${at})`)),
+    `Edit(/${levelFile()})`,
+    `Edit(/${promptFile()})`,
+  ];
 }
 
 /**

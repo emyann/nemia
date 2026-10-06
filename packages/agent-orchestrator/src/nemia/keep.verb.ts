@@ -16,9 +16,9 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
-import { composePrompt, memoryDir, nemiaDir, readLevel, readNemia, SHIPPED_NEMIA } from './level.store.ts';
+import { composePrompt, memoryDir, nemiaDir, ownBin, readLevel, readNemia, SHIPPED_NEMIA, storeAsks } from './level.store.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
-import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, type HerTask, type NemiaAct } from './nemia.ts';
+import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, nemiaSettings, type HerTask, type NemiaAct } from './nemia.ts';
 
 /** What the keeper did, each act counted once done. */
 export const NEMIA_ACTS = Metric.counter('nemia.acts', {
@@ -63,12 +63,16 @@ const factoryFolders = (): Mount[] => {
   return factoryMounts({ repos }, undefined);
 };
 
-/** Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition. */
+/**
+ * Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition, with
+ * her ask rules and the store's (`storeAsks`) and the daemon's own bin first on her path (`ownBin`), in the harness's settings.
+ */
 export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
   const prompt = composePrompt(step.body);
   const memory = `Edit(/${memoryDir()}/**)`;
   const quota = quotaUrl();
+  const settings = nemiaSettings([...step.askTools, ...storeAsks()], ownBin(), process.env.PATH ?? '');
   return {
     id,
     brief: nemiaBrief(quota),
@@ -78,12 +82,16 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
     priority: NEMIA_PRIORITY,
     config: {
       ...(step.model === undefined ? {} : { model: step.model }),
-      permissionMode: step.permissionMode ?? 'default',
+      permissionMode: step.permissionMode,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
       allowedTools: [...(step.allowedTools ?? []), memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
       background: true,
       mounts: factoryFolders(),
-      ...ownOf({ harness: step.harness, remote: true }, { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA] }, () => undefined),
+      ...ownOf(
+        { harness: step.harness, remote: true },
+        { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA], settings },
+        () => undefined,
+      ),
     },
   };
 }
@@ -91,6 +99,8 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
 /** One act owed on her task `id`: a stop or a drop already done by another is no failure. */
 const act = (e: Engine, id: string, owed: NemiaAct) =>
   Effect.gen(function* () {
+    if (owed === 'file' && ownBin() === undefined)
+      yield* Effect.logWarning(`Nemia is filed with no nemia of the daemon's first on her path: none links ${SHIPPED_NEMIA}/../bin.`);
     if (owed === 'file') yield* asked('file', e.file(nemiaSpec(id)));
     if (owed === 'stop') yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
     if (owed === 'subscribe')

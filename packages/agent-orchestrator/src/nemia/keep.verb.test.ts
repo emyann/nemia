@@ -1,8 +1,9 @@
 /**
  * The keeper and `nemia level` over an engine board of the test's: her task filed long-lived in her folder, by her shipped definition and
- * the person's custom words; subscribed once it is open; nothing filed again on the next beat, nor after a stop from outside; stopped and
- * unsubscribed at manual. And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own,
- * since `WF_ROOT` is read as the module loads.
+ * the person's custom words, with the daemon's own bin first on her path and an ask on every write in the store but her memory;
+ * subscribed once it is open; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed at manual.
+ * And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own, since `WF_ROOT` is read as
+ * the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +21,7 @@ process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const { keepOnce } = await import('./keep.verb.ts');
 const { LEVEL } = await import('./level.verb.ts');
 const { MEMORY } = await import('./memory.verb.ts');
-const { memoryDir, nemiaDir, promptFile, readLevel, readNemia } = await import('./level.store.ts');
+const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../folder/folder.store.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
@@ -77,7 +78,7 @@ test('REFUSED: semi-auto while her folder is not trusted, naming the command tha
   assert.equal(await beat().then((owed) => owed.length), 0, 'no level set owes nothing');
 });
 
-test("at semi-auto the keeper files her task long-lived, reading every factory's folders, subscribes it once open, and owes nothing on the next beat", async () => {
+test("at semi-auto the keeper files her task long-lived in auto, the daemon's bin first on her path, every store write asked but her memory; subscribes it once open, and owes nothing on the next beat", async () => {
   fs.mkdirSync(path.dirname(customInstructionsFile(ROOT, 'nemia')), { recursive: true });
   fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in French. Times in Montreal.\n');
   trust(true);
@@ -94,13 +95,22 @@ test("at semi-auto the keeper files her task long-lived, reading every factory's
   fs.writeFileSync(path.join(ROOT, 'daemon.json'), JSON.stringify(daemon));
   const set = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string; phase: string | null };
   assert.equal(set.phase, null, 'not filed until the keeper beats');
-  assert.deepEqual(await beat(), ['file']);
+  fs.mkdirSync(path.join(ROOT, 'brand-new'));
+  const bin = ownBin();
+  assert.ok(bin !== undefined, "the checkout's own nemia");
+  const searched = process.env.PATH;
+  process.env.PATH = ['/usr/local/bin', bin, '/usr/bin'].join(path.delimiter);
+  try {
+    assert.deepEqual(await beat(), ['file']);
+  } finally {
+    process.env.PATH = searched;
+  }
   const spec = b.specs.at(-1) as unknown as { id: string; cwd: string; restartPolicy: string; config: Record<string, unknown> };
   assert.equal(spec.id, set.task);
   assert.equal(spec.cwd, nemiaDir());
   assert.equal(spec.restartPolicy, 'Always');
   const shipped = readNemia();
-  assert.equal(spec.config.permissionMode, 'default');
+  assert.equal(spec.config.permissionMode, 'auto');
   assert.equal(spec.config.background, true);
   assert.deepEqual(spec.config.disallowedTools, shipped.disallowedTools);
   assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }], "every factory's folders, read-only");
@@ -108,8 +118,20 @@ test("at semi-auto the keeper files her task long-lived, reading every factory's
   assert.ok((spec.config.allowedTools as string[]).includes(`Edit(/${memoryDir()}/**)`), 'her memory hers to write');
   assert.ok((spec.config.allowedTools as string[]).includes('Bash(curl -s http://127.0.0.1:8787/api/quota)'), 'the quota hers to read');
   assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);
-  const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; pluginDir: string[] };
+  const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; settings: string };
   assert.equal(own.remoteControl, true);
+  const settings = JSON.parse(own.settings) as { permissions: { ask: string[] }; env: { PATH: string } };
+  assert.equal(settings.env.PATH, [bin, '/usr/local/bin', '/usr/bin'].join(path.delimiter), "the daemon's own bin first, and once");
+  const asks = settings.permissions.ask;
+  assert.deepEqual(asks.slice(0, shipped.askTools.length), shipped.askTools, 'her ask rules, as she ships them');
+  assert.ok(asks.includes(`Edit(/${path.join(ROOT, 'brand-new')}/**)`), 'a folder the store gained is asked');
+  assert.ok(asks.includes(`Edit(/${path.join(ROOT, 'daemon.json')})`), 'a file at the store top is asked');
+  assert.ok(asks.includes(`Edit(/${levelFile()})`) && asks.includes(`Edit(/${promptFile()})`), 'her level and her instruction are asked');
+  assert.deepEqual(
+    asks.filter((rule) => rule.startsWith(`Edit(/${nemiaDir()}`)),
+    [`Edit(/${levelFile()})`, `Edit(/${promptFile()})`],
+    'her memory is asked by no rule',
+  );
   assert.equal(own.appendSystemPromptFile, promptFile());
   const prompt = fs.readFileSync(promptFile(), 'utf8');
   assert.ok(prompt.startsWith(shipped.body.trim().slice(0, 40)), 'her shipped instruction first');

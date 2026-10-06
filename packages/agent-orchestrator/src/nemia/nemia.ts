@@ -1,11 +1,13 @@
 /**
  * Nemia, the store's own agent, kept on a long-lived session while a person has her on: the levels a person sets (`LEVELS`), the file
  * that says it (`LevelFile`), what the keeper owes on a beat (`nemiaDue`) off the state her session and her subscription are in
- * (`nemiaState`), the words that wake her (`NEMIA_WAKE`), and her machine as a board draws it (`nemiaGraph`, `nemiaDiagram`).
+ * (`nemiaState`), the words that wake her (`NEMIA_WAKE`), the settings her session is filed with (`nemiaSettings`), and her machine as a
+ * board draws it (`nemiaGraph`, `nemiaDiagram`).
  *
  * Pure. The person's file and her folder are `level.store.ts`'s, the keeper is `keep.verb.ts`, and the commands are `level.verb.ts` and
  * `memory.verb.ts`.
  */
+import path from 'node:path';
 import { DEFAULT_WAKE } from '../subscription/subscription.ts';
 
 /** The levels a person sets: `manual`, her session stopped; `semi-auto`, her session kept, every write she proposes asked of the person. */
@@ -34,6 +36,18 @@ export const NEMIA_DIGEST_EVERY = 1440;
 
 /** The task her session is filed under when she is put at `semi-auto` at `since`: `nemia-` and the time's digits. */
 export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
+
+/**
+ * The harness's settings her session is filed with, as JSON: her ask rules (`asks`), and the search path `searchPath` with the folder
+ * `bin` first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined. Pure.
+ */
+export function nemiaSettings(asks: readonly string[], bin: string | undefined, searchPath: string): string {
+  const rest = searchPath.split(path.delimiter).filter((entry) => entry !== '' && entry !== bin);
+  return JSON.stringify({
+    permissions: { ask: [...asks] },
+    ...(bin === undefined ? {} : { env: { PATH: [bin, ...rest].join(path.delimiter) } }),
+  });
+}
 
 /** The usage the refusals of `nemia level` end on. */
 export const LEVEL_FORM = `nemia level [${LEVELS.join('|')}]`;

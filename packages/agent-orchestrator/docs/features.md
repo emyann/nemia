@@ -2261,8 +2261,10 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
   never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
-  `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: default`, with every factory's folders mounted
-  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one.
+  `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: auto`, with every factory's folders mounted
+  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one. Her
+  settings ask the person each write: her `askTools:` (every verb that writes, `wf` and `ae`), and an `Edit` on each folder of the store
+  but hers, read at filing (`storeAsks`); and they put the daemon's own `nemia` first on her `PATH` (`ownBin`).
 - **Her subscription is `nemia`**, with the default wake words and `denied:`, and a digest once a day; `nemia subscribe nemia` and `nemia
   unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
 - **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in

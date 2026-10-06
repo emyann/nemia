@@ -19,6 +19,7 @@ import {
   turnOf,
   waitsForInput,
   type Action,
+  type Bridge,
   type Event,
   type Now,
   type Sighting,
@@ -28,7 +29,7 @@ import {
 import type { Monotonic } from '../clock.ts';
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
-import { configForTurn } from '../../harness/args.ts';
+import { bridgeOfTask, configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
 import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
@@ -113,6 +114,12 @@ export type TaskView = {
    * Absent for a task not filed queued, and once its turn has started. Off the record alone.
    */
   admission?: 'queued' | 'admitted';
+  /**
+   * The link that opens the session in a browser or on a phone, for a task that asked its harness to bridge it there — Claude
+   * Code's `claude.remoteControl` — or no link and why: not up yet, refused, or ended (`bridgeOfTask`). Absent for a task that did
+   * not ask, and only then. Off the same observation as the phase, read afresh every pass: the status a Pod's spec asked for.
+   */
+  bridge?: Bridge;
 };
 
 /**
@@ -819,7 +826,7 @@ function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sigh
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
  * observation, and that id is what `logs` reads then. `waitingFor` is carried only where the phase is `needs-human`: the
  * word answers "waiting for what?", and there is no question to answer about a session nobody is waiting on. Carried, not
- * judged — `decide` never saw it.
+ * judged — `decide` never saw it. So is its `bridge`, which only a task that asked for one carries (`bridgeOfTask`).
  */
 export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>): TaskView {
   const taskId = state.taskId;
@@ -828,6 +835,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
   const phase = phaseOfView(state, observed, sighting);
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   const admission = admissionOf(state);
+  const bridge = bridgeOfTask(state.config, state.settled !== null, sighting?.bridge);
   return {
     id: taskId,
     state,
@@ -836,5 +844,6 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...(waitingFor ? { waitingFor } : {}),
     ...(admission ? { admission } : {}),
+    ...(bridge ? { bridge } : {}),
   };
 }

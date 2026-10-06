@@ -40,12 +40,10 @@ check run by the run, which lands the merge or aborts it; `denials: fail` (§10)
 own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
 own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
 
-**What remains, in order.** Of the numbered items, three are open:
+**What remains, in order.** Of the numbered items, two are open:
 
 1. §1, a run that grows steps from a plan.
-2. §2's board half of Remote Control: the run page's word that a step's session is reachable from a phone, and whether a session was
-   in fact bridged, which nothing reads (runtime open issue 23).
-3. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
+2. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
    4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
 
 Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-out.md`, *Freezing* and open question 6): a team's own
@@ -2408,8 +2406,9 @@ stateDiagram-v2
   /api/level`, a refusal in the api's words), her session's state judged from the orchestrator's facts alone (`sessionOf`,
   `apps/web/src/lib/nemia.ts`: off, leaving, not filed, starting, up, stopped from outside with a way to a fresh one), how to reach it
   as the api answers it (its first line a command to copy), her spend and allows, and her memory read-only, with words saying a fact is
-  pruned by asking her. Still to build: the runtime reads her bridge's web link, and `reachOf` answers it, so the board shows the link
-  itself rather than the sentence about it.
+  pruned by asking her. Her web link is read off her task's view (`TaskView.bridge`, through `bridgeOf`): `reach` answers it after
+  the attach line, or why it is not up, and `nemia level` and `GET /api/level` answer it as `bridge` too, which the page draws as a
+  link.
 
 `commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory
 instruction` is not on her allow list, since its write flags share its prefix.
@@ -5391,9 +5390,9 @@ Next: 2c, a workflow that marks a mount writable on purpose.
   start, and the runtime client (`runtime-client.ts`) holds the engine's harness map.
 - **Nothing new on a screen.** `wf ls` and `wf decide` print the same lines whether the engine's record carries `remoteControl` or not,
   and a test holds them so. `wf --help`'s sentence on the keys names `remote` among the rest.
-- **Left**: the board's word for it on the run page; the supervisor; and whether a session was in fact bridged, which nothing reads
-  (engine open issue 23). *Since: the supervisor shipped as §9 (2026-09-17); the board's word and the bridge are what is left
-  (noted 2026-09-28).*
+- **Left**: nothing. *Since: the supervisor shipped as §9 (2026-09-17); whether a session was in fact bridged is read off its
+  registration onto its task's view (`TaskView.bridge`, runtime open issue 23), and a step's detail answers it (`StepFiled.bridge`),
+  drawn as a *Reach* row in the step's facts on the run page and its inspector (2026-10-06).*
 
 **Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
 whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
@@ -5416,7 +5415,7 @@ auto-registration with Remote Control fits.
 - agent-orchestrator: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
   supervisor: a session of its own, not a step of any run, that watches the store and acts, with Remote Control on. What it
   is told and what it may do is its own design; nothing here decides it.
-- Board: the run page says a step's session is reachable from the phone when it is.
+- Board: the run page says a step's session is reachable from the phone when it is, with its link. *Done 2026-10-06.*
 
 ## 3. The queue: a cap on runs in flight, and cards that start themselves
 

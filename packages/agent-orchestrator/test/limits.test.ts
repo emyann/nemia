@@ -132,7 +132,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-runtime/src/service/harness-refusal.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/args.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/claude/code.ts': { complexity: 1 },
-  'packages/agent-runtime/src/harness/claude/inbox.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/codex/transcript.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/detached/detached.ts': { 'max-lines-per-function': 1 },
   'packages/agent-runtime/src/harness/detached/output.ts': { 'sonarjs/cognitive-complexity': 2 },

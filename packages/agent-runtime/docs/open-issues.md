@@ -342,12 +342,14 @@ naming the new place (`FORMER_ARGS`), and a journal filed before reads as filed 
 move (`packages/agent-orchestrator/test/argv.test.ts`, recorded before). In the bag it could reach a `claude -p` spec at the Effect
 door, which the named key never did, so `claudeJob` and `claudeDetached` refuse it there (`claudePrintRefuses`).
 
+**What changed again** (2026-10-06). Whether a session was bridged is read: `observe` reads the `bridgeSessionId` of each listed
+session's registration (`claudeBridge`, `harness/claude/bridge.ts`), under the guards `find` uses (`claudeRegistration`), and the
+task's view carries `bridge` — `{ url }` asked and up, `{ url: null, why }` asked and not up (an account signed out, Remote Control
+off, no process seen, an id not of the form `session_…`), and nothing for a task that did not ask (`bridgeOfTask`,
+`test/bridge.test.ts`). The link's form, and when it appears, measured on 2.1.291: `CLAUDE.md`, *Claude Code, as a harness*.
+
 **What is left.**
 
-- **Nothing reads whether a session was bridged.** The runner passes the flag, and the `bridgeSessionId` is in the session's
-  registration, which `find` reads for its id alone. A session that could not be bridged — an account signed out of
-  claude.ai, Remote Control off for the organisation — runs unbridged and says so to nobody; `view` and `ae ls` do not say
-  whether a session is reachable. The board's "reachable from the phone" (features.md §2) needs that read first.
 - **Driven outside the record.** Whatever a person types into a bridged session from the web, and every prompt they answer
   there, reaches it without `say`, so none of it is journalled: `state.said` is not the whole of what such a session was
   told.

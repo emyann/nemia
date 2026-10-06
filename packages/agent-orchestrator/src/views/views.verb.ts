@@ -290,6 +290,26 @@ export const waitingOf =
     views.get(taskId)?.waitingFor;
 
 /**
+ * A session's web link, as a person opens it from a browser or a phone: `url` where it is up, else null and `why` says what keeps it
+ * down; `why` is null where `url` is set.
+ */
+export type Bridge = { url: string | null; why: string | null };
+
+/**
+ * Whether a task's session is reachable on the web, off views already read (`TaskView.bridge`): its link where the bridge is up, why not
+ * where it was asked and is not, and null where the task was not filed bridged, or is not viewed. Costs no observation of its own.
+ *
+ * Exported, log-free, for a consumer that shows a person where to reach a session, as `nemia level` and a run's step detail do.
+ */
+export const bridgeOf =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): Bridge | null => {
+    const bridge = views.get(taskId)?.bridge;
+    if (bridge === undefined) return null;
+    return bridge.url === null ? { url: null, why: bridge.why } : { url: bridge.url, why: null };
+  };
+
+/**
  * What a task's sessions were denied, off views already read: every call the harness refused on an attempt, a running one's so far, as
  * a permission rule names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task
  * nobody read, one whose attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the

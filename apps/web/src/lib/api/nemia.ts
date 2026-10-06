@@ -5,6 +5,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { pace } from '../feed.ts';
+import { BridgeSchema, type Bridge } from './bridge.ts';
 import { get, ReadRefusal, send } from './read.ts';
 
 /** Mirrors the package's `Level`: Manual, her session stopped; Semi-auto, her session kept, what waits on a person asked of them. */
@@ -24,8 +25,9 @@ export type FactoryLevel = { factory: string; level: Level; default: Level; own:
 
 /**
  * Mirrors the package's `NemiaLevel`: her `level`, the store's, and since when; each factory's level (`factories`); her task, its phase
- * and its session where one is filed; the lines that reach her session (`reach`); whether it was stopped from outside (`stopped`); what
- * her sessions cost (`spend`, null where none is filed); and the allow rules a person gave her at a prompt (`allows`).
+ * and its session where one is filed; the lines that reach her session (`reach`), and her web link where her session is bridged
+ * (`bridge`, null where not); whether it was stopped from outside (`stopped`); what her sessions cost (`spend`, null where none is
+ * filed); and the allow rules a person gave her at a prompt (`allows`).
  */
 export type NemiaLevel = {
   level: Level;
@@ -34,6 +36,7 @@ export type NemiaLevel = {
   phase: string | null;
   sessionId: string | null;
   reach: readonly string[];
+  bridge: Bridge | null;
   stopped: boolean;
   spend: Spend | null;
   allows: readonly string[];
@@ -63,6 +66,7 @@ const NemiaLevelSchema = Schema.Struct({
   phase: Schema.NullOr(Schema.String),
   sessionId: Schema.NullOr(Schema.String),
   reach: Schema.Array(Schema.String),
+  bridge: Schema.NullOr(BridgeSchema),
   stopped: Schema.Boolean,
   spend: Schema.NullOr(Schema.Struct({ usd: Schema.Number, measured: Schema.Number, unmeasured: Schema.Number })),
   allows: Schema.Array(Schema.String),

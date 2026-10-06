@@ -35,7 +35,12 @@ const BOOT = 'boot-1';
  */
 const bgOps = (o: ClaudeOptions = {}) => {
   const now = o.now;
-  return claudeOps({ ...(now ? { mono: () => ({ boot: BOOT, ms: now() }) } : {}), ...o, root: o.root ?? scratch('ae-bg-') });
+  return claudeOps({
+    ...(now ? { mono: () => ({ boot: BOOT, ms: now() }) } : {}),
+    sessionsDir: scratch('ae-bg-sessions-'),
+    ...o,
+    root: o.root ?? scratch('ae-bg-'),
+  });
 };
 
 /** A runner under `root` that first saw the transcript of the session under `name` at `mtimeMs` when the monotonic clock read `ms`. */
@@ -1199,7 +1204,7 @@ test("a registry row is ours only when named `ae/` with a `state` key: another's
   }
 });
 
-test('a row is held while it lists a process, which it names: an idle session open for its next words, a finished one still open, and a stopped one gone', async () => {
+test('a row is held while it lists a process, which it names with its bridge: an idle session open for its next words, a finished one still open, and a stopped one gone, whose bridge nobody reads', async () => {
   const restore = withFakeClaude(
     JSON.stringify([
       { name: 'ae/a/1', sessionId: 's-a', state: 'blocked', status: 'idle', pid: 42 },
@@ -1213,12 +1218,36 @@ test('a row is held while it lists a process, which it names: an idle session op
       transcriptTime: async () => undefined,
       closeoutFrom: async () => undefined,
       usageFrom: async () => undefined,
+      bridgeOf: async (pid, sessionId) =>
+        pid === 42 ? { url: `https://example.test/${sessionId}` } : { url: null, why: `${pid} holds no bridge` },
     });
     assert.deepEqual(
       [...(await Effect.runPromise(ops.observe))],
       [
-        ['ae/a/1', { sessionId: 's-a', state: 'input-required', busy: false, held: true, nativeId: 's-a', pid: 42 }],
-        ['ae/b/1', { sessionId: 's-b', state: 'completed', busy: false, held: true, nativeId: 's-b', pid: 43 }],
+        [
+          'ae/a/1',
+          {
+            sessionId: 's-a',
+            state: 'input-required',
+            busy: false,
+            held: true,
+            nativeId: 's-a',
+            pid: 42,
+            bridge: { url: 'https://example.test/s-a' },
+          },
+        ],
+        [
+          'ae/b/1',
+          {
+            sessionId: 's-b',
+            state: 'completed',
+            busy: false,
+            held: true,
+            nativeId: 's-b',
+            pid: 43,
+            bridge: { url: null, why: '43 holds no bridge' },
+          },
+        ],
         ['ae/c/1', { sessionId: 's-c', state: 'canceled', busy: false, held: false, nativeId: 's-c' }],
       ],
     );

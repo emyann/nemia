@@ -26,12 +26,14 @@ import { readFactoryLevel, writeFactoryLevel } from '../level/level.store.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { dollars, taskSpend, type Spend } from '../status/status.ts';
+import { bridgeOf, type Bridge } from '../views/views.verb.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
 import { LEVEL_FORM, LEVELS, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
 /**
  * Where Nemia is, as `nemia level` answers: the store's `level` and since when; each factory's level (`factories`), the default factory
- * first; her task, its phase and its session where one is filed; how a person reaches her session (`reach`); whether her task was stopped
+ * first; her task, its phase and its session where one is filed; how a person reaches her session (`reach`), and her session's web link
+ * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task was stopped
  * from outside (`stopped`); what her sessions cost (`spend`, counted as each ends, as a step's; null where none is filed); and the allow
  * rules a person gave her at a prompt (`allows`).
  */
@@ -42,6 +44,7 @@ export type NemiaLevel = {
   phase: string | null;
   sessionId: string | null;
   reach: string[];
+  bridge: Bridge | null;
   stopped: boolean;
   spend: Spend | null;
   allows: string[];
@@ -51,11 +54,16 @@ export type NemiaLevel = {
 /** The command a person runs once to trust her folder, which her session's harness refuses to start in until they do. */
 export const trustCommand = (): string => `mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`;
 
-/** How a person reaches her session `sessionId`, as measured: attached on this machine, or through the link its bridge shows. */
-const reachOf = (sessionId: string | null): string[] =>
-  sessionId === null
-    ? []
-    : [`${DEFAULT_HARNESS} attach ${sessionId.slice(0, 8)}`, 'or the web link her session shows once its bridge is up, from a phone too'];
+/**
+ * How a person reaches her session `sessionId`: attached on this machine, then through its web link (`bridge`) where it is up, or why it
+ * is not where it was asked; nothing more where it was not.
+ */
+const reachOf = (sessionId: string | null, bridge: Bridge | null): string[] => {
+  if (sessionId === null) return [];
+  const attach = `${DEFAULT_HARNESS} attach ${sessionId.slice(0, 8)}`;
+  if (bridge === null) return [attach];
+  return [attach, bridge.url ?? `her web link is not up: ${bridge.why ?? 'its bridge says nothing'}`];
+};
 
 /** What her sessions cost, off her task's view: a `Spend`, its share of the step's (`taskSpend`). */
 const spendOf = (view: Parameters<typeof taskSpend>[0]): Spend | null => {
@@ -72,13 +80,16 @@ const levelNow = (e: Engine) =>
     const view = file?.task === undefined ? undefined : yield* asked('view', e.view(file.task));
     const filed = view !== undefined && Boolean(view.state.filedAt);
     const sessionId = filed ? view.sessionId : null;
+    const open = filed && !view.state.settled;
+    const bridge = open ? bridgeOf(new Map([[view.id, view]]))(view.id) : null;
     return {
       level: file?.level ?? 'manual',
       since: file?.since ?? null,
       task: file?.task ?? null,
       phase: filed ? view.phase : null,
       sessionId,
-      reach: filed && !view.state.settled ? reachOf(sessionId) : [],
+      reach: open ? reachOf(sessionId, bridge) : [],
+      bridge,
       stopped: above && filed && (Boolean(view.state.settled) || view.state.stopRequested),
       spend: filed ? spendOf(view) : null,
       allows: yield* tried(promptAllows),

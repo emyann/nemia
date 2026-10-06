@@ -10,7 +10,8 @@
  */
 import path from 'node:path';
 import type { McpServer } from './seam.ts';
-import type { ClaudeFlags } from './claude/vocabulary.ts';
+import { bridgeAsked, type ClaudeFlags } from './claude/vocabulary.ts';
+import type { Bridge } from '../core/domain.ts';
 import { mcpRefuses } from './mcp.ts';
 import { mountsRefusalOf, type Mount } from './mounts.ts';
 import { admissionRefusalOf, type Admission } from './admission.ts';
@@ -188,6 +189,22 @@ const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringif
  */
 export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs | undefined): HarnessArgs | undefined =>
   turn === undefined ? base : { ...base, ...turn };
+
+/**
+ * A task's bridge as its view says it, from its configuration (`config`) and what its harness saw of the session (`seen`): `undefined`
+ * for a task that did not ask for one (`bridgeAsked`), whatever was seen; else the bridge seen, a link or why there is none; else no
+ * link, and why, by whether the task is `settled`. Never `undefined` for a task that asked: an absent link is not "not bridged".
+ */
+export const bridgeOfTask = (config: HarnessArgs | undefined, settled: boolean, seen: Bridge | undefined): Bridge | undefined => {
+  if (!bridgeAsked({ config })) return undefined;
+  if (seen) return seen;
+  return {
+    url: null,
+    why: settled
+      ? 'its session has ended, and its bridge with it.'
+      : 'no process of its session is seen yet to read its bridge from: it is starting, restarting, or between attempts.',
+  };
+};
 
 /**
  * Why what an answer gives its turn cannot be journalled — or `undefined`. Only the turn's own arguments (`TURN_ARGS`), in

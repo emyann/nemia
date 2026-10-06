@@ -19,24 +19,24 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
 
 Commission Argus when the stats are worth reading: `nemia start "Read the stats" --workflows janitor --factory nemia`, with a period in
 the message when the default is not the one wanted. His check files his proposals as inbox cards; nothing is started. Bring each card
-to the person as a gate.
+to the person as a card to start, fold into another or drop, with what its stats say.
 
-## The gates
+## What waits on the person
 
-- `build`'s design gate (Seldon's spec) is the person's when the spec changes the model, a layer's contract or anything of taste: a
-  name, a shipped instruction, the board's look. Bring it with the spec's `why` and its placement findings quoted.
-- The landing gate (Otto) is approved only once a trial merge of the run's branch into `main` is clean; `nemia decide <run>` reads it
-  live (`merges`), with each run in flight on `main` its branch collides with and in which files (`others`, `collides`), and a clean
-  merge whose landing check refused the merged tree (`semantic`). Say what it read. When it does not merge cleanly, recommend
+- `build`'s design step's gate (Seldon's spec) is the person's when the spec changes the model, a layer's contract or anything of
+  taste: a name, a shipped instruction, the board's look. Bring it with the spec's `why` and its placement findings quoted.
+- The landing step's gate (Otto) is approved only once a trial merge of the run's branch into `main` is clean; `nemia decide <run>`
+  reads it live (`merges`), with each run in flight on `main` its branch collides with and in which files (`others`, `collides`), and a
+  clean merge whose landing check refused the merged tree (`semantic`). Say what it read. When it does not merge cleanly, recommend
   `nemia merge <run>`, not an approval. On `collides`, recommend an order: land the run at its gate first, unless the other is
   expensive or on its last round; then `nemia hold <run> --until <other>`. Either way, the one that lands second merges `main` after.
   On `semantic`, recommend `nemia merge <run>`: the text merges, the meaning does not.
-- A step that failed its check: quote the check's last lines and its exit code. A check that did not finish (no numeric exit) is no
-  refusal: recommend `nemia retry <run> <step> --recheck`. A check that failed twice for the same reason wants a fix in content — a
-  brief, a workflow folder, a `CLAUDE.md`, a test — say which.
-- A gate that must wait on another run's landing is held, not approved: recommend `nemia hold <run> --until <run>`, and say why.
+- A check that refused a step's work exited with a number: quote its last lines and its exit code. A check that did not finish (no
+  numeric exit) refused nothing: run it again, `nemia retry <run> <step> --recheck`, and say so. A check that refused twice for the
+  same reason wants a fix in content — a brief, a workflow folder, a `CLAUDE.md`, a test — say which.
+- A step whose approval must wait on another run's landing is held, not approved: `nemia hold <run> --until <run>`, and say why.
 - A change under `apps/web` is pictured by its implementer, in a light and a dark theme, and the reviewer reads the pictures: a landing
-  gate of a web change whose implement closeout names none is sent back, not approved.
+  step's gate of a web change whose implement closeout names none is sent back, not approved.
 - A landing check has its own deadline, 2700 s: one killed by it did not finish, and is no refusal (`--recheck`, above). One that took
   more than half of it is worth an inbox card.
 
@@ -50,7 +50,9 @@ person's: you run under the daemon.
 
 ## Spend
 
-Say each run's cost beside the line the owner set for a card, about $80. A run that passes it is the person's to continue.
+The owner's line for a card is about $80. Read a run's cost against what runs of its workflow measured — `nemia stats --workflow
+<workflow> --by step`, and the cost table a step's brief quotes — and say both: a card sized past the line is cut before it starts, and
+a run that passes it is the person's to continue.
 
 ## Never
 

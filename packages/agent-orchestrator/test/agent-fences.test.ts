@@ -28,8 +28,8 @@
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
  * `auto` is refused her (`readNemia`). Every command of the table that writes is asked of the person by one of her `askTools`, bare and
- * with an argument, or in each write form where its bare form reads (`WRITE_FORMS`), and no read her allow list stands for is asked or
- * denied (`unasked`, `askedReads`).
+ * with an argument, or in each write form where its bare form reads (`writeForms`: a level, or a flag that sets), and no read her allow
+ * list stands for is asked or denied (`unasked`, `askedReads`).
  *
  * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
  * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
@@ -47,6 +47,7 @@ import { scratch } from './scratch.ts';
 import { readNemia, type Nemia } from '../src/nemia/level.store.ts';
 import { LEVELS } from '../src/nemia/nemia.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
+import type { Spec } from '../src/command/command.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
@@ -92,9 +93,10 @@ const shown = (call: Call): string => (call.command === undefined ? call.tool : 
 
 /**
  * Whether a permission rule reaches a call: a bare tool name is that tool, `mcp__<server>` or `mcp__<server>__*` every tool of the
- * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more. Any
- * other `Tool(x)` reaches some call of that tool, so it is read as reaching every one; Claude Code matches a write against `Edit` rules,
- * so an `Edit` rule reaches `Write` too. Throws on a `*` anywhere else, which this matcher does not model.
+ * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more; a `*`
+ * inside a Bash rule is any run of characters, none included (`globbed`). Any other `Tool(x)` reaches some call of that tool, so it is
+ * read as reaching every one; Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. Throws on a `*` in
+ * a tool's name, which this matcher does not model.
  */
 function reaches(rule: string, call: Call): boolean {
   const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
@@ -111,9 +113,21 @@ function reaches(rule: string, call: Call): boolean {
   if (call.command === undefined) return false;
   const prefix = /^(.*?)(?::\*| \*)$/s.exec(bash)?.[1];
   const exact = prefix ?? bash;
-  if (exact.includes('*')) throw new Error(`${rule}: a wildcard inside a Bash rule is not modelled; say how it reads, here`);
+  if (exact.includes('*')) return globbed(exact, prefix !== undefined).test(call.command);
   return prefix === undefined ? call.command === bash : call.command === prefix || call.command.startsWith(`${prefix} `);
 }
+
+/**
+ * The words of a Bash rule with a `*` inside them, as a pattern of the whole command: each `*` any run of characters, none included;
+ * `open`, where the rule ends in `:*` or ` *`, the words alone or followed by a space and more.
+ */
+const globbed = (words: string, open: boolean): RegExp =>
+  new RegExp(
+    `^${words
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[\\s\\S]*')}${open ? '(?: [\\s\\S]*)?' : ''}$`,
+  );
 
 /** A wrapper Claude Code strips before it matches a part: a leading assignment, `timeout` with its duration, `nohup`. */
 const WRAPPER = /^(?:[A-Za-z_]\w*=\S*|timeout \d+(?:\.\d+)?[smhd]?|nohup)\s+/;
@@ -246,10 +260,14 @@ test('the matcher reads the rule shapes the fences use, and throws on a wildcard
   assert.equal(reaches('Edit', { tool: 'Write' }), true);
   assert.equal(reaches('Read(**)', { tool: 'Edit' }), false);
   assert.equal(reaches('Edit(**)', push), false);
-  assert.throws(
-    () => reaches('Bash(git * push)', push),
-    (err: Error) => err.message.includes('not modelled'),
-  );
+  assert.equal(reaches('Bash(git * main)', push), true, 'a * inside a rule is any run of characters');
+  assert.equal(reaches('Bash(git * main)', { tool: 'Bash', command: 'git push origin main2' }), false, 'up to the end of the command');
+  const store = 'Bash(nemia factory instruction *--store*)';
+  assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction f --store' }), true);
+  assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction --store f' }), true, 'and none');
+  assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction f' }), false);
+  assert.equal(reaches('Bash(git (x) *.md)', { tool: 'Bash', command: 'git (x) a.md' }), true, "a rule's other characters are its own");
+  assert.equal(reaches('Bash(git (x) *.md)', { tool: 'Bash', command: 'git (x) a_md' }), false);
   assert.throws(
     () => reaches('mcp__play*', unsafe),
     (err: Error) => err.message.includes('not modelled'),
@@ -999,19 +1017,32 @@ test('REFUSED: Nemia without her deny of git push is open on each push, and a mo
 });
 
 /** A command of the table, as far as her ask rules read it. */
-type Entry = Pick<(typeof TABLE)[number], 'name' | 'writes' | 'only'>;
+type Entry = Pick<(typeof TABLE)[number], 'name' | 'writes' | 'only'> & { readonly spec?: Pick<Spec, 'flags'> };
 
-/** The write forms of a command whose bare form is a read on her allow list: `nemia level` reads, each level writes. */
-const WRITE_FORMS: Record<string, string[]> = { level: LEVELS.map((level) => `nemia level ${level}`) };
+/** The commands that write whose bare form is a read on her allow list, each with the flags it takes that only read. */
+const BARE_READS: Record<string, readonly string[]> = { 'factory instruction': [], 'agents custom': ['--repo'] };
 
 /**
- * Each call of a command of `table` that writes, served at the command line, that none of her ask rules reaches: the command bare and with
- * an argument, or its `WRITE_FORMS`.
+ * The calls of `entry` that write: `nemia level` with each level; a command of `BARE_READS` with each flag it takes at the command line
+ * that sets, after its argument and before it; any other bare and with an argument. Throws on a command of `BARE_READS` with no such flag.
  */
+function writeForms(entry: Entry): string[] {
+  if (entry.name === 'level') return LEVELS.map((level) => `nemia level ${level}`);
+  const reads = BARE_READS[entry.name];
+  if (reads === undefined) return [`nemia ${entry.name}`, `nemia ${entry.name} r-1`];
+  const sets = (entry.spec?.flags ?? []).filter((flag) => flag.only?.side !== 'api' && !reads.includes(flag.flag));
+  if (!sets.length) throw new Error(`nemia ${entry.name}: no flag of it sets, so nothing of it writes; take it out of BARE_READS`);
+  return sets.flatMap((flag) => {
+    const given = flag.kind === 'switch' ? flag.flag : `${flag.flag} v`;
+    return [`nemia ${entry.name} r-1 ${given}`, `nemia ${entry.name} ${given} r-1`];
+  });
+}
+
+/** Each call of a command of `table` that writes, served at the command line, that none of her ask rules reaches (`writeForms`). */
 const unasked = (table: readonly Entry[], her: Nemia): string[] =>
   table
     .filter((entry) => entry.writes && entry.only?.side !== 'api')
-    .flatMap((entry) => WRITE_FORMS[entry.name] ?? [`nemia ${entry.name}`, `nemia ${entry.name} r-1`])
+    .flatMap(writeForms)
     .filter((command) => !her.askTools.some((rule) => reaches(rule, { tool: 'Bash', command })));
 
 /** The calls her `Bash(nemia …)` allow rules stand for: the command itself, or with an argument where the rule takes more. */
@@ -1031,16 +1062,35 @@ test('every command that writes asks the person by one of her askTools, and no r
   const her = nemia();
   assert.deepEqual(unasked(TABLE, her), []);
   assert.deepEqual(askedReads(her), []);
-  for (const read of ['nemia ls', 'nemia show r-1', 'nemia level', 'nemia memory', 'nemia factory', 'nemia inbox'])
+  for (const read of [
+    'nemia ls',
+    'nemia show r-1',
+    'nemia level',
+    'nemia memory',
+    'nemia factory',
+    'nemia inbox',
+    'nemia factory instruction r-1',
+    'nemia agents custom r-1',
+  ])
     assert.ok(readsOf(her).includes(read), read);
-  for (const write of ['nemia level manual', 'nemia approve r-1 design', 'nemia inbox add card', 'wf approve r-1 design', 'ae stop t-1'])
+  for (const write of [
+    'nemia level manual',
+    'nemia approve r-1 design',
+    'nemia inbox add card',
+    'nemia factory instruction f --path NEMIA.md',
+    'nemia factory instruction --store f',
+    'nemia agents custom --clear ada',
+    'nemia agents custom ada --file -',
+    'wf approve r-1 design',
+    'ae stop t-1',
+  ])
     assert.ok(
       her.askTools.some((rule) => reaches(rule, { tool: 'Bash', command: write })),
       write,
     );
 });
 
-test('REFUSED: a write command added without an ask rule, an ask rule taken away, and an ask on the bare level are each named', () => {
+test('REFUSED: a write command or flag added without an ask rule, an ask rule taken away, and an ask on a bare read are each named', () => {
   const her = nemia();
   const frob: Entry = { name: 'frob', writes: true };
   assert.deepEqual(unasked([...TABLE, frob], her), ['nemia frob', 'nemia frob r-1']);
@@ -1052,4 +1102,15 @@ test('REFUSED: a write command added without an ask rule, an ask rule taken away
   const cut = { ...her, askTools: her.askTools.filter((rule) => rule !== 'Bash(nemia approve:*)') };
   assert.deepEqual(unasked(TABLE, cut), ['nemia approve', 'nemia approve r-1']);
   assert.deepEqual(askedReads({ ...her, askTools: [...her.askTools, 'Bash(nemia level:*)'] }), ['nemia level']);
+  assert.deepEqual(askedReads({ ...her, askTools: [...her.askTools, 'Bash(nemia factory instruction:*)'] }), [
+    'nemia factory instruction r-1',
+  ]);
+  const store = { ...her, askTools: her.askTools.filter((rule) => rule !== 'Bash(nemia factory instruction *--store*)') };
+  assert.deepEqual(unasked(TABLE, store), ['nemia factory instruction r-1 --store', 'nemia factory instruction --store r-1']);
+  const frobbed = TABLE.map((entry): Entry =>
+    entry.name === 'agents custom'
+      ? { ...entry, spec: { flags: [...entry.spec.flags, { flag: '--frob', kind: 'switch', key: 'frob' }] } }
+      : entry,
+  );
+  assert.deepEqual(unasked(frobbed, her), ['nemia agents custom r-1 --frob', 'nemia agents custom --frob r-1']);
 });

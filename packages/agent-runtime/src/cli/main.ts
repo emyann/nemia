@@ -303,6 +303,8 @@ const HELP = `ae — an engine for agent sessions
   ae close <id>                settle a task held open that waits: succeeded
   ae admit <id>...             let tasks filed queued start (ae ls: queued): the next
                                tick starts them — one a store filed before stage 4c too
+  ae admission -- <command…>   the hook a Claude Code session runs before a call its task's
+                               admission sees: hands the call to the command, prints its answer
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae forget <id>... [--yes]    count what settled tasks keep: their journals, their lines in
                                the feed, their sessions' files; --yes removes them

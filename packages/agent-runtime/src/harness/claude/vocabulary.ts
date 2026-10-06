@@ -216,14 +216,35 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
 };
 
 /**
+ * Why a task's admission cannot be merged into its Claude Code settings — or `undefined`: settings given as a file, which the runtime
+ * does not rewrite, or JSON that is no object.
+ */
+export const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+  const settings = task.config?.claude?.settings;
+  if (task.config?.admission === undefined || settings === undefined) return undefined;
+  if (settingsObject(settings) !== undefined) return undefined;
+  return `\`claude.settings\` is given as ${JSON.stringify(settings)}, and admission is merged into the session's settings as a hook: the runtime rewrites no file. Give the settings as a JSON object, like {"env":{"CI":"1"}}, or leave admission off.`;
+};
+
+/** Settings given as JSON, as an object; undefined for a file's path or JSON that is no object. */
+export const settingsObject = (settings: string): Record<string, unknown> | undefined => {
+  try {
+    const read: unknown = JSON.parse(settings);
+    return typeof read === 'object' && read !== null && !Array.isArray(read) ? (read as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Whether a task asks for its session bridged to claude.ai: Claude Code's `--remote-control`, given in its flags
  * (`config.claude.remoteControl`). Only a background session opens one.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
 /**
- * What Claude Code cannot be asked for, Codex's own arguments and a mount whose rule it cannot write among it, as a sentence that
- * says what to write instead.
+ * What Claude Code cannot be asked for, Codex's own arguments, a mount whose rule it cannot write and admission beside settings it
+ * cannot merge among it, as a sentence that says what to write instead.
  */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const { permissionMode, effort } = task.config ?? {};
@@ -240,7 +261,7 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
   if (effort !== undefined && !CLAUDE_EFFORTS.includes(effort)) {
     return `\`effort: ${effort}\` is not an effort Claude Code has. Its efforts are: ${CLAUDE_EFFORTS.join(', ')}.`;
   }
-  return claudeMountRefusal(task);
+  return claudeMountRefusal(task) ?? claudeAdmissionRefusal(task);
 };
 
 /**

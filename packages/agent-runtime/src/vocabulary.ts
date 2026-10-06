@@ -9,3 +9,4 @@ export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export { HARNESS_CHOICES } from './harness/choices.ts';
 export { fenceReach, type FenceReach } from './harness/reach.ts';
 export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
+export type { Admission, AdmissionAnswer, AdmissionCall } from './harness/admission.ts';

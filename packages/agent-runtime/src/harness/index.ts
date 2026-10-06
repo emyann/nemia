@@ -5,6 +5,8 @@
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './args.ts';
 export type { CodexArgs, HarnessArgs } from './args.ts';
 export type { Mount } from './mounts.ts';
+export type { Admission, AdmissionAnswer, AdmissionCall } from './admission.ts';
+export { admitCall } from './claude/admission.ts';
 export { forgetFiles } from './forget.ts';
 export { sdkRunner } from './sdk.ts';
 export { Runner, RunnerError, composite, testOps } from './seam.ts';

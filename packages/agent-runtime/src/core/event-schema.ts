@@ -63,6 +63,7 @@ const harnessArgs = {
   env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   niceness: Schema.optional(Schema.Finite),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
+  admission: Schema.optional(Schema.Struct({ command: Strings, tools: Strings })),
 };
 
 /**

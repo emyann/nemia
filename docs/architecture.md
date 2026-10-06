@@ -50,6 +50,11 @@ base moved since and a check that did not finish). While a merge is asked, `nemi
 and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling
 (`WF_MAX_CONCURRENT`) and files each step's momentum as its task's priority, and keeps its run slots (`src/cap/cap.ts`, `WF_MAX_RUNS`).
 
+**A call's admission** is split: running a command before a session's call and rendering it per harness is the runtime's
+(`config.admission`, `agent-runtime/src/harness/admission.ts`; Claude Code's hook, `ae admission`), as a probe's `exec` is the
+kubelet's; what a call of the table means at a run's state is the orchestrator's, pure (`admissionOf`, `src/admission/admission.ts`),
+served by `nemia admit`. The static rules of an agent that runs `nemia` are derived from each command's class (`nemiaFence`).
+
 **The daemon and its lease** are the orchestrator's (`src/daemon/`, `up` in `src/daemon/up.verb.ts`): one store takes one daemon, which
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board

@@ -13,6 +13,7 @@ import type { McpServer } from './seam.ts';
 import type { ClaudeFlags } from './claude/vocabulary.ts';
 import { mcpRefuses } from './mcp.ts';
 import { mountsRefusalOf, type Mount } from './mounts.ts';
+import { admissionRefusalOf, type Admission } from './admission.ts';
 
 export type HarnessArgs = {
   model?: string;
@@ -123,6 +124,13 @@ export type HarnessArgs = {
    * mount and refuses a writable one. Refused unless a list of mounts with no path given twice (`mountsRefusalOf`).
    */
   mounts?: Mount[];
+  /**
+   * A command run before each of the session's calls to the tools it names, which answers whether the call runs, asks the person or
+   * is refused (`Admission`). Each harness renders it its own way, and one that cannot ask a command before a call refuses the task
+   * before it is journalled: Claude Code runs it as a hook, through the runtime's own adapter (`ae admission`). Refused unless a
+   * command and the tools it sees (`admissionRefusalOf`).
+   */
+  admission?: Admission;
 };
 
 /**
@@ -152,6 +160,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   env: true,
   niceness: true,
   mounts: true,
+  admission: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -279,10 +288,14 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
 
 /**
  * Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or the
- * mounts every harness renders its own way, or `undefined`.
+ * mounts and the admission every harness renders its own way, or `undefined`.
  */
 const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
-  claudeFlagsRefusalOf(config.claude) ?? codexArgsRefusalOf(config.codex) ?? commandArgsRefusalOf(config) ?? mountsRefusalOf(config.mounts);
+  claudeFlagsRefusalOf(config.claude) ??
+  codexArgsRefusalOf(config.codex) ??
+  commandArgsRefusalOf(config) ??
+  mountsRefusalOf(config.mounts) ??
+  admissionRefusalOf(config.admission);
 
 /** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
 const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;

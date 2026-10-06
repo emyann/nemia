@@ -43,7 +43,7 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `worktree`, `background`, `budgetUsd`, `mounts`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, `mounts`, `admission`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
@@ -79,6 +79,23 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/h
   one, which only `--add-dir` would give and `exec resume` rejects.
 - **The command harness and a remote agent** hold none: a command reads the disk it runs on as it is, and a remote agent has none
   of this machine's disk. A `RunnerOps` brought as its own is handed them.
+
+### Admission
+
+A task asks a command before each of its session's calls to some tools through `config.admission`, as a Pod's probe gives the kubelet
+an `exec` to run: `{ "command": ["my-admit"], "tools": ["Bash"] }` (`Admission`, `src/harness/admission.ts`). The command reads the
+call on its stdin, `{ tool, input, cwd }` (`AdmissionCall`), and prints `{ decision, reason }` (`AdmissionAnswer`): `allow`, `ask`
+the person, or `deny`; or nothing, for no opinion, and the call meets the session's own rules. A command that fails, runs past 20
+seconds or prints what is no answer answers `ask`: a fault goes to the person, never through. A call to a tool `tools` does not name
+pays no process. `file()` refuses a value that is not `command` and `tools` alone, a command that is not a list of strings with no NUL,
+and `tools` that names no tool (`admissionRefusalOf`); and admission on a harness that runs no command before a call — Codex, the
+command harness, a remote agent, a `HarnessSpec` that does not declare `admission` — naming those that do (`admissionMisplaced`).
+
+- **Claude Code** (a job, `claude-detached`, `claude --bg`) runs it as a `PreToolUse` hook matched to `tools`, merged into the task's
+  `claude.settings` after the hooks they hold (`admittedFlags`); settings given as a file beside admission are refused, since the
+  runtime rewrites no file. The hook runs the runtime's own adapter, `ae admission -- <command…>` (`admitCall`), which turns Claude
+  Code's hook input into the call and the answer into its `permissionDecision`. A hook's `ask` prompts over the session's allow
+  rules, a person's "don't ask again" among them; its `allow` does not lift an `ask` rule (`CLAUDE.md`, *Claude Code, as a harness*).
 
 ### One attempt per start
 
@@ -2006,6 +2023,7 @@ of pure code sits beside it.
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
+| `src/harness/admission.ts` | a task's admission, `Admission`: the command run before each call to the tools it names, the call it reads and the answer it gives (`AdmissionCall`, `AdmissionAnswer`), and the check of its shape every harness shares (`admissionRefusalOf`) |
 | `src/harness/trust.ts` | whether a harness trusts a folder to run a background session in, `trustedFolder`: read off the harness's own file, `undefined` for a harness that keeps no trust |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
@@ -2021,6 +2039,7 @@ of pure code sits beside it.
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
+| `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`) |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
@@ -2052,6 +2071,7 @@ of pure code sits beside it.
 | `src/service/index.ts` | the face of `service/`, as the face takes it |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with |
+| `src/cli/admission.ts` | `ae admission -- <command…>`: the hook's input on stdin, the hook's output on stdout, loading the adapter alone |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |

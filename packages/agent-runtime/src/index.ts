@@ -88,7 +88,7 @@ export type {
   TranscriptEvent,
 } from './harness/index.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
-export type { CodexArgs, HarnessArgs, Mount } from './harness/index.ts';
+export type { Admission, AdmissionAnswer, AdmissionCall, CodexArgs, HarnessArgs, Mount } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
 export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';

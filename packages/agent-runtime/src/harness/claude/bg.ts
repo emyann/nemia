@@ -20,6 +20,7 @@ import type { SessionState, Sighting, Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './transcript.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllowArgs, claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
+import { admittedFlags } from './admission.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
@@ -447,7 +448,8 @@ const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name
  *    its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it. An edit
  *    under each writable mount is allowed here too (`claudeAllows`). Then `--add-dir` and each mount's path
  *    (`claudeMountArgs`), variadic, ended by the flag after it.
- * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`):
+ * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`), and the
+ *    task's admission merged into `--settings` as a hook (`admittedFlags`):
  *    the session bridged to claude.ai and listed in its agents view, where it can be driven from a browser or a
  *    phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag.
  * 5. `--permission-mode`, always: it ends the variadic lists above, and cannot be taken for the optional name of
@@ -479,7 +481,7 @@ export const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
   '--name',
   r.name,
   ...fenceFlags(r.config),
-  ...claudeFlagsOf(r.config?.claude),
+  ...claudeFlagsOf(admittedFlags(r.config)),
   '--permission-mode',
   r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...mcpArgs,

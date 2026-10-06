@@ -37,6 +37,7 @@ import {
   claudePrintRefuses,
   worktreeName,
 } from './vocabulary.ts';
+import { admittedFlags } from './admission.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
 
@@ -63,7 +64,8 @@ export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, outp
  *    The deny list also holds each read-only mount: an edit under it is denied (`claudeDenies`); the allow list each writable
  *    one: an edit under it is allowed (`claudeAllows`).
  * 2. `--add-dir` and each mount's path (`claudeMountArgs`): variadic, and ended by the flag after it.
- * 3. The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
+ * 3. The caller's own flags (`config.claude`), the task's admission merged into `--settings` as a hook (`admittedFlags`): after the
+ *    variadic lists, which any flag ends, and before the mode.
  * 4. `--permission-mode`, `auto` unless the task names one.
  * 5. The MCP configurations, strict on every spawn as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
  * 6. `--setting-sources project`, one value: a job reads its cwd's `.claude/settings.json`, and neither that cwd's
@@ -85,7 +87,7 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...claudeDenyArgs(r.config),
   ...claudeAllowArgs(r.config),
   ...claudeMountArgs(r.config),
-  ...claudeFlagsOf(r.config?.claude),
+  ...claudeFlagsOf(admittedFlags(r.config)),
   '--permission-mode',
   r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
@@ -141,6 +143,7 @@ export const claudeDetached: HarnessSpec = {
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
+  admission: true,
 };
 
 /**
@@ -189,6 +192,7 @@ export const claudeJob: HarnessSpec = {
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
+  admission: true,
   resumeCostCarried: true,
 };
 

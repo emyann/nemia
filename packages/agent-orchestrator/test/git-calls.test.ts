@@ -45,7 +45,6 @@ const GIT_SEGMENTS = ['.git', 'MERGE_HEAD'];
  * run and its row.
  */
 const CARDS: Readonly<Record<string, string>> = {
-  E: 'git-out-card-e-nemia-rm-and-excf: `inventory` and `remove` for `nemia rm` and `nemia prune`',
   F: "git-out-card-f-a-step-s-work-84on: `make` and `handoff`, `workspaceFor`'s git half, `handOff`, `includeFiles`'s check-ignore",
   H: 'git-out-card-h-what-a-result-wv83: `report`, what a result changed, its artifacts, and the base a merge is read against',
   I1: 'git-out-card-i1-where-a-resu-8xlp, row I, its first half: `standing`, whether a result is on its base and how far ahead',
@@ -60,9 +59,7 @@ type Baseline = Readonly<Record<string, Entry>>;
 const GIT_SITES: Baseline = {
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 1, cards: ['H'] },
   'packages/agent-orchestrator/src/branches/branches.store.ts': { count: 13, cards: ['H', 'I1', 'I2'] },
-  'packages/agent-orchestrator/src/forget/forget.verb.ts': { count: 8, cards: ['E'] },
   'packages/agent-orchestrator/src/merge/merge.verb.ts': { count: 1, cards: ['H'] },
-  'packages/agent-orchestrator/src/prune/prune.verb.ts': { count: 6, cards: ['E'] },
   'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 1, cards: ['I1', 'I2'] },
   'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 10, cards: ['F', 'J'] },
 };
@@ -366,7 +363,7 @@ test('REFUSED: a new file with a git call, in each layer, and a count raised by 
 test('REFUSED: a count above or below the baseline, an entry gone or clean, one with no card, an unknown card', () => {
   const exists = (file: string): boolean => file !== 'src/gone.ts';
   const breaks = (counts: Record<string, number>, entry: Entry): string[] => ratchetBreaks(counts, { 'src/a.ts': entry }, exists);
-  const held: Entry = { count: 2, cards: ['E', 'J'] };
+  const held: Entry = { count: 2, cards: ['F', 'J'] };
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, held), [], 'the measure the baseline holds is let through');
   assert.deepEqual(breaks({ 'src/a.ts': 3 }, held), [
     'src/a.ts holds 3 git calls, more than the 2 the baseline allows: never add them here',
@@ -379,7 +376,7 @@ test('REFUSED: a count above or below the baseline, an entry gone or clean, one 
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, cards: [] }), [
     "src/a.ts's entry for git calls names no card: name the cards that remove them",
   ]);
-  assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, cards: ['E', 'Z9'] }), [
+  assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, cards: ['F', 'Z9'] }), [
     "src/a.ts's entry for git calls names Z9, which CARDS does not know: name a filed card",
   ]);
 });

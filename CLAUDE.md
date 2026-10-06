@@ -179,5 +179,6 @@ What the `create-an-agent` skill, being generic, does not say here:
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
   started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and its four dashboards held to the code's names by
-  `agent-orchestrator/test/observe.test.ts`.
+  `agent-orchestrator/test/observe.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
+  `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

@@ -10,15 +10,15 @@ import { scratch } from './scratch.ts';
 
 import { WF_HINT } from '../src/cli/flags.ts';
 
-/** `bin/<bin>.ts <argv>` over a store of its own, as a process: its exit code and both streams. */
-function run(bin: 'nemia' | 'wf', argv: string[]): { status: number | null; stdout: string; stderr: string } {
+/** `bin/<bin>.ts <argv>` over a store of its own, as a process: its exit code, both streams, and the store. */
+function run(bin: 'nemia' | 'wf', argv: string[]): { status: number | null; stdout: string; stderr: string; store: string } {
   const dir = scratch(`wf-alias-${bin}-`);
   const { status, stdout, stderr } = spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'bin', `${bin}.ts`), ...argv], {
     cwd: dir,
     env: { ...process.env, WF_ROOT: path.join(dir, 'store'), AE_ROOT: path.join(dir, 'engine') },
     encoding: 'utf8',
   });
-  return { status, stdout, stderr };
+  return { status, stdout, stderr, store: path.join(dir, 'store') };
 }
 
 test('wf prints what nemia prints on stdout, exits as it does, and says its hint first on stderr, which nemia never does', () => {
@@ -27,7 +27,8 @@ test('wf prints what nemia prints on stdout, exits as it does, and says its hint
     const wf = run('wf', argv);
     assert.equal(wf.status, nemia.status, `wf ${argv.join(' ')} exits as nemia does`);
     assert.equal(wf.stdout, nemia.stdout, `wf ${argv.join(' ')} prints what nemia prints`);
-    assert.equal(wf.stderr, `${WF_HINT}\n${nemia.stderr}`, `wf ${argv.join(' ')}: the hint, then what nemia says`);
+    const said = nemia.stderr.replaceAll(nemia.store, wf.store);
+    assert.equal(wf.stderr, `${WF_HINT}\n${said}`, `wf ${argv.join(' ')}: the hint, then what nemia says, of its own store`);
     assert.ok(!nemia.stderr.includes(WF_HINT), `nemia ${argv.join(' ')} says no hint`);
   }
 });

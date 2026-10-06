@@ -216,6 +216,7 @@ export const INBOX_QUEUE: Command<Queued> = {
       ? '--off takes the card out of the queue, and --workflow writes what starts it: give one of them.'
       : leftOut(QUEUE_SPEC, args),
   writes: true,
+  ticks: true,
   nemia: 'hers',
   route: [
     { method: 'POST', path: '/api/inbox/:name/queue', status: 200, sets: { off: false } },

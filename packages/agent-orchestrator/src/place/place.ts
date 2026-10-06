@@ -127,7 +127,10 @@ export type Status = {
 /** What `land` answers: the commit that landed the staged merge, or that the merge was taken back. */
 export type Landed = { readonly commit: string } | { readonly aborted: true };
 
-/** One workspace a run left, as `inventory` reads it: where, for which step, on what, and whether it holds anything no commit has. */
+/**
+ * One workspace a run left, as `inventory` reads it: where, for which step, on what, and whether it holds anything no commit has — `clean`
+ * null where that could not be read — with the paths it holds uncommitted (`changes`), and whether its HEAD's commit is on a line of work.
+ */
 export type Held = {
   readonly path: string;
   readonly step?: string;
@@ -138,6 +141,7 @@ export type Held = {
   readonly prunable: boolean;
   readonly clean: boolean | null;
   readonly onBranch: boolean;
+  readonly changes?: readonly string[];
 };
 
 /** What `inventory` answers: the workspaces a run left, and its lines of work with whether each is merged. */
@@ -206,7 +210,7 @@ export type PlaceRequests = {
   readonly land:
     | { readonly checkout: string; readonly act: 'commit'; readonly message: string }
     | { readonly checkout: string; readonly act: 'abort' };
-  readonly inventory: { readonly repo: string; readonly under: string; readonly prefix: string };
+  readonly inventory: { readonly repo: string; readonly under: string; readonly prefix: string; readonly base: string };
   readonly remove: { readonly repo: string; readonly workspaces: readonly string[]; readonly branches: readonly string[] };
   readonly export: { readonly repo: string; readonly tag: string; readonly into: string };
   readonly seal: { readonly tree: string };
@@ -222,7 +226,19 @@ export type PlaceOutcome<V extends PlaceVerb> =
   | { readonly unread: Unread };
 
 /** The keys of `place.json`'s `say`: the sentences the code prints that name a place's own commands, as templates with `{name}` holes. */
-export const PLACE_SAYS = ['look', 'readResult', 'ship', 'drop', 'conflicts', 'unlock', 'stage'] as const;
+export const PLACE_SAYS = [
+  'look',
+  'readResult',
+  'ship',
+  'drop',
+  'conflicts',
+  'unlock',
+  'stage',
+  'attach',
+  'commit',
+  'inspect',
+  'orphans',
+] as const;
 
 /**
  * What a place skill's `place.json` declares: the contract's version, the verbs its scripts answer, the tools a landing session is denied,
@@ -245,3 +261,14 @@ export function missingVerbsRefusal(file: string, declared: PlaceDeclared, neede
   const which = missing.join(', ');
   return `${file} does not declare ${which}, which this workflow's run asks of its place: add ${missing.length === 1 ? 'the verb' : 'each verb'} to \`verbs\` with its script in scripts/, or start a workflow that asks no ${which} of it`;
 }
+
+/**
+ * A `say` template of `place.json` filled: each `{name}` hole `holes` names replaced by its value, and any other text — a hole it does not
+ * name, a `<branch>` left for a person — as written. Pure.
+ */
+export const sayFilled = (template: string, holes: Readonly<Record<string, string>>): string =>
+  template.replace(/\{(\w+)\}/g, (hole: string, name: string) => (Object.hasOwn(holes, name) ? holes[name] : hole));
+
+/** What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure. */
+export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>
+  'refused' in outcome ? outcome.refused : outcome.unread.said;

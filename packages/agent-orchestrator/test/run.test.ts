@@ -54,7 +54,6 @@ import {
   forgetRefusal,
   heldWorktree,
   idRefusal,
-  parseWorktrees,
   runWorktrees,
   type Forgot,
   budgetOf,
@@ -81,6 +80,7 @@ import {
   handOffDue,
   inFlight,
   listing,
+  feedWords,
   inputRefusal,
   inputsLine,
   inputsNote,
@@ -133,6 +133,7 @@ import {
   type StepRecord,
   type TaskPhase,
 } from '../src/run.ts';
+import type { Held } from '../src/place/place.ts';
 import {
   CLOSEOUT_SCHEMA,
   closeoutSchemaOf,
@@ -159,6 +160,9 @@ import {
   type RetryMode,
 } from '../src/retry/retry-ask.ts';
 import { tryOf } from '../src/record/record.ts';
+import { admissionOf } from '../src/admission/index.ts';
+import { TABLE } from '../src/command/commands.verb.ts';
+import { waitsOnPerson } from '../src/retry/index.ts';
 import {
   firstFiledAt,
   runStartedAt,
@@ -1853,7 +1857,8 @@ test('REFUSED past `retries:`: no try is due, and the step waits on you as it di
   assert.deepEqual(assess(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1).retry, [], 'nor at all, with no `retries:`');
   assert.deepEqual(
     cancelPlan(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1),
-    { kind: 'finished', status: 'failed' },
+    { kind: 'cancel', stop: [] },
+    'a refused check with no try due waits on a person, so the run is not finished: calling it off sets it aside',
   );
   const yours: EarlierTry[] = [
     { ...SPENT[0], then: 'nudge' },
@@ -1912,7 +1917,11 @@ test('a check that did not finish is no refusal: `retries:` spends nothing on it
     unread,
     'the same as the tick, which reads no exit code',
   );
-  assert.deepEqual(cancelPlan(RETRIED, onTry(), deadline, signedDone, asked), { kind: 'finished', status: 'failed' });
+  assert.deepEqual(
+    cancelPlan(RETRIED, onTry(), deadline, signedDone, asked),
+    { kind: 'cancel', stop: [] },
+    'a check stopped at its deadline waits on a person, who is offered --recheck: the run is not finished',
+  );
   const told = decision(RETRIED, onTry(), deadline, nothingShipped, signedDone, asked);
   assert.deepEqual(told.kind === 'awaiting' && [told.failedCheck, told.unfinishedCheck], [[], ['implement']]);
   const d = decision(RETRIED, onTry(SPENT), phases({ t1: 'succeeded', c1: 'failed' }), nothingShipped, signedDone, asked, () => 1);
@@ -3228,7 +3237,11 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   assert.equal(stepStatus(LOOPING_REVIEW, r, ALL_SUCCEEDED, said, asked, LOOP), 'exhausted');
   const a = assess(LOOP, r, ALL_SUCCEEDED, said, asked);
   assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'failed'], 'nothing filed, and ship never will be');
-  assert.deepEqual(cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked), { kind: 'finished', status: 'failed' });
+  assert.deepEqual(
+    cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked),
+    { kind: 'cancel', stop: [] },
+    'only a person takes the loop on, with nemia accept or nemia round: the run is not finished',
+  );
 
   const l = listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked });
   assert.deepEqual(
@@ -5365,8 +5378,8 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   );
   assert.deepEqual(
     cancelPlan(BUDGETED, r, p, signedDone, asked, () => 1, [], [], spent),
-    { kind: 'finished', status: 'failed' },
-    'no tick would file anything',
+    { kind: 'cancel', stop: [] },
+    'no tick would file anything, and a person raises the budget or calls the run off: the run is not finished',
   );
 
   const l = listing({
@@ -7068,45 +7081,23 @@ test('`forgetRefusal` names every reason at once — and a record from before th
   );
 });
 
-test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists inside its own directory — never the repository a `--no-worktree` run worked in, nor those of a run whose id starts with this one's — each with the step a hand-off commits under", () => {
-  const porcelain = [
-    'worktree /repo',
-    'HEAD abc',
-    'branch refs/heads/main',
-    '',
-    'worktree /wf/worktrees/r-1/implement',
-    'HEAD def',
-    'branch refs/heads/wf/r-1/implement',
-    '',
-    'worktree /wf/worktrees/r-1/cut',
-    'HEAD def',
-    'branch refs/heads/wf/r-1/cut',
-    'locked a person holds it',
-    '',
-    'worktree /wf/worktrees/r-1/lost',
-    'HEAD def',
-    'detached',
-    'prunable gitdir file points to non-existent location',
-    '',
-    'worktree /wf/worktrees/r-1-x2/implement',
-    'HEAD 123',
-    'branch refs/heads/wf/r-1-x2/implement',
-    '',
-  ].join('\n');
-  const listed = parseWorktrees(porcelain);
-  assert.deepEqual(listed, [
-    { path: '/repo', head: 'abc', branch: 'main' },
-    { path: '/wf/worktrees/r-1/implement', head: 'def', branch: 'wf/r-1/implement' },
-    { path: '/wf/worktrees/r-1/cut', head: 'def', branch: 'wf/r-1/cut', locked: 'a person holds it' },
-    { path: '/wf/worktrees/r-1/lost', head: 'def', detached: true, prunable: true },
-    { path: '/wf/worktrees/r-1-x2/implement', head: '123', branch: 'wf/r-1-x2/implement' },
-  ]);
-  assert.deepEqual(
-    parseWorktrees('worktree /a b\nlocked\n'),
-    [{ path: '/a b', locked: '' }],
-    'a path with a space, and a lock with no reason',
-  );
-
+test("`runWorktrees`: a run's worktrees are those its place lists inside its own directory — never the repository a `--no-worktree` run worked in, nor those of a run whose id starts with this one's — each with the step a hand-off commits under", () => {
+  const at = (p: string, more: Partial<Held> = {}): Held => ({
+    path: p,
+    head: 'def',
+    detached: false,
+    prunable: false,
+    clean: true,
+    onBranch: true,
+    ...more,
+  });
+  const listed: Held[] = [
+    at('/repo', { branch: 'main' }),
+    at('/wf/worktrees/r-1/implement', { branch: 'wf/r-1/implement' }),
+    at('/wf/worktrees/r-1/cut', { branch: 'wf/r-1/cut', locked: 'a person holds it', clean: null }),
+    at('/wf/worktrees/r-1/lost', { detached: true, prunable: true, clean: null }),
+    at('/wf/worktrees/r-1-x2/implement', { branch: 'wf/r-1-x2/implement' }),
+  ];
   const r = run(
     {},
     {
@@ -7131,23 +7122,31 @@ test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists
 
   const direct = run({}, { isolate: false, steps: { implement: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
   assert.deepEqual(
-    runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, { path: '/wf/worktrees/r-1' }]).worktrees.map((w) => w.path),
+    runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, at('/wf/worktrees/r-1')]).worktrees.map((w) => w.path),
     ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/cut', '/wf/worktrees/r-1/lost'],
     "never the repository, nor the run's directory itself",
   );
   assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', listed.slice(0, 1)), { worktrees: [], unlisted: [] });
 });
 
-test('REFUSED at shipped defaults: `heldWorktree` leaves a locked worktree, and one on no branch — unless nothing is uncommitted in it and its HEAD is on a branch already; one on a branch is removed', () => {
-  const on = { path: '/wf/worktrees/r-1/implement', head: 'abc', branch: 'wf/r-1/implement' };
-  const detached = { path: '/wf/worktrees/r-1/implement', head: 'abc', detached: true as const };
-  assert.equal(heldWorktree(on), null);
-  assert.deepEqual(heldWorktree({ ...on, locked: '' }), { locked: '' });
-  assert.deepEqual(heldWorktree({ ...detached, locked: 'mine' }, { clean: true, onBranch: true }), { locked: 'mine' });
-  assert.deepEqual(heldWorktree(detached), { detached: 'abc' }, 'git not asked: held');
-  assert.deepEqual(heldWorktree(detached, { clean: true, onBranch: false }), { detached: 'abc' }, 'a commit on no branch');
-  assert.deepEqual(heldWorktree(detached, { clean: false, onBranch: true }), { detached: 'abc' }, 'a hand-off would commit onto no branch');
-  assert.equal(heldWorktree(detached, { clean: true, onBranch: true }), null, 'nothing a removal loses');
+test('REFUSED at shipped defaults: `heldWorktree` leaves a locked worktree, and one on no branch — unless it is clean and its HEAD is on a branch already; one on a branch is removed', () => {
+  const on: Held = {
+    path: '/wf/worktrees/r-1/implement',
+    head: 'abc',
+    branch: 'wf/r-1/implement',
+    detached: false,
+    prunable: false,
+    clean: false,
+    onBranch: true,
+  };
+  const detached: Held = { ...on, branch: undefined, detached: true, clean: true, onBranch: true };
+  assert.equal(heldWorktree(on), null, 'what it holds uncommitted is handed off onto its branch');
+  assert.deepEqual(heldWorktree({ ...on, locked: '', clean: null }), { locked: '' });
+  assert.deepEqual(heldWorktree({ ...detached, locked: 'mine' }), { locked: 'mine' });
+  assert.deepEqual(heldWorktree({ ...detached, clean: null }), { detached: 'abc' }, 'its status not read: held');
+  assert.deepEqual(heldWorktree({ ...detached, onBranch: false }), { detached: 'abc' }, 'a commit on no branch');
+  assert.deepEqual(heldWorktree({ ...detached, clean: false }), { detached: 'abc' }, 'a hand-off would commit onto no branch');
+  assert.equal(heldWorktree(detached), null, 'nothing a removal loses');
 });
 
 test("REFUSED at shipped defaults: `branchFates` keeps every branch unless asked; asked, deletes one merged into the base and keeps one that is not unless forced — and never names the base branch, nor a branch of a run whose id starts with this one's", () => {
@@ -7265,10 +7264,11 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
         { branch: 'wf/r-1/fix', deleted: true, why: 'forced' },
         { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
         { branch: 'wf/r-1/odd', deleted: false, why: { git: 'error: it is checked out elsewhere' } },
+        { branch: 'wf/r-1/plan', deleted: false, why: { unread: 'it exited 1' } },
       ],
       unfrozen: 'no workflow folder at /wf/dev',
     }),
-    'r-1  forgotten: 1 worktree was already gone; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; deleted wf/r-1/implement (merged into main), wf/r-1/fix (not merged into main, forced); kept wf/r-1/review: not merged into main — --force-unmerged deletes it, and the work on it; kept wf/r-1/odd: git would not delete it — error: it is checked out elsewhere; its workflow was never frozen, and no workflow folder at /wf/dev',
+    "r-1  forgotten: 1 worktree was already gone; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; deleted wf/r-1/implement (merged into main), wf/r-1/fix (not merged into main, forced); kept wf/r-1/review: not merged into main — --force-unmerged deletes it, and the work on it; kept wf/r-1/odd: git would not delete it — error: it is checked out elsewhere; kept wf/r-1/plan: the place's remove did not answer — it exited 1; nemia rm r-1 again deletes it once it does; its workflow was never frozen, and no workflow folder at /wf/dev",
   );
   assert.equal(
     forgetLine({ ...forgotten, isolate: false, removed: [], handedOff: [], branches: [], files: ['runs/r-1.json'] }),
@@ -7283,10 +7283,15 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       removed: ['/wf/worktrees/r-1/review'],
       files: [],
       left: [
-        { path: '/wf/worktrees/r-1/implement', locked: 'a person holds it' },
+        {
+          path: '/wf/worktrees/r-1/implement',
+          locked: 'a person holds it',
+          fix: 'git -C /repo worktree unlock /wf/worktrees/r-1/implement',
+        },
         {
           path: '/wf/worktrees/r-1/fix',
           git: "fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it",
+          fix: 'git -C /wf/worktrees/r-1/fix status',
         },
         { path: '/wf/worktrees/r-1/stray', unknown: true },
       ],
@@ -7302,16 +7307,23 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       removed: [],
       files: [],
       left: [
-        { path: '/wf/worktrees/r-1/implement', detached: '9d2bd34db7ead0116fa7062827675f3a801e940d' },
+        {
+          path: '/wf/worktrees/r-1/implement',
+          detached: '9d2bd34db7ead0116fa7062827675f3a801e940d',
+          fix: 'git -C /wf/worktrees/r-1/implement switch -c <branch>',
+        },
         {
           path: '/wf/worktrees/r-1/review',
           step: 'review',
           uncommitted: 'lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1)',
+          fix: 'git -C /wf/worktrees/r-1/review commit',
         },
+        { path: '/wf/worktrees/r-1/fix', step: 'fix', unread: { verb: 'handoff', said: 'it did not answer within 120s' } },
       ],
     }),
     'r-1  not forgotten: /wf/worktrees/r-1/implement is on no branch — its HEAD is detached at 9d2bd34, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C /wf/worktrees/r-1/implement switch -c <branch>, or finish or abort what left it there), then nemia rm r-1 again; ' +
-      '/wf/worktrees/r-1/review holds what review left uncommitted, and the hand-off could not commit it — lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C /wf/worktrees/r-1/review commit), then nemia rm r-1 again. Its record, files and branches are kept until every worktree is gone: nemia rm r-1 again then.',
+      '/wf/worktrees/r-1/review holds what review left uncommitted, and the hand-off could not commit it — lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C /wf/worktrees/r-1/review commit), then nemia rm r-1 again; ' +
+      "/wf/worktrees/r-1/fix is left as it is: the place's handoff did not answer — it did not answer within 120s. nemia rm r-1 again once it does. Its record, files and branches are kept until every worktree is gone: nemia rm r-1 again then.",
   );
 
   assert.equal(
@@ -7333,6 +7345,13 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
   assert.equal(
     forgetLine({ ...missing, files: ['runs/r-9.asks/', 'runs/r-9.cancelled'] }),
     'r-9  no such run — nothing to forget but what was left under its id: removed runs/r-9.asks/, runs/r-9.cancelled',
+  );
+  assert.equal(
+    forgetLine({
+      ...missing,
+      left: [{ path: '/wf/worktrees/r-9', orphaned: true, fix: 'git worktree list in their repository, and git worktree remove each' }],
+    }),
+    'r-9  no such run — nothing to forget; /wf/worktrees/r-9 is still there, and with no record nemia rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each',
   );
 });
 
@@ -9947,4 +9966,121 @@ test('`forgetRefusal` keeps its order between every two reasons that can stand t
     forgetRefusal(CHECKED, withCheck(null), phases({ t1: 'succeeded' }), [], signedDone, asked, undefined, [askFor(5)], [], undefined, at),
     "implement's check is due, and a pass may be filing it now; try 5 of implement is asked for, and no pass files it as the run stands. Forgetting is not cancelling: nemia cancel r-1 files nothing more, then nemia rm r-1. Take that ask back, then nemia rm r-1: rm /wf/runs/r-1.asks/retry-implement-5.",
   );
+});
+
+/** implement signed off blocked, and review never filed: a failed run with nothing in flight that waits on a person. */
+const blockedRun = (rest: Partial<GitRun> = {}) => run({ implement: 't1', review: null }, rest);
+const BLOCKED_SAID = signedOff({ implement: said('blocked') });
+
+test('REFUSED to be finished: a failed run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
+  const p = phases({ t1: 'succeeded' });
+  const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
+  assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'failed');
+  assert.deepEqual(
+    listing({ steps: STEPS, run: blockedRun(), phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked })
+      .waitingOnYou,
+    ['implement'],
+  );
+  assert.deepEqual(
+    cancelPlan(STEPS, blockedRun(), p, blocked, asked),
+    { kind: 'cancel', stop: [] },
+    'nothing is in flight, but the blocked step is asked of a person: calling the run off is how they set it aside and keep its record',
+  );
+});
+
+test('a blocked run called off waits on no one in `nemia ls`, `nemia decide` or the feed, and its steps say what they said', () => {
+  const p = phases({ t1: 'succeeded' });
+  const listed = (r: GitRun) =>
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked });
+  const called = blockedRun(CANCELLED);
+  const l = listed(called);
+  assert.deepEqual(l.waitingOnYou, []);
+  assert.deepEqual(l.steps, listed(blockedRun()).steps, "the steps' words stand as they were");
+  assert.deepEqual(
+    decision(STEPS, called, p, nothingShipped, () => said('blocked'), asked),
+    {
+      kind: 'cancelled',
+      at: CANCELLED.cancelledAt,
+    },
+  );
+  const words = feedWords(
+    l,
+    called,
+    assess(STEPS, called, p, () => said('blocked'), asked),
+  );
+  assert.deepEqual([words.run.word, words.run.note], ['cancelled', undefined], 'no `waiting on you:` note');
+  assert.ok(
+    feedWords(
+      listed(blockedRun()),
+      blockedRun(),
+      assess(STEPS, blockedRun(), p, () => said('blocked'), asked),
+    ).run.note,
+  );
+});
+
+test('REFUSED to be finished: a run waiting on a person in any status `nemia ls` says so of — unsigned, budget exhausted, denied, an unreadable closeout — is called off by `nemia cancel`', () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+  const cases: Array<[string, Workflow[], GitRun, ReturnType<typeof signedOff>, SpendOf, StepStatus]> = [
+    ['unsigned, its nudge spent', STEPS, signedOffOnce(blockedRun()) as GitRun, signedOff({}), () => undefined, 'unsigned'],
+    ['cut off at its budget', STEPS, blockedRun(), signedOff({ implement: said('done') }), spends({}, ['t1']), 'budget exhausted'],
+    ['denied a call', DENYING, blockedRun(), signedOff({ implement: said('done') }), deniedSpend({ t1: ['Bash(x)'] }), 'denied'],
+    [
+      'a closeout that does not read, nudge spent',
+      STEPS,
+      signedOffOnce(blockedRun()) as GitRun,
+      signedOff({ implement: { error: 'outcome: not done or blocked' } }),
+      () => undefined,
+      'unsigned',
+    ],
+  ];
+  for (const [why, steps, r, closeouts, spendOf, status] of cases) {
+    const readable = (name: string) => {
+      const c = closeouts(name);
+      return c && !('error' in c) ? c : undefined;
+    };
+    const p = phases({ t1: 'succeeded' });
+    assert.equal(stepStatus(steps[0], r, p, readable, asked, steps, spendOf), status, why);
+    assert.deepEqual(
+      listing({ steps, run: r, phaseOf: shown({ t1: 'succeeded' }), closeoutOf: closeouts, askedCloseout: asked, spendOf }).waitingOnYou,
+      ['implement'],
+      why,
+    );
+    assert.deepEqual(
+      cancelPlan(steps, r, p, readable, asked, () => undefined, [], [], spendOf),
+      { kind: 'cancel', stop: [] },
+      `${why}: cancelPlan reads the closeout as the run's reader hands it, only a well-formed one`,
+    );
+  }
+});
+
+test('a stopped step holds its run but waits on no one for admission: Nemia retries an unsigned step and a failed check unasked, and `nemia cancel` calls the run off', () => {
+  const cases: Array<[StepStatus, Workflow[], GitRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
+    ['unsigned', STEPS, signedOffOnce(blockedRun()) as GitRun, { t1: 'succeeded' }, () => undefined],
+    ['failed (check)', CHECKED, withCheck('c1'), { t1: 'succeeded', c1: 'failed' }, signedDone],
+  ];
+  for (const [status, steps, r, ended, closeoutOf] of cases) {
+    const p = phases(ended);
+    assert.equal(stepStatus(steps[0], r, p, closeoutOf, asked, steps), status);
+    const waitOf = (_: string, name: string) =>
+      waitsOnPerson(
+        retryable(
+          steps.find((s) => s.name === name)!,
+          r,
+          p,
+          closeoutOf,
+          asked,
+          steps,
+        ),
+      );
+    const admitted = (command: string) => admissionOf({ tool: 'Bash', input: { command }, cwd: '/' }, TABLE, waitOf);
+    assert.equal(admitted('nemia retry r implement'), undefined, `${status}: a try of a stopped step is Nemia's to give`);
+    assert.ok(admitted('nemia retry r implement --budget 5'), `${status}: a budget is the person's`);
+    assert.deepEqual(cancelPlan(steps, r, p, closeoutOf, asked), { kind: 'cancel', stop: [] }, `${status}: the run is not finished`);
+    const closeouts = (name: string) => (name === 'implement' ? closeoutOf(name) : undefined);
+    assert.deepEqual(
+      listing({ steps, run: r, phaseOf: shown(ended), closeoutOf: closeouts, askedCloseout: asked }).waitingOnYou,
+      ['implement'],
+      `${status}: nemia ls says it waits on you`,
+    );
+  }
 });

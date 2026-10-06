@@ -2929,6 +2929,11 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   decides. A daemon taken over while it lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops
   rather than be a second writer. A pass that awaits for ever keeps beating, and holds the store until it is killed: `wf ls` says so —
   `last pass 40m00s ago (…), a pass under way since — alive 3s ago (…)` — rather than letting a second daemon in beside it.
+- **A command that files work starts the daemon where none ticks** (`ticks` in the command table, `ensureDaemon` in
+  `src/demand/demand.verb.ts`): the store's login service if one is installed, else the daemon it would run, detached, into
+  `$WF_ROOT/daemon.log`, waited for up to 60 s and named in one line with `kill <pid>`. It has the service's environment, not the shell's:
+  `PORT`, `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` and `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`. A daemon that ticks is
+  left alone; `NEMIA_DAEMON_START=off` starts none, and says so.
 - **`wf tick` by hand is refused the same way while a daemon ticks**, with no force: the daemon runs the same pass within its interval,
   and every case a hand tick helps in — the daemon stopped, gone or stalled — already passes. A hand tick never writes the file.
 - **Two starts on an empty store cannot both win**: the file is claimed with a link, which fails when it appeared in between, and the
@@ -3088,8 +3093,11 @@ reconciles toward it — the same level-triggered rule the engine runs on one la
 
 Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
 normal things for a person to do, so none of them is an error and each says which it was. A run
-waiting at a gate is not finished — an approval would file what follows — so it is called off. A
-finished run is deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
+with a step waiting on a person is not finished — at its gate, blocked, unsigned, a refused check,
+out of rounds or budget, denied (`HOLDS_THE_RUN`, the rule `wf ls` says *waiting on you* by) — so
+it is called off: that is how a person sets it aside and keeps its record, and it stops being listed
+as waiting on them. A finished run, one that succeeded or failed with nothing waiting on anyone, is
+deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
 cancelled would make `wf ls` lie about work that actually landed. Cancelling twice keeps the first
 time and re-asks for whatever is *still* in flight, because the engine carries a stop out on its
 next tick: running it again is how a person deals with one that slipped through, not a no-op.

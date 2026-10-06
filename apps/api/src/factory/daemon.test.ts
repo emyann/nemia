@@ -61,7 +61,7 @@ test('with no daemon.json, nothing ticks the store, and the api makes none', asy
   assert.equal(d.pid, null);
   assert.equal(
     d.line,
-    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served',
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one',
   );
   assert.deepEqual([d.by, d.url, d.start], [null, null, 'npm start in apps/api']);
   assert.equal(fs.existsSync(FILE), false);

@@ -9,6 +9,7 @@
  */
 import path from 'node:path';
 import { DEFAULT_WAKE } from '../subscription/subscription.ts';
+import { DEMAND_OFF } from '../demand/demand.ts';
 import { FACTORY_LEVEL_FORM, LEVELS, type Level } from '../level/level.ts';
 
 export { LEVELS, type Level } from '../level/level.ts';
@@ -39,9 +40,9 @@ export const NEMIA_DIGEST_EVERY = 1440;
 export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
 
 /**
- * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`), and the search path `searchPath` with the
- * folder `bin` first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined.
- * Pure.
+ * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`); `NEMIA_DAEMON_START=off` (`DEMAND_OFF`),
+ * so a `nemia` she types never starts a daemon beside the one that keeps her; and the search path `searchPath` with the folder `bin`
+ * first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined. Pure.
  */
 export function nemiaSettings(
   rules: { readonly ask: readonly string[]; readonly deny: readonly string[] },
@@ -51,7 +52,7 @@ export function nemiaSettings(
   const rest = searchPath.split(path.delimiter).filter((entry) => entry !== '' && entry !== bin);
   return JSON.stringify({
     permissions: { ask: [...rules.ask], deny: [...rules.deny] },
-    ...(bin === undefined ? {} : { env: { PATH: [bin, ...rest].join(path.delimiter) } }),
+    env: { [DEMAND_OFF]: 'off', ...(bin === undefined ? {} : { PATH: [bin, ...rest].join(path.delimiter) }) },
   });
 }
 

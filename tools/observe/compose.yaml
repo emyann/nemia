@@ -9,6 +9,7 @@ services:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
+      - "127.0.0.1:4040:4040"
     environment:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/nemia/dashboards/system.json
     volumes:

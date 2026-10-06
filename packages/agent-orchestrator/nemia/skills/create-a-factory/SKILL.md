@@ -19,6 +19,9 @@ build on it rather than beside it.
 
 `nemia factory add <name> --repo <path>`, a `--repo` for each repository, as an absolute path.
 
+A factory has its own level, `nemia level <level> --factory <name>`, and follows the store's until it has one. Its level is the person's
+to set: you never raise it.
+
 ## 3. Its workflows, agents and skills, drafted for the person to place
 
 You never write in a factory's repositories, and no verb writes a workflow, an agent or a skill for you. Draft each in your own folder,

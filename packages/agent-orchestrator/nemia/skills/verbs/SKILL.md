@@ -83,21 +83,28 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                stdin); --clear removes them. Words only: a frontmatter block is
                                refused. A run keeps the words it was started with
                                reads bare; prompts the person given --file, --clear
-  nemia level [manual|semi-auto]
-                               Nemia, the store's own agent: bare, where she is and how to reach her;
-                               semi-auto keeps her session: what waits on you (a gate, a step's question,
-                               a loop out of rounds, a cap) is asked of you, and a write that cannot be
-                               undone or changes your settings or a factory; the rest is hers;
-                               manual stops it
-                               reads bare; prompts the person given manual, semi-auto
+  nemia level [manual|semi-auto] [--factory <name> [--for <duration> | --end]]
+                               Nemia, the store's own agent: bare, where she is, each factory's level and
+                               how to reach her; a level sets the store's, which every factory follows
+                               unless it has its own; --factory sets that factory's, --for raises it for
+                               a stretch (90m, 2h, 1d; up to 7d) and --end ends the raise. semi-auto keeps
+                               her session: what waits on you (a gate, a step's question, a loop out of
+                               rounds, a cap) is asked of you, and a write that cannot be undone or
+                               changes your settings or a factory; the rest is hers; a factory at manual
+                               is left alone, and her session stops once none is above manual
+                               reads bare; prompts the person given manual, semi-auto, --factory, --for, --end
   nemia memory [<fact>]
                                what Nemia keeps of the store: bare, her facts' names; given one, its
                                words. Read only: her session alone writes them
+  nemia service status [--name <name>]
+                               the login service and the lease: whether it is installed and runs,
+                               the checkout it runs, who holds the store, and lingering
   nemia watch [cursor]
                                nemia feed's lines, followed as the tick writes them, until ^C
-  nemia admit
+  nemia admit [--at-least <level>]
                                a call's admission: the call a session is about to make, on stdin, answered
-                               ask where it answers what waits on you
+                               ask where it answers what waits on you;
+                               --at-least: deny a call acting on a run or a factory below the level
   nemia decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (nemia decide --help)
 ```
@@ -187,13 +194,15 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                interrupt
   nemia resume
                                resume the store: the next pass files what waits
-  nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>]
+  nemia subscribe <name> <task> [--wake <word>]... [--digest-every <minutes>] [--at-least <level>]
                                give the engine's long-lived task <task> a subscription to the feed,
                                named <name>, from its end: a line holding a wake word is said to it at
                                once, and the rest folded into a digest said with the next wake, or
                                after --digest-every minutes (default 60) with none.
                                --wake: a word that wakes it, once for each (default: the feed's words
                                for a wait on a person). Refused for a task not long-lived.
+                               --at-least: only the lines of runs whose factory's level is at least
+                               this (manual, semi-auto), read as each line is delivered.
   nemia unsubscribe <name>
                                take the subscription <name> away: its task is told nothing more of the feed
 ```
@@ -246,6 +255,17 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                a worktree locked, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
+  nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
+                               install the daemon as a login service: a systemd user unit on Linux,
+                               a launchd agent on macOS. It runs the api of this checkout with this
+                               node, WF_ROOT and PATH, and each --env, written once; it restarts on
+                               failure and starts at login. Started now unless another daemon holds
+                               the store; --take-over <pid> pauses the store, waits for landing
+                               checks, stops that pid and starts the service. --name: the service
+                               name (nemia; required for a store that is not the default)
+  nemia service uninstall [--name <name>]
+                               stop the login service, disable it and remove its file; a daemon
+                               started by hand is left alone
 ```
 
 ## Answers what waits

@@ -1835,6 +1835,22 @@ test("an earlier try's check its deadline ended reads `unfinished` whatever code
   assert.equal(implement.tries[1].check?.verdict, 'passed');
 });
 
+test('a refused check that kept no stdout is read off its log, as `nemia decide` reads it', async () => {
+  settledTask('t-74-e2e', done);
+  checkTask('r-74-e2e-check', { settled: 'stopped' });
+  detachedSession('check', 'r-74-e2e-check', 1, 'starting the browser\n', 1);
+  writeRun({
+    ...r2,
+    id: 'r-74',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: [{ name: 'e2e', after: [], body: 'Try it in a browser.', check: 'npm run e2e' }],
+    steps: { e2e: { taskId: 't-74-e2e', check: { taskId: 'r-74-e2e-check' } } },
+  });
+
+  const [e2e] = (await detailOf('r-74')).steps;
+  assert.deepEqual(e2e.check?.refused?.stdout, { lines: ['starting the browser'], truncated: false });
+});
+
 test('a refused check whose output cannot be read still answers, and says how to read it from the command line', async () => {
   settledTask('t-22-test', done);
   checkTask('r-22-test-check', { settled: 'failed', exitCode: 2 });

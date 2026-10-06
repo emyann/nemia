@@ -2,7 +2,7 @@
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
  * are Effects with typed errors.
  */
-import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
+import { Cause, Context, Effect, Exit, Fiber, Layer, Schema } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
 import {
@@ -42,7 +42,11 @@ import {
   AdmitRefused,
   InputRefused,
   StopRefused,
+  countsHere,
   ioCounts,
+  noCounts,
+  tallied,
+  talliesHere,
   tickMemoLayer,
   admit,
   answer,
@@ -388,6 +392,12 @@ export type EngineShape = {
   /** What this engine's reads, spawns and observes have cost so far (`EngineIo`): running totals, read by nothing in the engine. */
   readonly io: () => Effect.Effect<EngineIo>;
   /**
+   * `program` run in a tally of its own (`Tally`): inside it, `io` answers what the program and all it starts have read, spawned and
+   * observed, and never another caller's work in the same moment, which the process's totals count beside it. Fails, dies and is
+   * interrupted as `program` is.
+   */
+  readonly tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+  /**
    * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
    * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
    * loop must: `stop()` gives the process back.
@@ -425,6 +435,25 @@ const NONE: ObserveCount = { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 }
 /** The harnesses' observe counts as they stand, each copied, so a later call does not move what was read. */
 const copyOf = (observed: Record<string, ObserveCount>): Record<string, ObserveCount> =>
   Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
+
+/** `Engine.io`: the innermost tally's open where it is asked, else the process's totals and this engine's observes; each a copy. */
+const ioHere = (observedNow: () => Record<string, ObserveCount>): EngineIo => {
+  const t = talliesHere().at(-1);
+  return t ? { ...t.counts, observed: copyOf(t.observed) } : { ...ioCounts(), observed: observedNow() };
+};
+
+/** `Engine.io` over this engine's observes, and `Engine.tallied`. */
+const ioVerbsOf = (observedNow: () => Record<string, ObserveCount>): Pick<EngineShape, 'io' | 'tallied'> => ({
+  io: () => Effect.sync(() => ioHere(observedNow)),
+  tallied: talliedVerb,
+});
+
+/** `Engine.tallied`: `program` forked as a fiber that starts with a fresh tally open, and joined; interrupted with its caller. */
+const talliedVerb = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.flatMap(Effect.context<R>(), (context) => {
+    const fiber = tallied({ counts: noCounts(), observed: {} }, () => Effect.runForkWith(context)(program));
+    return Effect.onInterrupt(Fiber.join(fiber), () => Fiber.interrupt(fiber));
+  });
 
 /** What failed, in words, off a cause: its error's message, or the value itself. */
 const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -501,16 +530,20 @@ const countedInto =
     const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) =>
       Effect.suspend(() => {
         const t0 = performance.now();
-        const spawned = ioCounts().spawned;
+        const spawned = countsHere().spawned;
         return Effect.onExit(look, (exit) =>
           Effect.sync(() => {
-            const o = (observed[name] ??= { ...NONE });
-            o.calls++;
-            o.ms += performance.now() - t0;
-            o.spawned += ioCounts().spawned - spawned;
+            const ms = performance.now() - t0;
+            const more = countsHere().spawned - spawned;
             const r = Exit.isSuccess(exit) ? read(exit.value) : { listed: 0, unread: true };
-            o.listed += r.listed;
-            if (r.unread) o.unread++;
+            for (const into of [observed, ...talliesHere().map((t) => t.observed)]) {
+              const o = (into[name] ??= { ...NONE });
+              o.calls++;
+              o.ms += ms;
+              o.spawned += more;
+              o.listed += r.listed;
+              if (r.unread) o.unread++;
+            }
           }),
         );
       });
@@ -777,7 +810,7 @@ const make = (options: EngineOptions) =>
       ...bodyVerbsOf(go),
       forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(journalOps)),
       watch: watchOf(feedVerb, journalOps.subscribe),
-      io: () => Effect.sync(() => ({ ...ioCounts(), observed: observedNow() })),
+      ...ioVerbsOf(observedNow),
       start: startOf(tickVerb),
     });
   });

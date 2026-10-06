@@ -848,13 +848,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/harness/claude/inbox.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }],
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/codex/transcript.ts"],
       "rules": {
         "complexity": ["error", { "max": 23 }],

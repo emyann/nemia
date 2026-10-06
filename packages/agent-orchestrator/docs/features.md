@@ -52,7 +52,8 @@ Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-o
 skill as a run's place, copied per run to `WF_ROOT/places/<skill>@<version>/`, a copy whose `skillVersion` drifted refusing the run's
 passes, `nemia prune` removing a copy no record names, and `nemia refreeze`. Card C2 records `placeSkill` and runs the package's own place,
 which ships as a release that never changes under a run; the card is filed once G and H have landed, so the first copy carries every verb
-and `say` key, and `placeSkill.version` becomes the copy's name then.
+and `say` key, and `placeSkill.version` becomes the copy's name then. Card E has landed: `nemia rm` and `nemia prune` read, hand off and remove a run's
+worktrees and branches through its place (`inventory`, `handoff`, `remove`), and call no git of their own.
 
 Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer, and the hkb migration; and
 thin runtime stage 6 parts 3 (the gRPC binding) and 4 (streaming and subscribe). Each *Shipped* section names what it left, and those

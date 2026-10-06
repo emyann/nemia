@@ -33,6 +33,7 @@ test('REFUSED: a run that cannot be held by what it says of itself is offered no
     ['pruned', { pruned: { said: 'pruned' } }],
     ['held', { holding, heldUntil: ['r-2'] }],
     ['held, its words not read', { heldUntil: ['r-2'] }],
+    ['held, the runs it waits on not said', { holding }],
     ['succeeded', { status: 'succeeded' }],
   ];
   for (const [what, extra] of cases) assert.equal(holdable(run(extra)), false, what);

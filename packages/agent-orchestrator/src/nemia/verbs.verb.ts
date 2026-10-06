@@ -18,7 +18,7 @@ type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'nemia'>;
 /** A verb the CLI runs by a hand of its own: its name, usage and help, its class its table entry's. */
 type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help'>;
 
-/** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it. */
+/** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it; none lists `out`. */
 const SECTIONS: readonly { readonly class: 'read' | 'hers' | 'prompts' | 'answers'; readonly heading: string; readonly says: string }[] = [
   {
     class: 'read',
@@ -61,9 +61,8 @@ export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb
     const entry = table.find((c) => c.name === v.name);
     return entry === undefined ? [] : [{ ...v, nemia: entry.nemia }];
   });
-  const listed = [...served, ...own].filter((c) => c.nemia !== 'out');
   const sections = SECTIONS.flatMap((s) => {
-    const under = listed.filter((c) => sectionOf(c.nemia) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
+    const under = [...served, ...own].filter((c) => sectionOf(c.nemia) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
     return under.length === 0 ? [] : [`## ${s.heading}`, '', s.says, '', '```text', helpOf(under), '```', ''];
   });
   return [

@@ -33,7 +33,8 @@ const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg
 const { asyncOps } = await import('./promise-runner.ts');
 const { RunnerError } = await import('../src/harness/error.ts');
 const { readTranscript } = await import('../src/harness/transcript.ts');
-const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
+const { claudeTranscriptEvents, transcriptWrittenAt } = await import('../src/harness/claude/transcript.ts');
+const { noCounts, tallied } = await import('../src/core/engine/tally.ts');
 const { detachedOps } = await import('../src/harness/detached/detached.ts');
 const { codex } = await import('../src/harness/codex/codex.ts');
 const { codexRolloutEvents } = await import('../src/harness/codex/transcript.ts');
@@ -1178,6 +1179,86 @@ test('REFUSED: a finished background session whose transcript was found and cann
     const seen = await Effect.runPromise(ops.observe);
     assert.deepEqual(seen.get('ae/t/1')?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
   });
+});
+
+/**
+ * A transcript of `claudeLines` padded with prompts of filler to at least `bytes`, its conversation dated from `T0` and its closeout
+ * the last call in it.
+ */
+const longClaude = (sessionId: string, bytes: number) => {
+  const lines = claudeLines(sessionId);
+  const filler = { ...lines[1], uuid: 'u-pad', message: { role: 'user', content: 'x'.repeat(10_000) } };
+  const pad = jsonl([filler]);
+  return pad.repeat(Math.ceil(bytes / pad.length)) + jsonl(lines);
+};
+
+/** A StructuredOutput call and its result, made at `s` seconds into the fixture's conversation, saying `input`. */
+const closeoutAt = (sessionId: string, s: number, input: object) => {
+  const [call, result] = claudeLines(sessionId).slice(7, 9) as Record<string, unknown>[];
+  const id = `toolu_closeout_${s}`;
+  return jsonl([
+    {
+      ...call,
+      uuid: `a-${s}`,
+      timestamp: at(s),
+      message: { id: `msg_${s}`, role: 'assistant', content: [{ type: 'tool_use', id, name: 'StructuredOutput', input }] },
+    },
+    {
+      ...result,
+      uuid: `u-${s}`,
+      timestamp: at(s + 1),
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+    },
+  ]);
+};
+
+/** The file's mtime set `ago` milliseconds before now. */
+const writtenAgo = (file: string, ago: number) => {
+  const when = new Date(Date.now() - ago);
+  fs.utimesSync(file, when, when);
+};
+
+test("at shipped readers, a working idle session's transcript is read once per change of its mtime: once a look for its closeout and its usage together, and not at all while it is unchanged", async () => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, longClaude(sessionId, 2_000_000));
+  const file = claudeFile(sessionId);
+  writtenAgo(file, 10_000);
+  const rows = [{ name: 'ae/t/1', sessionId, state: 'working', status: 'idle', kind: 'background', startedAt: T0 - 1_000 }];
+  const ops = claudeOps({ root: tmp('root') });
+  const look = async () => {
+    const tally = { counts: noCounts(), observed: {} };
+    const seen = await tallied(tally, () => Effect.runPromise(ops.observe));
+    return { seen: seen.get('ae/t/1'), bytes: tally.counts.bytesRead };
+  };
+
+  await listing(rows, async () => {
+    const size = fs.statSync(file).size;
+    const first = await look();
+    assert.deepEqual(first.seen?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
+    assert.ok(first.seen?.usage, 'its usage read');
+    assert.ok(first.bytes >= size && first.bytes < 2 * size, `one read of ${size} bytes for both, not two: ${first.bytes}`);
+
+    let idle = 0;
+    for (let i = 0; i < 5; i++) idle += (await look()).bytes;
+    assert.ok(idle < size / 100, `five looks over a transcript nothing wrote read none of it: ${idle} bytes`);
+
+    fs.appendFileSync(file, closeoutAt(sessionId, 100, { outcome: 'done', summary: 'written' }));
+    writtenAgo(file, 5_000);
+    const grown = fs.statSync(file).size;
+    const next = await look();
+    assert.deepEqual(next.seen?.closeout?.payload, { outcome: 'done', summary: 'written' }, 'the closeout given since is seen');
+    assert.ok(next.bytes >= grown && next.bytes < 2 * grown, `written since: read once again, ${next.bytes} bytes`);
+  });
+});
+
+test("a transcript's mtime is its file's, in whole milliseconds, read by a stat; a session with no transcript has none", async () => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
+  const tally = { counts: noCounts(), observed: {} };
+  const written = await tallied(tally, () => transcriptWrittenAt(sessionId));
+  assert.equal(written, Math.trunc(fs.statSync(claudeFile(sessionId)).mtimeMs));
+  assert.equal(tally.counts.bytesRead, 0, 'no byte of it read');
+  assert.equal(await transcriptWrittenAt(randomUUID()), undefined);
 });
 
 test('a background session with no transcript at all still reads as none: no statement, no usage, and no read asked', async (t: TestContext) => {

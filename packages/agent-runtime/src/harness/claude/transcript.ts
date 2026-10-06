@@ -37,7 +37,22 @@ export const transcriptFile = (sessionId: string): string | undefined => {
 };
 
 /**
- * A transcript found and then not read: the OS refused the read (`code`, as `EACCES`, `EIO`, or `ENOENT` for a file gone since it
+ * When a Claude Code session's transcript was last written: its file's mtime in whole milliseconds, as the Agent SDK's
+ * `getSessionInfo` gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when
+ * the stat fails.
+ */
+export const transcriptWrittenAt = async (sessionId: string): Promise<number | undefined> => {
+  const file = transcriptFile(sessionId);
+  if (!file) return undefined;
+  try {
+    return Math.trunc((await fs.promises.stat(file)).mtimeMs);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * A transcript found and then not read:the OS refused the read (`code`, as `EACCES`, `EIO`, or `ENOENT` for a file gone since it
  * was found). Never no transcript: what it says is unknown until a later look reads it.
  */
 export class TranscriptUnread extends Error {

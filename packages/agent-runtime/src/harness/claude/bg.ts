@@ -15,7 +15,7 @@ import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
+import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Bridge, SessionState, Sighting, Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
 import { claudeBridge } from './bridge.ts';
@@ -27,6 +27,7 @@ import {
   transcriptFile,
   TranscriptUnread,
   transcriptUsage,
+  transcriptWrittenAt,
 } from './transcript.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllowArgs, claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
@@ -167,18 +168,12 @@ type Registry = {
 };
 
 /**
- * What a finished attempt said and consumed, as read from its transcript — kept for THAT attempt,
- * and only while the transcript has not been written since: while its mtime equals the one asked just
- * before the read (`mtime`), which was older than the read (`readAt`) by `MTIME_SLOP_MS`. Equality,
- * not order, so a write stamped before the read by a wall clock stepped back is read. A working session
- * is read on every idle pass instead, because that is when it may just have spoken. Losing this only
- * re-reads.
- *
- * `keep` says which reads are worth keeping, and the caller decides: an attempt whose session the registry
- * lists FINAL, and a busy session read over a transcript cold for the quiescence floor, which is reached
- * only while nothing has been written and so answers the same until something is. Without that second
- * one, a session in a tool call longer than the floor — `npm ci`, a build, a test suite — is read in full
- * on every pass for the length of the call, where the mtime that gates the read costs a fraction of it.
+ * What an attempt said and consumed, as read from its transcript — kept for THAT attempt, in any state the registry lists it in,
+ * and only while the transcript has not been written since: while its mtime equals the one asked just before the read (`mtime`),
+ * which was older than the read (`readAt`) by `MTIME_SLOP_MS`. Equality, not order, so a write stamped before the read by a wall
+ * clock stepped back is read. A session that takes a turn writes its transcript, so what it said in that turn is read on the next
+ * look, and a session that takes none — idle, blocked, a long-lived one between turns, a busy one in a long tool call — is read
+ * once. Losing this only re-reads.
  *
  * Both conditions are what reading again would find, so no driver answers differently for having
  * seen the session before. Kept by attempt, never by session id alone: the registry can list a session
@@ -188,6 +183,9 @@ type Registry = {
  */
 type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number; mtime: number | undefined };
 
+/** A read begun: when it began (`readAt`), and what it answers. */
+type Begun<T> = { readAt: number; value: Promise<T> };
+
 /**
  * An attempt's key in what is kept (`Kept`): the row's name, its session, the start `claude agents` gave it, and when its usage is
  * counted from where that is another time (`countsFrom`), so a read counted from one is never handed to a look counting from the other.
@@ -196,55 +194,74 @@ const attemptOf = (name: string, s: Sighting, startedAt: number | undefined, cou
   JSON.stringify([name, s.sessionId, startedAt ?? null, ...(countFrom !== startedAt ? [countFrom] : [])]);
 
 /**
- * A runner's kept reads (`Kept`), over its clock and its two readers: `statementOf` and `usageOf` read an attempt's closeout
- * and usage through them, and `prune` lets go of every attempt not in the set it is given. A read that throws — a transcript
+ * How a look reads a session's closeout (`statement`) and its usage since `since` (`usage`): off the look's one read of its
+ * transcript (`Look.transcript`), so a look that asks both reads the file once; or through `closeoutFrom` and `usageFrom` where they
+ * are given, each a read of its own.
+ */
+type Readers = {
+  statement: (l: Look) => Begun<Statement | undefined>;
+  usage: (l: Look, since: number) => Begun<Usage | undefined>;
+};
+
+/** `read` begun now, on `now`'s clock. */
+const begunNow = <T>(now: () => number, read: () => Promise<T>): Begun<T> => ({ readAt: now(), value: read() });
+
+/** What `of` finds in the look's one read of its transcript (`Look.transcript`), or `undefined` with no transcript. */
+const offTranscript = <T>(l: Look, of: (read: { file: string; text: string }) => T): Begun<T | undefined> => {
+  const begun = l.transcript();
+  return { readAt: begun.readAt, value: begun.value.then((read) => read && of(read)) };
+};
+
+/** The readers (`Readers`) over `options`' `closeoutFrom` and `usageFrom`, each off the look's transcript where it is not given. */
+const readersOf = (now: () => number, options: ClaudeOptions): Readers => {
+  const { closeoutFrom, usageFrom } = options;
+  return {
+    statement: (l) =>
+      closeoutFrom
+        ? begunNow(now, () => closeoutFrom(l.sighting.sessionId))
+        : offTranscript(l, (read) => lastStructuredOutput(read.text, read.file)),
+    usage: (l, since) =>
+      usageFrom
+        ? begunNow(now, () => usageFrom(l.sighting.sessionId, since))
+        : offTranscript(l, (read) => transcriptUsage(read.text, since, read.file)),
+  };
+};
+
+/**
+ * A runner's kept reads (`Kept`), over its clock and its readers: `statementOf` and `usageOf` read a look's closeout and usage
+ * through them, in any state, and `prune` lets go of every attempt not in the set it is given. A read that throws — a transcript
  * refused (`lines.ts`) — is kept as a value is, and thrown again while the transcript is unchanged, not read again; a transcript
  * found and not read (`TranscriptUnread`) is thrown and never kept, and lets go of what was kept for the attempt, so the next look
  * reads it again.
  */
-const keptReads = (
-  now: () => number,
-  closeoutFrom: (sessionId: string) => Promise<Statement | undefined>,
-  usageFrom: (sessionId: string, since: number) => Promise<Usage | undefined>,
-) => {
+const keptReads = (readers: Readers) => {
   const keptStatements = new Map<string, Kept<Statement | undefined>>();
   const keptUsage = new Map<string, Kept<Usage | undefined>>();
-  const keptRead = async <T>(
-    kept: Map<string, Kept<T>>,
-    attempt: string,
-    keep: boolean,
-    writtenAt: () => Promise<number | undefined>,
-    read: () => Promise<T>,
-  ): Promise<T> => {
-    if (!keep) return read();
-    const pin = kept.get(attempt);
-    const written = await writtenAt();
+  const keptRead = async <T>(kept: Map<string, Kept<T>>, l: Look, read: () => Begun<T>): Promise<T> => {
+    const pin = kept.get(l.attempt);
+    const written = await l.writtenAt();
     let got = pin && written !== undefined && written === pin.mtime && pin.mtime < pin.readAt - MTIME_SLOP_MS ? pin.read : undefined;
     if (!got) {
-      const readAt = now();
-      got = await read().then(
+      const begun = read();
+      got = await begun.value.then(
         (value) => ({ value }),
         (refused: unknown) => ({ refused }),
       );
       if ('refused' in got && got.refused instanceof TranscriptUnread) {
-        kept.delete(attempt);
+        kept.delete(l.attempt);
         throw got.refused;
       }
-      kept.set(attempt, { read: got, readAt, mtime: written });
+      kept.set(l.attempt, { read: got, readAt: begun.readAt, mtime: written });
     }
     if ('refused' in got) throw got.refused;
     return got.value;
   };
   return {
-    statementOf: (attempt: string, s: Sighting, writtenAt: () => Promise<number | undefined>, keep = FINAL.has(s.state)) =>
-      keptRead(keptStatements, attempt, keep, writtenAt, () => closeoutFrom(s.sessionId)),
-    usageOf: async (
-      attempt: string,
-      s: Sighting,
-      since: number | undefined,
-      writtenAt: () => Promise<number | undefined>,
-      keep = FINAL.has(s.state),
-    ) => (since === undefined ? undefined : keptRead(keptUsage, attempt, keep, writtenAt, () => usageFrom(s.sessionId, since))),
+    statementOf: (l: Look) => keptRead(keptStatements, l, () => readers.statement(l)),
+    usageOf: async (l: Look) => {
+      const since = l.countFrom;
+      return since === undefined ? undefined : keptRead(keptUsage, l, () => readers.usage(l, since));
+    },
     prune: (attempts: ReadonlySet<string>) => {
       for (const kept of [keptStatements, keptUsage]) for (const key of kept.keys()) if (!attempts.has(key)) kept.delete(key);
     },
@@ -267,7 +284,7 @@ type Reading = {
 
 /**
  * One sighting in one pass: its row's name and start, when its usage is counted from, its attempt, its transcript's mtime asked once
- * at most, and its quiet so far.
+ * at most, its transcript read once at most (`transcript`), and its quiet so far.
  */
 type Look = {
   name: string;
@@ -276,25 +293,8 @@ type Look = {
   countFrom: number | undefined;
   attempt: string;
   writtenAt: () => Promise<number | undefined>;
+  transcript: () => Begun<{ file: string; text: string } | undefined>;
   quietFor: () => Promise<number | undefined>;
-};
-
-/** When a session's transcript was last written, as the Agent SDK's `getSessionInfo` says, or `undefined` when it cannot. */
-const sdkTranscriptTime = async (sessionId: string) => {
-  try {
-    return (await getSessionInfo(sessionId))?.lastModified;
-  } catch {
-    return undefined;
-  }
-};
-
-/**
- * A session's closing statement, read off its transcript (`lastStructuredOutput`), or `undefined` with no transcript. Throws the
- * refusal of a transcript whose lines do not decode, and a `TranscriptUnread` when one found cannot be read.
- */
-const transcriptCloseout = async (sessionId: string) => {
-  const read = await readSessionTranscript(sessionId);
-  return read && lastStructuredOutput(read.text, read.file);
 };
 
 /**
@@ -363,7 +363,7 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  *   - its start (`starts`), what `release` reads usage from — or, for a long-lived attempt a look was told the start of, that
  *     start (`countsFrom`), so its spend is counted across every process Claude Code respawned it in; kept by every look
  *     told nothing of the session, so a view's look between the pass's and its release leaves it as the pass set it.
- * - What a finished attempt said and consumed (`Kept`), which only saves reads.
+ * - What an attempt said and consumed (`Kept`), which only saves reads.
  *
  * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
  * its own, and a wrong count is worse than none.
@@ -372,14 +372,13 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const now = options.now ?? (() => Date.now());
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const sessionsDir = options.sessionsDir ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
-  const usageFrom = options.usageFrom ?? transcriptUsageSince;
   const reading: Reading = {
     root,
     quiescentAfterMs: options.quiescentAfterMs ?? QUIESCENT_AFTER_MS,
     now,
     mono: options.mono ?? monoNow,
-    transcriptTime: options.transcriptTime ?? sdkTranscriptTime,
-    kept: keptReads(now, options.closeoutFrom ?? transcriptCloseout, usageFrom),
+    transcriptTime: options.transcriptTime ?? transcriptWrittenAt,
+    kept: keptReads(readersOf(now, options)),
     bridgeOf: options.bridgeOf ?? ((pid, sessionId) => claudeBridge(sessionsDir, pid, sessionId)),
   };
   const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map(), countsFrom: new Map() };
@@ -389,7 +388,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     observeFor: (expected) => observeInto(reading, registry, countsFromOf(expected)),
     find: findIn(sessionsDir),
     stop: stopSession,
-    release: releaseFrom(registry, usageFrom),
+    release: releaseFrom(registry, options.usageFrom ?? transcriptUsageSince),
     logs: sessionLogs,
     transcript: sessionTranscript,
     say: sayThrough(sessionsDir, registry.pids),
@@ -691,6 +690,8 @@ const lookOf = (x: Reading, name: string, l: Listed): Look => {
   const countFrom = l.countFrom ?? startedAt;
   let written: Promise<number | undefined> | undefined;
   const writtenAt = () => (written ??= x.transcriptTime(sighting.sessionId));
+  let read: Begun<{ file: string; text: string } | undefined> | undefined;
+  const transcript = () => (read ??= begunNow(x.now, () => readSessionTranscript(sighting.sessionId)));
   const quietFor = async () => {
     const lastWrite = await writtenAt();
     if (lastWrite === undefined) return undefined;
@@ -699,7 +700,8 @@ const lookOf = (x: Reading, name: string, l: Listed): Look => {
     const sighted = sightingOf(quietFileOf(x.root, name), lastWrite, mono);
     return sighted && mono ? Math.min(aged, mono.ms - sighted.ms) : aged;
   };
-  return { name, sighting, startedAt, countFrom, attempt: attemptOf(name, sighting, startedAt, countFrom), writtenAt, quietFor };
+  const attempt = attemptOf(name, sighting, startedAt, countFrom);
+  return { name, sighting, startedAt, countFrom, attempt, writtenAt, transcript, quietFor };
 };
 
 /**
@@ -720,8 +722,8 @@ const lookOf = (x: Reading, name: string, l: Listed): Look => {
 const reportOf = async (x: Reading, l: Look): Promise<Sighting> => {
   const { sighting } = l;
   if (sighting.busy) return busyReportOf(x, l);
-  const told = toldOf(x, l.name, await x.kept.statementOf(l.attempt, sighting, l.writtenAt));
-  const used = await x.kept.usageOf(l.attempt, sighting, l.countFrom, l.writtenAt);
+  const told = toldOf(x, l.name, await x.kept.statementOf(l));
+  const used = await x.kept.usageOf(l);
   const reported: Sighting = {
     ...sighting,
     ...(told ? { closeout: told } : {}),
@@ -750,17 +752,16 @@ const toldOf = (x: Reading, name: string, said: Statement | undefined): { payloa
  * its process — a background shell it left running — and its closeout, its usage and its `quietMs` are reported. Both halves are
  * needed: a session in a long turn has said nothing since its last tool call, and one whose closeout is its parent's has said
  * nothing of its own. Its own is the one `toldOf` tells by its id, whatever its time, and else one made from its own start on.
- * Both reads are kept (`Kept`) while the transcript stays as they found it, since this branch is reached only over a transcript
- * cold for the floor.
+ * Both reads are kept (`Kept`) while the transcript stays as they found it, as every look's are.
  */
 const busyReportOf = async (x: Reading, l: Look): Promise<Sighting> => {
   const { name, sighting, startedAt } = l;
   const quiet = sighting.state === 'working' ? await l.quietFor() : undefined;
   if (quiet === undefined || quiet < x.quiescentAfterMs || startedAt === undefined) return sighting;
-  const said = await x.kept.statementOf(l.attempt, sighting, l.writtenAt, true);
+  const said = await x.kept.statementOf(l);
   const told = said?.lastWord ? toldOf(x, name, said) : undefined;
   if (!told || (told.at !== undefined && told.at < startedAt)) return sighting;
-  const used = await x.kept.usageOf(l.attempt, sighting, l.countFrom, l.writtenAt, true);
+  const used = await x.kept.usageOf(l);
   return { ...sighting, closeout: told, ...(used ? { usage: used } : {}), quietMs: quiet };
 };
 

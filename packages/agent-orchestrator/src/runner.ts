@@ -421,6 +421,7 @@ export { readPause } from './pause/pause.store.ts';
 export { retryRun } from './retry/retry.verb.ts';
 export { sayRun } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
+export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { LOGS, STATS } from './command/reads.verb.ts';
 export { START } from './start/commands.verb.ts';

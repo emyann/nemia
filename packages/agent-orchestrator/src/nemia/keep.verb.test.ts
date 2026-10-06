@@ -1,6 +1,7 @@
 /**
  * The keeper and `nemia level` over an engine board of the test's: her task filed long-lived in her folder, by her shipped definition and
- * the person's custom words, with the daemon's own bin first on her path and an ask on every write in the store but her memory;
+ * the person's custom words, with the daemon's own bin first on her path, her fence derived from the table, her admission, and a deny
+ * on the store but her folder;
  * subscribed once it is open; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed at manual.
  * And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own, since `WF_ROOT` is read as
  * the module loads.
@@ -11,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
+import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 
@@ -27,6 +29,8 @@ const { customInstructionsFile } = await import('../folder/folder.store.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
+const { nemiaFence } = await import('../admission/index.ts');
+const { TABLE } = await import('../command/commands.verb.ts');
 
 const b = board();
 
@@ -96,6 +100,9 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   const set = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string; phase: string | null };
   assert.equal(set.phase, null, 'not filed until the keeper beats');
   fs.mkdirSync(path.join(ROOT, 'brand-new'));
+  const local = path.join(nemiaDir(), CONFIG_FOLDERS[0], 'settings.local.json');
+  fs.mkdirSync(path.dirname(local), { recursive: true });
+  fs.writeFileSync(local, JSON.stringify({ permissions: { allow: ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)'] } }));
   const bin = ownBin();
   assert.ok(bin !== undefined, "the checkout's own nemia");
   const searched = process.env.PATH;
@@ -120,17 +127,33 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);
   const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; settings: string };
   assert.equal(own.remoteControl, true);
-  const settings = JSON.parse(own.settings) as { permissions: { ask: string[] }; env: { PATH: string } };
+  const settings = JSON.parse(own.settings) as { permissions: { ask: string[]; deny: string[] }; env: { PATH: string } };
   assert.equal(settings.env.PATH, [bin, '/usr/local/bin', '/usr/bin'].join(path.delimiter), "the daemon's own bin first, and once");
-  const asks = settings.permissions.ask;
-  assert.deepEqual(asks.slice(0, shipped.askTools.length), shipped.askTools, 'her ask rules, as she ships them');
-  assert.ok(asks.includes(`Edit(/${path.join(ROOT, 'brand-new')}/**)`), 'a folder the store gained is asked');
-  assert.ok(asks.includes(`Edit(/${path.join(ROOT, 'daemon.json')})`), 'a file at the store top is asked');
-  assert.ok(asks.includes(`Edit(/${levelFile()})`) && asks.includes(`Edit(/${promptFile()})`), 'her level and her instruction are asked');
+  const fence = nemiaFence(TABLE);
   assert.deepEqual(
-    asks.filter((rule) => rule.startsWith(`Edit(/${nemiaDir()}`)),
+    settings.permissions.ask,
+    fence.ask.filter((rule) => rule !== 'Bash(nemia cancel:*)'),
+    'her asks, derived from the table, less the prompt the person allowed in her folder',
+  );
+  const denies = settings.permissions.deny;
+  assert.deepEqual(denies.slice(0, fence.deny.length), fence.deny, 'tick and up out of her reach');
+  assert.ok(fence.deny.includes('Bash(nemia tick:*)') && fence.deny.includes('Bash(nemia up:*)'));
+  assert.ok(denies.includes(`Edit(/${path.join(ROOT, 'brand-new')}/**)`), 'a folder the store gained is denied');
+  assert.ok(denies.includes(`Edit(/${path.join(ROOT, 'daemon.json')})`), 'a file at the store top is denied');
+  assert.ok(
+    denies.includes(`Edit(/${levelFile()})`) && denies.includes(`Edit(/${promptFile()})`),
+    'her level and her instruction are denied',
+  );
+  assert.deepEqual(
+    [...settings.permissions.ask, ...denies].filter((rule) => rule.startsWith(`Edit(/${nemiaDir()}`)),
     [`Edit(/${levelFile()})`, `Edit(/${promptFile()})`],
-    'her memory is asked by no rule',
+    'her memory is denied and asked by no rule',
+  );
+  for (const rule of fence.allow) assert.ok((spec.config.allowedTools as string[]).includes(rule), `${rule} allowed`);
+  assert.deepEqual(
+    spec.config.callAdmission,
+    { command: [path.join(bin, 'nemia'), 'admit'], tools: ['Bash'] },
+    "her shell calls admitted by the daemon's own nemia",
   );
   assert.equal(own.appendSystemPromptFile, promptFile());
   const prompt = fs.readFileSync(promptFile(), 'utf8');
@@ -146,6 +169,7 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   assert.equal(b.filings.filter((id) => id === set.task).length, 1);
   const status = await runWith(e, LEVEL.handler({}));
   assert.equal(status.level, 'semi-auto');
+  assert.deepEqual(status.allows, ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)'], 'what the person allowed in her folder, shown');
   assert.deepEqual(status.spend, { usd: 0.42, measured: 1, unmeasured: 0 });
   assert.ok(LEVEL.print(status, {}).includes('spent $0.42 over 1 session ended; her open one counts once it ends'));
   assert.equal(status.reach[0], `${DEFAULT_HARNESS} attach 01234567`);

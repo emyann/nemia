@@ -27,9 +27,10 @@
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
- * `auto` is refused her (`readNemia`). Every command of the table that writes is asked of the person by one of her `askTools`, bare and
- * with an argument, or in each write form where its bare form reads (`writeForms`: a level, or a flag that sets), and no read her allow
- * list stands for is asked or denied (`unasked`, `askedReads`).
+ * `auto` is refused her (`readNemia`). Her rules are those her keeper files (`herRules`): the fence derived from the table's classes
+ * (`nemiaFence`) asks every write that prompts and every write form of a command that reads bare, denies her what is out of her reach,
+ * and lets the rest through (`misjudged`); her admission asks every answer to what waits on the person, whatever the person allows
+ * (`verdictOf`); and an edit of the store outside her folder is denied her (`editVerdictOf`).
  *
  * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
  * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
@@ -44,10 +45,9 @@ import { filedConfig, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
-import { readNemia, type Nemia } from '../src/nemia/level.store.ts';
-import { LEVELS } from '../src/nemia/nemia.ts';
+import { levelFile, promptFile, readNemia, storeDenies } from '../src/nemia/level.store.ts';
+import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
-import type { Spec } from '../src/command/command.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
@@ -983,7 +983,7 @@ test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow 
 });
 
 /** Nemia as her keeper files her: her shipped definition, in the background. */
-const nemia = (file?: string): Step & Nemia => ({ ...readNemia(file), name: 'nemia', background: true });
+const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia', background: true });
 
 test("Nemia is refused git push, a forced branch delete, a kill by name, browser_run_code_unsafe, a merge and gh's merge by her own deny", () => {
   const her = nemia();
@@ -1016,101 +1016,181 @@ test('REFUSED: Nemia without her deny of git push is open on each push, and a mo
   }
 });
 
-/** A command of the table, as far as her ask rules read it. */
-type Entry = Pick<(typeof TABLE)[number], 'name' | 'writes' | 'only'> & { readonly spec?: Pick<Spec, 'flags'> };
-
-/** The commands that write whose bare form is a read on her allow list, each with the flags it takes that only read. */
-const BARE_READS: Record<string, readonly string[]> = { 'factory instruction': [], 'agents custom': ['--repo'] };
+/** Her rules as Claude Code reads them: what runs unasked, what is asked of the person, and what is refused her. */
+type Rules = { allow: readonly string[]; ask: readonly string[]; deny: readonly string[] };
 
 /**
- * The calls of `entry` that write: `nemia level` with each level; a command of `BARE_READS` with each flag it takes at the command line
- * that sets, after its argument and before it; any other bare and with an argument. Throws on a command of `BARE_READS` with no such flag.
+ * Her rules as her keeper files them (`nemiaSpec`) in the store `root`: her own allow list and deny, the fence derived from the table
+ * (`nemiaFence`) less each prompt `local` allows by its own rule (`widened`) and the store's denies (`storeDenies`), her memory allowed
+ * her; with the person's own allows `local` besides, in her folder's local settings.
  */
-function writeForms(entry: Entry): string[] {
-  if (entry.name === 'level') return LEVELS.map((level) => `nemia level ${level}`);
-  const reads = BARE_READS[entry.name];
-  if (reads === undefined) return [`nemia ${entry.name}`, `nemia ${entry.name} r-1`];
-  const sets = (entry.spec?.flags ?? []).filter((flag) => flag.only?.side !== 'api' && !reads.includes(flag.flag));
-  if (!sets.length) throw new Error(`nemia ${entry.name}: no flag of it sets, so nothing of it writes; take it out of BARE_READS`);
-  return sets.flatMap((flag) => {
-    const given = flag.kind === 'switch' ? flag.flag : `${flag.flag} v`;
-    return [`nemia ${entry.name} r-1 ${given}`, `nemia ${entry.name} ${given} r-1`];
-  });
+function herRules(root: string, local: readonly string[] = []): Rules {
+  const her = nemia();
+  const fence = widened(nemiaFence(TABLE), local);
+  return {
+    allow: [...(her.allowedTools ?? []), ...fence.allow, `Edit(/${path.join(root, 'nemia', 'memory')}/**)`, ...local],
+    ask: fence.ask,
+    deny: [...(her.disallowedTools ?? []), ...fence.deny, ...storeDenies(root)],
+  };
 }
 
-/** Each call of a command of `table` that writes, served at the command line, that none of her ask rules reaches (`writeForms`). */
-const unasked = (table: readonly Entry[], her: Nemia): string[] =>
-  table
-    .filter((entry) => entry.writes && entry.only?.side !== 'api')
-    .flatMap(writeForms)
-    .filter((command) => !her.askTools.some((rule) => reaches(rule, { tool: 'Bash', command })));
+/** A store with what her keeper reads to deny her: a run's folder, the daemon's file and her own folder. */
+function herStore(): string {
+  const root = scratch('wf-nemia-store-');
+  fs.mkdirSync(path.join(root, 'runs', 'r-1'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'nemia', 'memory'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'daemon.json'), '{}');
+  return root;
+}
 
-/** The calls her `Bash(nemia …)` allow rules stand for: the command itself, or with an argument where the rule takes more. */
-const readsOf = (her: Step): string[] =>
-  (her.allowedTools ?? []).flatMap((rule) => {
-    const read = /^Bash\((nemia [^:)]+)(:\*)?\)$/.exec(rule);
-    return read === null ? [] : [read[2] === undefined ? read[1] : `${read[1]} r-1`];
-  });
+/** What waits on the person in the tests' store: `design` of `r-1` at its gate; `check` of `r-1` on no one; no other run is there. */
+const waitOf = (runId: string, step: string): string | undefined =>
+  runId !== 'r-1' ? 'is not there: no such run' : step === 'design' ? 'is awaiting approval' : undefined;
 
-/** The reads her allow list stands for (`readsOf`) that an ask or a deny of hers reaches. */
-const askedReads = (her: Step & Nemia): string[] =>
-  readsOf(her).filter((command) =>
-    [...her.askTools, ...(her.disallowedTools ?? [])].some((rule) => reaches(rule, { tool: 'Bash', command })),
+/** What Claude Code does with a call: refuse it, ask the person, run it unasked, or leave it to its mode, which no rule reaches. */
+type Verdict = 'deny' | 'ask' | 'allow' | 'unmatched';
+
+/**
+ * The verdict on the shell line `command` under `rules`, with her admission asked first (`admissionOf`) unless `admitted` is false: a
+ * deny on any part refuses it; else her admission's ask, or an ask on any part, asks; else an allow on every part runs it unasked.
+ */
+function verdictOf(rules: Rules, command: string, admitted = true): Verdict {
+  const parts = partsOfCall({ tool: 'Bash', command });
+  const on = (list: readonly string[]) => (part: Call) => list.some((rule) => reaches(rule, part));
+  if (parts.some(on(rules.deny))) return 'deny';
+  const asked = admitted && admissionOf({ tool: 'Bash', input: { command }, cwd: '/' }, TABLE, waitOf) !== undefined;
+  if (asked || parts.some(on(rules.ask))) return 'ask';
+  return parts.every(on(rules.allow)) ? 'allow' : 'unmatched';
+}
+
+/** Whether an `Edit` rule on an absolute path (`Edit(//at)`, `Edit(//at/**)`) reaches a write of `file`: that file, or one under it. */
+function editReaches(rule: string, file: string): boolean {
+  const at = /^Edit\(\/(\/.*?)(\/\*\*)?\)$/.exec(rule);
+  if (at === null) return false;
+  return at[2] === undefined ? file === at[1] : file.startsWith(`${at[1]}/`);
+}
+
+/** The verdict on an edit of `file` under `rules`: a deny that reaches it refuses it, else an allow runs it unasked. */
+const editVerdictOf = (rules: Rules, file: string): Verdict =>
+  rules.deny.some((rule) => editReaches(rule, file)) ? 'deny' : rules.allow.some((rule) => editReaches(rule, file)) ? 'allow' : 'unmatched';
+
+/**
+ * Each call the command line serves of every command of `table`, and the verdict its class owes: a write that prompts asks, bare and with
+ * an argument, one out of her reach is denied, a read, her own write and an answer run unasked by her rules alone; a command that reads
+ * bare runs unasked with an argument and with a flag it reads by, and asks with each word or flag that sets, after its argument and
+ * before it.
+ */
+function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
+  return table
+    .filter((entry) => entry.only?.side !== 'api')
+    .flatMap(({ name, nemia: c }): [string, Verdict][] => {
+      const forms = [`nemia ${name}`, `nemia ${name} r-1`];
+      if (c === 'out' || c === 'prompts') return forms.map((form) => [form, c === 'out' ? 'deny' : 'ask']);
+      if (typeof c !== 'object') return forms.map((form) => [form, 'allow']);
+      const set = (s: string) => (s.startsWith('-') ? [`nemia ${name} r-1 ${s} v`, `nemia ${name} ${s} v r-1`] : [`nemia ${name} ${s}`]);
+      return [
+        ...forms.map((form): [string, Verdict] => [form, 'allow']),
+        ...(c.readsBy ?? []).map((s): [string, Verdict] => [`nemia ${name} r-1 ${s} v`, 'allow']),
+        ...c.setsBy.flatMap(set).map((form): [string, Verdict] => [form, 'ask']),
+      ];
+    });
+}
+
+/** Each call of `owedOf` whose verdict under `rules`, her admission left out, is not the one its class owes, as `<call>: <verdict>`. */
+const misjudged = (rules: Rules, table = TABLE): string[] =>
+  owedOf(table)
+    .filter(([command, owed]) => verdictOf(rules, command, false) !== owed)
+    .map(([command]) => `${command}: ${verdictOf(rules, command, false)}`);
+
+test('her fence asks every write that prompts and every write form of a command that reads bare, denies her what is out, and lets the rest through', () => {
+  const rules = herRules(herStore());
+  assert.deepEqual(misjudged(rules), []);
+  const owed: [string, Verdict][] = [
+    ['nemia ls', 'allow'],
+    ['nemia show r-1', 'allow'],
+    ['nemia level', 'allow'],
+    ['nemia factory instruction f', 'allow'],
+    ['nemia agents custom ada --repo /code/app', 'allow'],
+    ['nemia start build --message m', 'allow'],
+    ['nemia hold r-1', 'allow'],
+    ['nemia inbox add card', 'allow'],
+    ['nemia retry r-1 check', 'allow'],
+    ['nemia level manual', 'ask'],
+    ['nemia cancel r-1', 'ask'],
+    ['nemia rm r-1', 'ask'],
+    ['nemia factory instruct f --text t', 'ask'],
+    ['nemia factory instruction f --path NEMIA.md', 'ask'],
+    ['nemia factory instruction --store f', 'ask'],
+    ['nemia agents custom --clear ada', 'ask'],
+    ['nemia agents custom ada --file -', 'ask'],
+    ['nemia agents write ada', 'ask'],
+    ['nemia tick', 'deny'],
+    ['nemia up --port 8787', 'deny'],
+    ['wf approve r-1 design', 'deny'],
+    ['ae stop t-1', 'deny'],
+  ];
+  assert.deepEqual(
+    owed.filter(([command, verdict]) => verdictOf(rules, command) !== verdict).map(([command]) => command),
+    [],
   );
-
-test('every command that writes asks the person by one of her askTools, and no read on her allow list is asked or denied', () => {
-  const her = nemia();
-  assert.deepEqual(unasked(TABLE, her), []);
-  assert.deepEqual(askedReads(her), []);
-  for (const read of [
-    'nemia ls',
-    'nemia show r-1',
-    'nemia level',
-    'nemia memory',
-    'nemia factory',
-    'nemia inbox',
-    'nemia factory instruction r-1',
-    'nemia agents custom r-1',
-  ])
-    assert.ok(readsOf(her).includes(read), read);
-  for (const write of [
-    'nemia level manual',
-    'nemia approve r-1 design',
-    'nemia inbox add card',
-    'nemia factory instruction f --path NEMIA.md',
-    'nemia factory instruction --store f',
-    'nemia agents custom --clear ada',
-    'nemia agents custom ada --file -',
-    'wf approve r-1 design',
-    'ae stop t-1',
-  ])
-    assert.ok(
-      her.askTools.some((rule) => reaches(rule, { tool: 'Bash', command: write })),
-      write,
-    );
 });
 
-test('REFUSED: a write command or flag added without an ask rule, an ask rule taken away, and an ask on a bare read are each named', () => {
-  const her = nemia();
-  const frob: Entry = { name: 'frob', writes: true };
-  assert.deepEqual(unasked([...TABLE, frob], her), ['nemia frob', 'nemia frob r-1']);
+test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken away, and a deny taken away are each named', () => {
+  const rules = herRules(herStore());
+  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, nemia: 'hers' as const } : entry));
+  assert.deepEqual(misjudged(rules, reclassed), ['nemia cancel: ask', 'nemia cancel r-1: ask']);
+  const cut = { ...rules, ask: rules.ask.filter((rule) => rule !== 'Bash(nemia rm:*)') };
+  assert.deepEqual(misjudged(cut), ['nemia rm: unmatched', 'nemia rm r-1: unmatched']);
+  const store = { ...rules, ask: rules.ask.filter((rule) => rule !== 'Bash(nemia factory instruction *--store*)') };
+  assert.deepEqual(misjudged(store), ['nemia factory instruction r-1 --store v: allow', 'nemia factory instruction --store v r-1: allow']);
+  const open = { ...rules, deny: rules.deny.filter((rule) => rule !== 'Bash(nemia tick:*)') };
+  assert.deepEqual(misjudged(open), ['nemia tick: unmatched', 'nemia tick r-1: unmatched']);
+});
+
+test('REFUSED to run unasked: an approval, a round, an accept, a raised cap and a retry of what waits ask by her admission, whatever the person allows', () => {
+  const answers = [
+    'nemia approve r-1 design',
+    'nemia round r-1 --message m',
+    'nemia accept r-1 design',
+    'nemia retry r-1 design',
+    'nemia retry r-1 check --budget 5',
+    'nemia retry r-9 check',
+    'cd /code/app && nemia approve r-1 design',
+  ];
+  for (const local of [[], ['Bash(nemia:*)', 'Bash(nemia approve:*)', 'Bash(nemia retry:*)']]) {
+    const rules = herRules(herStore(), local);
+    assert.deepEqual(
+      answers.filter((command) => verdictOf(rules, command) !== 'ask'),
+      [],
+      `local allows ${local.join(', ')}`,
+    );
+    assert.equal(verdictOf(rules, 'nemia retry r-1 check'), 'allow', 'a retry that waits on no one runs unasked');
+    assert.equal(verdictOf(rules, 'nemia tick'), 'deny', 'no allow of the person reaches what is out of her reach');
+  }
+  const rules = herRules(herStore());
   assert.deepEqual(
-    unasked([...TABLE, { ...frob, only: { side: 'api', why: 'the board alone' } }], her),
-    [],
-    'not served at the command line',
+    answers.filter((command) => verdictOf(rules, command, false) !== 'allow'),
+    ['cd /code/app && nemia approve r-1 design'],
+    'her static rules allow an answer, but where it follows a command of no rule of hers: her admission alone asks it',
   );
-  const cut = { ...her, askTools: her.askTools.filter((rule) => rule !== 'Bash(nemia approve:*)') };
-  assert.deepEqual(unasked(TABLE, cut), ['nemia approve', 'nemia approve r-1']);
-  assert.deepEqual(askedReads({ ...her, askTools: [...her.askTools, 'Bash(nemia level:*)'] }), ['nemia level']);
-  assert.deepEqual(askedReads({ ...her, askTools: [...her.askTools, 'Bash(nemia factory instruction:*)'] }), [
-    'nemia factory instruction r-1',
-  ]);
-  const store = { ...her, askTools: her.askTools.filter((rule) => rule !== 'Bash(nemia factory instruction *--store*)') };
-  assert.deepEqual(unasked(TABLE, store), ['nemia factory instruction r-1 --store', 'nemia factory instruction --store r-1']);
-  const frobbed = TABLE.map((entry): Entry =>
-    entry.name === 'agents custom'
-      ? { ...entry, spec: { flags: [...entry.spec.flags, { flag: '--frob', kind: 'switch', key: 'frob' }] } }
-      : entry,
-  );
-  assert.deepEqual(unasked(frobbed, her), ['nemia agents custom r-1 --frob', 'nemia agents custom --frob r-1']);
+});
+
+test('a prompt the person allowed by its own rule runs unasked once she is filed again; a broader allow widens no prompt and no answer', () => {
+  const root = herStore();
+  assert.equal(verdictOf(herRules(root), 'nemia cancel r-1'), 'ask');
+  assert.equal(verdictOf(herRules(root, ['Bash(nemia cancel:*)']), 'nemia cancel r-1'), 'allow');
+  const broad = herRules(root, ['Bash(nemia:*)', 'Bash(nemia approve:*)']);
+  assert.equal(verdictOf(broad, 'nemia cancel r-1'), 'ask', 'an ask outranks an allow written anywhere');
+  assert.equal(verdictOf(broad, 'nemia approve r-1 design'), 'ask', 'what waits is asked by her admission over every allow');
+  assert.equal(verdictOf(herRules(root, ['Bash(nemia tick:*)']), 'nemia tick'), 'deny');
+});
+
+test('REFUSED: an edit of the store outside her folder, of her level or of her instruction is denied her, not asked; her memory is hers', () => {
+  const root = herStore();
+  const rules = herRules(root);
+  for (const file of [path.join(root, 'runs', 'r-1', 'run.json'), path.join(root, 'daemon.json'), levelFile(), promptFile()])
+    assert.equal(editVerdictOf(rules, file), 'deny', file);
+  assert.equal(editVerdictOf(rules, path.join(root, 'nemia', 'memory', 'fact.md')), 'allow');
+  const open = { ...rules, deny: rules.deny.filter((rule) => !rule.includes(path.join(root, 'runs'))) };
+  assert.equal(editVerdictOf(open, path.join(root, 'runs', 'r-1', 'run.json')), 'unmatched', 'without the deny, her mode decides');
 });

@@ -81,6 +81,7 @@ export const INBOX: Command<{ cards: InboxListing[] }> = {
       `nemia inbox does not take ${arg}. It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with nemia inbox rm <name> (nemia inbox --help).`,
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/inbox', status: 200 },
   manual: INBOX_HELP,
   handler: () => tried(() => ({ cards: readInbox() })),
@@ -134,6 +135,7 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string }> = {
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
+  nemia: 'hers',
   route: {
     method: 'POST',
     path: '/api/inbox',
@@ -214,6 +216,7 @@ export const INBOX_QUEUE: Command<Queued> = {
       ? '--off takes the card out of the queue, and --workflow writes what starts it: give one of them.'
       : leftOut(QUEUE_SPEC, args),
   writes: true,
+  nemia: 'hers',
   route: [
     { method: 'POST', path: '/api/inbox/:name/queue', status: 200, sets: { off: false } },
     { method: 'DELETE', path: '/api/inbox/:name/queue', status: 200, sets: { off: true } },
@@ -274,6 +277,7 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
       : 'nemia inbox from takes the runs the card is handed as context, by id — nemia inbox from <name> <run>... — or --off to take them off.';
   },
   writes: true,
+  nemia: 'hers',
   route: [
     { method: 'PUT', path: '/api/inbox/:name/from', status: 200, sets: { off: false } },
     { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
@@ -302,6 +306,7 @@ export const INBOX_RM: Command<InboxDropped> = {
     missing: 'nemia inbox rm takes the name of the card to drop, as nemia inbox lists it: nemia inbox rm <name>.',
   },
   writes: true,
+  nemia: 'prompts',
   route: { method: 'DELETE', path: '/api/inbox/:name', status: 200 },
   handler: (args) => tried(() => dropFromInbox(textOf(args, 'name') ?? '')),
   apiRefusal: (dropped, args) => (dropped.removed ? null : new Missing({ message: noCardLine(textOf(args, 'name') ?? '', dropped.cards) })),
@@ -336,6 +341,7 @@ export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
     unknown: (arg) => `the board's card page reads one card, and ${arg} is a second.`,
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/inbox/:name', status: 200 },
   only: { side: 'api', why: "the board's card page reads one card with its file as written; at the command line a person opens the file" },
   handler: (args) =>

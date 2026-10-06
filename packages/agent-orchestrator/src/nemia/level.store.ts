@@ -80,32 +80,27 @@ export function writeLevel(level: LevelFile): void {
   fs.renameSync(hidden, levelFile());
 }
 
-/** Her definition as a step is read, with her ask rules: every call that asks the person first, outranking what her mode allows. */
-export type Nemia = Workflow & { askTools: string[] };
-
 /**
- * Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`); and her
- * ask rules (`askTools:`, a line only she takes, read out before the rest). Refused (`Invalid`): a mode but `auto`, and an `askTools:`
- * missing or naming no rule, without which a write she proposes is not asked of the person.
+ * Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`). Refused
+ * (`Invalid`): a mode but `auto`, in which she reads unasked while her derived fence asks; and an `askTools:` line or a rule on `nemia` in
+ * her `allowedTools:`, which her fence derives from the command table (`nemiaFence`): a hand list there would drift from it.
  */
-export function readNemia(file: string = nemiaDefinition()): Nemia {
+export function readNemia(file: string = nemiaDefinition()): Workflow {
   const text = fs.readFileSync(file, 'utf8');
-  const asked = /^askTools:(.*)\n/m.exec(text);
-  const askTools = (asked?.[1] ?? '')
-    .split(',')
-    .map((rule) => rule.trim())
-    .filter(Boolean);
-  if (!askTools.length)
-    throw new Invalid({
-      message: `${file}: her askTools: names no rule, and every write she proposes is asked of the person by one: askTools: Bash(nemia approve:*), …`,
-    });
-  const agent = parseAgent('nemia', asked === null ? text : text.replace(asked[0], ''));
+  if (/^askTools:/m.test(text))
+    throw new Invalid({ message: `${file}: her askTools: is derived from the command table: take it out of nemia.md.` });
+  const agent = parseAgent('nemia', text);
   const step = stepFrom('nemia/nemia.md', agent.keys, agent.body, undefined);
+  const handed = (step.allowedTools ?? []).filter((rule) => /^Bash\(\s*nemia\b/.test(rule));
+  if (handed.length)
+    throw new Invalid({
+      message: `${file}: her allowedTools: ${handed.join(', ')} is derived from the command table: take it out of nemia.md.`,
+    });
   if (step.permissionMode !== 'auto')
     throw new Invalid({
-      message: `${file}: her permissionMode is ${step.permissionMode ?? 'not set'}, and she reads unasked while her askTools ask the person each write: permissionMode: auto.`,
+      message: `${file}: her permissionMode is ${step.permissionMode ?? 'not set'}, and she reads unasked while her fence asks what waits on the person: permissionMode: auto.`,
     });
-  return { ...step, askTools };
+  return step;
 }
 
 /** The package she ships in: its `package.json` names its `nemia`. */
@@ -139,11 +134,11 @@ export function ownBin(root: string = PACKAGE): string | undefined {
 }
 
 /**
- * The ask rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, and
+ * The deny rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, and
  * on her level and her instruction, the two files of her folder she does not own. Read at each filing, so a folder the store gains is
- * asked at the next.
+ * denied at the next.
  */
-export function storeAsks(root: string = ROOT): string[] {
+export function storeDenies(root: string = ROOT): string[] {
   let names: string[];
   try {
     names = fs.readdirSync(root).sort();

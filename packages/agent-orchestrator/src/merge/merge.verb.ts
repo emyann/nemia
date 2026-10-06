@@ -170,6 +170,7 @@ export const MERGE: Command<{ step: string; target: string; onto: string; sha: s
       'nemia merge takes the run and, when the run has more than one loop, the step that closes the one whose work merges: nemia merge <runId> [<step>].',
   },
   writes: true,
+  nemia: 'hers',
   route: { method: 'POST', path: '/api/runs/:runId/merge', status: 202 },
   apiKeys: ['step', 'target', 'onto', 'sha', 'round', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {

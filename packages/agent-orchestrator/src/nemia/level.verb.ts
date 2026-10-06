@@ -12,7 +12,7 @@ import { Conflict } from '../refusal/refusal.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { dollars, taskSpend, type Spend } from '../status/status.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
-import { LEVEL_FORM, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
+import { LEVEL_FORM, LEVELS, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
 /**
  * Where Nemia is, as `nemia level` answers: her `level` and since when; her task, its phase and its session where one is filed; how a
@@ -124,7 +124,9 @@ export const LEVEL: Command<NemiaLevel> = {
   usage: '[manual|semi-auto]',
   help: [
     "Nemia, the store's own agent: bare, where she is and how to reach her;",
-    'semi-auto keeps her session, every write she proposes asked of you;',
+    "semi-auto keeps her session: what waits on you (a gate, a step's question,",
+    'a loop out of rounds, a cap) is asked of you, and a write that cannot be',
+    'undone or changes your settings or a factory; the rest is hers;',
     'manual stops it',
   ],
   spec: {
@@ -134,6 +136,7 @@ export const LEVEL: Command<NemiaLevel> = {
   },
   check: (args) => (typeof args.level === 'string' ? (levelRefusal(args.level) ?? null) : null),
   writes: true,
+  nemia: { bare: 'read', sets: 'prompts', setsBy: LEVELS },
   route: [
     {
       method: 'GET',

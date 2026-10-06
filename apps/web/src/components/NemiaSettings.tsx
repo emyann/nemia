@@ -33,8 +33,9 @@ export function NemiaSettings() {
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold">Nemia</h2>
         <p className="text-sm text-muted-foreground">
-          The store's own agent, across every factory: on Semi-auto she keeps a session of her own, and every write she proposes is asked of
-          you first.
+          The store's own agent, across every factory: on Semi-auto she keeps a session of her own, and what waits on you — a gate, a step's
+          question, a loop out of rounds — is asked of you first, as is a write that cannot be undone or changes your settings or a factory.
+          The rest is hers.
         </p>
       </div>
       {data ? (
@@ -88,7 +89,7 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
       </div>
       <p className="text-xs text-muted-foreground">
         {nemia.level === 'semi-auto'
-          ? 'Semi-auto: the keeper keeps her session, and every write she proposes waits for you. Off, Manual stops her session at its next beat.'
+          ? 'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. Off, Manual stops her session at its next beat.'
           : 'Manual: no session of hers is kept. On, Semi-auto files her one at the keeper’s next beat.'}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>

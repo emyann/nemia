@@ -10,7 +10,10 @@
 import path from 'node:path';
 import { DEFAULT_WAKE } from '../subscription/subscription.ts';
 
-/** The levels a person sets: `manual`, her session stopped; `semi-auto`, her session kept, every write she proposes asked of the person. */
+/**
+ * The levels a person sets: `manual`, her session stopped; `semi-auto`, her session kept, what waits on the person asked of them, and a
+ * write that cannot be undone or changes their settings or a factory.
+ */
 export const LEVELS = ['manual', 'semi-auto'] as const;
 
 /** A level a person sets. */
@@ -38,13 +41,18 @@ export const NEMIA_DIGEST_EVERY = 1440;
 export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
 
 /**
- * The harness's settings her session is filed with, as JSON: her ask rules (`asks`), and the search path `searchPath` with the folder
- * `bin` first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined. Pure.
+ * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`), and the search path `searchPath` with the
+ * folder `bin` first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined.
+ * Pure.
  */
-export function nemiaSettings(asks: readonly string[], bin: string | undefined, searchPath: string): string {
+export function nemiaSettings(
+  rules: { readonly ask: readonly string[]; readonly deny: readonly string[] },
+  bin: string | undefined,
+  searchPath: string,
+): string {
   const rest = searchPath.split(path.delimiter).filter((entry) => entry !== '' && entry !== bin);
   return JSON.stringify({
-    permissions: { ask: [...asks] },
+    permissions: { ask: [...rules.ask], deny: [...rules.deny] },
     ...(bin === undefined ? {} : { env: { PATH: [bin, ...rest].join(path.delimiter) } }),
   });
 }

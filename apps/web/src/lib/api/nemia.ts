@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 import { pace } from '../feed.ts';
 import { get, ReadRefusal, send } from './read.ts';
 
-/** Mirrors the package's `Level`: Manual, her session stopped; Semi-auto, her session kept, every write she proposes asked of a person. */
+/** Mirrors the package's `Level`: Manual, her session stopped; Semi-auto, her session kept, what waits on a person asked of them. */
 export type Level = 'manual' | 'semi-auto';
 
 /** Mirrors the package's `Spend`: what her ended sessions cost, how many were measured, and how many were not. */

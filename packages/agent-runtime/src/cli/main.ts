@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
-import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
+import { admissionHook, Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
 import { refusedText, retiredKeyRefusal, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
 import type { SweepReport, TaskSpec } from '../index.ts';
 import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
@@ -303,6 +303,8 @@ const HELP = `ae — an engine for agent sessions
   ae close <id>                settle a task held open that waits: succeeded
   ae admit <id>...             let tasks filed queued start (ae ls: queued): the next
                                tick starts them — one a store filed before stage 4c too
+  ae admission -- <command…>   the hook a Claude Code session runs before a call its task's
+                               admission sees: hands the call to the command, prints its answer
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae forget <id>... [--yes]    count what settled tasks keep: their journals, their lines in
                                the feed, their sessions' files; --yes removes them
@@ -536,6 +538,21 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
 };
 
 /**
+ * Refuses, with exit code 2, to run with `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`); then runs the verb `argv` names where
+ * it needs no engine — `admission`, the hook's (`admissionHook`), which `bin/ae.ts` runs before any engine loads. Answers whether it ran.
+ */
+function engineless(argv: string[]): boolean {
+  if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
+  switch (argv[0]) {
+    case 'admission':
+      admissionHook(argv.slice(1));
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
  * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
  * `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`).
  *
@@ -546,10 +563,11 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
  *   timer is only the backstop for a store that cannot or an OS event that is dropped, and a drain guard keeps
  *   "at-least-once, in order" true when a push and a tick land together, all behind one method: a CLI that re-implemented
  *   its easy half would be the worst consumer of its own API.
+ * - `admission` is the hook's, served with no engine (`engineless`).
  */
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
-  if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
+  if (engineless(argv)) return;
   const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');
   const engine = await engineAt({ root });
 

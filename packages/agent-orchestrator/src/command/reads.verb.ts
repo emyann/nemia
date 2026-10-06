@@ -41,6 +41,7 @@ export const SHOW: Command<Run> = {
     unknown: takesNo('show', "one run's id"),
   },
   writes: false,
+  nemia: 'read',
   only: { side: 'cli', why: "the board's run page is the api's judged view of a run (GET /api/runs/:id), not its record" },
   handler: (args) =>
     tried(() => {
@@ -68,6 +69,7 @@ export const LOGS: Command<{ taskId?: string; output?: string }> = {
     unknown: takesNo('logs', "one run's id and one step's name"),
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 },
   handler: Effect.fnUntraced(function* (args: Args) {
     const e = yield* EngineService;
@@ -99,6 +101,7 @@ export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }>
     return cursor === undefined || /^\d+$/.test(cursor) ? null : cursorTakes('feed');
   },
   writes: false,
+  nemia: 'read',
   only: { side: 'cli', why: 'the board follows the feed through GET /api/feed/stream, the counterpart of nemia watch' },
   handler: Effect.fnUntraced(function* (args: Args) {
     return { ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: yield* pausedRead() };
@@ -197,6 +200,7 @@ export const STATS: Command<Stats> = {
   },
   check: statsRefusal,
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/stats', status: 200 },
   handler: (args, env, _home, kept?: Kept) =>
     statsRun(
@@ -232,6 +236,7 @@ export const SERIES: Command<SeriesRead> = {
     apart: () => RANGE_TAKES,
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/series', status: 200 },
   handler: (args, _env, _home, kept?: Kept) => tried(() => seriesRead(textOf(args, 'range'), kept?.series)),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : seriesLines(read)),

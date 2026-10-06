@@ -2321,6 +2321,23 @@ a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` not
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
 `default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).
 
+## Shipped: at Semi-auto, only what waits on the person prompts
+
+Card A of the third Nemia amendment: every command of the table is classed once by who answers for it when an agent calls it, and her
+fence is derived from the class, with no hand list in `nemia/nemia.md`.
+
+- **The class** (`nemia` on each entry, `src/admission/class.ts`): `read`, `hers`, `prompts` (a write that cannot be undone or changes
+  the person's settings or a factory), `answers` (to what waits: a gate, a step's question, a loop out of rounds, a cap) and `out`
+  (`tick`, `up`); a command that reads bare names the words or flags that set. `classBreaks` refuses a command with none, a read classed
+  as a write and a write as a read, a flag in neither list, and a name a longer one's rule would override (`test/commands.test.ts`).
+- **Her fence** (`nemiaFence`, `src/admission/fence.ts`): a read, her own write and an answer allowed; a prompt asked; a setter asked
+  set; `out` denied, with `wf` and `ae` denied by her definition and the store outside her folder denied (`storeDenies`), never asked.
+  A prompt the person allowed by its own rule in her folder's local settings is asked no more from her next filing (`widened`), and
+  `nemia level` lists it: an ask outranks an allow wherever each is written, so the keeper takes the ask out.
+- **Her admission** (`nemia admit`, `src/admission/`), the runtime's hook on her `Bash` calls: an approval, a round, an accept, any
+  `--budget` and a retry of a step that waits on the person (`waitsOnPerson`, `src/retry/waits.ts`) are asked, whatever she types around
+  them; a retry that waits on no one runs. A hook's ask prompts over every allow, so a "don't ask again" never widens what waits.
+
 ## Shipped: freeing the space — `wf prune`
 
 `wf rm` frees a run's space only by forgetting it, and a finished run is still read: its closeouts, its cost, what it decided. A

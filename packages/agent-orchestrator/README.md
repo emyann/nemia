@@ -2737,8 +2737,12 @@ recommendation, recaps what moved, and carries their answer back as a `nemia` ve
 - **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, or the
   web link her session shows, from a phone too), and what a person allowed her at a prompt beyond what ships.
 - **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
-  (the subscription `nemia`, hers alone). She reads freely; every write she proposes — `approve`, `round`, `retry`, `hold`, `cancel`,
-  `say`, `start`, `inbox add` — is asked of the person at a prompt. The harness must trust her folder first, once, by hand: the
+  (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve`, `round`, `accept`,
+  a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
+  admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
+  settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
+  retry that waits on no one — is hers. Each command's class in the table decides (`nemia` on its entry, `src/admission/class.ts`), and
+  a "don't ask again" never widens what waits. The harness must trust her folder first, once, by hand: the
   refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask

@@ -6,6 +6,7 @@
  */
 import { dollarsOf } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import type { CommandClass } from '../admission/index.ts';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
@@ -97,7 +98,8 @@ export type Route =
 
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
- * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
+ * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `nemia`, who
+ * answers for it when an agent calls it (`CommandClass`); its `route` on the
  * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
  * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
  * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one.
@@ -109,6 +111,7 @@ export type CommandSpec = {
   readonly spec: Spec;
   readonly check?: (args: Args) => string | null;
   readonly writes: boolean;
+  readonly nemia: CommandClass;
   readonly route?: Route | readonly Route[];
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
   readonly apiTakes?: readonly string[];

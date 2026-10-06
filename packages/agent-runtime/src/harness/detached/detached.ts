@@ -136,6 +136,11 @@ export type HarnessSpec = {
    */
   mounts?: { readOnly?: true; writable?: true };
   /**
+   * The harness runs a task's `config.callAdmission` before each call to the tools it names, and does what it answers (`Admission`).
+   * Absent: `file()` refuses a task that carries one rather than run its calls unadmitted.
+   */
+  callAdmission?: true;
+  /**
    * The worker keeps the harness's stdout and its stderr each whole, in a file of its own beside the log (`.stdout`, `.stderr`),
    * and the runner reads them (`output`). Absent: the log alone, both streams in one, and the runner has no `output`.
    */

@@ -88,7 +88,7 @@ export type {
   TranscriptEvent,
 } from './harness/index.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
-export type { CodexArgs, HarnessArgs, Mount } from './harness/index.ts';
+export type { Admission, AdmissionAnswer, AdmissionCall, CodexArgs, HarnessArgs, Mount } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
 export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
@@ -103,7 +103,7 @@ export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
 export { commandHarness } from './harness/command/command.ts';
 export { composite } from './harness/index.ts';
-export { sdkRunner } from './harness/index.ts';
+export { admissionHook, sdkRunner } from './harness/index.ts';
 export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/index.ts';

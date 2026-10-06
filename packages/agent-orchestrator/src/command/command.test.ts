@@ -457,7 +457,9 @@ test("the table's help is today's, word for word", () => {
       '                               take the subscription <name> away: its task is told nothing more of the feed',
       '  nemia level [manual|semi-auto]',
       "                               Nemia, the store's own agent: bare, where she is and how to reach her;",
-      '                               semi-auto keeps her session, every write she proposes asked of you;',
+      "                               semi-auto keeps her session: what waits on you (a gate, a step's question,",
+      '                               a loop out of rounds, a cap) is asked of you, and a write that cannot be',
+      '                               undone or changes your settings or a factory; the rest is hers;',
       '                               manual stops it',
       '  nemia memory [<fact>]',
       "                               what Nemia keeps of the store: bare, her facts' names; given one, its",
@@ -484,6 +486,9 @@ test("the table's help is today's, word for word", () => {
       '                               nemia tick --stats',
       '  nemia watch [cursor]',
       "                               nemia feed's lines, followed as the tick writes them, until ^C",
+      '  nemia admit',
+      "                               a call's admission: the call a session is about to make, on stdin, answered",
+      '                               ask where it answers what waits on you',
     ].join('\n'),
   );
 });

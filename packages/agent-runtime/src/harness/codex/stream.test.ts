@@ -92,11 +92,13 @@ test('REFUSED: the first line that does not decode is the one named, and nothing
   assert.ok(message.startsWith('line 3 of the `codex exec --json` stream is a `item.completed` event whose `item.id` '), message);
 });
 
-test('a refusal names the fix, and says every Codex session is unread until it is made', () => {
+test('a refusal ends with the fix, and claims nothing of the other Codex sessions, which the runner reads', () => {
+  const message = wrong(stream(TURN, completed({})));
   assert.match(
-    wrong(stream(TURN, completed({}))),
-    /Every Codex session stays unread, neither there nor gone, until its stream decodes: run a Codex whose `exec --json` stream this runtime reads, or a runtime whose `CodexEventSchema` \(`harness\/codex\/stream\.ts`\) reads this one\.$/,
+    message,
+    /`usage\.input_tokens` is missing\. Run a Codex whose `exec --json` stream this runtime reads, or a runtime whose `CodexEventSchema` \(`harness\/codex\/stream\.ts`\) reads this one\.$/,
   );
+  assert.doesNotMatch(message, /unread/i);
 });
 
 test('a refused value is quoted to 60 characters, however large', () => {

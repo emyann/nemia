@@ -47,6 +47,7 @@ import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
+import { warned } from './warned.ts';
 import { stepClock } from './clock.ts';
 import { FILES_STREAM, resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
@@ -847,19 +848,23 @@ const codexRun = (dir: string, name: string, lines: object[]) => {
 };
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
 
-test('REFUSED: a Codex run whose stream does not decode fails observe, in words naming the session, the line, the event, the field and the fix', async () => {
+test('REFUSED: a Codex run whose stream does not decode is read as failed alone, and why is said in words naming the session, the line, the event, the field and the fix', async () => {
   const dir = root();
   const log = codexRun(dir, 'ae/c1/1', [
     { type: 'turn.started' },
     { type: 'turn.completed', usage: { ...CODEX_USED, input_tokens: 'many' } },
   ]);
-  const e = await Effect.runPromise(Effect.flip(detachedOps(codex, dir).observe));
-  assert.ok(e instanceof RunnerError, String(e));
-  assert.equal(e.verb, 'observe');
-  assert.equal(
-    e.message,
-    `codex: \`ae/c1/1\`'s output, ${log}, cannot be read: line 3 of the \`codex exec --json\` stream is a \`turn.completed\` event whose \`usage.input_tokens\` is "many", where Codex prints number. Every Codex session stays unread, neither there nor gone, until its stream decodes: run a Codex whose \`exec --json\` stream this runtime reads, or a runtime whose \`CodexEventSchema\` (\`harness/codex/stream.ts\`) reads this one.`,
+  codexRun(dir, 'ae/c0/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
+  const { value, warnings } = await warned(detachedOps(codex, dir).observe);
+  assert.deepEqual(
+    value.get('ae/c1/1'),
+    { sessionId: 'ae/c1/1', state: 'failed', nativeId: undefined, closeout: undefined, exitCode: 0 },
+    'ended, so failed: never completed, and nothing its output says',
   );
+  assert.equal(value.get('ae/c0/1')?.state, 'completed', 'the harness’s other run is read');
+  assert.deepEqual(warnings, [
+    `codex: \`ae/c1/1\`'s output, ${log}, cannot be read: line 3 of the \`codex exec --json\` stream is a \`turn.completed\` event whose \`usage.input_tokens\` is "many", where Codex prints number. Run a Codex whose \`exec --json\` stream this runtime reads, or a runtime whose \`CodexEventSchema\` (\`harness/codex/stream.ts\`) reads this one. It is unread while its process runs, and read as failed once it has ended; the other sessions of codex are read. Once its task has settled, \`ae forget\` lets this session go.`,
+  ]);
 
   codexRun(dir, 'ae/c1/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
   const seen = (await Effect.runPromise(detachedOps(codex, dir).observe)).get('ae/c1/1');
@@ -877,19 +882,27 @@ test('REFUSED: a Codex run whose stream does not decode fails observe, in words 
   );
 });
 
-test('a Codex stream that does not decode is never an absence: through the composite, the names routed to Codex are unread', async () => {
+test('a Codex stream that does not decode is never an absence: through the composite, a run at work is unread, the other harness’s read, and failed once it has ended', async () => {
   const dir = root();
-  codexRun(dir, 'ae/c2/1', [{ type: 'turn.started' }, { type: 'item.completed', item: { id: '', type: 'agent_message' } }]);
+  const bad = [{ type: 'turn.started' }, { type: 'item.completed', item: { id: '', type: 'agent_message' } }];
+  const log = codexRun(dir, 'ae/c2/1', bad);
+  const file = log.replace(/\.log$/, '.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), state: 'working', exitCode: undefined }));
   const other = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
   const ops = composite({ codex: detachedOps(codex, dir), alpha: testOps({ sessions: other }) }, 'alpha');
-  const o = await Effect.runPromise(
-    ops.observeFor!([
-      { name: 'ae/c2/1', harness: 'codex' },
-      { name: 'ae/x/1', harness: 'alpha' },
-    ]),
-  );
-  assert.deepEqual([...o.seen.keys()], ['ae/x/1']);
-  assert.deepEqual(o.unread, new Set(['ae/c2/1']), 'neither there nor gone');
+  const expected = [
+    { name: 'ae/c2/1', harness: 'codex' },
+    { name: 'ae/x/1', harness: 'alpha' },
+  ];
+  const working = await Effect.runPromise(ops.observeFor!(expected));
+  assert.deepEqual([...working.seen.keys()], ['ae/x/1']);
+  assert.deepEqual(working.unread, new Set(['ae/c2/1']), 'neither there nor gone');
+
+  codexRun(dir, 'ae/c2/1', bad);
+  const ended = await Effect.runPromise(ops.observeFor!(expected));
+  assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
+  assert.equal(ended.seen.get('ae/c2/1')?.state, 'failed');
+  assert.equal(ended.seen.get('ae/x/1')?.state, 'working');
 });
 
 test('a Codex stream refused is refused once per change of its output: an unchanged log is not decoded again on every pass', async () => {
@@ -899,12 +912,13 @@ test('a Codex stream refused is refused once per change of its output: an unchan
   const counted: HarnessSpec = { ...codex, readOutput: (text) => (reads++, codex.readOutput!(text)) };
   const ops = detachedOps(counted, dir);
   for (const pass of [1, 2]) {
-    const e = await Effect.runPromise(Effect.flip(ops.observe));
-    assert.match(e.message, /`usage\.input_tokens` is missing\./, `pass ${pass}`);
+    const { value, warnings } = await warned(ops.observe);
+    assert.equal(value.get('ae/c3/1')?.state, 'failed', `pass ${pass}`);
+    assert.match(warnings[0] ?? '', /`usage\.input_tokens` is missing\./, `pass ${pass}: said on every look`);
   }
   assert.equal(reads, 1, 'read once, and the refusal kept');
   fs.appendFileSync(log, '\n');
-  await Effect.runPromise(Effect.flip(ops.observe));
+  await Effect.runPromise(ops.observe);
   assert.equal(reads, 2, 'read again once its output changed');
 });
 
@@ -2202,7 +2216,7 @@ test("a name asked for with no run file is absent, one whose run file is there a
   assert.deepEqual(told.unread, new Set(['ae/h/1', 'ae/p/1']), 'half written, or with no pid: neither there nor gone');
 });
 
-test('REFUSED: a run asked for whose output the spec refuses fails the look, naming the run and its output; through the composite, the names routed there are unread', async () => {
+test('REFUSED: a run asked for whose output the spec refuses is unread at work and failed once ended, naming the run and its output; through the composite, the names routed there are unread while they run', async () => {
   const dir = root();
   const spec: HarnessSpec = {
     ...sh('true'),
@@ -2210,12 +2224,17 @@ test('REFUSED: a run asked for whose output the spec refuses fails the look, nam
       throw new Error('no result line in it');
     },
   };
-  doneRun(dir, 'ae/w/1');
+  doneRun(dir, 'ae/w/1', { state: 'working', heartbeatAt: new Date().toISOString() });
+  doneRun(dir, 'ae/d/1');
   const ops = detachedOps(spec, dir);
-  const refused = await Effect.runPromise(Effect.flip(ops.observeFor!([{ name: 'ae/w/1' }])));
-  assert.equal(
-    refused.message,
-    `sh: \`ae/w/1\`'s output, ${path.join(dir, 'runs', 'sh', 'ae_w_1.log')}, cannot be read: no result line in it`,
+  const { value, warnings } = await warned(ops.observeFor!([{ name: 'ae/w/1' }, { name: 'ae/d/1' }]));
+  assert.deepEqual(value.unread, new Set(['ae/w/1']), 'at work: neither there nor gone');
+  assert.equal(value.seen.get('ae/d/1')?.state, 'failed', 'ended: failed, never completed');
+  assert.deepEqual(
+    warnings.map((w) => w.split(' It is unread')[0]),
+    ['ae_w_1', 'ae_d_1'].map(
+      (f) => `sh: \`${f.replace(/_/g, '/')}\`'s output, ${path.join(dir, 'runs', 'sh', `${f}.log`)}, cannot be read: no result line in it.`,
+    ),
   );
   const other = new Map<string, Sighting>([['ae/o/1', { sessionId: 'o', state: 'working' }]]);
   const both = composite({ sh: ops, other: testOps({ sessions: other }) }, 'other');

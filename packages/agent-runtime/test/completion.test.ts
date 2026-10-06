@@ -18,13 +18,13 @@ import { claudeOps, type ClaudeOptions, QUIESCENT_AFTER_MS } from '../src/harnes
 import { quietFileOf, sightingOf } from '../src/harness/claude/quiet.ts';
 import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
 import { Engine } from '../src/index.ts';
-import { RunnerError } from '../src/harness/error.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import type { Event } from '../src/core/domain.ts';
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { warned } from './warned.ts';
 
 /** The boot the runners these tests make read their monotonic clock under. */
 const BOOT = 'boot-1';
@@ -643,37 +643,106 @@ test('an idle session reports what it said; a busy one is not even asked', async
   }
 });
 
-test('REFUSED: a transcript whose statement does not decode fails `observe` as a RunnerError, never a defect or no statement, and is not read again while it is unchanged', async () => {
-  const restore = withFakeClaude(row('done', 'idle'));
+/** Rows for the sessions `ae/t-1/1` (`s-1`) and `ae/t-2/1` (`s-2`), listed `done` and idle. */
+const twoDone = JSON.stringify(
+  ['1', '2'].map((n) => ({ name: `ae/t-${n}/1`, sessionId: `s-${n}`, state: 'done', status: 'idle', kind: 'background' })),
+);
+
+/** The words the warning for `ae/t-1/1`'s refused transcript says, `cause` among them. */
+const unreadWords = (cause: string) => [
+  /`ae\/t-1\/1`'s\s+transcript\s+cannot\s+be\s+read/,
+  new RegExp(cause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  /other\s+background\s+sessions\s+are\s+read/,
+  /`ae forget`/,
+];
+
+test('REFUSED: a transcript whose statement does not decode leaves that session alone unread while it was written within the floor — never a defect, no statement or a blind harness — is not read again while unchanged, and reads failed once cold, why said on every look', async () => {
+  const restore = withFakeClaude(twoDone);
   try {
     let asked = 0;
-    let written = 0;
     let t = 10 * QUIESCENT_AFTER_MS;
+    let written = t - 2_000;
+    const said = { payload: { outcome: 'done' }, at: 5 };
+    const cause = 'line 2 of the transcript is an `assistant` line whose `message.content.0.id` is 7';
     const ops = bgOps({
       now: () => t,
       transcriptTime: async () => written,
-      closeoutFrom: async () => {
+      closeoutFrom: async (sessionId) => {
+        if (sessionId !== 's-1') return said;
         asked++;
-        throw new Error('line 2 of the transcript is an `assistant` line whose `message.content.0.id` is 7');
+        throw new Error(cause);
       },
     });
-    const refused = async () => {
-      const e = await Effect.runPromise(Effect.flip(ops.observe));
-      assert.ok(e instanceof RunnerError, String(e));
-      assert.equal(e.verb, 'observe');
-      assert.ok(e.message.includes("`ae/t-1/1`'s transcript cannot be read, so every background session of ours stays unread"), e.message);
-      assert.ok(e.message.endsWith('whose `message.content.0.id` is 7'), e.message);
+    const unread = async (look: string) => {
+      const listed = await warned(ops.observe);
+      assert.deepEqual([...listed.value.keys()], ['ae/t-2/1'], `${look}: left out of observe, which reads the other session`);
+      assert.deepEqual(listed.value.get('ae/t-2/1')?.closeout, said);
+      const asked = await warned(ops.observeFor!([{ name: 'ae/t-1/1' }, { name: 'ae/t-2/1' }]));
+      assert.deepEqual([...asked.value.unread], ['ae/t-1/1'], `${look}: neither there nor gone`);
+      assert.deepEqual([...asked.value.seen.keys()], ['ae/t-2/1']);
+      for (const { warnings } of [listed, asked]) {
+        assert.equal(warnings.length, 1, `${look}: ${warnings.join(' | ')}`);
+        for (const w of [...unreadWords(cause), /unread\s+until\s+it\s+has\s+ended/]) assert.match(warnings[0], w);
+      }
     };
-    await refused();
-    await refused();
+    await unread('first look');
+    await unread('second look');
     assert.equal(asked, 1, 'a transcript nothing has written since it was refused is refused again, not read again');
 
-    written = t;
     t += QUIESCENT_AFTER_MS;
-    await refused();
+    const failed = await warned(ops.observeFor!([{ name: 'ae/t-1/1' }, { name: 'ae/t-2/1' }]));
+    assert.deepEqual(failed.value.seen.get('ae/t-1/1'), { sessionId: 's-1', state: 'failed', busy: false, held: false, nativeId: 's-1' });
+    assert.deepEqual([...failed.value.unread], []);
+    assert.equal(failed.warnings.length, 1);
+    for (const w of [...unreadWords(cause), /reads\s+as\s+failed/]) assert.match(failed.warnings[0], w);
+    assert.equal(asked, 1, 'cold and unchanged: refused again, not read again');
+
+    written = t - 2_000;
+    await unread('written since the refusal');
     assert.equal(asked, 2, 'written since the refusal: read again');
   } finally {
     restore();
+  }
+});
+
+test('REFUSED: a session whose transcript cannot be read reads as failed only once it has ended — listed finished, or working and idle, its transcript cold for the floor or a finished one with none — and is unread otherwise', async () => {
+  const now = 10 * QUIESCENT_AFTER_MS;
+  const cases: { listed: object; written: number | undefined; as: 'failed' | 'unread' }[] = [
+    { listed: { state: 'done', status: 'idle' }, written: 0, as: 'failed' },
+    { listed: { state: 'working', status: 'idle' }, written: 0, as: 'failed' },
+    { listed: { state: 'done', status: 'idle' }, written: undefined, as: 'failed' },
+    { listed: { state: 'working', status: 'busy' }, written: 0, as: 'unread' },
+    { listed: { state: 'blocked', status: 'idle', waitingFor: 'permission prompt' }, written: 0, as: 'unread' },
+    { listed: { state: 'done', status: 'idle' }, written: now - 2_000, as: 'unread' },
+  ];
+  for (const c of cases) {
+    const what = `${JSON.stringify(c.listed)}, written ${c.written}`;
+    const restore = withFakeClaude(
+      JSON.stringify([{ name: 'ae/t-1/1', sessionId: 's-1', kind: 'background', pid: 4242, startedAt: 0, ...c.listed }]),
+    );
+    try {
+      const root = scratch('ae-bg-');
+      if (c.written !== undefined) seenSince(root, 'ae/t-1/1', c.written, 0);
+      const refused = async () => {
+        throw new Error('line 4 of the transcript is a `user` line whose `timestamp` is "yesterday"');
+      };
+      const ops = bgOps({ root, now: () => now, transcriptTime: async () => c.written, closeoutFrom: refused, usageFrom: refused });
+      const { value, warnings } = await warned(ops.observeFor!([{ name: 'ae/t-1/1' }]));
+      assert.equal(warnings.length, 1, what);
+      if (c.as === 'unread') {
+        assert.deepEqual([...value.unread], ['ae/t-1/1'], what);
+        assert.equal(value.seen.size, 0, what);
+        continue;
+      }
+      const seen = value.seen.get('ae/t-1/1');
+      assert.equal(seen?.state, 'failed', what);
+      assert.equal(seen?.pid, 4242, `${what}: its process kept, for release to stop`);
+      assert.equal(seen?.held, true, what);
+      for (const none of ['closeout', 'usage', 'quietMs'] as const) assert.equal(seen?.[none], undefined, `${what}: no ${none}`);
+      assert.deepEqual([...value.unread], [], what);
+    } finally {
+      restore();
+    }
   }
 });
 

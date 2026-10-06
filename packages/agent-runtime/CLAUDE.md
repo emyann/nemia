@@ -89,12 +89,13 @@ owns what*.
 - **A stop between two processes that share only files**: each writes its half before it reads the other's (the stop's marker, then the
   pid; the worker's pid, then the marker). A worker installs its signal handlers before it publishes its pid.
 - **A Codex `exec --json` line of a type the runtime reads is decoded by `CodexEventSchema` (`harness/codex/stream.ts`)**: one that
-  does not decode fails the Codex harness's `observe`, so every Codex session is unread, never gone. A field the runtime starts
-  reading is added to the schema; any other line passes undecoded.
+  does not decode leaves that session alone unread while its process runs and failed once it has ended (`lookOf`, `detached.ts`),
+  never gone. A field the runtime starts reading is added to the schema; any other line passes undecoded.
 - **A Claude Code transcript line of a kind the runtime reads is decoded by `LINES` (`harness/claude/lines.ts`), by the reader that
-  reads it**: one that does not decode fails the `--bg` `observe` (every background session unread) or the `transcript` verb, never
-  read as absent; so does a transcript found and not read (`TranscriptUnread`, `harness/claude/transcript.ts`), never kept by
-  `keptRead`. A field the runtime starts reading is added to the schema; any other line passes undecoded.
+  reads it**: one that does not decode leaves that `--bg` session alone unread until it has ended, then failed (`endedOf`,
+  `harness/claude/bg.ts`), or refuses the `transcript` verb, never read as absent; so does a transcript found and not read
+  (`TranscriptUnread`, `harness/claude/transcript.ts`), never kept by `keptRead`. A field the runtime starts reading is added to the
+  schema; any other line passes undecoded.
 - **A stream a runner keeps whole is read through `output`, never off the run directory** (`streamIn`, `detached.ts`, which counts
   the read); a harness that keeps its streams apart says `streams: true`. `config.env` is journalled with the task: no secret there.
 - **A test runs at whatever niceness and IO class its parent gave it, and a worker it starts inherits both**: read a niceness
@@ -104,7 +105,7 @@ owns what*.
   `--input-format stream-json` exits only when its stdin ends.
 - **A detached session's id is read by the worker from its spec's `start` event, on whole stdout lines** (`readers`, `bin/ae-worker.ts`);
   one that does not decode is `startRefused`: that session alone is unread while its process runs, then read as failed with no id,
-  so its task settles and can be forgotten (`refusedAtWork`, `startRefusalOf`, `test/start-event.test.ts`). Measured
+  so its task settles and can be forgotten (`lookOf`, `startRefusalOf`, `test/start-event.test.ts`). Measured
   2026-10-06: `codex exec --json` (0.154.0) prints `thread.started` first; `claude -p` (2.1.291) prints `system`/`init` first under
   `--output-format stream-json --verbose`, and one `result` line under `--output-format json`.
 

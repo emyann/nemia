@@ -103,7 +103,7 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
  * spend cap, as `codex exec` has none and its stream counts tokens, not dollars — its config's budgets are token
  * budgets; Claude Code's flags, as `codex exec` is another CLI. It reads what a session consumed from the same JSONL
  * (`codexOutput`: tokens from `turn.completed`, tool calls by item), each event it reads decoded by `CodexEventSchema` — a
- * line that does not decode fails `observe`, so every Codex session is unread, never gone — and the conversation from Codex's
+ * line that does not decode leaves that session unread while it runs, and failed once it has ended — and the conversation from Codex's
  * own rollout of the thread rather than the stream: the rollout dates every record, and `exec --json` dates none. Its `start` is
  * the stream's `thread.started`, whose `thread_id` the worker reads as the session's id, which a resume and the rollout are found by.
  */

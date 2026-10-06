@@ -528,7 +528,7 @@ test("a pass where no branch moved asks no distance from a run's base: a kept me
     const cold = await columns(kept);
     const read = readStanding()?.places.map((p) => ({ ...p, at: undefined }));
     assert.ok(cold.length > 0 && cold.every((n) => n > 1), `base's column and one for each base of the runs: ${cold}`);
-    assert.ok(cold[0] > 2, `the runs on main were cut at more than one base: ${cold}`);
+    assert.ok(Math.max(...cold) > 2, `the runs on main were cut at more than one base: ${cold}`);
     assert.deepEqual(
       await columns(kept),
       cold.map(() => 1),

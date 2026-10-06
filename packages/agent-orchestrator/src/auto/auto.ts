@@ -51,6 +51,9 @@ export const NO_FACTS: Facts = {
   spend: Number.POSITIVE_INFINITY,
 };
 
+/** The folder of the store the rules for auto are kept in, one writer to each of its files (`auto.store.ts`). */
+export const AUTO_FOLDER = 'auto';
+
 /** The id of the rule that ships. */
 export const DEFAULT_ID = 'default';
 

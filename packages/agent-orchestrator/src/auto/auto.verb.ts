@@ -129,7 +129,9 @@ export const AUTO: Command<AutoList> = {
 const proposalRefusal = (why: string): Invalid =>
   new Invalid({ message: `${why}. A proposal is JSON: { "rules": [{ "id", "answer", "steps"?, "when", "under"? }], "guidance": ["…"] }.` });
 
-/** The proposal in `words`: its rules and its guidance. Refused (`Invalid`): no JSON, a rule that is none, an id twice, guidance not words. */
+/**
+ * The proposal in `words`: its rules and its guidance. Refused (`Invalid`): no JSON, a rule that is none, an id twice, guidance not words.
+ */
 export function proposalOf(words: string): { rules: AutoRule[]; guidance: string[] } {
   let raw: unknown;
   try {
@@ -155,7 +157,9 @@ export function proposalOf(words: string): { rules: AutoRule[]; guidance: string
   return { rules: rules.map(kept), guidance };
 }
 
-/** `nemia auto propose <agent> --file <path>|-`: what the agent proposes from the custom instruction, its own file, over what it proposed. */
+/**
+ * `nemia auto propose <agent> --file <path>|-`: what the agent proposes from the custom instruction, its own file, over what it proposed.
+ */
 export const AUTO_PROPOSE: Command<AutoList> = {
   name: 'auto propose',
   usage: '<agent> --file <path>|-',

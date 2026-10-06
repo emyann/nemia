@@ -8,6 +8,7 @@ import path from 'node:path';
 import {
   admitted,
   AGENTS_CUSTOM,
+  AUTO_PROPOSE,
   FACTORY_INSTRUCT,
   HOME,
   PRUNE,
@@ -222,6 +223,15 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
   const data = await runWith(e, FACTORY_INSTRUCT.handler(asked, undefined, HOME));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
+}
+
+/**
+ * `nemia auto propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
+ */
+export async function autoProposeRun(args: Args, e: Engine): Promise<void> {
+  const asked = withWords(args, AUTO_PROPOSE.name);
+  const data = await runWith(e, AUTO_PROPOSE.handler(asked, undefined, HOME));
+  for (const line of AUTO_PROPOSE.print(data, asked)) console.log(line);
 }
 
 /**

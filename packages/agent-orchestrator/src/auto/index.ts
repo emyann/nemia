@@ -3,6 +3,7 @@ export {
   AUTO_ANSWERS,
   CONDITIONS,
   DEFAULT_AUTO,
+  AUTO_FOLDER,
   DEFAULT_ID,
   NO_FACTS,
   allowedBy,

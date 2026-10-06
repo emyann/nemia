@@ -162,7 +162,7 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   for (const rule of fence.allow) assert.ok((spec.config.allowedTools as string[]).includes(rule), `${rule} allowed`);
   assert.deepEqual(
     spec.config.callAdmission,
-    { command: [path.join(bin, 'nemia'), 'admit', '--at-least', 'semi-auto'], tools: ['Bash'] },
+    { command: [path.join(bin, 'nemia'), 'admit', '--at-least', 'semi-auto', '--auto', 'nemia'], tools: ['Bash'] },
     "her shell calls admitted by the daemon's own nemia",
   );
   assert.equal(own.appendSystemPromptFile, promptFile());

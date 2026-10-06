@@ -11,7 +11,7 @@ import { Result, Schema } from 'effect';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { AUTO_ANSWERS, CONDITIONS, DEFAULT_AUTO, DEFAULT_ID, type AutoRule } from './auto.ts';
+import { AUTO_ANSWERS, AUTO_FOLDER, CONDITIONS, DEFAULT_AUTO, DEFAULT_ID, type AutoRule } from './auto.ts';
 
 /** A rule as the files keep it. */
 const RuleSchema = Schema.Struct({
@@ -44,7 +44,7 @@ export type Confirmed = { since: string; rules: AutoRule[] };
 export type Proposed = { at: string; rules: AutoRule[]; guidance: string[]; digest: string | null };
 
 /** The folder of `<store>/auto/`, under the store `home`. */
-export const autoDir = (home: string): string => path.join(home, 'auto');
+export const autoDir = (home: string): string => path.join(home, AUTO_FOLDER);
 
 /** `agent`'s name, refused (`Invalid`) where it is no agent's. */
 function named(agent: string): string {

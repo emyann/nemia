@@ -12,6 +12,9 @@ const LEVEL = COMMANDS.find((c) => c.name === 'level')!;
 /** `nemia memory`'s entry of the package's table. */
 const MEMORY = COMMANDS.find((c) => c.name === 'memory')!;
 
+/** `nemia auto`'s entry of the package's table. */
+const AUTO = COMMANDS.find((c) => c.name === 'auto')!;
+
 /**
  * - `GET /api/level` — where Nemia is, as `nemia level --json` prints it:
  *   `{ level, since, task, phase, sessionId, reach, bridge, stopped, spend, allows, factories }`, the store's level `manual` where none
@@ -23,10 +26,20 @@ const MEMORY = COMMANDS.find((c) => c.name === 'memory')!;
  * - `GET /api/nemia/memory` — the facts she keeps, `{ dir, facts, fact: null }`, by name.
  * - `GET /api/nemia/memory/:fact` — one fact's words, `{ dir, facts, fact: { name, text } }`; 404 for a fact she does not keep, naming
  *   those she does.
+ * - `GET /api/auto/:name` — an agent's rules for auto: `{ agent, file, isDefault, rules, proposed, instruction }`, each rule with its
+ *   words, `proposed` null where it proposed none, else `{ file, at, rules, guidance, stale }`; 400 for a name that is no agent's, 422 for
+ *   a file of rules that does not read. Its writes, `PUT` and `DELETE /api/auto/:name/rules/:id`, confirm a rule and drop one.
  */
 export const nemia = new Hono<ApiEnv>()
   .get('/api/level', (c) => served(c, async ({ e }) => c.json(await runWith(e, LEVEL.handler({})))))
   .get('/api/nemia/memory', (c) => served(c, async ({ e }) => c.json(await runWith(e, MEMORY.handler({})))))
   .get('/api/nemia/memory/:fact', (c) =>
     served(c, async ({ e }) => c.json(await runWith(e, MEMORY.handler({ fact: c.req.param('fact') })))),
+  )
+  .get('/api/auto/:name', (c) =>
+    served(c, async ({ e, home }) => {
+      const wrong = AUTO.check?.({ name: c.req.param('name') });
+      if (wrong) return c.json({ error: wrong }, 400);
+      return c.json(await runWith(e, AUTO.handler({ name: c.req.param('name') }, undefined, home)));
+    }),
   );

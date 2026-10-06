@@ -71,6 +71,8 @@ froze when it started; you need not run them. Each reads one JSON request on std
   `{ "repo", "branches": [{ "branch", "tip", "baseRef" }], "base" }` answers `{ "heads", "branches" }`, every branch and its commit, and
   for each asked its tip (null once git no longer has it), whether it is within `base` (`onBase`: yes, no or unknown), whether it holds
   work past its `baseRef` (`pastBase`), and how many commits it is ahead of `base`.
+  A branch may carry `"known": { "tip", "pastBase" }`, what was last read of it: its `baseRef` is then left out of the listing, and its
+  `pastBase` is believed only while its commit is still that `tip`, else asked of git.
 - `trial` — whether branches merge, by a merge made in git's object store alone, which touches no checkout, index or ref:
   `{ "repo", "trials": [{ "onto", "branch" }] }` answers `{ "at", "trials" }`, the commit each `onto` names now and each trial in the
   order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.

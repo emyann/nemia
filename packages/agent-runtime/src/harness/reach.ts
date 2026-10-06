@@ -1,8 +1,8 @@
 /**
  * What a harness's fence words reach: how wide each permission mode or sandbox is, which one a task naming none runs in, which one a
  * session held to its directory runs in, which ones a background session runs in without stopping to ask a person, and which ones
- * Claude Code drops on a model. Pure, reading the harnesses' vocabularies alone, so a caller that only judges words asks without loading
- * a runner.
+ * Claude Code drops on a model, and which characters its permission rules cannot carry in a path. Pure, reading the harnesses'
+ * vocabularies alone, so a caller that only judges words asks without loading a runner.
  */
 import {
   CLAUDE_AUTO_DROPPED,
@@ -10,6 +10,7 @@ import {
   CLAUDE_HELD_MODE,
   CLAUDE_MODE_RANK,
   CLAUDE_UNASKING_MODES,
+  CLAUDE_UNRULED,
 } from './claude/vocabulary.ts';
 import { CODEX_DEFAULT_SANDBOX, CODEX_SANDBOXES } from './codex/vocabulary.ts';
 
@@ -64,3 +65,11 @@ export const fenceReach = (harness: string, model?: string): FenceReach | undefi
   if (harness === 'codex') return codexReach();
   return undefined;
 };
+
+/**
+ * The first character of `path` that a permission rule of harness `harness` cannot carry (`CLAUDE_UNRULED` on Claude Code), so that a
+ * rule naming the path would end, or name another folder, or widen to one beside it; `undefined` for a path every rule carries, and on a
+ * harness whose fence takes no rule naming a path: Codex, a command, an A2A agent, or a name the runtime does not know.
+ */
+export const unruledIn = (harness: string, path: string): string | undefined =>
+  harness === 'claude' || harness === 'claude-detached' ? CLAUDE_UNRULED.exec(path)?.[0] : undefined;

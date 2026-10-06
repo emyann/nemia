@@ -819,6 +819,15 @@ and never on a pass:
 The size itself is the lever not taken: a feed rotated on a size or an age, its sealed half kept for a cursor from before, would
 keep the disk and those reads bounded. Not changed with the reads, so a store's format stays as it is.
 
+### 38. A `--bg` session's transcript is read whole on a look that keeps no read (2026-10-06, measured, not fixed)
+
+The runtime phase of a pass read 17 files and 3.07 MB at 11:33Z on this machine, from 15 listed `claude` sessions, where it read
+1.45 MB at 11:05Z: it grows with the sessions' length, not with the store. The candidate is `keptReads` (`harness/claude/bg.ts`):
+a closeout or usage read is kept by the transcript's mtime only for a session in a final state (`keep = FINAL.has(s.state)`), and
+`readSessionTranscript` reads the whole file, so a session that is not busy and not final (idle, blocked, a long-lived one between
+turns) has its transcript read whole twice on every pass, for a closeout and for its usage. Keeping the read by mtime for every state,
+or reading from the last byte read as the journals are (`journalReader`), would bound it; not attributed file by file live.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

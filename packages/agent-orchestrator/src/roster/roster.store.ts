@@ -7,7 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
-import { agentUsers, agentVersion, cardSkills, customInstructionsFile, loadAgents, skillsFor } from '../folder/folder.store.ts';
+import { agentUsers, agentVersion, cardSkills, loadAgents, skillsFor } from '../folder/folder.store.ts';
+import { customInstructionsFile } from '../agents/custom-file.store.ts';
 import { HOME } from '../record/record.store.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { agentCard, type Agent, type SkillsFound } from '../agents/agents.ts';

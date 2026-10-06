@@ -1,13 +1,14 @@
 /**
  * A person's custom instructions, written: one file per agent name in their store (`customInstructionsFile`), what they add to an agent
- * they use without rewriting it. Read by the load (`readCustomInstructions`), which a run does once, at `nemia start`: a write or a clear
- * reaches only the runs started after it. The one writer of the folder, and its reader for a person's command and the board alike: a name
- * no place has is refused here, read, written or cleared, so both refuse it in the same words.
+ * they use without rewriting it. Read beside it (`custom-file.store.ts`) by the load (`readCustomInstructions`), which a run does once,
+ * at `nemia start`: a write or a clear reaches only the runs started after it. The one writer of the folder, and its reader for a person's
+ * command and the board alike: a name no place has is refused here, read, written or cleared, so both refuse it in the same words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { customInstructionsRefusal } from './agents.ts';
-import { agentsFor, customInstructionsFile, readCustomInstructions } from '../folder/folder.store.ts';
+import { customInstructionsFile, notAFileRefusal, readCustomInstructions } from './custom-file.store.ts';
+import { agentsFor } from '../folder/folder.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 
 /**
@@ -34,8 +35,8 @@ export function customInstructionsFor(home: string, name: string, repo: string):
 
 /**
  * Write `text` as the custom instructions for the agent `name` in the store `home`, and the file written. Refused, writing nothing: a name
- * a run on `repo` could not name (`Missing`), blank text, and a frontmatter block (`customInstructionsRefusal`). A link at the file is
- * replaced, never written through.
+ * a run on `repo` could not name (`Missing`), blank text, a frontmatter block (`customInstructionsRefusal`), and anything at the file
+ * that is neither a file nor a link (`notAFileRefusal`), which the read refuses too. A link at the file is replaced, never written through.
  */
 export function writeCustomInstructions(home: string, name: string, text: string, repo: string): string {
   refuseNoAgent(home, name, repo);
@@ -46,6 +47,8 @@ export function writeCustomInstructions(home: string, name: string, text: string
     });
   const refused = customInstructionsRefusal(file, text);
   if (refused !== undefined) throw new Invalid({ message: refused });
+  const there = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (there && !there.isFile() && !there.isSymbolicLink()) throw new Invalid({ message: notAFileRefusal(file, name) });
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.rmSync(file, { force: true });
   fs.writeFileSync(file, text.trim() + '\n');

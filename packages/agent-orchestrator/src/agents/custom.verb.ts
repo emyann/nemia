@@ -5,7 +5,7 @@
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { customInstructionsFile } from '../folder/folder.store.ts';
+import { customInstructionsFile } from './custom-file.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom.store.ts';
 

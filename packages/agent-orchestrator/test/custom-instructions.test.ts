@@ -24,7 +24,7 @@ const { startRun } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { clearCustomInstructions, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
-const { Missing } = await import('../src/refusal/refusal.ts');
+const { Invalid, Missing } = await import('../src/refusal/refusal.ts');
 
 /** The agent `ada`, told in English, with `custom` as a person's custom instructions for it when given. */
 const adaWith = (custom?: string, keys = 'tools: Read'): Agents =>
@@ -154,7 +154,7 @@ test('`nemia start` freezes the custom instructions with the step: an edit or a 
   }
 });
 
-test('REFUSED at shipped defaults: custom instructions with a frontmatter block, or a link, stop a start of a step naming the agent; one naming another starts', async () => {
+test('REFUSED at shipped defaults: custom instructions with a frontmatter block, a link, or a directory, stop a start of a step naming the agent; one naming another starts', async () => {
   const team = teamCopy('wf-custom-refused-');
   const solo = path.join(team, 'solo');
   fs.mkdirSync(solo);
@@ -173,6 +173,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
       },
       /is a link/,
     ],
+    ['a directory', () => fs.mkdirSync(path.join(CUSTOM, 'implementer.md'), { recursive: true }), /is not a file/],
   ];
   try {
     for (const [what, plant, said] of refusals) {
@@ -232,4 +233,28 @@ test("REFUSED: writeCustomInstructions and clearCustomInstructions for a name no
   assert.equal(writeCustomInstructions(home, 'helper', 'Help in French.', repo), path.join(custom, 'helper.md'));
   assert.equal(fs.readFileSync(path.join(custom, 'helper.md'), 'utf8'), 'Help in French.\n');
   assert.equal(clearCustomInstructions(home, 'helper', repo), true);
+});
+
+test('REFUSED: writeCustomInstructions over a directory throws Invalid naming the file and the clear, and leaves the directory as it was', () => {
+  const home = scratch('wf-custom-home-');
+  const repo = scratch('wf-custom-repo-');
+  fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'scribe.md'), '---\ndescription: Writes it down.\n---\nWrite.\n');
+  const file = path.join(home, 'custom-instructions', 'scribe.md');
+  fs.mkdirSync(file, { recursive: true });
+  fs.writeFileSync(path.join(file, 'keep.txt'), 'kept\n');
+  assert.throws(
+    () => writeCustomInstructions(home, 'scribe', 'Write in French.', repo),
+    (err: Error) => {
+      assert.ok(err instanceof Invalid, err.message);
+      assert.ok(err.message.includes(`${file} is not a file`), err.message);
+      assert.ok(err.message.includes('nemia agents custom scribe --clear'), err.message);
+      return true;
+    },
+  );
+  assert.ok(fs.statSync(file).isDirectory());
+  assert.equal(fs.readFileSync(path.join(file, 'keep.txt'), 'utf8'), 'kept\n');
+  assert.equal(clearCustomInstructions(home, 'scribe', repo), true);
+  assert.equal(writeCustomInstructions(home, 'scribe', 'Write in French.', repo), file);
+  assert.equal(fs.readFileSync(file, 'utf8'), 'Write in French.\n');
 });

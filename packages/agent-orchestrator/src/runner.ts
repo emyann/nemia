@@ -165,14 +165,12 @@ export {
   agentUsers,
   agentVersion,
   cardSkills,
-  customInstructionsFile,
   preloads,
   formerKeyLines,
   isShippedPlace,
   loadAgents,
   loadWorkflows,
   lookupRoots,
-  readCustomInstructions,
   skillsFor,
   skillVersion,
   workflowDescription,
@@ -181,6 +179,7 @@ export {
   workflowsIn,
 } from './folder/folder.store.ts';
 export type { Places } from './folder/folder.store.ts';
+export { customInstructionsFile, readCustomInstructions } from './agents/custom-file.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';

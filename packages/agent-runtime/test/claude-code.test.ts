@@ -17,6 +17,7 @@ import { parentFileOf, type ParentCall } from '../src/harness/claude/parent.ts';
 import type { Statement } from '../src/harness/claude/bg.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { stepClock } from './clock.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { refusedOsError, TRANSIENT_ERRNOS } from '../src/harness/error.ts';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
@@ -104,15 +105,8 @@ const opsOptions = (root: string) => ({
 /** The Claude Code runner over a store at `root` (`opsOptions`). */
 const opsIn = (root: string) => claudeCodeOps(opsOptions(root));
 
-const until = async <T>(read: () => Promise<T | undefined>, what: string, ms = 15_000): Promise<T> => {
-  const deadline = Date.now() + ms;
-  for (;;) {
-    const got = await read();
-    if (got !== undefined) return got;
-    if (Date.now() > deadline) assert.fail(`never saw ${what}`);
-    await new Promise((r) => setTimeout(r, 100));
-  }
-};
+/** What `read` answers, in test `t`, once it answers anything: read again every 100ms. */
+const looked = <T>(t: Waiter, read: () => Promise<T | undefined>, what: string) => until(t, read, what, { everyMs: 100 });
 
 test('a job is `claude -p` reading a stream and printing one, verbose, that no prompt can hold — its brief the first line on its stdin', () => {
   const args = claudeJob.command({
@@ -151,35 +145,43 @@ test('a job is `claude -p` reading a stream and printing one, verbose, that no p
   );
 });
 
-test('a task is run as a job unless it asks for a background session, which is `claude --bg` — and the job is seen by its name, with its own id and answer', async () => {
-  const f = fake();
-  try {
-    const root = tmp('root');
-    const ops = opsIn(root);
-    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
-    const seen = await until(async () => {
-      const s = (await Effect.runPromise(ops.observe)).get('ae/j/1');
-      return s?.state === 'completed' ? s : undefined;
-    }, 'the job done');
-    assert.equal(f.read('job-args')?.[0], '-p');
-    assert.deepEqual(
-      f.read('job-stdin')?.map((l) => JSON.parse(l).message.content),
-      ['go'],
-      'the brief on its stdin, and its stdin ended at the result',
-    );
-    assert.equal(f.read('bg-args'), undefined, 'no background session for a job');
-    assert.equal(seen.sessionId, 'ae/j/1', 'a job is known by its name');
-    assert.equal(seen.nativeId, JOB_ID, "and carries Claude Code's own id, to resume and read by");
-    assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-    assert.equal(seen.usage?.costUsd, 0.03);
+test(
+  'a task is run as a job unless it asks for a background session, which is `claude --bg` — and the job is seen by its name, with its own id and answer',
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const root = tmp('root');
+      const ops = opsIn(root);
+      await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+      const seen = await looked(
+        t,
+        async () => {
+          const s = (await Effect.runPromise(ops.observe)).get('ae/j/1');
+          return s?.state === 'completed' ? s : undefined;
+        },
+        'the job done',
+      );
+      assert.equal(f.read('job-args')?.[0], '-p');
+      assert.deepEqual(
+        f.read('job-stdin')?.map((l) => JSON.parse(l).message.content),
+        ['go'],
+        'the brief on its stdin, and its stdin ended at the result',
+      );
+      assert.equal(f.read('bg-args'), undefined, 'no background session for a job');
+      assert.equal(seen.sessionId, 'ae/j/1', 'a job is known by its name');
+      assert.equal(seen.nativeId, JOB_ID, "and carries Claude Code's own id, to resume and read by");
+      assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+      assert.equal(seen.usage?.costUsd, 0.03);
 
-    await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
-    assert.equal(f.read('bg-args')?.[0], '--bg');
-    assert.equal(f.read('bg-args')?.includes('ae/b/1'), true, 'named as the engine named it');
-  } finally {
-    f.restore();
-  }
-});
+      await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+      assert.equal(f.read('bg-args')?.[0], '--bg');
+      assert.equal(f.read('bg-args')?.includes('ae/b/1'), true, 'named as the engine named it');
+    } finally {
+      f.restore();
+    }
+  },
+);
 
 test('observe lists the jobs and the background sessions in one map — and a registry that will not answer hides only its own', async () => {
   const f = fake();
@@ -383,78 +385,94 @@ test('a row of ours `claude agents` lists that does not decode leaves that name 
   }
 });
 
-test('a stop, a release and words reach the mode the id belongs to, by its shape — with no observe made first, as after a restart', async () => {
-  const f = fake();
-  try {
-    const root = tmp('root');
-    const first = opsIn(root);
-    await Effect.runPromise(first.spawn({ name: 'ae/j/2', brief: 'wait', cwd: f.dir }));
-    await until(async () => f.read('job-args'), 'the job started');
+test(
+  'a stop, a release and words reach the mode the id belongs to, by its shape — with no observe made first, as after a restart',
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const root = tmp('root');
+      const first = opsIn(root);
+      await Effect.runPromise(first.spawn({ name: 'ae/j/2', brief: 'wait', cwd: f.dir }));
+      await looked(t, async () => f.read('job-args'), 'the job started');
 
-    const ops = opsIn(root);
-    await Effect.runPromise(ops.stop('ae/j/2'));
-    await Effect.runPromise(ops.stop(BG_ID));
-    assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'a background session is stopped by `claude stop`, a job never');
-    const stopped = await until(async () => {
-      const s = (await Effect.runPromise(ops.observe)).get('ae/j/2');
-      return s?.state === 'canceled' ? s : undefined;
-    }, 'the job stopped by its worker');
-    assert.equal(stopped.sessionId, 'ae/j/2');
+      const ops = opsIn(root);
+      await Effect.runPromise(ops.stop('ae/j/2'));
+      await Effect.runPromise(ops.stop(BG_ID));
+      assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'a background session is stopped by `claude stop`, a job never');
+      const stopped = await looked(
+        t,
+        async () => {
+          const s = (await Effect.runPromise(ops.observe)).get('ae/j/2');
+          return s?.state === 'canceled' ? s : undefined;
+        },
+        'the job stopped by its worker',
+      );
+      assert.equal(stopped.sessionId, 'ae/j/2');
 
-    await Effect.runPromise(ops.release!(stopped, {}));
-    assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'releasing a job asks Claude Code for nothing');
-    await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'completed' }, {}));
-    assert.deepEqual(f.read('verbs'), ['stop 5e551011', 'rm 5e551011'], "a background session is removed from Claude Code's list");
+      await Effect.runPromise(ops.release!(stopped, {}));
+      assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'releasing a job asks Claude Code for nothing');
+      await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'completed' }, {}));
+      assert.deepEqual(f.read('verbs'), ['stop 5e551011', 'rm 5e551011'], "a background session is removed from Claude Code's list");
 
-    const toJob = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/j/2', sessionId: 'ae/j/2' }, 'hello')));
-    assert.match(
-      toJob.message,
-      /^claude: `ae\/j\/2` is `stopped`, not running/,
-      "a job's words go to its worker, which refuses them once it has ended",
-    );
-    const toBg = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/b/1', sessionId: BG_ID }, 'hello')));
-    assert.match(toBg.message, /^claude --bg: /, 'words for a background session go to its inbox');
-  } finally {
-    f.restore();
-  }
-});
+      const toJob = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/j/2', sessionId: 'ae/j/2' }, 'hello')));
+      assert.match(
+        toJob.message,
+        /^claude: `ae\/j\/2` is `stopped`, not running/,
+        "a job's words go to its worker, which refuses them once it has ended",
+      );
+      const toBg = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/b/1', sessionId: BG_ID }, 'hello')));
+      assert.match(toBg.message, /^claude --bg: /, 'words for a background session go to its inbox');
+    } finally {
+      f.restore();
+    }
+  },
+);
 
-test('words said to a running job reach its stdin as the next user message, and once it has given its result it takes no more', async () => {
-  const f = fake();
-  try {
-    const root = tmp('root');
-    const ops = opsIn(root);
-    await Effect.runPromise(ops.spawn({ name: 'ae/s/1', brief: 'wait', cwd: f.dir }));
-    await until(async () => f.read('job-stdin'), 'the brief read');
-    await Effect.runPromise(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'hello'));
-    const done = await until(async () => {
-      const s = (await Effect.runPromise(ops.observe)).get('ae/s/1');
-      return s?.state === 'completed' ? s : undefined;
-    }, 'the job done on the words it was told');
-    assert.deepEqual(
-      f.read('job-stdin')?.map((l) => JSON.parse(l)),
-      [
-        { type: 'user', message: { role: 'user', content: 'wait' } },
-        { type: 'user', message: { role: 'user', content: 'hello' } },
-      ],
-      'the brief, then the words, each a user message on its stdin',
-    );
-    assert.deepEqual(done.closeout?.payload, { outcome: 'done' }, 'the result the words brought on');
+test(
+  'words said to a running job reach its stdin as the next user message, and once it has given its result it takes no more',
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const root = tmp('root');
+      const ops = opsIn(root);
+      await Effect.runPromise(ops.spawn({ name: 'ae/s/1', brief: 'wait', cwd: f.dir }));
+      await looked(t, async () => f.read('job-stdin'), 'the brief read');
+      await Effect.runPromise(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'hello'));
+      const done = await looked(
+        t,
+        async () => {
+          const s = (await Effect.runPromise(ops.observe)).get('ae/s/1');
+          return s?.state === 'completed' ? s : undefined;
+        },
+        'the job done on the words it was told',
+      );
+      assert.deepEqual(
+        f.read('job-stdin')?.map((l) => JSON.parse(l)),
+        [
+          { type: 'user', message: { role: 'user', content: 'wait' } },
+          { type: 'user', message: { role: 'user', content: 'hello' } },
+        ],
+        'the brief, then the words, each a user message on its stdin',
+      );
+      assert.deepEqual(done.closeout?.payload, { outcome: 'done' }, 'the result the words brought on');
 
-    const late = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'too late')));
-    assert.match(late.message, /^claude: `ae\/s\/1` has given its result and reads no more words/);
-    assert.equal(
-      fs
-        .readFileSync(path.join(root, 'runs', 'claude', 'ae_s_1.inbox.jsonl'), 'utf8')
-        .split('\n')
-        .filter(Boolean).length,
-      1,
-      'nothing appended once refused',
-    );
-  } finally {
-    f.restore();
-  }
-});
+      const late = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'too late')));
+      assert.match(late.message, /^claude: `ae\/s\/1` has given its result and reads no more words/);
+      assert.equal(
+        fs
+          .readFileSync(path.join(root, 'runs', 'claude', 'ae_s_1.inbox.jsonl'), 'utf8')
+          .split('\n')
+          .filter(Boolean).length,
+        1,
+        'nothing appended once refused',
+      );
+    } finally {
+      f.restore();
+    }
+  },
+);
 
 test('a job is found by its run file, and a name no job has is asked of Claude Code', async () => {
   const f = fake();
@@ -469,36 +487,44 @@ test('a job is found by its run file, and a name no job has is asked of Claude C
   }
 });
 
-test("finding a job reads its run file and nothing else — no other job's, and no job's output, though every log changed since both ended", async () => {
-  const f = fake();
-  try {
-    const root = tmp('root');
-    const ops = opsIn(root);
-    for (const name of ['ae/j/1', 'ae/k/1']) await Effect.runPromise(ops.spawn({ name, brief: 'go', cwd: f.dir }));
-    await until(async () => {
-      const seen = await Effect.runPromise(ops.observe);
-      return ['ae/j/1', 'ae/k/1'].every((n) => seen.get(n)?.state === 'completed') || undefined;
-    }, 'both jobs done');
-    const runs = path.join(root, 'runs', 'claude');
-    for (const log of fs.readdirSync(runs).filter((n) => n.endsWith('.log'))) fs.appendFileSync(path.join(runs, log), '\n');
-    const read: string[] = [];
-    const readFileSync = fs.readFileSync;
-    fs.readFileSync = ((file: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
-      read.push(String(file));
-      return (readFileSync as (...a: unknown[]) => unknown)(file, ...rest);
-    }) as typeof fs.readFileSync;
-    let found;
+test(
+  "finding a job reads its run file and nothing else — no other job's, and no job's output, though every log changed since both ended",
+  WAITED,
+  async (t) => {
+    const f = fake();
     try {
-      found = await Effect.runPromise(ops.find!('ae/j/1'));
+      const root = tmp('root');
+      const ops = opsIn(root);
+      for (const name of ['ae/j/1', 'ae/k/1']) await Effect.runPromise(ops.spawn({ name, brief: 'go', cwd: f.dir }));
+      await looked(
+        t,
+        async () => {
+          const seen = await Effect.runPromise(ops.observe);
+          return ['ae/j/1', 'ae/k/1'].every((n) => seen.get(n)?.state === 'completed') || undefined;
+        },
+        'both jobs done',
+      );
+      const runs = path.join(root, 'runs', 'claude');
+      for (const log of fs.readdirSync(runs).filter((n) => n.endsWith('.log'))) fs.appendFileSync(path.join(runs, log), '\n');
+      const read: string[] = [];
+      const readFileSync = fs.readFileSync;
+      fs.readFileSync = ((file: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+        read.push(String(file));
+        return (readFileSync as (...a: unknown[]) => unknown)(file, ...rest);
+      }) as typeof fs.readFileSync;
+      let found;
+      try {
+        found = await Effect.runPromise(ops.find!('ae/j/1'));
+      } finally {
+        fs.readFileSync = readFileSync;
+      }
+      assert.deepEqual(found, { sessionId: 'ae/j/1' });
+      assert.deepEqual(read, [path.join(runs, 'ae_j_1.json')], 'one file read, the run file of the job asked for');
     } finally {
-      fs.readFileSync = readFileSync;
+      f.restore();
     }
-    assert.deepEqual(found, { sessionId: 'ae/j/1' });
-    assert.deepEqual(read, [path.join(runs, 'ae_j_1.json')], 'one file read, the run file of the job asked for');
-  } finally {
-    f.restore();
-  }
-});
+  },
+);
 
 test('a run file another name folds onto is not the job asked for', async () => {
   const f = fake();
@@ -517,51 +543,67 @@ test('a run file another name folds onto is not the job asked for', async () => 
   }
 });
 
-test("a running job's conversation is read by its name, and an ended one's by Claude Code's id — the same transcript", async () => {
-  const f = fake();
-  try {
-    const root = tmp('root');
-    const ops = opsIn(root);
-    const file = path.join(config, 'projects', 'fake-project', `${JOB_ID}.jsonl`);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(
-      file,
-      `${JSON.stringify({ type: 'user', uuid: 'u1', timestamp: new Date().toISOString(), message: { role: 'user', content: 'the brief' } })}\n`,
-    );
-    await Effect.runPromise(ops.spawn({ name: 'ae/j/4', brief: 'wait', cwd: f.dir }));
-    const byName = await until(async () => {
-      const t = await Effect.runPromise(ops.transcript!('ae/j/4'));
-      return t.events.length ? t : undefined;
-    }, 'the transcript through the run file');
-    assert.equal(byName.events[0]?.text, 'the brief', 'read while it runs: the stream named the session first');
-    const byId = await Effect.runPromise(ops.transcript!(JOB_ID));
-    assert.deepEqual(byId.events, byName.events);
-    await Effect.runPromise(ops.stop('ae/j/4'));
-  } finally {
-    f.restore();
-  }
-});
+test(
+  "a running job's conversation is read by its name, and an ended one's by Claude Code's id — the same transcript",
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const root = tmp('root');
+      const ops = opsIn(root);
+      const file = path.join(config, 'projects', 'fake-project', `${JOB_ID}.jsonl`);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(
+        file,
+        `${JSON.stringify({ type: 'user', uuid: 'u1', timestamp: new Date().toISOString(), message: { role: 'user', content: 'the brief' } })}\n`,
+      );
+      await Effect.runPromise(ops.spawn({ name: 'ae/j/4', brief: 'wait', cwd: f.dir }));
+      const byName = await looked(
+        t,
+        async () => {
+          const got = await Effect.runPromise(ops.transcript!('ae/j/4'));
+          return got.events.length ? got : undefined;
+        },
+        'the transcript through the run file',
+      );
+      assert.equal(byName.events[0]?.text, 'the brief', 'read while it runs: the stream named the session first');
+      const byId = await Effect.runPromise(ops.transcript!(JOB_ID));
+      assert.deepEqual(byId.events, byName.events);
+      await Effect.runPromise(ops.stop('ae/j/4'));
+    } finally {
+      f.restore();
+    }
+  },
+);
 
-test('a job resumed from a background session is a job — and, its parent not one of its runs, carries no cost it cannot tell from its parent', async () => {
-  const f = fake();
-  try {
-    const root = tmp('root');
-    const ops = opsIn(root);
-    await Effect.runPromise(ops.spawn({ name: 'ae/u/2', brief: 'go', cwd: f.dir, resumeFrom: BG_ID }));
-    const seen = await until(async () => {
-      const s = (await Effect.runPromise(ops.observe)).get('ae/u/2');
-      return s?.state === 'completed' ? s : undefined;
-    }, 'the resumed job done');
-    const args = f.read('job-args')!;
-    assert.equal(args[0], '-p');
-    assert.equal(args[args.indexOf('--resume') + 1], BG_ID);
-    assert.equal(f.read('bg-args'), undefined);
-    assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-    assert.equal(seen.usage?.costUsd, undefined, "the printed total carries the background session's on");
-  } finally {
-    f.restore();
-  }
-});
+test(
+  'a job resumed from a background session is a job — and, its parent not one of its runs, carries no cost it cannot tell from its parent',
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const root = tmp('root');
+      const ops = opsIn(root);
+      await Effect.runPromise(ops.spawn({ name: 'ae/u/2', brief: 'go', cwd: f.dir, resumeFrom: BG_ID }));
+      const seen = await looked(
+        t,
+        async () => {
+          const s = (await Effect.runPromise(ops.observe)).get('ae/u/2');
+          return s?.state === 'completed' ? s : undefined;
+        },
+        'the resumed job done',
+      );
+      const args = f.read('job-args')!;
+      assert.equal(args[0], '-p');
+      assert.equal(args[args.indexOf('--resume') + 1], BG_ID);
+      assert.equal(f.read('bg-args'), undefined);
+      assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+      assert.equal(seen.usage?.costUsd, undefined, "the printed total carries the background session's on");
+    } finally {
+      f.restore();
+    }
+  },
+);
 
 test('what the default Claude Code refuses depends on the mode: a job refuses a bridge, named or not, a background session a spend cap — each naming the other', () => {
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 1 } }), undefined, 'a job keeps a cap');
@@ -765,58 +807,66 @@ test('REFUSED at shipped defaults: a mount whose path a permission rule cannot n
   }
 });
 
-test("a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — `--setting-sources project` once, on both `claude -p` specs; a background session is not given it", async () => {
-  const { claudeDetached } = await import('../src/harness/claude/code.ts');
-  const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
-  const f = fake();
-  let job: string[];
-  let bg: string[];
-  try {
-    const ops = opsIn(tmp('root'));
-    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
-    job = await until(async () => f.read('job-args'), 'the job started');
-    await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
-    bg = f.read('bg-args')!;
-  } finally {
-    f.restore();
-  }
-  assert.deepEqual(sources(job), ['project'], 'the argv the worker gave the job');
-  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project'], 'claude-detached');
-  assert.deepEqual(
-    sources(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).args),
-    ['project'],
-    "beside the caller's own `--settings`",
-  );
-  assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
-});
+test(
+  "a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — `--setting-sources project` once, on both `claude -p` specs; a background session is not given it",
+  WAITED,
+  async (t) => {
+    const { claudeDetached } = await import('../src/harness/claude/code.ts');
+    const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
+    const f = fake();
+    let job: string[];
+    let bg: string[];
+    try {
+      const ops = opsIn(tmp('root'));
+      await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+      job = await looked(t, async () => f.read('job-args'), 'the job started');
+      await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+      bg = f.read('bg-args')!;
+    } finally {
+      f.restore();
+    }
+    assert.deepEqual(sources(job), ['project'], 'the argv the worker gave the job');
+    assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project'], 'claude-detached');
+    assert.deepEqual(
+      sources(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).args),
+      ['project'],
+      "beside the caller's own `--settings`",
+    );
+    assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
+  },
+);
 
 const JOB_ENV_KEYS = ['CLAUDE_CODE_DISABLE_BACKGROUND_TASKS', 'BASH_DEFAULT_TIMEOUT_MS'] as const;
 
-test("REFUSED at shipped defaults: a job runs with background tasks off and its calls' default timeout at the most one may take, on both `claude -p` specs; a background session is left as it is", async () => {
-  const { claudeDetached } = await import('../src/harness/claude/code.ts');
-  const saved = JOB_ENV_KEYS.map((key) => [key, process.env[key]] as const);
-  for (const key of JOB_ENV_KEYS) delete process.env[key];
-  const f = fake();
-  let job: string[];
-  let bg: string[] | undefined;
-  try {
-    const ops = opsIn(tmp('root'));
-    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
-    job = await until(async () => f.read('job-env'), 'the job started');
-    await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
-    bg = f.read('bg-env');
-  } finally {
-    f.restore();
-    for (const [key, value] of saved) if (value !== undefined) process.env[key] = value;
-  }
-  assert.deepEqual(job, ['1 600000'], 'the environment the worker gave the job');
-  assert.deepEqual(
-    claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).env,
-    { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', BASH_DEFAULT_TIMEOUT_MS: '600000' },
-    'claude-detached',
-  );
-  assert.deepEqual(bg, ['unset unset'], 'a background session runs as it did before');
-});
+test(
+  "REFUSED at shipped defaults: a job runs with background tasks off and its calls' default timeout at the most one may take, on both `claude -p` specs; a background session is left as it is",
+  WAITED,
+  async (t) => {
+    const { claudeDetached } = await import('../src/harness/claude/code.ts');
+    const saved = JOB_ENV_KEYS.map((key) => [key, process.env[key]] as const);
+    for (const key of JOB_ENV_KEYS) delete process.env[key];
+    const f = fake();
+    let job: string[];
+    let bg: string[] | undefined;
+    try {
+      const ops = opsIn(tmp('root'));
+      await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+      job = await looked(t, async () => f.read('job-env'), 'the job started');
+      await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+      bg = f.read('bg-env');
+    } finally {
+      f.restore();
+      for (const [key, value] of saved) if (value !== undefined) process.env[key] = value;
+    }
+    assert.deepEqual(job, ['1 600000'], 'the environment the worker gave the job');
+    assert.deepEqual(
+      claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).env,
+      { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', BASH_DEFAULT_TIMEOUT_MS: '600000' },
+      'claude-detached',
+    );
+    assert.deepEqual(bg, ['unset unset'], 'a background session runs as it did before');
+  },
+);
 
 test('a bridge asked in `config.claude` reaches a background session as --remote-control, first of the bag and directly before the mode when it is written first', async () => {
   const f = fake();
@@ -932,45 +982,53 @@ test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not 
   );
 });
 
-test("a flag Claude Code does not have fails the attempt as the CLI fails it — nothing on stdout, its words on stderr, exit 1 — and the CLI's own words reach the attempt's logs", async () => {
-  const dir = tmp('bin');
-  fs.writeFileSync(
-    path.join(dir, 'claude'),
-    [
-      '#!/bin/sh',
-      'case "$1" in',
-      '  agents) echo "[]" ;;',
-      '  *) for a in "$@"; do case "$a" in --frobnicate) echo "error: unknown option \'--frobnicate\'" >&2; exit 1 ;; esac; done; exit 0 ;;',
-      'esac',
-      '',
-    ].join('\n'),
-    { mode: 0o755 },
-  );
-  const prev = process.env.PATH;
-  process.env.PATH = `${dir}:${prev}`;
-  try {
-    const { Engine } = await import('../src/index.ts');
-    const { builtEngine } = await import('./engine.ts');
-    const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
-    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, config: { claude: { frobnicate: true } } }));
-    const until = Date.now() + 20_000;
-    while (!(await Effect.runPromise(e.view(id))).state.settled) {
-      assert.ok(Date.now() < until, 'settled');
-      await Effect.runPromise(e.tick());
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    const v = await Effect.runPromise(e.view(id));
-    assert.equal(v.phase, 'failed', 'an ordinary failed end');
-    assert.equal(v.state.attempts[0]?.exitCode, 1, 'with the exit code the CLI gave');
-    assert.match(
-      await Effect.runPromise(e.logs(id)),
-      /error: unknown option '--frobnicate'/,
-      "and the CLI's words, where a person reads why",
+test(
+  "a flag Claude Code does not have fails the attempt as the CLI fails it — nothing on stdout, its words on stderr, exit 1 — and the CLI's own words reach the attempt's logs",
+  WAITED,
+  async (t) => {
+    const dir = tmp('bin');
+    fs.writeFileSync(
+      path.join(dir, 'claude'),
+      [
+        '#!/bin/sh',
+        'case "$1" in',
+        '  agents) echo "[]" ;;',
+        '  *) for a in "$@"; do case "$a" in --frobnicate) echo "error: unknown option \'--frobnicate\'" >&2; exit 1 ;; esac; done; exit 0 ;;',
+        'esac',
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
     );
-  } finally {
-    process.env.PATH = prev;
-  }
-});
+    const prev = process.env.PATH;
+    process.env.PATH = `${dir}:${prev}`;
+    try {
+      const { Engine } = await import('../src/index.ts');
+      const { builtEngine } = await import('./engine.ts');
+      const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
+      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, config: { claude: { frobnicate: true } } }));
+      await until(
+        t,
+        async () => {
+          if ((await Effect.runPromise(e.view(id))).state.settled) return true;
+          await Effect.runPromise(e.tick());
+          return false;
+        },
+        `${id} settled`,
+        { everyMs: 50 },
+      );
+      const v = await Effect.runPromise(e.view(id));
+      assert.equal(v.phase, 'failed', 'an ordinary failed end');
+      assert.equal(v.state.attempts[0]?.exitCode, 1, 'with the exit code the CLI gave');
+      assert.match(
+        await Effect.runPromise(e.logs(id)),
+        /error: unknown option '--frobnicate'/,
+        "and the CLI's words, where a person reads why",
+      );
+    } finally {
+      process.env.PATH = prev;
+    }
+  },
+);
 
 const PARENT_ID = '5e551011-0000-4000-8000-00000000000c';
 const PARENT_CALL = 'toolu_01Parent';
@@ -1217,10 +1275,10 @@ test('with no record, or one that does not read, a statement keeps its time for 
 });
 
 /**
- * The first attempt of a task resumed from a background session, run on Claude Code's background runner through an engine until it
- * settles: `claude --bg` registers a finished session, and `said` is what its transcript says, given the session's start.
+ * The first attempt of a task resumed from a background session, run on Claude Code's background runner through an engine, in test
+ * `t`, until it settles: `claude --bg` registers a finished session, and `said` is what its transcript says, given the session's start.
  */
-const settledResumed = async (said: (startedAt: number) => Statement) => {
+const settledResumed = async (t: Waiter, said: (startedAt: number) => Statement) => {
   const f = fake();
   try {
     const { Engine } = await import('../src/index.ts');
@@ -1244,36 +1302,45 @@ const settledResumed = async (said: (startedAt: number) => Statement) => {
     const id = await Effect.runPromise(
       e.file({ brief: 'b', cwd: f.dir, harness: 'bg', resumeFrom: PARENT_ID, closeoutSchema: { type: 'object' } }),
     );
-    const until = Date.now() + 20_000;
-    while (!(await Effect.runPromise(e.view(id))).state.settled) {
-      assert.ok(Date.now() < until, 'settled');
-      await Effect.runPromise(e.tick());
-      const name = f.read('bg-args')?.[2];
-      if (name && !startedAt) {
-        startedAt = Date.now();
-        fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([bgRow(name, 'done', 'idle', startedAt)]));
-      }
-    }
+    await until(
+      t,
+      async () => {
+        if ((await Effect.runPromise(e.view(id))).state.settled) return true;
+        await Effect.runPromise(e.tick());
+        const name = f.read('bg-args')?.[2];
+        if (name && !startedAt) {
+          startedAt = Date.now();
+          fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([bgRow(name, 'done', 'idle', startedAt)]));
+        }
+        return false;
+      },
+      `${id} settled`,
+      { everyMs: 10 },
+    );
     return (await Effect.runPromise(e.view(id))).state.attempts[0];
   } finally {
     f.restore();
   }
 };
 
-test("through the engine, a resumed session's own statement is on the record when this process's clock runs ahead of its transcript's", async (t: TestContext) => {
-  stepClock(t, 60_000);
-  const attempt = await settledResumed((startedAt) => ({
-    payload: { by: 'child' },
-    at: startedAt - 60_000 + 1_000,
-    id: OWN_CALL,
-    lastWord: true,
-  }));
-  assert.deepEqual(attempt?.closeout, { by: 'child' });
-  assert.notEqual(attempt?.stated, false);
-});
+test(
+  "through the engine, a resumed session's own statement is on the record when this process's clock runs ahead of its transcript's",
+  WAITED,
+  async (t: TestContext) => {
+    stepClock(t, 60_000);
+    const attempt = await settledResumed(t, (startedAt) => ({
+      payload: { by: 'child' },
+      at: startedAt - 60_000 + 1_000,
+      id: OWN_CALL,
+      lastWord: true,
+    }));
+    assert.deepEqual(attempt?.closeout, { by: 'child' });
+    assert.notEqual(attempt?.stated, false);
+  },
+);
 
-test("through the engine, a resumed session that ended with only its parent's statement said nothing of its own", async () => {
-  const attempt = await settledResumed((startedAt) => ({
+test("through the engine, a resumed session that ended with only its parent's statement said nothing of its own", WAITED, async (t) => {
+  const attempt = await settledResumed(t, (startedAt) => ({
     payload: { by: 'parent' },
     at: startedAt + 1_000,
     id: PARENT_CALL,
@@ -1401,72 +1468,84 @@ test("a restarted long-lived task's earlier attempt keeps its start when a look 
   );
 });
 
-test("through the engine, a stopped long-lived attempt's spend is read from its journalled start though the task is viewed between the pass's look and its release", async () => {
-  const f = fake();
-  try {
-    const { Engine } = await import('../src/index.ts');
-    const { builtEngine } = await import('./engine.ts');
-    const root = tmp('root');
-    const asked: Array<[string, number]> = [];
-    let exited = false;
-    const ops = claudeOps({
-      root,
-      transcriptTime: async () => Date.now(),
-      closeoutFrom: async () => undefined,
-      usageFrom: async (sessionId: string, since: number) => {
-        asked.push([sessionId, since]);
-        return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
-      },
-    });
-    const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
-    let view = (): Effect.Effect<unknown, unknown> => Effect.void;
-    const viewed: typeof ops = {
-      ...ops,
-      observeFor: (expected) =>
-        ops.observeFor!(expected).pipe(
-          Effect.tap(() => (expected.some((x) => x.since !== undefined) ? Effect.ignore(view()) : Effect.void)),
-        ),
-      release: (session, task) => {
-        const from = asked.length;
-        exited = true;
-        return ops.release!(session, task).pipe(
-          Effect.tap((measured) => Effect.sync(() => released.push({ asked: asked.slice(from), measured }))),
-        );
-      },
-    };
-    const e = builtEngine(Engine.layer({ root, harnesses: { bg: viewed } }));
-    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: f.dir, harness: 'bg', restartPolicy: 'Always' }));
-    view = () => e.view(id);
-    const name = await until(async () => {
-      await Effect.runPromise(e.tick());
-      return f.read('bg-args')?.[2];
-    }, 'the session spawned');
-    const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0].startedAt);
-    const listing = (state: string) =>
-      fs.writeFileSync(
-        path.join(f.dir, 'agents.json'),
-        JSON.stringify([{ ...bgRow(name, state, 'idle', begun + 3_600_000), pid: process.pid }]),
+test(
+  "through the engine, a stopped long-lived attempt's spend is read from its journalled start though the task is viewed between the pass's look and its release",
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const { Engine } = await import('../src/index.ts');
+      const { builtEngine } = await import('./engine.ts');
+      const root = tmp('root');
+      const asked: Array<[string, number]> = [];
+      let exited = false;
+      const ops = claudeOps({
+        root,
+        transcriptTime: async () => Date.now(),
+        closeoutFrom: async () => undefined,
+        usageFrom: async (sessionId: string, since: number) => {
+          asked.push([sessionId, since]);
+          return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
+        },
+      });
+      const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
+      let view = (): Effect.Effect<unknown, unknown> => Effect.void;
+      const viewed: typeof ops = {
+        ...ops,
+        observeFor: (expected) =>
+          ops.observeFor!(expected).pipe(
+            Effect.tap(() => (expected.some((x) => x.since !== undefined) ? Effect.ignore(view()) : Effect.void)),
+          ),
+        release: (session, task) => {
+          const from = asked.length;
+          exited = true;
+          return ops.release!(session, task).pipe(
+            Effect.tap((measured) => Effect.sync(() => released.push({ asked: asked.slice(from), measured }))),
+          );
+        },
+      };
+      const e = builtEngine(Engine.layer({ root, harnesses: { bg: viewed } }));
+      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: f.dir, harness: 'bg', restartPolicy: 'Always' }));
+      view = () => e.view(id);
+      const name = await looked(
+        t,
+        async () => {
+          await Effect.runPromise(e.tick());
+          return f.read('bg-args')?.[2];
+        },
+        'the session spawned',
       );
-    listing('working');
-    await Effect.runPromise(e.tick());
-    await Effect.runPromise(e.stop(id));
-    await Effect.runPromise(e.tick());
-    listing('stopped');
-    const release = await until(async () => {
+      const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0].startedAt);
+      const listing = (state: string) =>
+        fs.writeFileSync(
+          path.join(f.dir, 'agents.json'),
+          JSON.stringify([{ ...bgRow(name, state, 'idle', begun + 3_600_000), pid: process.pid }]),
+        );
+      listing('working');
       await Effect.runPromise(e.tick());
-      return released[0];
-    }, 'the session released');
-    assert.deepEqual(release.asked, [[BG_ID, begun]], "the release reads the spend from the attempt's journalled start, not its row's");
-    const entries = (await Effect.runPromise(e.feed(0))).entries.filter((x) => x.taskId === id).map((x) => x.event);
-    assert.deepEqual(
-      entries.flatMap((x) => (x.kind === 'measured' ? [x.usage] : [])),
-      [release.measured],
-      'what the release read is journalled as the attempt measured',
-    );
-  } finally {
-    f.restore();
-  }
-});
+      await Effect.runPromise(e.stop(id));
+      await Effect.runPromise(e.tick());
+      listing('stopped');
+      const release = await looked(
+        t,
+        async () => {
+          await Effect.runPromise(e.tick());
+          return released[0];
+        },
+        'the session released',
+      );
+      assert.deepEqual(release.asked, [[BG_ID, begun]], "the release reads the spend from the attempt's journalled start, not its row's");
+      const entries = (await Effect.runPromise(e.feed(0))).entries.filter((x) => x.taskId === id).map((x) => x.event);
+      assert.deepEqual(
+        entries.flatMap((x) => (x.kind === 'measured' ? [x.usage] : [])),
+        [release.measured],
+        'what the release read is journalled as the attempt measured',
+      );
+    } finally {
+      f.restore();
+    }
+  },
+);
 
 test("a session expected with no start, or with one that is no number, is counted from its row's start — by its look and its release", async () => {
   const f = fake();

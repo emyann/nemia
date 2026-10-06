@@ -63,7 +63,7 @@ const told = (what: string | (() => string)): string => {
 /**
  * Waits until `ok` answers truthy: asks it at once, again on each ring of `bell`, and every `everyMs` where a pace is given, one ask at a
  * time. The pace says how often to look, never how long to wait. A pending wait holds the event loop open, so a wait that never comes
- * ends at its test's timeout, never as a loop gone idle.
+ * ends at its test's timeout, never as a loop gone idle; one that cannot read its test's signal fails at once, holding nothing open.
  *
  * @param t the test that waits: its signal ends the wait, and its diagnostics say what never came
  * @param ok the condition, sync or async; what it throws fails the wait, so an assert inside it surfaces
@@ -84,7 +84,8 @@ export function until<T>(
     let asking = false;
     let again = false;
     let paced: ReturnType<typeof setTimeout> | undefined;
-    const held = every(() => undefined, LONGEST_DELAY_MS);
+    let held: ReturnType<typeof setInterval> | undefined;
+    let deaf: () => void = () => undefined;
     const settle = (end: () => void) => {
       if (settled) return;
       settled = true;
@@ -122,9 +123,10 @@ export function until<T>(
       }
       if (how.everyMs !== undefined && !settled) paced = later(() => void ask(), how.everyMs);
     };
-    const deaf = how.bell?.hear(() => void ask()) ?? (() => false);
     if (t.signal.aborted) return abort();
     t.signal.addEventListener('abort', abort, { once: true });
+    deaf = how.bell?.hear(() => void ask()) ?? deaf;
+    held = every(() => undefined, LONGEST_DELAY_MS);
     void ask();
   });
 }

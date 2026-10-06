@@ -27,6 +27,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { EngineShape, Event, FeedEntry, Sighting, TaskSpec } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import type { AsyncJournal, AsyncRunner } from './promise-runner.ts';
 
 const tmp = (label: string) => scratch(`ae-say-${label}-`);
@@ -281,98 +282,106 @@ test('a task journalled on claude before a job was its default runs --bg with no
   await box.close();
 });
 
-/** Until `read` answers, bounded. */
-const until = async <T>(read: () => T | undefined | Promise<T | undefined>, what: string): Promise<T> => {
-  const deadline = Date.now() + 15_000;
-  for (;;) {
-    const got = await read();
-    if (got !== undefined) return got;
-    if (Date.now() > deadline) assert.fail(`never saw ${what}`);
-    await new Promise((r) => setTimeout(r, 50));
-  }
-};
+/** What `read` answers, in test `t`, once it answers anything: read again every 50ms. */
+const heard = <T>(t: Waiter, read: () => T | undefined | Promise<T | undefined>, what: string) => until(t, read, what, { everyMs: 50 });
 
-/** A job filed at shipped defaults — no `background` — and ticked until its harness has read its brief on its stdin. */
-const job = async (engine: EngineShape, brief: string, spec: Partial<TaskSpec> = {}) => {
+/** A job filed at shipped defaults — no `background` — and ticked until its harness has read its brief on its stdin, in test `t`. */
+const job = async (t: Waiter, engine: EngineShape, brief: string, spec: Partial<TaskSpec> = {}) => {
   const id = await Effect.runPromise(engine.file({ brief, cwd: work, ...spec }));
   await Effect.runPromise(engine.tick());
-  await until(() => fake.stdin(brief), `${brief} read its brief`);
+  await heard(t, () => fake.stdin(brief), `${brief} read its brief`);
   return id;
 };
 
-test('at shipped defaults, a job is told on its stdin: the words, verbatim, as the next user message after its brief — then journalled', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const id = await job(engine, 'job-told');
-  const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
+test(
+  'at shipped defaults, a job is told on its stdin: the words, verbatim, as the next user message after its brief — then journalled',
+  WAITED,
+  async (t) => {
+    const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
+    const id = await job(t, engine, 'job-told');
+    const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
 
-  const said = await Effect.runPromise(engine.say(id, text));
-  assert.equal(said.attempt, 1);
-  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled');
-  const read = await until(() => {
-    const l = fake.stdin('job-told');
-    return l && l.length > 1 ? l : undefined;
-  }, 'the words on its stdin');
-  assert.deepEqual(
-    read,
-    [
-      { type: 'user', message: { role: 'user', content: 'job-told' } },
-      { type: 'user', message: { role: 'user', content: text } },
-    ],
-    'one line each, a line break in the words kept inside theirs',
-  );
+    const said = await Effect.runPromise(engine.say(id, text));
+    assert.equal(said.attempt, 1);
+    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled');
+    const read = await heard(
+      t,
+      () => {
+        const l = fake.stdin('job-told');
+        return l && l.length > 1 ? l : undefined;
+      },
+      'the words on its stdin',
+    );
+    assert.deepEqual(
+      read,
+      [
+        { type: 'user', message: { role: 'user', content: 'job-told' } },
+        { type: 'user', message: { role: 'user', content: text } },
+      ],
+      'one line each, a line break in the words kept inside theirs',
+    );
 
-  await Effect.runPromise(engine.say(id, 'and the web app'));
-  await until(() => (fake.stdin('job-told')!.length === 3 ? true : undefined), 'the second words');
-  assert.equal(fake.stdin('job-told')![2].message.content, 'and the web app', 'in the order they were said');
-  await Effect.runPromise(engine.stop(id));
-  await Effect.runPromise(engine.tick());
-});
-
-test("a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox", async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const id = await job(engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
-  await Effect.runPromise(engine.say(id, 'carry on'));
-  await until(() => (fake.stdin('job-bypass')!.length === 2 ? true : undefined), 'the words on its stdin');
-  assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
-  await Effect.runPromise(engine.stop(id));
-  await Effect.runPromise(engine.tick());
-});
-
-test('a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused', async () => {
-  const root = tmp('board');
-  const engine = builtEngine(EngineService.layer({ root }));
-  const id = await job(engine, 'job-lingers');
-  await Effect.runPromise(engine.say(id, 'finish and linger'));
-  const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
-  const runFile = workerFile('.json');
-  await until(() => (JSON.parse(fs.readFileSync(runFile, 'utf8')).inputClosed ? true : undefined), 'its input closed at its result');
-  assert.equal(JSON.parse(fs.readFileSync(runFile, 'utf8')).state, 'working', 'and it is still running');
-
-  await assert.rejects(
-    Effect.runPromise(engine.say(id, 'one more thing')),
-    (e: Refusal) => {
-      assert.equal(e._tag, 'SayUnsent', e.message);
-      assert.match(e.message, /has given its result and reads no more words/);
-      return true;
-    },
-    "its harness lists it working, so this is the worker's word, not the engine's: unsent, no refusal",
-  );
-  assert.deepEqual(
-    (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
-    ['finish and linger'],
-    'nothing more journalled',
-  );
-  assert.equal(fake.stdin('job-lingers')!.length, 2, 'nothing written on');
-  const inbox = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
-  assert.equal(inbox.split('\n').filter(Boolean).length, 1, 'nothing appended');
-
-  await Effect.runPromise(engine.stop(id));
-  for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(id))).state.settled; i++) {
+    await Effect.runPromise(engine.say(id, 'and the web app'));
+    await heard(t, () => (fake.stdin('job-told')!.length === 3 ? true : undefined), 'the second words');
+    assert.equal(fake.stdin('job-told')![2].message.content, 'and the web app', 'in the order they were said');
+    await Effect.runPromise(engine.stop(id));
     await Effect.runPromise(engine.tick());
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  await refused(engine, id, 'hello', /has settled/);
-});
+  },
+);
+
+test(
+  "a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox",
+  WAITED,
+  async (t) => {
+    const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
+    const id = await job(t, engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
+    await Effect.runPromise(engine.say(id, 'carry on'));
+    await heard(t, () => (fake.stdin('job-bypass')!.length === 2 ? true : undefined), 'the words on its stdin');
+    assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
+    await Effect.runPromise(engine.stop(id));
+    await Effect.runPromise(engine.tick());
+  },
+);
+
+test(
+  'a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused',
+  WAITED,
+  async (t) => {
+    const root = tmp('board');
+    const engine = builtEngine(EngineService.layer({ root }));
+    const id = await job(t, engine, 'job-lingers');
+    await Effect.runPromise(engine.say(id, 'finish and linger'));
+    const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
+    const runFile = workerFile('.json');
+    await heard(t, () => (JSON.parse(fs.readFileSync(runFile, 'utf8')).inputClosed ? true : undefined), 'its input closed at its result');
+    assert.equal(JSON.parse(fs.readFileSync(runFile, 'utf8')).state, 'working', 'and it is still running');
+
+    await assert.rejects(
+      Effect.runPromise(engine.say(id, 'one more thing')),
+      (e: Refusal) => {
+        assert.equal(e._tag, 'SayUnsent', e.message);
+        assert.match(e.message, /has given its result and reads no more words/);
+        return true;
+      },
+      "its harness lists it working, so this is the worker's word, not the engine's: unsent, no refusal",
+    );
+    assert.deepEqual(
+      (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
+      ['finish and linger'],
+      'nothing more journalled',
+    );
+    assert.equal(fake.stdin('job-lingers')!.length, 2, 'nothing written on');
+    const inbox = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
+    assert.equal(inbox.split('\n').filter(Boolean).length, 1, 'nothing appended');
+
+    await Effect.runPromise(engine.stop(id));
+    for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(id))).state.settled; i++) {
+      await Effect.runPromise(engine.tick());
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    await refused(engine, id, 'hello', /has settled/);
+  },
+);
 
 test('refused: empty words, and words that are only whitespace', async () => {
   const engine = builtEngine(EngineService.layer({ root: tmp('board') }));

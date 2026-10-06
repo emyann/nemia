@@ -17,6 +17,7 @@ import { instantNow } from '../src/core/engine/now.ts';
 import { elapsedMs } from '../src/core/clock.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
@@ -232,13 +233,8 @@ const stateOf = (pid: number) => {
   }
 };
 
-/** Until `ok` holds, under a bound of ten seconds. */
-const until = async (ok: () => boolean, what: string) => {
-  for (const bound = performance.now() + 10_000; !ok();) {
-    if (performance.now() > bound) assert.fail(`${what}, in 10s`);
-    await new Promise((r) => setTimeout(r, 20));
-  }
-};
+/** Until `ok` holds, in test `t`, looked at every 20ms. */
+const holds = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
 
 /** A child, continued and ended, whatever the test left it in. */
 const reap = (child: ChildProcess) => {
@@ -251,33 +247,40 @@ const reap = (child: ChildProcess) => {
 const exited = (child: ChildProcess) =>
   child.exitCode !== null ? Promise.resolve(child.exitCode) : new Promise<number | null>((r) => child.once('exit', (code) => r(code)));
 
-test("a holder of the feed's lock that is stopped keeps an append out for FEED_LOCK_WAIT_MS, which then fails naming it, and writes nothing", async () => {
-  const { root, ops, head } = await store();
-  const feedUrl = pathToFileURL(path.join(PACKAGE, 'src', 'core', 'engine', 'feed.ts')).href;
-  const code = `import { withFeedLock } from '${feedUrl}'; withFeedLock(process.env.FEED_ROOT, () => process.kill(process.pid, 'SIGSTOP'));`;
-  const child = spawn(process.execPath, ['--input-type=module', '-e', code], { env: { ...process.env, FEED_ROOT: root }, stdio: 'ignore' });
-  try {
-    const pid = child.pid!;
-    await until(() => stateOf(pid).startsWith('T'), 'the holder stops holding the lock');
-    const sizes = () => [fs.statSync(head).size, fs.statSync(path.join(root, 'tasks', 'b.jsonl')).size];
-    const was = sizes();
-    const t0 = instantNow();
-    const error = await Effect.runPromise(Effect.flip(ops.append('b', said(31) as never)));
-    const waited = elapsedMs(t0, instantNow());
-    assert.ok(waited >= FEED_LOCK_WAIT_MS, `waited ${waited} ms on the clock the lock is bounded by, at least the bound`);
-    assert.ok(error.message.includes(path.join(root, 'feed.lock')), error.message);
-    assert.ok(error.message.includes(`process ${pid}`), error.message);
-    assert.ok(error.message.includes('if it is stopped, continue it or end it'), error.message);
-    assert.deepEqual(sizes(), was, 'nothing was written');
+test(
+  "a holder of the feed's lock that is stopped keeps an append out for FEED_LOCK_WAIT_MS, which then fails naming it, and writes nothing",
+  WAITED,
+  async (t) => {
+    const { root, ops, head } = await store();
+    const feedUrl = pathToFileURL(path.join(PACKAGE, 'src', 'core', 'engine', 'feed.ts')).href;
+    const code = `import { withFeedLock } from '${feedUrl}'; withFeedLock(process.env.FEED_ROOT, () => process.kill(process.pid, 'SIGSTOP'));`;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', code], {
+      env: { ...process.env, FEED_ROOT: root },
+      stdio: 'ignore',
+    });
+    try {
+      const pid = child.pid!;
+      await holds(t, () => stateOf(pid).startsWith('T'), 'the holder stops holding the lock');
+      const sizes = () => [fs.statSync(head).size, fs.statSync(path.join(root, 'tasks', 'b.jsonl')).size];
+      const was = sizes();
+      const t0 = instantNow();
+      const error = await Effect.runPromise(Effect.flip(ops.append('b', said(31) as never)));
+      const waited = elapsedMs(t0, instantNow());
+      assert.ok(waited >= FEED_LOCK_WAIT_MS, `waited ${waited} ms on the clock the lock is bounded by, at least the bound`);
+      assert.ok(error.message.includes(path.join(root, 'feed.lock')), error.message);
+      assert.ok(error.message.includes(`process ${pid}`), error.message);
+      assert.ok(error.message.includes('if it is stopped, continue it or end it'), error.message);
+      assert.deepEqual(sizes(), was, 'nothing was written');
 
-    child.kill('SIGCONT');
-    assert.equal(await exited(child), 0);
-    await Effect.runPromise(ops.append('b', said(31) as never));
-    assert.deepEqual(texts((await read(ops, cursorAfter(head, 30))).entries), ['b n31'], 'once let go, the append goes through');
-  } finally {
-    reap(child);
-  }
-});
+      child.kill('SIGCONT');
+      assert.equal(await exited(child), 0);
+      await Effect.runPromise(ops.append('b', said(31) as never));
+      assert.deepEqual(texts((await read(ops, cursorAfter(head, 30))).entries), ['b n31'], 'once let go, the append goes through');
+    } finally {
+      reap(child);
+    }
+  },
+);
 
 test('a lock whose holder is dead is broken by the next append, which goes through and counts one lock', async () => {
   const { root, ops } = await store();
@@ -297,53 +300,57 @@ test('a lock whose holder is dead is broken by the next append, which goes throu
   );
 });
 
-test('a writer stopped between its journal and its feed line keeps a rotation out, and its line is in the feed the rotation then writes', async () => {
-  const { root, ops, head } = await store();
-  const dir = scratch('ae-feed-hook-');
-  const hook = path.join(dir, 'stop-after-journal.mjs');
-  fs.writeFileSync(
-    hook,
-    [
-      "import fs from 'node:fs';",
-      'const append = fs.appendFileSync;',
-      "fs.appendFileSync = (...a) => { fs.appendFileSync = append; append(...a); process.kill(process.pid, 'SIGSTOP'); };",
-    ].join('\n'),
-  );
-  const code = [
-    "import { Effect } from 'effect';",
-    "import { Journal } from './src/core/engine/journal.ts';",
-    `Effect.runSync(Journal.filesOps(process.env.FEED_ROOT).append('b', ${JSON.stringify(said(31))}));`,
-  ].join('\n');
-  const env = {
-    ...process.env,
-    FEED_ROOT: root,
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(hook).href}`.trim(),
-  };
-  const child = spawn(process.execPath, ['--input-type=module', '-e', code], { cwd: PACKAGE, env, stdio: 'ignore' });
-  try {
-    const pid = child.pid!;
-    await until(() => stateOf(pid).startsWith('T'), 'the writer stops after its journal line');
-    assert.ok(fs.readFileSync(path.join(root, 'tasks', 'b.jsonl'), 'utf8').includes('"n31"'), 'its journal line is written');
-    assert.ok(!fs.readFileSync(head, 'utf8').includes('"n31"'), 'its feed line is not');
+test(
+  'a writer stopped between its journal and its feed line keeps a rotation out, and its line is in the feed the rotation then writes',
+  WAITED,
+  async (t) => {
+    const { root, ops, head } = await store();
+    const dir = scratch('ae-feed-hook-');
+    const hook = path.join(dir, 'stop-after-journal.mjs');
+    fs.writeFileSync(
+      hook,
+      [
+        "import fs from 'node:fs';",
+        'const append = fs.appendFileSync;',
+        "fs.appendFileSync = (...a) => { fs.appendFileSync = append; append(...a); process.kill(process.pid, 'SIGSTOP'); };",
+      ].join('\n'),
+    );
+    const code = [
+      "import { Effect } from 'effect';",
+      "import { Journal } from './src/core/engine/journal.ts';",
+      `Effect.runSync(Journal.filesOps(process.env.FEED_ROOT).append('b', ${JSON.stringify(said(31))}));`,
+    ].join('\n');
+    const env = {
+      ...process.env,
+      FEED_ROOT: root,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(hook).href}`.trim(),
+    };
+    const child = spawn(process.execPath, ['--input-type=module', '-e', code], { cwd: PACKAGE, env, stdio: 'ignore' });
+    try {
+      const pid = child.pid!;
+      await holds(t, () => stateOf(pid).startsWith('T'), 'the writer stops after its journal line');
+      assert.ok(fs.readFileSync(path.join(root, 'tasks', 'b.jsonl'), 'utf8').includes('"n31"'), 'its journal line is written');
+      assert.ok(!fs.readFileSync(head, 'utf8').includes('"n31"'), 'its feed line is not');
 
-    const error = await Effect.runPromise(Effect.flip(ops.forget!(['a'])));
-    assert.ok(error.message.includes(`process ${pid}`), error.message);
-    assert.ok(!fs.existsSync(path.join(root, 'feed.sealed.jsonl')), 'the rotation did nothing');
-    assert.ok(fs.existsSync(path.join(root, 'tasks', 'a.jsonl')));
+      const error = await Effect.runPromise(Effect.flip(ops.forget!(['a'])));
+      assert.ok(error.message.includes(`process ${pid}`), error.message);
+      assert.ok(!fs.existsSync(path.join(root, 'feed.sealed.jsonl')), 'the rotation did nothing');
+      assert.ok(fs.existsSync(path.join(root, 'tasks', 'a.jsonl')));
 
-    const parked = await read(ops, 0);
-    child.kill('SIGCONT');
-    assert.equal(await exited(child), 0);
-    await forget(ops, ['a']);
-    const all = await read(ops, 0);
-    assert.deepEqual(texts(all.entries).at(-1), 'b n31', "the writer's line is in the feed, last");
-    const resumed = await read(ops, parked.cursor);
-    assert.deepEqual(texts(resumed.entries), ['b n31'], 'a reader parked at the end before the rotation reads it, once');
-    assert.deepEqual(texts((await read(ops, resumed.cursor)).entries), []);
-  } finally {
-    reap(child);
-  }
-});
+      const parked = await read(ops, 0);
+      child.kill('SIGCONT');
+      assert.equal(await exited(child), 0);
+      await forget(ops, ['a']);
+      const all = await read(ops, 0);
+      assert.deepEqual(texts(all.entries).at(-1), 'b n31', "the writer's line is in the feed, last");
+      const resumed = await read(ops, parked.cursor);
+      assert.deepEqual(texts(resumed.entries), ['b n31'], 'a reader parked at the end before the rotation reads it, once');
+      assert.deepEqual(texts((await read(ops, resumed.cursor)).entries), []);
+    } finally {
+      reap(child);
+    }
+  },
+);
 
 test('one append writes twice, the journal and the feed, and takes the lock once', async () => {
   const { ops } = await store();

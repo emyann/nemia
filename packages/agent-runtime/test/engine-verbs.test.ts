@@ -27,6 +27,7 @@ import { Engine as EngineService } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { bell, until, WAITED, type Waiter } from './waits.ts';
 
 /** A store in twelve lines of plain async — what an application with its own database writes. */
 const memoryJournal = (): AsyncJournal => {
@@ -160,7 +161,7 @@ test('the file-backed default needs no configuration at all', async () => {
 
 /**
  * A harness whose every observation takes `ms`: one pass of `tick()` observes once, so this is a tick slower than
- * the timer. It counts the passes begun and the most ever in flight at once.
+ * the timer. It counts the passes begun and the most ever in flight at once, and rings `begun` as each begins.
  *
  * With a pass three intervals long, the timer comes due before the pass's own wait does, and timers fire in the
  * order they come due, however late: the timer fires during every pass, and only the guard in `start()` keeps a
@@ -169,12 +170,14 @@ test('the file-backed default needs no configuration at all', async () => {
 const slowHarness = (sessions: Map<string, Sighting>, ms: number) => {
   const fast = fakeHarness(sessions);
   const seen = { passes: 0, inFlight: 0, most: 0 };
+  const begun = bell();
   const harness: AsyncRunner = {
     ...fast,
     async observe() {
       seen.passes += 1;
       seen.inFlight += 1;
       seen.most = Math.max(seen.most, seen.inFlight);
+      begun.ring();
       try {
         await new Promise((r) => setTimeout(r, ms));
         return await fast.observe();
@@ -183,43 +186,35 @@ const slowHarness = (sessions: Map<string, Sighting>, ms: number) => {
       }
     },
   };
-  return { harness, seen };
+  return { harness, seen, begun };
 };
 
 /**
- * Resolves when `onTick` has been called `n` times, or rejects after `boundMs` of wall clock. A test waits for the
- * tick it counts, as long as a starved machine needs, never for a length of time before counting.
+ * Counts the calls of `onTick`; `wait` resolves once it has been called `n` times, in test `t`, asked again on each call. A test waits
+ * for the tick it counts, as long as a starved machine needs, never for a length of time.
  */
-const ticksUntil = (n: number, boundMs: number) => {
+const ticksUntil = (n: number) => {
   let ticks = 0;
-  let reached!: () => void;
-  const done = new Promise<void>((r) => {
-    reached = r;
-  });
+  const ticked = bell();
   return {
     onTick: () => {
       ticks += 1;
-      if (ticks === n) reached();
+      ticked.ring();
     },
     count: () => ticks,
-    wait: async (errors: unknown[]) => {
-      let timer: NodeJS.Timeout | undefined;
-      const late = new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`saw ${ticks} tick(s) of ${n} in ${boundMs}ms; errors: ${errors.map(String).join('; ') || 'none'}`)),
-          boundMs,
-        );
-      });
-      try {
-        await Promise.race([done, late]);
-      } finally {
-        clearTimeout(timer);
-      }
-    },
+    wait: (t: Waiter, errors: unknown[]) =>
+      until(
+        t,
+        () => ticks >= n,
+        () => `${n} tick(s); saw ${ticks}; errors: ${errors.map(String).join('; ') || 'none'}`,
+        {
+          bell: ticked,
+        },
+      ),
   };
 };
 
-test('start() ticks on a timer and never overlaps', async () => {
+test('start() ticks on a timer and never overlaps', WAITED, async (t) => {
   const sessions = new Map<string, Sighting>();
   const { harness, seen } = slowHarness(sessions, 60);
   const engine = builtEngine(
@@ -228,7 +223,7 @@ test('start() ticks on a timer and never overlaps', async () => {
   await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
 
   const errors: unknown[] = [];
-  const ticks = ticksUntil(3, 30_000);
+  const ticks = ticksUntil(3);
   const loop = Effect.runSync(
     engine.start({
       intervalMs: 20,
@@ -239,7 +234,7 @@ test('start() ticks on a timer and never overlaps', async () => {
     }),
   );
   try {
-    await ticks.wait(errors);
+    await ticks.wait(t, errors);
   } finally {
     loop.stop();
   }
@@ -255,37 +250,43 @@ test('start() ticks on a timer and never overlaps', async () => {
   assert.deepEqual(errors, []);
 });
 
-test('a tick under way when stop() is called — its sessions spawned, its events journalled, not to be taken back — finishes, and reports, and is the last', async () => {
-  const sessions = new Map<string, Sighting>();
-  const { harness, seen } = slowHarness(sessions, 60);
-  const engine = builtEngine(
-    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { fake: asyncOps(harness) }, defaultHarness: 'fake' }),
-  );
-  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+test(
+  'a tick under way when stop() is called — its sessions spawned, its events journalled, not to be taken back — finishes, and reports, and is the last',
+  WAITED,
+  async (t) => {
+    const sessions = new Map<string, Sighting>();
+    const { harness, seen, begun } = slowHarness(sessions, 60);
+    const engine = builtEngine(
+      EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { fake: asyncOps(harness) }, defaultHarness: 'fake' }),
+    );
+    await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
 
-  const errors: unknown[] = [];
-  const ticks = ticksUntil(1, 30_000);
-  const loop = Effect.runSync(
-    engine.start({
-      intervalMs: 20,
-      onTick: ticks.onTick,
-      onError: (e) => {
-        errors.push(e);
-      },
-    }),
-  );
-  const bound = Date.now() + 30_000;
-  while (seen.inFlight === 0 && Date.now() < bound) await new Promise((r) => setTimeout(r, 1));
-  loop.stop();
-  assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
-  assert.equal(ticks.count(), 0, 'and it has not reported yet');
+    const errors: unknown[] = [];
+    const ticks = ticksUntil(1);
+    const loop = Effect.runSync(
+      engine.start({
+        intervalMs: 20,
+        onTick: ticks.onTick,
+        onError: (e) => {
+          errors.push(e);
+        },
+      }),
+    );
+    try {
+      await until(t, () => seen.inFlight > 0, 'a pass under way', { bell: begun });
+    } finally {
+      loop.stop();
+    }
+    assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
+    assert.equal(ticks.count(), 0, 'and it has not reported yet');
 
-  await ticks.wait(errors);
-  await new Promise((r) => setTimeout(r, 100));
-  assert.equal(ticks.count(), 1, 'the pass under way reported once');
-  assert.equal(seen.passes, 1, 'and no other began');
-  assert.deepEqual(errors, []);
-});
+    await ticks.wait(t, errors);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(ticks.count(), 1, 'the pass under way reported once');
+    assert.equal(seen.passes, 1, 'and no other began');
+    assert.deepEqual(errors, []);
+  },
+);
 
 test('running is keyed by the harness the task resolved to: a task that names it and one that does not count together', async () => {
   const sessions = new Map<string, Sighting>();
@@ -369,53 +370,68 @@ test('a task whose journal holds an entry no runtime wrote is left out of each p
   await assert.rejects(Effect.runPromise(engine.view(bad)), (e: Error) => e.message.includes(`${bad}'s journal (${journal}), entry 2`));
 });
 
-test('a feed entry no runtime wrote is skipped: the pass that meets it says it once and moves on, and a watcher is told and delivers the rest', async () => {
-  const root = scratch('ae-verbs-');
-  const sessions = new Map<string, Sighting>();
-  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
-  await Effect.runPromise(engine.tick());
-  const feedFile = path.join(root, 'feed.jsonl');
-  fs.appendFileSync(feedFile, JSON.stringify({ taskId: id, event: { kind: 'nudged', at: 'x' } }) + '\n');
-  fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
-  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
+test(
+  'a feed entry no runtime wrote is skipped: the pass that meets it says it once and moves on, and a watcher is told and delivers the rest',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-verbs-');
+    const sessions = new Map<string, Sighting>();
+    const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+    await Effect.runPromise(engine.tick());
+    const feedFile = path.join(root, 'feed.jsonl');
+    fs.appendFileSync(feedFile, JSON.stringify({ taskId: id, event: { kind: 'nudged', at: 'x' } }) + '\n');
+    fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
+    for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
 
-  const meets = await Effect.runPromise(engine.tick());
-  assert.equal((await Effect.runPromise(engine.view(id))).phase, 'succeeded');
-  assert.equal(meets.unreadable.length, 2);
-  assert.ok(
-    meets.unreadable[0].startsWith(`the feed (${feedFile}), entry `) &&
-      meets.unreadable[0].includes('is no event this runtime writes (its kind is "nudged"'),
-    meets.unreadable[0],
-  );
-  assert.deepEqual((await Effect.runPromise(engine.tick())).unreadable, [], 'said once: the cursor is past it');
+    const meets = await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'succeeded');
+    assert.equal(meets.unreadable.length, 2);
+    assert.ok(
+      meets.unreadable[0].startsWith(`the feed (${feedFile}), entry `) &&
+        meets.unreadable[0].includes('is no event this runtime writes (its kind is "nudged"'),
+      meets.unreadable[0],
+    );
+    assert.deepEqual((await Effect.runPromise(engine.tick())).unreadable, [], 'said once: the cursor is past it');
 
-  const { entries, cursor, refused } = await Effect.runPromise(engine.feed(0));
-  assert.equal(cursor, fs.statSync(feedFile).size);
-  assert.deepEqual(
-    entries.map((e) => e.event.kind),
-    ['filed', 'starting', 'spawned', 'ended', 'settled'],
-  );
-  assert.equal(refused?.length, 2);
+    const { entries, cursor, refused } = await Effect.runPromise(engine.feed(0));
+    assert.equal(cursor, fs.statSync(feedFile).size);
+    assert.deepEqual(
+      entries.map((e) => e.event.kind),
+      ['filed', 'starting', 'spawned', 'ended', 'settled'],
+    );
+    assert.equal(refused?.length, 2);
 
-  const seen: string[] = [];
-  const told: string[] = [];
-  const w = Effect.runSync(
-    engine.watch({
-      onEntry: (e) => void seen.push(e.event.kind),
-      onError: (e) => void told.push((e as Error).message),
-      intervalMs: 20,
-    }),
-  );
-  const bound = Date.now() + 10_000;
-  while (seen.length < 5 && Date.now() < bound) await new Promise((r) => setTimeout(r, 10));
-  w.stop();
-  assert.deepEqual(seen, ['filed', 'starting', 'spawned', 'ended', 'settled']);
-  assert.deepEqual(
-    told,
-    refused?.map((r) => r.why),
-  );
-});
+    const seen: string[] = [];
+    const told: string[] = [];
+    const entered = bell();
+    const w = Effect.runSync(
+      engine.watch({
+        onEntry: (e) => {
+          seen.push(e.event.kind);
+          entered.ring();
+        },
+        onError: (e) => void told.push((e as Error).message),
+        intervalMs: 20,
+      }),
+    );
+    try {
+      await until(
+        t,
+        () => seen.length >= 5,
+        () => `five entries; saw ${seen.join(', ') || 'none'}`,
+        { bell: entered },
+      );
+    } finally {
+      w.stop();
+    }
+    assert.deepEqual(seen, ['filed', 'starting', 'spawned', 'ended', 'settled']);
+    assert.deepEqual(
+      told,
+      refused?.map((r) => r.why),
+    );
+  },
+);
 
 test('a watcher starting at 0 replays history, and stop() stops', async () => {
   const sessions = new Map<string, Sighting>();

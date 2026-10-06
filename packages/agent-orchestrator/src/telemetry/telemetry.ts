@@ -4,10 +4,10 @@
  * on them is `telemetry.store.ts`'s.
  */
 
-/** Where the process exports its traces and logs over OTLP: the collector's base `url`, and the name its spans and logs are filed under. */
+/** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
 export type Otlp = { url: string; serviceName: string };
 
-/** The service a process's spans and logs are filed under when `OTEL_SERVICE_NAME` names none. */
+/** The service a process's spans, logs and metrics are filed under when `OTEL_SERVICE_NAME` names none. */
 export const DEFAULT_SERVICE_NAME = 'nemia';
 
 /**
@@ -31,6 +31,9 @@ export const tracesUrl = (otlp: Otlp): string => `${otlp.url}/v1/traces`;
 
 /** Where an OTLP collector at `otlp` takes logs. */
 export const logsUrl = (otlp: Otlp): string => `${otlp.url}/v1/logs`;
+
+/** Where an OTLP collector at `otlp` takes metrics. */
+export const metricsUrl = (otlp: Otlp): string => `${otlp.url}/v1/metrics`;
 
 /**
  * A log's `message` as `nemia up` prints it: the time of `date`, `HH:MM:SS` in UTC, two spaces, then the message — its parts joined by a

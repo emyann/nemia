@@ -263,7 +263,7 @@ export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
 export type { UpOptions } from './daemon/up.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
-export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/meter.ts';
+export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
 export type {
   HarnessCost,
   Interval,
@@ -276,7 +276,7 @@ export type {
   Phase,
   PhaseCost,
   RecentPass,
-} from './meter/meter.ts';
+} from './meter/index.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, watchFeed } from './feed/feed.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
 export type { Followed } from './feed/feed.verb.ts';

@@ -21,7 +21,7 @@ import {
   type Phase,
   type Reading,
   type RecentPass,
-} from '../meter/meter.ts';
+} from '../meter/index.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,

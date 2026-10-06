@@ -59,7 +59,8 @@ served by `nemia admit`. The static rules of an agent that runs `nemia` are deri
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
-next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
+next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come. A person may run it as a login
+service (`nemia service install`, `src/service/`), which runs the same daemon from the checkout and hands the lease over only when told.
 
 **A journal's bodies** are the runtime's storage: each long text of a line kept once, under the sha256 of its text, resolved on every
 read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's
@@ -71,10 +72,11 @@ asks `forget` of every task its record names, and the tick asks again for one th
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
-`OTEL_EXPORTER_OTLP_ENDPOINT` is set. A session exports to the same collector: the orchestrator hands the runtime the endpoint
-(`engine()`) and files a step's task with its run and step as labels (`stepLabels`); the runtime, which alone knows how a harness is told,
-hands each session it starts the collector, those labels and its `task`, and the filing's trace context, and a command none
-(`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`).
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set — its traces, its logs and every metric in its registry, the pass's and the steps' (`STEP_METRICS`,
+recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone). A session exports to the same
+collector: the orchestrator hands the runtime the endpoint (`engine()`) and files a step's task with its run and step as labels
+(`stepLabels`); the runtime, which alone knows how a harness is told, hands each session it starts the collector, those labels and its
+`task`, and the filing's trace context, and a command none (`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`).
 
 **The feed** is the orchestrator's, written once: `emitFeed` (`src/feed/feed.verb.ts`) appends each line to `feed.jsonl`, the record,
 logs it at Info with its run, step and word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,

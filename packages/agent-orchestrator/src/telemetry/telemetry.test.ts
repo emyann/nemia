@@ -1,14 +1,15 @@
 /**
  * The daemon's telemetry: whether the environment asks for an OTLP export (`otlpOf`), a log as `nemia up` prints it (`lineOf`), and the
- * layer (`telemetryLayer`), which exports spans and logs to a collector only when one is named — proven against a scratch collector that
- * counts what it is posted, and refused with none named by what the layer puts in the context.
+ * layer (`telemetryLayer`), which exports spans, logs and metrics to a collector only when one is named — proven against a scratch
+ * collector that counts what it is posted, and refused with none named by what the layer puts in the context and posts.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Effect, Logger } from 'effect';
-import { DEFAULT_SERVICE_NAME, lineOf, logsUrl, otlpOf, tracesUrl } from './telemetry.ts';
+import { Effect, Logger, Metric } from 'effect';
+import { DEFAULT_SERVICE_NAME, lineOf, logsUrl, metricsUrl, otlpOf, tracesUrl } from './telemetry.ts';
+import { PASS_METRICS } from '../meter/meter.verb.ts';
 import { lineLogger, telemetryLayer } from './telemetry.store.ts';
 
 test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, and its service: nemia unless named', () => {
@@ -25,6 +26,7 @@ test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, 
   assert.deepEqual(named, { url: 'http://collector:4318', serviceName: 'factory' });
   assert.equal(tracesUrl(named), 'http://collector:4318/v1/traces');
   assert.equal(logsUrl(named), 'http://collector:4318/v1/logs');
+  assert.equal(metricsUrl(named), 'http://collector:4318/v1/metrics');
 });
 
 test('lineOf: the time in UTC, two spaces, then the message, its parts joined by a space', () => {
@@ -111,7 +113,7 @@ async function collector(t: TestContext) {
       if (had) found(had.body);
       else waiting.push({ path, word, found });
     });
-  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, posted };
+  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, posted, posts };
 }
 
 test('with an endpoint, a span and a log reach the collector, under the service named, and the log is printed too', async (t) => {
@@ -130,4 +132,37 @@ test('with an endpoint, a span and a log reach the collector, under the service 
   );
   assert.match(await traced, /"factory"/);
   assert.match(await logged, /"factory"/);
+});
+
+/** A pass's time put into `pass.duration`, as the tick does, answering `value`. */
+const passed = <A>(value: A) => Metric.update(PASS_METRICS.duration, 42).pipe(Effect.as(value));
+
+test("with an endpoint, the registry's metrics reach the collector's /v1/metrics before the program ends, under the service named", async (t) => {
+  const c = await collector(t);
+  const env = { OTEL_EXPORTER_OTLP_ENDPOINT: c.url, OTEL_SERVICE_NAME: 'factory' };
+  assert.equal(await Effect.runPromise(passed('ran').pipe(Effect.provide(telemetryLayer(env)))), 'ran');
+  const body = c.posts.find((p) => p.path === '/v1/metrics' && p.body.includes('"pass.duration"'))?.body;
+  assert.ok(body, `pass.duration was posted to /v1/metrics as the layer closed: ${JSON.stringify(c.posts.map((p) => p.path))}`);
+  assert.match(body, /"factory"/);
+  assert.match(body, /"aggregationTemporality":2/, 'cumulative, as Prometheus behind the collector reads it');
+});
+
+test("REFUSED: no endpoint in the env the layer is given, no metric posted — not even to one the process's own environment names", async (t) => {
+  const c = await collector(t);
+  const before = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT = c.url;
+  t.after(() => {
+    if (before === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = before;
+  });
+  assert.equal(await Effect.runPromise(passed('ran').pipe(Effect.provide(telemetryLayer({ OTEL_SERVICE_NAME: 'nemia' })))), 'ran');
+  assert.deepEqual(
+    c.posts.filter((p) => p.path === '/v1/metrics'),
+    [],
+  );
+});
+
+test('a collector that does not answer costs the metrics their post, never the program', async () => {
+  const env = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9' };
+  assert.equal(await Effect.runPromise(passed('ran').pipe(Effect.provide(telemetryLayer(env)))), 'ran');
 });

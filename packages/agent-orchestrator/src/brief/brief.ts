@@ -41,6 +41,18 @@ const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?:
   return isLoopTarget(steps, step.name) ? 'none' : false;
 };
 
+/** The conflicts a step's merge left, named with how its place says to see them; nothing for a merge that left none. */
+const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly say: string } | undefined): string[] =>
+  merge?.conflicts.length
+    ? [
+        '',
+        'The merge left conflicts, and they are yours to resolve — that is what a step waiting on several others is for:',
+        '',
+        ...merge.conflicts.map((file) => `- ${file}`),
+        ...(merge.say ? ['', merge.say] : []),
+      ]
+    : [];
+
 /**
  * What a step is told. THE decision about what one step knows of another.
  *
@@ -110,6 +122,8 @@ const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?:
  *   by file.verb.ts and said among what the step is handed (`costsSection`). Absent, and nothing is said of costs.
  * @param landing For an ending that lands on its check: how its place stages the merge and what it denies (`landingWords`), said in its
  *   contract. Absent, and the contract sends it to its place's skill.
+ * @param merge For a step that waits on several, as its place merged them (`make`): the paths the merge left conflicted, and the place's
+ *   sentence of how to see them (`say.conflicts`). Conflicts are named under what is in the workspace; none, and nothing is said of them.
  */
 export function composeBrief(
   step: Workflow,
@@ -126,6 +140,7 @@ export function composeBrief(
   folders?: FiledFolders,
   costs?: WorkflowCosts,
   landing?: LandingWords,
+  merge?: { readonly conflicts: readonly string[]; readonly say: string },
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -160,8 +175,7 @@ export function composeBrief(
       '## What is in this workspace',
       '',
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
-      'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
-      'several others is for. `git status` shows them.',
+      ...conflictLines(merge),
       ...(tree.length ? ['', ...tree] : []),
       ...(given ? [given] : []),
       contracts,

@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { asked, awaited, over, type Engine, type TaskView } from '../runtime-client.ts';
+import { asked, over, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
@@ -28,6 +28,7 @@ import {
   stepTaskId,
   tryOf,
   type CloseoutAsked,
+  type GitRun,
   type Run,
   type StepRecord,
   type StepStatus,
@@ -59,9 +60,10 @@ import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } f
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
+import { checkoutParts, gitSays, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
-import { noteFiledCheck, within } from '../meter/tally.store.ts';
+import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
+import { readPlaceJson, RunPlace } from '../place/place.store.ts';
 import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
@@ -512,8 +514,14 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   run.steps[name] = { ...run.steps[name], check: { taskId } };
 });
 
-/** Where a step is filed and what it depends on, as its workspace was cut (`workspaceFor`). */
-type Place = Awaited<ReturnType<typeof workspaceFor>>;
+/** How the run's place says to see a merge's conflicts (`say.conflicts`), or nothing where its place is not read. */
+function conflictsSaid(run: Run, dirOf: (run: GitRun) => string): string {
+  try {
+    return isGitRun(run) ? readPlaceJson(dirOf(run)).say.conflicts : '';
+  } catch {
+    return '';
+  }
+}
 
 /**
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
@@ -526,12 +534,18 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
     run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run) : undefined;
   const filed: string[] = [];
+  const dirOf = yield* RunPlace;
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
     const landing = landingTold(run, step, f.notes);
     if (!landing) continue;
-    const place = yield* awaited(() => within('act', () => workspaceFor(run, f.reads.steps, step)));
+    const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, dirOf));
+    if ('uncut' in made) {
+      f.notes.push(`${name}: ${made.uncut}`);
+      continue;
+    }
+    const place = made.cut;
     f.notes.push(...place.notes.map((note) => `${name}: ${note}`));
     if (!f.mayFile()) break;
     const files = artifactsDir(run, name);
@@ -543,9 +557,15 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
       costs: yield* costsFor(f, step, false),
       words: landing.words,
+      merge: place.conflicts.length ? { conflicts: place.conflicts, say: conflictsSaid(run, dirOf) } : undefined,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
-    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
+    run.steps[name] = {
+      ...run.steps[name],
+      taskId,
+      workspace: place.workspace,
+      ...(place.branch === undefined ? {} : { branch: place.branch }),
+    };
     filed.push(name);
   }
   return filed;
@@ -564,7 +584,7 @@ const sessionOf = (f: Filing, stepName: string): string | undefined => {
 function readySpec(
   f: Filing,
   step: Workflow,
-  place: Place,
+  place: Cut,
   files: string,
   said: {
     parents: ParentCloseout[] | undefined;
@@ -572,6 +592,7 @@ function readySpec(
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
     words: LandingWords | undefined;
+    merge: { readonly conflicts: readonly string[]; readonly say: string } | undefined;
   },
 ): Spec {
   const { parents, closeoutOf } = said;
@@ -604,6 +625,7 @@ function readySpec(
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
           said.costs,
           said.words,
+          said.merge,
         ),
     cwd: place.workspace,
     harness: step.harness,

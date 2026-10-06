@@ -7099,7 +7099,8 @@ const startProgram = async () => {
   const { startRun } = await import('../src/start/start.verb.ts');
   const { Invalid, isRefusal } = await import('../src/refusal/refusal.ts');
   const { inputsDir, runsDir } = await import('../src/record/record.store.ts');
-  return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir };
+  const { runStore } = await import('../src/record/files.store.ts');
+  return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir, runStore };
 };
 
 /**
@@ -7209,6 +7210,43 @@ test('a run whose inputs cannot be copied is what the start program dies of, not
   assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
   assert.deepEqual(fs.readdirSync(s.runsDir()).sort(), before, 'no record, and no run directory');
 });
+
+test(
+  'a run that dies once its own directory is made takes that directory with it: an input that cannot be read, a skill that cannot be ' +
+    'rendered — exit 1, and nothing of it is left',
+  { skip: process.getuid?.() === 0 && 'root reads a file of mode 000' },
+  async (t) => {
+    const s = await startProgram();
+    const unreadable = (at: string) => {
+      fs.writeFileSync(at, 'kept from the run\n');
+      fs.chmodSync(at, 0o000);
+      t.after(() => fs.chmodSync(at, 0o644));
+    };
+    const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+    unreadable(input);
+    const team = folderTeam();
+    const skill = path.join(path.dirname(team), 'skills', 'noting');
+    fs.mkdirSync(skill, { recursive: true });
+    fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: noting\ndescription: How a note is kept.\n---\nKeep it short.\n');
+    unreadable(path.join(skill, 'form.md'));
+    const writer = path.join(path.dirname(team), 'agents', 'writer.md');
+    fs.writeFileSync(writer, fs.readFileSync(writer, 'utf8').replace('description:', 'skills: noting\ndescription:'));
+    const cases: Array<[string, Parameters<typeof startRun>[0], RegExp]> = [
+      ['an input', { brief: 'unreadable', repo: aRepo(), workflowDir: folder(), inputs: [input] }, /^--input: the run's files could/],
+      ['a skill', { brief: 'unrendered', workflowDir: team }, /^the steps' agents could not be rendered into /],
+    ];
+    for (const [what, opts, said] of cases) {
+      const before = fs.readdirSync(s.runsDir()).sort();
+      const err = await rejected(async () => await Effect.runPromise(startRun(opts)), what);
+      assert.equal((err as Error & { exitCode?: number }).exitCode, 1, `${what}: ${String(err)}`);
+      assert.match((err as Error).message, said, what);
+      const id = /runs\/([a-z0-9-]+)\//.exec((err as Error).message)?.[1] ?? '';
+      assert.ok(id, `${what}: the message names the run's directory: ${(err as Error).message}`);
+      assert.equal(s.runStore.runs.taken(id), false, `${what}: nothing of ${id} is left`);
+      assert.deepEqual(fs.readdirSync(s.runsDir()).sort(), before, `${what}: no record, and no run directory`);
+    }
+  },
+);
 
 test('the start program says in its type that it refuses and requires nothing: a run, a refusal, no service', async () => {
   const s = await startProgram();

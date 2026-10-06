@@ -85,6 +85,7 @@ const row = (extra: object = {}): RunSummary => ({
       waitingFor: { words: 'a permission', advice: 'answer it' },
       approve: null,
       denied: { words: 'denied: Skill(look)', calls: ['Skill(look)'] },
+      sessionUnread: "`ae/t-1/1`'s output cannot be read",
     },
   ],
   graph: {

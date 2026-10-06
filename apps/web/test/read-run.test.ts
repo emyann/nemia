@@ -46,6 +46,14 @@ test("a run's detail decodes as the api gave it, each union in its every shape",
   assert.deepEqual(await readDetail(), detail());
 });
 
+test("a step's session read alone unread keeps why on the run's detail, in the runtime's words", async (t) => {
+  const unreadStep = step({
+    sessionUnread: "`ae/t-1/1`'s transcript cannot be read: line 2 is an `assistant` line whose `timestamp` is 7",
+  });
+  answering(t, detail({ steps: [unreadStep] }));
+  assert.equal((await readDetail()).steps[0].sessionUnread, unreadStep.sessionUnread);
+});
+
 test("a run's detail from no inbox card has neither `from` nor `fromNote`, and they stay absent", async (t) => {
   const bare = without(detail(), 'from', 'fromNote');
   answering(t, bare);

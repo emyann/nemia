@@ -56,6 +56,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
     waitingFor: null,
     approve: null,
     denied: null,
+    sessionUnread: null,
   })),
   graph: { roots: [], edges: [] },
   waitingOnYou: [],

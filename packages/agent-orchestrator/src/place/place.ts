@@ -79,15 +79,16 @@ export type TrialMerge =
   | { readonly unknown: string };
 
 /**
- * What `report` answers: the base and tips it was made at, the files each result branch changed, the full diff of each path asked of,
- * each branch's trial merge onto the base, whether each path asked of is on a branch, and each path's text at the base (null if absent).
+ * What `report` answers: the base, the commit `onto` names now (null where the place has none) and each branch's tip it read; the files
+ * each branch changed; for each branch, the whole diff of each path asked of that it changed; whether each path asked of is a file, a
+ * directory or absent on each branch; and each path's text at the base (null if absent). A branch the place does not have is in none of
+ * them: not known, never a branch that changed nothing.
  */
 export type Changes = {
-  readonly at: { readonly baseRef: string; readonly onto: string; readonly tips: Readonly<Record<string, string>> };
+  readonly at: { readonly baseRef: string; readonly onto: string | null; readonly tips: Readonly<Record<string, string>> };
   readonly files: Readonly<Record<string, readonly ChangedFile[]>>;
-  readonly diffs: Readonly<Record<string, string>>;
-  readonly merges: Readonly<Record<string, TrialMerge>>;
-  readonly present: Readonly<Record<string, 'file' | 'directory' | 'absent'>>;
+  readonly diffs: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  readonly present: Readonly<Record<string, Readonly<Record<string, 'file' | 'directory' | 'absent'>>>>;
   readonly atBase: Readonly<Record<string, string | null>>;
 };
 

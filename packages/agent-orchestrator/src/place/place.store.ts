@@ -64,11 +64,14 @@ const TrialMergeSchema = Schema.Union([
 ]);
 
 const ChangesSchema = Schema.Struct({
-  at: Schema.Struct({ baseRef: Schema.String, onto: Schema.String, tips: Schema.Record(Schema.String, Schema.String) }),
+  at: Schema.Struct({
+    baseRef: Schema.String,
+    onto: Schema.NullOr(Schema.String),
+    tips: Schema.Record(Schema.String, Schema.String),
+  }),
   files: Schema.Record(Schema.String, Schema.Array(ChangedFileSchema)),
-  diffs: Schema.Record(Schema.String, Schema.String),
-  merges: Schema.Record(Schema.String, TrialMergeSchema),
-  present: Schema.Record(Schema.String, Schema.Literals(['file', 'directory', 'absent'])),
+  diffs: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String)),
+  present: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Literals(['file', 'directory', 'absent']))),
   atBase: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
 }) satisfies Schema.Schema<Changes>;
 

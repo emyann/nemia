@@ -134,6 +134,7 @@ import {
   type TaskPhase,
 } from '../src/run.ts';
 import type { Held } from '../src/place/place.ts';
+import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
 import {
   CLOSEOUT_SCHEMA,
   closeoutSchemaOf,
@@ -389,8 +390,20 @@ test('a step is told its own prose and the original request', () => {
   assert.match(brief, /add a flag/, 'the spec travels to every step');
 });
 
+/** `step`'s brief in `r`, told the package's place's words for reading the work (`say`). */
+const placed = (s: Workflow, r: Run, steps: readonly Workflow[]): string =>
+  composeBrief(
+    s,
+    r,
+    steps,
+    ...([undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const),
+    {
+      say: readPlaceJson(SHIPPED_PLACE).say,
+    },
+  );
+
 test('a later step is pointed at the workspace and the base ref, not at a transcript', () => {
-  const brief = composeBrief(step('review', ['implement']), run({ implement: 't1', review: null }), STEPS);
+  const brief = placed(step('review', ['implement']), run({ implement: 't1', review: null }), STEPS);
   assert.match(brief, /git diff abc123/, 'it is told how to see what changed');
   assert.match(brief, /implement/, 'and who was here before it');
   assert.match(brief, /not an account of it/, 'and that it is judging the change, not a claim');
@@ -505,7 +518,7 @@ test("an ending step is told where the work is — the branches, not the workspa
       },
     },
   );
-  const brief = composeBrief(ending, r, dev);
+  const brief = placed(ending, r, dev);
   assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
   assert.match(brief, /The work of review is not in this directory: it is on wf\/r-1\/implement, cut from `abc123`:/);
   assert.match(brief, /git log --oneline main\.\.wf\/r-1\/implement/);
@@ -635,11 +648,41 @@ test('a step in the checkout is told the one place its files go: the run hands n
   assert.match(artifactsContract(FILES), /Or leave it in this workspace/);
 });
 
-test('a fan-in step is told it is holding merged work, and that conflicts are its job', () => {
+test("a fan-in step is told it is holding merged work, and the conflicts its place's merge left, with the place's words for seeing them", () => {
   const merge: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine them' };
-  const brief = composeBrief(merge, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), merge]);
+  const steps = [step('a'), step('b'), merge];
+  const r = run({ a: 't1', b: 't2', integrate: null });
+  const told = (conflicts: string[]) =>
+    composeBrief(
+      merge,
+      r,
+      steps,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        conflicts,
+        say: 'SAY-CONFLICTS shows them.',
+      },
+    );
+  const brief = told(['src/a.ts', 'src/b.ts']);
   assert.match(brief, /work of a and b has been merged/);
-  assert.match(brief, /yours to resolve/);
+  assert.match(
+    brief,
+    /The merge left conflicts, and they are yours to resolve — that is what a step waiting on several others is for:\n\n- src\/a\.ts\n- src\/b\.ts\n\nSAY-CONFLICTS shows them\./,
+  );
+  for (const clean of [told([]), composeBrief(merge, r, steps)]) {
+    assert.match(clean, /work of a and b has been merged/);
+    assert.doesNotMatch(clean, /conflict/i, 'a merge that left none is told of none');
+  }
 });
 
 test('`slotNeed`: a run is in flight while a task of it is filed and not settled, or it has started and a pass files something — between two steps too; a run with nothing filed and a root ready wants a slot, unless it waits on a run or was called off', () => {

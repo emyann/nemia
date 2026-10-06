@@ -168,6 +168,7 @@ export {
   customInstructionsFile,
   preloads,
   formerKeyLines,
+  isShippedPlace,
   loadAgents,
   loadWorkflows,
   lookupRoots,
@@ -311,6 +312,7 @@ export {
   writeSkill,
 } from './skills/skills.store.ts';
 export { readPlaceJson, runPlaceVerb } from './place/place.store.ts';
+export { briefNow } from './tick/told.verb.ts';
 export type {
   BranchStood,
   ChangedFile,

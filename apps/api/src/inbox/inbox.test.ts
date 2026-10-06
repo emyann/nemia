@@ -703,14 +703,19 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
   assert.deepEqual(cards(), [`${card.name}.md`, 'broken.md', `${started.name}.md`].sort());
 });
 
-test("REFUSED at shipped defaults: a card whose `repo:` is a folder a run cannot branch from — no git checkout, or no commit — is a 422 in the place's words, and nothing is written or removed", async () => {
+test("REFUSED at shipped defaults: a card whose `repo:` is a folder a run cannot branch from — no git checkout, no commit, or a `.worktreeinclude` that is a directory — is a 422 in the place's words, and nothing is written or removed", async () => {
   clear();
   const plain = scratch('nemia-api-inbox-plain-');
   const empty = scratch('nemia-api-inbox-empty-');
   execFileSync('git', ['init', '-q'], { cwd: empty });
+  const odd = scratch('nemia-api-inbox-odd-');
+  execFileSync('git', ['init', '-q'], { cwd: odd });
+  execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: odd });
+  fs.mkdirSync(path.join(odd, '.worktreeinclude'));
   for (const [about, words] of [
     [plain, `${plain} is not a git repository: run git init there and commit once, or name a repository with --repo`],
     [empty, `${empty} has no commit yet, so a run has nothing to start from: commit once there, then start again`],
+    [odd, `${path.join(odd, '.worktreeinclude')} is not a file: write it as a file, one gitignored path per line, or remove it`],
   ]) {
     const { card } = addToInbox({ text: 'Not a repository', repo: about });
     const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
@@ -722,21 +727,21 @@ test("REFUSED at shipped defaults: a card whose `repo:` is a folder a run cannot
   }
 });
 
-test("a card whose start fails without a refusal — its repository's `.worktreeinclude` a directory, say — fails as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
+test("a card whose start fails without a refusal — its repository's `.worktreeinclude` a link to itself, which its place's open cannot read, say — fails as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
   clear();
   const odd = scratch('nemia-api-inbox-odd-');
   execFileSync('git', ['init', '-q'], { cwd: odd });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: odd });
-  fs.mkdirSync(path.join(odd, '.worktreeinclude'));
+  fs.symlinkSync('.worktreeinclude', path.join(odd, '.worktreeinclude'));
   const said = t.mock.method(console, 'error', () => {});
-  const { card } = addToInbox({ text: 'Its include file is a directory', repo: odd });
+  const { card } = addToInbox({ text: 'Its include file is a link to itself', repo: odd });
   let failure: (Error & { exitCode?: unknown }) | undefined;
   try {
     await runWith(engine(), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
   } catch (err) {
     failure = err as Error & { exitCode?: unknown };
   }
-  assert.ok(failure && failure.exitCode !== 2 && failure.message.startsWith('EISDIR'), failure?.message);
+  assert.ok(failure && failure.exitCode !== 2 && failure.message.startsWith("the place's open was not heard: ELOOP"), failure?.message);
   const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
   assert.equal(res.status, 500);
   assert.equal(((await res.json()) as Refused).error, failure.message);

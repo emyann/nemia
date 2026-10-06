@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
+import { SKILL_SECTIONS, unknownHoles } from '../src/place/place.ts';
 import { running } from './running.ts';
 import { steppingClock } from './clock.ts';
 import { scratch } from './scratch.ts';
@@ -89,7 +90,7 @@ function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceO
 
 /** The file `open` names for a merge staged in the checkout `root`, or a failure where it names none. */
 function stagedOf(root: string): string {
-  const { staged } = answerOf(run('open', { root }));
+  const { staged } = answerOf(run('open', { root, isolate: true }));
   assert.ok(staged !== undefined, `open named no staged-merge file for ${root}`);
   return staged;
 }
@@ -118,6 +119,7 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     'handoff',
     'inventory',
     'land',
+    'make',
     'open',
     'remove',
     'report',
@@ -128,8 +130,15 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
   assert.deepEqual(declared.denyWhileLanding, ['Bash(git commit:*)', 'Bash(git merge --continue:*)']);
 });
 
+test("SKILL.md holds the sections a brief told no command sends a step to, every template names only holes the code fills, and the skill forbids nothing a team's fence holds", () => {
+  const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
+  for (const section of Object.values(SKILL_SECTIONS)) assert.match(skill, new RegExp(`^## ${section}$`, 'm'), section);
+  assert.doesNotMatch(skill, /never push/i);
+  assert.deepEqual(unknownHoles(readPlaceJson(GIT_SKILL).say), []);
+});
+
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
-  for (const script of ['open', 'handoff', 'status', 'land', 'trial', 'report', 'export', 'seal', 'inventory', 'remove']) {
+  for (const script of ['open', 'make', 'handoff', 'status', 'land', 'trial', 'report', 'export', 'seal', 'inventory', 'remove']) {
     const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
       input: JSON.stringify({ v: 2, root: '/' }),
       encoding: 'utf8',
@@ -143,7 +152,7 @@ test('a request that does not carry v 1 is refused by every script, exit 2, befo
 
 test('open answers the repository as given, the commit HEAD is at, the branch it is on, and the file a staged merge is named in', () => {
   const dir = repository();
-  assert.deepEqual(answerOf(run('open', { root: dir })), {
+  assert.deepEqual(answerOf(run('open', { root: dir, isolate: true })), {
     repo: dir,
     baseRef: git(dir, 'rev-parse', 'HEAD'),
     branch: 'main',
@@ -185,23 +194,52 @@ test("the place's stage words, run as said with the checkout and the branches fi
 test('REFUSED: open on no directory, on a directory that is no repository, and on a repository with no commit', () => {
   const plain = scratch('wf-git-skill-plain-');
   assert.match(
-    refusalOf(run('open', { root: path.join(plain, 'nowhere') })),
+    refusalOf(run('open', { root: path.join(plain, 'nowhere'), isolate: true })),
     /nowhere is not a directory: name a git repository with --repo$/,
   );
   assert.equal(
-    refusalOf(run('open', { root: plain })),
+    refusalOf(run('open', { root: plain, isolate: true })),
     `${plain} is not a git repository: run git init there and commit once, or name a repository with --repo`,
   );
   const empty = scratch('wf-git-skill-empty-');
   git(empty, 'init', '-q', '-b', 'main');
   assert.equal(
-    refusalOf(run('open', { root: empty })),
+    refusalOf(run('open', { root: empty, isolate: true })),
     `${empty} has no commit yet, so a run has nothing to start from: commit once there, then start again`,
   );
 });
 
-test('open is unread for a request with no root', () => {
-  assert.equal(unreadOf(run('open', {})), "the request's `root` is missing, where a string is asked");
+test('open is unread for a request with no root, and for one whose isolate is missing or no boolean', () => {
+  const dir = repository();
+  assert.equal(unreadOf(run('open', { isolate: true })), "the request's `root` is missing, where a string is asked");
+  assert.equal(unreadOf(run('open', { root: dir })), "the request's `isolate` is missing, where a boolean is asked");
+  assert.equal(unreadOf(run('open', { root: dir, isolate: 'yes' })), 'the request\'s `isolate` is "yes", where a boolean is asked');
+});
+
+test('REFUSED: open, for a run that cuts worktrees, refuses a .worktreeinclude line make would refuse as written, each by name, and one that is no file', () => {
+  const dir = repository();
+  const file = path.join(dir, '.worktreeinclude');
+  fs.writeFileSync(file, '/.env.local\n../x\n.git/config\n');
+  assert.equal(
+    refusalOf(run('open', { root: dir, isolate: true })),
+    `${file}: "../x" is outside the repository; ".git/config" is git's own. Each line is a gitignored path inside the repository, relative to its root — fix or remove those lines.`,
+  );
+  assert.equal(
+    answerOf(run('open', { root: dir, isolate: false })).repo,
+    dir,
+    'a run that cuts no worktree copies nothing, and reads no file',
+  );
+  fs.writeFileSync(file, '.git\n');
+  assert.match(refusalOf(run('open', { root: dir, isolate: true })), /: "\.git" is git's own\. .* fix or remove that line\.$/);
+  fs.rmSync(file);
+  fs.mkdirSync(file);
+  assert.equal(
+    refusalOf(run('open', { root: dir, isolate: true })),
+    `${file} is not a file: write it as a file, one gitignored path per line, or remove it`,
+  );
+  fs.rmdirSync(file);
+  fs.writeFileSync(file, '# for claude --worktree\n/.env.local\nnode_modules\n');
+  assert.equal(answerOf(run('open', { root: dir, isolate: true })).repo, dir, 'a file with nothing to refuse opens');
 });
 
 test('handoff commits what a step left, under its name and why, and answers the commit', () => {

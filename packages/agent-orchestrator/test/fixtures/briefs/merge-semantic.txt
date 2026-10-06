@@ -1,0 +1,80 @@
+## What was asked for
+
+add a flag
+
+## Where to look
+
+This workspace has already been worked in by: review.
+Their work is on disk, and against `abc123` you can see exactly what changed:
+
+```
+git diff abc123
+git status
+```
+
+Judge what is there. You have not been given their reasoning, on purpose — read the change,
+not an account of it.
+
+## Merge main
+
+A person asked for this (`nemia merge`): the work merges cleanly onto `main` as text, but ship's check refused the
+merged tree at `def4567890`, so the conflict is semantic: this change and what `main`
+changed each hold alone, and break together. Merge it in at that commit, without committing:
+
+    git merge --no-ff --no-commit def4567890
+
+- Fix what broke inside the merge, before you commit it, so `git show --remerge-diff` shows the fix to whoever reads the merge.
+  Keep both meanings: what this change does, and what `main` changed. Where both cannot hold, sign off blocked and name the
+  choice in `needs`.
+- Run the check (`npm test && npm run typecheck && npm run lint`), and fix what the merge broke — nothing else. Commit the merge.
+- This is no review round: there are no findings to answer, and your `replies` are an empty list.
+
+When you have signed off, review runs again and reads the merge. The round stays as it is.
+
+## What ship's check said on the merged tree
+
+What it said cannot be given here — its task is gone. Its task is `t9`.
+
+## Before you sign off
+
+This must exit 0 in this workspace: `npm test && npm run typecheck && npm run lint`
+
+The run executes it afterwards, where the work is, and nothing that waits on this step starts
+until it does. Do not weaken it to pass it: the command comes from the run, not from this checkout.
+
+## Files for the steps after you
+
+A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.
+
+- Put it in `/art/implement`, and name it in `artifacts` by absolute path. The run made that directory for
+  this step, outside every workspace, so a file there does not ride the branch.
+- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root, such as
+  `RESPONSE.md` or `.e2e/shot.png`. When you finish, the run copies each such file into that directory, at the
+  same path, before it checks your work, so a step that cannot write outside its workspace hands its files over
+  all the same. A file left in the workspace is committed with the rest too, unless git ignores it.
+
+The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute
+path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a
+file that is not there: name each file.
+
+A file whose path passes through `.claude`, a folder a harness reads as its own configuration, is
+refused, and not handed over: the steps after you read your files in a folder of theirs, and would take it as their own.
+
+## When you are finished
+
+Your final answer is a structured closeout, and it is how this run knows you are done. The session
+asks you for it in the required shape when you finish — in Claude Code, by calling the
+`StructuredOutput` tool. There is no file to write.
+
+- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step
+  that reports success it did not have is worse than one that stops and says why.
+- `summary`: one to three sentences on what you did, for the person who decides what ships.
+- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this
+  workspace: when you finish, the run commits whatever you left, so the next step receives it.
+  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is
+  **not** a reason to block. A file you list that does not exist is reported as missing.
+- `needs`: when blocked, what a person has to settle; otherwise `null`.
+- `replies`: `[]`. You were handed no findings this round. If a later round hands you some, you answer each there.
+
+**Give it once, and give it last**, after everything else. The run reads it as your final word
+and may start the next step on it.

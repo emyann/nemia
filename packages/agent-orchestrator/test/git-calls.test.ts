@@ -59,7 +59,7 @@ type Baseline = Readonly<Record<string, Entry>>;
 const GIT_SITES: Baseline = {
   'packages/agent-orchestrator/src/branches/branches.store.ts': { count: 7, cards: ['I1', 'I2'] },
   'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 1, cards: ['I1', 'I2'] },
-  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 10, cards: ['F', 'J'] },
+  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 1, cards: ['J'] },
 };
 
 /** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */

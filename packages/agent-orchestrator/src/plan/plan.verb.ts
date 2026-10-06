@@ -6,7 +6,9 @@ import { Cause, Effect, Exit } from 'effect';
 import { workflowFolder } from '../folder/folder.store.ts';
 import { type Card, type Planned } from './plan.ts';
 import { readPlan } from './plan.store.ts';
-import { refuseInclude, startRun, stepsToStart } from '../start/start.verb.ts';
+import { StartPlace, startRun, stepsToStart } from '../start/start.verb.ts';
+import { openPlace } from '../place/place.store.ts';
+import { isFolderTeam } from '../workflow/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -28,9 +30,10 @@ export type PlanStarted = {
  * record, and no file of its own. The runs and their `after` are the plan.
  *
  * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no
- * workflow folder (`workflowFolder`, from the plan folder), or one `startRun` would refuse — that refusal, behind the card; and a
- * `.worktreeinclude` `startRun` would refuse. A start that refuses after that, part-way, stops the plan: the runs already started stand,
- * and `stopped` says which card refused and which are left. The option `start` is `startRun`, unless a test hands it one of its own.
+ * workflow folder (`workflowFolder`, from the plan folder), or one `startRun` would refuse — that refusal, behind the card; and, when a
+ * card runs on the repository, what its place's `open` refuses of it, a `.worktreeinclude` among them (`StartPlace`, `openPlace`). A start
+ * that refuses after that, part-way, stops the plan: the runs already started stand, and `stopped` says which card refused and which are
+ * left. The option `start` is `startRun`, unless a test hands it one of its own.
  *
  * `factory` names the factory every card's run is started in, as `nemia start --factory` names it: read first (`readFactory`), and each
  * card's workflow is judged in it before the first run, a workflow it has not attached or a step its hires leave unfilled among what is
@@ -39,17 +42,19 @@ export type PlanStarted = {
 export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; repo: string; factory?: string; start?: typeof startRun }) {
   const cards = readPlan(opts.dir);
   const factory = opts.factory === undefined ? undefined : readFactory(opts.factory);
-  refuseInclude(opts.repo, true);
   const folders = new Map<string, string>();
+  let onRepo = false;
   for (const card of cards) {
     try {
       const folder = workflowFolder(card.workflow, opts.dir, opts.repo);
-      stepsToStart(folder, true, placesOf(opts.repo), factory);
+      const steps = stepsToStart(folder, true, placesOf(opts.repo), factory);
+      onRepo = onRepo || !isFolderTeam(steps);
       folders.set(card.name, folder);
     } catch (err) {
       throw new Invalid({ message: `${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}` });
     }
   }
+  if (onRepo) openPlace(yield* StartPlace, opts.repo, [], true);
   const folderOf = (card: Card): string => folders.get(card.name)!;
   const startOne = opts.start ?? startRun;
   const started: Planned[] = [];

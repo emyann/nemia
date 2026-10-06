@@ -1157,7 +1157,7 @@ does not have is reported. The first real run lost a reviewer's entire output to
 **Committing is the run's job.** Every brief tells the step that the run commits whatever it leaves,
 and that being unable to commit is not a reason to block. That is not generosity. Codex's sandbox
 keeps git's metadata read-only, and two runs stopped dead because a review — told its artifacts
-*must* be committed — honestly signed off `blocked`, over a `REVIEW.md` that `handOff` then committed
+*must* be committed — honestly signed off `blocked`, over a `REVIEW.md` that the hand-off then committed
 anyway. A repository can still let Codex commit its own work by shipping a rule
 ([`.codex/rules/git-commit.rules`](.codex/rules/git-commit.rules); the engine's README says how and
 why): the run's commit is the floor, not the ceiling.
@@ -1683,7 +1683,10 @@ A failed run is decided too. The first run this was pointed at had been sitting 
 `failed`, and its branch held a real fix plus a design question addressed to a person — none of
 which anything in this tool had ever shown anyone.
 
-`wf decide` is read-only. It reports facts and changes nothing: what it reads of git, it asks the run's place. It ends with where each result branch stands
+`wf decide` is read-only. It reports facts and changes nothing. Whether a loop's work still merges onto its base, it asks the run's
+place (`trial`, for the merges it offers); where each result branch stands, and whether the run shipped, it still reads by running git
+itself (`branchReader`, `standingsOf` and `shippedOf` in `src/branches/branches.store.ts`), until card I1/I2 asks the place's `standing`
+for it. It ends with where each result branch stands
 against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
 then with what is left to decide: a last step waiting at its gate, with the `wf approve` that answers it — in
 its own prose where that step is an ending that has not run, since approving is what runs it — or, where no
@@ -3432,7 +3435,8 @@ holding a concurrency slot forever.
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
-| `src/branches/branches.store.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
+| `src/branches/branches.store.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and the tips of a run's branches and a repository's heads (`resultTips`, `refsOf`, `headsOf`) |
+| `src/branches/changes.store.ts` | what a git run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `SkillWriteError` |

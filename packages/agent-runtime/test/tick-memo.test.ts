@@ -99,20 +99,40 @@ test("a task filed again under a settled task's id is folded again on the next p
   );
 });
 
-test('a fresh engine on the same store folds every task on its first pass, and reads the whole feed once to learn where it ends', async () => {
+test('a fresh engine on the same store folds every task on its first pass, and reads none of the feed: its memo has nothing to forget', async () => {
   const { root } = await settledStore();
   const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
   const before = Effect.runSync(engine.io());
   await Effect.runPromise(engine.tick());
   const first = Effect.runSync(engine.io()).bytesRead - before.bytesRead;
   const journals = journalsOf(root);
-  const feed = sizeOf(path.join(root, 'feed.jsonl'));
-  assert.equal(first, feed + journals, `read ${first}: the feed's ${feed} bytes, and each journal once (${journals} bytes)`);
+  assert.ok(sizeOf(path.join(root, 'feed.jsonl')) > 0, 'the feed names every filing and settling');
+  assert.equal(first, journals, `read ${first}: each journal once (${journals} bytes), and no byte of the feed`);
   const second = Effect.runSync(engine.io());
   await Effect.runPromise(engine.tick());
   assert.equal(
     Effect.runSync(engine.io()).bytesRead - second.bytesRead,
     0,
     'its second pass reads nothing: every task settled before this engine was made, so its first pass wrote nothing for the feed to name',
+  );
+});
+
+test('a fresh engine on a store whose journals have no feed beside them reads the feed from its start once one is written: a settled task filed again is folded again', async () => {
+  const { root, cwd, ids } = await settledStore();
+  fs.rmSync(path.join(root, 'feed.jsonl'));
+  const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
+  await Effect.runPromise(engine.tick());
+  assert.equal(fs.existsSync(path.join(root, 'feed.jsonl')), false, 'its first pass folded every task and wrote no feed');
+  const journal = path.join(root, 'tasks', `${ids[5]}.jsonl`);
+  const journal0 = sizeOf(journal);
+  await Effect.runPromise(engine.file({ id: ids[5], brief: 'again', cwd }));
+  const appended = sizeOf(journal) - journal0;
+  const before = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
+  const read = Effect.runSync(engine.io()).bytesRead - before.bytesRead;
+  assert.equal(
+    read,
+    sizeOf(path.join(root, 'feed.jsonl')) + appended,
+    `read ${read}: the feed written since, from its start, and what was appended to the one journal it names`,
   );
 });

@@ -126,19 +126,33 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
   return new Map([...found].map(([name, { agent }]) => [name, withCustom(agent, name, places.home)]));
 }
 
+/** The folder of the place skills the package ships (`place/<name>`), each a skill an agent may give where no root holds its name. */
+export const PLACE_SKILLS = path.join(import.meta.dirname, '..', '..', 'place');
+
+/** Whether the skill folder `dir` is a place skill the package ships (`PLACE_SKILLS`). */
+export const isShippedPlace = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(PLACE_SKILLS);
+
+/** Whether `dir` holds a skill: a `SKILL.md` that is a file. */
+const holdsSkill = (dir: string): boolean => fs.statSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true;
+
+/** The names of the place skills the package ships: each folder of `PLACE_SKILLS` that holds a skill. */
+const placeSkills = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => holdsSkill(path.join(PLACE_SKILLS, name)));
+
 /**
  * Every skill a workflow's agents may give (`lookupRoots`): each name, the folder it is — `<root>/skills/<name>`, holding a `SKILL.md` — or
- * the refusal of a name one repository has in both `workflows/skills/` and `.claude/skills/`. The first root that has a name wins, and the
- * roots are named for the refusal of a name none has (`skillAt`).
+ * the refusal of a name one repository has in both `workflows/skills/` and `.claude/skills/`. The first root that has a name wins, and a
+ * place skill the package ships (`PLACE_SKILLS`) is found last, where no root has its name. The roots and the package's place folder are
+ * named for the refusal of a name none has (`skillAt`).
  */
 export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
   const roots = lookupRoots(workflowDir, places);
+  const looked = [...roots.map((root) => path.join(root, SKILLS_FOLDER)), PLACE_SKILLS];
   const found = new Map<string, { at: string; dir: string | WorkflowError }>();
   for (const root of roots) {
     const dir = path.join(root, SKILLS_FOLDER);
     for (const name of entriesOf(dir).sort()) {
       const at = path.join(dir, name);
-      if (!fs.statSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false })?.isFile()) continue;
+      if (!holdsSkill(at)) continue;
       const first = found.get(name);
       if (!first) {
         found.set(name, { at: root, dir: rulesRefusal(at) ?? at });
@@ -154,7 +168,8 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
       }
     }
   }
-  return { at: new Map([...found].map(([name, { dir }]) => [name, dir])), looked: roots.map((root) => path.join(root, SKILLS_FOLDER)) };
+  for (const name of placeSkills().sort()) if (!found.has(name)) found.set(name, { at: PLACE_SKILLS, dir: path.join(PLACE_SKILLS, name) });
+  return { at: new Map([...found].map(([name, { dir }]) => [name, dir])), looked };
 }
 
 /** The file beside a skill's SKILL.md that names its traceable rules (`readSkillRules`). */

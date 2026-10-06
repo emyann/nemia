@@ -123,6 +123,7 @@ const VERBS = [
   'start',
   'stop',
   'sweep',
+  'tallied',
   'tick',
   'transcript',
   'view',

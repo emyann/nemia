@@ -152,10 +152,12 @@ export type ClaudeOptions = {
 };
 
 /**
- * What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`: its state (`listed`), its
- * process (`pids`) and its start (`starts`); and, for a session the last `observeFor` was told began earlier — a long-lived
- * attempt, across the processes Claude Code respawned it in — when to count its usage from (`countsFrom`), rebuilt by every
- * `observeFor` and kept by an `observe` for each session it still lists.
+ * What `claude agents` last listed of each of our sessions, by session id, rebuilt by every look: its state (`listed`), its
+ * process (`pids`) and its start (`starts`); and, for a session a look was told began earlier — a long-lived attempt, across the
+ * processes Claude Code respawned it in — when to count its usage from (`countsFrom`): set by a look told it, kept by every look
+ * told nothing of it while the session is listed, and dropped with its row. Every start told comes from the journal, so no look
+ * can erase another's, and nothing rests on what survives in memory: level-triggered, after a restart the registry is empty and
+ * the pass's own look, told the start, sets it again before the pass releases anything.
  */
 type Registry = {
   listed: Map<string, SessionState>;
@@ -352,14 +354,15 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  *   read on every look: what tells the session's own statement from the one it inherited.
  * - When a working session's transcript was first seen at its mtime, on the monotonic clock, by the attempt's name under `root`
  *   (`quiet.ts`): cleared at spawn, rewritten by a look only when the mtime or the boot differs, read fresh on every look.
- * - What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`, which a pass
+ * - What `claude agents` last listed of each of our sessions, by session id, rebuilt by every look, which a pass
  *   always makes before it releases anything and `say` is always handed a session from:
  *   - its state (`listed`), which `release` stops on whatever the sighting it is handed says: a session whose end is
  *     on the record — quiet, or idle after its closeout — still runs on Claude Code, and `release` must stop it;
  *   - its process (`pids`), how `say` finds the session's registration and so its inbox; a session listed with no
  *     process — one that has exited — has none;
- *   - its start (`starts`), what `release` reads usage from — or, for a long-lived attempt `observeFor` was told the start of, that
- *     start (`countsFrom`), so its spend is counted across every process Claude Code respawned it in.
+ *   - its start (`starts`), what `release` reads usage from — or, for a long-lived attempt a look was told the start of, that
+ *     start (`countsFrom`), so its spend is counted across every process Claude Code respawned it in; kept by every look
+ *     told nothing of the session, so a view's look between the pass's and its release leaves it as the pass set it.
  * - What a finished attempt said and consumed (`Kept`), which only saves reads.
  *
  * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
@@ -382,7 +385,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map(), countsFrom: new Map() };
   return {
     spawn: spawnUnder(root, options.parentCallFrom ?? transcriptLastCall),
-    observe: observeInto(reading, registry, undefined).pipe(Effect.map((o) => o.seen)),
+    observe: observeInto(reading, registry, new Map()).pipe(Effect.map((o) => o.seen)),
     observeFor: (expected) => observeInto(reading, registry, countsFromOf(expected)),
     find: findIn(sessionsDir),
     stop: stopSession,
@@ -534,9 +537,9 @@ const countsFromOf = (expected: readonly ExpectedSession[]): Map<string, number>
   new Map(expected.flatMap((e) => (typeof e.since === 'number' && Number.isFinite(e.since) ? [[e.name, e.since] as const] : [])));
 
 /**
- * Every session of ours that `claude agents --all --json` lists, by name, in two passes, `registry` rebuilt by the first. Told when
- * to count sessions' usage from (`observeFor`), by name, each of those is counted from then; told nothing (`observe`), each from its
- * own start, as its row gives it, unless the last `observeFor` said otherwise of it.
+ * Every session of ours that `claude agents --all --json` lists, by name, in two passes, `registry` rebuilt by the first. Each
+ * session told when to count its usage from (`countsFrom`, by name) is counted from then; each told nothing, from what a look
+ * last told of it while it stayed listed, else from its own start, as its row gives it.
  *
  * 1. The registry's rows (`listedIn`).
  * 2. This harness's own definition of finished, applied to what is still `working` (`reportOf`). What was kept for an
@@ -545,11 +548,7 @@ const countsFromOf = (expected: readonly ExpectedSession[]): Map<string, number>
  * Seen, each session read; unread, each whose transcript cannot be read while it runs (`reportedOf`), why said as a warning on
  * every look. Fails only when the listing itself cannot be read: it is every session's.
  */
-const observeInto = (
-  x: Reading,
-  registry: Registry,
-  countsFrom: ReadonlyMap<string, number> | undefined,
-): Effect.Effect<Observation, RunnerError> =>
+const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<string, number>): Effect.Effect<Observation, RunnerError> =>
   sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
     Effect.flatMap((out) => {
       const read = registryOf(out);
@@ -571,17 +570,18 @@ const observeInto = (
 /**
  * Our decoded rows (`registryOf`) as sessions by name, each with its start and when its usage is counted from, and `registry`
  * cleared and rebuilt from them in row order: each session's state (`listed`), its process (`pids`) and its start (`starts`).
- * `countsFrom`, by name, when given (`observeFor`), rebuilds the registry's too; when not (`observe`), each session still listed
- * keeps what the last one said. Called only on a listing that decoded, so a refused one leaves the registry as the last one read.
+ * Its `countsFrom` is rebuilt too: a session's start told by name in `countsFrom`, else the one the registry kept for it, so a
+ * look told nothing of a session never erases what another look was told. Called only on a listing that decoded, so a refused one
+ * leaves the registry as the last one read.
  */
-const listedIn = (rows: RegistryRow[], registry: Registry, countsFrom: ReadonlyMap<string, number> | undefined) => {
+const listedIn = (rows: RegistryRow[], registry: Registry, countsFrom: ReadonlyMap<string, number>) => {
   const m = new Map<string, Listed>();
-  const kept = countsFrom ? new Map<string, number>() : new Map(registry.countsFrom);
+  const kept = new Map(registry.countsFrom);
   for (const map of [registry.listed, registry.pids, registry.starts, registry.countsFrom]) map.clear();
   for (const row of rows) {
     const ours = ourRow(row);
     const { sessionId, state } = ours.sighting;
-    const countFrom = countsFrom?.get(row.name) ?? kept.get(sessionId) ?? ours.startedAt;
+    const countFrom = countsFrom.get(row.name) ?? kept.get(sessionId) ?? ours.startedAt;
     registry.listed.set(sessionId, state);
     if (ours.pid !== undefined) registry.pids.set(sessionId, ours.pid);
     if (ours.startedAt !== undefined) registry.starts.set(sessionId, ours.startedAt);

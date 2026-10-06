@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { asked, awaited, over, type Engine, type TaskView } from '../runtime-client.ts';
+import { asked, over, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
@@ -17,7 +17,6 @@ import {
   LANDING_CHECK_DEADLINE_SECONDS,
   type CheckHanded,
   type LandingSaid,
-  type LandingWords,
   type Verdict,
 } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
@@ -59,16 +58,17 @@ import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } f
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
+import { checkoutParts, cutNotes, gitSays, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
-import { noteFiledCheck, within } from '../meter/tally.store.ts';
+import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
+import { RunPlace } from '../place/place.store.ts';
 import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
-import { landingTold, toldOf, type Landing, type Told } from './told.verb.ts';
+import { placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -185,7 +185,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
-  const landing = landingTold(run, step, notes);
+  const landing = placeTold(run, step, notes);
   if (!landing) return;
   const answers = answersHeld(f, r, step, record);
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
@@ -216,10 +216,10 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
 });
 
 /**
- * Send a try to the engine, told what its place says of its landing (`words`): filed as a task of its own, or given as the answer to the
+ * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
  */
-const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: Landing) {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: PlaceTold) {
   const { e, run, reads } = f;
   const record = run.steps[r.step];
   const files = artifactsDir(run, r.step);
@@ -254,7 +254,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        told.words,
+        { words: told.words, say: told.say },
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -362,7 +362,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
-  const landing = landingTold(run, target, notes);
+  const landing = placeTold(run, target, notes);
   if (!landing) return;
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
@@ -376,6 +376,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
     const said = {
       words: landing.words,
+      say: landing.say,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
@@ -406,7 +407,7 @@ function roundSpec(
   looping: Workflow,
   target: Workflow,
   taskId: string,
-  said: { words: LandingWords | undefined; landing?: LandingSaid; costs?: WorkflowCosts },
+  said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts },
 ): Spec {
   const { run, reads } = f;
   const record = run.steps[r.target];
@@ -435,7 +436,7 @@ function roundSpec(
       undefined,
       filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       said.costs,
-      said.words,
+      { words: said.words, say: said.say },
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -512,9 +513,6 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   run.steps[name] = { ...run.steps[name], check: { taskId } };
 });
 
-/** Where a step is filed and what it depends on, as its workspace was cut (`workspaceFor`). */
-type Place = Awaited<ReturnType<typeof workspaceFor>>;
-
 /**
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
  * that waited on runs, on the pass that files its roots, moves its base to its branch as it stands; and a run that waited on runs or was
@@ -526,13 +524,16 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
     run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run) : undefined;
   const filed: string[] = [];
+  const dirOf = yield* RunPlace;
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
-    const landing = landingTold(run, step, f.notes);
+    const landing = placeTold(run, step, f.notes);
     if (!landing) continue;
-    const place = yield* awaited(() => within('act', () => workspaceFor(run, f.reads.steps, step)));
-    f.notes.push(...place.notes.map((note) => `${name}: ${note}`));
+    const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, dirOf));
+    f.notes.push(...cutNotes(name, made));
+    if (!('cut' in made)) continue;
+    const place = made.cut;
     if (!f.mayFile()) break;
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
@@ -543,6 +544,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
       costs: yield* costsFor(f, step, false),
       words: landing.words,
+      say: landing.say,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
@@ -564,14 +566,13 @@ const sessionOf = (f: Filing, stepName: string): string | undefined => {
 function readySpec(
   f: Filing,
   step: Workflow,
-  place: Place,
+  place: Cut,
   files: string,
-  said: {
+  said: PlaceTold & {
     parents: ParentCloseout[] | undefined;
     checked: readonly CheckHanded[];
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
-    words: LandingWords | undefined;
   },
 ): Spec {
   const { parents, closeoutOf } = said;
@@ -603,7 +604,8 @@ function readySpec(
           said.checked,
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
           said.costs,
-          said.words,
+          { words: said.words, say: said.say },
+          place.merge,
         ),
     cwd: place.workspace,
     harness: step.harness,

@@ -529,7 +529,7 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
   const status = (checkout: string, tips: Record<string, string>) => answered('status', { checkout, tips });
   const land = (checkout: string, act: { act: 'commit'; message: string } | { act: 'abort' }) =>
     runPlaceVerb(SHIPPED_PLACE, 'land', { checkout, ...act }, { env });
-  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root }).staged });
+  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root, isolate: false }).staged });
   const a = branch('wf/r/a', 'a.ts', 'a\n');
   const b = branch('wf/r/b', 'b.ts', 'b\n');
   const base = git(repo, 'rev-parse', 'HEAD');
@@ -2926,9 +2926,7 @@ test('REFUSED: an ending whose place this nemia does not ship is not filed once 
   const out = await runWith(odd.e, advanceRun(readRun(odd.id)));
   assert.deepEqual(out.filed, [], 'its ending is not filed');
   assert.ok(
-    out.notes.some((n) =>
-      n.startsWith(`ship: not filed, for its place gives it no landing words: run ${odd.id} names the place skill svn`),
-    ),
+    out.notes.some((n) => n.startsWith(`ship: not filed, for its place gives it no words: run ${odd.id} names the place skill svn`)),
     out.notes.join('\n'),
   );
   assert.equal(readRun(odd.id).steps.ship.taskId, null);

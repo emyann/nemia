@@ -224,7 +224,7 @@ function itemLines(item: unknown): string[] {
  *
  * Committing is the run's job, not the step's: a sandboxed harness may be unable to touch git's
  * metadata at all — Codex keeps it read-only — so a step is told that a file it cannot commit is no
- * reason to block, and `handOff` commits what it left. `inFolder`, for a folder run, which has nothing
+ * reason to block, and its place's `handoff` commits what it left. `inFolder`, for a folder run, which has nothing
  * to commit, says each named file is kept by being collected (`artifactsContract`). `replies` is
  * `owed` for a step answering findings, and `none` on a loop's target with none to answer, since its
  * schema asks for them on every try (`closeoutSchemaOf`).

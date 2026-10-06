@@ -41,5 +41,5 @@ export type { ForgottenFeed } from './feed.ts';
 export { BodyRefused } from './bodies.ts';
 export type { BodyEntry, BodyOps, BodyRef } from './bodies.ts';
 export { tickMemoLayer } from './memo.ts';
-export { ioCounts } from './tally.ts';
-export type { IoCounts } from './tally.ts';
+export { countsHere, ioCounts, noCounts, tallied, talliesHere } from './tally.ts';
+export type { IoCounts, ObserveCount, Tally } from './tally.ts';

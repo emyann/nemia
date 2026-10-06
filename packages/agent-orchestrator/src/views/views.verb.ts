@@ -191,6 +191,7 @@ const ENGINE_READS = new Set([
   'feed',
   'watch',
   'io',
+  'tallied',
   'start',
   'sweep',
   'removeBody',

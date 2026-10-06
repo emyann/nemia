@@ -38,6 +38,13 @@ type EngineIo = Effect.Success<ReturnType<Engine['io']>>;
 export const ioOf = (e: Engine): Effect.Effect<EngineIo | undefined> => (typeof e.io === 'function' ? e.io() : Effect.succeed(undefined));
 
 /**
+ * `program` in a tally of the runtime's own (`Engine.tallied`), so that the totals `ioOf` reads inside it are the program's work alone,
+ * never a read another caller of the engine makes while it waits; as it is, for an engine that keeps no tally (a test's fake).
+ */
+export const talliedIn = <A, E, R>(e: Engine, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  typeof e.tallied === 'function' ? e.tallied(program) : program;
+
+/**
  * Each harness's observes between two of the runtime's totals, for a harness observed in between; `unread` only where some observe could
  * not read, and read as none from totals that carry no count of it.
  */

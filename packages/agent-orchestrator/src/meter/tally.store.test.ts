@@ -358,11 +358,62 @@ test('REFUSED: a metered program leaves no meter open, whether it fails, dies or
   );
   assert.equal(died, boom, 'the defect is rethrown as itself');
   assert.equal(metering(), false, 'no meter open after a defect');
-  const fiber = Effect.runFork(meteredPass(Effect.never));
+  let inside = false;
+  const fiber = Effect.runFork(meteredPass(Effect.sync(() => (inside = metering())).pipe(Effect.andThen(Effect.never))));
   await Effect.runPromise(Effect.yieldNow);
-  assert.equal(metering(), true, 'the meter open while the program runs');
+  assert.equal(inside, true, 'the meter open while the program runs');
   await Effect.runPromise(Fiber.interrupt(fiber));
   assert.equal(metering(), false, 'no meter open after an interruption');
+});
+
+test("REFUSED: a reader called beside an open pass, by another caller in the process, counts nothing to the pass: only the pass's own", async () => {
+  emptyStore();
+  const [run] = await started(1);
+  let go!: () => void;
+  const waiting = new Promise<void>((resolve) => (go = resolve));
+  const own = Effect.sync(() => readRun(run.id));
+  const pass = Effect.runPromise(
+    meteredPass(
+      Effect.andThen(
+        Effect.promise(() => waiting),
+        own,
+      ),
+    ),
+  );
+  const promised = metered(async () => {
+    await waiting;
+    readRun(run.id);
+  });
+  await Effect.runPromise(Effect.sync(() => readRun(run.id)));
+  readRun(run.id);
+  assert.equal(metering(), false, 'no pass is open to a caller beside them');
+  go();
+  assert.deepEqual([(await pass).tallies?.records, (await promised).tallies?.records], [1, 1], 'each pass its own read alone');
+});
+
+test('REFUSED: a fiber beside a pass does not run while the pass is at work: the pass yields to the process only where it waits', async () => {
+  let beside = 0;
+  const other = Effect.runFork(
+    Effect.forever(
+      Effect.andThen(
+        Effect.sync(() => beside++),
+        Effect.yieldNow,
+      ),
+    ),
+  );
+  await Effect.runPromise(Effect.yieldNow);
+  const { value } = await Effect.runPromise(
+    meteredPass(
+      Effect.gen(function* () {
+        const from = beside;
+        yield* Effect.forEach(Array.from({ length: 20_000 }), () => Effect.void);
+        return beside - from;
+      }),
+    ),
+  );
+  await Effect.runPromise(Fiber.interrupt(other));
+  assert.ok(beside > 0, 'the fiber beside ran');
+  assert.equal(value, 0, 'and not once inside the pass');
 });
 
 test('a pass keeps what it saw: the runs listed, the tasks, the sessions queued and at work; and the recent passes grow by it', async () => {

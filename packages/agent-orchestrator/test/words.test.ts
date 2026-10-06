@@ -197,8 +197,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/workflow/fence.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 13, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/validate.ts': { count: 22, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 5, card: 'slice-2' },
-  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 2, card: 'slice-2' },
+  'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 3, card: 'slice-2' },
 };
 
 /** Each file of the runtime that says a workflow's word today, with its count and what removes them. */

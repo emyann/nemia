@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { configRefusal, readRemote, tried } from '../runtime-client.ts';
 import { remoteAgentsFile } from '../harness/a2a.store.ts';
-import { refusalLines } from '../workspace/workspace.ts';
+import { workspacePlan } from '../workspace/workspace.ts';
 import { type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteNameOf } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
@@ -17,7 +17,7 @@ import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
-import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { formerModesWritten, isShippedPlace, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
@@ -28,7 +28,6 @@ import { inputRefusal, type InputFile } from './inputs.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
-import { readInclude } from '../workspace/worktree.store.ts';
 import { SHIPPED_PLACE, openPlace, readPlaceJson } from '../place/place.store.ts';
 import type { PlaceVerb } from '../place/place.ts';
 import { parentRecord } from '../branches/branches.store.ts';
@@ -72,6 +71,7 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * before the first run is started. Refused:
  * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
  *   unfilled or fill twice (`stepsIn`);
+ * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);
  * - with `isolate: false` (`--no-worktree`): a team that says `place: folder`, which has no base branch to work on in place; one that
  *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
  *   does not have into the branch it stands on;
@@ -97,6 +97,8 @@ export function stepsToStart(
         `Start it without --no-worktree.`,
     });
   }
+  const placeSkill = placeSkillRefusal(steps, workflowDir, places);
+  if (placeSkill) throw new Invalid({ message: placeSkill });
   if (!isolate && fansOut(steps)) {
     throw new Invalid({
       message:
@@ -132,6 +134,27 @@ export function stepsToStart(
   const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
+}
+
+/**
+ * Why a team that says `place: folder` cannot start: a step whose session is given a skill its places resolve to a place skill the package
+ * ships (`isShippedPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is.
+ */
+function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, places: Places): string | undefined {
+  if (!isFolderTeam(steps)) return undefined;
+  const found = skillsFor(workflowDir, places).at;
+  for (const step of steps) {
+    const skill = step.agent?.skills?.find((name) => {
+      const at = found.get(name);
+      return typeof at === 'string' && isShippedPlace(at);
+    });
+    if (skill)
+      return (
+        `${step.name}: its agent is given the skill \`${skill}\`, the ${skill} place's, and this workflow's steps say \`place: folder\`: a folder run has no repository for it to act on.\n` +
+        `Take \`${skill}\` off the agent's \`skills:\`, or start a workflow whose steps work in a repository.`
+      );
+  }
+  return undefined;
 }
 
 /**
@@ -214,19 +237,6 @@ function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
   const file = remoteAgentsFile(HOME);
   const has = read.agents.size === 0 ? 'declares none' : `declares ${[...read.agents.keys()].map((n) => `\`${n}\``).join(', ')}`;
   return `${missing.s.name}: \`harness: ${missing.s.harness}\` names a remote A2A agent \`${missing.name}\`, and ${file} ${has}. Add it there — \`{ "${missing.name}": { "url": "https://…" } }\`, the agent's base URL, where its card is served — or name a declared one.`;
-}
-
-/**
- * A `.worktreeinclude` with lines `start` refuses, refused where a person is looking, rather than line by line in a daemon's log. Only a
- * run that cuts worktrees reads the file.
- */
-export function refuseInclude(repo: string, isolate: boolean): void {
-  const refused = isolate ? (readInclude(repo)?.refused ?? []) : [];
-  if (refused.length) {
-    throw new Invalid({
-      message: `${path.join(repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
-    });
-  }
 }
 
 /** What `nemia start` is told: the brief, the repository and the workflow folder, and what `startRun` says of each of the rest. */
@@ -352,11 +362,14 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
 });
 
 /**
- * The verbs a git run's place must declare for this build to run `steps` through it: `status` and `land` when an ending lands on its check
- * (`landsOnCheck`), else none.
+ * The verbs a git run's place must declare for this build to run `steps` through it: `make` and `handoff` when the run cuts worktrees
+ * (`isolate`) and a step forks or merges (`workspacePlan`); `status` and `land` when an ending lands on its check (`landsOnCheck`).
  */
-export const placeVerbsNeeded = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): PlaceVerb[] =>
-  steps.some((step) => landsOnCheck(step, run)) ? ['status', 'land'] : [];
+export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gates'>, isolate: boolean): PlaceVerb[] {
+  const cuts = isolate && steps.some((step) => ['fork', 'merge'].includes(workspacePlan(steps, step).kind));
+  const lands = steps.some((step) => landsOnCheck(step, run));
+  return [...(cuts ? (['make', 'handoff'] as const) : []), ...(lands ? (['status', 'land'] as const) : [])];
+}
 
 /**
  * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
@@ -364,8 +377,8 @@ export const placeVerbsNeeded = (steps: readonly Workflow[], run: Pick<Run, 'gat
  */
 const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const placeDir = yield* StartPlace;
-  const needed = placeVerbsNeeded(told.workflow ?? [], told);
-  const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed));
+  const needed = placeVerbsNeeded(told.workflow ?? [], told, isolate);
+  const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed, isolate));
   const { baseRef, branch, staged } = opened;
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, parentRecord));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
@@ -476,8 +489,9 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
  * no run started. Left out when none is mounted, and in the default factory.
  *
- * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
- * else, the copy's and the render's `Error` included (`tried`).
+ * Fails with the refusal it met, every one before anything is written (`stepsToStart`, the place's `open` — a `.worktreeinclude` it
+ * refuses among them, for a run that cuts worktrees — and those above); dies of anything else, an `open` not heard and the copy's and the
+ * render's `Error` included (`tried`).
  */
 export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const isolate = opts.isolate ?? true;
@@ -491,7 +505,6 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (outside) return yield* Effect.fail(new Invalid({ message: outside }));
   const refusedGates = gateRefusal(opts.gates ?? [], steps);
   if (refusedGates) return yield* Effect.fail(new Invalid({ message: refusedGates }));
-  if (!folder) yield* tried(() => refuseInclude(opts.repo, isolate));
   const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));

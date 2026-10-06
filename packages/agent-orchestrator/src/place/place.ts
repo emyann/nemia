@@ -109,6 +109,12 @@ export type BranchStood = {
   readonly ahead: number | null;
 };
 
+/**
+ * What was last read of a result branch against its run's `baseRef`, handed back to `standing`: the commit judged (null where none was) and
+ * its `pastBase`. The place lists no distance from that `baseRef` for it, and believes `pastBase` only while the branch's commit is `tip`.
+ */
+export type KnownStood = { readonly tip: string | null; readonly pastBase: boolean | null };
+
 /** What `standing` answers: every head of the repository by name, and each result branch asked of. */
 export type Standing = { readonly heads: Readonly<Record<string, string>>; readonly branches: readonly BranchStood[] };
 
@@ -204,7 +210,12 @@ export type PlaceRequests = {
   };
   readonly standing: {
     readonly repo: string;
-    readonly branches: readonly { readonly branch: string; readonly tip?: string; readonly baseRef: string }[];
+    readonly branches: readonly {
+      readonly branch: string;
+      readonly tip?: string;
+      readonly baseRef: string;
+      readonly known?: KnownStood;
+    }[];
     readonly base: string;
   };
   readonly trial: { readonly repo: string; readonly trials: readonly { readonly onto: string; readonly branch: string }[] };

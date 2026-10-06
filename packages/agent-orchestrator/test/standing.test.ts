@@ -14,6 +14,7 @@ import { runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { shippedOver } from '../src/branches/branches.ts';
 import { scratch } from './scratch.ts';
+import { columnsListed, plantedGit } from './planted-git.ts';
 
 /** The git place the package ships. */
 const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
@@ -105,29 +106,6 @@ const STOOD = [
 /** `STOOD` with each branch's tip as `dir` has it. */
 const stood = (dir: string) => STOOD.map((s) => ({ tip: 'tip' in s ? s.tip : git(dir, 'rev-parse', s.branch), ...s }));
 
-/**
- * A `git` on a `PATH` of its own, which writes each call's arguments as a line of `calls` and refuses a `for-each-ref` format that
- * names `refuse`, as git does a field it does not know, before handing the rest to the git this process finds.
- */
-function plantedGit(refuse: string) {
-  const bin = scratch('wf-standing-git-');
-  const calls = path.join(bin, 'calls');
-  const real = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
-  fs.writeFileSync(
-    path.join(bin, 'git'),
-    [
-      '#!/bin/sh',
-      `printf '%s\\n' "$*" >> '${calls}'`,
-      `case "$*" in *for-each-ref*${refuse}*) echo "fatal: unknown field name: ${refuse}" >&2; exit 128;; esac`,
-      `exec '${real}' "$@"`,
-    ].join('\n'),
-    { mode: 0o755 },
-  );
-  const env = { ...ENV, PATH: `${bin}${path.delimiter}${ENV.PATH ?? ''}` };
-  const said = (): string[] => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n') : []);
-  return { env, said };
-}
-
 test('standing answers every head, and where each branch stands: on its base or not, past its base, how far ahead', () => {
   const repo = repository();
   const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) }));
@@ -142,7 +120,7 @@ test('standing answers every head, and where each branch stands: on its base or 
 
 test('standing reads every branch git has in one listing: no process per branch where git lists their distances', () => {
   const repo = repository();
-  const planted = plantedGit('no-such-field');
+  const planted = plantedGit(ENV, 'no-such-field');
   const asks = asked(repo).filter((a) => !a.tip && a.branch !== 'wf/r/never');
   assert.deepEqual(answerOf(standing({ repo: repo.dir, base: 'main', branches: asks }, planted.env)).branches.length, 3);
   assert.deepEqual(
@@ -153,7 +131,7 @@ test('standing reads every branch git has in one listing: no process per branch 
 
 test('standing on a git older than 2.41, which lists no distance, asks each branch one by one and answers the same', () => {
   const repo = repository();
-  const planted = plantedGit('ahead-behind');
+  const planted = plantedGit(ENV, 'ahead-behind');
   const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) }, planted.env));
   assert.deepEqual(answer.branches, stood(repo.dir));
   assert.ok(
@@ -164,7 +142,7 @@ test('standing on a git older than 2.41, which lists no distance, asks each bran
 
 test('standing against a baseRef git cannot read lists the rest with their distances, and says pastBase null of that one', () => {
   const repo = repository();
-  const planted = plantedGit('no-such-field');
+  const planted = plantedGit(ENV, 'no-such-field');
   const asks = [
     { branch: 'wf/r/a', baseRef: NOWHERE },
     { branch: 'wf/r/b', baseRef: repo.cut },
@@ -242,4 +220,137 @@ test('REFUSED: standing of no repository, and against a base git cannot read; un
   const unread = standing({ repo: repo.dir, base: 'main', branches: 'wf/r/a' });
   assert.ok('unread' in unread, JSON.stringify(unread));
   assert.equal(unread.unread.said, 'the request\'s `branches` is "wf/r/a", where a list of branches is asked');
+});
+
+/** How many distinct bases, and result branches cut at them, a repository shaped like the live store has. */
+const BASES = 340;
+const BRANCHES = 560;
+
+/** What becomes of the result branch `i` of `manyBases()`: one in twenty each unmerged, gone and with nothing of its own, the rest merged. */
+const kindOf = (i: number) => (['unmerged', 'gone', 'unchanged'] as const)[i % 20] ?? 'merged';
+
+/**
+ * A repository shaped like the live store, written by one `git fast-import`: `main` a line of `BASES` commits, each the `baseRef` of the
+ * runs cut there, and `BRANCHES` result branches cut at them in turn (`kindOf`), a merged one merged on `main`'s next commit and a gone one
+ * merged and kept outside `refs/heads/`. `asked` is each branch as the pass asks it, a gone one with the tip its run recorded.
+ */
+function manyBases() {
+  const dir = scratch('wf-standing-bases-');
+  git(dir, 'init', '-q', '-b', 'main');
+  const lines: string[] = [];
+  const data = (text: string) => [`data ${Buffer.byteLength(text)}`, text];
+  const header = (ref: string, mark: number) => [
+    `commit ${ref}`,
+    `mark :${mark}`,
+    'committer Test <test@local> 1700000000 +0000',
+    ...data('c'),
+  ];
+  const baseMark = (k: number) => k + 1;
+  const branchMark = (i: number) => BASES + 2 + i;
+  const cutAt = (k: number) => [k, k + BASES].filter((i) => i < BRANCHES);
+  const landing = (k: number) => cutAt(k).filter((i) => ['merged', 'gone'].includes(kindOf(i)));
+  for (let k = 0; k <= BASES; k++) {
+    const merges = k ? landing(k - 1).map((i) => `merge :${branchMark(i)}`) : [];
+    lines.push(...header('refs/heads/main', baseMark(k)), ...(k ? [`from :${baseMark(k - 1)}`] : []), ...merges);
+    lines.push('M 644 inline main.txt', ...data(`${k}\n`));
+    for (const i of k < BASES ? cutAt(k) : []) {
+      if (kindOf(i) === 'unchanged') lines.push(`reset refs/heads/wf/r/${i}`, `from :${baseMark(k)}`);
+      else {
+        lines.push(...header(kindOf(i) === 'gone' ? `refs/gone/${i}` : `refs/heads/wf/r/${i}`, branchMark(i)), `from :${baseMark(k)}`);
+        lines.push(`M 644 inline f${i}.txt`, ...data(`${i}\n`));
+      }
+    }
+  }
+  const marks = path.join(dir, '.git', 'marks');
+  execFileSync('git', ['fast-import', '--quiet', `--export-marks=${marks}`], { cwd: dir, env: ENV, input: `${lines.join('\n')}\n` });
+  const sha = new Map(
+    fs
+      .readFileSync(marks, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => line.slice(1).split(' ') as [string, string])
+      .map(([mark, id]) => [Number(mark), id]),
+  );
+  const asked = Array.from({ length: BRANCHES }, (_, i) => ({
+    branch: `wf/r/${i}`,
+    baseRef: sha.get(baseMark(i % BASES))!,
+    ...(kindOf(i) === 'gone' ? { tip: sha.get(branchMark(i))! } : {}),
+  }));
+  return { dir, asked };
+}
+
+/** `asked`, each branch handed what `answer` read of it: the commit judged and its `pastBase`. */
+const knownFrom = (asked: readonly { tip?: string }[], answer: ReturnType<typeof answerOf>) =>
+  asked.map((a, i) => ({ ...a, known: { tip: answer.branches[i].tip ?? a.tip ?? null, pastBase: answer.branches[i].pastBase } }));
+
+test('standing asked again with what it last read lists the distance from base alone, over 340 bases and 560 branches', () => {
+  const repo = manyBases();
+  const cold = plantedGit(ENV);
+  const first = answerOf(standing({ repo: repo.dir, base: 'main', branches: repo.asked }, cold.env));
+  assert.deepEqual(columnsListed(cold.said()), [1 + BASES], 'the fixture carries the growth: a column for each base');
+  const count = (pick: (b: (typeof first.branches)[number]) => boolean) => first.branches.filter(pick).length;
+  assert.deepEqual(
+    [count((b) => b.pastBase === true), count((b) => b.pastBase === false), count((b) => b.onBase === 'no')],
+    [504, 28, 28],
+    'merged and gone, unchanged, unmerged',
+  );
+  const steady = plantedGit(ENV);
+  const again = answerOf(standing({ repo: repo.dir, base: 'main', branches: knownFrom(repo.asked, first) }, steady.env));
+  assert.deepEqual(again, first);
+  assert.deepEqual(columnsListed(steady.said()), [1], "base's column alone");
+  assert.deepEqual(
+    steady.said().filter((line) => line.startsWith('merge-base')),
+    repo.asked.filter((a) => a.tip).map((a) => `merge-base --is-ancestor ${a.tip} main`),
+    'a gone branch is asked whether it is on base, and of its baseRef nothing',
+  );
+});
+
+test('a branch moved since standing last read it is asked of git again, by one merge-base and no column, and answers as a cold ask', () => {
+  const repo = manyBases();
+  const first = answerOf(standing({ repo: repo.dir, base: 'main', branches: repo.asked }));
+  const moved = repo.asked[2];
+  assert.equal(first.branches[2].pastBase, false, 'it had nothing of its own');
+  const next = git(repo.dir, 'commit-tree', `${moved.branch}^{tree}`, '-p', moved.branch, '-m', 'more');
+  git(repo.dir, 'update-ref', `refs/heads/${moved.branch}`, next);
+  git(repo.dir, 'update-ref', 'refs/heads/main', git(repo.dir, 'commit-tree', 'main^{tree}', '-p', 'main', '-p', next, '-m', 'land it'));
+  const planted = plantedGit(ENV);
+  const again = answerOf(standing({ repo: repo.dir, base: 'main', branches: knownFrom(repo.asked, first) }, planted.env));
+  assert.deepEqual(again, answerOf(standing({ repo: repo.dir, base: 'main', branches: repo.asked })));
+  assert.equal(again.branches[2].pastBase, true);
+  assert.deepEqual(columnsListed(planted.said()), [1]);
+  assert.deepEqual(
+    planted.said().filter((line) => line.startsWith('merge-base') && !line.endsWith(' main')),
+    [`merge-base --is-ancestor ${next} ${moved.baseRef}`],
+  );
+});
+
+test('standing never believes what it is told it last read past the commit it was read of', () => {
+  const repo = repository();
+  const known = (tip: string, pastBase: boolean) => ({ known: { tip, pastBase } });
+  const hinted = asked(repo).map((a) =>
+    a.branch === 'wf/r/a'
+      ? { ...a, ...known(repo.cut, false) }
+      : a.branch === 'wf/r/e'
+        ? { ...a, ...known(repo.landed, false) }
+        : a.branch === 'wf/r/g'
+          ? { ...a, ...known(repo.gone, true) }
+          : a,
+  );
+  const planted = plantedGit(ENV);
+  assert.deepEqual(answerOf(standing({ repo: repo.dir, base: 'main', branches: hinted }, planted.env)).branches, stood(repo.dir));
+  const said = planted.said();
+  assert.ok(!said.some((line) => line.includes(`ahead-behind:${repo.landed}`)), said.join('\n'));
+  assert.ok(!said.includes(`merge-base --is-ancestor ${repo.gone} ${repo.cut}`), said.join('\n'));
+  assert.ok(said.includes(`merge-base --is-ancestor ${repo.gone} main`), said.join('\n'));
+});
+
+test('REFUSED: standing told what it last read of a branch in any shape but { tip, pastBase } reads unread, naming the branch', () => {
+  const repo = repository();
+  const told = { branch: 'wf/r/a', baseRef: repo.cut, known: { tip: 1 } };
+  const unread = standing({ repo: repo.dir, base: 'main', branches: [told] });
+  assert.ok('unread' in unread, JSON.stringify(unread));
+  assert.equal(
+    unread.unread.said,
+    `the request's \`branches[0]\` is ${JSON.stringify(told)}, where { branch, tip?, baseRef, known?: { tip, pastBase } } is asked`,
+  );
 });

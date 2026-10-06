@@ -4,7 +4,7 @@
  * by a schema per answer, each held to its type in `place.ts`: a field missing or of another type is no answer, and a field the contract
  * does not name is dropped. `openPlace` is a start's use of a place, and `placeDirOf` the one answer to where a run's place runs from.
  */
-import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from 'node:child_process';
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Result, Schema, SchemaIssue } from 'effect';
@@ -30,6 +30,7 @@ import {
   type Standing,
   type Status,
   type Trials,
+  type Unread,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { skillVersion } from '../folder/folder.store.ts';
@@ -198,13 +199,13 @@ function firstWrong(value: unknown, error: Schema.SchemaError): string {
 }
 
 /** How long a script's process group, stopped at its deadline, is given to end on SIGTERM before it is killed. */
-const STOP_GRACE_MS = 2000;
+export const STOP_GRACE_MS = 2000;
 
 /** How often a stopped group is asked whether it has ended. */
-const STOP_POLL_MS = 20;
+export const STOP_POLL_MS = 20;
 
 /** Signal the process group `pgid` leads; false when it has no process left, or cannot be signalled. */
-function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
+export function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
   try {
     process.kill(-pgid, signal);
     return true;
@@ -248,21 +249,28 @@ function lastLines(stderr: string): string {
     .join(' / ');
 }
 
-/** Whether a script was stopped at its deadline. */
-const pastDeadline = (ran: SpawnSyncReturns<string>): boolean =>
-  ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT';
-
 /**
- * Why a finished script gave no answer, or undefined when it exited 0 and its stdout is to be read. `killed` says a process it started
- * outlived SIGTERM at its deadline and was killed.
+ * How a verb's script ended, as either runner read it: its exit status or the signal that ended it, what it printed, the error that kept
+ * it from running, whether it was stopped at its deadline, and whether a process it started outlived SIGTERM there and was killed.
  */
-function unheard(ran: SpawnSyncReturns<string>, deadlineMs: number, killed: boolean): string | undefined {
-  const words = lastLines(ran.stderr ?? '');
+export type PlaceRan = {
+  readonly status: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly error?: Error;
+  readonly timedOut: boolean;
+  readonly killed: boolean;
+};
+
+/** Why a finished script gave no answer, or undefined when it exited 0 and its stdout is to be read. */
+function unheard(ran: PlaceRan, deadlineMs: number): string | undefined {
+  const words = lastLines(ran.stderr);
   const tail = words ? `: ${words}` : '';
-  const kill = killed
+  const kill = ran.killed
     ? `, and a process it started outlived SIGTERM for ${STOP_GRACE_MS / 1000} s and was killed, so a lock it held may be left`
     : '';
-  if (pastDeadline(ran)) return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${tail}`;
+  if (ran.timedOut) return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${tail}`;
   if (ran.error) return `it could not be run: ${ran.error.message}`;
   if (ran.signal) return `it was ended by ${ran.signal}${tail}`;
   if (ran.status !== 0) return words || `it exited ${ran.status ?? 'with no status'}`;
@@ -285,9 +293,46 @@ function heard<V extends PlaceVerb>(verb: V, stdout: string): { readonly answer:
   return `its answer does not read as ${verb}'s: ${firstWrong(printed, answer.failure)}`;
 }
 
+/** `verb` unread, with why and now. */
+const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unread } => ({
+  unread: { verb, said, at: new Date().toISOString() },
+});
+
+/** What a run of `verb`'s script is: the script, what it is handed on stdin, its deadline and its environment. */
+export type PlaceAsk = { readonly script: string; readonly input: string; readonly deadlineMs: number; readonly env: NodeJS.ProcessEnv };
+
+/**
+ * How `verb` of the place in `skillDir` is run (`runPlaceVerb`): its script, `request` with `v` added, the verb's deadline
+ * (`PLACE_DEADLINE_MS`) unless `deadlineMs` says another, and `env`, this process's when none is given. Unread when there is no script.
+ */
+export function placeAsk<V extends PlaceVerb>(
+  skillDir: string,
+  verb: V,
+  request: PlaceRequests[V],
+  options: { readonly deadlineMs?: number; readonly env?: NodeJS.ProcessEnv },
+): PlaceAsk | { readonly unread: Unread } {
+  const script = path.join(skillDir, 'scripts', `${verb}.ts`);
+  if (!fs.existsSync(script)) return unreadNow(verb, `the place has no script for ${verb}: ${script} is not there`);
+  return {
+    script,
+    input: JSON.stringify({ ...request, v: PLACE_CONTRACT }),
+    deadlineMs: options.deadlineMs ?? PLACE_DEADLINE_MS[verb],
+    env: options.env ?? process.env,
+  };
+}
+
+/** The outcome of `verb` as its script ran (`PlaceRan`): its decoded answer, its refusal, or unread with why. */
+export function outcomeOf<V extends PlaceVerb>(verb: V, ran: PlaceRan, deadlineMs: number): PlaceOutcome<V> {
+  const why = unheard(ran, deadlineMs);
+  if (why !== undefined) return unreadNow(verb, why);
+  const answer = heard(verb, ran.stdout);
+  return typeof answer === 'string' ? unreadNow(verb, answer) : answer;
+}
+
 /**
  * Run `verb` of the place skill in `skillDir`: `node <skillDir>/scripts/<verb>.ts` in `skillDir`, `request` on stdin with `v` added, within
- * the verb's deadline (`PLACE_DEADLINE_MS`) unless `deadlineMs` says another, in `env` (this process's when none is given).
+ * the verb's deadline (`PLACE_DEADLINE_MS`) unless `deadlineMs` says another, in `env` (this process's when none is given). It holds this
+ * process until the script ends: a verb that may take long, as `make` may, is run by `runPlaceVerbAsync` (`place-async.store.ts`).
  *
  * Returns the verb's decoded answer; `{ refused }` when the script refused at exit 0; or `{ unread }`, with its last stderr lines or the
  * reason, for anything else — no script, a non-zero exit, a signal, the deadline passed, or a stdout that does not decode. Never throws for
@@ -301,27 +346,27 @@ export function runPlaceVerb<V extends PlaceVerb>(
   request: PlaceRequests[V],
   options: { readonly deadlineMs?: number; readonly env?: NodeJS.ProcessEnv } = {},
 ): PlaceOutcome<V> {
-  const unread = (said: string): PlaceOutcome<V> => ({ unread: { verb, said, at: new Date().toISOString() } });
-  const script = path.join(skillDir, 'scripts', `${verb}.ts`);
-  if (!fs.existsSync(script)) return unread(`the place has no script for ${verb}: ${script} is not there`);
-  const deadlineMs = options.deadlineMs ?? PLACE_DEADLINE_MS[verb];
+  const asked = placeAsk(skillDir, verb, request, options);
+  if ('unread' in asked) return asked;
   const spawned: SpawnSyncOptionsWithStringEncoding & { readonly detached: boolean } = {
     cwd: skillDir,
-    input: JSON.stringify({ ...request, v: PLACE_CONTRACT }),
+    input: asked.input,
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
-    timeout: deadlineMs,
+    timeout: asked.deadlineMs,
     killSignal: 'SIGKILL',
     maxBuffer: 256 * 1024 * 1024,
-    env: options.env ?? process.env,
+    env: asked.env,
     detached: true,
   };
-  const ran = spawnSync(process.execPath, [script], spawned);
-  const killed = pastDeadline(ran) && ran.pid > 0 && stopGroup(ran.pid);
-  const why = unheard(ran, deadlineMs, killed);
-  if (why !== undefined) return unread(why);
-  const answer = heard(verb, ran.stdout);
-  return typeof answer === 'string' ? unread(answer) : answer;
+  const ran = spawnSync(process.execPath, [asked.script], spawned);
+  const timedOut = ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT';
+  const killed = timedOut && ran.pid > 0 && stopGroup(ran.pid);
+  return outcomeOf(
+    verb,
+    { status: ran.status, signal: ran.signal, stdout: ran.stdout ?? '', stderr: ran.stderr ?? '', error: ran.error, timedOut, killed },
+    asked.deadlineMs,
+  );
 }
 
 /**
@@ -396,21 +441,21 @@ export type OpenedPlace = { readonly opened: Opened; readonly placeSkill: { read
 
 /**
  * A git run's place, opened at `nemia start` on `root`: the skill in `skillDir` read (`readPlaceJson`), every verb of `needed` declared,
- * its version taken (`skillVersion`), and its `open` verb run. Refuses (`Invalid`) a `place.json` that does not read or leaves out a verb
- * of `needed` (`missingVerbsRefusal`), a folder with no SKILL.md, an `open` that refuses, in its own words, and one that is not heard,
- * with why.
+ * its version taken (`skillVersion`), and its `open` verb run, told whether the run cuts worktrees (`isolate`). Refuses (`Invalid`) a
+ * `place.json` that does not read or leaves out a verb of `needed` (`missingVerbsRefusal`), a folder with no SKILL.md, and an `open` that
+ * refuses, in its own words. An `open` that is not heard is no refusal: it throws a plain `Error`, with why, so a queued card is tried
+ * again.
  */
-export function openPlace(skillDir: string, root: string, needed: readonly PlaceVerb[]): OpenedPlace {
+export function openPlace(skillDir: string, root: string, needed: readonly PlaceVerb[], isolate: boolean): OpenedPlace {
   const declared = readPlaceJson(skillDir);
   const missing = missingVerbsRefusal(path.join(skillDir, 'place.json'), declared, needed);
   if (missing) throw new Invalid({ message: missing });
   const version = skillVersion(skillDir);
   if (version === null)
     throw new Invalid({ message: `${skillDir} has no SKILL.md, so it is no skill to run a place from: write its SKILL.md there` });
-  const outcome = runPlaceVerb(skillDir, 'open', { root });
+  const outcome = runPlaceVerb(skillDir, 'open', { root, isolate });
   if ('refused' in outcome) throw new Invalid({ message: outcome.refused });
-  if ('unread' in outcome)
-    throw new Invalid({ message: `the place's open was not heard: ${outcome.unread.said}. Nothing was started: start it again` });
+  if ('unread' in outcome) throw new Error(`the place's open was not heard: ${outcome.unread.said}. Nothing was started: start it again`);
   return { opened: outcome.answer, placeSkill: { skill: SHIPPED_PLACE_SKILL, version } };
 }
 

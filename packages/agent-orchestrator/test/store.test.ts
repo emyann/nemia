@@ -1177,13 +1177,14 @@ test("a worktree whose main packages could only be linked — its store on anoth
 });
 
 test('nemia start refuses a .worktreeinclude line outside the repository, by name, before a run is written', async () => {
-  const repo = aNodeRepo('/.env.local\n../x\nC:\\x\n');
+  const repo = aNodeRepo('/.env.local\n../x\nC:\\x\n.git/hooks\n');
   const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
   await assert.rejects(
     () => isolated(repo),
     (err: Error & { exitCode?: number }) => {
       assert.match(err.message, /"\.\.\/x" is outside the repository/);
       assert.match(err.message, /"C:\\x" is absolute/);
+      assert.match(err.message, /"\.git\/hooks" is git's own/);
       assert.match(err.message, /fix or remove those lines/);
       assert.doesNotMatch(err.message, /\.env\.local/, 'a leading / is the root of the repository, and nothing to refuse');
       assert.equal(err.exitCode, 2);
@@ -4172,6 +4173,22 @@ test("`nemia start --workflows <name>` starts the repository's workflow of that 
       ),
     ),
   );
+  assert.equal(runsWritten(), before);
+});
+
+test("REFUSED: nemia plan of a card on the repository whose .worktreeinclude its place's open refuses, before any run is written", async () => {
+  const repo = aRepo();
+  fs.writeFileSync(path.join(repo, '.worktreeinclude'), '../x\n');
+  const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the root') }));
+  const before = runsWritten();
+  await assert.rejects(Effect.runPromise(startPlan({ dir: plan, repo })), (err: Error & { exitCode?: number }) => {
+    assert.equal(
+      err.message,
+      `${path.join(repo, '.worktreeinclude')}: "../x" is outside the repository. Each line is a gitignored path inside the repository, relative to its root — fix or remove that line.`,
+    );
+    assert.equal(err.exitCode, 2);
+    return true;
+  });
   assert.equal(runsWritten(), before);
 });
 

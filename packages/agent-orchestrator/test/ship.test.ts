@@ -529,7 +529,7 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
   const status = (checkout: string, tips: Record<string, string>) => answered('status', { checkout, tips });
   const land = (checkout: string, act: { act: 'commit'; message: string } | { act: 'abort' }) =>
     runPlaceVerb(SHIPPED_PLACE, 'land', { checkout, ...act }, { env });
-  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root }).staged });
+  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root, isolate: false }).staged });
   const a = branch('wf/r/a', 'a.ts', 'a\n');
   const b = branch('wf/r/b', 'b.ts', 'b\n');
   const base = git(repo, 'rev-parse', 'HEAD');

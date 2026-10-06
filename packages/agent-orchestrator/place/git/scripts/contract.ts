@@ -7,6 +7,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 /** The version of the contract these scripts speak, carried as `v` on the request. */
 const CONTRACT = 1;
@@ -45,6 +46,14 @@ export function texts(request: Request, key: string): readonly string[] {
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string'))
     throw new Malformed(`the request's \`${key}\` is ${JSON.stringify(value) ?? 'missing'}, where a list of strings is asked`);
   return value as string[];
+}
+
+/** The boolean `key` of `request`, or `Malformed` naming it. */
+export function flag(request: Request, key: string): boolean {
+  const value = request[key];
+  if (typeof value !== 'boolean')
+    throw new Malformed(`the request's \`${key}\` is ${JSON.stringify(value) ?? 'missing'}, where a boolean is asked`);
+  return value;
 }
 
 /**
@@ -96,3 +105,59 @@ export function gitSays(cwd: string, args: readonly string[]): string | undefine
 
 /** Whether `dir` is a directory, so that git is never run where it cannot start. */
 export const isDirectory = (dir: string): boolean => fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ?? false;
+
+/** `.worktreeinclude`, read: what to copy, what is provisioned instead, and what is refused and why. */
+export type WorktreeInclude = {
+  copy: string[];
+  provisioned: string[];
+  refused: Array<{ line: string; why: string }>;
+};
+
+/**
+ * Parse `.worktreeinclude`: one gitignored path per line, file or directory, relative to the repository root. Blank lines and `#` comments
+ * are skipped. Paths, not patterns — a glob is a name nothing has. A leading `/` anchors a line at the root, as it does in the gitignore
+ * syntax of Claude Code's file: `/.env.local` is the repository's `.env.local`, never the machine's root.
+ *
+ * Refused by name: a path on a drive (`C:\`), one that climbs out of the repository, the repository itself, and `.git`, which in a worktree
+ * is a file git owns. Set aside as `provisioned`, never copied: anything that is or is inside a `node_modules`, which the orchestrator
+ * makes, since a copy costs minutes per step. Whether git ignores a path is a fact of the checkout, not the text, so `make` asks git at the
+ * cut.
+ */
+export function worktreeInclude(text: string): WorktreeInclude {
+  const out: WorktreeInclude = { copy: [], provisioned: [], refused: [] };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const rel = path.posix.normalize(line.replaceAll('\\', '/').replace(/^\/+/, '') || '.').replace(/\/+$/, '');
+    const segments = rel.split('/');
+    const why = /^[A-Za-z]:[\\/]/.test(line)
+      ? 'is absolute'
+      : rel === '..' || rel.startsWith('../')
+        ? 'is outside the repository'
+        : rel === '.' || rel === ''
+          ? 'is the repository itself'
+          : segments[0] === '.git'
+            ? "is git's own"
+            : null;
+    if (why) out.refused.push({ line, why });
+    else if (segments.includes('node_modules')) {
+      if (!out.provisioned.includes(rel)) out.provisioned.push(rel);
+    } else if (!out.copy.includes(rel)) out.copy.push(rel);
+  }
+  return out;
+}
+
+/** Each refused line as a person reads it: `"../x" is outside the repository`. */
+export const refusalLines = (refused: WorktreeInclude['refused']): string[] => refused.map((r) => `"${r.line}" ${r.why}`);
+
+/**
+ * `.worktreeinclude` at the root of `repo`, parsed; null when the repository has none, a link that leads nowhere included; and, when it
+ * is there and no file, the words that say so. A link to a file is read as the file. Throws when the file cannot be read.
+ */
+export function readInclude(repo: string): WorktreeInclude | null | string {
+  const file = path.join(repo, '.worktreeinclude');
+  const st = fs.statSync(file, { throwIfNoEntry: false });
+  if (!st) return null;
+  if (!st.isFile()) return `${file} is not a file`;
+  return worktreeInclude(fs.readFileSync(file, 'utf8'));
+}

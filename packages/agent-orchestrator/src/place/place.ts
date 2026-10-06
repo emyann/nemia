@@ -53,7 +53,8 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
 export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly staged?: string };
 
 /**
- * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for its brief.
+ * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for the run's
+ * log — what `.worktreeinclude` copied or refused, and a merge that failed with nothing conflicted.
  */
 export type Made = {
   readonly workspace: string;
@@ -183,7 +184,7 @@ export type PlaceAnswers = {
 
 /** Each verb's request, as the code hands it: `v` is added by the runner. */
 export type PlaceRequests = {
-  readonly open: { readonly root: string };
+  readonly open: { readonly root: string; readonly isolate: boolean };
   readonly make: {
     readonly repo: string;
     readonly at: string;

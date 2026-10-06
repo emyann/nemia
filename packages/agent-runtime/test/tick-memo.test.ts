@@ -116,3 +116,23 @@ test('a fresh engine on the same store folds every task on its first pass, and r
     'its second pass reads nothing: every task settled before this engine was made, so its first pass wrote nothing for the feed to name',
   );
 });
+
+test('a fresh engine on a store whose journals have no feed beside them reads the feed from its start once one is written: a settled task filed again is folded again', async () => {
+  const { root, cwd, ids } = await settledStore();
+  fs.rmSync(path.join(root, 'feed.jsonl'));
+  const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
+  await Effect.runPromise(engine.tick());
+  assert.equal(fs.existsSync(path.join(root, 'feed.jsonl')), false, 'its first pass folded every task and wrote no feed');
+  const journal = path.join(root, 'tasks', `${ids[5]}.jsonl`);
+  const journal0 = sizeOf(journal);
+  await Effect.runPromise(engine.file({ id: ids[5], brief: 'again', cwd }));
+  const appended = sizeOf(journal) - journal0;
+  const before = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
+  const read = Effect.runSync(engine.io()).bytesRead - before.bytesRead;
+  assert.equal(
+    read,
+    sizeOf(path.join(root, 'feed.jsonl')) + appended,
+    `read ${read}: the feed written since, from its start, and what was appended to the one journal it names`,
+  );
+});

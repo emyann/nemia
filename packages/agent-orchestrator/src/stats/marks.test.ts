@@ -1,7 +1,7 @@
 /**
  * The change marks (`frozenOf`, `marksOf`, `marks.ts`) and their way through the stats (`statsOf`) and its words (`statsLines`): an item is
- * marked on the later run's day where its digest is known in both runs and differs, in series by factory and workflow folder and by creation
- * time, never by a name or an order listed.
+ * marked on the later run's day where its digest is known in both runs and differs, in series by factory and workflow folder and by
+ * creation time, never by a name or an order listed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +15,7 @@ const NOW = new Date('2026-09-30T12:00:00.000Z');
 const BUILD = '/a/workflows/build';
 const SKILL = 'review-a-change';
 
-/** A review step filled by `agent` (agora unless said), resolved as the parser resolves it: the agent's instructions before the step's own note. */
+/** A review step filled by agora, or the agent `more` names, as the parser resolves it: its instructions before the step's own note. */
 function review(
   more: { agent?: string; instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {},
 ): Workflow {
@@ -191,7 +191,7 @@ test('an agent that fills two steps is one item, and a skill two steps give is o
   );
 });
 
-/** Two runs of build in the default factory, agora's skill changed by the second, and between them a run of another factory, listed last. */
+/** Two runs of build in the default factory, agora's skill changed by the second, and between them one of another factory, listed last. */
 const history = (): RunFrozen[] => [
   frozen('r1', '2026-09-10T08:00:00.000Z', [implement, review()], 'v1'),
   frozen('r2', '2026-09-20T08:00:00.000Z', [implement, review()], 'v2'),

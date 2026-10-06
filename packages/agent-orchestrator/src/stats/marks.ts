@@ -120,7 +120,7 @@ const byCreated = (a: RunFrozen, b: RunFrozen): number => inOrder(a.at, b.at) ||
 const byMark = (a: Mark, b: Mark): number =>
   inOrder(a.day, b.day) || inOrder(a.run, b.run) || inOrder(a.kind, b.kind) || inOrder(a.name, b.name);
 
-/** The marks of one factory's runs of one workflow folder, each item against the nearest run before it that froze an item of that kind and name. */
+/** The marks of one factory's runs of a workflow folder, each item against the nearest run before that froze one of its kind and name. */
 function seriesMarks(runs: readonly RunFrozen[]): Mark[] {
   const last = new Map<string, { run: string; digest: string | null }>();
   const marks: Mark[] = [];

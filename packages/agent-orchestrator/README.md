@@ -209,8 +209,8 @@ wf stats --json                            # what GET /api/stats answers
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
   instructions, skills and harness prompt, or a skill as `wf start` rendered it, that differs from what
   the run of the same factory and workflow folder created just before it froze for the same item (the
-  default factory is its own). It falls on the UTC day the later run was created, names the run it is compared with, and respects the filters and
-  the days. Where either run does not say — a record without its agent's instructions, a rendered
+  default factory is its own). It falls on the UTC day the later run was created, names the run it is
+  compared with, and respects the filters and the days. Where either run does not say — a record without its agent's instructions, a rendered
   folder gone — and on an item's first appearance, there is no mark.
 
 ## Where this stops

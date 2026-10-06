@@ -1,5 +1,5 @@
 /** A step's session output and its check's, as the board is given them: the end of each, and what a refused check said. */
-import { phaseOfView, verdictWord, type Views } from 'agent-orchestrator';
+import { attemptVerdict, phaseOfView, verdictWord, type Views } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { engineRead, type Engine } from '../store.ts';
@@ -94,16 +94,15 @@ const unreadableOutput = (run: Run, taskId: string, err: unknown): string =>
 
 /**
  * A check of one try, off the engine's view of its task: the command, its verdict, and once it refused, what it exited with and
- * the end of its stderr, read before for every refused check (`refusedStderr`) — its stdout left unread (`StepCheck`). A check is filed
- * for the step, so a settled one's record has a verdict: an exit code, or `unfinished` — `exitVerdicts`' reading, for a try that need not
- * be the current one.
+ * the end of its stderr, read before for every refused check (`refusedStderr`) — its stdout left unread (`StepCheck`). The verdict is
+ * the package's `attemptVerdict` on the last attempt of the try's own check, whichever try: its exit code, or `unfinished` for one that
+ * recorded none or that its deadline or an operator ended, as the tick, `nemia ls` and `nemia decide` read it.
  */
 export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr): StepCheck {
   if (!taskId) return { command, taskId: null, verdict: null, refused: null };
   const view = views.get(taskId);
   const phase = phaseOfView(view);
-  const exitCode = view?.state.attempts.at(-1)?.exitCode;
-  const exit = verdictWord(typeof exitCode === 'number' ? exitCode : 'unfinished');
+  const exit = verdictWord(attemptVerdict(view?.state.attempts.at(-1)));
   const refused = refusedIn(views)(taskId);
   const said = stderr.get(taskId) ?? NO_LINES;
   return {
@@ -122,10 +121,10 @@ export function checkIn(command: string, taskId: string | undefined, views: View
 }
 
 /**
- * Each judged step's check: its command, and for a check that refused, what it said — what `checkReports` in views.verb.ts reads for
- * `nemia ls` and `nemia decide`, which the package does not export. The current try's stdout is read through the engine's `output`, which
- * observes no harness; a check run before the runtime kept its streams kept none, and is read off its log, a `logs` call that observes
- * its harness again: on one run's page, and never on the list.
+ * Each judged step's check: its command, and for a check that refused, what it said, as `nemia decide` shows it. The current try's stdout
+ * is read through the engine's `output`, which observes no harness. A check that kept no stdout — filed before the runtime kept its
+ * streams, or stopped before its process wrote one — is read off its log, as `nemia decide` reads it: a `logs` call that observes its
+ * harness again, on one run's page and never on the list.
  */
 export async function checksOf(
   e: Engine['Service'],

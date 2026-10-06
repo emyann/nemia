@@ -416,7 +416,7 @@ const openAttemptOf = (taskId: string, state: State, resume: string): { last: At
   return { last };
 };
 
-/** The W3C trace context of the span this runs in (`traceparentOf`): the filing's own, for its sessions to join; undefined where none is. */
+/** The W3C trace context of the span this runs in (`traceparentOf`): the filing's, for its sessions to join; undefined where none is. */
 const filingSpan = Effect.currentSpan.pipe(Effect.match({ onFailure: () => undefined, onSuccess: traceparentOf }));
 
 /** An observe count with nothing counted: a harness this engine has not observed yet. */

@@ -398,10 +398,9 @@ export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.sta
 /**
  * What a settled check said, for a person to read.
  *
- * `passed` is the engine's settled phase — the worker's reading of the exit code, and the only thing
- * the run gates on. The rest is evidence: the exit code its attempt recorded (`attemptVerdict`), and the last lines of
- * each stream, kept apart because a loud stderr must not push a test runner's stdout verdict off the
- * screen.
+ * `passed` is whether its task settled `succeeded`. `verdict` is what its latest attempt exited with, or `unfinished` (`attemptVerdict`):
+ * the word the tick tells a refusal from a check that did not finish by (`exitVerdicts`, `refusedCheck`), and the one `nemia ls` and the
+ * api say. Then the last lines of each stream, kept apart so that a loud stderr does not push stdout's last lines off the screen.
  */
 export type CheckReport = { command: string; passed: boolean; verdict: Verdict; stdout: string; stderr: string };
 
@@ -436,8 +435,8 @@ export const refusalRead = Effect.fn('refusalOf')(function* (command: string, ta
 
 /**
  * What a checked step's check said, for the step filed after it (`checkHandedSection`): the verdict, the tails of its streams, and the
- * lines it marked (`reportedLines`) from its whole stdout (`checkStreams`). With no stdout kept — a check run before the runtime kept its
- * streams — the marked lines come from the log, which keeps only the end, and are `partial`. A read that rejects, with anything, is
+ * lines it marked (`reportedLines`) from its whole stdout (`checkStreams`). Where `output` gave no stdout — no attempt yet, or none kept
+ * under its name — the marked lines come from the log, which keeps only the end, and are `partial`. A read that rejects, with anything, is
  * `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read throws.
  */
 export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
@@ -494,9 +493,9 @@ const TAIL_BYTES = 64_000;
 
 /**
  * A check's verdict and streams, off the engine: the verdict of its latest attempt (`attemptVerdict`), its stderr's last `TAIL_BYTES`,
- * and its stdout — whole, or its last `stdoutBytes` — through `output`, which the runtime keeps whole for a check. Where it kept none
- * (`kept` false: a check run before the runtime kept them), stderr is empty and stdout is the end of the log. Dies of what a read failed
- * with, in the runtime's words (`asked`).
+ * and its stdout — whole, or its last `stdoutBytes` — through `output`, which the runtime keeps whole for a check. Where `output` gives no
+ * stdout (`kept` false: no attempt yet, or none kept under its name), stderr is what `output` gave or empty, and stdout is the end of the
+ * log. Dies of what a read failed with, in the runtime's words (`asked`).
  */
 const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, stdoutBytes?: number) {
   const view = yield* asked('view', e.view(taskId));

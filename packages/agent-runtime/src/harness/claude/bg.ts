@@ -156,8 +156,8 @@ export type ClaudeOptions = {
  * process (`pids`) and its start (`starts`); and, for a session a look was told began earlier — a long-lived attempt, across the
  * processes Claude Code respawned it in — when to count its usage from (`countsFrom`): set by a look told it, kept by every look
  * told nothing of it while the session is listed, and dropped with its row. Every start told comes from the journal, so no look
- * can erase another's; after a restart the registry is empty, and the pass's own look, told the start, sets it again before
- * the pass releases anything.
+ * can erase another's, and nothing rests on what survives in memory: level-triggered, after a restart the registry is empty and
+ * the pass's own look, told the start, sets it again before the pass releases anything.
  */
 type Registry = {
   listed: Map<string, SessionState>;
@@ -548,11 +548,7 @@ const countsFromOf = (expected: readonly ExpectedSession[]): Map<string, number>
  * Seen, each session read; unread, each whose transcript cannot be read while it runs (`reportedOf`), why said as a warning on
  * every look. Fails only when the listing itself cannot be read: it is every session's.
  */
-const observeInto = (
-  x: Reading,
-  registry: Registry,
-  countsFrom: ReadonlyMap<string, number>,
-): Effect.Effect<Observation, RunnerError> =>
+const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<string, number>): Effect.Effect<Observation, RunnerError> =>
   sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
     Effect.flatMap((out) => {
       const read = registryOf(out);

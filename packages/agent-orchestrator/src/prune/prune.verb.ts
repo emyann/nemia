@@ -16,7 +16,7 @@ import { filesPrunedWords, isGitRun, namesInOrder, type GitRun, type Pruned, typ
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import { decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, runWorktrees, type AskName } from '../forget/forget.ts';
-import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
+import { HOME, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { readRunPlace, RunPlace, runPlaceVerb, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
@@ -98,8 +98,7 @@ const pruning = Effect.fn('prune')(function* (
   if (!('inventory' in place))
     return { id, kind: 'refused', refusal: inventoryUnread('prune', id, run.repo, place), ...none } satisfies Pruning;
   const listed = placeWorktrees(run, steps, within, place).filter((w) => !(w.prunable && w.locked === undefined));
-  const filesDir = path.join(runsDir(), id, 'artifacts');
-  const files = artifacts && lstatOf(filesDir)?.isDirectory() ? filesDir : undefined;
+  const files = artifacts ? runStore.runs.filesAt(id) : undefined;
   if (!listed.length && !files) return nothingLeft(run, place, { yes, artifacts });
 
   const judged = yield* judgedOf(e, run, steps, { unmerged, artifacts });
@@ -247,9 +246,9 @@ function removeAll(
   try {
     fs.rmdirSync(within);
   } catch {}
-  const files = kept ? removeFiles(kept) : undefined;
+  const files = kept ? removeFiles(run.id, kept) : undefined;
   if (files?.left) left.push(files.left);
-  const filesWent = files !== undefined && (files.freed > 0 || !lstatOf(kept!.path));
+  const filesWent = files !== undefined && (files.freed > 0 || !files.left);
   runStore.runs.prune(run.id, !removed.length && !filesWent ? run.pruned : marker(removed, filesWent ? files.freed : undefined));
   return {
     id: run.id,
@@ -281,16 +280,10 @@ function removeWorktrees(run: GitRun, place: RunPlaceRead, worktrees: ReadonlyAr
 }
 
 /** Remove the run's files directory, and answer what it freed, and what would not go when not all of it did. */
-function removeFiles(kept: { path: string; bytes: number }): { freed: number; left?: Pruning['left'][number] } {
-  try {
-    fs.rmSync(kept.path, { recursive: true, force: true });
-    return { freed: kept.bytes };
-  } catch (err) {
-    return {
-      freed: Math.max(0, kept.bytes - diskBytes(kept.path)),
-      left: { path: kept.path, files: (err as Error).message.split('\n')[0] },
-    };
-  }
+function removeFiles(id: string, kept: { path: string; bytes: number }): { freed: number; left?: Pruning['left'][number] } {
+  const why = runStore.runs.dropFiles(id);
+  if (why === null) return { freed: kept.bytes };
+  return { freed: Math.max(0, kept.bytes - diskBytes(kept.path)), left: { path: kept.path, files: why } };
 }
 
 /**

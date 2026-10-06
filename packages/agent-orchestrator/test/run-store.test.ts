@@ -5,7 +5,9 @@
  * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
  * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
  * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file. And the inbox: its entries, a
- * card filed exclusively, rewritten keeping its filing time, dropped, and the tick's tries put, read and dropped.
+ * card filed exclusively, rewritten keeping its filing time, dropped, and the tick's tries put, read and dropped. And what `nemia rm`,
+ * `nemia prune --artifacts` and `nemia start <path>` read of it: every run's id read or not, a run's files directory found and dropped,
+ * and the card a path names.
  *
  * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
  * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as
@@ -554,6 +556,81 @@ function sourcesOfSrc(): Record<string, string> {
   }
   return out;
 }
+
+test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
+  const listed = (): string[] => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-'));
+  made('r-ids-read');
+  fs.writeFileSync(runFile('r-ids-torn'), '{ "id": ');
+  markCancelled('r-ids-cancelled');
+  filesStore.holds.put('r-ids-held', ['x'], {});
+  fs.mkdirSync(asksDir('r-ids-asked'), { recursive: true });
+  assert.deepEqual(listed(), ['r-ids-read', 'r-ids-torn']);
+  assert.ok(!filesStore.runs.list(() => {}).some((run) => run.id === 'r-ids-torn'), 'where list leaves the torn record out');
+});
+
+test('no run id is listed with no runs folder', () => {
+  const away = path.join(scratch('wf-run-store-ids-'), 'runs');
+  fs.renameSync(runsDir(), away);
+  try {
+    assert.deepEqual(filesStore.runs.ids(), []);
+  } finally {
+    fs.renameSync(away, runsDir());
+  }
+});
+
+test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
+  const files = (id: string): string => path.join(runsDir(), id, 'artifacts');
+  fs.mkdirSync(files('r-files-there'), { recursive: true });
+  assert.equal(filesStore.runs.filesAt('r-files-there'), files('r-files-there'));
+  assert.equal(filesStore.runs.filesAt('r-files-never'), undefined);
+  fs.mkdirSync(path.join(runsDir(), 'r-files-linked'), { recursive: true });
+  fs.symlinkSync(files('r-files-there'), files('r-files-linked'));
+  assert.equal(filesStore.runs.filesAt('r-files-linked'), undefined);
+});
+
+test("a run's files directory dropped is gone, and one never there drops as gone", () => {
+  const files = path.join(runsDir(), 'r-drop-files', 'artifacts');
+  fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
+  fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
+  assert.equal(filesStore.runs.dropFiles('r-drop-files'), null);
+  assert.equal(fs.existsSync(files), false);
+  assert.equal(fs.existsSync(path.join(runsDir(), 'r-drop-files')), true, 'the run keeps its own directory');
+  assert.equal(filesStore.runs.dropFiles('r-drop-never'), null);
+});
+
+test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (t) => {
+  if (process.getuid?.() === 0) return t.skip('root removes what a mode forbids');
+  const files = path.join(runsDir(), 'r-drop-stuck', 'artifacts');
+  fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
+  fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
+  fs.chmodSync(path.join(files, 'implement'), 0o555);
+  t.after(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
+  const why = filesStore.runs.dropFiles('r-drop-stuck');
+  assert.match(why ?? '', /EACCES/);
+  assert.ok(!why?.includes('\n'), why ?? '');
+  assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
+});
+
+test('a path names an inbox card by its file, by its name, through a link to the inbox, and in an inbox that is a link; and no card outside it', () => {
+  const inbox = path.join(ROOT, 'inbox');
+  fs.mkdirSync(inbox, { recursive: true });
+  assert.equal(filesStore.inbox.nameAt(path.join(inbox, 'c-named.md')), 'c-named');
+  assert.equal(filesStore.inbox.nameAt(path.join(inbox, 'c-named')), 'c-named');
+  const linked = path.join(scratch('wf-run-store-link-'), 'cards');
+  fs.symlinkSync(inbox, linked);
+  assert.equal(filesStore.inbox.nameAt(path.join(linked, 'c-named.md')), 'c-named');
+  assert.equal(filesStore.inbox.nameAt(path.join(ROOT, 'elsewhere', 'c-named.md')), null);
+  assert.equal(filesStore.inbox.nameAt('add a flag'), null);
+  const real = path.join(scratch('wf-run-store-real-'), 'inbox');
+  fs.renameSync(inbox, real);
+  fs.symlinkSync(real, inbox);
+  try {
+    assert.equal(filesStore.inbox.nameAt(path.join(real, 'c-named.md')), 'c-named', 'an inbox that is itself a link');
+  } finally {
+    fs.rmSync(inbox);
+    fs.renameSync(real, inbox);
+  }
+});
 
 test('a file that imports a run function from record.store.ts is refused, naming the file and the function', () => {
   const sources = { 'src/new/new.verb.ts': "import { readRun, stepsOf } from '../record/record.store.ts';\n" };

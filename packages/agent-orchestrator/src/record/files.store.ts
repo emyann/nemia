@@ -9,7 +9,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
-import type { QueueTry } from '../inbox/inbox.ts';
+import { inboxNameOf, type QueueTry } from '../inbox/inbox.ts';
 import type { AskKey, AskKind, AsksRead, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
@@ -177,6 +177,48 @@ function runIdTaken(id: string): boolean {
     return false;
   }
   return names.some((name) => name === id || name.startsWith(`${id}.`));
+}
+
+/** The id of every `<id>.json` under `runs/`, read or not, sorted; none when there is no `runs/`. */
+function runIds(): string[] {
+  try {
+    return fs
+      .readdirSync(runsDir())
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => path.basename(f, '.json'))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+/** The run's files directory, `runs/<id>/artifacts`. */
+const filesDir = (id: string): string => path.join(runsDir(), id, 'artifacts');
+
+/** The run's files directory while it is a directory and no link; else undefined. */
+const filesAt = (id: string): string | undefined => (lstatOf(filesDir(id))?.isDirectory() ? filesDir(id) : undefined);
+
+/** Remove the run's files directory: null once it is gone; else the first line of what the filesystem said. */
+function dropFiles(id: string): string | null {
+  try {
+    fs.rmSync(filesDir(id), { recursive: true, force: true });
+    return null;
+  } catch (err) {
+    return lstatOf(filesDir(id)) ? ((err as Error).message.split('\n')[0] ?? '') : null;
+  }
+}
+
+/** The name of the inbox card `given` is a path to, links resolved on the way to it and to the inbox (`inboxNameOf`); else null. */
+function inboxNameAt(given: string): string | null {
+  const real = (at: string): string => {
+    try {
+      return fs.realpathSync(at);
+    } catch {
+      return at;
+    }
+  };
+  const at = path.resolve(given);
+  return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxDir()));
 }
 
 /** Write the prune marker whole, or remove it for `undefined`. */
@@ -373,6 +415,9 @@ export const filesStore: RunStore = {
     calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(pauseFile()),
     cancel: markCancelled,
     forget: removeRunFiles,
+    ids: runIds,
+    filesAt,
+    dropFiles,
     prune: writePruned,
   },
   asks: { read: readAllAsks, answers: readAnswers, consume: consumeAllAsks, write: writePersonAsk, where: askWhere },
@@ -392,6 +437,7 @@ export const filesStore: RunStore = {
     rewrite: rewriteCard,
     drop: dropCard,
     where: (file) => path.join(inboxDir(), file),
+    nameAt: inboxNameAt,
     tries: queueTries,
     putTry,
     dropTry: (name) => fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true }),

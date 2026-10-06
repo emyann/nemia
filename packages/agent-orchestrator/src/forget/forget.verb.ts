@@ -25,7 +25,7 @@ import {
   type ForgetHow,
   type Forgot,
 } from './forget.ts';
-import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
+import { HOME, lstatOf, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { readPlaceJson, readRunPlace, runPlaceVerb, RunPlace, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
@@ -336,14 +336,7 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
   try {
     logs = fs.readdirSync(checks);
   } catch {}
-  let otherIds: string[] = [];
-  try {
-    if (!names)
-      otherIds = fs
-        .readdirSync(runsDir())
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => path.basename(f, '.json'));
-  } catch {}
+  const otherIds = names ? [] : runStore.runs.ids();
   for (const file of checkLogsOf(id, names, logs, otherIds)) remove(path.join(checks, file));
   try {
     fs.rmdirSync(path.join(HOME, 'worktrees', id));

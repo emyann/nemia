@@ -6198,7 +6198,7 @@ test('REFUSED at shipped defaults: a worktree on no branch — its session stopp
   assert.deepEqual([forgot.kind, forgot.removed, forgot.handedOff], ['forgotten', [q.wt], []]);
 });
 
-test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id plus the suffix of one of its files — `<id>.json`, `<id>.cancelled`, `<id>.asks`, as `ls runs/` gives them — exit 2, saying the id to give; its record, cancellation and asks stay. Nor does a run with no record take a live run's check logs: `nemia rm <id>-implement` leaves `<id>-implement-check.stderr`", async (t) => {
+test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id plus the suffix of one of its files — `<id>.json`, `<id>.cancelled`, `<id>.asks`, as `ls runs/` gives them — exit 2, saying the id to give; its record, cancellation and asks stay. Nor does a run with no record take a live run's check logs: `nemia rm <id>-implement` leaves `<id>-implement-check.stderr`, nor a run's whose record does not read", async (t) => {
   const repo = aRepo();
   const b = board();
   const live = await aParent(repo, b);
@@ -6245,6 +6245,14 @@ test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id 
   const sibling = await rmTyped(t, b.e, `${id}-implement`);
   assert.deepEqual([sibling.error, sibling.printed], [undefined, [`${id}-implement  no such run — nothing to forget`]]);
   assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
+
+  const torn = 'torn-record-x2';
+  fs.writeFileSync(path.join(ROOT, 'runs', `${torn}.json`), '{ "id": ');
+  fs.writeFileSync(path.join(ROOT, 'checks', `${torn}-review-check.stderr`), "a torn run's\n");
+  t.after(() => fs.rmSync(path.join(ROOT, 'runs', `${torn}.json`), { force: true }));
+  const prefix = await rmTyped(t, b.e, 'torn-record');
+  assert.deepEqual([prefix.error, prefix.printed], [undefined, ['torn-record  no such run — nothing to forget']]);
+  assert.ok(under('checks', `${torn}-review-check.stderr`), 'nor a run whose record does not read');
 });
 
 test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before `nemia rm` forgot it hands nothing off and collects nothing afterwards — its workspace, the repository, is still there, and its files directory is not made again', async () => {
@@ -7091,7 +7099,8 @@ const startProgram = async () => {
   const { startRun } = await import('../src/start/start.verb.ts');
   const { Invalid, isRefusal } = await import('../src/refusal/refusal.ts');
   const { inputsDir, runsDir } = await import('../src/record/record.store.ts');
-  return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir };
+  const { runStore } = await import('../src/record/files.store.ts');
+  return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir, runStore };
 };
 
 /**
@@ -7201,6 +7210,43 @@ test('a run whose inputs cannot be copied is what the start program dies of, not
   assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
   assert.deepEqual(fs.readdirSync(s.runsDir()).sort(), before, 'no record, and no run directory');
 });
+
+test(
+  'a run that dies once its own directory is made takes that directory with it: an input that cannot be read, a skill that cannot be ' +
+    'rendered — exit 1, and nothing of it is left',
+  { skip: process.getuid?.() === 0 && 'root reads a file of mode 000' },
+  async (t) => {
+    const s = await startProgram();
+    const unreadable = (at: string) => {
+      fs.writeFileSync(at, 'kept from the run\n');
+      fs.chmodSync(at, 0o000);
+      t.after(() => fs.chmodSync(at, 0o644));
+    };
+    const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+    unreadable(input);
+    const team = folderTeam();
+    const skill = path.join(path.dirname(team), 'skills', 'noting');
+    fs.mkdirSync(skill, { recursive: true });
+    fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: noting\ndescription: How a note is kept.\n---\nKeep it short.\n');
+    unreadable(path.join(skill, 'form.md'));
+    const writer = path.join(path.dirname(team), 'agents', 'writer.md');
+    fs.writeFileSync(writer, fs.readFileSync(writer, 'utf8').replace('description:', 'skills: noting\ndescription:'));
+    const cases: Array<[string, Parameters<typeof startRun>[0], RegExp]> = [
+      ['an input', { brief: 'unreadable', repo: aRepo(), workflowDir: folder(), inputs: [input] }, /^--input: the run's files could/],
+      ['a skill', { brief: 'unrendered', repo: ROOT, workflowDir: team }, /^the steps' agents could not be rendered into /],
+    ];
+    for (const [what, opts, said] of cases) {
+      const before = fs.readdirSync(s.runsDir()).sort();
+      const err = await rejected(async () => await Effect.runPromise(startRun(opts)), what);
+      assert.equal((err as Error & { exitCode?: number }).exitCode, 1, `${what}: ${String(err)}`);
+      assert.match((err as Error).message, said, what);
+      const id = /runs\/([a-z0-9-]+)\//.exec((err as Error).message)?.[1] ?? '';
+      assert.ok(id, `${what}: the message names the run's directory: ${(err as Error).message}`);
+      assert.equal(s.runStore.runs.taken(id), false, `${what}: nothing of ${id} is left`);
+      assert.deepEqual(fs.readdirSync(s.runsDir()).sort(), before, `${what}: no record, and no run directory`);
+    }
+  },
+);
 
 test('the start program says in its type that it refuses and requires nothing: a run, a refusal, no service', async () => {
   const s = await startProgram();

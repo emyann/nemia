@@ -554,6 +554,15 @@ export type RunStore = {
      * a trailing `/`. Writes nothing.
      */
     readonly forget: (id: string) => string[];
+    /**
+     * The id of every run whose record file is in the store, read or not, sorted: what `nemia rm` keeps another run's check logs by,
+     * where `list` would leave out a record that does not read. None when there is no store.
+     */
+    readonly ids: () => string[];
+    /** The run's files directory, the files its steps handed on: its path while it is a directory and no link; else undefined. */
+    readonly filesAt: (id: string) => string | undefined;
+    /** Remove the run's files directory: null once it is gone, there before or not; else the first line of why it would not go. */
+    readonly dropFiles: (id: string) => string | null;
     /** Write the prune marker a person's `nemia prune` puts on the run, whole over the one there; `undefined` takes the marker away. */
     readonly prune: (id: string, marker: Pruned | undefined) => void;
   };
@@ -625,6 +634,11 @@ export type RunStore = {
     readonly drop: (file: string) => boolean;
     /** Where a person finds the inbox's entry `file`: the path a message names. */
     readonly where: (file: string) => string;
+    /**
+     * The name of the card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on
+     * the way to both — or null for a path outside it, and for text: the inverse of `where`.
+     */
+    readonly nameAt: (given: string) => string | null;
     /**
      * The tick's tries of a queued card's start that did not happen, by card name. A file that does not read as one, torn or removed
      * after the listing, is none.

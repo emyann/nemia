@@ -437,7 +437,8 @@ export const codex: HarnessSpec = {
 
 The start event is where the session's own id is read, by the worker, off whole lines of stdout: the first JSON object whose keys
 hold `event`'s values, its `id` field a string of hex and dashes, 16 or more. A start printed with anything else there is refused
-(`startRefused` on the run file): that session is unread, and the harness's others are read.
+(`startRefused` on the run file): that session is unread while its process runs, and read as failed, with no id, once it has
+ended, so its task settles and `ae forget` can let it go; the harness's others are read.
 
 Exit 0 is success, anything else is failure. That is all a generic harness has to say, and it is
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,

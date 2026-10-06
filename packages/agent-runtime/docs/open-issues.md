@@ -774,6 +774,17 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
   to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
   gap above already leaves too wide. Found in review of the run that made a failed observe say so.
 
+### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06)
+
+A line of `codex exec --json` of a type the runtime reads that `CodexEventSchema` (`harness/codex/stream.ts`) does not decode fails
+the Codex harness's whole look, so every Codex session is unread, by design (issue 35), until the run file whose output it is goes.
+Nothing makes it go: `ae forget` takes only a settled task, refuses a session its harness could not be read for (`sessionsHeld`,
+`service/forget.ts`), and a task with no deadline on that harness never settles — the gap issue 35 names. The one way out today is a
+hand removal of the run, which the repository's rules forbid. The same trap was found, and closed, for a session whose start event
+does not decode: unread only while its process runs, then read as failed with no id (`refusedAtWork`, `harness/detached/detached.ts`;
+`test/start-event.test.ts`). A refused output is not closed here: it is read off a run whose process may have ended, so the same
+answer — read the run that refused as failed once it has ended, and its harness's others as read — is the candidate fix.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

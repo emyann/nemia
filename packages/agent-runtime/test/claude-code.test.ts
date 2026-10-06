@@ -808,11 +808,29 @@ test('a task with no mounts is given the argv it was given before mounts existed
   assert.deepEqual(argvs, PINNED_ARGV);
 });
 
+/** Paths a permission rule cannot carry, one per character `CLAUDE_UNRULED` holds: each ends, misses or widens the rule. */
+const UNRULED_MOUNTS = [
+  '/srv/(x)',
+  '/srv/a)',
+  '/srv/*',
+  '/srv/a?',
+  '/srv/[a]',
+  '/srv/a]',
+  '/srv/a\\b',
+  '/srv/a\tb',
+  '/srv/a\nb',
+  `/srv/a${String.fromCharCode(0xa0)}b`,
+  `/srv/a${String.fromCharCode(0x2028)}b`,
+];
+
+/** Paths a permission rule carries, as measured on Claude Code 2.1.291: a space, a comma and braces inside its parentheses. */
+const RULED_MOUNTS = ['/srv/my notes', '/srv/a,b', '/srv/{a,b}', '/srv/plain'];
+
 test('REFUSED at shipped defaults: a mount whose path a permission rule cannot name, read-only or writable, on a job, on a background session and on claude-detached', async () => {
   const { Engine } = await import('../src/index.ts');
   const { builtEngine } = await import('./engine.ts');
   const e = builtEngine(Engine.layer({ root: tmp('root') }));
-  for (const at of ['/srv/my notes', '/srv/a,b', '/srv/(x)', '/srv/*']) {
+  for (const at of UNRULED_MOUNTS) {
     for (const [harness, background] of [
       ['claude', false],
       ['claude', true],
@@ -825,17 +843,33 @@ test('REFUSED at shipped defaults: a mount whose path a permission rule cannot n
       );
       assert.equal(
         says,
-        `\`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`,
+        `\`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a whitespace other than a space. Mount a folder whose path has none of them, or leave the mount off.`,
         `${harness}${background ? ' --bg' : ''}: ${at}`,
       );
     }
   }
-  for (const at of ['/srv/my notes', '/srv/a,b', '/srv/(x)', '/srv/*']) {
+  for (const at of UNRULED_MOUNTS) {
     assert.equal(
       claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: at, readOnly: false }] } }),
-      `\`mounts\` gives the session ${JSON.stringify(at)} writable, and Claude Code lets a session write a folder beside its own by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`,
+      `\`mounts\` gives the session ${JSON.stringify(at)} writable, and Claude Code lets a session write a folder beside its own by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a whitespace other than a space. Mount a folder whose path has none of them, or leave the mount off.`,
       at,
     );
+  }
+});
+
+test('a mount whose path holds a space, a comma or braces is taken, read-only or writable, as a permission rule carries them', () => {
+  for (const at of RULED_MOUNTS) {
+    for (const readOnly of [true, false]) {
+      assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: at, readOnly }] } }), undefined, `${at} ${readOnly}`);
+    }
+  }
+});
+
+test("the mount guard and the vocabulary door's `unruledIn` refuse the same paths, so a caller asking the door is never refused later", async () => {
+  const { unruledIn } = await import('../src/vocabulary.ts');
+  for (const at of [...UNRULED_MOUNTS, ...RULED_MOUNTS]) {
+    const refused = claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: at, readOnly: true }] } }) !== undefined;
+    assert.equal(unruledIn('claude', at) !== undefined, refused, JSON.stringify(at));
   }
 });
 

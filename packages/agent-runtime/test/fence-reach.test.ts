@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fenceReach } from '../src/harness/reach.ts';
+import { fenceReach, unruledIn } from '../src/harness/reach.ts';
 import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
 import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
 import { claudeJob } from '../src/harness/claude/code.ts';
@@ -77,4 +77,18 @@ test('Claude Code drops auto on a listed model, named or with a suffix, and on n
 
 test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
   for (const harness of ['command', 'a2a:x', 'nope', '']) assert.equal(fenceReach(harness), undefined, harness);
+});
+
+test('the first character of a path a permission rule cannot carry is answered on Claude Code, a whitespace but the space among them, and nothing on a clean path', () => {
+  for (const harness of CLAUDES) {
+    assert.equal(unruledIn(harness, '/srv/my wf(1)/runs'), '(', harness);
+    assert.equal(unruledIn(harness, '/srv/wf*'), '*', harness);
+    assert.equal(unruledIn(harness, '/srv/a\\b'), '\\', harness);
+    assert.equal(unruledIn(harness, `/srv/my${String.fromCharCode(0xa0)}wf`), String.fromCharCode(0xa0), harness);
+    assert.equal(unruledIn(harness, '/srv/my wf,{a}'), undefined, harness);
+  }
+});
+
+test('a harness whose fence takes no rule naming a path answers nothing, whatever the path holds', () => {
+  for (const harness of ['codex', 'command', 'a2a:x', 'nobody']) assert.equal(unruledIn(harness, '/srv/wf*(x)'), undefined, harness);
 });

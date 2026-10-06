@@ -72,6 +72,7 @@ const PINNED: Record<string, string[]> = {
     'testOps',
     'tick',
     'trustedFolder',
+    'unruledIn',
     'view',
     'viewOfState',
   ],
@@ -86,6 +87,7 @@ const PINNED: Record<string, string[]> = {
     'HARNESS_CHOICES',
     'configFolderIn',
     'fenceReach',
+    'unruledIn',
   ],
 };
 

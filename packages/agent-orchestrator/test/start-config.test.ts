@@ -198,3 +198,13 @@ test("REFUSED at `nemia start`: a codex sandbox written under its former name, `
   );
   assert.deepEqual(runsWritten(), before);
 });
+
+test("a lone step in the checkout and an ending after a step start in a store whose path every permission rule carries, and their runs are written: the store's refusal asks the root", () => {
+  const lone = path.join(ROOT, 'workflows', 'lone-ending');
+  fs.mkdirSync(lone, { recursive: true });
+  fs.writeFileSync(path.join(lone, 'ship.md'), '---\nplace: git\nworkspace: main\n---\nShip it.\n');
+  for (const dir of [lone, GATED]) {
+    const id = started(dir);
+    assert.ok(runsWritten().includes(id), dir);
+  }
+});

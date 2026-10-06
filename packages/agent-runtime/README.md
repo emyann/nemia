@@ -70,10 +70,12 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/h
 - **Claude Code** (a job, `claude-detached`, `claude --bg`) holds both modes. Each mount is `--add-dir <path>`, and a read-only one
   is also `Edit(//<path>/**)` in the one `--disallowedTools` list (`claudeMountArgs`, `claudeDenies`). `--add-dir` grants writes
   as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
-  and `bypassPermissions`, a Bash redirection into it included. A read-only path a permission rule cannot name — a space, a
-  comma, a parenthesis, a glob's character — is refused. `--add-dir` also lists the folder's own `.claude/skills` in the
-  session; its `CLAUDE.md` is not read. The vocabulary door names the folders a harness reads so as its own configuration
-  (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts files into a folder it mounts.
+  and `bypassPermissions`, a Bash redirection into it included. A path a permission rule cannot carry — a parenthesis, a
+  glob's `*`, `?` or bracket, a backslash, a whitespace other than a space (`CLAUDE_UNRULED`) — is refused; a space, a comma and braces
+  are carried. The vocabulary door answers the same characters (`unruledIn`), for a caller that builds a rule from a path.
+  `--add-dir` also lists the folder's own `.claude/skills` in the session; its `CLAUDE.md` is not read. The vocabulary door
+  names the folders a harness reads so as its own configuration (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts
+  files into a folder it mounts.
 - **Codex** holds a read-only mount and is given nothing for it: its `read-only` and `workspace-write` sandboxes read the whole
   disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
   one, which only `--add-dir` would give and `exec resume` rejects.
@@ -743,7 +745,10 @@ the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lo
 a session held to its directory runs in (`held`: `dontAsk`), the modes a background session runs in without stopping to ask a
 person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
 `CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'haiku' }` is
-filed in `auto` and runs in `default`, as the measure above says.
+filed in `auto` and runs in `default`, as the measure above says. `unruledIn(harness, path)` gives the first character of `path`
+that a permission rule of the harness cannot carry, the set its mounts are refused by (`CLAUDE_UNRULED`), and `undefined` for a path
+every rule carries or a harness whose fence takes no rule naming a path, so a caller that builds a rule from a path refuses it in its
+own words first.
 
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
 started, and waiting would not change that — the OS would not create the process for a reason that stays (no binary,
@@ -2071,7 +2076,7 @@ of pure code sits beside it.
 | `src/harness/forget.ts` | what every harness's `forget` shares (`forgetFiles`): the files it keeps of a session, removed or, dry, listed, and what it leaves that is not its own |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
-| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model |
+| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model; and `unruledIn`, the first character of a path its permission rules cannot carry |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |

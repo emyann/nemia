@@ -298,7 +298,7 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
 test('REFUSED: a factory folder whose path a permission rule cannot name refuses a Claude Code step at start, naming the factory and what to do, before anything is written', async () => {
   const { loop } = fresh();
   const own = aRepo();
-  const spaced = aRepo('First Last-');
+  const spaced = aRepo('First (Last)-');
   addFactory({ name: 'spaced', repos: [own, spaced] });
   attachWorkflow({ factory: 'spaced', workflow: 'loop' });
   hireAgent({ factory: 'spaced', agent: 'implementer', step: 'loop/implement' });
@@ -451,7 +451,7 @@ test('REFUSED: a `writable:` in a run started in no factory', async () => {
 test("REFUSED: a read-only folder no permission rule can name, beside a step's `writable:` one, is said as the read-only mount it is", async () => {
   const { loop } = fresh();
   const own = aRepo();
-  const spaced = aRepo('First Last-');
+  const spaced = aRepo('First (Last)-');
   const web = aRepo();
   addFactory({ name: 'spaced-web', repos: [own, spaced, web] });
   attachWorkflow({ factory: 'spaced-web', workflow: 'loop' });

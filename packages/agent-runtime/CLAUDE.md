@@ -4,9 +4,9 @@ Agent sessions on one harness each, durably: a job that runs to its end, and a l
 (`restartPolicy: 'Always'` with `background: true`, README *A long-lived session*). It owns how a session runs: the task's command,
 mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. `decide` (`src/core/domain.ts`) is the whole judgement,
 pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the second, the
-harnesses' words, `HARNESS_CHOICES`, `fenceReach` and `configFolderIn`, loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The
-orchestrator reaches it through its one client; what is still above it and a candidate to come down is in `docs/architecture.md`, *Who
-owns what*.
+harnesses' words, `HARNESS_CHOICES`, `fenceReach`, `unruledIn` and `configFolderIn`, loads no Effect and no I/O
+(`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
+down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
 
@@ -158,6 +158,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   `auto` writes both with no allow (2.1.288, a trusted checkout and not; `claudeAllows`). `dontAsk` reads a file, a picture
   included, under a read-only added folder with no `Read` allow, and refuses it without the folder; a folder that is not
   there is no error (2.1.289).
+- **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
+  folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
+  `\*` is read as an escape, unused yet.
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
 - **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
   kept per path in `.claude.json` (`trustedFolder`, `src/harness/claude/trust.ts`), read, never written. A `--bg` permission prompt

@@ -28,7 +28,7 @@ const startOf = (pid: number): string | undefined => {
   return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
 };
 
-/** A long-lived task on Claude Code's background harness, filed with `taskConfig` and spawned once: its journal, as the engine writes it. */
+/** A long-lived task on Claude Code's background harness, filed with `taskConfig` and spawned once: its journal, as the engine writes. */
 const spawned = (taskId: string, taskConfig: object) => {
   const file = path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -1,10 +1,11 @@
 /**
- * A step is filed the artifacts folder of each step it comes after, read-only (`handedMounts`), under the store's `runs/`: a store whose
- * path no permission rule can name refuses `wf start` of a workflow with a later step on Claude Code, in the runtime's words, before
- * anything is written, rather than a filing mid-run, and so does a step whose `reads:` names the inbox (`readsMounts`). A workflow of
- * one step, handed nothing and reading no store folder, starts there.
+ * A step is filed the artifacts folder of each step it comes after, read-only (`handedMounts`), under the store's `runs/`, and a step
+ * whose `reads:` names the inbox the inbox (`readsMounts`): a store whose path no permission rule can carry refuses `nemia start` of
+ * either on Claude Code, in the store's words (`storeRootRefusal`), before anything is written and before the runtime's words about a
+ * mount the person never wrote; so does a step in the checkout, filed a read of its run's artifacts folder, before the runtime's words
+ * about a rule list. A workflow of one step, handed nothing and reading no store folder, starts there.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads; its path holds a space.
+ * `WF_ROOT` is set before the runner is imported, since it is read as the module loads; its path holds a `(`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,12 +15,11 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 
-const ROOT = path.join(scratch('wf-start-handed-'), 'First Last');
+const ROOT = path.join(scratch('wf-start-handed-'), 'First (Last)');
 fs.mkdirSync(ROOT);
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, startRun } = await import('../src/runner.ts');
-const { artifactsDir } = await import('../src/record/record.store.ts');
+const { startRun } = await import('../src/runner.ts');
 
 /** A git repository with one commit on `main`, under the store. */
 function aRepo(): string {
@@ -41,10 +41,16 @@ function folderOf(steps: Record<string, string>): string {
   return dir;
 }
 
+/** The store's words for `step`, given `what` by a rule naming a path under the store. */
+const storeWords = (step: string, what: string) =>
+  `${step}: its harness would be given ${what} by a permission rule naming a path under the store, WF_ROOT=${ROOT} ` +
+  `(~/.agent-workflows when WF_ROOT is unset), and such a rule cannot carry the "(" in it: it would name another folder, or none.\n` +
+  `Set WF_ROOT to a directory whose path holds only letters, digits, \`-\`, \`_\`, \`.\` and \`/\`, like WF_ROOT=/srv/wf, and move the store's folder there first to keep its runs.`;
+
 /** The runs on disk, by file name. */
 const runs = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
 
-test('REFUSED at shipped defaults: a store no permission rule can name refuses a later step on Claude Code at start, before anything is written', async () => {
+test("REFUSED at shipped defaults: a store no permission rule can carry refuses a later step on Claude Code at start, in the store's words, before anything is written", async () => {
   const repo = aRepo();
   const before = runs();
   let message = '';
@@ -60,9 +66,8 @@ test('REFUSED at shipped defaults: a store no permission rule can name refuses a
   } catch (err) {
     message = (err as Error).message;
   }
-  const handed = artifactsDir({ id: 'run' }, 'implement');
-  assert.match(message, /^review: /, "the later step's name first");
-  assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(handed)} read-only, and Claude Code holds a folder`), message);
+  assert.equal(message, storeWords('review', 'the artifacts folders of the steps before it'));
+  assert.doesNotMatch(message, /Mount a folder|is not a list of permission rules/);
   assert.deepEqual(runs(), before, 'nothing was written');
 });
 
@@ -73,7 +78,7 @@ test('a workflow of one step, handed nothing, starts in the same store', async (
   assert.ok(runs().includes(`${run.id}.json`), runs().join('\n'));
 });
 
-test("REFUSED at shipped defaults: a store no permission rule can name refuses a step's `reads: inbox` at start, quoting the line, before anything is written", async () => {
+test("REFUSED at shipped defaults: a store no permission rule can carry refuses a step's `reads: inbox` at start, in the store's words, before anything is written", async () => {
   const before = runs();
   let message = '';
   try {
@@ -83,27 +88,21 @@ test("REFUSED at shipped defaults: a store no permission rule can name refuses a
   } catch (err) {
     message = (err as Error).message;
   }
-  const inbox = path.join(ROOT, 'inbox');
-  assert.match(message, /^argus: `reads: inbox` \(filed as `mounts`\): /, message);
-  assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(inbox)} read-only, and Claude Code holds a folder`), message);
+  assert.equal(message, storeWords('argus', 'the inbox'));
   assert.deepEqual(runs(), before, 'nothing was written');
 });
 
-test('REFUSED at shipped defaults: a step with both `writable:` and `reads: inbox`, refused its mounts at start, quotes both lines', async () => {
-  const repos = [aRepo(), aRepo()].sort();
-  addFactory({ name: 'both', repos });
-  const web = path.basename(repos[1]);
-  fs.mkdirSync(path.join(ROOT, 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'agents', 'reader.md'), '---\nharness: claude\n---\nRead what you are asked.\n');
-  const workflowDir = folderOf({ argus: `agent: reader\nwritable: ${web}\nreads: inbox` });
-  attachWorkflow({ factory: 'both', workflow: path.basename(workflowDir) });
+test("REFUSED at shipped defaults: a step in the checkout, under a store whose path holds a `(`, is refused in the store's words, never the runtime's about a rule list or a mount", async () => {
   const before = runs();
-  let message = '';
+  let failed: (Error & { _tag?: string; exitCode?: number }) | undefined;
   try {
-    await Effect.runPromise(startRun({ brief: 'read it', repo: repos[0], workflowDir, isolate: false, factory: 'both' }));
+    await Effect.runPromise(startRun({ brief: 'ship it', repo: aRepo(), workflowDir: folderOf({ ship: 'workspace: main' }) }));
   } catch (err) {
-    message = (err as Error).message;
+    failed = err as Error & { _tag?: string; exitCode?: number };
   }
-  assert.ok(message.startsWith(`argus: \`writable: ${web}\` and \`reads: inbox\` (filed as \`mounts\`): `), message);
+  assert.equal(failed?._tag, 'Invalid', failed?.message);
+  assert.equal(failed?.exitCode, 2);
+  assert.equal(failed?.message, storeWords('ship', "a read of its run's artifacts folder"));
+  assert.doesNotMatch(failed?.message ?? '', /is not a list of permission rules|Mount a folder/);
   assert.deepEqual(runs(), before, 'nothing was written');
 });

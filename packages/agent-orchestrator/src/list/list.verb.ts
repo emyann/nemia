@@ -8,7 +8,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { RunSlot } from '../cap/cap.ts';
 import { runSlots } from '../cap/cap.verb.ts';
-import { isGitRun, runTasks, unjudgedWords, type Run, type TaskPhase } from '../record/record.ts';
+import { isGitRun, runTasks, unjudgedWords, unloadedWords, type Run, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { holdsOf, waitsOf, type ParentRun } from '../wait/wait.ts';
 import { listing, type Listing, type RunsListed, type Unjudged } from './list.ts';
@@ -16,7 +16,7 @@ import { assess, type Assessment } from '../tick/assess.ts';
 import { runSpend, type BranchStanding, type Spend, type SpendOf } from '../status/status.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { stepsOf, stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { branchReader, resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import {
@@ -139,8 +139,8 @@ export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = br
   runReading(e, run, { slot, git, checkout: true });
 
 /**
- * What `list` reads of `run`, or why it is left unjudged (`unjudgedOf`): a run a task journal of which does not read; any other failure of
- * the read is the program's.
+ * What `list` reads of `run`, or why it is left unjudged (`unjudgedOf`): a run a task journal of which does not read, or whose unfrozen
+ * folder does not load; any other failure of the read is the program's.
  */
 const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined, git: BranchReader) {
   const exit = yield* Effect.exit(list(e, run, slot, git));
@@ -152,8 +152,9 @@ const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: R
 /**
  * `nemia ls`'s answer: every run, or the one named, each as `list` reads it, and which daemon ticks the store (`daemonStanding`). The cap
  * on runs in flight is judged over the whole store even for one run; each task is viewed once and each repository's branches listed once
- * (`viewedOnce`, `branchReader`). A run a task journal of which does not read is answered unjudged (`unjudgedOf`); any other failure
- * rejects. Refuses a run named that is not in the store, as `runStore.runs.read` does.
+ * (`viewedOnce`, `branchReader`). A run a task journal of which does not read, or whose unfrozen folder does not load, is answered
+ * unjudged (`unjudgedOf`), the second with no result branch (`resultOf`); any other failure rejects. Refuses a run named that is not in
+ * the store, as `runStore.runs.read` does.
  */
 export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const e = yield* EngineService;
@@ -168,14 +169,17 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
     const held = yield* runSlots(viewed, runId ? runStore.runs.list() : runs);
     for (const run of runs) {
       const read = yield* readOrUnjudged(viewed, run, held.get(run.id), git);
-      listed.push({ run, listed: read, result: resultBranches(run) });
-      reads.push({ run, read, staged: () => mergeStaged(run, stepsOf(run), memo) });
+      listed.push({ run, listed: read, result: resultOf(run) });
+      reads.push({ run, read, staged: () => mergeStaged(run, stepsOrNone(run), memo) });
     }
   }
   const pause = readPause();
   const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
   return { runs: listed, daemon: daemonStanding(), ...paused } satisfies RunsListed;
 });
+
+/** The run's result branches (`resultBranches`); none for a run whose unfrozen folder does not load, which cannot say its result steps. */
+const resultOf = (run: Run): string[] => (stepsOrNone(run).length ? resultBranches(run) : []);
 
 /** A run, the package's reading of it or why it is left unjudged, and whether a merge is staged in its checkout (`mergeStaged`). */
 type Read = { run: Run; read: RunReading | Unjudged; staged: () => boolean };
@@ -187,7 +191,7 @@ type Read = { run: Run; read: RunReading | Unjudged; staged: () => boolean };
  */
 const heldOf = ({ run, read, staged: merging }: Read): Pick<Paused, 'staged' | 'held'> => {
   const checks = 'assessed' in read ? (read.assessed.paused?.checks ?? []) : [];
-  const landings = stepsOf(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
+  const landings = stepsOrNone(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
   const staged: PauseStaged[] =
     landings.length && isGitRun(run) && merging() ? landings.map((s) => ({ run: run.id, step: s.name, repo: run.repo })) : [];
   const held: PauseHeld[] = checks.filter((step) => !staged.some((s) => s.step === step)).map((step) => ({ run: run.id, step }));
@@ -213,7 +217,7 @@ const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: rea
     finishing: finishingAmong(
       runs,
       (taskId) => read.get(taskId),
-      stepsOf,
+      stepsOrNone,
       (run) => runStore.asks.read(run.id).asks,
     ),
     ...heldAmong(reads),
@@ -236,17 +240,18 @@ export const pausedRead = Effect.fn('pausedRead')(function* () {
 
 /** Whether `run` has a step with a `check:` whose session was filed and whose check was not: one the pause can hold. */
 const checkDue = (run: Run): boolean =>
-  stepsOf(run).some((s) => s.check !== undefined && run.steps[s.name]?.taskId && !run.steps[s.name]?.check);
+  stepsOrNone(run).some((s) => s.check !== undefined && run.steps[s.name]?.taskId && !run.steps[s.name]?.check);
 
 /**
  * The readings of those of `runs` the pause can hold a check of (`heldOf`): each whose ending lands on its check while a merge is staged
  * in its checkout (`mergeStaged`, asked once a run), read as `nemia ls` reads it, and each other with a check due (`checkDue`), read
- * without asking git where its branches stand. A run a task journal of which does not read (`unreadableJournal`) is left out, as the tick
- * leaves it unjudged; any other failure throws. `memo` is the read's reading of its places (`StatusMemo`).
+ * without asking git where its branches stand. A run a task journal of which does not read (`unreadableJournal`), or whose unfrozen
+ * folder does not load (`stepsOrNone`), is left out, as the tick leaves it unjudged; any other failure throws. `memo` is the read's
+ * reading of its places (`StatusMemo`).
  */
 const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[], memo: StatusMemo = statusMemo()) {
   const holding = runs.flatMap((run) => {
-    if (mergeStaged(run, stepsOf(run), memo)) return [{ run, how: {}, staged: () => true }];
+    if (mergeStaged(run, stepsOrNone(run), memo)) return [{ run, how: {}, staged: () => true }];
     return checkDue(run) ? [{ run, how: { standings: () => [] } satisfies ReadingHow, staged: () => false }] : [];
   });
   const reads = yield* Effect.all(
@@ -270,22 +275,24 @@ const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[
 export const heldRead = (e: Engine, runs: readonly Run[], memo?: StatusMemo) => Effect.map(holdingReads(e, runs, memo), heldAmong);
 
 /**
- * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`),
- * as the tick leaves such a run where it is: why it is not judged, by `by` (`unjudgedWords`), and each step's word (`unjudgedWord`) off one
- * read of the run's own tasks (`list`), which names every one of them that does not read — a check's and an earlier try's among them.
- * Undefined for any other failure, which the caller throws.
+ * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`)
+ * or an unfrozen folder that does not load (`unloadedFolder`), as the tick leaves such a run where it is: why it is not judged, by `by`
+ * (`unjudgedWords`, `unloadedWords`), and each step's word (`unjudgedWord`) off one read of the run's own tasks (`list`), which names every
+ * one of them that does not read — a check's and an earlier try's among them; the steps of a run whose folder does not load are its
+ * record's. Undefined for any other failure, which the caller throws.
  */
 export const unjudgedOf = Effect.fn('unjudgedOf')(function* (e: Engine, run: Run, err: unknown, by: string) {
   const why = unreadableJournal(err);
-  if (why === undefined) return undefined;
+  const folder = unloadedFolder(err);
+  if (why === undefined && folder === undefined) return undefined;
   const tasks = runTasks(run);
   const listed = yield* asked('list', e.list(tasks));
   const unreadable = new Map(listed.unreadable.map((u) => [u.taskId, u.why]));
+  const word = unjudgedWord(new Map(listed.views.map((v) => [v.id, v])), unreadable);
+  const names = folder === undefined ? stepsOf(run).map((s) => s.name) : Object.keys(run.steps);
+  const steps = names.map((name) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch }));
+  if (folder !== undefined) return { said: unloadedWords(run.id, folder, by), steps } satisfies Unjudged;
   const named = (err as { taskId: string }).taskId;
   const own = tasks.find((id) => unreadable.has(id)) ?? tasks.find((id) => id === named);
-  const word = unjudgedWord(new Map(listed.views.map((v) => [v.id, v])), unreadable);
-  return {
-    said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why, by),
-    steps: stepsOf(run).map(({ name }) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch })),
-  } satisfies Unjudged;
+  return { said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why!, by), steps } satisfies Unjudged;
 });

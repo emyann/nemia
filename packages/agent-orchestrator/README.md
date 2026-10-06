@@ -682,7 +682,10 @@ windows each harness takes: `wf start` and `wf retry` ask the runtime's `configR
 config before anything is written, and say its words after the step's line (`configRefused`). The board's form offers
 the runtime's own lists (`HARNESS_CHOICES`, through the runtime's vocabulary door, `agent-runtime/vocabulary`). The load
 keeps only what the runtime cannot refuse: `tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote agent, and `sandbox:` on Claude Code, which
-would be filed as a mode.
+would be filed as a mode. Before the runtime's words, `nemia start` refuses a store, `WF_ROOT`, whose path a permission
+rule a step would be filed cannot carry — an ending's read of its run's artifacts, the folders handed to a step, the inbox — in
+the store's own words, naming `WF_ROOT` and the fix (`storeRootRefusal`); which characters a rule cannot carry is the runtime's
+answer (`unruledIn`, through `agent-runtime/vocabulary`).
 
 ### A job, or a session that stays: `background:`
 

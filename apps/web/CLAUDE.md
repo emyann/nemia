@@ -37,6 +37,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - A run added to the seed shifts every count asserted about the store (the Factory's tally, the Runs rows and headings): run the e2e to
   its end. A test about the pages reads the pages that exist, never a hard-coded last page.
 - An expectation about a time of day decides as `clockWord` does (same calendar day or not), never a hard-coded form.
+- A page that waits for a state polls through `expectNone` (`checks.ts`), never a loop of its own: `DEADLINES` (`test/waits.test.ts`)
+  allows a deadline in `checks.ts`'s assertions alone.
 - Wait with `idle(page)` (`checks.ts`), never `networkidle`: the feed stream never ends. A page that edits the store by hand where the
   board must see it says so on the feed, `fed(run, step?, word)` (`board.ts`); the board polls once a minute while it follows the feed.
 - A page that changes what the e2e's `claude` answers the quota with reloads with `reloadForQuota(page, state)` (`board.ts`): it waits for
@@ -129,5 +131,7 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 
 - `assert.deepEqual(x, [])` from `node:assert/strict` narrows `x` to `never[]` after it: assert on its length, or compare a copy.
 - No directory import in a module a test reads (`./api` is a folder Node refuses): a helper a test reads uses file imports only.
+- A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held by `test/waits.test.ts`), on a `bell` its event's
+  source rings or at a pace, given `WAITED`; `DEADLINES` refuses a hand-written deadline.
 - A component that draws a `routeLink` renders under `RouterContextProvider` over a memory-history router (`components.test.ts`); the
   markup spells React's props (`readOnly=""`).

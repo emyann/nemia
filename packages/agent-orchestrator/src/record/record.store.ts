@@ -13,8 +13,8 @@ import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, ty
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
-import { asNamed, orderSteps, type Workflow } from '../workflow.ts';
-import { FrozenStepSchema, loadWorkflows } from '../folder/folder.store.ts';
+import { asNamed } from '../workflow.ts';
+import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -323,14 +323,7 @@ const readRecord = (id: string): Run => {
   };
 };
 
-/**
- * The run's steps: the workflow it froze at `nemia start`, in the order they run (`orderSteps`).
- *
- * The folder is read only for a record that froze no workflow, never for a run `nemia start` froze, so
- * nothing written into the folder after `nemia start` reaches it. Ordered on the way out, so a record
- * frozen in the folder's order, alphabetical, reads in the order its steps run.
- */
-export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? loadWorkflows(run.workflowDir));
+export { stepsOf } from './steps.store.ts';
 
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.

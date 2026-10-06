@@ -5,6 +5,7 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { decisionQuery, ReadRefusal, retryRun, runGone, runQuery, sayToStep } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 import { decidable, detail } from './run-fixtures.ts';
+import { bell, until, WAITED } from './waits.ts';
 
 test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
   const before = globalThis.fetch;
@@ -133,75 +134,84 @@ test('an answer with nothing to say says what came back: the status line of an e
       /look on the Runs page before starting it again/.test(err.message),
   );
 });
-/** Until `done` holds, or two seconds have passed. */
-async function until(done: () => boolean): Promise<void> {
-  const by = performance.now() + 2_000;
-  while (!done() && performance.now() < by) await new Promise((resolve) => setTimeout(resolve, 5));
-}
+test(
+  "a run's decision is asked for once while a live step's engine word moves, once more when it settles — and the last one stays shown meanwhile",
+  WAITED,
+  async (t) => {
+    const answers: Array<(body: object) => void> = [];
+    const rang = bell();
+    const before = globalThis.fetch;
+    globalThis.fetch = async () => {
+      const body = await new Promise<object>((resolve) => {
+        answers.push(resolve);
+        rang.ring();
+      });
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const client = new QueryClient();
+    t.after(() => {
+      globalThis.fetch = before;
+      client.clear();
+    });
 
-test("a run's decision is asked for once while a live step's engine word moves, once more when it settles — and the last one stays shown meanwhile", async (t) => {
-  const answers: Array<(body: object) => void> = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async () => {
-    const body = await new Promise<object>((resolve) => answers.push(resolve));
-    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  const client = new QueryClient();
-  t.after(() => {
-    globalThis.fetch = before;
-    client.clear();
-  });
+    const run = (tokens: string) => ({
+      status: 'failed' as const,
+      cancelledAt: null,
+      waitingOnYou: ['implement'],
+      steps: [
+        { name: 'implement', taskId: 't-1', status: 'succeeded · BLOCKED' },
+        { name: 'tokens', taskId: 't-2', status: tokens },
+      ],
+    });
+    const observer = new QueryObserver(client, decisionQuery('r-1', decisionStamp(run('running (working)'))));
+    const shown: unknown[] = [];
+    t.after(
+      observer.subscribe((result) => {
+        shown.push(result.data);
+        rang.ring();
+      }),
+    );
 
-  const run = (tokens: string) => ({
-    status: 'failed' as const,
-    cancelledAt: null,
-    waitingOnYou: ['implement'],
-    steps: [
-      { name: 'implement', taskId: 't-1', status: 'succeeded · BLOCKED' },
-      { name: 'tokens', taskId: 't-2', status: tokens },
-    ],
-  });
-  const observer = new QueryObserver(client, decisionQuery('r-1', decisionStamp(run('running (working)'))));
-  const shown: unknown[] = [];
-  t.after(observer.subscribe((result) => shown.push(result.data)));
+    const first = decidable({ touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' } });
+    await until(t, () => answers.length === 1, 'the decision asked for once', { bell: rang });
+    answers[0](first);
+    await until(t, () => observer.getCurrentResult().data !== undefined, 'the first answer shown', { bell: rang });
 
-  const first = decidable({ touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' } });
-  await until(() => answers.length === 1);
-  answers[0](first);
-  await until(() => observer.getCurrentResult().data !== undefined);
+    for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'running (working)']) {
+      observer.setOptions(decisionQuery('r-1', decisionStamp(run(word))));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(
+      answers.length,
+      1,
+      "no ask while the poll brings tokens' engine word a little different each time, and nothing the decision reads moves",
+    );
 
-  for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'running (working)']) {
-    observer.setOptions(decisionQuery('r-1', decisionStamp(run(word))));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  assert.equal(
-    answers.length,
-    1,
-    "no ask while the poll brings tokens' engine word a little different each time, and nothing the decision reads moves",
-  );
+    observer.setOptions(decisionQuery('r-1', decisionStamp(run('unverified · done'))));
+    await until(t, () => answers.length === 2, 'the decision asked for once more, as tokens signs off', { bell: rang });
+    assert.equal(answers.length, 2, 'tokens signs off: asked once more');
+    const meanwhile = observer.getCurrentResult();
+    assert.deepEqual(
+      [meanwhile.data, meanwhile.isPlaceholderData],
+      [first, true],
+      'until the answer lands, the decision read before is what is shown',
+    );
 
-  observer.setOptions(decisionQuery('r-1', decisionStamp(run('unverified · done'))));
-  await until(() => answers.length === 2);
-  assert.equal(answers.length, 2, 'tokens signs off: asked once more');
-  const meanwhile = observer.getCurrentResult();
-  assert.deepEqual(
-    [meanwhile.data, meanwhile.isPlaceholderData],
-    [first, true],
-    'until the answer lands, the decision read before is what is shown',
-  );
-
-  const second = decidable({ touched: [], lesson: { said: 'CLAUDE.md +2 −0', state: 'written' } });
-  answers[1](second);
-  await until(() => !observer.getCurrentResult().isPlaceholderData);
-  assert.deepEqual(observer.getCurrentResult().data, second);
-  const from = shown.findIndex((data) => isDeepStrictEqual(data, first));
-  assert.ok(from >= 0, `the first answer, a copy the observer made, is among what was shown: ${JSON.stringify(shown)}`);
-  assert.ok(shown.length - from > 2, `every value from the first answer on is held to it, not the last alone: ${JSON.stringify(shown)}`);
-  assert.ok(
-    shown.slice(from).every((data) => data !== undefined),
-    `from the first answer on, never nothing, so the section does not blink out: ${JSON.stringify(shown)}`,
-  );
-});
+    const second = decidable({ touched: [], lesson: { said: 'CLAUDE.md +2 −0', state: 'written' } });
+    answers[1](second);
+    await until(t, () => !observer.getCurrentResult().isPlaceholderData, 'the second answer shown in place of the first', {
+      bell: rang,
+    });
+    assert.deepEqual(observer.getCurrentResult().data, second);
+    const from = shown.findIndex((data) => isDeepStrictEqual(data, first));
+    assert.ok(from >= 0, `the first answer, a copy the observer made, is among what was shown: ${JSON.stringify(shown)}`);
+    assert.ok(shown.length - from > 2, `every value from the first answer on is held to it, not the last alone: ${JSON.stringify(shown)}`);
+    assert.ok(
+      shown.slice(from).every((data) => data !== undefined),
+      `from the first answer on, never nothing, so the section does not blink out: ${JSON.stringify(shown)}`,
+    );
+  },
+);
 
 const { askTry } = await import('../src/lib/api.ts');
 

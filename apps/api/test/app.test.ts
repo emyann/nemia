@@ -176,6 +176,16 @@ const listed = async (id: string) => {
 /** A run as GET /api/runs/:id answers it. */
 const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
 
+/** That run `id`'s page and its decision are refused as the list leaves it unjudged, in the list's words. */
+const saysAsListed = async (id: string) => {
+  const { unreadable } = await listed(id);
+  assert.ok(unreadable, `${id} is unjudged on the list`);
+  for (const route of [`/api/runs/${id}`, `/api/runs/${id}/decision`]) {
+    const res = await app.request(route);
+    assert.deepEqual([res.status, ((await res.json()) as { error?: string }).error], [502, unreadable], `${route} says what the list says`);
+  }
+};
+
 test('health answers', async () => {
   const res = await app.request('/api/health');
   assert.equal(res.status, 200);
@@ -205,6 +215,10 @@ test('runs are read from the workflow store and summarized, with what each step 
     isolate: true,
     brief: 'Do the thing',
     workflowDir: '/code/app/workflows',
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.' },
+      { name: 'review', after: [], body: 'Review it.' },
+    ],
     createdAt: '2026-09-12T00:00:00.000Z',
     steps: { implement: { taskId: 't-1', branch: 'wf/r-1/implement' }, review: { taskId: null } },
   });
@@ -274,7 +288,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           sessionUnread: null,
         },
       ],
-      /** No workflow frozen and no folder to read: nothing says what waits on what, so every step is a root, as on the run's page. */
+      /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
       graph: { roots: ['implement', 'review'], edges: [] },
       waitingOnYou: [],
       onYou: [],
@@ -597,131 +611,42 @@ test('the api words a step as list does — `unknown` for a task the engine has 
   }
 });
 
-test('a run whose workflow folder is gone still answers, from its record', async () => {
+test('a run whose workflow folder is gone, and froze none, is answered unjudged: its list off its record, its page and decision in its words', async () => {
   const gone = path.join(NOWHERE, 'no-such-workflow');
   writeRun({ ...r2, id: 'r-3', workflowDir: gone });
 
-  const res = await app.request('/api/runs/r-3');
-  assert.equal(res.status, 200);
-  const run = (await res.json()) as RunDetail;
-  assert.ok(run.warning);
-  assert.match(run.warning, /is gone/);
-  assert.ok(run.warning.includes(gone), run.warning);
-  assert.match(run.warning, /without their spec or prose/);
+  const listing = await listed('r-3');
   assert.deepEqual(
-    run.graph,
+    listing.graph,
     { roots: ['implement', 'review'], edges: [] },
     'a record with no frozen workflow and its folder gone: nothing says what waits on what, so every step is a root',
   );
-  assert.deepEqual((await listed('r-3')).graph, run.graph);
-  assert.deepEqual(run.waitingOnYou, ['implement']);
-  const implementTry = {
-    taskId: 't-2',
-    status: 'succeeded · BLOCKED',
-    check: null,
-    closeout: blockedCloseout,
-    unreadable: null,
-    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
-  };
-  const reviewTry = {
-    taskId: null,
-    status: 'waiting',
-    check: null,
-    closeout: null,
-    unreadable: null,
-    attempts: { count: 0, latest: null },
-  };
-  assert.deepEqual(run.steps, [
-    {
-      name: 'implement',
-      spec: null,
-      filed: filedBare,
-      body: null,
-      told: filedBrief('t-2'),
-      layers: null,
-      taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
-      workspace: '/code/app/.wt/r-2/implement',
-      branch: 'wf/r-2/implement',
-      files: [],
-      filesError: null,
-      note: null,
-      roundDue: false,
-      commands: { approve: 'nemia approve r-3 implement', retry: 'nemia retry r-3 implement', say: 'nemia say r-3 implement' },
-      needs: 'Which database?',
-      blockedByHarness: false,
-      waitingFor: null,
-      approve: null,
-      denied: null,
-      sessionUnread: null,
-      gate: null,
-      accepted: null,
-      lastLine: null,
-      said: [],
-      asked: null,
-      ...implementTry,
-      used: {
-        usage: null,
-        used: 'not measured',
-        cost: 'not measured',
-        costUsd: null,
-        apiMs: null,
-        toolMs: null,
-        read: null,
-        peak: null,
-        rebuilt: 0,
-      },
-      spent: null,
-      budget: null,
-      raise: null,
-      tries: firstTry(implementTry),
-      timeline: settledTimeline('t-2'),
-    },
-    {
-      name: 'review',
-      spec: null,
-      filed: null,
-      body: null,
-      told: null,
-      layers: null,
-      taskParts: null,
-      workspace: null,
-      branch: null,
-      files: [],
-      filesError: null,
-      note: null,
-      roundDue: false,
-      commands: { approve: 'nemia approve r-3 review', retry: 'nemia retry r-3 review', say: 'nemia say r-3 review' },
-      needs: null,
-      blockedByHarness: false,
-      waitingFor: null,
-      approve: null,
-      denied: null,
-      sessionUnread: null,
-      gate: null,
-      accepted: null,
-      lastLine: null,
-      said: [],
-      asked: null,
-      ...reviewTry,
-      used: null,
-      spent: null,
-      budget: null,
-      raise: null,
-      tries: firstTry(reviewTry),
-      timeline: [],
-    },
-  ]);
+  await saysAsListed('r-3');
 
+  const unjudged = (listing: RunSummary, why: string) => {
+    const said = listing.unreadable ?? '';
+    assert.ok(said.startsWith("r-3's workflow folder does not load, so the board does not judge the run"), why);
+    assert.ok(said.includes(`does not load: no workflow folder at ${gone}`), said);
+    assert.deepEqual([listing.status, listing.moving, listing.waitingOnYou], ['running', true, []], why);
+    assert.deepEqual(
+      listing.steps.map((s) => [s.name, s.status]),
+      [
+        ['implement', 'succeeded'],
+        ['review', 'pending'],
+      ],
+      why,
+    );
+  };
   let [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
-  assert.deepEqual(withoutFolder.steps, withFolder.steps, 'same record, same engine: the same words with the folder as without it');
-  assert.deepEqual(withoutFolder.waitingOnYou, withFolder.waitingOnYou);
+  assert.deepEqual(withFolder.waitingOnYou, ['implement']);
+  unjudged(withoutFolder, 'the list says it as the tick leaves it, unjudged and in flight, its steps off its record');
 
   fs.writeFileSync(path.join(root, 'runs', 'r-2.cancelled'), '2026-09-12T03:00:00.000Z');
   fs.writeFileSync(path.join(root, 'runs', 'r-3.cancelled'), '2026-09-12T03:00:00.000Z');
   [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
   assert.deepEqual(withFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
-  assert.deepEqual(withoutFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
-  assert.deepEqual(withoutFolder.steps, withFolder.steps, 'a called-off step still says how it signed off');
+  assert.equal(withFolder.steps[0].status, 'succeeded · BLOCKED', 'a called-off step still says how it signed off');
+  unjudged(withoutFolder, 'called off, it is still unjudged: the tick reads its steps to stop it');
 });
 
 test('a folder changed since the run started keeps the steps that ran, and names what moved', async () => {
@@ -1419,7 +1344,6 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
     ['r-20', 'failed', null, 'a check refused, so what waits on that step waits for ever: a step broke'],
     ['r-8', 'failed', 'blocked', 'a step signed off blocked, so its follower will never be filed'],
     ['r-2', 'cancelled', null, 'called off, whatever its steps say'],
-    ['r-3', 'cancelled', null, 'called off, and judged from its record, its folder gone'],
   ];
   for (const [id, status, stoppedOn, why] of cases) {
     const summary = await listed(id);
@@ -1427,6 +1351,12 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
     assert.equal(summary.stoppedOn, stoppedOn, `${id} stopped on: ${why}`);
     assert.equal((await detailOf(id)).status, status, `${id} in full: ${why}`);
   }
+  assert.equal(
+    (await listed('r-3')).status,
+    'running',
+    'called off, its folder gone and no workflow frozen: unjudged, as the tick leaves it',
+  );
+  await saysAsListed('r-3');
 });
 
 test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
@@ -1490,12 +1420,6 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     ['r-5', 'running', true, 'a step queued for a slot'],
     ['r-6', 'running', true, 'a step the folder gained, which the tick would file'],
     ['r-8', 'failed', false, 'a step signed off blocked, and its follower will never be filed'],
-    [
-      'r-26',
-      'failed',
-      false,
-      'a record with no frozen workflow, its folder gone and not called off: its bare review reads as ready, and the tick, which cannot read its steps, files nothing',
-    ],
     ['r-21', 'succeeded', false, 'verified, then done on its own word'],
     ['r-2', 'cancelled', false, 'called off, nothing left running'],
     [
@@ -1511,6 +1435,13 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
     assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
   }
+  const summary = await listed('r-26');
+  assert.deepEqual(
+    [summary.status, summary.moving],
+    ['running', true],
+    'a record with no frozen workflow, its folder gone and not called off: unjudged and in flight, as the tick leaves it',
+  );
+  await saysAsListed('r-26');
 });
 
 test('a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you', async () => {

@@ -26,6 +26,17 @@ test("a field the runtime refuses alone is named by the step's line it comes fro
   );
 });
 
+test('REFUSED: a mount refused of a step with both `writable:` and `reads: inbox` quotes both lines, as `mounts` is filed from both', () => {
+  const mounts = [
+    { path: '/srv/web(1)', readOnly: false },
+    { path: '/srv/wf/inbox', readOnly: true },
+  ];
+  assert.match(
+    said('claude', { writable: ['web(1)'], reads: ['inbox'] }, { mounts })!,
+    /^implement: `writable: web\(1\)` and `reads: inbox` \(filed as `mounts`\): `mounts` gives the session /,
+  );
+});
+
 test('a field a retry chose is named by the flag as typed, before the line of the step it replaces', () => {
   assert.match(said('codex', { budget: 3 }, { budgetUsd: 5 }, { budget: 5 })!, /^implement: `--budget 5` \(filed as `budgetUsd`\): /);
   assert.match(

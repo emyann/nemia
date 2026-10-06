@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
 
 const ROOT = scratch('wf-remote-step-');
@@ -70,23 +71,26 @@ async function started(dir: string): Promise<string> {
   }
 }
 
-/** Ticks until the step's task settles, a pass after, and once more so the run reads what it came to; bounded. */
-async function settle(e: Engine, id: string): Promise<void> {
-  const until = Date.now() + 60_000;
-  while (Date.now() < until) {
-    await runWith(e, tickRun({ repo: ROOT }));
-    if ((await Effect.runPromise(e.view(`${id}-ask`))).state.settled) {
+/** Ticks in test `t`, every 100ms, until the step's task settles, a pass after, and once more so the run reads what it came to. */
+async function settle(t: Waiter, e: Engine, id: string): Promise<void> {
+  let seen = 'not read yet';
+  await until(
+    t,
+    async () => {
       await runWith(e, tickRun({ repo: ROOT }));
-      await runWith(e, tickRun({ repo: ROOT }));
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  assert.fail(`${id}-ask did not settle: ${JSON.stringify(await Effect.runPromise(e.view(`${id}-ask`)))}`);
+      const v = await Effect.runPromise(e.view(`${id}-ask`));
+      seen = JSON.stringify(v);
+      return v.state.settled;
+    },
+    () => `${id}-ask settled; it reads ${seen}`,
+    { everyMs: 100 },
+  );
+  await runWith(e, tickRun({ repo: ROOT }));
+  await runWith(e, tickRun({ repo: ROOT }));
 }
 
-/** An agent that asks for a bearer secret, declared as `name`, answering each message with `answer`; and its run, settled. */
-async function remoteRun(name: string, answer: Answer, secret: string | undefined) {
+/** An agent that asks for a bearer secret, declared as `name`, answering each message with `answer`; and its run, settled in test `t`. */
+async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string | undefined) {
   const server = await a2aServer({ token: 's3cret', answer: () => answer });
   const variable = `WF_A2A_${name.toUpperCase()}_TOKEN`;
   if (secret === undefined) delete process.env[variable];
@@ -95,7 +99,7 @@ async function remoteRun(name: string, answer: Answer, secret: string | undefine
     declare({ [name]: { url: server.url } });
     const id = await started(team(`${name}-team`, name));
     const e = engine();
-    await settle(e, id);
+    await settle(t, e, id);
     return { server, id, e, decided: await printed(['decide', id], e), listed: await printed(['ls'], e) };
   } finally {
     delete process.env[variable];
@@ -103,46 +107,58 @@ async function remoteRun(name: string, answer: Answer, secret: string | undefine
   }
 }
 
-test('a step on a remote agent is sent its brief, with the secret its card asks for, and the Task it completes signs it off', async () => {
-  const { server, id, e, decided, listed } = await remoteRun('reviewer', { text: 'It is right.' }, 's3cret');
-  assert.equal(server.sent.length, 1, 'one message, one Task');
-  const brief = server.sent[0];
-  assert.match(brief, /^Read the note and say whether it is right\.\n\n## What was asked for\n\na note on tides\n/);
-  assert.match(brief, /Files were given with it \(`nemia start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/);
-  assert.equal(brief.includes(ROOT), false, `the brief names no path of this machine: ${brief}`);
-  assert.ok(
-    server.headers.some((h) => h.authorization === 'Bearer s3cret'),
-    'the secret went in the header its card asks for',
-  );
+test(
+  'a step on a remote agent is sent its brief, with the secret its card asks for, and the Task it completes signs it off',
+  WAITED,
+  async (t) => {
+    const { server, id, e, decided, listed } = await remoteRun(t, 'reviewer', { text: 'It is right.' }, 's3cret');
+    assert.equal(server.sent.length, 1, 'one message, one Task');
+    const brief = server.sent[0];
+    assert.match(brief, /^Read the note and say whether it is right\.\n\n## What was asked for\n\na note on tides\n/);
+    assert.match(
+      brief,
+      /Files were given with it \(`nemia start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/,
+    );
+    assert.equal(brief.includes(ROOT), false, `the brief names no path of this machine: ${brief}`);
+    assert.ok(
+      server.headers.some((h) => h.authorization === 'Bearer s3cret'),
+      'the secret went in the header its card asks for',
+    );
 
-  const view = await Effect.runPromise(e.view(`${id}-ask`));
-  assert.equal(view.phase, 'succeeded');
-  const run = readRun(id);
-  assert.ok(run.steps.ask?.taskId, 'filed');
-  assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
-  assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
-  const everything = (dir: string): string[] =>
-    fs
-      .readdirSync(dir, { withFileTypes: true })
-      .flatMap((d) => (d.isDirectory() ? everything(path.join(dir, d.name)) : [path.join(dir, d.name)]));
-  for (const file of everything(ROOT))
-    assert.equal(fs.readFileSync(file, 'utf8').includes('s3cret'), false, `the secret is in no file of the store, and ${file} holds it`);
-});
+    const view = await Effect.runPromise(e.view(`${id}-ask`));
+    assert.equal(view.phase, 'succeeded');
+    const run = readRun(id);
+    assert.ok(run.steps.ask?.taskId, 'filed');
+    assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
+    assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
+    const everything = (dir: string): string[] =>
+      fs
+        .readdirSync(dir, { withFileTypes: true })
+        .flatMap((d) => (d.isDirectory() ? everything(path.join(dir, d.name)) : [path.join(dir, d.name)]));
+    for (const file of everything(ROOT))
+      assert.equal(fs.readFileSync(file, 'utf8').includes('s3cret'), false, `the secret is in no file of the store, and ${file} holds it`);
+  },
+);
 
-test('a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs', async () => {
-  const { server, decided } = await remoteRun(
-    'blocker',
-    { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } },
-    's3cret',
-  );
-  assert.equal(server.sent.length, 1);
-  const said = decided.join('\n');
-  assert.match(said, /blocked/, said);
-  assert.match(said, /a source for the tide tables/, said);
-});
+test(
+  'a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs',
+  WAITED,
+  async (t) => {
+    const { server, decided } = await remoteRun(
+      t,
+      'blocker',
+      { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } },
+      's3cret',
+    );
+    assert.equal(server.sent.length, 1);
+    const said = decided.join('\n');
+    assert.match(said, /blocked/, said);
+    assert.match(said, /a source for the tide tables/, said);
+  },
+);
 
-test('a secret not given sends nothing, and the step fails naming the variable to set', async () => {
-  const { server, id, e, decided } = await remoteRun('critic', { text: 'never sent' }, undefined);
+test('a secret not given sends nothing, and the step fails naming the variable to set', WAITED, async (t) => {
+  const { server, id, e, decided } = await remoteRun(t, 'critic', { text: 'never sent' }, undefined);
   assert.equal(server.sent.length, 0, 'no message went out without its secret');
   const view = await Effect.runPromise(e.view(`${id}-ask`));
   assert.equal(view.phase, 'failed');
@@ -155,40 +171,51 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
 });
 
-test('a Task the agent leaves waiting on a question reads as waiting on you: nemia logs prints the question, and nemia say answers it', async () => {
-  const server = await a2aServer({
-    answer: (text) => (text.includes('Brest') ? { text: 'Right, for Brest.' } : { asks: 'Which tide tables — Brest or Dover?' }),
-  });
-  try {
-    declare({ asker: { url: server.url } });
-    const id = await started(team('asker-team', 'asker'));
-    const e = engine();
-    const until = Date.now() + 60_000;
-    while ((await Effect.runPromise(e.view(`${id}-ask`))).phase !== 'needs-human') {
-      assert.ok(Date.now() < until, JSON.stringify(await Effect.runPromise(e.view(`${id}-ask`))));
+test(
+  'a Task the agent leaves waiting on a question reads as waiting on you: nemia logs prints the question, and nemia say answers it',
+  WAITED,
+  async (t) => {
+    const server = await a2aServer({
+      answer: (text) => (text.includes('Brest') ? { text: 'Right, for Brest.' } : { asks: 'Which tide tables — Brest or Dover?' }),
+    });
+    try {
+      declare({ asker: { url: server.url } });
+      const id = await started(team('asker-team', 'asker'));
+      const e = engine();
+      let seen = 'not read yet';
+      await until(
+        t,
+        async () => {
+          const v = await Effect.runPromise(e.view(`${id}-ask`));
+          if (v.phase === 'needs-human') return true;
+          seen = JSON.stringify(v);
+          await runWith(e, tickRun({ repo: ROOT }));
+          return false;
+        },
+        () => `${id}-ask waiting on a question; it reads ${seen}`,
+        { everyMs: 100 },
+      );
       await runWith(e, tickRun({ repo: ROOT }));
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    await runWith(e, tickRun({ repo: ROOT }));
-    const listed = (await printed(['ls'], e)).join('\n');
-    assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
-    const decided = (await printed(['decide', id], e)).join('\n');
-    assert.match(
-      decided,
-      new RegExp(
-        `ask: waiting for an input — read its question with nemia logs ${id} ask, and answer it with nemia say ${id} ask "<your answer>"`,
-      ),
-      `a person answers with nemia say, not in a Claude Code session a remote agent is not in:\n${decided}`,
-    );
-    assert.equal(decided.includes('claude agents'), false, decided);
-    assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);
+      const listed = (await printed(['ls'], e)).join('\n');
+      assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
+      const decided = (await printed(['decide', id], e)).join('\n');
+      assert.match(
+        decided,
+        new RegExp(
+          `ask: waiting for an input — read its question with nemia logs ${id} ask, and answer it with nemia say ${id} ask "<your answer>"`,
+        ),
+        `a person answers with nemia say, not in a Claude Code session a remote agent is not in:\n${decided}`,
+      );
+      assert.equal(decided.includes('claude agents'), false, decided);
+      assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);
 
-    await printed(['say', id, 'ask', 'Brest, please.'], e);
-    await settle(e, id);
-    assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
-    assert.equal((await Effect.runPromise(e.view(`${id}-ask`))).phase, 'succeeded');
-    assert.match((await printed(['ls'], e)).join('\n'), /^\s+ask\s+unverified\s+· said to 1×\s*$/m);
-  } finally {
-    await server.close();
-  }
-});
+      await printed(['say', id, 'ask', 'Brest, please.'], e);
+      await settle(t, e, id);
+      assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
+      assert.equal((await Effect.runPromise(e.view(`${id}-ask`))).phase, 'succeeded');
+      assert.match((await printed(['ls'], e)).join('\n'), /^\s+ask\s+unverified\s+· said to 1×\s*$/m);
+    } finally {
+      await server.close();
+    }
+  },
+);

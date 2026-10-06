@@ -29,6 +29,7 @@ import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
+import { until } from './waits.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -251,7 +252,7 @@ test(
     skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
     timeout: 12 * 60_000,
   },
-  async () => {
+  async (t) => {
     const engine: Engine = plainEngine(EngineService.layer({ root: scratch('wf-live-mcp-') }));
     const id = await Effect.runPromise(
       engine.file({
@@ -264,13 +265,16 @@ test(
     );
     let view: TaskView | undefined;
     try {
-      const until = Date.now() + 10 * 60_000;
-      while (Date.now() < until) {
-        await Effect.runPromise(engine.tick());
-        view = await Effect.runPromise(engine.view(id));
-        if (view.state.settled) break;
-        await new Promise((r) => setTimeout(r, 5_000));
-      }
+      await until(
+        t,
+        async () => {
+          await Effect.runPromise(engine.tick());
+          view = await Effect.runPromise(engine.view(id));
+          return view.state.settled;
+        },
+        `${id} settled on Claude Code`,
+        { everyMs: 5_000 },
+      );
       assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
       const said = view.state.attempts.at(-1)?.closeout as { mcpServers?: string[]; mcpTools?: string[] } | undefined;
       assert.deepEqual(said?.mcpServers, ['playwright'], `the repository's server and only that; it said ${JSON.stringify(said)}`);

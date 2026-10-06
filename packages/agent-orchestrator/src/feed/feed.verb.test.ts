@@ -11,10 +11,10 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, References, Stream, type Duration } from 'effect';
 import type { FeedWords } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
+import { bell, until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-feed-verb-');
 const FEED = path.join(ROOT, 'feed.jsonl');
@@ -46,32 +46,36 @@ const counted = (metric: typeof FEED_FOLLOW_READS) => Effect.runSync(Metric.valu
 /** The live readers counted now (`FEED_FOLLOWERS`). */
 const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
-/**
- * Waits until `ok()` holds, checking between turns of the event loop; fails under a bound of seconds, never a length of time, so a
- * reader that never gets what it waits for fails its test rather than hangs it.
- */
-async function until(ok: () => boolean): Promise<void> {
-  const deadline = performance.now() + 30_000;
-  while (!ok()) {
-    if (performance.now() > deadline) throw new Error(`waited 30 s for ${ok.toString()}`);
-    await sleep(5);
-  }
-}
+/** Waits in test `t` until `ok()` holds, read every 5ms: a metric or a fiber's end, which no callback of the test's rings. */
+const read = (t: TestContext, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 5 });
 
 /**
  * A reader from the feed's end on `rt`, each item it is handed kept in `got`, counted once it holds its cursor: stopped once the test `t`
- * ends, and no longer counted.
+ * ends, and no longer counted. `handed(ok, what)` waits until `ok()` holds, asked as each item is handed.
  */
 async function following(t: TestContext, rt: ReturnType<typeof hubbed>, beat: Duration.Input) {
   const got: Followed[] = [];
+  const pushed = bell();
   const was = followers();
-  const fiber = rt.runFork(Stream.runForEach(followFeed(feedSize(), { beat }), (f) => Effect.sync(() => got.push(f))));
+  const fiber = rt.runFork(
+    Stream.runForEach(followFeed(feedSize(), { beat }), (f) =>
+      Effect.sync(() => {
+        got.push(f);
+        pushed.ring();
+      }),
+    ),
+  );
   t.after(async () => {
     await Effect.runPromise(Fiber.interrupt(fiber));
-    await until(() => followers() === was);
+    assert.equal(followers(), was, 'no longer counted once interrupted');
   });
-  await until(() => followers() === was + 1 || fiber.pollUnsafe() !== undefined);
-  return { got, fiber, words: () => got.flatMap((f) => (f.kind === 'line' ? [f.line.word] : [])) };
+  await read(t, () => followers() === was + 1 || fiber.pollUnsafe() !== undefined, 'the reader counted, or its end');
+  return {
+    got,
+    fiber,
+    words: () => got.flatMap((f) => (f.kind === 'line' ? [f.line.word] : [])),
+    handed: (ok: () => boolean, what: string) => until(t, ok, what, { bell: pushed }),
+  };
 }
 
 test('REFUSED: a reader that takes nothing never holds up the writer — the hub slides, the oldest line dropped for it', async (t) => {
@@ -92,81 +96,97 @@ test('REFUSED: a reader that takes nothing never holds up the writer — the hub
   );
 });
 
-test('a reader that lags gets every line once and in order: one read of the file for what the hub dropped, none for an item it read', async (t) => {
-  const rt = hubbed(t, 2);
-  const reader = await following(t, rt, '1 hour');
-  const reads = counted(FEED_FOLLOW_READS);
-  rt.runSync(Effect.forEach(['1', '2', '3', '4', '5', '6', '7', '8'], (word) => emitFeed(judged(word))));
-  await until(() => reader.words().length >= 8);
-  await rt.runPromise(emitFeed(judged('9')));
-  await until(() => reader.words().length >= 9);
+test(
+  'a reader that lags gets every line once and in order: one read of the file for what the hub dropped, none for an item it read',
+  WAITED,
+  async (t) => {
+    const rt = hubbed(t, 2);
+    const reader = await following(t, rt, '1 hour');
+    const reads = counted(FEED_FOLLOW_READS);
+    rt.runSync(Effect.forEach(['1', '2', '3', '4', '5', '6', '7', '8'], (word) => emitFeed(judged(word))));
+    await reader.handed(() => reader.words().length >= 8, 'eight lines handed');
+    await rt.runPromise(emitFeed(judged('9')));
+    await reader.handed(() => reader.words().length >= 9, 'the ninth line handed');
 
-  assert.deepEqual(reader.words(), ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
-  const cursors = reader.got.flatMap((f) => (f.kind === 'line' ? [f.cursor] : []));
-  assert.deepEqual(
-    cursors,
-    [...cursors].sort((a, b) => a - b),
-    'each cursor past the one before',
-  );
-  assert.equal(cursors.at(-1), feedSize(), 'the last cursor is the end of the feed');
-  assert.equal(
-    counted(FEED_FOLLOW_READS) - reads,
-    1,
-    'the first item past the cursor read the six lines the hub dropped, the eighth line was in that read and its item cost nothing, and the ninth came from the hub',
-  );
-});
+    assert.deepEqual(reader.words(), ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+    const cursors = reader.got.flatMap((f) => (f.kind === 'line' ? [f.cursor] : []));
+    assert.deepEqual(
+      cursors,
+      [...cursors].sort((a, b) => a - b),
+      'each cursor past the one before',
+    );
+    assert.equal(cursors.at(-1), feedSize(), 'the last cursor is the end of the feed');
+    assert.equal(
+      counted(FEED_FOLLOW_READS) - reads,
+      1,
+      'the first item past the cursor read the six lines the hub dropped, the eighth line was in that read and its item cost nothing, and the ninth came from the hub',
+    );
+  },
+);
 
-test("a line another process wrote is read from the file before the next line the hub brings, as the item's bytes are past the cursor", async (t) => {
-  const rt = hubbed(t);
-  const reader = await following(t, rt, '1 hour');
-  await foreign('theirs');
-  await rt.runPromise(emitFeed(judged('ours')));
-  await until(() => reader.words().length >= 2);
-  assert.deepEqual(reader.words(), ['theirs', 'ours']);
-});
+test(
+  "a line another process wrote is read from the file before the next line the hub brings, as the item's bytes are past the cursor",
+  WAITED,
+  async (t) => {
+    const rt = hubbed(t);
+    const reader = await following(t, rt, '1 hour');
+    await foreign('theirs');
+    await rt.runPromise(emitFeed(judged('ours')));
+    await reader.handed(() => reader.words().length >= 2, 'both lines handed');
+    assert.deepEqual(reader.words(), ['theirs', 'ours']);
+  },
+);
 
-test('the beat stats the file and reads it only once it moved: a line another process wrote is read on the next beat, and nothing before it', async (t) => {
-  const rt = hubbed(t);
-  const reader = await following(t, rt, '5 millis');
-  const reads = counted(FEED_FOLLOW_READS);
-  const beats = counted(FEED_FOLLOW_BEATS);
-  await until(() => counted(FEED_FOLLOW_BEATS) >= beats + 3);
-  assert.equal(counted(FEED_FOLLOW_READS), reads, 'three beats on a feed that did not move read nothing');
+test(
+  'the beat stats the file and reads it only once it moved: a line another process wrote is read on the next beat, and nothing before it',
+  WAITED,
+  async (t) => {
+    const rt = hubbed(t);
+    const reader = await following(t, rt, '5 millis');
+    const reads = counted(FEED_FOLLOW_READS);
+    const beats = counted(FEED_FOLLOW_BEATS);
+    await read(t, () => counted(FEED_FOLLOW_BEATS) >= beats + 3, 'three beats');
+    assert.equal(counted(FEED_FOLLOW_READS), reads, 'three beats on a feed that did not move read nothing');
 
-  await foreign('theirs, on a beat');
-  await until(() => reader.words().length >= 1);
-  assert.deepEqual(reader.words(), ['theirs, on a beat']);
-  assert.deepEqual(
-    reader.got.map((f) => f.kind === 'line' && f.cursor),
-    [feedSize()],
-  );
-});
+    await foreign('theirs, on a beat');
+    await reader.handed(() => reader.words().length >= 1, 'the line handed');
+    assert.deepEqual(reader.words(), ['theirs, on a beat']);
+    assert.deepEqual(
+      reader.got.map((f) => f.kind === 'line' && f.cursor),
+      [feedSize()],
+    );
+  },
+);
 
-test('REFUSED: a reader whose read failed at the end of the feed says `readable` before the next line, though its item starts at the cursor', async (t) => {
-  if (process.getuid?.() === 0) return t.skip('a folder of mode 600 does not keep root from reading it');
-  const rt = hubbed(t);
-  const reader = await following(t, rt, '5 millis');
-  const mode = fs.statSync(ROOT).mode & 0o777;
-  fs.chmodSync(ROOT, 0o600);
-  try {
-    await until(() => reader.got.length >= 1);
-  } finally {
-    fs.chmodSync(ROOT, mode);
-  }
-  assert.deepEqual(
-    reader.got.map((f) => f.kind),
-    ['unreadable'],
-    'a beat that cannot stat the feed reads it, and the read fails',
-  );
+test(
+  'REFUSED: a reader whose read failed at the end of the feed says `readable` before the next line, though its item starts at the cursor',
+  WAITED,
+  async (t) => {
+    if (process.getuid?.() === 0) return t.skip('a folder of mode 600 does not keep root from reading it');
+    const rt = hubbed(t);
+    const reader = await following(t, rt, '5 millis');
+    const mode = fs.statSync(ROOT).mode & 0o777;
+    fs.chmodSync(ROOT, 0o600);
+    try {
+      await reader.handed(() => reader.got.length >= 1, 'the failed read handed');
+    } finally {
+      fs.chmodSync(ROOT, mode);
+    }
+    assert.deepEqual(
+      reader.got.map((f) => f.kind),
+      ['unreadable'],
+      'a beat that cannot stat the feed reads it, and the read fails',
+    );
 
-  await rt.runPromise(emitFeed(judged('after a failed read')));
-  await until(() => reader.words().length >= 1);
-  assert.deepEqual(
-    reader.got.map((f) => f.kind),
-    ['unreadable', 'readable', 'line'],
-    'the feed did not move while it failed, so the item starts at the cursor: only a read says the feed is readable again',
-  );
-});
+    await rt.runPromise(emitFeed(judged('after a failed read')));
+    await reader.handed(() => reader.words().length >= 1, 'the line handed');
+    assert.deepEqual(
+      reader.got.map((f) => f.kind),
+      ['unreadable', 'readable', 'line'],
+      'the feed did not move while it failed, so the item starts at the cursor: only a read says the feed is readable again',
+    );
+  },
+);
 
 test('REFUSED: a cursor the feed cannot be read from fails the stream before the reader is counted — past the end, or inside a line', async () => {
   await foreign('cursor');
@@ -185,12 +205,12 @@ test('REFUSED: a cursor the feed cannot be read from fails the stream before the
   }
 });
 
-test('REFUSED: a feed cut under an open reader fails it on the next beat, and is never said as a read that failed', async (t) => {
+test('REFUSED: a feed cut under an open reader fails it on the next beat, and is never said as a read that failed', WAITED, async (t) => {
   await foreign('cut');
   const rt = hubbed(t);
   const reader = await following(t, rt, '5 millis');
   fs.truncateSync(FEED, 0);
-  await until(() => reader.fiber.pollUnsafe() !== undefined || reader.got.length > 0);
+  await read(t, () => reader.fiber.pollUnsafe() !== undefined || reader.got.length > 0, 'the reader failed, or handed an item');
   assert.deepEqual(reader.got, [], 'the cut is no line, and no unreadable feed to try again');
   const exit = await Effect.runPromise(Fiber.await(reader.fiber));
   assert.ok(Exit.isFailure(exit));

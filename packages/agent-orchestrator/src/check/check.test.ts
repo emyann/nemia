@@ -35,6 +35,7 @@ import { HARNESSES } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
+import { until, WAITED, type Waiter } from '../../test/waits.ts';
 
 const ENV: CheckEnv = {
   WF_RUN: 'r-1',
@@ -186,28 +187,23 @@ test('the last lines of some output, without the blank ones at its end', () => {
   assert.equal(lastLines('a\nb\n\n\n', 1), 'b');
 });
 
-/**
- * Ticks `e` until `id` is in a phase `done` accepts, and answers its view; fails after `ms` on the monotonic clock, which a test may
- * seed `Date` beside.
- */
-const reached = async (
-  e: Engine,
-  id: string,
-  done: (v: Effect.Success<ReturnType<Engine['view']>>) => boolean,
-  what: string,
-  ms = 20_000,
-) => {
-  const deadline = performance.now() + ms;
-  for (;;) {
-    await Effect.runPromise(e.tick());
-    const v = await Effect.runPromise(e.view(id));
-    if (done(v)) return v;
-    if (performance.now() > deadline) assert.fail(`${id} never ${what}; phase ${v.phase}`);
-    await new Promise((r) => setTimeout(r, 150));
-  }
+/** Ticks `e` in test `t` every 150ms until `id` is in a phase `done` accepts, and answers its view. */
+const reached = (t: Waiter, e: Engine, id: string, done: (v: Effect.Success<ReturnType<Engine['view']>>) => boolean, what: string) => {
+  let phase = 'not read yet';
+  return until(
+    t,
+    async () => {
+      await Effect.runPromise(e.tick());
+      const v = await Effect.runPromise(e.view(id));
+      phase = v.phase;
+      return done(v) && v;
+    },
+    () => `${id} ${what}; phase ${phase}`,
+    { everyMs: 150 },
+  );
 };
 
-const settled = (e: Engine, id: string, ms?: number) => reached(e, id, (v) => Boolean(v.state.settled), 'settled', ms);
+const settled = (t: Waiter, e: Engine, id: string) => reached(t, e, id, (v) => Boolean(v.state.settled), 'settled');
 
 const rig = () => {
   const root = fs.realpathSync(scratch('wf-check-'));
@@ -229,7 +225,7 @@ const rig = () => {
   return { root, workspace, e, file };
 };
 
-test('LIVE: the engine settles a check on its exit code, in the workspace, with stderr kept apart', async () => {
+test('LIVE: the engine settles a check on its exit code, in the workspace, with stderr kept apart', WAITED, async (t) => {
   const { workspace, e, file } = rig();
 
   const refused = await file(
@@ -238,7 +234,7 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
   );
   const passed = await file('passed', 'test -d .');
 
-  const r = await settled(e, refused);
+  const r = await settled(t, e, refused);
   assert.equal(
     r.state.settled,
     'failed',
@@ -250,26 +246,26 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
   assert.doesNotMatch(stdout, /loud/, 'stderr is not in stdout');
   assert.equal(await Effect.runPromise(e.output(refused, 'stderr')), 'loud\n', 'stderr is kept apart, whole');
 
-  const p = await settled(e, passed);
+  const p = await settled(t, e, passed);
   assert.equal(p.state.settled, 'succeeded');
   assert.equal(attemptVerdict(p.state.attempts.at(-1)), 0);
 });
 
-test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async (t) => {
+test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', WAITED, async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
   const { e, file } = rig();
   const hung = await file('hung', 'sleep 60', 1);
-  await reached(e, hung, (v) => v.phase === 'running (working)', 'came to work');
+  await reached(t, e, hung, (v) => v.phase === 'running (working)', 'came to work');
   t.mock.timers.tick(5_000);
-  const v = await settled(e, hung);
+  const v = await settled(t, e, hung);
   assert.equal(v.state.settled, 'failed', 'a hung suite does not hold the run for ever');
   assert.equal(attemptVerdict(v.state.attempts.at(-1)), 'unfinished');
 });
 
-test('LIVE: a check the engine runs is niced, and IO-idle where this machine lets it be', async () => {
+test('LIVE: a check the engine runs is niced, and IO-idle where this machine lets it be', WAITED, async (t) => {
   const { e, file } = rig();
   const id = await file('niced', 'echo "nice=$(nice)"; echo "io=$(ionice 2>/dev/null || echo none)"');
-  const v = await settled(e, id);
+  const v = await settled(t, e, id);
   assert.equal(v.state.settled, 'succeeded');
   const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';
   assert.match(
@@ -286,38 +282,42 @@ test('LIVE: a check the engine runs is niced, and IO-idle where this machine let
     );
 });
 
-test('LIVE: a failing check still fails through `nice`, with its own exit code', async () => {
+test('LIVE: a failing check still fails through `nice`, with its own exit code', WAITED, async (t) => {
   const { e, file } = rig();
   const id = await file('five', 'exit 5');
-  const v = await settled(e, id);
+  const v = await settled(t, e, id);
   assert.equal(v.state.settled, 'failed');
   assert.equal(attemptVerdict(v.state.attempts.at(-1)), 5);
 });
 
-test("LIVE: an ending's check whose install fails settles failed with no exit code, which the run reads as a check that did not finish", async (t) => {
-  const { e, file } = rig();
-  const npm = fakeNpm(3);
-  const PATH = process.env.PATH;
-  t.after(() => {
+test(
+  "LIVE: an ending's check whose install fails settles failed with no exit code, which the run reads as a check that did not finish",
+  WAITED,
+  async (t) => {
+    const { e, file } = rig();
+    const npm = fakeNpm(3);
+    const PATH = process.env.PATH;
+    t.after(() => {
+      process.env.PATH = PATH;
+    });
+    process.env.PATH = npm.PATH;
+    const id = await file('ship', 'echo command ran', 60, true);
+    const v = await settled(t, e, id);
     process.env.PATH = PATH;
-  });
-  process.env.PATH = npm.PATH;
-  const id = await file('ship', 'echo command ran', 60, true);
-  const v = await settled(e, id);
-  process.env.PATH = PATH;
-  assert.equal(v.state.settled, 'failed');
-  assert.equal(v.state.attempts.at(-1)?.exitCode, null, 'no exit code on the attempt');
-  const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never)('ship');
-  assert.equal(verdict, 'unfinished');
-  assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
-  const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';
-  assert.match(
-    log,
-    /\[nemia check\] install failed, exit 3/,
-    "the worker inherits this process's environment when a tick starts it: its npm is the fake until the check has settled",
-  );
-  assert.doesNotMatch(log, /command ran/);
-});
+    assert.equal(v.state.settled, 'failed');
+    assert.equal(v.state.attempts.at(-1)?.exitCode, null, 'no exit code on the attempt');
+    const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never)('ship');
+    assert.equal(verdict, 'unfinished');
+    assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
+    const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';
+    assert.match(
+      log,
+      /\[nemia check\] install failed, exit 3/,
+      "the worker inherits this process's environment when a tick starts it: its npm is the fake until the check has settled",
+    );
+    assert.doesNotMatch(log, /command ran/);
+  },
+);
 
 test('the lines a check marks are those starting `wf <name>:`, whole and in order — never a prefixed line or `wfx:`', () => {
   const log = [

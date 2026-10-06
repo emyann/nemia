@@ -51,12 +51,12 @@ const branchesOf = (run: Run): string[] => {
   }
 };
 
-/** Whether `run`'s own result branches are asked: a git run that cut worktrees of its own, neither called off nor pruned. */
-const asksOwn = (run: Run): run is GitRun => isGitRun(run) && run.isolate && !run.cancelledAt && !run.pruned;
+/** Whether `run`'s own result branches are asked: a git run that cut worktrees of its own and was not called off; a prune keeps them. */
+const asksOwn = (run: Run): run is GitRun => isGitRun(run) && run.isolate && !run.cancelledAt;
 
 /**
  * The asks over `runs`: one for each repository, place and base branch a git run of them is in, each asked of the result branches of every
- * run `own` asks of — by default one that cut worktrees and was neither called off nor pruned (`asksOwn`): what the list shows and a
+ * run `own` asks of — by default one that cut worktrees and was not called off (`asksOwn`): what the list shows and a
  * decision reads — of the runs waited on there (`waitedOn`: `--after` and a hold's `--until`), and of the runs a run not yet started is
  * handed as context, with the tip each recorded and the commit it was cut at.
  */
@@ -191,7 +191,7 @@ const recordsOf = (ids: Iterable<string>, runs: readonly Run[]): Run[] =>
   });
 
 /**
- * A reader over where `runs` — each asked of, called off or pruned — and the runs they wait on or are handed as context stand now
+ * A reader over where `runs` — each asked of, called off or not — and the runs they wait on or are handed as context stand now
  * (`standingNow`, `standingReader`), the store read for those: what a person's one-off verb reads through. Fails with a refusal a read of
  * the store failed with.
  */
@@ -221,7 +221,7 @@ export const standingWhen = Effect.fn('standingWhen')(function* (runs: readonly 
   };
 });
 
-/** What a person's verb asks of: the result branches of each run of `ids`, called off or pruned, and of every run `asksOwn` asks of. */
+/** What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of. */
 export const asksOwnOr = (ids: readonly string[]): ((run: GitRun) => boolean) => {
   const asked = new Set(ids);
   return (run) => asked.has(run.id) || asksOwn(run);

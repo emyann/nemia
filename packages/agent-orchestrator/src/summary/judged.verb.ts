@@ -255,12 +255,12 @@ type Judged = {
 
 /**
  * The result branches whose standing against the base branch decides anything, for this run: none unless it finished with every step
- * satisfied, it was neither called off nor pruned (its branches are deleted), it cut worktrees of its own, and no step of its workflow
- * merges (`merges`) — a folder whose ending merges answers for its own branch. Pure, and off the record alone: what `standingsOf` asks git
- * about, and nothing more.
+ * satisfied, it was not called off, it cut worktrees of its own, and no step of its workflow merges (`merges`) — a folder whose ending
+ * merges answers for its own branch; a pruned run's branches are kept, and still decide. Pure, and off the record alone: what
+ * `standingsOf` asks git about, and nothing more.
  */
 const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatus): string[] =>
-  run.cancelledAt || run.pruned || status !== 'succeeded' || !run.isolate || merges(steps)
+  run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
     ? []
     : [
         ...new Set(

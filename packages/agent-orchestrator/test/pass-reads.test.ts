@@ -279,18 +279,20 @@ test('a pass spends no git process more for more runs waiting on runs of the sam
   );
 });
 
-test("a pass's one standing for the repository asks of a finished run, a pruned run handed to one not started and one held until", async () => {
+test("a pass's one standing for the repository asks of a finished run, a pruned one, a pruned run handed to one not started and one held until", async () => {
   const { b, repo } = await theStore();
   const done = await settledOne(b, repo, 'succeeded');
+  const pruned = await settledOne(b, repo, 'succeeded');
   const handed = await settledOne(b, repo, 'succeeded');
   const until = await atTheGate(b, repo);
   await Effect.runPromise(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
   const held = await Effect.runPromise(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
   await runWith(b.e, hold(held.id, [until.id]));
-  for (const r of [handed, until]) fs.writeFileSync(pruneFile(r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
+  for (const r of [handed, until, pruned])
+    fs.writeFileSync(pruneFile(r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
   await onePass(b);
   const { value: git, tallies } = await metered(() => runWith(b.e, standingSnapshot().pipe(Effect.map(standingReader))));
-  for (const r of [done, handed, until]) {
+  for (const r of [done, handed, until, pruned]) {
     const branch = r.steps.implement.branch!;
     assert.equal(git.unread(readRun(r.id) as never, branch), undefined, `${r.id}'s ${branch} answered off the pass`);
   }

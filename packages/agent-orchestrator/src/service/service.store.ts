@@ -1,6 +1,7 @@
 /**
  * The login service on the machine: what the machine is (`machineOf`), where the checkout's daemon is (`daemonEntry`), the service's file
- * written, read and removed, the system's own programs called (`systemCall`) and whether the user's services linger (`lingerOf`). Judged
+ * written, read and removed, the system's own programs called (`systemCall`), whether the user's services linger (`lingerOf`), the service
+ * files of a folder (`unitsOf`), and a daemon spawned on demand in a session of its own (`spawnDetached`). Judged
  * and rendered by `service.ts`; the verbs call these through their host (`ServiceHost` in `service.verb.ts`), so a test hands fakes.
  *
  * Beneath the controllers: it imports only the bottom of the store's tree.
@@ -8,7 +9,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { wfRoot } from '../config/config.store.ts';
 import { Missing } from '../refusal/refusal.ts';
 import type { Machine } from './service.ts';
@@ -150,3 +151,44 @@ export const userOf = (): { name: string; uid: number } => {
   const info = os.userInfo();
   return { name: info.username, uid: info.uid };
 };
+
+/** The service files of the folder `dir` holds, by name, with their text: `nemia.service` or `nemia.plist` is `nemia`. None where it is not. */
+export function unitsOf(dir: string): { name: string; text: string }[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names.flatMap((file) => {
+    const name = /^([a-z0-9][a-z0-9-]*)\.(?:service|plist)$/.exec(file)?.[1];
+    const text = name === undefined ? null : textOf(path.join(dir, file));
+    return name === undefined || text === null ? [] : [{ name, text }];
+  });
+}
+
+/** How a spawned daemon ended: its exit code or the signal that ended it; an error that kept it from starting is a code of null. */
+export type SpawnEnded = { code: number | null; signal: string | null };
+
+/** A daemon spawned on demand: its pid, none where it could not start, and its end, which settles only once it has ended. */
+export type Spawned = { pid: number | undefined; ended: Promise<SpawnEnded> };
+
+/**
+ * Starts `node entry` in `cwd` with `env` alone, in a session of its own (`detached`), so a closed terminal does not end it, its stdout and
+ * stderr appended to `log`, and lets it go: this process ends without waiting for it.
+ */
+export function spawnDetached(s: { node: string; entry: string; cwd: string; env: Record<string, string>; log: string }): Spawned {
+  fs.mkdirSync(path.dirname(s.log), { recursive: true });
+  const fd = fs.openSync(s.log, 'a');
+  try {
+    const child = spawn(s.node, [s.entry], { cwd: s.cwd, env: s.env, detached: true, stdio: ['ignore', fd, fd] });
+    const ended = new Promise<SpawnEnded>((resolve) => {
+      child.once('error', () => resolve({ code: null, signal: null }));
+      child.once('exit', (code, signal) => resolve({ code, signal }));
+    });
+    child.unref();
+    return { pid: child.pid, ended };
+  } finally {
+    fs.closeSync(fd);
+  }
+}

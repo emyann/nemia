@@ -7,7 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Fiber } from 'effect';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { runPlaceVerbAsync } from './place-async.store.ts';
 import type { PlaceOutcome, PlaceRequests, PlaceVerb } from './place.ts';
 import { running } from '../../test/running.ts';
@@ -26,6 +27,11 @@ const MAKE: PlaceRequests['make'] = { repo: '/r', at: '/w', name: 'wf/x/a', from
 /** `verb` run off the loop, awaited. */
 const ran = <V extends PlaceVerb>(dir: string, verb: V, request: PlaceRequests[V], deadlineMs?: number): Promise<PlaceOutcome<V>> =>
   Effect.runPromise(runPlaceVerbAsync(dir, verb, request, deadlineMs === undefined ? {} : { deadlineMs }));
+
+/** Resolves once `seen` holds, asked every 10 ms. */
+async function waitFor(seen: () => boolean): Promise<void> {
+  while (!seen()) await sleep(10);
+}
 
 /** What an unread outcome said; fails on any other. */
 function saidOf(outcome: PlaceOutcome<PlaceVerb>): string {
@@ -128,4 +134,20 @@ test('a make past its deadline is unread, saying so, its script and the child de
     );
     return;
   }
+});
+
+test('a make whose ask is interrupted, as a pass is when the api is stopped, leaves nothing of its group running, the deaf child too', async (t) => {
+  const dir = planted('make', DEAF);
+  const child = path.join(dir, 'scripts', 'child.mjs');
+  t.after(() => {
+    for (const pid of running(child)) process.kill(pid, 'SIGKILL');
+  });
+  const marker = path.join(dir, 'deaf');
+  const fiber = Effect.runFork(runPlaceVerbAsync(dir, 'make', MAKE, { deadlineMs: 600_000 }));
+  await waitFor(() => fs.existsSync(marker));
+  const pid = Number(fs.readFileSync(marker, 'utf8'));
+  await Effect.runPromise(Fiber.interrupt(fiber));
+  assert.deepEqual(running(path.join(dir, 'scripts', 'make.ts')), [], 'the script is not left running');
+  assert.deepEqual(running(child), [], 'no child left running');
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone`);
 });

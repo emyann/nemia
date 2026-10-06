@@ -202,7 +202,9 @@ test('a skill is made in the library, read by the store, and refused a second ti
   refuses(
     () => writeSkill(LIBRARY, { ...DRAFT, description: 'Something else.' }, { version: null }),
     'Conflict',
-    /skills\/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it\./,
+    new RegExp(
+      `skills/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it: it is at version ${skillVersion(path.join(LIBRARY, 'tidy-notes'))}, and a write given that version changes it\\.$`,
+    ),
   );
 });
 

@@ -213,7 +213,9 @@ test('a new agent over one that is there, and an edit of one that is not, are re
   fresh();
   refused(
     () => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version: null }),
-    /^agents\/reviewer\.md is there already/,
+    new RegExp(
+      `^agents/reviewer\\.md is there already\\. Give the new agent another name, or open it and change it: it is at version ${agentVersion(AGENTS, 'reviewer')}, and a write given that version changes it\\.$`,
+    ),
     'Conflict',
   );
   refused(() => writeAgent(AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');

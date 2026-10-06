@@ -35,6 +35,8 @@ import {
   type SkillRead,
   type SkillWritten,
   runWith,
+  repoWriteRefusal,
+  skillCopyCommand,
 } from 'agent-orchestrator';
 import {
   AGENTS_FOLDER,
@@ -356,15 +358,6 @@ export function skillUsers(dir: string, name: string, repo: string): SkillUser[]
   });
 }
 
-export const quoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
-
-/**
- * The command a person runs to copy the skill folder `dir` into the skills folder `into`, as `into/<name>/`. `cp -r dir into/` makes `into`
- * itself the copy when `into` is not there yet — a repository with a `.claude/` and no `skills/` would get `skills/SKILL.md` — so it makes
- * `into` first; and each path is quoted, for a home with a space in it.
- */
-export const copyCommand = (dir: string, into: string): string => `mkdir -p ${quoted(into)} && cp -r ${quoted(dir)} ${quoted(`${into}/`)}`;
-
 /**
  * The skill `name` of `from` read now, for its page. Null when that place has no such skill. A SKILL.md that cannot be read, or does not
  * read as a draft, leaves `draft` null, the row saying why, and the page is filled from the body.
@@ -401,9 +394,9 @@ export async function skillDetail(
   }
   const copyHint =
     from === 'yours'
-      ? copyCommand(dir, path.join(path.resolve(repo), '.claude', SKILLS_FOLDER))
+      ? skillCopyCommand(dir, path.join(path.resolve(repo), '.claude', SKILLS_FOLDER))
       : from === 'repo'
-        ? copyCommand(dir, librarySkills(home))
+        ? skillCopyCommand(dir, librarySkills(home))
         : null;
   return { skill, version: version ?? '', draft, body, users, copyHint };
 }
@@ -440,22 +433,19 @@ async function written(
 ): Promise<{ status: 200 | 201; body: SkillSaved } | { status: 500; error: string }> {
   const args = {
     from: 'yours',
-    library: librarySkills(home),
     change: JSON.stringify(change),
     ...(version !== null && { version }),
     ...(name !== undefined && { name }),
   };
-  const wrote = (await runWith(e, WRITE.handler(args))) as SkillWritten;
+  const wrote = (await runWith(e, WRITE.handler(args, undefined, home))) as SkillWritten;
   const detail = await skillDetail(e, 'yours', wrote.name, repo, home);
   if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
   return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
 }
 
-/** The repository's skills are the checkout's: the api writes none of them, and says how a person does. */
-const repoRefusal = (route: string, name: string | null, repo: string, home: string): string => {
-  const theirs = path.join(repo, '.claude', SKILLS_FOLDER);
-  return `${route} refuses to write the repository's skills (${theirs}): the board writes only your library, in ${librarySkills(home)}, and the api writes nothing into a checkout. Write the skill in your library, then copy its folder into the repository by hand — \`${copyCommand(path.join(librarySkills(home), name ?? '<name>'), theirs)}\` — where git shows it as a change to commit.`;
-};
+/** The repository's skills are the checkout's: the api writes none of them, and says how a person does (`repoWriteRefusal`). */
+const repoRefusal = (route: string, name: string | null, repo: string, home: string): string =>
+  repoWriteRefusal(route, 'skills', name, repo, home);
 
 /**
  * The skills' routes. Each write is guarded (guard.ts) and writes only your library: 403 for the repository's (`repoRefusal`), 400 for
@@ -507,7 +497,6 @@ export const skills = new Hono<ApiEnv>()
         c.req.header('content-type'),
       );
       if (refused) return c.json({ error: refused.error }, refused.status);
-      const library = librarySkills(home);
       if (from === 'repo') return c.json({ error: repoRefusal(route, null, repo, home) }, 403);
       if (from !== 'yours')
         return c.json(
@@ -528,7 +517,7 @@ export const skills = new Hono<ApiEnv>()
         return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
       }
       if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
-      const copied = (await runWith(e, WRITE.handler({ from, library, copy: name, shipped: SHIPPED_SKILLS }))) as SkillCopied;
+      const copied = (await runWith(e, WRITE.handler({ from, copy: name, shipped: SHIPPED_SKILLS }, undefined, home))) as SkillCopied;
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);

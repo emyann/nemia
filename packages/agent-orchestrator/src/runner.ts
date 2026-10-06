@@ -318,12 +318,16 @@ export type {
   Unread,
 } from './place/place.ts';
 export { writeWorkflow } from './folder/write.store.ts';
+export { workflowStale } from './folder/folder.ts';
+export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
 export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
 export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
-export { TRY_STEP, triesDir, tryDir, writeTryFolder } from './roster/try.store.ts';
+export { TRY_STEP, triesDir, tryDir, tryFolder, writeTryFolder } from './roster/try.store.ts';
+export { skillCopyCommand, untriedOf, yourAgentsDir, type Untried } from './roster/try.ts';
+export { repoWriteRefusal } from './roster/yours.ts';
 export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead, FilledStep } from './roster/roster.ts';
 export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';

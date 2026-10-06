@@ -1,13 +1,16 @@
 /**
- * The board's skill library as entries of the command table, each served on the api alone: the skill folders it lists, each read
- * (`SKILLS_LIST`, `skillRead`), one skill read for its page (`SKILLS_READ`), and a skill of yours written from its form or copied from
- * what Nemia ships (`SKILLS_WRITE`, `writeSkill`, `copySkill`). The api resolves which folders a request names, guards each write, and
- * words the board's answer around what each entry answers.
+ * The skill library as entries of the command table: the skill folders the board lists, each read (`SKILLS_LIST`, `skillRead`), and one
+ * skill read for its page (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from what
+ * Nemia ships (`SKILLS_WRITE`, `writeSkill`, `copySkill`), served on both sides. The api resolves which folders a read names, guards each
+ * write, and words the board's answer around what each entry answers.
  */
 import { tried } from '../runtime-client.ts';
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
+import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText } from '../command/writers.ts';
+import { HOME } from '../record/record.store.ts';
+import { yoursOrRefused } from '../roster/yours.ts';
 import { skillVersion } from '../folder/folder.store.ts';
 import {
   copySkill,
@@ -88,21 +91,36 @@ export const SKILLS_READ: Command<SkillPage> = {
 const WRITE_HAND =
   "the board guards the write, decodes the skill's form in its own words, answers a skill made with 201 and a change with 200, and reads the skill back";
 
+/** The words a written skill is said in: the files written, and the version it is at now, which a change of it gives. */
+const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
+  `${data.name} written in ${data.dir}${'version' in data ? `, at version ${data.version}` : ''}: ${data.written.join(', ')}`,
+];
+
 /**
- * A skill of yours written into your library (`library`): copied whole from the folder of skills Nemia ships (`shipped`) under the name
- * `copy` (`copySkill`), or else written from its change (`change`, as JSON text) at the `version` it was read at, none for a skill made
- * (`writeSkill`).
+ * A skill of yours written into your library (`yourSkillsDir`): copied whole from the folder of skills Nemia ships (`shipped`) under the
+ * name `copy` (`copySkill`), or else written from its change (`change`, as JSON text, which the command line reads off `--file`) at the
+ * `version` it was read at, none for a skill made (`writeSkill`). Refused, as `Invalid`, for a place but yours (`yoursOrRefused`).
  */
 export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
   name: 'skills write',
-  usage: '<from> [<name>]',
-  help: ['a skill of yours written from its form, or copied from what Nemia ships'],
-  spec: apiSpec(
+  usage: 'yours [<name>] --file <SKILL.md> [--version <v>]',
+  help: ['a skill of yours written from its SKILL.md: <name> is the skill it', 'changes, at the --version it was read at; none, a new one'],
+  spec: writerSpec(
+    'skills write',
+    'yours [<name>] --file <SKILL.md> [--version <v>]',
+    [FROM, { key: 'name', takes: 'optional', kind: 'name' }],
     [
-      { key: 'from', takes: 'required', kind: 'name' },
-      { key: 'name', takes: 'optional', kind: 'name' },
+      cliPath(
+        'skills write',
+        'file',
+        "the skill's SKILL.md, whose name: is its folder",
+        "the api is sent the skill's form, never a path to read",
+      ),
+      versionFlag('skills write', 'the skill'),
+      apiKey('change', 'the command line reads the skill off --file, into the form the board sends'),
+      apiKey('copy', 'the board copies a skill Nemia ships; the command line writes one a person wrote'),
+      apiKey('shipped', 'the board names the folder of skills Nemia ships, where a copy is read from'),
     ],
-    ['library', 'change', 'version', 'copy', 'shipped'],
   ),
   writes: true,
   nemia: 'prompts',
@@ -110,16 +128,22 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
     { method: 'POST', path: '/api/skills/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/skills/:from/:name', status: 200, hand: WRITE_HAND },
   ],
-  only: { side: 'api', why: "the board's library writes a skill from a form; at the command line a person edits the skill's SKILL.md" },
-  handler: (args) =>
+  handler: (args, _env, home = HOME) =>
     tried(() => {
-      const library = textOf(args, 'library') ?? '';
-      const copy = textOf(args, 'copy');
-      if (copy !== undefined) return copySkill(textOf(args, 'shipped') ?? '', library, copy);
-      const change = JSON.parse(textOf(args, 'change') ?? 'null') as SkillChange;
-      return writeSkill(library, change, { version: textOf(args, 'version') ?? null });
+      const library = yoursOrRefused(
+        'nemia skills write',
+        'skills',
+        writerText(args, 'from') ?? '',
+        writerText(args, 'name') ?? null,
+        '',
+        home,
+      );
+      const copy = writerText(args, 'copy');
+      if (copy !== undefined) return copySkill(writerText(args, 'shipped') ?? '', library, copy);
+      const change = JSON.parse(writerText(args, 'change') ?? 'null') as SkillChange;
+      return writeSkill(library, change, { version: writerText(args, 'version') ?? null });
     }),
-  print: () => [],
+  print: writtenLines,
 };
 
 /** The board's skill entries, in the order the table lists them. */

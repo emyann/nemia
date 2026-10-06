@@ -32,7 +32,7 @@ import {
   type SkillAgain,
 } from './agents.ts';
 import { frontmatterKey } from '../former/former.ts';
-import { linkRefusal } from '../folder/folder.ts';
+import { linkRefusal, takenAt } from '../folder/folder.ts';
 import { agentUsers, agentVersion, preloads, readSkillRules, skillsFor, skillVersion } from '../folder/folder.store.ts';
 import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
@@ -232,6 +232,10 @@ function repoUsers(at: string, name: string, repo: string | undefined): string[]
 const inUseByRepo = (name: string, users: readonly string[], repo: string, does: string): string =>
   `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} of the repository ${repo} — ${users.join(', ')} — which has no ${name} of its own, so its workflows are given this one, and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent or remove the \`agent:\` line, or copy this agent into ${path.join(repo, 'workflows', AGENTS_FOLDER)}/ (git shows it as a change to commit), first.`;
 
+/** Why a new agent `name` is not written over the one there, at `version`. */
+const agentTaken = (name: string, version: string | null): string =>
+  `${AGENTS_FOLDER}/${name}.md is there already. Give the new agent another name, or open it and change it${takenAt(version)}.`;
+
 /**
  * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir`
  * is a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps
@@ -283,8 +287,7 @@ export function writeAgent(
   const renamed = old !== name;
   const versionOf = (n: string) => agentVersion(at, n, skillsAt(at, repo));
   if (version === null) {
-    if (fs.existsSync(file(name)))
-      refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, Conflict);
+    if (fs.existsSync(file(name))) refuse(agentTaken(name, versionOf(name)), Conflict);
   } else {
     const now = versionOf(old);
     if (now === null)
@@ -405,7 +408,7 @@ export function writeAgent(
 export function removeAgent(
   dir: string,
   name: string,
-  { version, anywhere = false, repo }: { version: string; anywhere?: boolean; repo?: string },
+  { version, anywhere = false, repo }: { version: string | null; anywhere?: boolean; repo?: string },
 ): { dir: string; removed: string[] } {
   const at = path.resolve(dir);
   refuse(agentPlaceRefusal(at, anywhere, repo));
@@ -415,6 +418,10 @@ export function removeAgent(
     refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
   const now = agentVersion(at, name, skillsAt(at, repo));
   if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, Missing);
+  if (version === null)
+    refuse(
+      `${AGENTS_FOLDER}/${name}.md is at version ${now}, and a removal is checked against the version it was read at, so an agent changed since is not removed unseen. Give that version to remove it.`,
+    );
   if (now !== version)
     refuse(
       `${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`,

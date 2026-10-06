@@ -11,8 +11,9 @@
  * with the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`): a refused folder
  * leaves no schema behind under "nothing written".
  *
- * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder holds something else: a step
- * edited, added or removed by hand while the board had it open would otherwise be written over, or deleted, from a draft that never saw it.
+ * A save carries the `version` the folder was listed at (`workflowVersion`), and is refused (409, `workflowStale`) when the folder holds
+ * something else: a step edited, added or removed by hand while the board had it open would otherwise be written over, or deleted, from a
+ * draft that never saw it.
  *
  * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes
  * nothing into a checkout. Every write passes the guard (guard.ts) before its body is read.
@@ -32,6 +33,9 @@ import {
   type Places,
   type WorkflowWritten,
   runWith,
+  repoWriteRefusal,
+  workflowStale,
+  workflowVersion,
 } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
@@ -56,7 +60,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { KINDS, schemaNameRefusal, WORDS, workflowNameRefusal, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
-import { folderOf, listed, loadedOf, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
+import { folderOf, listed, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**
  * The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The
@@ -305,15 +309,7 @@ export const buildGuard = (route: string, does: string, shape: string): Guarded 
  */
 export function yoursOnly(route: string, from: unknown, name: string | null, repo: string, home: string): Refusal | null {
   if (from === 'yours') return null;
-  const yours = path.join(home, 'workflows');
-  const theirs = path.join(repo, 'workflows');
-  if (from === 'repo') {
-    const start = name ? ` — \`cp -r ${path.join(theirs, name)} ${yours}/\` starts from this one —` : '';
-    return {
-      status: 403,
-      error: `${route} refuses to write the repository's workflows (${theirs}): the builder writes only yours, in ${yours}, and the api writes nothing into a checkout. Build the workflow in yours${start} then copy the folder into ${theirs} by hand, where git shows it as a change to commit.`,
-    };
-  }
+  if (from === 'repo') return { status: 403, error: repoWriteRefusal(route, 'workflows', name, repo, home) };
   return {
     status: 400,
     error: `${route}: the builder writes yours, at /api/workflows/yours/…, and this request named ${JSON.stringify(from)}.`,
@@ -487,11 +483,14 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
   }
 }
 
-/** The table's entry a folder of yours is written through, served on the api alone. */
+/** The table's entry a folder of yours is written through, served on both sides. */
 const WRITE = COMMANDS.find((c) => c.name === 'workflows write')!;
 
-/** A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`. */
-type Writing = { e: Engine['Service']; name: string; dir: string; repo: string; home: string };
+/**
+ * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
+ * there (`changes`), handed the version it holds once its schemas are written, or a new one.
+ */
+type Writing = { e: Engine['Service']; name: string; dir: string; repo: string; home: string; changes: boolean };
 
 /**
  * A folder written through the package (`WRITE`, the table's `workflows write`), with the schemas pasted for it, or its refusal (422,
@@ -507,7 +506,7 @@ type Writing = { e: Engine['Service']; name: string; dir: string; repo: string; 
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
 async function write(
-  { e, name, dir, repo, home }: Writing,
+  { e, name, dir, repo, home, changes }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
@@ -540,7 +539,14 @@ async function write(
       written.push(before[i]);
       fs.writeFileSync(path.join(dir, file), text);
     }
-    const args = { from: 'yours', name, dir, draft: JSON.stringify(steps), repo, ...(readme !== undefined && { readme }) };
+    const args = {
+      from: 'yours',
+      name,
+      draft: JSON.stringify(steps),
+      repo,
+      ...(readme !== undefined && { readme }),
+      ...(changes && { version: workflowVersion(dir, places) }),
+    };
     result = (await runWith(e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
   } catch (err) {
     putSchemasBack(dir, written);
@@ -555,10 +561,6 @@ async function write(
     removed: result.removed,
   };
 }
-
-/** Why a save of a folder read at `version`, and at `now` since, writes nothing (409). */
-const staleWords = (dir: string, version: string, now: string): string =>
-  `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`;
 
 /**
  * The builder's routes. Each write is guarded (guard.ts) and writes only yours (`yoursOnly`: 403 for the repository's, with the copy to
@@ -604,7 +606,7 @@ export const builder = new Hono<ApiEnv>()
           409,
         );
       }
-      const saved = await write({ e, name, dir, repo, home }, [step], readme);
+      const saved = await write({ e, name, dir, repo, home, changes: false }, [step], readme);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 201);
     }),
@@ -638,9 +640,9 @@ export const builder = new Hono<ApiEnv>()
         const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
         return c.json({ error: `${folder.error}${make}` }, folder.status);
       }
-      const now = versionOf(folder.dir, placesOf(repo, home));
-      if (now !== body.version) return c.json({ error: staleWords(folder.dir, body.version, now), steps: [] }, 409);
-      const saved = await write({ e, name, dir: folder.dir, repo, home }, steps, body.readme, schemas);
+      const now = workflowVersion(folder.dir, placesOf(repo, home));
+      if (now !== body.version) return c.json({ error: workflowStale.write(folder.dir, body.version, now), steps: [] }, 409);
+      const saved = await write({ e, name, dir: folder.dir, repo, home, changes: true }, steps, body.readme, schemas);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 200);
     }),

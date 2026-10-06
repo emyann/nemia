@@ -390,6 +390,23 @@ export function renderAgent(draft: AgentDraft): string {
 }
 
 /**
+ * The draft of the agent `name` whose file holds `text`, as `renderAgent` takes it back: read by `parseAgent`, so what it refuses is
+ * refused here in its words, the former `systemPrompt:` read as `harnessPrompt:` and `color` dropped. Pure.
+ */
+export function agentDraftOf(name: string, text: string): AgentDraft {
+  const agent = parseAgent(name, text);
+  return {
+    name,
+    role: agent.role ?? null,
+    description: agent.description ?? null,
+    skills: agent.skills?.length ? agent.skills.join(', ') : null,
+    harnessPrompt: agent.harnessPrompt ?? null,
+    keys: agent.keys,
+    body: agent.body,
+  };
+}
+
+/**
  * A local agent described in the A2A protocol's terms — its name, what it is for, what it can do — and **not** an A2A Agent Card. Protocol
  * 1.0, as `specification/a2a.proto` in a2aproject/A2A and the specification's Agent Card section define it.
  *

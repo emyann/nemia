@@ -13,7 +13,8 @@ import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
 import { app } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
-import { listWorkflows, versionOf as versionIn } from './workflows.ts';
+import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { listWorkflows } from './workflows.ts';
 import { engine, HARNESS_CHOICES, loadWorkflows, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
@@ -837,7 +838,7 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
   const before = [snapshot(theirs), snapshot(path.join(STORE, 'mine'))];
   const step = { name: 'implement', spec: spec({ model: 'sonnet' }), body: 'Implement it my way.' };
   const sentence = (route: string, name: string | null) =>
-    `${route} refuses to write the repository's workflows (${path.join(repo, 'workflows')}): the builder writes only yours, in ${STORE}, and the api writes nothing into a checkout. Build the workflow in yours${name ? ` — \`cp -r ${path.join(repo, 'workflows', name)} ${STORE}/\` starts from this one —` : ''} then copy the folder into ${path.join(repo, 'workflows')} by hand, where git shows it as a change to commit.`;
+    `${route} refuses to write the repository's workflows (${path.join(repo, 'workflows')}): only yours is written, in ${STORE}, and nothing into a checkout. Build the workflow in yours${name ? ` — \`cp -r ${path.join(repo, 'workflows', name)} ${STORE}/\` starts from this one —` : ''} then copy the folder into ${path.join(repo, 'workflows')} by hand, where git shows it as a change to commit.`;
   for (const [res, route, name] of [
     [await put('good', { steps: [step] }, 'repo'), 'PUT /api/workflows/repo/good', 'good'],
     [await put('mine', { steps: [step], from: 'repo' }), 'PUT /api/workflows/yours/mine', 'mine'],

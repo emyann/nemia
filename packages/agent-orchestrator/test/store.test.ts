@@ -2698,6 +2698,36 @@ test("a run's first steps are every step that waits on nothing: two roots with n
   assert.deepEqual(momentaOf(b, run.id), { left: 0, right: 0, join: 1 });
 });
 
+test("a fan-in whose two parents wrote one file differently is filed told the path its place's make left conflicted and the place's words for seeing it; a clean one is told of no conflict", async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'left.md'), 'the left half\n');
+  fs.writeFileSync(path.join(dir, 'right.md'), 'the right half\n');
+  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\n---\njoin them\n');
+  const joined = async (left: [string, string], right: [string, string]) => {
+    const run = await Effect.runPromise(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
+    const b = board();
+    assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed.sort(), ['left', 'right']);
+    for (const [step, [file, text]] of [
+      ['left', left],
+      ['right', right],
+    ] as const) {
+      fs.writeFileSync(path.join(readRun(run.id).steps[step].workspace!, file), text);
+      b.settle(`${run.id}-${step}`, 'succeeded', SIGNED);
+    }
+    for (let pass = 1; !b.tasks.has(`${run.id}-join`); pass++) {
+      assert.ok(pass <= 3, `join is filed within three passes: ${JSON.stringify(readRun(run.id).steps)}`);
+      await runWith(b.e, advanceRun(readRun(run.id)));
+    }
+    return b.tasks.get(`${run.id}-join`)!.spec.brief;
+  };
+  const conflicted = await joined(['flag.ts', 'export const flag = 1;\n'], ['flag.ts', 'export const flag = 2;\n']);
+  assert.match(conflicted, /work of left and right has been merged/);
+  assert.match(conflicted, /The merge left conflicts, and they are yours to resolve[^\n]*\n\n- flag\.ts\n\n`git status` shows them\./);
+  const clean = await joined(['left.ts', 'export const left = 1;\n'], ['right.ts', 'export const right = 1;\n']);
+  assert.match(clean, /work of left and right has been merged/);
+  assert.doesNotMatch(clean, /conflict|`git status` shows them/i, 'a merge that left none is told of none');
+});
+
 /** The engine's store, in memory, as its own tests keep one. */
 const memoryJournal = (): AsyncJournal => {
   const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();

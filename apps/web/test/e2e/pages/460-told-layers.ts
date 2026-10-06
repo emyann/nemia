@@ -226,6 +226,8 @@ export default {
         'a record that froze no layers still draws its body',
       );
       await expectCount(whole.locator('[data-layer]'), 0, 'and no layer, since none was frozen');
+      await settled(page);
+      await photograph(whole, path.join(OUT, `told-layers-unfrozen-${await themeOf(page)}.png`));
       await goto(page, `/runs/${FOLDER.id}`);
     } finally {
       for (const record of records) fs.rmSync(record, { force: true });

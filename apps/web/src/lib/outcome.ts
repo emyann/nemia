@@ -90,7 +90,7 @@ export type Outcome =
   | { by: 'nobody'; words: string };
 
 /**
- * The machine's reason an attempt has no statement, in a sentence each, off the engine's `EndReason` (agent-runtime/src/domain.ts).
+ * The machine's reason an attempt has no statement, in a sentence each, off the engine's `EndReason` (agent-runtime).
  * `harness` is not here: a harness's own end is a reason only when it said `failed` or `stopped` (`outcomeOf`).
  */
 export const MACHINE_WORDS: Readonly<Record<string, string>> = {

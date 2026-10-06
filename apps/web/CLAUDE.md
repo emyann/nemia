@@ -57,7 +57,7 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - The store is in `/tmp`, which a boot can empty under a running check: when a failure says the store is gone (`storeGone`), run again.
 - The engine's task view carries no filing time; its feed does: a store written by hand writes `engine/feed.jsonl` too (`seedFeed`).
 - A journal line written by hand goes on `engine/feed.jsonl` too, and its take-back cuts the feed back: the api keeps a run judged at
-  rest until a line for its tasks reaches the feed (`restingRead` in the api's `runs/resting.ts`; `130-say.ts`).
+  rest until a line for its tasks reaches the feed (`restingRead` in the orchestrator's `rest/resting.verb.ts`; `130-say.ts`).
 - A record or journal written by hand is decoded as the tick's and the runtime's are (`StepRecordSchema` in the orchestrator's `record.store.ts`,
   `event-schema.ts`): write each key as they write it — a key they leave out is absent, never `null` (`340-agent-try.ts`).
 - Anything a check runs that can fail says why last, on stdout too (`exitOn`, `headlineOf` in `visit.ts`).

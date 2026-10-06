@@ -13,7 +13,7 @@ import path from 'node:path';
 import { runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { shippedOver } from '../src/branches/branches.ts';
-import { knownOf } from '../src/standing/standing.verb.ts';
+import { knownOf, toldOf } from '../src/standing/standing.verb.ts';
 import { scratch } from './scratch.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
 
@@ -371,4 +371,13 @@ test('REFUSED: what standing read of a branch is kept only against a baseRef tha
     tip: id,
     pastBase: false,
   });
+});
+
+test('REFUSED: a branch is told what was last read of it only where it was read against the baseRef it is asked against now', () => {
+  const known = { tip: 'a'.repeat(40), pastBase: true };
+  const kept = new Map([['wf/r/a', { baseRef: NOWHERE, known }]]);
+  assert.deepEqual(toldOf([{ branch: 'wf/r/a', baseRef: NOWHERE }], kept), [{ branch: 'wf/r/a', baseRef: NOWHERE, known }]);
+  assert.deepEqual(toldOf([{ branch: 'wf/r/a', baseRef: 'e'.repeat(40) }], kept), [{ branch: 'wf/r/a', baseRef: 'e'.repeat(40) }]);
+  assert.deepEqual(toldOf([{ branch: 'wf/r/b', baseRef: NOWHERE }], kept), [{ branch: 'wf/r/b', baseRef: NOWHERE }]);
+  assert.deepEqual(toldOf([{ branch: 'wf/r/a', baseRef: NOWHERE }], undefined), [{ branch: 'wf/r/a', baseRef: NOWHERE }]);
 });

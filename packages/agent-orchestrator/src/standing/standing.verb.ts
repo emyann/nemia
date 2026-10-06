@@ -51,7 +51,10 @@ type Ask = { place: string; repo: string; base: string; branches: Map<string, As
  * believes it only while the branch's commit is the one it was read of, and both are commit ids, so it never goes stale: a fresh one is a
  * restart, which asks every `baseRef` once.
  */
-export type StandingMemo = Map<string, ReadonlyMap<string, { readonly baseRef: string; readonly known: KnownStood }>>;
+export type StandingMemo = Map<string, KeptStood>;
+
+/** What a `StandingMemo` keeps of one repository, place and base branch: each branch's `baseRef`, and what was read of it against it. */
+type KeptStood = ReadonlyMap<string, { readonly baseRef: string; readonly known: KnownStood }>;
 
 /** A memo that holds nothing: what a daemon starts with. */
 export const freshStandingMemo = (): StandingMemo => new Map();
@@ -70,14 +73,12 @@ export const knownOf = (asked: AskedBranch, stood: BranchStood | undefined): Kno
   return { tip, pastBase: tip === null ? null : stood.pastBase };
 };
 
-/** `ask`'s branches, each with what `memo` last read of it against the same `baseRef`. */
-const toldOf = (ask: Ask, memo: StandingMemo | undefined): AskedBranch[] => {
-  const kept = memo?.get(keyOf(ask.repo, ask.place, ask.base));
-  return [...ask.branches.values()].map((b) => {
+/** `branches`, each told what `kept` last read of it (`known`), where that was read against the `baseRef` it is asked against now. */
+export const toldOf = (branches: Iterable<AskedBranch>, kept: KeptStood | undefined): AskedBranch[] =>
+  [...branches].map((b) => {
     const was = kept?.get(b.branch);
     return was?.baseRef === b.baseRef ? { ...b, known: was.known } : b;
   });
-};
 
 /**
  * `memo` made what `read` says of `asks`, read in that order: each ask answered keeps what was read of its branches (`knownOf`), one not
@@ -172,7 +173,8 @@ const stoodOutcome = (ask: Pick<Ask, 'place' | 'repo' | 'base'>, outcome: PlaceO
 const stoodRead = (ask: Ask, memo: StandingMemo | undefined): Effect.Effect<StoodRead> =>
   Effect.suspend(() => {
     countSpawn();
-    const request = { repo: ask.repo, base: ask.base, branches: toldOf(ask, memo) };
+    const kept = memo?.get(keyOf(ask.repo, ask.place, ask.base));
+    const request = { repo: ask.repo, base: ask.base, branches: toldOf(ask.branches.values(), kept) };
     return runPlaceVerbAsync(ask.place, 'standing', request, { deadlineMs: STANDING_DEADLINE_MS, env: cachedEnv() });
   }).pipe(Effect.map((outcome) => stoodOutcome(ask, outcome)));
 

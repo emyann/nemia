@@ -79,14 +79,14 @@ test('REFUSED: a release placed where one of its tag is already moves nothing; t
 test("a build's commands get its trial store for WF_ROOT and AE_ROOT and no HKB_REPO, whatever the person's environment names", () => {
   const person = {
     PATH: '/bin',
-    HOME: '/home/ann',
-    WF_ROOT: '/home/ann/.agent-workflows',
-    AE_ROOT: '/home/ann/.agent-engine',
+    HOME: '/home/me',
+    WF_ROOT: '/home/me/.agent-workflows',
+    AE_ROOT: '/home/me/.agent-engine',
     HKB_REPO: '/r',
   };
   assert.deepEqual(trialEnv(person, '/b/trial'), {
     PATH: '/bin',
-    HOME: '/home/ann',
+    HOME: '/home/me',
     WF_ROOT: '/b/trial/workflows',
     AE_ROOT: '/b/trial/engine',
   });

@@ -498,8 +498,8 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
   assert.equal(repoOf({}), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: '  ' }), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: 'elsewhere' }), path.resolve('elsewhere'));
-  const install = { kind: 'install', root: '/s/releases/v1', tag: 'v1', commit: 'abc', source: '/home/ann/nemia', builtAt: '' } as const;
-  assert.equal(repoOf({}, install), '/home/ann/nemia', 'an install serves the repository it was built from, not its own folder');
+  const install = { kind: 'install', root: '/s/releases/v1', tag: 'v1', commit: 'abc', source: '/home/me/nemia', builtAt: '' } as const;
+  assert.equal(repoOf({}, install), '/home/me/nemia', 'an install serves the repository it was built from, not its own folder');
   assert.equal(repoOf({ HKB_REPO: 'elsewhere' }, install), path.resolve('elsewhere'), 'HKB_REPO first');
   assert.equal(repoOf({}, { kind: 'checkout', root: '/elsewhere' }), HOME_REPO, 'a checkout serves its own');
   assert.ok(fs.existsSync(path.join(HOME_REPO, 'CLAUDE.md')), `${HOME_REPO} is the checkout`);

@@ -224,14 +224,14 @@ test('the frame height: no page under the bottom bar is the screen less the head
 });
 
 test("the version says the code serving the board: an install's tag, or checkout, and the folder in its hover; the version alone without", () => {
-  const install = { kind: 'install', root: '/home/ann/.nemia/v1.2.0', tag: 'v1.2.0', commit: 'abcdef1234567890' } as const;
+  const install = { kind: 'install', root: '/home/me/.nemia/v1.2.0', tag: 'v1.2.0', commit: 'abcdef1234567890' } as const;
   assert.deepEqual(versionWords({ version: '1.0.0', release: install }), {
     text: 'v1.0.0 · v1.2.0',
-    title: "Nemia's orchestrator, version 1.0.0, the installed release v1.2.0 (abcdef1) at /home/ann/.nemia/v1.2.0",
+    title: "Nemia's orchestrator, version 1.0.0, the installed release v1.2.0 (abcdef1) at /home/me/.nemia/v1.2.0",
   });
-  assert.deepEqual(versionWords({ version: '1.0.0', release: { kind: 'checkout', root: '/home/ann/nemia' } }), {
+  assert.deepEqual(versionWords({ version: '1.0.0', release: { kind: 'checkout', root: '/home/me/nemia' } }), {
     text: 'v1.0.0 · checkout',
-    title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/ann/nemia",
+    title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/me/nemia",
   });
   assert.deepEqual(versionWords({ version: '1.0.0' }), { text: 'v1.0.0', title: "Nemia's orchestrator, version 1.0.0" });
 });

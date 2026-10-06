@@ -48,8 +48,8 @@ test('the api ticks with no argument, and not with --no-tick; any other is refus
 
 /**
  * `node src/main.ts` with `PORT` and `args`, in the store `root` (one of its own unless given), exporting no telemetry unless `otel`
- * names a collector, with `more` over that environment: what it printed, and how it ended if it did. It is killed when the test is done, if it still runs, and in any case
- * within a minute.
+ * names a collector, with `more` over that environment: what it printed, and how it ended if it did. It is killed when the test is
+ * done, if it still runs, and in any case within a minute.
  */
 function startApi(port: string, args: string[] = [], root = scratch('nemia-api-main-'), otel = '', more: NodeJS.ProcessEnv = {}) {
   const { NEMIA_ON_INSTALLED: _set, ...ambient } = process.env;

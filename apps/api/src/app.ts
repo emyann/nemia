@@ -42,7 +42,7 @@ export const answerError: ErrorHandler = (err, c) => {
   return c.json({ error: err.message }, 500);
 };
 
-/** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, never its source; a checkout's folder. */
+/** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, not its source; a checkout's folder. */
 const RELEASE = leaseRelease(runningRelease());
 
 /**

@@ -287,7 +287,7 @@ test('REFUSED: a tag the repository lacks, and a tag that names no release folde
 });
 
 test("a release's checks run on the build's own trial store, never a person's: WF_ROOT and AE_ROOT under the build, HKB_REPO gone", async () => {
-  const home = '/home/ann';
+  const home = '/home/me';
   tagged('v6', 'six');
   const { WF_ROOT: _wf, AE_ROOT: _ae, ...unset } = ENV;
   for (const env of [

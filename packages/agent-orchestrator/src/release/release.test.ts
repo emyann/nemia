@@ -8,17 +8,17 @@ import assert from 'node:assert/strict';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import { leaseRelease, pointedEntry, restartPlan, tagRefusal, trialRefusal, versionLines, type Current, type Running } from './release.ts';
 
-const CHECKOUT: Running = { kind: 'checkout', root: '/home/ann/nemia' };
+const CHECKOUT: Running = { kind: 'checkout', root: '/home/me/nemia' };
 const INSTALL: Running = {
   kind: 'install',
-  root: '/home/ann/.agent-workflows/releases/v1.2.0',
+  root: '/home/me/.agent-workflows/releases/v1.2.0',
   tag: 'v1.2.0',
   commit: 'abcdef1234567890',
-  source: '/home/ann/nemia',
+  source: '/home/me/nemia',
   builtAt: '2026-10-06T07:00:00.000Z',
 };
 const CURRENT: Current = { ...INSTALL, dir: INSTALL.root };
-const STORE = '/home/ann/.agent-workflows';
+const STORE = '/home/me/.agent-workflows';
 
 /** A lease standing as `kind`, held by `pid`, with the release given. */
 const lease = (kind: 'ticking' | 'stopped' | 'gone', pid = 4242, release?: Running): DaemonStanding => ({
@@ -48,7 +48,7 @@ test('REFUSED: a checkout on a store whose pointer names an install, naming a tr
   const refusal = trialRefusal(CHECKOUT, CURRENT, STORE, {});
   assert.ok(refusal !== null);
   for (const said of [
-    'this is the checkout /home/ann/nemia',
+    'this is the checkout /home/me/nemia',
     `the store ${STORE} runs the installed release v1.2.0`,
     'WF_ROOT=<a scratch folder> nemia',
     `${STORE}/releases/current/node_modules/.bin/nemia`,
@@ -92,7 +92,7 @@ test("the lease records an install's kind, folder, tag and commit, never its sou
 test("nemia version says this nemia's release, the store's pointer and the daemon's, each as it stands", () => {
   assert.deepEqual(versionLines('1.0.0', CHECKOUT, CURRENT, lease('ticking', 4242, INSTALL)), [
     'nemia 1.0.0',
-    'this nemia: checkout at /home/ann/nemia',
+    'this nemia: checkout at /home/me/nemia',
     `current: v1.2.0 (abcdef1) at ${INSTALL.root}`,
     `daemon: pid 4242, v1.2.0 (install, abcdef1) at ${INSTALL.root}`,
   ]);

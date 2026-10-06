@@ -23,9 +23,9 @@ export type Raise = { level: Level; until: string };
 export type FactoryLevel = { factory: string; level: Level; default: Level; own: Level | null; raise: Raise | null };
 
 /**
- * Mirrors the package's `NemiaLevel`: her `level`, the store's, and since when; each factory's level (`factories`); her task, its phase and its session where one is filed; the lines that
- * reach her session (`reach`); whether it was stopped from outside (`stopped`); what her sessions cost (`spend`, null where none is
- * filed); and the allow rules a person gave her at a prompt (`allows`).
+ * Mirrors the package's `NemiaLevel`: her `level`, the store's, and since when; each factory's level (`factories`); her task, its phase
+ * and its session where one is filed; the lines that reach her session (`reach`); whether it was stopped from outside (`stopped`); what
+ * her sessions cost (`spend`, null where none is filed); and the allow rules a person gave her at a prompt (`allows`).
  */
 export type NemiaLevel = {
   level: Level;

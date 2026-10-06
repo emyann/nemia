@@ -6448,6 +6448,7 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
     stopped: false,
     spend: null,
     allows: [],
+    factories: [],
     ...level,
   });
   client.setQueryData(['nemia', 'memory'], { dir: '/store/nemia/memory', facts, fact: null });
@@ -6465,6 +6466,42 @@ const nemiaUp = {
   sessionId: '0123456789abcdef',
   reach: ['attach 01234567', 'or the web link her session shows once its bridge is up, from a phone too'],
 };
+
+test("REFUSED to offer: the default factory's own switch or raise, a raise over a raise, a raise of a factory at Semi-auto by default", async () => {
+  const row = (factory: string, over: Record<string, unknown> = {}) => ({
+    factory,
+    level: 'manual',
+    default: 'manual',
+    own: null,
+    raise: null,
+    ...over,
+  });
+  const html = await nemiaWith({
+    factories: [
+      row('default'),
+      row('mill', { level: 'semi-auto', raise: { level: 'semi-auto', until: '2026-10-05T18:00:00.000Z' } }),
+      row('quay'),
+      row('harbour', { level: 'semi-auto', default: 'semi-auto', own: 'semi-auto' }),
+    ],
+  });
+  const of = (factory: string) => html.slice(html.indexOf(`data-factory-level="${factory}"`)).split('</li>')[0];
+  assert.match(of('default'), /data-level="manual"/);
+  assert.match(of('default'), /the store&#x27;s level, for runs in no factory/);
+  assert.doesNotMatch(
+    of('default'),
+    /data-factory-default|data-factory-raise|data-factory-end/,
+    "the default factory's level is the store's",
+  );
+  assert.match(of('mill'), /data-level="semi-auto"/);
+  assert.match(of('mill'), /data-factory-raised/);
+  assert.match(of('mill'), /data-factory-end/);
+  assert.doesNotMatch(of('mill'), /data-factory-raise=/, 'a raise in force is ended, never raised again');
+  assert.match(of('quay'), /data-factory-raise=/);
+  assert.match(of('quay'), /data-factory-stretch/);
+  assert.doesNotMatch(of('quay'), /data-factory-end|data-factory-raised/);
+  assert.doesNotMatch(of('harbour'), /data-factory-raise=|data-factory-end/, 'Semi-auto by default has nothing to raise');
+  assert.match(of('harbour'), /Semi-auto by default \(its own\)\./);
+});
 
 test('Nemia off: the Semi-auto switch unselected, her session off, no reach, and her memory empty with how to prune it', async () => {
   const html = await nemiaWith({});

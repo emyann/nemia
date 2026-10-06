@@ -1,6 +1,7 @@
 /**
  * Nemia on the board: her session's state judged from the orchestrator's facts (`sessionOf`), kept while any factory is above Manual, the
- * level the switch writes, a factory's level in words, her spend in words, and the mirror of what the api answers of her, which decodes her level and memory and refuses an answer it does not read.
+ * level the switch writes, a factory's level in words, her spend in words, and the mirror of what the api answers of her, which decodes
+ * her level and memory and refuses an answer it does not read.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

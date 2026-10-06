@@ -8,8 +8,8 @@ import { clockWord } from './quota.ts';
 import { dollars } from './stats.ts';
 
 /**
- * Her session's state, as the board says it: off, none kept; leaving, no factory left above Manual with a session still reached, which the keeper stops;
- * not filed yet; filed and starting, not yet reachable; up, reached; and stopped from outside, not filed again.
+ * Her session's state, as the board says it: off, none kept; leaving, no factory left above Manual with a session still reached, which
+ * the keeper stops; not filed yet; filed and starting, not yet reachable; up, reached; and stopped from outside, not filed again.
  */
 export type SessionKind = 'off' | 'leaving' | 'not-filed' | 'starting' | 'up' | 'stopped';
 

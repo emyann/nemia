@@ -227,7 +227,7 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/harness/mcp.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/index.ts': { count: 3, ...MOVES.reword },
-  'packages/agent-runtime/src/service/engine.ts': { count: 1, ...MOVES.reword },
+  'packages/agent-runtime/src/service/say.ts': { count: 1, ...MOVES.reword },
 };
 
 /** Each package file that names an agent of the team today, with its count and what removes them. */

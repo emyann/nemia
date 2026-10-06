@@ -353,8 +353,8 @@ export type RunDetail = {
     lastLine: string | null;
     /**
      * What a person said to the session of the step's current try while it ran — with `nemia say`, or the session page's prompt box — in
-     * the order said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one
-     * nobody told.
+     * the order said: the engine's `said` entries on its task, off the views the request already read, each with the last event of the
+     * session's transcript before its words went (`after`). Empty for a step not filed, and one nobody told.
      */
     said: Said[];
     /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */

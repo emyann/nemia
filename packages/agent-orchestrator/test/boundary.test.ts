@@ -96,8 +96,8 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/folder/folder.store.ts'
 /**
  * The store files another store file may import, each with the store files it may import itself: the bottom, then the run store and the
  * store's pause on it, the factories on the run store, and the run store's files on them (`runStore`), then git, a workflow folder
- * written on the factories too, and where a run looks and a place's workflow folders (`lookup.store.ts`) on both. No other store file is imported by another, so the tree has no cycle; outside
- * the store, the client and the controllers beneath the CLI alone import them.
+ * written on the factories too, and where a run looks and a place's workflow folders (`lookup.store.ts`) on both. No other store file
+ * is imported by another, so the tree has no cycle; outside the store, the client and the controllers beneath the CLI alone import them.
  */
 const STORE_SHARED: Record<string, readonly string[]> = {
   'src/record/places.store.ts': [],

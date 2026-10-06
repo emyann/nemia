@@ -2,7 +2,8 @@
 
 Since 2026-09-29 Nemia ships no workflows, agents or skills: the repository's `workflows/` and this package's own were removed, and
 the tests run the machinery on `test/fixtures/team/`. The sections below that name those folders are records of what shipped then,
-kept as they were written.
+kept as they were written. So is a record's path to a file since removed with what it held; a record whose subject moved keeps the
+old path with "(now …)" beside it, and a line that says how things are now names today's file.
 
 The features agent-orchestrator is still missing, in the order I would take them. Each says what exists
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
@@ -1466,7 +1467,7 @@ Plan §6 item 29, the workflow half; E8 was the engine's. The old hkb had a budg
 `wf decide` said `cost not measured` on every step. E8 made the engine read what a session cost from its harness (`usage.costUsd`,
 `apiMs`, `toolMs`) and take `budgetUsd` on a task. This carries a budget from the folder to the task, and shows the cost where a person
 decides. Read from this workspace, where E8 had merged (`1944644`): agent-runtime's README (*What a session may spend*, *What an attempt
-consumed*), `src/domain.ts`, and its open issues 17 and 18.
+consumed*), `src/domain.ts` (now `src/core/domain.ts`), and its open issues 17 and 18.
 
 What was built:
 
@@ -2730,7 +2731,8 @@ and a card marked to start on its own is started by the tick when a run slot is 
 What was built, the cap:
 
 - **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in daemon.store.ts), unset or 0 for no cap, today's behaviour. Anything but a
-  whole count is refused by name, exit 2 (`runCapOf`), by `wf up`, `wf tick` and `wf ls`: read as no cap, a typo would lift the cap.
+  whole count is refused by name, exit 2 (`runCapOf`, now `maxRuns` in `config/config.store.ts`), by `wf up`, `wf tick` and `wf ls`: read
+  as no cap, a typo would lift the cap.
 - **A pure admission gate beside `runReady`.** `slotNeed` says what a run asks of the cap: in flight — a step's or a check's task filed and
   not settled, or a started run nobody called off that the pass files something of — and whether it wants a slot: nothing filed, not called
   off, its `--after` runs shipped, a root ready. `runAdmitted` files a run's roots only while fewer runs than the cap are in flight, and never
@@ -2895,7 +2897,8 @@ What was built:
   jumped to the top of the list with the queue's time as its own. From review, round 2.
 - **`GET /api/ceilings`** (`apps/api/src/factory/ceilings.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
   before any pass has written them. `cap` is what `runSlots` judges by: the last pass's cap, or before any pass, the api's own `WF_MAX_RUNS`,
-  whose non-count is a 500 in `runCapOf`'s sentence. `inFlight` lists the runs counted against the cap, oldest first. `held` lists the runs
+  whose non-count is a 500 in `runCapOf`'s sentence (now `maxRuns`'s). `inFlight` lists the runs counted against the cap, oldest first.
+  `held` lists the runs
   it holds, each with its count and `slotWord`'s words. With no cap nothing is read, as `runSlots` reads nothing. With a cap there is one
   observation (`everyView`), and each run is judged as `runSlots` judges it, with the package's `slotNeed` and `heldRuns`.
 - **The Inbox page** (`routes/inbox.tsx`): a queued card says `queued · 2nd` and since when, and offers Unqueue. A card that names a workflow,
@@ -2946,7 +2949,7 @@ What was measured:
   held, then one, then none, `held` equal to `runSlots`' each time, one observation, a run waiting on a run in flight and a run called off
   neither counted nor held, and in flight ordered by `createdAt` against the id order. Refused: a pass that ran with no cap is `no cap` beside
   `WF_MAX_RUNS=1` in the api's environment, and a pass's cap of 3 wins over it. The api's own is read only before any pass has written its
-  cap, `WF_MAX_RUNS=two` is a 500 in `runCapOf`'s words, and it is not read once a pass has.
+  cap, `WF_MAX_RUNS=two` is a 500 in `runCapOf`'s words (now `maxRuns`'s), and it is not read once a pass has.
 - Each api guard broken on purpose and the file run again, 11 breaks, each failing 1 to 4 tests: the queue unguarded; the name not refused in
   the route; the body not read; every refusal 422; a conflict 422; DELETE queueing; the api's environment over the pass; reading with no cap;
   a run wanting a slot counted in flight; a parent never shipped read as shipped; views read per task. From round 2, the mtime not set back
@@ -3827,7 +3830,8 @@ What it leaves:
   --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
   folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
   belongs with the board half above.
-- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/runs/judged.ts`, `decision.ts`), so
+- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout
+  (`apps/api/src/runs/judged.ts`, now the package's `src/summary/judged.verb.ts`; `decision.ts`), so
   an ending held for the checkout draws as plain `waiting` — and a held try as one the next tick files — where `wf ls` says `waiting on the
   checkout (<run>'s ship has it)`.
 - **Answered: work that does not hold on the base branch once the ending has run.** `ship.md` aborts a trial merge that conflicts and signs
@@ -4977,7 +4981,8 @@ orchestrator's, and nothing beneath it to lift. The number §12 had is left behi
 - **The runtime keeps no ceiling, no pools and no order.** `decide` has no ceiling branch and `Now` is the time and the grace; a pass
   walks the board in the order the store lists it, starts every task not queued, and reports `running`, the sessions at work per
   harness. `DEFAULT_MAX_CONCURRENT`, `poolsOf`, `pool?` on a harness, `CLAUDE_POOL`, `State.priority` and the runtime's `admissionOrder`
-  are gone, and so are its ceiling tests and `pool.test.ts`, whose cases the orchestrator's `src/cap/cap.test.ts` and
+  are gone, and so are its ceiling tests and `pool.test.ts`, whose cases the orchestrator's `src/cap/cap.test.ts` (now agent-runtime's
+  `test/admission.test.ts`) and
   `test/pool.test.ts` hold. The orchestrator's own `admissionOrder`, the runs in flight under `WF_MAX_RUNS`, is another thing and stays.
 - **Each is refused by name, never dropped** (exit 2, each with a test that makes it refuse at shipped defaults, each shown to fail with
   its refusal taken out): `priority` at any value, at both doors; `maxConcurrent` on `Engine.layer`; a harness that names a `pool`; any
@@ -5080,9 +5085,11 @@ The owner chose an in-memory memo in the daemon, keyed by what the run was judge
   from it is counted (`rested` on the pass's cost; `, 200 runs at rest answered from memory` in the breakdown).
 - **The tests that tick judge every answer twice.** `WF_VERIFY_REST=1` (`verifyRest` on `tick`), set by every test file that ticks a store,
   runs the full pass as well for each run answered from memory and throws where the two differ. Two refusals keep the watch honest
-  (`test/rest-store.test.ts`): an ask file the stamp would not see, and a journal line the feed would not read — each run with the
+  (`test/rest-store.test.ts`, now `src/tick/rest-store.test.ts`): an ask file the stamp would not see, and a journal line the feed would
+  not read — each run with the
   mutant (no `.asks` in the stamp; no feed read) fails, and so does the scaling test with the memo's skip taken out.
-- **What it saves, measured** (`test/rest-store.test.ts`, a fake engine, two scratch repositories, a few runs in flight): a pass reads
+- **What it saves, measured** (`test/rest-store.test.ts`, now `src/tick/rest-store.test.ts`; a fake engine, two scratch repositories, a
+  few runs in flight): a pass reads
   4 journals and observes 6 times at 0, 100 and 200 finished runs, and starts 0 git processes with none and 2 with any (one
   `for-each-ref` a repository); a fresh memo each pass — a daemon restarted before every one — reads 200 journals more and starts at
   least 6 git processes more. Observes no longer grew with finished runs before this: main's settled task's view asks no harness.
@@ -5144,7 +5151,8 @@ out (`restBlockers`, `src/rest/rest.ts`, which `atRest` is now written on). Ther
   not depend on the slot. A run with nothing ready wants no slot.
 - **`WF_VERIFY_REST` names the clause.** A memo answer that a full pass finds not at rest throws with the clauses that hold it out
   (`finds it not at rest (status, settled, inFlight)`).
-- **Tested** (`test/rest-store.test.ts`, `src/rest/rest.test.ts`). Every clause alone gives its name. A run called off before it started
+- **Tested** (`test/rest-store.test.ts`, now `src/tick/rest-store.test.ts`; `src/rest/rest.test.ts`). Every clause alone gives its name.
+  A run called off before it started
   rests, and a `.pruned` marker takes it out. Three finished runs (succeeded, failed at a step, called off) whose worktrees were removed
   owe no hand-off and rest, with the pass's cost unchanged. `wf prune` of a run with one worktree of two gone is `prunable`. The verify
   message names the clauses. Each test was run against its mutant and failed: the unstarted routing reverted, the existence filter taken
@@ -5168,7 +5176,8 @@ once in its step): agent-runtime's open issue 33.
   task it names, and skips a task still kept: no read, no fold, no `settleTask`; its finished sessions are let go off the memo. A fresh
   engine folds everything, and `Engine.layer` makes one memo per engine, so `wf up` keeps it for as long as it runs. It rests on
   `settledQuiet`, `decide`'s first line: a settled task decides nothing in every journal shape, whatever is appended after
-  (`test/lifecycle.test.ts`). `TickReport.views` and `refused` never held a settled task, so admission reads what it read.
+  (`test/lifecycle.test.ts`, now agent-runtime's `src/core/lifecycle.test.ts`). `TickReport.views` and `refused` never held a settled
+  task, so admission reads what it read.
 - **What could append to a settled task**: a second `file` under its id, `say`, the pass's `measured`, a `requestStop` that read the
   task before a pass settled it, and, through the same store, `ae` and the api's engine. `answer`, `close`, `admit` and `requestStop`
   refuse a settled task. Every one goes through
@@ -5204,7 +5213,8 @@ approach for the api: a cache of a pure function keyed by the same facts, rebuil
   harnesses told the last attempt of each task in flight among them (`observeFor`) — one look however many, and none with none in flight.
   This meets the operator's fallback (one `list()` when several `claude --bg` tasks are in flight) differently: one observation that asks
   `claude agents` only for a background session, with no journal read that was not named.
-- **The api answers a run at rest from memory** (`apps/api/src/runs/resting.ts`), keyed as the tick's memo is: `restStamps`, the record as
+- **The api answers a run at rest from memory** (`apps/api/src/runs/resting.ts`, now the package's `src/rest/resting.verb.ts`), keyed as
+  the tick's memo is: `restStamps`, the record as
   read, the feed since (`evictedBy`), and the tips of the branches git was asked about that are not on the base, with the base's. What it
   keeps is what the list says, not what a pass would file: a final status or a pruned run, nothing moving, waited on or held, every task
   settled, the workflow frozen, every git question answered. `startedAt` is read per request, so a kept answer holds no clock. The runs it

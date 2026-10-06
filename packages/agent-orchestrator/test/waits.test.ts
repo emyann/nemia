@@ -1,167 +1,27 @@
 /**
- * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), and the guard that keeps a hand-written deadline out of the
- * package's tests (`DEADLINES`).
+ * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's held here byte for byte, and the guard
+ * that keeps a hand-written deadline out of the package's tests (`DEADLINES`). The helper's own tests are the runtime's.
  *
- * A wait asks at once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested
- * `node --test` of `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file,
- * each `now()` of `Date` or `performance` a number is added to in the package's tests: each left is a mocked clock, a timestamp or a spin,
- * never a wait, and a count only shrinks (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
+ * `DEADLINES` counts, file by file, each `now()` of `Date` or `performance` a number is added to in the package's tests: each left is a
+ * mocked clock, a timestamp or a spin, never a wait, and a count only shrinks (`deadlineBreaks`). A change that takes one out lowers
+ * its count in the same commit.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { bell, until, type Waiter } from './waits.ts';
 
-const PACKAGE = path.join(import.meta.dirname, '..');
+const TEST = import.meta.dirname;
+const PACKAGE = path.join(TEST, '..');
+/** The one copy the others are held to. */
+const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'waits.ts');
 
-/**
- * A test's signal and diagnostics, as `until` reads them, with what it said kept and its abort in the test's hands: aborted once the test
- * `of` ends, so a wait it left pending holds no process open.
- */
-const waiter = (of: TestContext) => {
-  const said: string[] = [];
-  const control = new AbortController();
-  const t: Waiter = { signal: control.signal, diagnostic: (message: string) => void said.push(message) };
-  of.after(() => control.abort());
-  return { t, said, abort: () => control.abort() };
-};
-
-/** A turn of the event loop, so a timer due at once has fired. */
-const turn = () => new Promise((r) => setImmediate(r));
-
-test('a wait with no pace asks at once and on each ring, and on nothing else', async (of) => {
-  const { t } = waiter(of);
-  const rung = bell();
-  let asked = 0;
-  let ready = false;
-  const waiting = until(
-    t,
-    () => {
-      asked++;
-      return ready;
-    },
-    'the third ring',
-    { bell: rung },
+test("the helper is the runtime's, byte for byte", () => {
+  assert.equal(
+    fs.readFileSync(path.join(TEST, 'waits.ts'), 'utf8'),
+    fs.readFileSync(RUNTIME, 'utf8'),
+    'copy packages/agent-runtime/test/waits.ts over this one: a change to it is made there and copied to every package',
   );
-  await new Promise((r) => setTimeout(r, 30));
-  assert.equal(asked, 1, 'asked once at its start, and not again on a timer');
-  rung.ring();
-  await turn();
-  assert.equal(asked, 2);
-  ready = true;
-  rung.ring();
-  await waiting;
-  assert.equal(asked, 3);
-  rung.ring();
-  await turn();
-  assert.equal(asked, 3, 'a wait that came hears the bell no more');
-});
-
-test('a wait at a pace asks again until its answer holds, and answers it; an async condition is never asked twice at once', async (of) => {
-  const { t } = waiter(of);
-  const rung = bell();
-  let asked = 0;
-  let at = 0;
-  let most = 0;
-  const answer = await until(
-    t,
-    async () => {
-      asked++;
-      most = Math.max(most, ++at);
-      rung.ring();
-      await new Promise((r) => setTimeout(r, 2));
-      at--;
-      return asked >= 4 && `asked ${asked} times`;
-    },
-    'the fourth ask',
-    { bell: rung, everyMs: 1 },
-  );
-  assert.equal(answer, 'asked 4 times', 'the first truthy answer');
-  assert.equal(most, 1, 'one ask at a time, though the bell rang during each');
-});
-
-test('a wait fails with what its condition throws, so an assert inside it surfaces', async (of) => {
-  const { t } = waiter(of);
-  const err = await until(
-    t,
-    () => {
-      throw new Error('the beat is not a pass');
-    },
-    'a pass',
-    { everyMs: 1 },
-  ).catch((e: unknown) => e);
-  assert.ok(err instanceof Error);
-  assert.equal(err.message, 'the beat is not a pass');
-});
-
-test('REFUSED: a wait whose test is aborted, before it or while it waits, fails naming what never came, and asks no more', async (of) => {
-  const before = waiter(of);
-  before.abort();
-  const early = await until(before.t, () => true, 'a beat').catch((e: unknown) => e);
-  assert.ok(early instanceof Error);
-  assert.equal(early.message, 'never came: a beat', 'never asked, as its test is over');
-  assert.deepEqual(before.said, ['never came: a beat']);
-
-  const during = waiter(of);
-  let asked = 0;
-  const waiting = until(during.t, () => void asked++, 'two beats', { everyMs: 1 }).catch((e: unknown) => e);
-  await new Promise((r) => setTimeout(r, 10));
-  during.abort();
-  const late = await waiting;
-  assert.ok(late instanceof Error);
-  assert.equal(late.message, 'never came: two beats');
-  assert.deepEqual(during.said, ['never came: two beats']);
-  const asks = asked;
-  await new Promise((r) => setTimeout(r, 10));
-  assert.equal(asked, asks, 'its pace stopped as it failed');
-});
-
-test('REFUSED: a wait that says what it waits for by a function says it as it stands when the wait fails, stuck where it is', async (of) => {
-  const stuck = waiter(of);
-  let phase = 'queued';
-  const waiting = until(
-    stuck.t,
-    () => phase === 'succeeded',
-    () => `c1 succeeded; c1 ${phase}`,
-    { everyMs: 1 },
-  ).catch((e: unknown) => e);
-  phase = 'running (working)';
-  await new Promise((r) => setTimeout(r, 10));
-  stuck.abort();
-  const err = await waiting;
-  assert.ok(err instanceof Error);
-  assert.equal(err.message, 'never came: c1 succeeded; c1 running (working)', 'asked as the wait fails, not as it began');
-  assert.deepEqual(stuck.said, ['never came: c1 succeeded; c1 running (working)']);
-
-  const unsaid = waiter(of);
-  let still: unknown;
-  void until(
-    unsaid.t,
-    () => false,
-    () => {
-      throw new Error('the journal does not read');
-    },
-  ).catch((e: unknown) => {
-    still = e;
-  });
-  unsaid.abort();
-  await turn();
-  assert.ok(still instanceof Error, 'failed at the abort, though what it waits for could not be said');
-  assert.equal(still.message, 'never came: (the wait could not say what: the journal does not read)', 'it fails all the same');
-});
-
-test('REFUSED: a wait that never comes fails its test at the timeout, and the runner says what never came', () => {
-  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-  const ran = spawnSync(
-    'timeout',
-    ['-k', '5', '120', process.execPath, '--test', '--test-reporter=tap', path.join('test', 'fixtures', 'waits', 'never.ts')],
-    { cwd: PACKAGE, env, encoding: 'utf8' },
-  );
-  assert.equal(ran.status, 1, ran.stdout + ran.stderr);
-  assert.match(ran.stdout, /error: 'test timed out after 50ms'/, ran.stdout);
-  assert.match(ran.stdout, /^# never came: the bell that never rings$/m, ran.stdout);
 });
 
 /** What a count is held to: how many a file has, and why each is no wait. */

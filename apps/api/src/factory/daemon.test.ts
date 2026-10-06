@@ -12,9 +12,11 @@ import { app } from '../app.ts';
 import { daemonOf } from './daemon.ts';
 import { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } from 'agent-orchestrator';
 const FILE = path.join(root, 'daemon.json');
+const STATS = path.join(root, 'tick-stats.json');
 
 type Daemon = import('./daemon.ts').Daemon;
 type DaemonFile = import('agent-orchestrator').DaemonFile;
+type PassCostRead = import('agent-orchestrator').PassCostRead;
 
 /** A pid no process has: above any `pid_max` Linux allows (2^22). */
 const NO_PID = 2 ** 30;
@@ -52,7 +54,10 @@ async function get(): Promise<Daemon> {
   return (await res.json()) as Daemon;
 }
 
-test.afterEach(() => fs.rmSync(FILE, { recursive: true, force: true }));
+test.afterEach(() => {
+  fs.rmSync(FILE, { recursive: true, force: true });
+  fs.rmSync(STATS, { force: true });
+});
 
 test('with no daemon.json, nothing ticks the store, and the api makes none', async () => {
   const d = await get();
@@ -187,6 +192,7 @@ test("daemonOf: the standing as facts, and nemia ls's line with them", () => {
     staleAfterMs: staleAfterMs(120_000),
     identity: 'unknown',
     line: daemonLine(standing, now),
+    unobserved: [],
   });
   assert.equal(staleAfterMs(120_000), 20 * MIN, 'ten of its intervals, over the floor');
   assert.equal(daemonOf({ kind: 'ticking', file, last: Date.parse(file.beatAt!), quiet: 0, identity: 'same' }, now).ticking, true);
@@ -198,4 +204,58 @@ test("daemonOf: the standing as facts, and nemia ls's line with them", () => {
       Array(9).fill(null),
     );
   }
+});
+
+/** What a pass cost as the tick writes it (`recordPassCost`), at `at`, with what it could not read of a harness. */
+const passAt = (at: string, unobserved?: string[]): PassCostRead => ({
+  at,
+  ms: 212,
+  records: 12,
+  bytes: 0,
+  spawned: 1,
+  overheadMs: 0.4,
+  rested: 0,
+  phases: Object.fromEntries(
+    ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p) => [
+      p,
+      { ms: 10, calls: 1, bytes: 0, reads: 1, spawned: 0 },
+    ]),
+  ) as PassCostRead['phases'],
+  harnesses: { claude: { calls: 1, ms: 30, listed: 3, spawned: 1, unread: 1 } },
+  ...(unobserved ? { unobserved } : {}),
+});
+
+const UNREAD = ['harness `claude`: claude agents: timed out'];
+
+test('a ticking daemon whose last pass could not read a harness says why; nobody else says it, nor a pass from before it started', async () => {
+  put(written(0));
+  fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString(), UNREAD)));
+  assert.deepEqual((await get()).unobserved, UNREAD);
+  fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString())));
+  assert.deepEqual((await get()).unobserved, [], 'a pass that read every harness says nothing');
+  fs.writeFileSync(STATS, JSON.stringify(passAt(ago(41 * MIN), UNREAD)));
+  assert.deepEqual((await get()).unobserved, [], 'REFUSED: the last pass of a daemon before this one');
+  fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString(), UNREAD)));
+  put(written(0, { stoppedAt: new Date().toISOString() }));
+  assert.equal((await get()).kind, 'stopped');
+  assert.deepEqual((await get()).unobserved, [], 'REFUSED: a daemon that stopped reads nothing now');
+  fs.rmSync(FILE);
+  assert.deepEqual((await get()).unobserved, [], 'nor where none ever ran');
+});
+
+test('daemonOf: what the last pass could not read is said only of a ticking daemon, by a pass since its start', () => {
+  const now = Date.parse('2026-09-22T10:00:00.000Z');
+  const file: DaemonFile = {
+    pid: 42,
+    startedAt: '2026-09-22T09:00:00.000Z',
+    cwd: '/r',
+    every: 4_000,
+    passedAt: '2026-09-22T09:59:58.000Z',
+    beatAt: '2026-09-22T09:59:58.000Z',
+  };
+  const at = (kind: 'ticking' | 'stalled') => ({ kind, file, last: Date.parse(file.beatAt!), quiet: 2_000, identity: 'same' as const });
+  assert.deepEqual(daemonOf(at('ticking'), now, passAt(file.startedAt, UNREAD)).unobserved, UNREAD, 'a pass at its start is its own');
+  assert.deepEqual(daemonOf(at('ticking'), now, passAt('2026-09-22T08:59:59.999Z', UNREAD)).unobserved, []);
+  assert.deepEqual(daemonOf(at('stalled'), now, passAt(file.passedAt!, UNREAD)).unobserved, []);
+  assert.deepEqual(daemonOf(at('ticking'), now, null).unobserved, []);
 });

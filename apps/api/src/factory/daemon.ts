@@ -10,6 +10,8 @@ import {
   holderOf,
   type HolderKind,
   type Identity,
+  lastPassCost,
+  type PassCostRead,
   staleAfterMs,
 } from 'agent-orchestrator';
 
@@ -24,6 +26,8 @@ export const START = 'npm start in apps/api';
  * `identity` is what the api's own process table said of the pid (the package's `Identity`). `by` is which kind of daemon wrote the file,
  * the api or a `nemia up` (a file that names none is a `nemia up`'s), and `url` where an api holder serves the board, null for a `nemia
  * up`. `start` is how a person starts one (`START`). A file that does not read has no fields.
+ * `unobserved` is why the daemon's last pass could not read a harness, in the runtime's words (`PassCost.unobserved`): said only while it
+ * ticks and of a pass since it started, empty otherwise.
  */
 export type Daemon = {
   kind: DaemonStanding['kind'];
@@ -41,10 +45,14 @@ export type Daemon = {
   staleAfterMs: number | null;
   identity: Identity | null;
   line: string;
+  unobserved: readonly string[];
 };
 
-/** The standing as the board reads it, at `now`: pure. */
-export function daemonOf(standing: DaemonStanding, now: number): Daemon {
+/**
+ * The standing as the board reads it, at `now`: pure. `pass` is the last pass's cost as the store kept it (`lastPassCost`), null where
+ * none reads; its `unobserved` is the daemon's only while it ticks and the pass is not older than its start.
+ */
+export function daemonOf(standing: DaemonStanding, now: number, pass: PassCostRead | null = null): Daemon {
   const line = daemonLine(standing, now);
   if (standing.kind === 'none' || standing.kind === 'unreadable') {
     return {
@@ -63,6 +71,7 @@ export function daemonOf(standing: DaemonStanding, now: number): Daemon {
       staleAfterMs: null,
       identity: null,
       line,
+      unobserved: [],
     };
   }
   const { file } = standing;
@@ -82,12 +91,14 @@ export function daemonOf(standing: DaemonStanding, now: number): Daemon {
     staleAfterMs: staleAfterMs(file.every),
     identity: standing.identity,
     line,
+    unobserved:
+      standing.kind === 'ticking' && pass && Date.parse(pass.at) >= Date.parse(file.startedAt) ? [...(pass.unobserved ?? [])] : [],
   };
 }
 
 /**
  * Whether a daemon ticks the store now: the file read and the process table asked, as `nemia ls` asks them, the package reading both
- * clocks; `now` is the wall time its ages are worded at. Throws what the package throws of a file that is there and cannot be read — a
- * store that cannot be read cannot be said to tick or not.
+ * clocks, with the last pass's cost; `now` is the wall time its ages are worded at. Throws what the package throws of a file that is
+ * there and cannot be read — a store that cannot be read cannot be said to tick or not.
  */
-export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now);
+export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now, lastPassCost() ?? null);

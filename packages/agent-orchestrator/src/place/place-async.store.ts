@@ -28,9 +28,10 @@ async function stopGroup(pgid: number): Promise<boolean> {
 }
 
 /**
- * Run `verb` of the place skill in `skillDir` as `runPlaceVerb` runs it — its script, request, deadline, environment and outcome — with the
- * event loop free while it runs: the script is spawned and awaited, never waited on in place. Past its deadline its leader is killed, what it
- * started is stopped, SIGTERM then SIGKILL after `STOP_GRACE_MS`, and its pipes are closed, before the outcome is answered. Never fails.
+ * Run `verb` of the place skill in `skillDir` as `runPlaceVerb` runs it — its script, request, deadline, environment and outcome — with
+ * the event loop free while it runs: the script is spawned and awaited, never waited on in place. Past its deadline its leader is killed,
+ * what it started is stopped, SIGTERM then SIGKILL after `STOP_GRACE_MS`, and its pipes are closed, before the outcome is answered. Never
+ * fails.
  */
 export const runPlaceVerbAsync = <V extends PlaceVerb>(
   skillDir: string,

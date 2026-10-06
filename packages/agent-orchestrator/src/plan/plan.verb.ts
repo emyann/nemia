@@ -31,8 +31,9 @@ export type PlanStarted = {
  *
  * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no
  * workflow folder (`workflowFolder`, from the plan folder), or one `startRun` would refuse — that refusal, behind the card; and, when a
- * card runs on the repository, what its place's `open` refuses of it, a `.worktreeinclude` among them (`StartPlace`, `openPlace`). A start that refuses after that, part-way, stops the plan: the runs already started stand,
- * and `stopped` says which card refused and which are left. The option `start` is `startRun`, unless a test hands it one of its own.
+ * card runs on the repository, what its place's `open` refuses of it, a `.worktreeinclude` among them (`StartPlace`, `openPlace`). A start
+ * that refuses after that, part-way, stops the plan: the runs already started stand, and `stopped` says which card refused and which are
+ * left. The option `start` is `startRun`, unless a test hands it one of its own.
  *
  * `factory` names the factory every card's run is started in, as `nemia start --factory` names it: read first (`readFactory`), and each
  * card's workflow is judged in it before the first run, a workflow it has not attached or a step its hires leave unfilled among what is

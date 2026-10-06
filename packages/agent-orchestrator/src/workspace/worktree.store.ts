@@ -31,6 +31,7 @@ import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
 import { countSpawn, execCounted, withinEffect } from '../meter/tally.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
+import { readPlaceJson } from '../place/place.store.ts';
 import type { PlaceRequests } from '../place/place.ts';
 
 /**
@@ -293,7 +294,7 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
   return why ? { tree: 'linked', made, why } : { tree: 'hardlinked', made };
 }
 
-/** The notes a step's `node_modules` gives the run's log: installed with `npm ci`, not provisioned, or linked where it could not hardlink. */
+/** The notes a step's `node_modules` gives the run's log: installed with `npm ci`, not provisioned, or linked, not hardlinked. */
 function depsNotes(deps: Provisioned): string[] {
   if (deps.tree === 'own' && deps.installed)
     return ['node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed'];
@@ -305,17 +306,24 @@ function depsNotes(deps: Provisioned): string[] {
   return [];
 }
 
-/** A step's workspace as it was made: where, on what line of work, the paths its merge left conflicted, its dependencies, and notes. */
+/**
+ * A step's workspace as it was made: where, on what line of work, the paths its merge left conflicted with the place's words for seeing
+ * them (`say.conflicts`), only where there are some, its dependencies, and notes.
+ */
 export type Cut = {
   readonly workspace: string;
   readonly branch?: string;
-  readonly conflicts: readonly string[];
+  readonly merge?: { readonly conflicts: readonly string[]; readonly say: string };
   readonly deps?: Provisioned;
   readonly notes: readonly string[];
 };
 
 /** A step's workspace made, or why it was not, in words for the run's log. */
 export type CutOutcome = { readonly cut: Cut } | { readonly uncut: string };
+
+/** What the run's log says of step `name`'s workspace: the notes of its cut, or why it was not cut. */
+export const cutNotes = (name: string, made: CutOutcome): string[] =>
+  ('cut' in made ? made.cut.notes : [made.uncut]).map((note) => `${name}: ${note}`);
 
 /** Why a step's workspace was not made. */
 const uncut = (words: string): CutOutcome => ({ uncut: `not cut — ${words}` });
@@ -349,8 +357,17 @@ const madeBy = Effect.fn('madeBy')(function* (run: GitRun, dirOf: (run: GitRun) 
     return uncut(
       `the place's make answered ${outcome.answer.workspace}, where it was asked for ${request.at}: read as not heard, and asked again on the next pass`,
     );
-  return { made: outcome.answer } as const;
+  return { made: outcome.answer, dir } as const;
 });
+
+/** How the place in `dir` says to see a merge's conflicts (`say.conflicts`), or nothing where its `place.json` does not read. */
+function conflictsSaid(dir: string): string {
+  try {
+    return readPlaceJson(dir).say.conflicts;
+  } catch {
+    return '';
+  }
+}
 
 /**
  * The workspace a step runs in, made real: `{ cut }`, or `{ uncut }` with why, for the run's log, when the place made none.
@@ -377,16 +394,16 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
 ) {
   const plan = workspacePlan(steps, step);
   const cut = (made: Cut): CutOutcome => ({ cut: made });
-  if (!isGitRun(run)) return cut({ ...folderPlace(runsDir()).make(run, plan, step.name), conflicts: [] });
+  if (!isGitRun(run)) return cut(folderPlace(runsDir()).make(run, plan, step.name));
   const of = (name: string) => {
     const s = run.steps[name];
     if (!s?.workspace || !s.branch) throw new Error(`${step.name}: ${name} has no workspace yet`);
     return s as { workspace: string; branch: string };
   };
-  if (!run.isolate || plan.kind === 'main') return cut({ workspace: run.repo, branch: run.branch, conflicts: [], notes: [] });
+  if (!run.isolate || plan.kind === 'main') return cut({ workspace: run.repo, branch: run.branch, notes: [] });
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
-    return cut({ workspace: parent.workspace, branch: parent.branch, conflicts: [], notes: [] });
+    return cut({ workspace: parent.workspace, branch: parent.branch, notes: [] });
   }
   const asked = yield* madeBy(run, dirOf, {
     repo: run.repo,
@@ -401,7 +418,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   return cut({
     workspace: made.workspace,
     branch: made.branch,
-    conflicts: made.conflicts,
+    ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: conflictsSaid(asked.dir) } } : {}),
     deps,
     notes: [...made.notes, ...depsNotes(deps)],
   });

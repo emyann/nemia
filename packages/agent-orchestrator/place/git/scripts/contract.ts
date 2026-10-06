@@ -129,22 +129,21 @@ export function worktreeInclude(text: string): WorktreeInclude {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const rel = path.posix.normalize(line.replaceAll('\\', '/').replace(/^\/+/, '') || '.').replace(/\/+$/, '');
-    const segments = rel.split('/');
-    const why = /^[A-Za-z]:[\\/]/.test(line)
-      ? 'is absolute'
-      : rel === '..' || rel.startsWith('../')
-        ? 'is outside the repository'
-        : rel === '.' || rel === ''
-          ? 'is the repository itself'
-          : segments[0] === '.git'
-            ? "is git's own"
-            : null;
+    const why = whyRefused(line, rel);
+    const into = rel.split('/').includes('node_modules') ? out.provisioned : out.copy;
     if (why) out.refused.push({ line, why });
-    else if (segments.includes('node_modules')) {
-      if (!out.provisioned.includes(rel)) out.provisioned.push(rel);
-    } else if (!out.copy.includes(rel)) out.copy.push(rel);
+    else if (!into.includes(rel)) into.push(rel);
   }
   return out;
+}
+
+/** Why the `.worktreeinclude` line `line`, normalized to `rel`, is refused: on a drive, outside the repository, it, or git's own. */
+function whyRefused(line: string, rel: string): string | null {
+  if (/^[A-Za-z]:[\\/]/.test(line)) return 'is absolute';
+  if (rel === '..' || rel.startsWith('../')) return 'is outside the repository';
+  if (rel === '.' || rel === '') return 'is the repository itself';
+  const [first] = rel.split('/');
+  return first === '.git' ? "is git's own" : null;
 }
 
 /** Each refused line as a person reads it: `"../x" is outside the repository`. */

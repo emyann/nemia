@@ -6,10 +6,11 @@ import type { PageSpec } from '../visit.ts';
 export default {
   /**
    * A run whose review loop is out of rounds, waiting on you. Its record names a repository that is not on this machine, so the Decide
-   * section says what its branch changed is not known, and the page renders. The graph the run froze: implement → review, the edge back beneath
-   * the row, and review drawn as a human gate. Each step's note is on hover on the canvas and under its chip on the run's page, read before
-   * a click opens the inspector, which has a heading of its own. The timeline has a row a try and a total a round; implement's Details
-   * list its three rounds, each a task of its own, and round 2 selected shows its closeout with the other two folded beneath.
+   * section says what its branch changed is not known, and the page renders. The graph the run froze: implement → review, the edge back
+   * beneath the row, and review drawn as a human gate. Each step's note is on hover on the canvas and under its chip on the run's page,
+   * read before a click opens the inspector, which has a heading of its own. The timeline has a row a try and a total a round;
+   * implement's Details list its three rounds, each a task of its own, and round 2 selected shows its closeout with the other two
+   * folded beneath.
    */
   name: 'loop',
   route: `/runs/${LOOPING.id}`,

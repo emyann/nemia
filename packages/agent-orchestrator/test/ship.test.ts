@@ -2298,6 +2298,37 @@ test('nemia decide offers the merge where the work conflicts with the base, and 
   assert.deepEqual(await merges(), [], 'nor once it is asked');
 });
 
+/** A `git` on PATH that answers every command as git does but reading the commit `branch` names, which it says it has none of. */
+function blindTo(branch: string): string {
+  const real = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  const dir = scratch('wf-ship-blind-git-');
+  fs.writeFileSync(
+    path.join(dir, 'git'),
+    `#!/bin/sh\ncase "$*" in *"rev-parse --verify --quiet ${branch}^{commit}"*) exit 1;; esac\nexec ${real} "$@"\n`,
+    { mode: 0o755 },
+  );
+  return dir;
+}
+
+test('REFUSED at shipped defaults: a merge whose trial read no commit of the base says git cannot read it, and `nemia decide` offers none', async () => {
+  const { repo, id, e } = await stoppedOnBase();
+  mainMoves(repo);
+  const before = process.env.PATH;
+  process.env.PATH = `${blindTo('main')}${path.delimiter}${before}`;
+  try {
+    await assert.rejects(
+      runWith(e, mergeRun(id)),
+      mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia merge ${id}\\.$`)),
+    );
+    assert.deepEqual(
+      (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'merge'),
+      [],
+    );
+  } finally {
+    process.env.PATH = before;
+  }
+});
+
 test("a merge send-back leaves the round count unchanged: the loop's target merges the base at the commit asked, the run's base moves there, and the reviewer reads the merge", async () => {
   const { repo, id, e, tasks, settle } = await stoppedOnBase();
   const sha = mainMoves(repo);

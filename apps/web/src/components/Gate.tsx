@@ -260,8 +260,8 @@ export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): bool
  * off the run's decision, which the Decide section on this page has already read for this state of the run); then, for each step the
  * ending waits on — the steps a send-back goes to (`sendBackTo`) — the closeout it handed on, rendered, with the files it named. That is
  * the whole of what there is to read: the ending has run nothing and said nothing. The counts sit under each branch — `3 files: +14 −1`,
- * or the sentence saying what the run changed is not known — as the CLI's `decide` prints them beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever the
- * ending's spec reads.
+ * or the sentence saying what the run changed is not known — as the CLI's `decide` prints them beside the branch; the steps waited on are
+ * read in the run's order off the graph the api gives, whatever the ending's spec reads.
  */
 export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps'][number] }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });

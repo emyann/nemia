@@ -1,5 +1,6 @@
 /**
- * What a person asks of a run from the board — a try, a round, an approval, an acceptance, words to a session (apps/api/src/asks/asks.ts).
+ * What a person asks of a run from the board — a try, a round, an approval, an acceptance, words to a session (the command table's
+ * routes, apps/api/src/commands/routes.ts).
  */
 
 import { Schema } from 'effect';

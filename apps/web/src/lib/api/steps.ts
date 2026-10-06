@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 import { get } from './read.ts';
 
 /**
- * Mirrors `TranscriptEvent` in packages/agent-runtime/src/runner.ts, as the api passes it on: one thing said in a session's
+ * Mirrors `TranscriptEvent` in agent-runtime, as the api passes it on: one thing said in a session's
  * conversation. A `tool_result` carries its call's `id`, so an event is unique by `id` and `kind` together. A tool's `input` is absent
  * where the harness recorded the call without one (Claude Code's `input` is optional).
  */

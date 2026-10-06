@@ -70,7 +70,7 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * before the first run is started. Refused:
  * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
  *   unfilled or fill twice (`stepsIn`);
- * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that
+ * - with `isolate: false` (`--no-worktree`): a team that says `place: folder`, which has no base branch to work on in place; one that
  *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
  *   does not have into the branch it stands on;
  * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
@@ -91,7 +91,7 @@ export function stepsToStart(
   if (!isolate && isFolderTeam(steps)) {
     throw new Invalid({
       message:
-        `--no-worktree: this workflow's steps say \`workspace: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
+        `--no-worktree: this workflow's steps say \`place: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
         `Start it without --no-worktree.`,
     });
   }
@@ -241,7 +241,7 @@ type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'context'
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
-  `--repo ${repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
+  `--repo ${repo}: this workflow's steps say \`place: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
   `Start it without --repo, or start a workflow whose steps work on a repository.`;
 
 /**
@@ -432,7 +432,7 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * (`nemia start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  *
- * A team that says `workspace: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
+ * A team that says `place: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
  * run's own directory in the store is its workspace, each step's folder made beneath it when the step is filed (`folderPlace`).
  *
  * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `nemia ls`, `nemia decide` and the

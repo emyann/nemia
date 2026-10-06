@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Result, Schema } from 'effect';
 import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
-import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
+import { asNamed, FORMER_KEYS, stepPlace, type Workflow } from '../src/workflow.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
 import { placesOf, shippedFolders, TEAM_DEV } from './team.ts';
 
@@ -42,7 +42,8 @@ test('a step with every key the parser types, its agent and its output reads as 
     body: 'Read it.',
     resume: 'implement',
     input: ['implement'],
-    workspace: 'folder',
+    place: 'folder',
+    workspace: 'main',
     slot: 'none',
     harness: 'claude',
     model: 'opus',
@@ -96,6 +97,8 @@ test('a step with every key the parser types, its agent and its output reads as 
     ['after', 'implement'],
     ['tally', 3],
     ['tally', 'verdict'],
+    ['place', 'cloud'],
+    ['workspace', 'worktree'],
   ] as const) {
     assert.ok(Result.isFailure(decode({ ...(frozen(step) as object), [key]: value })), `${key}: ${value} is refused`);
   }
@@ -150,6 +153,43 @@ test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now
     });
     assert.ok(Result.isFailure(decode({ ...step, [former]: 'SendMessage' })), `${former} as text is refused, as ${now} is`);
   }
+});
+
+test("a step frozen before `place:`, with `workspace: folder`, is read as `place: folder`, its agent's keys too; one with neither key reads as it was, a git step", () => {
+  const record = {
+    name: 'write',
+    after: [],
+    body: 'You write.\n\nGo.',
+    workspace: 'folder',
+    agent: { name: 'writer', keys: ['workspace'], body: 'Go.', given: {} },
+  };
+  const decoded = decode(record);
+  assert.ok(Result.isSuccess(decoded), Result.isFailure(decoded) ? String(decoded.failure) : '');
+  assert.deepEqual(asNamed(decoded.success), {
+    name: 'write',
+    after: [],
+    body: 'You write.\n\nGo.',
+    place: 'folder',
+    agent: { name: 'writer', keys: ['place'], body: 'Go.', given: {} },
+  });
+  const ending = {
+    name: 'ship',
+    after: ['write'],
+    body: 'Ship.',
+    workspace: 'main',
+    agent: { name: 'shipper', keys: ['workspace'], body: '', given: {} },
+  };
+  const main = decode(ending);
+  assert.ok(Result.isSuccess(main));
+  assert.deepEqual(asNamed(main.success), ending, '`workspace: main` is its own word, and is left as it is');
+  const old = { name: 'implement', after: [], body: 'Build.' };
+  const read = decode(old);
+  assert.ok(Result.isSuccess(read));
+  assert.deepEqual(asNamed(read.success), old, 'a step frozen before the key, with no place, reads as it was');
+  assert.equal(stepPlace(asNamed(read.success)), 'git', 'and works on a repository, as it did');
+  const place = decode({ ...old, place: 'cloud' });
+  assert.ok(Result.isFailure(place));
+  assert.match(String(place.failure), /place/, 'a frozen place outside its words is refused, naming the field');
 });
 
 test('the decoded step, read under the names its keys have now, is a `Workflow`, and a `Workflow` is a decoded step', () => {

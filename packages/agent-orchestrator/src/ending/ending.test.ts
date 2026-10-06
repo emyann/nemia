@@ -21,7 +21,8 @@ test("a step in the checkout is filed with a read of its run's artifacts after i
 test('REFUSED: a step in a worktree or a folder, and one in the checkout on a harness fenced by no permission rule, is filed with its own list only', () => {
   const own = ['Bash(git status)'];
   assert.equal(filedAllows({ allowedTools: own }, ARTIFACTS), own, 'a worktree');
-  assert.equal(filedAllows({ workspace: 'folder', allowedTools: own }, ARTIFACTS), own, 'a folder');
+  const inFolder = { place: 'folder' as const, allowedTools: own };
+  assert.equal(filedAllows(inFolder, ARTIFACTS), own, 'a folder');
   assert.equal(filedAllows({ workspace: 'main', harness: 'codex' }, ARTIFACTS), undefined, 'a sandbox');
   assert.equal(filedAllows({ workspace: 'main', harness: 'a2a:far-away' }, ARTIFACTS), undefined, 'a remote agent');
 });

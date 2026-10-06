@@ -47,6 +47,7 @@ export {
   splitFrontmatter,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
+  stepPlace,
   WorkflowError,
 } from './step/step.ts';
 export type { OutputSchema, StepAgent, StepKey, StepOutput, Workflow } from './step/step.ts';
@@ -65,6 +66,7 @@ export {
   DENIALS,
   disallowedBy,
   dollarsOf,
+  PLACES,
   sessionContext,
   SKILL_NAME,
   SLOTS,

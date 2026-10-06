@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { HOME } from '../record/record.store.ts';
+import { firstRefusal, HOME } from '../record/record.store.ts';
+import { Invalid } from '../refusal/refusal.ts';
 import { StandingSchema } from '../place/place.store.ts';
 import type { Standing } from '../place/place.ts';
 
@@ -42,25 +43,33 @@ export const StandingFileSchema = Schema.StructWithRest(
   Rest,
 );
 
+/** What to do about a `standing.json` that does not read. */
+const REWRITTEN =
+  'only the tick writes it, and its next pass writes it whole: if a newer nemia wrote it, read the store with that nemia; else remove it.';
+
 /**
- * What the last pass read of where the branches stand (`standingFile`), or undefined before any pass wrote it, or where it does not decode
- * as `StandingFileSchema`: a file half written is never one, since it is written whole and renamed.
+ * What the last pass read of where the branches stand (`standingFile`), or undefined before any pass wrote it. Refused (`Invalid`), naming
+ * the file and its first wrong field, where it does not decode as `StandingFileSchema`: a file half written is never one, since it is
+ * written whole and renamed.
  */
 export function readStanding(): StandingFile | undefined {
   let text: string;
   try {
     text = fs.readFileSync(standingFile(), 'utf8');
-  } catch {
-    return undefined;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
   }
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
-    return undefined;
+    throw new Invalid({ message: `${standingFile()} is not JSON: ${REWRITTEN}` });
   }
   const decoded = Schema.decodeUnknownResult(StandingFileSchema)(json);
-  return Result.isSuccess(decoded) ? decoded.success : undefined;
+  if (Result.isSuccess(decoded)) return decoded.success;
+  const { path: at, words } = firstRefusal(json, decoded.failure);
+  throw new Invalid({ message: `${standingFile()}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${REWRITTEN}` });
 }
 
 /**

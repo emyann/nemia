@@ -37,7 +37,7 @@ const adaWith = (custom?: string, keys = 'tools: Read'): Agents =>
 
 /** The step `build`, attached to `ada`, its own note in Spanish, on `harness`. */
 const buildOn = (agents: Agents, harness = 'claude'): Workflow =>
-  parseWorkflow('build', `---\nagent: ada\nharness: ${harness}\n---\nReply in Spanish.\n`, undefined, agents);
+  parseWorkflow('build', `---\nplace: git\nagent: ada\nharness: ${harness}\n---\nReply in Spanish.\n`, undefined, agents);
 
 /** Where `text` is in `told`, which must hold it. */
 const at = (told: string, text: string): number => {
@@ -92,7 +92,7 @@ test('an agent told nothing in its file but given custom instructions is rendere
   const agents: Agents = new Map([
     ['quiet', { ...parseAgent('quiet', '---\ntools: Read\n---\n'), customInstructions: 'Reply in French.' }],
   ]);
-  const step = parseWorkflow('build', '---\nagent: quiet\n---\nReply in Spanish.\n', undefined, agents);
+  const step = parseWorkflow('build', '---\nplace: git\nagent: quiet\n---\nReply in Spanish.\n', undefined, agents);
   assert.equal(rendersAgent(step), true);
   assert.deepEqual(renderedFlags(step, '/r'), { appendSystemPromptFile: '/r/prompt.md' });
   assert.equal(renderedPrompt(step, []), 'Reply in French.\n');
@@ -158,7 +158,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
   const team = teamCopy('wf-custom-refused-');
   const solo = path.join(team, 'solo');
   fs.mkdirSync(solo);
-  fs.writeFileSync(path.join(solo, 'write.md'), '---\nagent: reviewer\n---\nWrite it.\n');
+  fs.writeFileSync(path.join(solo, 'write.md'), '---\nplace: git\nagent: reviewer\n---\nWrite it.\n');
   const repo = aRepo();
   const outside = path.join(ROOT, 'elsewhere.md');
   fs.writeFileSync(outside, 'Words from elsewhere.\n');

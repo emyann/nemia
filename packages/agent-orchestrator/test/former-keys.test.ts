@@ -47,7 +47,7 @@ const team = (write: string, writer: string): string => {
   const root = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.mkdirSync(path.join(root, 'team'));
   fs.mkdirSync(path.join(root, 'agents'));
-  fs.writeFileSync(path.join(root, 'team', 'write.md'), `---\nagent: writer\n${write}\n---\n`);
+  fs.writeFileSync(path.join(root, 'team', 'write.md'), `---\nplace: git\nagent: writer\n${write}\n---\n`);
   fs.writeFileSync(path.join(root, 'agents', 'writer.md'), `---\n${writer}\n---\nWrite it.\n`);
   return path.join(root, 'team');
 };

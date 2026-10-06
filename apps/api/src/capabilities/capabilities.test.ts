@@ -535,10 +535,10 @@ const stepsRepo = () =>
     '.mcp.json': { mcpServers: { fixture: fixture() } },
     '.claude/skills/review/SKILL.md': '---\nname: code-review\ndescription: Review a diff.\n---\n',
     'workflows/dev/implement.md':
-      '---\nharness: claude\ndisallowedTools: SendMessage, CronCreate, mcp__fixture__echo, Bash(npm run build)\n---\nImplement it.\n',
+      '---\nplace: git\nharness: claude\ndisallowedTools: SendMessage, CronCreate, mcp__fixture__echo, Bash(npm run build)\n---\nImplement it.\n',
     'workflows/dev/review.md':
-      '---\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\nallowedTools: Edit(**)\neffort: high\n---\nReview it.\n',
-    'workflows/codexed/plan.md': '---\nharness: codex\nsandbox: read-only\n---\nPlan it.\n',
+      '---\nplace: git\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\nallowedTools: Edit(**)\neffort: high\n---\nReview it.\n',
+    'workflows/codexed/plan.md': '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nPlan it.\n',
   });
 
 /** The steps GET /api/capabilities says each step gets, by `<workflow>/<step>`. */
@@ -782,8 +782,9 @@ test('REFUSED: a deny takes back every allow whose commands it matches, however 
       },
     },
     'workflows/dev/review.md':
-      '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(npm run:*)\n---\nReview it.\n',
-    'workflows/dev/shut.md': '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(*)\n---\nRead it.\n',
+      '---\nplace: git\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(npm run:*)\n---\nReview it.\n',
+    'workflows/dev/shut.md':
+      '---\nplace: git\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(*)\n---\nRead it.\n',
   });
   const { 'dev/review': review, 'dev/shut': shut } = await claudeStepsOf(repo);
   const settings = (rule: string) => ({ rule, source: SETTINGS });
@@ -833,8 +834,8 @@ test('REFUSED: a deny takes back every allow whose commands it matches, however 
 test('REFUSED: a `dontAsk` step without Bash runs no command, whatever the settings allow — its tools have none, or a deny names it — and says why', async () => {
   const repo = repoWith({
     '.claude/settings.json': { permissions: { allow: ['Bash(npm test)', 'Bash(git diff:*)', 'Read'] } },
-    'workflows/dev/reader.md': '---\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
-    'workflows/dev/denied.md': '---\nharness: claude\npermissionMode: dontAsk\ndisallowedTools: Bash\n---\nRead it.\n',
+    'workflows/dev/reader.md': '---\nplace: git\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
+    'workflows/dev/denied.md': '---\nplace: git\nharness: claude\npermissionMode: dontAsk\ndisallowedTools: Bash\n---\nRead it.\n',
   });
   const { 'dev/reader': reader, 'dev/denied': denied } = await claudeStepsOf(repo);
   assert.deepEqual(reader.allowed, {
@@ -887,8 +888,8 @@ test('a Codex step shows its fence, and nothing it was not measured to get or do
 
 test('a workflow the loader refuses has no step on the page, and a repository with a workflow and nothing else still says what its step gets', async () => {
   const repo = repoWith({
-    'workflows/broken/review.md': '---\nafer: implement\n---\nReview it.\n',
-    'workflows/lone/implement.md': 'Implement it.\n',
+    'workflows/broken/review.md': '---\nplace: git\nafer: implement\n---\nReview it.\n',
+    'workflows/lone/implement.md': '---\nplace: git\n---\nImplement it.\n',
   });
   const steps = await stepsOf(repo);
   assert.deepEqual(Object.keys(steps), ['lone/implement']);
@@ -909,8 +910,8 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
       },
     },
     '.mcp.json': { mcpServers: { fixture: fixture() } },
-    'workflows/dev/shut.md': '---\nharness: claude\ndisallowedTools: mcp__fixture\n---\nWork.\n',
-    'workflows/dev/open.md': '---\nharness: claude\n---\nWork.\n',
+    'workflows/dev/shut.md': '---\nplace: git\nharness: claude\ndisallowedTools: mcp__fixture\n---\nWork.\n',
+    'workflows/dev/open.md': '---\nplace: git\nharness: claude\n---\nWork.\n',
   });
   const { 'dev/shut': shut, 'dev/open': open } = await claudeStepsOf(repo);
   const settings = (rule: string) => ({ rule, source: SETTINGS });
@@ -972,8 +973,8 @@ test("a step with Bash runs Claude Code's read-only commands with no rule, in do
   assert.deepEqual(steps['dev/implement'].readOnly, readOnlyAll());
   assert.equal(steps['codexed/plan'].readOnly, null, 'nothing of a Codex session was measured');
   const repo = repoWith({
-    'workflows/dev/reader.md': '---\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
-    'workflows/dev/denied.md': '---\nharness: claude\npermissionMode: dontAsk\ndisallowedTools: Bash(*)\n---\nRead it.\n',
+    'workflows/dev/reader.md': '---\nplace: git\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
+    'workflows/dev/denied.md': '---\nplace: git\nharness: claude\npermissionMode: dontAsk\ndisallowedTools: Bash(*)\n---\nRead it.\n',
   });
   const { 'dev/reader': reader, 'dev/denied': denied } = await claudeStepsOf(repo);
   assert.deepEqual(reader.readOnly, [], 'its tools have no Bash');
@@ -984,7 +985,7 @@ test('REFUSED: a deny that covers a read-only command refuses it — a prefix, a
   const repo = repoWith({
     '.claude/settings.json': { permissions: { deny: ['Bash(cat:*)', 'Bash(git push:*)', 'Bash(head -c *)'] } },
     'workflows/dev/review.md':
-      '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(find *), Bash(git:*), Bash(ls -la)\n---\nReview it.\n',
+      '---\nplace: git\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(find *), Bash(git:*), Bash(ls -la)\n---\nReview it.\n',
   });
   const { 'dev/review': review } = await claudeStepsOf(repo);
   const refused = Object.fromEntries(
@@ -1028,9 +1029,9 @@ test('the ask list is permissions.ask in .claude/settings.json, in its order —
 const askingRepo = (permissions: object) =>
   repoWith({
     '.claude/settings.json': { permissions },
-    'workflows/dev/review.md': '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\n---\nReview it.\n',
-    'workflows/dev/implement.md': '---\nharness: claude\ntools: Read, Bash\n---\nImplement it.\n',
-    'workflows/dev/watch.md': '---\nharness: claude\ntools: Read, Bash\nbackground: true\n---\nWatch it.\n',
+    'workflows/dev/review.md': '---\nplace: git\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/dev/implement.md': '---\nplace: git\nharness: claude\ntools: Read, Bash\n---\nImplement it.\n',
+    'workflows/dev/watch.md': '---\nplace: git\nharness: claude\ntools: Read, Bash\nbackground: true\n---\nWatch it.\n',
   });
 
 test('REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step and on a job, asking on a background session — and a deny over it is still the deny', async () => {
@@ -1152,7 +1153,7 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
       permissions: { allow: ['mcp__fixture'], ask: ['mcp__fixture__echo', 'mcp__fixture__wipe'], deny: ['mcp__fixture__wipe'] },
     },
     '.mcp.json': { mcpServers: { fixture: fixture() } },
-    'workflows/dev/review.md': '---\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/dev/review.md': '---\nplace: git\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
   });
   const { 'dev/review': review } = await claudeStepsOf(repo);
   assert.deepEqual(review.mcp[0].tools, [
@@ -1168,7 +1169,7 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
   const whole = repoWith({
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'], permissions: { allow: ['mcp__fixture__echo'], ask: ['mcp__fixture'] } },
     '.mcp.json': { mcpServers: { fixture: fixture() } },
-    'workflows/dev/review.md': '---\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
+    'workflows/dev/review.md': '---\nplace: git\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
   });
   const { 'dev/review': asked } = await claudeStepsOf(whole);
   assert.deepEqual(

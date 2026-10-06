@@ -4,6 +4,7 @@
  * sentence; the pure judgement under it (`quotaOf`); and that the read starts no process of its own.
  */
 import { asks, recorded, usageAnswer } from '../../test/harness.ts';
+import { until, WAITED } from '../../test/waits.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Layer } from 'effect';
@@ -586,7 +587,7 @@ test('askedAt is when the ask began, not when it answered', async () => {
   assert.equal(answered.ageMs, 7_000);
 });
 
-test('REFUSED: a read that waits past its wait says asking, then what the ask came to', async () => {
+test('REFUSED: a read that waits past its wait says asking, then what the ask came to', WAITED, async (t) => {
   fresh();
   let answered = false;
   const ask = () =>
@@ -599,9 +600,15 @@ test('REFUSED: a read that waits past its wait says asking, then what the ask ca
   const q = await readQuota({ ask, waitMs: 50 });
   assert.equal(q.state, 'asking');
   assert.equal(q.said, 'Asking Claude Code for the quota…');
-  let after = q;
-  for (const bound = performance.now() + 5_000; after.state === 'asking' && performance.now() < bound;)
-    after = await readQuota({ ask, waitMs: 50 });
+  const after = await until(
+    t,
+    async () => {
+      const read = await readQuota({ ask, waitMs: 50 });
+      return read.state !== 'asking' && read;
+    },
+    'the quota read to come to what its ask answered',
+    { everyMs: 20 },
+  );
   assert.ok(answered);
   assert.equal(after.state, 'timeout');
   assert.match(after.said!, /^Claude Code did not answer the usage request within 15 s:/);

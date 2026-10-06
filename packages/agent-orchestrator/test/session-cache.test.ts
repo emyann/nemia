@@ -260,10 +260,13 @@ test("a loop's target that declares an `output:` of its own keeps one schema too
   };
   fs.writeFileSync(
     path.join(dir, 'implement.md'),
-    '---\ncheck: npm test\nmodel: opus\neffort: high\noutput: implement.schema.json\n---\nimplement it\n',
+    '---\nplace: git\ncheck: npm test\nmodel: opus\neffort: high\noutput: implement.schema.json\n---\nimplement it\n',
   );
   fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(notes));
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nreview it\n');
+  fs.writeFileSync(
+    path.join(dir, 'review.md'),
+    '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\n---\nreview it\n',
+  );
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
   const { filed } = await walk(dir);
   assert.deepEqual(chainDifferences(filed), []);
@@ -282,10 +285,10 @@ test("a loop's target with a context window keeps it on every try — a nudge, a
     required: ['findings', 'again'],
     additionalProperties: false,
   };
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\nmodel: opus\ncontext: 200k\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: npm test\nmodel: opus\ncontext: 200k\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'review.md'),
-    '---\nafter: implement\ncontext: 150000\noutput: review.schema.json\nloop: implement\n---\nreview it\n',
+    '---\nafter: implement\nplace: git\ncontext: 150000\noutput: review.schema.json\nloop: implement\n---\nreview it\n',
   );
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
   for (const first of [{ mode: 'nudge' as const }, { mode: 'fresh' as const, model: 'sonnet' }]) {

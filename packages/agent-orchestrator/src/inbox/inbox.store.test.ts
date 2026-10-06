@@ -63,7 +63,7 @@ const aRepoWith = (...workflows: string[]): string => {
   git('commit', '-q', '--allow-empty', '-m', 'base');
   for (const name of workflows) {
     fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
-    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `implement it, on ${name}\n`);
+    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `---\nplace: git\n---\nimplement it, on ${name}\n`);
   }
   return repo;
 };
@@ -456,7 +456,7 @@ test("a start says what the card does not, over what it does: --workflows over `
   const repo = aRepoWith('dev');
   const other = aRepoWith('ui');
   const mine = fs.mkdtempSync(path.join(ROOT, 'mine-'));
-  fs.writeFileSync(path.join(mine, 'implement.md'), 'implement it, mine\n');
+  fs.writeFileSync(path.join(mine, 'implement.md'), '---\nplace: git\n---\nimplement it, mine\n');
 
   const over = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
   const run = readRun(

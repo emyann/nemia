@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { TranscriptEvent } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
+import { type RolloutItem, rolloutRecordOf } from './rollout.ts';
 
 const rollouts = new Map<string, string>();
 
@@ -46,12 +47,54 @@ export const codexRolloutFile = (threadId: string): string | undefined => {
 };
 
 /** The text of a list of content blocks, as far as each has any. */
-const textsOf = (blocks: unknown): string[] =>
-  Array.isArray(blocks)
-    ? blocks
-        .map((b) => (typeof b === 'string' ? b : (b as { text?: unknown } | null)?.text))
-        .filter((t): t is string => typeof t === 'string')
-    : [];
+const textsOf = (blocks: readonly (string | { readonly text?: string })[] | undefined): string[] =>
+  (blocks ?? []).map((b) => (typeof b === 'string' ? b : b.text)).filter((t): t is string => t !== undefined);
+
+/** An item of `type`, as `ROLLOUT` decodes it. */
+type ItemOf<T extends string> = Extract<RolloutItem, { type: T }>;
+
+const isItem =
+  <T extends string>(type: T) =>
+  (item: RolloutItem): item is ItemOf<T> =>
+    item.type === type;
+
+/** A completed thread item as events, under `id` and at `at`. */
+const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[] => {
+  if (isItem('UserMessage')(item)) return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }];
+  if (isItem('AgentMessage')(item)) return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }];
+  if (isItem('Reasoning')(item)) {
+    const text = [...textsOf(item.summary_text), ...textsOf(item.raw_content)].join('\n');
+    return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }];
+  }
+  if (isItem('CommandExecution')(item)) {
+    return [
+      { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'CommandExecution', input: { command: item.command, cwd: item.cwd } } },
+      {
+        id,
+        at,
+        role: 'user',
+        kind: 'tool_result',
+        result: { text: item.aggregated_output ?? '', isError: !(item.status === 'completed' && item.exit_code === 0) },
+      },
+    ];
+  }
+  if (isItem('FileChange')(item)) {
+    return [
+      { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: item.changes } } },
+      {
+        id,
+        at,
+        role: 'user',
+        kind: 'tool_result',
+        result: {
+          text: [item.stdout, item.stderr].filter((s) => s !== undefined && s !== '').join('\n'),
+          isError: item.status !== 'completed',
+        },
+      },
+    ];
+  }
+  return [{ id, at, role: 'system', kind: 'system', text: `[${String(item.type)}]` }];
+};
 
 /**
  * One record of a Codex rollout as events.
@@ -73,75 +116,30 @@ const textsOf = (blocks: unknown): string[] =>
  * it has completed, so its call and its result carry that one time, and one still running is not there.
  * `task_complete` is a system event, its error's message when it has one. An item of a type not read here
  * is a system event naming it, rather than nothing. A record with no time gives nothing.
+ *
+ * A record of those two kinds is decoded (`rollout.ts`) before anything is read of it, and one that does not decode throws an
+ * `Error` naming the line by its offset, in `file` when it is given, its kind, its field and the fix: the rollout is refused, never
+ * read as saying nothing. Any other value — another kind, no object — gives nothing, unread.
  */
-export const codexRolloutEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
-  const record = entry as {
-    timestamp?: unknown;
-    type?: unknown;
-    payload?: { type?: unknown; item?: unknown; turn_id?: unknown; error?: unknown } | null;
-  } | null;
-  const at = isoTime(record?.timestamp);
-  const payload = record?.payload;
-  if (!at || record?.type !== 'event_msg' || !payload) return [];
-  if (payload.type === 'task_complete') {
-    const error = (payload.error as { message?: unknown } | null | undefined)?.message;
+export const codexRolloutEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
+  const where = `the line at byte ${offset} of ${file ? `the rollout \`${file}\`` : 'the rollout'}`;
+  const read = rolloutRecordOf(entry, where);
+  if (read === undefined) return [];
+  if ('wrong' in read) throw new Error(read.wrong);
+  const at = isoTime(read.record.timestamp);
+  if (!at) return [];
+  if (read.kind === 'event_msg task_complete') {
+    const { turn_id: turn, error } = read.record.payload;
     return [
       {
-        id: typeof payload.turn_id === 'string' ? `${payload.turn_id}:complete` : `@${offset}`,
+        id: turn === undefined ? `@${offset}` : `${turn}:complete`,
         at,
         role: 'system',
         kind: 'system',
-        text: typeof error === 'string' ? error : 'task_complete',
+        text: error?.message ?? 'task_complete',
       },
     ];
   }
-  const item = payload.type === 'item_completed' ? (payload.item as Record<string, unknown> | null | undefined) : undefined;
-  if (!item) return [];
-  const id = typeof item.id === 'string' && item.id ? item.id : `@${offset}`;
-  switch (item.type) {
-    case 'UserMessage':
-      return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }];
-    case 'AgentMessage':
-      return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }];
-    case 'Reasoning': {
-      const text = [...textsOf(item.summary_text), ...textsOf(item.raw_content)].join('\n');
-      return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }];
-    }
-    case 'CommandExecution':
-      return [
-        {
-          id,
-          at,
-          role: 'assistant',
-          kind: 'tool_use',
-          tool: { name: 'CommandExecution', input: { command: item.command, cwd: item.cwd } },
-        },
-        {
-          id,
-          at,
-          role: 'user',
-          kind: 'tool_result',
-          result: {
-            text: typeof item.aggregated_output === 'string' ? item.aggregated_output : '',
-            isError: !(item.status === 'completed' && item.exit_code === 0),
-          },
-        },
-      ];
-    case 'FileChange':
-      return [
-        { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: item.changes } } },
-        {
-          id,
-          at,
-          role: 'user',
-          kind: 'tool_result',
-          result: {
-            text: [item.stdout, item.stderr].filter((s): s is string => typeof s === 'string' && s !== '').join('\n'),
-            isError: item.status !== 'completed',
-          },
-        },
-      ];
-    default:
-      return [{ id, at, role: 'system', kind: 'system', text: `[${String(item.type)}]` }];
-  }
+  const { item } = read.record.payload;
+  return item ? itemEvents(item, item.id || `@${offset}`, at) : [];
 };

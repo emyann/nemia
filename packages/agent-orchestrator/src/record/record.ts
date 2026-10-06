@@ -463,6 +463,14 @@ export function unjudgedWords(runId: string, own: string | undefined, why: strin
   return `${runId}'s record reads, but ${/[.!?]$/.test(what) ? what : `${what}.`} So ${by} does not judge the run, and the tick does not advance it, until that journal reads again.`;
 }
 
+/**
+ * Why `by` leaves a run unjudged whose unfrozen workflow folder does not load, followed by the refusal's words (`unloadedFolder`), which
+ * name the folder and the two ways on: one sentence wherever such a run is left unjudged, as the tick leaves it.
+ */
+export function unloadedWords(runId: string, why: string, by: string): string {
+  return `${runId}'s workflow folder does not load, so ${by} does not judge the run, and the tick does not advance it, until it loads again: ${why}`;
+}
+
 /** The asks waiting beside a run, tries and rounds, and a line for each file named as one that cannot be read as one. */
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 

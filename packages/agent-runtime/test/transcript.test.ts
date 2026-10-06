@@ -34,7 +34,8 @@ const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg
 const { asyncOps } = await import('./promise-runner.ts');
 const { RunnerError } = await import('../src/harness/error.ts');
 const { readTranscript } = await import('../src/harness/transcript.ts');
-const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
+const { claudeTranscriptEvents, transcriptWrittenAt } = await import('../src/harness/claude/transcript.ts');
+const { noCounts, tallied } = await import('../src/core/engine/tally.ts');
 const { detachedOps } = await import('../src/harness/detached/detached.ts');
 const { codex } = await import('../src/harness/codex/codex.ts');
 const { codexRolloutEvents } = await import('../src/harness/codex/transcript.ts');
@@ -759,6 +760,128 @@ test("a Codex record: a failed task's end is its error; a command that exited 0 
   );
 });
 
+/** A record of the kind `payload.type` names, at `at(0)`, carrying `payload`. */
+const eventMsg = (payload: object): object => ({ timestamp: at(0), type: 'event_msg', payload });
+
+/** The words `codexRolloutEvents` refuses `record` with, read alone as the line at byte 9 of `/r.jsonl`. */
+const refusedWith = (record: object): string => {
+  try {
+    codexRolloutEvents(record, 9, '/r.jsonl');
+  } catch (e) {
+    return (e as Error).message;
+  }
+  return 'not refused';
+};
+
+test("REFUSED: a Codex rollout's record of a kind the runtime reads with a field that is there in another shape refuses the read by its file, its offset, its field and the fix", async () => {
+  const fix = '`ROLLOUT` (`harness/codex/rollout.ts`)';
+  const thread = randomUUID();
+  const lines = rolloutLines(thread);
+  lines.splice(2, 0, eventMsg({ type: 'task_complete', turn_id: 't' }));
+  (lines[2] as { timestamp: string }).timestamp = 'yesterday';
+  const text = jsonl(lines);
+  writeRollout(thread, text);
+  const offset = Buffer.byteLength(text.split('\n').slice(0, 2).join('\n')) + 1;
+  await assert.rejects(readTranscript(rolloutFile(thread), undefined, codexRolloutEvents), (e: Error) => {
+    assert.ok(
+      e.message.startsWith(
+        `the line at byte ${offset} of the rollout \`${rolloutFile(thread)}\` is an \`event_msg\` \`task_complete\` record whose \`timestamp\` is "yesterday"`,
+      ),
+      e.message,
+    );
+    assert.ok(e.message.includes(fix), e.message);
+    return true;
+  });
+
+  const content = refusedWith(eventMsg({ type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: 'hello' } }));
+  assert.ok(
+    content.startsWith(
+      'the line at byte 9 of the rollout `/r.jsonl` is an `event_msg` `item_completed` record whose `payload.item.content` is "hello"',
+    ),
+    content,
+  );
+  assert.ok(content.includes(fix), content);
+
+  const error = refusedWith(eventMsg({ type: 'task_complete', turn_id: 't', error: { message: 7 } }));
+  assert.ok(
+    error.startsWith(
+      'the line at byte 9 of the rollout `/r.jsonl` is an `event_msg` `task_complete` record whose `payload.error.message` is 7',
+    ),
+    error,
+  );
+  assert.ok(error.includes(fix), error);
+});
+
+test('REFUSED: a Codex command whose exit code is no number refuses the `transcript` verb, never reads as a failed command', async () => {
+  const root = tmp('root');
+  const thread = randomUUID();
+  const lines = rolloutLines(thread);
+  const bad = eventMsg({
+    type: 'item_completed',
+    item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: '0', aggregated_output: 'a' },
+  });
+  const text = jsonl(lines) + jsonl([bad]);
+  writeRollout(thread, text);
+  runFile(root, 'codex', 'ae/c4/1', { nativeId: thread });
+  const offset = Buffer.byteLength(jsonl(lines));
+  await assert.rejects(detachedRead(detachedOps(codex, root), 'ae/c4/1'), (e: unknown) => {
+    assert.ok(e instanceof RunnerError, String(e));
+    assert.equal(e.verb, 'transcript');
+    assert.ok(
+      e.message.startsWith(
+        `codex: the line at byte ${offset} of the rollout \`${rolloutFile(thread)}\` is an \`event_msg\` \`item_completed\` record whose \`payload.item.exit_code\` is "0"`,
+      ),
+      e.message,
+    );
+    assert.ok(e.message.includes('`harness/codex/rollout.ts`'), e.message);
+    return true;
+  });
+});
+
+test('a Codex record of a kind the runtime reads with a field left out reads as it always has; a record of any other kind passes undecoded', () => {
+  const system = (id: string, text: string) => [{ id, at: at(0), role: 'system', kind: 'system', text }];
+  const item = (fields: object) => codexRolloutEvents(eventMsg({ type: 'item_completed', item: fields }), 9);
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete' }), 9), system('@9', 'task_complete'));
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: null }), 9), system('@9', 'task_complete'));
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: {} }), 9), system('@9', 'task_complete'));
+  assert.deepEqual(codexRolloutEvents({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't' } }, 9), [], 'no time');
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'item_completed' }), 9), []);
+  assert.deepEqual(item({ type: 'AgentMessage' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'text', text: '' }]);
+  assert.deepEqual(item({ type: 'UserMessage', id: '' }), [{ id: '@9', at: at(0), role: 'user', kind: 'text', text: '' }]);
+  assert.deepEqual(item({ type: 'Reasoning' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'thinking' }]);
+  assert.deepEqual(item({ type: 'CommandExecution' }), [
+    {
+      id: '@9',
+      at: at(0),
+      role: 'assistant',
+      kind: 'tool_use',
+      tool: { name: 'CommandExecution', input: { command: undefined, cwd: undefined } },
+    },
+    { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
+  ]);
+  assert.deepEqual(item({ type: 'CommandExecution', exit_code: null, aggregated_output: null, status: 'completed' })[1]?.result, {
+    text: '',
+    isError: true,
+  });
+  assert.deepEqual(item({ type: 'FileChange' }), [
+    { id: '@9', at: at(0), role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: undefined } } },
+    { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
+  ]);
+  assert.deepEqual(item({ type: 'WebSearch', id: 'w', query: 7 }), system('w', '[WebSearch]'));
+  assert.deepEqual(item({ id: 'n' }), system('n', '[undefined]'));
+  for (const other of [
+    { timestamp: at(0), type: 'response_item', payload: 7 },
+    { timestamp: 'yesterday', type: 'session_meta', payload: { id: 7 } },
+    eventMsg({ type: 'token_count', info: 'x' }),
+    { timestamp: at(0), type: 'event_msg', payload: 'task_complete' },
+    { timestamp: at(0), type: 'turn_context', payload: { type: 'task_complete', error: 7 } },
+    'event_msg',
+    null,
+  ]) {
+    assert.deepEqual(codexRolloutEvents(other, 9, '/r.jsonl'), [], JSON.stringify(other));
+  }
+});
+
 test("claude-detached reads the transcript `claude --bg` would, once its run has the session's id; a spec that keeps no record has no transcript", async () => {
   const root = tmp('root');
   const sessionId = randomUUID();
@@ -1180,6 +1303,86 @@ test('REFUSED: a finished background session whose transcript was found and cann
     const seen = await Effect.runPromise(ops.observe);
     assert.deepEqual(seen.get('ae/t/1')?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
   });
+});
+
+/**
+ * A transcript of `claudeLines` padded with prompts of filler to at least `bytes`, its conversation dated from `T0` and its closeout
+ * the last call in it.
+ */
+const longClaude = (sessionId: string, bytes: number) => {
+  const lines = claudeLines(sessionId);
+  const filler = { ...lines[1], uuid: 'u-pad', message: { role: 'user', content: 'x'.repeat(10_000) } };
+  const pad = jsonl([filler]);
+  return pad.repeat(Math.ceil(bytes / pad.length)) + jsonl(lines);
+};
+
+/** A StructuredOutput call and its result, made at `s` seconds into the fixture's conversation, saying `input`. */
+const closeoutAt = (sessionId: string, s: number, input: object) => {
+  const [call, result] = claudeLines(sessionId).slice(7, 9) as Record<string, unknown>[];
+  const id = `toolu_closeout_${s}`;
+  return jsonl([
+    {
+      ...call,
+      uuid: `a-${s}`,
+      timestamp: at(s),
+      message: { id: `msg_${s}`, role: 'assistant', content: [{ type: 'tool_use', id, name: 'StructuredOutput', input }] },
+    },
+    {
+      ...result,
+      uuid: `u-${s}`,
+      timestamp: at(s + 1),
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+    },
+  ]);
+};
+
+/** The file's mtime set `ago` milliseconds before now. */
+const writtenAgo = (file: string, ago: number) => {
+  const when = new Date(Date.now() - ago);
+  fs.utimesSync(file, when, when);
+};
+
+test("at shipped readers, a working idle session's transcript is read once per change of its mtime: once a look for its closeout and its usage together, and not at all while it is unchanged", async () => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, longClaude(sessionId, 2_000_000));
+  const file = claudeFile(sessionId);
+  writtenAgo(file, 10_000);
+  const rows = [{ name: 'ae/t/1', sessionId, state: 'working', status: 'idle', kind: 'background', startedAt: T0 - 1_000 }];
+  const ops = claudeOps({ root: tmp('root') });
+  const look = async () => {
+    const tally = { counts: noCounts(), observed: {} };
+    const seen = await tallied(tally, () => Effect.runPromise(ops.observe));
+    return { seen: seen.get('ae/t/1'), bytes: tally.counts.bytesRead };
+  };
+
+  await listing(rows, async () => {
+    const size = fs.statSync(file).size;
+    const first = await look();
+    assert.deepEqual(first.seen?.closeout?.payload, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
+    assert.ok(first.seen?.usage, 'its usage read');
+    assert.ok(first.bytes >= size && first.bytes < 2 * size, `one read of ${size} bytes for both, not two: ${first.bytes}`);
+
+    let idle = 0;
+    for (let i = 0; i < 5; i++) idle += (await look()).bytes;
+    assert.ok(idle < size / 100, `five looks over a transcript nothing wrote read none of it: ${idle} bytes`);
+
+    fs.appendFileSync(file, closeoutAt(sessionId, 100, { outcome: 'done', summary: 'written' }));
+    writtenAgo(file, 5_000);
+    const grown = fs.statSync(file).size;
+    const next = await look();
+    assert.deepEqual(next.seen?.closeout?.payload, { outcome: 'done', summary: 'written' }, 'the closeout given since is seen');
+    assert.ok(next.bytes >= grown && next.bytes < 2 * grown, `written since: read once again, ${next.bytes} bytes`);
+  });
+});
+
+test("a transcript's mtime is its file's, in whole milliseconds, read by a stat; a session with no transcript has none", async () => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
+  const tally = { counts: noCounts(), observed: {} };
+  const written = await tallied(tally, () => transcriptWrittenAt(sessionId));
+  assert.equal(written, Math.trunc(fs.statSync(claudeFile(sessionId)).mtimeMs));
+  assert.equal(tally.counts.bytesRead, 0, 'no byte of it read');
+  assert.equal(await transcriptWrittenAt(randomUUID()), undefined);
 });
 
 test('a background session with no transcript at all still reads as none: no statement, no usage, and no read asked', async (t: TestContext) => {

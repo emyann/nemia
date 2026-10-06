@@ -26,6 +26,7 @@ import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
+import { storeRootRefusal } from './store-root.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { SHIPPED_PLACE, openPlace, readPlaceJson } from '../place/place.store.ts';
@@ -79,6 +80,8 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
  *   under those names, and would read one task as the other;
  * - a remote agent not declared (`undeclaredRefusal`): the engine refuses it only when the step is filed, with the run on the record;
+ * - a store (`WF_ROOT`) whose path a permission rule a step would be filed cannot carry (`storeRootRefusal`), in the store's words, asked
+ *   before the runtime's, which would speak of a rule or a folder the person never wrote;
  * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
  *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take.
  */
@@ -132,6 +135,8 @@ export function stepsToStart(
   }
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
+  const unruled = storeRootRefusal(HOME, steps, { runArtifacts: startArtifacts(), inbox: inboxDir() });
+  if (unruled) throw new Invalid({ message: unruled });
   const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
@@ -162,8 +167,10 @@ function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, plac
  * The first step whose config, as its first filing would file it (`filedConfig`) in a run started at `gates`, the runtime refuses on its
  * harness (`configRefusal`), in the runtime's words after the step's line they come from (`filedRefusal`); undefined where every step's
  * is taken. A step on a remote agent is configured by its operator, and asked nothing. Its agent's flags name the folder the run renders
- * it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a step has, never where they
- * point. A step whose sandbox its file writes as `permissionMode:` (`written`, by the step's name) is quoted by that line.
+ * it to, and an ending's read the run's artifacts folder, neither there yet. The runtime judges which flags a step has, and of a path a
+ * permission rule names, a mount's or an allow's, whether the rule can carry it, never whether it is there; a store whose own path no
+ * rule can carry is refused before it, in the store's words (`storeRootRefusal`). A step whose sandbox its file writes as
+ * `permissionMode:` (`written`, by the step's name) is quoted by that line.
  */
 export const configRefused = (
   steps: readonly Workflow[],
@@ -171,6 +178,9 @@ export const configRefused = (
   gates: readonly string[],
   written: Readonly<Record<string, string>> = {},
 ): string | undefined => refusedStep(steps, places, gates, written, [])?.why;
+
+/** A run's artifacts folder as a start asks of its steps' first filing, before the run has an id. */
+const startArtifacts = (): string => path.dirname(artifactsDir({ id: 'run' }, 'step'));
 
 /** What the package's place denies a landing session (`denyWhileLanding`), as an ending's first filing is denied it. */
 const shippedDenies = (): readonly string[] => readPlaceJson(SHIPPED_PLACE).denyWhileLanding;
@@ -185,7 +195,7 @@ function refusedStep(
 ): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
-    const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
+    const runArtifacts = startArtifacts();
     const config = filedConfig(
       step,
       steps,

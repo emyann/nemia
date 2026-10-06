@@ -61,8 +61,8 @@ test('a refusal of --no-worktree on a workflow that fans out exits 2, as its sib
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], { cwd: repo });
   const team = path.join(dir, 'team');
   fs.mkdirSync(team);
-  fs.writeFileSync(path.join(team, 'left.md'), 'write the left half\n');
-  fs.writeFileSync(path.join(team, 'right.md'), 'write the right half\n');
+  fs.writeFileSync(path.join(team, 'left.md'), '---\nplace: git\n---\nwrite the left half\n');
+  fs.writeFileSync(path.join(team, 'right.md'), '---\nplace: git\n---\nwrite the right half\n');
   const root = path.join(dir, 'store');
   const { status, stderr } = wf(root, ['start', 'two halves', '--workflows', team, '--repo', repo, '--no-worktree']);
   assert.equal(status, 2, `a fan-out refused --no-worktree exits with the refusal's code; it said: ${stderr}`);

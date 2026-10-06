@@ -127,7 +127,7 @@ const sessionName = (id: string) => nameFor(id, 1);
 /** A one-step team, and a run of it for real over a fresh repository, its step then named as the old tick filed it. */
 const solo = (() => {
   const dir = scratch('wf-restart-team-');
-  fs.writeFileSync(path.join(dir, 'solo.md'), '---\nretries: 1\n---\ndo it\n');
+  fs.writeFileSync(path.join(dir, 'solo.md'), '---\nplace: git\nretries: 1\n---\ndo it\n');
   return dir;
 })();
 const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; then: 'retries' }> }) => {

@@ -46,9 +46,14 @@ export const filedDenies = (
  * step is filed with its own list. Pure.
  */
 export const filedAllows = (step: Pick<Workflow, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string): string[] | undefined =>
-  step.workspace === 'main' && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness)
-    ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])]
-    : step.allowedTools;
+  readsRunArtifacts(step) ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])] : step.allowedTools;
+
+/**
+ * Whether a step is filed a rule reading its run's artifacts folder (`filedAllows`): one in the repository's own checkout
+ * (`workspace: main`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
+ */
+export const readsRunArtifacts = (step: Pick<Workflow, 'workspace' | 'harness'>): boolean =>
+  step.workspace === 'main' && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
 
 /**
  * The repository's own checkout as a pass reads it for an ending that lands on its check, as its place's `status` answers

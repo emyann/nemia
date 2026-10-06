@@ -34,7 +34,7 @@ function aRepo(): string {
 /** A run of one step `implement`, filed and settled `phase`, with the ask a pause at once wrote for its next try on disk. */
 async function pausedThen(phase: 'failed' | 'stopped') {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const run = await Effect.runPromise(startRun({ brief: 'the pause', repo: aRepo(), workflowDir: dir, isolate: false }));
   const b = engineBoard();
   const e = engineOf(b.layer);

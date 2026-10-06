@@ -153,7 +153,7 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`. */
 const oneStep = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 })();
 
@@ -502,7 +502,7 @@ const aRepoWith = (...workflows: string[]): string => {
   const repo = aRepo();
   for (const name of workflows) {
     fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
-    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `implement it, on ${name}\n`);
+    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `---\nplace: git\n---\nimplement it, on ${name}\n`);
   }
   return repo;
 };
@@ -843,7 +843,7 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
   );
 
   fs.mkdirSync(path.join(repo, 'workflows', 'nope'));
-  fs.writeFileSync(path.join(repo, 'workflows', 'nope', 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(repo, 'workflows', 'nope', 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off');
   await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2');
   const retried = await runWith(b.e, tickRun());
@@ -974,7 +974,7 @@ test("REFUSED at shipped defaults: a queued card whose `repo:` is no git reposit
   const b = board();
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
   fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
-  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
 
   const said: string[] = [];

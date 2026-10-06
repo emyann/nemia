@@ -1,5 +1,5 @@
 import { sidebar } from '../board.ts';
-import { expectCount, expectInside, expectVisible, Refused, WAIT_MS } from '../checks.ts';
+import { expectCount, expectInside, expectNone, expectVisible, Refused } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
@@ -92,12 +92,10 @@ export default {
     await talk.hover();
     await page.mouse.wheel(0, -100_000);
     const scrolled = () => talk.evaluate((element) => element.scrollTop);
-    for (const until = performance.now() + WAIT_MS; (await scrolled()) > 0 && performance.now() < until;)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    if ((await scrolled()) > 0)
-      throw new Refused(
-        `the conversation scrolls up to its start for the photograph, from its end, where the scroller opens and only the closeout shows — it stopped ${await scrolled()} px down`,
-      );
+    await expectNone(async () => {
+      const px = await scrolled();
+      return px > 0 ? `it stopped ${px} px down` : null;
+    }, 'the conversation scrolls up to its start for the photograph, from its end, where the scroller opens and only the closeout shows');
     await expectInside(talk.locator('[data-turn="said"][data-role="user"]'), talk, 'the prompt is in view for the photograph');
     await expectInside(line, talk, `the fold's line (${SESSION.folded}) is in view for the photograph`);
   },

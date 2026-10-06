@@ -9,6 +9,7 @@ import {
   disconnect,
   draftGraph,
   draftOf,
+  firstStep,
   listedWith,
   listOf,
   listUnsetWords,
@@ -32,8 +33,10 @@ import {
 } from '../src/lib/builder.ts';
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
+/** A spec with every key unset but `fields` and the `place: git` every step says. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   ...UNSET,
+  place: 'git',
   after: [],
   input: [],
   disallowedTools: [],
@@ -113,10 +116,17 @@ test('an edge taken away takes its key: `after` — and `resume`, which after li
   assert.deepEqual(disconnect(draft, 'not an edge'), draft);
 });
 
-test('a step added has a name and a body and sets nothing; a name there is none of or one taken is refused and adds nothing', () => {
+test("a step added has a name and a body and sets nothing but the place the draft's steps say; a name there is none of or one taken is refused and adds nothing", () => {
   const draft = draftOf(folder);
   const added = addStep(draft, 'ship', 'Ship it.');
   assert.deepEqual(added.at(-1), { name: 'ship', spec: spec(), body: 'Ship it.', own: null, schema: null });
+  const folders = draftOf({ steps: [listed('take', { place: 'folder' }), listed('write', { place: 'folder' })] });
+  assert.equal(addStep(folders, 'file', 'File it.').at(-1)?.spec.place, 'folder', 'a step of a folder team works in folders too');
+  assert.equal(
+    addStep([], 'first', 'Begin.').at(-1)?.spec.place,
+    null,
+    'a draft of no step says no place to inherit: the save asks for one',
+  );
   assert.equal(unsaved(added, folder), true);
   assert.deepEqual(unsavedSteps(added, folder), ['ship']);
   assert.equal(nameRefusal(draft, ''), 'A step needs a name: its file is <name>.md.');
@@ -124,6 +134,19 @@ test('a step added has a name and a body and sets nothing; a name there is none 
   assert.equal(nameRefusal(draft, 'review'), 'There is a step named review already.');
   assert.deepEqual(addStep(draft, 'review', 'Again.'), draft);
   assert.deepEqual(addStep(draft, '', 'Nothing.'), draft);
+});
+
+test("REFUSED: a new workflow's first step with no place chosen, none being chosen for a person, or with no name or no words; given each, it says its place and sets nothing else", () => {
+  assert.equal(firstStep('plan', 'Write PLAN.md.', null), null, 'no place chosen');
+  assert.equal(firstStep(' ', 'Write PLAN.md.', 'git'), null, 'no name');
+  assert.equal(firstStep('plan', ' ', 'git'), null, 'no words');
+  assert.deepEqual(firstStep('plan', 'Write PLAN.md.', 'folder'), {
+    name: 'plan',
+    spec: { ...UNSET, place: 'folder' },
+    body: 'Write PLAN.md.',
+    own: null,
+  });
+  assert.equal(firstStep('plan', 'Write PLAN.md.', 'git')?.spec.place, 'git');
 });
 
 test('a step removed takes every key of another step that names it, and the draft is unsaved though no step left changed', () => {
@@ -310,7 +333,7 @@ test("a step with an agent: a key changed is its own, one unset is its agent's a
 test('an agent attached to a step makes what it has its own; taken away, the step keeps what its agent gave it, words and all', () => {
   const plain = draftOf({ steps: [listed('build', { model: 'sonnet', check: 'npm test' }, 'Build it.')] });
   const given = setKey(plain, 'build', 'agent', 'coder');
-  assert.deepEqual([given[0].spec.agent, given[0].own], ['coder', { keys: ['model', 'check'], body: 'Build it.' }]);
+  assert.deepEqual([given[0].spec.agent, given[0].own], ['coder', { keys: ['model', 'place', 'check'], body: 'Build it.' }]);
 
   const taken = setKey(draftOf(attached), 'build', 'agent', null);
   assert.deepEqual(

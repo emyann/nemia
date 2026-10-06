@@ -86,9 +86,16 @@ function refusal(fn: () => unknown): string {
 const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
 
-/** A team of one step `build` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
+/**
+ * A team of one step `build` on `place: git` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files`
+ * gives them.
+ */
 const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
-  path.join(tree({ 'workflows/team/build.md': step, 'workflows/agents/builder.md': agent, ...files }), 'workflows', 'team');
+  path.join(
+    tree({ 'workflows/team/build.md': step.replace(/^---\n/, '---\nplace: git\n'), 'workflows/agents/builder.md': agent, ...files }),
+    'workflows',
+    'team',
+  );
 
 test("an agent gives skills by name and says what becomes of Claude Code's prompt, each its own line, read and written back", () => {
   const a = parseAgent(
@@ -262,7 +269,7 @@ test('REFUSED at shipped defaults: a codex agent with skills or a harness prompt
 test('REFUSED at shipped defaults: skills or a harness prompt on a step that continues another session, which keeps its own (F13)', () => {
   const dir = team(
     '---\nharnessPrompt: no-coding\n---\nYou build.\n',
-    { 'workflows/team/plan.md': '---\n---\nPlan it.\n' },
+    { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
     '---\nagent: builder\nafter: plan\nresume: plan\n---\n',
   );
   assert.match(
@@ -272,7 +279,7 @@ test('REFUSED at shipped defaults: skills or a harness prompt on a step that con
   const told = loadWorkflows(
     team(
       '---\n---\nYou build.\n',
-      { 'workflows/team/plan.md': '---\n---\nPlan it.\n' },
+      { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
       '---\nagent: builder\nafter: plan\nresume: plan\n---\nAnd go on.\n',
     ),
   ).find((s) => s.name === 'build')!;
@@ -369,7 +376,7 @@ const WIZARD =
 
 test("an agent Claude Code's /agents wizard wrote into .claude/agents/ runs as it is: `color` read and ignored, every other line the run's", () => {
   const repo = tree({ '.claude/agents/code-reviewer.md': WIZARD });
-  const home = tree({ 'workflows/team/review.md': '---\nagent: code-reviewer\n---\nReview the change.\n' });
+  const home = tree({ 'workflows/team/review.md': '---\nplace: git\nagent: code-reviewer\n---\nReview the change.\n' });
   const [step] = loadWorkflows(path.join(home, 'workflows', 'team'), { repo, home });
   assert.deepEqual([step.model, step.tools, step.permissionMode], ['sonnet', ['Read', 'Grep', 'Glob', 'Bash'], undefined]);
   const agent = agentsFor(path.join(home, 'workflows', 'team'), { repo, home }).get('code-reviewer') as Agent;
@@ -414,7 +421,7 @@ test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would d
 
 test("REFUSED at shipped defaults: a name in both of one repository's places, workflows/ and .claude/ — an agent and a skill — naming both", () => {
   const repo = tree({
-    'workflows/team/build.md': '---\nagent: builder\n---\n',
+    'workflows/team/build.md': '---\nplace: git\nagent: builder\n---\n',
     'workflows/agents/builder.md': '---\nskills: write-a-note\n---\nYou build.\n',
     'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
     '.claude/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
@@ -531,7 +538,10 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
     'nothing to render: an agent with no instructions, no skills and the default prompt',
   );
   assert.equal(
-    renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': 'Just a step.\n' }), 'workflows', 'team'))[0], dir),
+    renderedFlags(
+      loadWorkflows(path.join(tree({ 'workflows/team/build.md': '---\nplace: git\n---\nJust a step.\n' }), 'workflows', 'team'))[0],
+      dir,
+    ),
     undefined,
     'nothing to render: a step with no agent',
   );
@@ -681,7 +691,7 @@ test("a git run's step whose folder is gone is told a skill from the run's repos
   );
   git('add', '-A');
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'skills');
-  const dir = storeTeam('lost-git', { write: '---\nagent: scribe\n---\nWrite about tides.\n' });
+  const dir = storeTeam('lost-git', { write: '---\nplace: git\nagent: scribe\n---\nWrite about tides.\n' });
   const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
   fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
   const { e, filed } = board();
@@ -716,15 +726,19 @@ test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and th
     return args[args.indexOf('-s') + 1];
   };
   for (const sandbox of CODEX_SANDBOXES) {
-    assert.equal(sandboxOf(`---\nharness: codex\nsandbox: ${sandbox}\n---\nreview it\n`), sandbox);
-    assert.equal(sandboxOf(`---\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`), sandbox, `the former line, ${sandbox}`);
+    assert.equal(sandboxOf(`---\nplace: git\nharness: codex\nsandbox: ${sandbox}\n---\nreview it\n`), sandbox);
+    assert.equal(
+      sandboxOf(`---\nplace: git\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`),
+      sandbox,
+      `the former line, ${sandbox}`,
+    );
   }
-  assert.equal(sandboxOf('---\nharness: codex\npermissionMode: bypassPermissions\n---\nreview it\n'), 'danger-full-access');
+  assert.equal(sandboxOf('---\nplace: git\nharness: codex\npermissionMode: bypassPermissions\n---\nreview it\n'), 'danger-full-access');
   const { args } = codex.command({
     name: 'review',
     brief: 'b',
     cwd: scratch('wf-rendering-codex-'),
-    config: { permissionMode: parseWorkflow('review', '---\nharness: codex\nsandbox: read-only\n---\nr\n').permissionMode },
+    config: { permissionMode: parseWorkflow('review', '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nr\n').permissionMode },
   });
   assert.equal(
     args[args.indexOf('-s') + 1],

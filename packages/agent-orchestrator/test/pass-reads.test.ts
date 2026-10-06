@@ -68,7 +68,7 @@ const aRepo = (): string => {
 /** `implement → ship`, the team's `dev/ship.md` its ending, after implement. */
 const shipFolder = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-ship-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(path.join(dir, 'ship.md'), SHIP_MD.replace(/^after: review$/m, 'after: implement'));
   return dir;
 })();
@@ -76,7 +76,7 @@ const shipFolder = (() => {
 /** One step, `implement`. */
 const oneStep = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 })();
 

@@ -197,22 +197,28 @@ export const claudeAllowArgs = (config: SpawnRequest['config']): string[] => {
 };
 
 /**
- * A path a permission rule cannot name: a space or a comma would split the rule, a parenthesis end it, and a glob's own
- * characters would widen it.
+ * A character a permission rule cannot carry in a path, `Read(//<path>/**)` or `Edit(//<path>/**)`: a glob's `*`, `?` or `[` widens the
+ * rule to a sibling, and `]` with it; a backslash escapes the character after it, so the rule misses its own folder and names the one
+ * without it; a parenthesis is refused by the runtime's own grammar of a rule (`RULE`, `harness/args.ts`), though Claude Code reads one;
+ * and a whitespace other than a space is not measured. Measured on Claude Code 2.1.291, `claude -p` in `dontAsk` given
+ * `--allowedTools 'Edit(**),Read(//<dir>/**)'` as one argument: a space, a comma and braces are carried inside the parentheses, in an
+ * allow and in a deny alike, so a folder named with them is read and its sibling is not; a folder named with `*`, `?` or `[ab]` let a
+ * sibling the glob matches be read, and one named with a backslash before a letter let the sibling without the backslash be read, and
+ * not itself. An escape is read: a rule naming `\*` let the folder named with the `*` be read, and not its sibling.
  */
-const UNRULED = /[\s,()*?[\]{}]/;
+export const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
 
 /**
  * Why a task's mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule that denies an
- * edit there (`claudeDenies`), or allows one (`claudeAllows`), cannot carry (`UNRULED`).
+ * edit there (`claudeDenies`), or allows one (`claudeAllows`), cannot carry (`CLAUDE_UNRULED`).
  */
 const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
-  const mount = task.config?.mounts?.find((m) => UNRULED.test(m.path));
+  const mount = task.config?.mounts?.find((m) => CLAUDE_UNRULED.test(m.path));
   if (!mount) return undefined;
   const how = mount.readOnly
     ? 'read-only, and Claude Code holds a folder read-only'
     : 'writable, and Claude Code lets a session write a folder beside its own';
-  return `\`mounts\` gives the session ${JSON.stringify(mount.path)} ${how} by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`;
+  return `\`mounts\` gives the session ${JSON.stringify(mount.path)} ${how} by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a whitespace other than a space. Mount a folder whose path has none of them, or leave the mount off.`;
 };
 
 /**

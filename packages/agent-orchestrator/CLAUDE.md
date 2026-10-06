@@ -128,8 +128,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   person's one-off verb asks the place live (`standingNow`, `standingLive`); neither runs git through a reader of its own.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).
 - **What `engine()` reads, it reads without throwing** (`readRemote`): a bad file is left out and said on stderr.
-- **A task journal that does not read stops its own run, never the pass**: `pass` in `tick/tick.verb.ts` leaves the run unjudged, in
-  flight and out of the feed's `removed` (`unreadableJournal`); `test/unreadable-journal.test.ts` walks it on the runtime itself.
+- **A task journal that does not read, or an unfrozen run's folder that does not load (`UnloadedFolder`, `record/steps.store.ts`), stops
+  its own run, never the pass**: `pass` in `tick/tick.verb.ts` leaves the run unjudged, in flight and out of the feed's `removed`
+  (`unreadableJournal`, `unloadedFolder`); `test/unreadable-journal.test.ts` and `test/unloaded-folder.test.ts` walk it on the runtime.
 - **The ending's check is the run's**: the shipper stages the merge; the tick commits on the check's exit 0 or aborts (`landingDue`)
   through the place's `land`, level-triggered off the place's `status`, asked only where `landingOpen` holds, and the `stat` of the file
   `open` named (`stagedHere`, `place/landing.store.ts`); an unread `status` is never a verdict. A landed

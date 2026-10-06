@@ -682,7 +682,10 @@ windows each harness takes: `wf start` and `wf retry` ask the runtime's `configR
 config before anything is written, and say its words after the step's line (`configRefused`). The board's form offers
 the runtime's own lists (`HARNESS_CHOICES`, through the runtime's vocabulary door, `agent-runtime/vocabulary`). The load
 keeps only what the runtime cannot refuse: `tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote agent, and `sandbox:` on Claude Code, which
-would be filed as a mode.
+would be filed as a mode. Before the runtime's words, `nemia start` refuses a store, `WF_ROOT`, whose path a permission
+rule a step would be filed cannot carry — an ending's read of its run's artifacts, the folders handed to a step, the inbox — in
+the store's own words, naming `WF_ROOT` and the fix (`storeRootRefusal`); which characters a rule cannot carry is the runtime's
+answer (`unruledIn`, through `agent-runtime/vocabulary`).
 
 ### A job, or a session that stays: `background:`
 
@@ -1930,21 +1933,23 @@ holds its gate on the merge and nothing else, so when git already has its result
 has made that merge by hand: the run has shipped as git reads it, and its children start. Held back, they
 would wait for ever, since the approval that would release them is refused with nothing left to merge.
 
-## A run with no repository: `workspace: folder`
+## A run with no repository: `place: folder`
 
-A team whose work is not code needs no git repository, and a run of it runs no git. `workspace:` names a kind of
-workspace; `folder` is the first beside git's worktrees (and `main`, the checkout an ending runs in), and a team that writes a
-note is the example:
+A team whose work is not code needs no git repository, and a run of it runs no git. `place:` names where a step works:
+`git`, on branches of a repository, or `folder`, in folders the run makes; a team that writes a note is the example:
 
 ```md
 ---
-workspace: folder
+place: folder
 agent: note-writer
 ---
 ```
 
-- **A team is of one kind.** Every step says `workspace: folder`, or none does; a folder that mixes them is refused
-  when it is loaded, since the kind is the run's, not the step's.
+- **Every step says its place.** None is the default: a step file without `place:` is refused when it is loaded, in words
+  that name both (`placeRequired`), and the board's New workflow asks a person to choose, none chosen for them. `workspace:
+  folder`, the former spelling, is still read as `place: folder`.
+- **A team is of one kind.** Every step says `place: folder`, or every step says `place: git`; a folder that mixes them is
+  refused when it is loaded, since the kind is the run's, not the step's.
 - **The record says so.** `wf start` freezes `place: { kind: 'folder' }` on the run, with no `repo`, `baseRef`, `branch`
   or `isolate`; a record without `place` is a git run, as every record before it was. Its workspace is
   `runs/<id>/work`, in the store, and nothing reads the directory `wf start` was typed in.
@@ -2636,7 +2641,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 - **Refused before anything is written**, exit 2 (`Invalid`, `outsideRefusal`): a git run on a repository that is not one of
   the factory's, naming them, the `--repo` that starts it in one, and the `wf factory add` that files a factory on it, since
   none adds a repository to a factory. Paths are compared as `path.resolve` spells them, so a
-  symlink to a repository is not that repository. A team that says `workspace: folder` works on no repository: it records its
+  symlink to a repository is not that repository. A team that says `place: folder` works on no repository: it records its
   factory and no `repo`, and is never refused for where it is typed.
 
 ### Every run in a factory
@@ -3265,7 +3270,7 @@ has is refused, not handed off.
   (below), since `--unmerged` gets past none of that; once that is cleared, the next `wf prune` says it.
 - **a worktree that is dirty** (its files named), **locked** (with the `git worktree unlock`), or
   **detached on a commit no branch holds** (with the `git switch -c` that keeps it).
-- **a folder run** (`workspace: folder`): its steps' folders are its work, kept until `wf rm`.
+- **a folder run** (`place: folder`): its steps' folders are its work, kept until `wf rm`.
 - whatever `wf rm` refuses, and for the same reasons: a step waiting at its gate, an ask no pass has spent.
 
 **A pruned run is marked, and read as over.** `wf prune` writes `runs/<id>.pruned` — when, and each worktree
@@ -3432,7 +3437,7 @@ holding a concurrency slot forever.
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`), its size and the ends of its lines from a cursor (`feedSize`, `readFeedEnds`) |
 | `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines written once — appended, logged and published to the process's hub (`emitFeed`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
-| `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |
+| `src/record/places.store.ts` | where a folder run's steps work (`place: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches/branches.store.ts` | where a run's result branches stand, read off a `BranchReader` over the place's `standing`: whether each landed and where it stands (`standingsOf`, `shippedOf`, `branchStandings`, `resultBranches`), a parent run as its record and the standing say it (`parentRecord`), and the tips of a run's branches (`resultTips`) |
 | `src/standing/standing.verb.ts` | where a pass's repositories stand, read once a pass (`passStanding`): one `standing` of the run's place for each repository, place and base branch, of the result branches of every run waited on there, within 15 s (`STANDING_DEADLINE_MS`); the reader the pass's `shippedBy`, `parentOf`, `runReady` and holds ask through (`standingReader`), and the heads its memo of runs at rest, its tips and a filed run's base are read from (`headsFor`), read afresh for a run that handed off on the pass. An unread `standing` reads as not shipped, and the waiting run says why |
@@ -3491,7 +3496,7 @@ for the same reason, and so does the `wf` command.
 | path | |
 |---|---|
 | `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds |
-| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
+| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |

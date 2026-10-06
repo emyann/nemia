@@ -200,7 +200,7 @@ function writeRun(root: string): string[] {
   for (const step of steps) {
     const output = 'output' in step && step.output ? `output: ${step.output.file}\n` : '';
     const loop = 'loop' in step ? `loop: ${step.loop}\n` : '';
-    write(path.join(dir, `${step.name}.md`), `---\nharness: claude\n${output}${loop}---\nDo ${step.name}.\n`);
+    write(path.join(dir, `${step.name}.md`), `---\nplace: git\nharness: claude\n${output}${loop}---\nDo ${step.name}.\n`);
     if ('output' in step && step.output) write(path.join(dir, step.output.file), `${JSON.stringify(step.output.schema, null, 2)}\n`);
   }
   const record = path.join(root, 'runs', `${id}.json`);

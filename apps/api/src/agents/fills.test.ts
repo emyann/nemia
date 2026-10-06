@@ -36,18 +36,18 @@ process.env.HKB_REPO = repoR;
 const repoS = scratch('nemia-api-fills-s-');
 const STORE = path.join(root, 'workflows');
 
-write(path.join(repoR, 'workflows', 'alpha', 'implement.md'), 'Implement it.\n');
-write(path.join(repoR, 'workflows', 'alpha', 'review.md'), '---\nagent: iris\n---\nReview it.\n');
-write(path.join(repoR, 'workflows', 'gamma', 'plan.md'), '---\nagent: cleo\n---\nPlan it.\n');
-write(path.join(repoR, 'workflows', 'delta', 'ship.md'), 'Ship it.\n');
-write(path.join(repoR, 'workflows', 'broken', 'named.md'), '---\nagent: bo\n---\nDo it.\n');
-write(path.join(repoR, 'workflows', 'broken', 'bad.md'), '---\nnotakey: 1\n---\nDo it.\n');
-write(path.join(repoR, 'workflows', 'broken', 'stray.md'), '---\nagent: ../agents/cleo\n---\nDo it.\n');
+write(path.join(repoR, 'workflows', 'alpha', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
+write(path.join(repoR, 'workflows', 'alpha', 'review.md'), '---\nplace: git\nagent: iris\n---\nReview it.\n');
+write(path.join(repoR, 'workflows', 'gamma', 'plan.md'), '---\nplace: git\nagent: cleo\n---\nPlan it.\n');
+write(path.join(repoR, 'workflows', 'delta', 'ship.md'), '---\nplace: git\n---\nShip it.\n');
+write(path.join(repoR, 'workflows', 'broken', 'named.md'), '---\nplace: git\nagent: bo\n---\nDo it.\n');
+write(path.join(repoR, 'workflows', 'broken', 'bad.md'), '---\nplace: git\nnotakey: 1\n---\nDo it.\n');
+write(path.join(repoR, 'workflows', 'broken', 'stray.md'), '---\nplace: git\nagent: ../agents/cleo\n---\nDo it.\n');
 for (const name of ['ada', 'iris', 'cleo', 'bo'])
   write(path.join(repoR, 'workflows', 'agents', `${name}.md`), agentText(`You are ${name}.`));
 write(path.join(repoR, '.claude', 'agents', 'max.md'), agentText('You are the repository max.'));
 for (const name of ['ada', 'max', 'zed']) write(path.join(STORE, 'agents', `${name}.md`), agentText(`You are your ${name}.`));
-write(path.join(STORE, 'omega', 'step.md'), 'Step it.\n');
+write(path.join(STORE, 'omega', 'step.md'), '---\nplace: git\n---\nStep it.\n');
 
 for (const [name, repo, workflow] of [
   ['hired', repoR, 'alpha'],

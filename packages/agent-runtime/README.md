@@ -70,10 +70,12 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/h
 - **Claude Code** (a job, `claude-detached`, `claude --bg`) holds both modes. Each mount is `--add-dir <path>`, and a read-only one
   is also `Edit(//<path>/**)` in the one `--disallowedTools` list (`claudeMountArgs`, `claudeDenies`). `--add-dir` grants writes
   as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
-  and `bypassPermissions`, a Bash redirection into it included. A read-only path a permission rule cannot name — a space, a
-  comma, a parenthesis, a glob's character — is refused. `--add-dir` also lists the folder's own `.claude/skills` in the
-  session; its `CLAUDE.md` is not read. The vocabulary door names the folders a harness reads so as its own configuration
-  (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts files into a folder it mounts.
+  and `bypassPermissions`, a Bash redirection into it included. A path a permission rule cannot carry — a parenthesis, a
+  glob's `*`, `?` or bracket, a backslash, a whitespace other than a space (`CLAUDE_UNRULED`) — is refused; a space, a comma and braces
+  are carried. The vocabulary door answers the same characters (`unruledIn`), for a caller that builds a rule from a path.
+  `--add-dir` also lists the folder's own `.claude/skills` in the session; its `CLAUDE.md` is not read. The vocabulary door
+  names the folders a harness reads so as its own configuration (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts
+  files into a folder it mounts.
 - **Codex** holds a read-only mount and is given nothing for it: its `read-only` and `workspace-write` sandboxes read the whole
   disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
   one, which only `--add-dir` would give and `exec resume` rejects.
@@ -743,7 +745,10 @@ the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lo
 a session held to its directory runs in (`held`: `dontAsk`), the modes a background session runs in without stopping to ask a
 person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
 `CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'haiku' }` is
-filed in `auto` and runs in `default`, as the measure above says.
+filed in `auto` and runs in `default`, as the measure above says. `unruledIn(harness, path)` gives the first character of `path`
+that a permission rule of the harness cannot carry, the set its mounts are refused by (`CLAUDE_UNRULED`), and `undefined` for a path
+every rule carries or a harness whose fence takes no rule naming a path, so a caller that builds a rule from a path refuses it in its
+own words first.
 
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
 started, and waiting would not change that — the OS would not create the process for a reason that stays (no binary,
@@ -1169,7 +1174,7 @@ unchanged: with no statement it is left to the deadline exactly as before.
 **What that read costs, and why it is kept.** A busy session costs its transcript's mtime and nothing else until that
 has been cold for ninety seconds — which every tool call longer than ninety seconds is, `npm ci` and this repository's
 own suite included. The read that follows is then kept for as long as the transcript stays as it found it, by the same
-mtime machinery a finished session's read uses, so a long call costs one read rather than one per pass: measured on a
+mtime machinery every look's read uses, so a long call costs one read rather than one per pass: measured on a
 39.5 MB transcript, a read is 174–282 ms against 17–60 ms for the mtime. Keeping it changes no answer, because the
 branch is only reached while nothing has been written — which is exactly the condition under which reading again would
 say the same thing.
@@ -1343,10 +1348,10 @@ real runs:
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
-Claude Code's runner reads the statement from the transcript on every idle pass while a session
-works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
-and the start `claude agents` gave it — and only while the transcript has not been written since: its mtime, asked again, equals the one asked just
-before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
+Claude Code's runner reads the statement and the usage from the transcript in one read a look, in any state — a busy
+session's once its transcript is cold, above. What it read it keeps for that attempt only — the row's name, its session, and the start `claude agents` gave it — and
+only while the transcript has not been written since, as a turn writes it: its mtime, a stat (`transcriptWrittenAt`), asked
+again, equals the one asked just before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
 stepped back is read again.
 Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
 final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
@@ -1463,8 +1468,9 @@ Two measured traps shape the transcript count. A response is written as one line
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
 transcript holds its parent's conversation with the parent's timestamps, so only what came after
 the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
-usage rather than a wrong one. A count read from a finished session is kept as its statement is: for
-that start, while the transcript is unchanged. `ae show` prints one line per attempt — when it ran, then what it
+usage rather than a wrong one. A count is kept as the statement is, off the same read: for
+that start, while the transcript is unchanged. So a look at an idle or blocked session, or a long-lived one between turns,
+reads none of its transcript until a turn writes it, and the next look sees what that turn said and spent. `ae show` prints one line per attempt — when it ran, then what it
 consumed, naming what was not measured, and its cost to the cent (`<$0.01` under one: `$0.00` would read as free) — and an
 attempt still running as `running since <start>`. After the cost, what the attempt read by class and its peak context, each named not measured where its runner could not see it. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
 
@@ -1537,7 +1543,7 @@ names one. Words said to a session while it works are a `queued_command` attachm
 a `system` event, and its own user's — a person typing into it, or a job's next line on its stdin, with no origin at
 all (2.1.280) — a `user` text event, as the words that started its turn are.
 
-**Codex, as far as its records allow** (codex-cli 0.154.0, read on the 34 rollouts on this machine). A
+**Codex, as far as its records allow** (codex-cli 0.154.0, read on the 37 rollouts on this machine, 2026-10-06). A
 rollout says most things twice — as the model was given them, and as the thread items Codex itself
 shows — and the items are read: the prompt without the instructions and context Codex puts around it,
 each command with its exit code, each file change with its status. The model's own call is an `exec`
@@ -1551,6 +1557,12 @@ could not say whether a result was an error. What the records do not give, and s
   `Bash` or `Edit`; its input is the command and its cwd, or the changes.
 - **Anything before the worker has the thread id**, and any item of a type not in those rollouts beyond
   a `system` event naming it.
+
+A record the runtime reads — an `event_msg` whose payload is `task_complete` or `item_completed` — is decoded by its
+schema in `ROLLOUT` (`src/harness/codex/rollout.ts`) before any of its fields is read; all 428 in those rollouts decode.
+An absent field means what it always has; a field there in another shape refuses the `transcript` verb with words that
+name the line by its byte offset and the rollout, its kind, its first wrong field and the fix, so a rollout whose format
+moved is never read as saying nothing. Any other record passes undecoded.
 
 **Which session is read.** An attempt that has ended — or whose task settled with it open — is read by the
 session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
@@ -1865,6 +1877,17 @@ unwritten for the quiet floor, or listed finished with no transcript — it read
 as a warning on every look, so its task settles and `stop`, `release` and `forget` reach it (`endedOf`, `harness/claude/bg.ts`). A
 line torn mid-write, one that is no JSON object, and a line of a type the reader does not read pass undecoded.
 
+What `claude -p` prints is decoded where the runtime reads it (`printedLinesOf`, `harness/claude/print.ts`): a `result` line, a
+`system` line of subtype `permission_denied` or `init`, and an `assistant` line with its `tool_use` blocks, each by its schema in
+`PRINTED`. Every field the readers read may be absent, and an absent one means what it always has; a field that is there has the shape
+the runtime reads: a cost or an API time a number of 0 or more, a token count an integer, `permission_denials` a list whose entries name
+their tool, a call's id and tool non-empty strings. An output with one such line that does not decode is refused as a whole, in words
+naming the line, its kind, the field, at most 60 characters of what it found, and the fix: that session alone is unread while its
+process runs and failed once it has ended (`lookOf`, `harness/detached/detached.ts`), never a job that said nothing. Stderr captured
+beside it, a line torn mid-write, and a line of any other type or subtype pass undecoded. Measured 2026-10-06 over the store's 2,346
+kept captures (2,392 `result`, 962 `permission_denied` and 2,416 `init` lines, 78,605 `tool_use` blocks): none refused, each read as
+before.
+
 A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
 refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,
 neither there nor gone, and followed again by an engine that has the harness; a spawn is refused (`unstartable`, in words that name the
@@ -2059,7 +2082,7 @@ of pure code sits beside it.
 | `src/harness/forget.ts` | what every harness's `forget` shares (`forgetFiles`): the files it keeps of a session, removed or, dry, listed, and what it leaves that is not its own |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
-| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model |
+| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model; and `unruledIn`, the first character of a path its permission rules cannot carry |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
 | `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
@@ -2078,6 +2101,7 @@ of pure code sits beside it.
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
+| `src/harness/claude/print.ts` | the lines of `claude -p`'s output the runtime reads (`PRINTED`), decoded, and why an output is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration, read under its guards (`claudeRegistration`) and found by name |
 | `src/harness/claude/bridge.ts` | a `--bg` session's Remote Control link, off its registration's `bridgeSessionId` (`claudeBridge`), or why there is none |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
@@ -2089,9 +2113,10 @@ of pure code sits beside it.
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
+| `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
-| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
+| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, decoded by `print.ts` or refused, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's methods (`SESSION_METHODS`), `forgetSession` among them, holding nothing — every answer read afresh off the harness and the journal |
@@ -2261,7 +2286,10 @@ task: its journal's bytes, its lines in the feed, each session's files, and what
 runtime's to remove (a conversation Claude Code or Codex keeps, the Task a remote agent keeps), named. With it, each
 session's files go through its harness (`RunnerOps.forget`, `forgetSession` across the A2A seam), then the feed's lines and
 the journal in one call to the store (`JournalOps.forget`), the journal last, so a forget cut short is finished by asking
-again. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
+again. The feed is read once either way: the files store counts each task's lines off its raw lines (`feedLines`), and with
+`--yes` its rotation answers the lines it forgot of each (`ForgottenFeed.linesByTask`). So a line of the task that no runtime
+wrote, which a read of the feed skips and the rotation removes, is counted, and a count says what `--yes` removes; a store with
+neither is counted off its feed read whole, decoded lines alone. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
 
 Every guard is asked of every id before anything is removed, and a refusal (`ForgetRefused`, exit 2) ends "nothing was
 forgotten": an id the store does not list; a journal that cannot be read; a task not settled (stop it, let it settle,

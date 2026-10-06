@@ -69,7 +69,7 @@ fs.writeFileSync(path.join(GIVEN_FILES, 'brief notes.md'), '# what the tides do\
 /** A team that works on a repository, to hold the refusals apart: a card for it keeps the repository it names. */
 const GIT_TEAM = path.join(ROOT, 'workflows', 'change');
 fs.mkdirSync(GIT_TEAM, { recursive: true });
-fs.writeFileSync(path.join(GIT_TEAM, 'implement.md'), '---\n---\nmake the change\n');
+fs.writeFileSync(path.join(GIT_TEAM, 'implement.md'), '---\nplace: git\n---\nmake the change\n');
 
 /** Where a `git` that refuses and says so is put, first on PATH: anything that reaches for git during a folder run is written down. */
 const BIN = path.join(ROOT, 'bin');
@@ -234,7 +234,7 @@ test("REFUSED: a folder team whose agent is given the git place's skill, which h
 test('a git team is still a git run: from a directory that is no repository, it is refused by git', async () => {
   const GIT_TEAM = path.join(ROOT, 'workflows', 'plain');
   fs.mkdirSync(GIT_TEAM, { recursive: true });
-  fs.writeFileSync(path.join(GIT_TEAM, 'write.md'), 'write the note\n');
+  fs.writeFileSync(path.join(GIT_TEAM, 'write.md'), '---\nplace: git\n---\nwrite the note\n');
   await assert.rejects(async () => await Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: GIT_TEAM })));
   assert.ok(gitAsked().length > 0, 'a git team asks git');
   fs.rmSync(GIT_ASKED, { force: true });

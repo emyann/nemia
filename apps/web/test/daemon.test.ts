@@ -27,6 +27,7 @@ const held = (over: Partial<Daemon> = {}): Daemon => ({
   staleAfterMs: 15 * 60_000,
   identity: 'same',
   line: 'wf up: ticking, pid 4242',
+  unobserved: [],
   ...over,
 });
 const free = (kind: 'none' | 'unreadable'): Daemon => ({
@@ -45,6 +46,7 @@ const free = (kind: 'none' | 'unreadable'): Daemon => ({
   staleAfterMs: null,
   identity: null,
   line: `wf up: ${kind}`,
+  unobserved: [],
 });
 const said = (d: Daemon): string | null => {
   const words = daemonWords(d, NOW);

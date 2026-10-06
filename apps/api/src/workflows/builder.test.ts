@@ -81,15 +81,15 @@ function devIn(name: string): string {
 /** A workflow of yours, `plan` then `build`, with a schema `build` does not name yet. */
 function planned(name: string): string {
   const dir = path.join(STORE, name);
-  write(path.join(dir, 'plan.md'), '---\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n');
-  write(path.join(dir, 'build.md'), '---\nafter: plan\ncheck: npm test\n---\nBuild what PLAN.md says.\n');
+  write(path.join(dir, 'plan.md'), '---\nplace: git\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n');
+  write(path.join(dir, 'build.md'), '---\nafter: plan\nplace: git\ncheck: npm test\n---\nBuild what PLAN.md says.\n');
   write(path.join(dir, 'build.schema.json'), again);
   return dir;
 }
 
 /** The repository's own, which the builder never writes. */
 const theirs = path.join(repo, 'workflows', 'good');
-write(path.join(theirs, 'implement.md'), '---\nmodel: opus\n---\nImplement it.\n');
+write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImplement it.\n');
 
 /** A workflow's steps as GET /api/workflows lists them. */
 async function listedSteps(name: string, from = 'yours'): Promise<ListedStep[]> {
@@ -118,7 +118,7 @@ const put = (name: string, body: unknown, from = 'yours', headers: Record<string
 const post = (body: unknown, from = 'yours', headers: Record<string, string> = json) =>
   app.request(`/api/workflows/${from}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
-/** A spec with every key unset but `fields`, as the listing has one. */
+/** A spec with every key unset but `fields` and the `place: git` every step says, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   harness: null,
   model: null,
@@ -127,7 +127,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   after: [],
   resume: null,
   input: [],
-  place: null,
+  place: 'git',
   workspace: null,
   writable: [],
   reads: [],
@@ -240,7 +240,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     );
 
   const refusedAs = (key: string, value: string): string | null => {
-    const lines = { after: 'a', output: 'b.schema.json', loop: 'a' } as Record<string, string>;
+    const lines = { after: 'a', place: 'git', output: 'b.schema.json', loop: 'a' } as Record<string, string>;
     lines[key] = value;
     const b = `---\n${Object.entries(lines)
       .map(([k, v]) => `${k}: ${v}`)
@@ -248,7 +248,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     try {
       parseFolder(
         [
-          ['a', 'Do a.\n'],
+          ['a', '---\nplace: git\n---\nDo a.\n'],
           ['b', b],
         ],
         (f) => (f === 'b.schema.json' ? again : undefined),
@@ -272,16 +272,17 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     for (const word of words) assert.equal(refusedAs(key, word), null, `the parser takes the flag's word ${key}: ${word}`);
   assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/, "gate's `false` is refused");
   assert.equal(form.defaultHarness, DEFAULT_HARNESS, "the default harness is the parser's");
-  for (const mode of HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS]) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
+  for (const mode of HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS])
+    parseWorkflow('a', `---\nplace: git\npermissionMode: ${mode}\n---\nDo a.\n`);
   assert.equal(Object.hasOwn(HARNESS_CHOICES.sandbox, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');
   const codexOnly = HARNESS_CHOICES.sandbox.codex.find((m) => !HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS].includes(m))!;
   assert.equal(
-    parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`).permissionMode,
+    parseWorkflow('a', `---\nplace: git\npermissionMode: ${codexOnly}\n---\nDo a.\n`).permissionMode,
     codexOnly,
     "a mode's word is the runtime's to judge, at `nemia start`: the load reads it as written",
   );
   assert.throws(
-    () => parseWorkflow('a', `---\nsandbox: ${codexOnly}\n---\nDo a.\n`),
+    () => parseWorkflow('a', `---\nplace: git\nsandbox: ${codexOnly}\n---\nDo a.\n`),
     (e: Error) => e.message.startsWith('a: `sandbox: '),
   );
 });
@@ -308,7 +309,7 @@ test("PUT /api/workflows/yours/:name with a folder's steps as the listing has th
 function attached(name: string): string {
   const dir = path.join(STORE, name);
   write(path.join(STORE, 'agents', 'coder.md'), '---\nharness: claude\nmodel: opus\neffort: high\n---\nYou write code.\n');
-  write(path.join(dir, 'build.md'), '---\nagent: coder\ncheck: npm test\n---\nAnd mind the cache.\n');
+  write(path.join(dir, 'build.md'), '---\nplace: git\nagent: coder\ncheck: npm test\n---\nAnd mind the cache.\n');
   return dir;
 }
 
@@ -319,7 +320,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     name: 'build',
     spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
     body: 'You write code.\n\nAnd mind the cache.',
-    own: { keys: ['check'], body: 'And mind the cache.' },
+    own: { keys: ['place', 'check'], body: 'And mind the cache.' },
     hired: null,
     layers: {
       agent: 'coder',
@@ -351,17 +352,19 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal(
     fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
-    '---\nagent: coder\neffort: low\ncheck: npm test\n---\nAnd mind the index.\n',
+    '---\nplace: git\nagent: coder\neffort: low\ncheck: npm test\n---\nAnd mind the index.\n',
     "a key changed, which the board makes the node's own, and the note are written, and nothing else of the agent's",
   );
   const [read] = await listedSteps('with-agent');
   assert.deepEqual([read.spec.model, read.spec.effort, read.body], ['opus', 'low', 'You write code.\n\nAnd mind the index.']);
 
-  res = await put('with-agent', { steps: [{ name: 'build', spec: { agent: 'coder', check: 'npm test' }, body: 'Mind nothing.' }] });
+  res = await put('with-agent', {
+    steps: [{ name: 'build', spec: { place: 'git', agent: 'coder', check: 'npm test' }, body: 'Mind nothing.' }],
+  });
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal(
     fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
-    '---\nagent: coder\ncheck: npm test\n---\nMind nothing.\n',
+    '---\nplace: git\nagent: coder\ncheck: npm test\n---\nMind nothing.\n',
     'a step sent without `own`, as one drafted by hand, has every key it sets as its own, and its body as its note',
   );
 });
@@ -370,8 +373,11 @@ test("a step with an agent is listed with its layers — the agent's instruction
   const dir = path.join(STORE, 'layered');
   write(path.join(STORE, 'agents', 'scribe.md'), '---\nmodel: opus\n---\nYou write things down.\n');
   write(path.join(root, 'custom-instructions', 'scribe.md'), 'Write it in French.\n');
-  write(path.join(dir, 'note.md'), '---\nagent: scribe\nmodel: sonnet\ndisallowedTools: Bash(rm:*)\n---\nNote the decisions.\n');
-  write(path.join(dir, 'tidy.md'), '---\nafter: note\n---\nTidy up.\n');
+  write(
+    path.join(dir, 'note.md'),
+    '---\nplace: git\nagent: scribe\nmodel: sonnet\ndisallowedTools: Bash(rm:*)\n---\nNote the decisions.\n',
+  );
+  write(path.join(dir, 'tidy.md'), '---\nafter: note\nplace: git\n---\nTidy up.\n');
   try {
     const before = snapshot(dir);
     const [note, tidy] = (await listedSteps('layered')) as [ListedStep, ListedStep];
@@ -435,7 +441,7 @@ test("versionOf reads `agent:` as the parser does — indented, or with a space 
       path.join(STORE, 'agents', 'critique.schema.json'),
       JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }),
     );
-    write(path.join(dir, 'judge.md'), `---\n${line}\n---\n`);
+    write(path.join(dir, 'judge.md'), `---\nplace: git\n${line}\n---\n`);
     const listing = (await listWorkflows(engine(), repo, root)).find((w) => w.name === `version-${folder}`);
     assert.equal(
       listing?.steps[0]?.spec.agent,
@@ -464,7 +470,7 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
   write(skill, '---\nname: mind-the-cache\ndescription: Use this when a change touches the cache.\n---\nRead the cache first.\n');
   write(path.join(STORE, 'agents', 'cacher.md'), '---\ntools: Read, Skill\nskills: mind-the-cache\n---\nYou mind the cache.\n');
   const dir = path.join(STORE, 'skilled');
-  write(path.join(dir, 'build.md'), '---\nagent: cacher\n---\n');
+  write(path.join(dir, 'build.md'), '---\nplace: git\nagent: cacher\n---\n');
   try {
     assert.throws(
       () => loadWorkflows(dir),
@@ -512,7 +518,7 @@ test("a skill only a step's own `skills:` adds moves the folder's version when i
   write(added, '---\nname: mind-the-index\ndescription: Use this when a change touches the index.\n---\nRead the index first.\n');
   write(other, '---\nname: mind-nothing\ndescription: Use this never.\n---\nNothing.\n');
   write(path.join(STORE, 'agents', 'indexer.md'), '---\ntools: Read, Skill\n---\nYou mind the index.\n');
-  write(path.join(dir, 'build.md'), '---\nagent: indexer\nskills: mind-the-index\n---\n');
+  write(path.join(dir, 'build.md'), '---\nplace: git\nagent: indexer\nskills: mind-the-index\n---\n');
   try {
     assert.equal(
       loadWorkflows(dir, { repo, home: root })
@@ -535,7 +541,10 @@ test("a skill only a step's own `skills:` adds moves the folder's version when i
 
 test('a folder that writes a list under its former name — `disallow:`, `allow:` — is listed under the name it has now, and a save of the step writes that name; a page from before, which sends the former name, is refused and nothing written', async () => {
   const dir = path.join(STORE, 'former');
-  write(path.join(dir, 'write.md'), '---\npermissionMode: dontAsk\ndisallow: SendMessage\nallow: Edit(**)\n---\nWrite the note.\n');
+  write(
+    path.join(dir, 'write.md'),
+    '---\nplace: git\npermissionMode: dontAsk\ndisallow: SendMessage\nallow: Edit(**)\n---\nWrite the note.\n',
+  );
   const [step] = (await listedSteps('former')) as [ListedStep];
   assert.deepEqual([step.spec.disallowedTools, step.spec.allowedTools], [['SendMessage'], ['Edit(**)']]);
   assert.equal(Object.hasOwn(step.spec, 'allow') || Object.hasOwn(step.spec, 'disallow'), false, 'the listing has one name for each list');
@@ -555,7 +564,7 @@ test('a folder that writes a list under its former name — `disallow:`, `allow:
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(
     fs.readFileSync(path.join(dir, 'write.md'), 'utf8'),
-    '---\npermissionMode: dontAsk\ndisallowedTools: SendMessage\nallowedTools: Edit(notes/**)\n---\nWrite the note.\n',
+    '---\nplace: git\npermissionMode: dontAsk\ndisallowedTools: SendMessage\nallowedTools: Edit(notes/**)\n---\nWrite the note.\n',
     'a save of the step writes the names the keys have',
   );
 });
@@ -601,7 +610,7 @@ test('a folder that says `workspace: folder` is listed with `place: folder`, a f
 
 test('a codex step that names its sandbox under the former key `permissionMode:` is listed with its `sandbox`, and a save writes `sandbox:`; REFUSED: a page that sends `permissionMode` for it, and `sandbox` on a Claude Code step — nothing written', async () => {
   const dir = path.join(STORE, 'fenced');
-  write(path.join(dir, 'review.md'), '---\nharness: codex\npermissionMode: read-only\n---\nReview it.\n');
+  write(path.join(dir, 'review.md'), '---\nplace: git\nharness: codex\npermissionMode: read-only\n---\nReview it.\n');
   const [step] = (await listedSteps('fenced')) as [ListedStep];
   assert.deepEqual(
     [step.spec.sandbox, step.spec.permissionMode],
@@ -639,7 +648,7 @@ test('a codex step that names its sandbox under the former key `permissionMode:`
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(
     fs.readFileSync(path.join(dir, 'review.md'), 'utf8'),
-    '---\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n',
+    '---\nplace: git\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n',
     'saved with a change, it says `sandbox:`',
   );
 });
@@ -713,16 +722,16 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   assert.deepEqual([saved.written, saved.kept, saved.removed], [['README.md', 'build.md', 'review.md'], ['plan.md'], []]);
   assert.equal(
     fs.readFileSync(path.join(dir, 'plan.md'), 'utf8'),
-    '---\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n',
+    '---\nplace: git\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n',
     'a step unchanged keeps its file, comment and all',
   );
   assert.equal(
     fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
-    '---\nafter: plan\ncheck: npm test\nretries: 1\n---\nBuild what PLAN.md says.\n',
+    '---\nafter: plan\nplace: git\ncheck: npm test\nretries: 1\n---\nBuild what PLAN.md says.\n',
   );
   assert.equal(
     fs.readFileSync(path.join(dir, 'review.md'), 'utf8'),
-    '---\nafter: build\nmodel: opus\noutput: build.schema.json\nloop: build\nrounds: 2\n---\nReview the build.\n',
+    '---\nafter: build\nplace: git\nmodel: opus\noutput: build.schema.json\nloop: build\nrounds: 2\n---\nReview the build.\n',
   );
   assert.equal(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), '# drawn\n\nPlan, build, review.\n');
   assert.deepEqual(
@@ -769,20 +778,20 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
     'a step run as a background session says so and is listed back as one; a step that does not say is a job, listed as null',
   );
 
-  const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { check: 'npm test' }, body: 'Build it.' }] });
+  const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { place: 'git', check: 'npm test' }, body: 'Build it.' }] });
   assert.equal(gone.status, 200, await gone.clone().text());
   const after = (await gone.json()) as WorkflowSaved;
   assert.deepEqual([after.written, after.removed], [['build.md'], ['review.md']], 'a step gone takes its file');
   assert.equal(
     fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
-    '---\ncheck: npm test\n---\nBuild it.\n',
+    '---\nplace: git\ncheck: npm test\n---\nBuild it.\n',
     'an edge deleted takes its key, and a key the listing leaves out is unset',
   );
   assert.deepEqual(after.workflow.graph, { roots: ['build', 'plan'], edges: [] });
   assert.deepEqual(after.workflow.schemas, ['build.schema.json'], 'the schema is left as it is');
 });
 
-test("REFUSED at shipped defaults: what the package refuses is a 422 in its words, naming the steps it names — a cycle, an after naming no step, a key no step has, `maxAttempts`, a loop with no output, a schema not there, a name that is not a file's, a name twice, a list of no tools, a line break, no steps — and the folder is as it was", async () => {
+test("REFUSED at shipped defaults: what the package refuses is a 422 in its words, naming the steps it names — a cycle, an after naming no step, a key no step has, `maxAttempts`, a loop with no output, a schema not there, a name that is not a file's, a name twice, a list of no tools, a line break, a step with no place, no steps — and the folder is as it was", async () => {
   const dir = planned('refused');
   const before = snapshot(dir);
   const [plan, build] = (await listedSteps('refused')) as [ListedStep, ListedStep];
@@ -799,6 +808,7 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     ['no tools', [plan, { ...build, spec: { ...build.spec, tools: [] } }], ['build']],
     ['a line break in a check', [plan, { ...build, spec: { ...build.spec, check: 'npm test\nharness: codex' } }], ['build']],
     ['an empty body', [plan, { ...build, body: '  ' }], ['build']],
+    ['a step with no place', [plan, { ...build, spec: { ...build.spec, place: null } }], ['build']],
     ['no steps', [], []],
   ];
   for (const [what, steps, named] of cases) {
@@ -959,7 +969,7 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
 });
 
 test('REFUSED at shipped defaults: a put to a folder yours does not have is a 404 that says how to make one — a name only the repository has, a hidden folder, a name that climbs through an encoded slash (a URL resolves a bare `..` before the route) — and nothing is made', async () => {
-  write(path.join(STORE, '.hidden', 'plan.md'), 'Plan it.\n');
+  write(path.join(STORE, '.hidden', 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
   const step = { name: 'plan', spec: spec(), body: 'Plan it.' };
   for (const name of ['nope', 'good', '.hidden', '..%2Fworkflows%2Fmine', '..%2F..%2Fworkflows']) {
     const res = await put(name, { steps: [step] });
@@ -973,7 +983,7 @@ test('REFUSED at shipped defaults: a put to a folder yours does not have is a 40
   }
   assert.equal(fs.existsSync(path.join(STORE, 'nope')), false);
   assert.equal(fs.existsSync(path.join(STORE, 'good')), false);
-  assert.deepEqual(snapshot(path.join(STORE, '.hidden')), { 'plan.md': 'Plan it.\n' });
+  assert.deepEqual(snapshot(path.join(STORE, '.hidden')), { 'plan.md': '---\nplace: git\n---\nPlan it.\n' });
 });
 
 test('POST /api/workflows/yours makes a folder with its first step, and a README when given one, answered read back from disk', async () => {
@@ -987,7 +997,7 @@ test('POST /api/workflows/yours makes a folder with its first step, and a README
   const dir = path.join(STORE, 'fresh');
   assert.deepEqual(snapshot(dir), {
     'README.md': '# fresh\n\nA plan.\n',
-    'plan.md': '---\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n',
+    'plan.md': '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n',
   });
   assert.deepEqual(saved.written, ['README.md', 'plan.md']);
   assert.deepEqual(
@@ -997,7 +1007,7 @@ test('POST /api/workflows/yours makes a folder with its first step, and a README
   assert.equal(saved.workflow.from, 'yours');
   assert.deepEqual(
     loadWorkflows(dir).map((s) => renderStep(s)),
-    ['---\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'],
+    ['---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'],
     'the step as a start would read it',
   );
 
@@ -1007,7 +1017,7 @@ test('POST /api/workflows/yours makes a folder with its first step, and a README
     201,
     `a name the repository has too is yours to make, and the board starts it with \`from\`: ${await same.clone().text()}`,
   );
-  assert.deepEqual(snapshot(path.join(STORE, 'good')), { 'implement.md': 'Implement it.\n' });
+  assert.deepEqual(snapshot(path.join(STORE, 'good')), { 'implement.md': '---\nplace: git\n---\nImplement it.\n' });
   fs.rmSync(path.join(STORE, 'good'), { recursive: true });
 });
 
@@ -1149,8 +1159,8 @@ test('PUT /api/workflows/yours/:name writes the schemas pasted for it beside the
 
 test("REFUSED at shipped defaults: a pasted schema is judged with the steps before a byte of either is written — not JSON, not an object, not strict, a loop's schema without `again`, and a schema beside steps refused for something else, a cycle or a name — 422 or the package's refusal, naming the steps, and no schema written or replaced", async () => {
   const dir = path.join(STORE, 'pasted');
-  write(path.join(dir, 'implement.md'), 'Implement it.\n');
-  write(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
+  write(path.join(dir, 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
+  write(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
   write(path.join(dir, 'review.schema.json'), again);
   const before = snapshot(dir);
   const [implement, review] = (await listedSteps('pasted')) as [ListedStep, ListedStep];
@@ -1239,18 +1249,18 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
   const handEdits: Array<[string, () => void, () => void]> = [
     [
       'plan.md edited',
-      () => write(path.join(dir, 'plan.md'), '---\nharness: claude\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'),
-      () => write(path.join(dir, 'plan.md'), '---\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n'),
+      () => write(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'),
+      () => write(path.join(dir, 'plan.md'), '---\nplace: git\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n'),
     ],
     [
       'ship.md added',
-      () => write(path.join(dir, 'ship.md'), '---\nafter: build\n---\nShip it.\n'),
+      () => write(path.join(dir, 'ship.md'), '---\nafter: build\nplace: git\n---\nShip it.\n'),
       () => fs.rmSync(path.join(dir, 'ship.md')),
     ],
     [
       'build.md removed',
       () => fs.rmSync(path.join(dir, 'build.md')),
-      () => write(path.join(dir, 'build.md'), '---\nafter: plan\ncheck: npm test\n---\nBuild what PLAN.md says.\n'),
+      () => write(path.join(dir, 'build.md'), '---\nafter: plan\nplace: git\ncheck: npm test\n---\nBuild what PLAN.md says.\n'),
     ],
     [
       'a schema edited',
@@ -1264,7 +1274,7 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
     ],
     [
       '.draft.md added, hidden and a step all the same, which a save without it would remove',
-      () => write(path.join(dir, '.draft.md'), 'Draft.\n'),
+      () => write(path.join(dir, '.draft.md'), '---\nplace: git\n---\nDraft.\n'),
       () => fs.rmSync(path.join(dir, '.draft.md')),
     ],
     [
@@ -1294,7 +1304,7 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
 
   write(path.join(dir, 'NOTES.txt'), 'Ideas.\n');
   write(path.join(dir, '.notes.txt'), 'Ideas.\n');
-  write(path.join(dir, 'sub', 'x.md'), 'Not a step.\n');
+  write(path.join(dir, 'sub', 'x.md'), '---\nplace: git\n---\nNot a step.\n');
   assert.equal(
     versionOf(dir),
     read,
@@ -1313,7 +1323,7 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
 
 test('a write the package does not refuse but the disk does puts each pasted schema back as it was: a step file that is a folder', async () => {
   const dir = path.join(STORE, 'blocked');
-  write(path.join(dir, 'build.md'), 'Build it.\n');
+  write(path.join(dir, 'build.md'), '---\nplace: git\n---\nBuild it.\n');
   fs.mkdirSync(path.join(dir, 'plan.md'));
   write(path.join(dir, 'kept.schema.json'), again);
   const before = snapshot(dir);
@@ -1337,8 +1347,8 @@ test(
   { skip: process.getuid?.() === 0 ? 'root writes a read-only file all the same' : false },
   async () => {
     const dir = path.join(STORE, 'read-only');
-    write(path.join(dir, 'plan.md'), 'Plan it.\n');
-    write(path.join(dir, 'build.md'), '---\nafter: plan\n---\nBuild it.\n');
+    write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
+    write(path.join(dir, 'build.md'), '---\nafter: plan\nplace: git\n---\nBuild it.\n');
     write(path.join(dir, 'kept.schema.json'), again);
     fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o444);
     const before = snapshot(dir);

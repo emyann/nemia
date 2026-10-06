@@ -127,7 +127,7 @@ const aRepo = (): string => {
  */
 const folder = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   assert.match(SHIP_MD, /^after: review$/m);
   fs.writeFileSync(path.join(dir, 'ship.md'), SHIP_MD.replace(/^after: review$/m, 'after: implement'));
   return dir;
@@ -197,10 +197,10 @@ const board = () => {
  */
 const loopingFolder = (rounds = 3): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'review.md'),
-    `---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: ${rounds}\n---\nreview it\n`,
+    `---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: ${rounds}\n---\nreview it\n`,
   );
   fs.writeFileSync(
     path.join(dir, 'review.schema.json'),
@@ -246,7 +246,7 @@ const uncheckedFolder = (): string => {
 /** A folder of one step, for a run started `--after` another. */
 const oneStep = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 };
 

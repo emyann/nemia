@@ -57,8 +57,11 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`followFeed` under `feedEvents`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
-- **A handle count is waited for, never read once after a close** (`followers` and `until` in `src/factory/feed.test.ts`): a stream's reader
-  is counted a few microtasks after its response, so a test waits for it before it breaks the feed.
+- **A handle count is waited for, never read once after a close** (`followers` in `src/factory/feed.test.ts`, waited for with the `until`
+  of `test/waits.ts`): a stream's reader is counted a few microtasks after its response, so a test waits for it before it breaks the feed.
+- **A test waits in its process with `until` (`test/waits.ts`, the runtime's copy, held by `test/waits.test.ts`)**, asked on a `bell`
+  its event's source rings or at a pace for a state, its test given `WAITED`: the runner's timeout is its one bound, which the `test`
+  script's `--test-timeout` gives a test given none. `DEADLINES` (`test/waits.test.ts`) refuses a hand-written deadline.
 - **A run's record, asks and stamps, and the inbox's cards, are read through `runStore`** (`agent-orchestrator`): the root exports no
   store function of a run (`packages/agent-orchestrator/test/entries.test.ts`).
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`

@@ -849,6 +849,69 @@ test('a forward step of the wall clock costs at most one more read, and an uncha
   }
 });
 
+/**
+ * A runner over the session `ae/t-1/1`, listed `state` and `status` from `STARTED`, at `clock.t`, its transcript written
+ * `clock.written`, saying `clock.said` and having made `clock.turns` turns; `reads` counts each reader's calls.
+ */
+const countedOver = (state: string, status: string, clock: { t: number; written: number; said?: number; turns: number }) => {
+  const reads = { closeout: 0, usage: 0 };
+  const ops = bgOps({
+    now: () => clock.t,
+    transcriptTime: async () => clock.written,
+    closeoutFrom: async () => {
+      reads.closeout++;
+      return clock.said === undefined ? undefined : { payload: clock.said, at: clock.written };
+    },
+    usageFrom: async () => {
+      reads.usage++;
+      return { turns: clock.turns };
+    },
+  });
+  const restore = withFakeClaude(rowStarted(state, status, STARTED));
+  const look = async () => {
+    const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
+    return { said: seen?.closeout?.payload, turns: seen?.usage?.turns };
+  };
+  return { reads, look, restore };
+};
+
+test('an idle or blocked session across many looks, its transcript unchanged, is read once: its closeout and its usage alike', async () => {
+  for (const [state, status] of [
+    ['working', 'idle'],
+    ['blocked', 'idle'],
+  ]) {
+    const clock = { t: STARTED + 10_000, written: STARTED + 5_000, turns: 3 };
+    const { reads, look, restore } = countedOver(state, status, clock);
+    try {
+      for (let i = 0; i < 10; i++) {
+        assert.deepEqual(await look(), { said: undefined, turns: 3 }, `${state}/${status}, look ${i + 1}`);
+        clock.t += 1_000;
+      }
+      assert.deepEqual(reads, { closeout: 1, usage: 1 }, `${state}/${status}: ten looks over a transcript nothing wrote, one read each`);
+    } finally {
+      restore();
+    }
+  }
+});
+
+test('a closeout given in a turn of an idle session is seen on the next look, and so is the usage that turn changed', async () => {
+  const clock: { t: number; written: number; said?: number; turns: number } = { t: STARTED + 10_000, written: STARTED + 5_000, turns: 3 };
+  const { reads, look, restore } = countedOver('working', 'idle', clock);
+  try {
+    assert.deepEqual(await look(), { said: undefined, turns: 3 });
+    clock.t += 1_000;
+    assert.deepEqual(await look(), { said: undefined, turns: 3 }, 'unchanged: kept');
+    clock.written = clock.t;
+    clock.said = 7;
+    clock.turns = 4;
+    clock.t += 1_000;
+    assert.deepEqual(await look(), { said: 7, turns: 4 }, 'a turn wrote the transcript: read again, the closeout and the usage');
+    assert.deepEqual(reads, { closeout: 2, usage: 2 });
+  } finally {
+    restore();
+  }
+});
+
 test('Claude Code is handed the schema as --json-schema, and the prompt still comes last', async () => {
   const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');

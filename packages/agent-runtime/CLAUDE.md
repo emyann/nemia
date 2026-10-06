@@ -4,9 +4,9 @@ Agent sessions on one harness each, durably: a job that runs to its end, and a l
 (`restartPolicy: 'Always'` with `background: true`, README *A long-lived session*). It owns how a session runs: the task's command,
 mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. `decide` (`src/core/domain.ts`) is the whole judgement,
 pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the second, the
-harnesses' words, `HARNESS_CHOICES`, `fenceReach` and `configFolderIn`, loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The
-orchestrator reaches it through its one client; what is still above it and a candidate to come down is in `docs/architecture.md`, *Who
-owns what*.
+harnesses' words, `HARNESS_CHOICES`, `fenceReach`, `unruledIn` and `configFolderIn`, loads no Effect and no I/O
+(`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
+down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
 
@@ -95,6 +95,14 @@ owns what*.
 - **A Codex `exec --json` line of a type the runtime reads is decoded by `CodexEventSchema` (`harness/codex/stream.ts`)**: one that
   does not decode leaves that session alone unread while its process runs and failed once it has ended (`lookOf`, `detached.ts`),
   never gone. A field the runtime starts reading is added to the schema; any other line passes undecoded.
+- **A Codex rollout record of a kind the runtime reads is decoded by `ROLLOUT` (`harness/codex/rollout.ts`)**: an `event_msg`
+  `task_complete` or `item_completed`. One that does not decode refuses the `transcript` verb, naming the line by its byte offset
+  and the rollout, never read as saying nothing. A field the runtime starts reading is added to the schema; any other record
+  passes undecoded.
+- **A `claude -p` line of a kind the runtime reads is decoded by `PRINTED` (`harness/claude/print.ts`)**: a `result`, a `system`
+  `permission_denied` or `init`, an `assistant` line's `tool_use` blocks. One that does not decode refuses the output: that session alone
+  is unread while its process runs and failed once it has ended (`lookOf`), never read with no answer. A field the runtime starts
+  reading is added to the schema; any other line passes undecoded.
 - **A Claude Code transcript line of a kind the runtime reads is decoded by `LINES` (`harness/claude/lines.ts`), by the reader that
   reads it**: one that does not decode leaves that `--bg` session alone unread until it has ended, then failed (`endedOf`,
   `harness/claude/bg.ts`), or refuses the `transcript` verb, never read as absent; so does a transcript found and not read
@@ -154,6 +162,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   `auto` writes both with no allow (2.1.288, a trusted checkout and not; `claudeAllows`). `dontAsk` reads a file, a picture
   included, under a read-only added folder with no `Read` allow, and refuses it without the folder; a folder that is not
   there is no error (2.1.289).
+- **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
+  folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
+  `\*` is read as an escape, unused yet.
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
 - **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
   kept per path in `.claude.json` (`trustedFolder`, `src/harness/claude/trust.ts`), read, never written. A `--bg` permission prompt

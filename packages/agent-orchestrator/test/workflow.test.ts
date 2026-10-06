@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fansOut, orderSteps, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
-import { isFolderTeam, stepPlace } from '../src/workflow.ts';
+import { isFolderTeam, splitFrontmatter, stepPlace } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
@@ -70,7 +70,7 @@ const LOOPING = {
 };
 
 test('a step is frontmatter and prose, and the prose is the point', () => {
-  const w = parseWorkflow('review', '---\nharness: codex\nafter: implement\n---\nRead the diff.\n');
+  const w = parseWorkflow('review', '---\nplace: git\nharness: codex\nafter: implement\n---\nRead the diff.\n');
   assert.equal(w.name, 'review');
   assert.equal(w.harness, 'codex');
   assert.deepEqual(w.after, ['implement']);
@@ -78,25 +78,25 @@ test('a step is frontmatter and prose, and the prose is the point', () => {
 });
 
 test('check and retries are read — the command verbatim, colons and all', () => {
-  const w = parseWorkflow('implement', '---\ncheck: npm test && node -e "console.log(1 ? 2 : 3)"\nretries: 2\n---\nbuild it');
+  const w = parseWorkflow('implement', '---\nplace: git\ncheck: npm test && node -e "console.log(1 ? 2 : 3)"\nretries: 2\n---\nbuild it');
   assert.equal(w.check, 'npm test && node -e "console.log(1 ? 2 : 3)"');
   assert.equal(w.retries, 2);
-  const bare = parseWorkflow('implement', '---\nharness: claude\n---\nbuild it');
+  const bare = parseWorkflow('implement', '---\nplace: git\nharness: claude\n---\nbuild it');
   assert.equal(bare.check, undefined, 'absent means nothing runs');
   assert.equal(bare.retries, undefined);
 });
 
-test('no frontmatter at all is a valid step', () => {
-  assert.deepEqual(parseWorkflow('only', 'Just do it.').after, []);
-  assert.equal(parseWorkflow('only', 'Just do it.').body, 'Just do it.');
+test('a step with no key but its place is valid: no after, its body whole', () => {
+  assert.deepEqual(parseWorkflow('only', '---\nplace: git\n---\nJust do it.').after, []);
+  assert.equal(parseWorkflow('only', '---\nplace: git\n---\nJust do it.').body, 'Just do it.');
 });
 
 test('after takes a list', () => {
-  assert.deepEqual(parseWorkflow('x', '---\nafter: a, b ,c\n---\nbody').after, ['a', 'b', 'c']);
+  assert.deepEqual(parseWorkflow('x', '---\nafter: a, b ,c\nplace: git\n---\nbody').after, ['a', 'b', 'c']);
 });
 
 test('a step with nothing to say is refused', () => {
-  assert.throws(() => parseWorkflow('empty', '---\nharness: claude\n---\n'), WorkflowError);
+  assert.throws(() => parseWorkflow('empty', '---\nplace: git\nharness: claude\n---\n'), WorkflowError);
 });
 
 test('waiting on a step that does not exist is refused before anything is spent', () => {
@@ -142,8 +142,8 @@ const folderRefusal = (dir: string): WorkflowError => {
 test("a README in a workflow folder is not a step, and its first paragraph is the workflow's description", () => {
   const dir = folder({
     'README.md': '# dev\n\nImplement what was asked,\nthen review it.\n\nA second paragraph.\n',
-    'implement.md': '---\nharness: claude\n---\nImplement it.\n',
-    'review.md': '---\nafter: implement\n---\nReview it.\n',
+    'implement.md': '---\nplace: git\nharness: claude\n---\nImplement it.\n',
+    'review.md': '---\nafter: implement\nplace: git\n---\nReview it.\n',
   });
   assert.deepEqual(
     loadWorkflows(dir).map((s) => s.name),
@@ -155,7 +155,10 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
     'the paragraph after the title, and not the one after it',
   );
 
-  const lower = folder({ 'readme.md': '---\ntitle: ui\n---\nA change a person will see.\n', 'implement.md': 'Implement it.\n' });
+  const lower = folder({
+    'readme.md': '---\ntitle: ui\n---\nA change a person will see.\n',
+    'implement.md': '---\nplace: git\n---\nImplement it.\n',
+  });
   assert.deepEqual(
     loadWorkflows(lower).map((s) => s.name),
     ['implement'],
@@ -163,9 +166,9 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
   );
   assert.equal(workflowDescription(lower), 'A change a person will see.', 'and its frontmatter is not the description');
 
-  assert.equal(workflowDescription(folder({ 'implement.md': 'Implement it.\n' })), null, 'no README: no description');
+  assert.equal(workflowDescription(folder({ 'implement.md': '---\nplace: git\n---\nImplement it.\n' })), null, 'no README: no description');
   assert.equal(
-    workflowDescription(folder({ 'README.md': '# dev\n', 'implement.md': 'Implement it.\n' })),
+    workflowDescription(folder({ 'README.md': '# dev\n', 'implement.md': '---\nplace: git\n---\nImplement it.\n' })),
     null,
     'a README with only a title: no description',
   );
@@ -174,14 +177,18 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
 
 test('a workflow README is read whole, in any case, and none is null', () => {
   const whole = '# dev\n\nImplement what was asked, then review it.\n\nMore about it.\n';
-  assert.equal(workflowReadme(folder({ 'README.md': whole, 'implement.md': 'Implement it.\n' })), whole, 'every paragraph, the title too');
+  assert.equal(
+    workflowReadme(folder({ 'README.md': whole, 'implement.md': '---\nplace: git\n---\nImplement it.\n' })),
+    whole,
+    'every paragraph, the title too',
+  );
   const bom = String.fromCharCode(0xfeff);
   assert.equal(
-    workflowReadme(folder({ 'readme.md': `${bom}A change a person will see.\n`, 'implement.md': 'Implement it.\n' })),
+    workflowReadme(folder({ 'readme.md': `${bom}A change a person will see.\n`, 'implement.md': '---\nplace: git\n---\nImplement it.\n' })),
     'A change a person will see.\n',
     'a lowercase readme, without its byte order mark',
   );
-  assert.equal(workflowReadme(folder({ 'implement.md': 'Implement it.\n' })), null, 'no README: null');
+  assert.equal(workflowReadme(folder({ 'implement.md': '---\nplace: git\n---\nImplement it.\n' })), null, 'no README: null');
   assert.equal(workflowReadme(path.join(scratch('wf-none-'), 'no-such-folder')), null, 'no folder: null');
 });
 
@@ -197,8 +204,8 @@ test('REFUSED: a folder with a README and no step, as a folder with no step is �
 test('REFUSED: a folder of workflows is not a workflow, and the refusal names the ones in it', () => {
   const dir = folder({
     'dev/README.md': '# dev\n',
-    'dev/implement.md': 'Implement it.\n',
-    'ui/implement.md': 'Implement it.\n',
+    'dev/implement.md': '---\nplace: git\n---\nImplement it.\n',
+    'ui/implement.md': '---\nplace: git\n---\nImplement it.\n',
     'notes/README.md': '# notes\n',
   });
   const e = folderRefusal(dir);
@@ -210,7 +217,7 @@ test('REFUSED: a folder of workflows is not a workflow, and the refusal names th
 });
 
 test('resume implies after — you cannot continue a session that has not run', () => {
-  const w = parseWorkflow('respond', '---\nresume: implement\n---\nreply to the review');
+  const w = parseWorkflow('respond', '---\nresume: implement\nplace: git\n---\nreply to the review');
   assert.equal(w.resume, 'implement');
   assert.deepEqual(w.after, ['implement'], 'the ordering comes for free');
 });
@@ -264,7 +271,7 @@ test("`orderSteps`: every step after each step its `after` names, and otherwise 
     'given out of order, only what comes before what it waits on moves: the root first, the siblings as given, the join after both',
   );
   assert.deepEqual(
-    names([parseWorkflow('respond', '---\nresume: implement\n---\nanswer it\n'), step('implement')]),
+    names([parseWorkflow('respond', '---\nresume: implement\nplace: git\n---\nanswer it\n'), step('implement')]),
     ['implement', 'respond'],
     '`resume:` is in `after` already',
   );
@@ -289,9 +296,9 @@ test("`orderSteps`: every step after each step its `after` names, and otherwise 
 
 test("REFUSED before, now in order: a folder `plan → implement ⇄ review` loads as plan, implement, review — not in its files' order, implement, plan, review", () => {
   const dir = folder({
-    'implement.md': '---\nafter: plan\n---\nImplement it.\n',
-    'plan.md': 'Plan it.\n',
-    'review.md': '---\nafter: implement\nloop: implement\noutput: review.schema.json\n---\nReview it.\n',
+    'implement.md': '---\nafter: plan\nplace: git\n---\nImplement it.\n',
+    'plan.md': '---\nplace: git\n---\nPlan it.\n',
+    'review.md': '---\nafter: implement\nplace: git\nloop: implement\noutput: review.schema.json\n---\nReview it.\n',
     'review.schema.json': JSON.stringify({
       type: 'object',
       properties: { again: { type: 'boolean' } },
@@ -338,7 +345,7 @@ test("REFUSED at shipped defaults: the team's review with its loop pointed at a 
     ['implement', 'review'],
     'the copy, its ending taken off and nothing else, loads',
   );
-  const docs = '---\nafter: implement\n---\ndocument it\n';
+  const docs = '---\nafter: implement\nplace: git\n---\ndocument it\n';
 
   const elsewhere = copy();
   fs.writeFileSync(path.join(elsewhere, 'docs.md'), docs);
@@ -468,8 +475,11 @@ test('the shipped examples are valid workflows too', () => {
   assert.equal(fansOut(split), false);
 });
 
-/** A step with this frontmatter and a body, as a folder hands it to the parser. */
-const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n---\nDo the work.\n`);
+/** `lines` with `place: git` before them, unless they say a place already, as every step file must. */
+const placed = (lines: string): string => (/^(place:|workspace: folder)/m.test(lines) ? lines : `place: git\n${lines}`);
+
+/** A step with this frontmatter and a body, with `place: git` unless it says a place (`placed`), as a folder hands it to the parser. */
+const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(lines)}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'background' | 'sandbox'>, string> = {
@@ -509,7 +519,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(watching.slot, 'none', "slot: is read on a step of its own: it is a workflow of one step's");
   const attached = parseWorkflow(
     'build',
-    '---\nagent: implementer\nskills: look\n---\nBuild it.\n',
+    '---\nplace: git\nagent: implementer\nskills: look\n---\nBuild it.\n',
     undefined,
     new Map([['implementer', { name: 'implementer', keys: {}, body: '', read: () => undefined }]]),
   );
@@ -690,7 +700,7 @@ test('REFUSED: a context: that is not a number of tokens, by name, saying what t
       bad,
     );
   }
-  assert.throws(() => parseWorkflow('implement', '---\ncontext:\n---\nDo it.\n'), refusedWith(/`context` has no value/));
+  assert.throws(() => parseWorkflow('implement', '---\nplace: git\ncontext:\n---\nDo it.\n'), refusedWith(/`context` has no value/));
   for (const [line, tokens] of [
     ['context: 50k', 50_000],
     ['harness: claude-detached\ncontext: 2M', 2_000_000],
@@ -703,8 +713,8 @@ test('REFUSED: a context: that is not a number of tokens, by name, saying what t
 test("REFUSED: a step that continues another's session with a context window of its own other than that session's — by name, saying what to do", () => {
   const folder = (implement: string, respond: string, extra: Array<[string, string]> = []) =>
     parseFolder([
-      ['implement', `---\n${implement}\n---\nimplement it\n`],
-      ['respond', `---\nresume: implement\n${respond}\n---\nanswer it\n`],
+      ['implement', `---\nplace: git\n${implement}\n---\nimplement it\n`],
+      ['respond', `---\nresume: implement\nplace: git\n${respond}\n---\nanswer it\n`],
       ...extra,
     ]);
   assert.throws(
@@ -720,7 +730,7 @@ test("REFUSED: a step that continues another's session with a context window of 
     ),
   );
   assert.throws(
-    () => folder('context: 200k', 'harness: claude', [['more', '---\nresume: respond\ncontext: 300k\n---\nmore\n']]),
+    () => folder('context: 200k', 'harness: claude', [['more', '---\nresume: respond\nplace: git\ncontext: 300k\n---\nmore\n']]),
     refusedWith(/^more: `context: 300k`, and it continues respond's session, which runs on `context: 200k`/),
     "through a chain: a step that continues respond continues implement's session",
   );
@@ -1003,10 +1013,10 @@ test('`disallow:` and `allow:`, the names the lists had until 2026-09-23, are st
 
 test("a step on the former name beside an agent on the new one sets that one key, its own, over the agent's", () => {
   const agents = new Map([['writer', parseAgent('writer', '---\nallowedTools: Edit(**)\ndisallowedTools: SendMessage\n---\nWrite.\n')]]);
-  const [step] = parseFolder([['write', '---\nagent: writer\nallow: Edit(notes/**)\n---\n']], undefined, agents);
+  const [step] = parseFolder([['write', '---\nplace: git\nagent: writer\nallow: Edit(notes/**)\n---\n']], undefined, agents);
   assert.deepEqual(step.allowedTools, ['Edit(notes/**)'], "the step's own, as a step's own key always is");
   assert.deepEqual(step.disallowedTools, ['SendMessage'], "and the agent's other key is the step's");
-  assert.deepEqual(step.agent!.keys, ['allowedTools'], 'owned under the new name');
+  assert.deepEqual(step.agent!.keys, ['place', 'allowedTools'], 'owned under the new name');
   assert.equal(step.agent!.given.disallowedTools, 'SendMessage');
   assert.equal(Object.hasOwn(step.agent!.given, 'allowedTools'), false, 'what the step sets is not given to it');
 });
@@ -1125,8 +1135,8 @@ test('`nemia start` is told which files still write a former name: the steps, th
     "w/write.md: `allow:` is read as `allowedTools:`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.",
   );
   const root = folder({
-    'team/write.md': '---\nagent: writer\ndisallow: SendMessage\n---\n',
-    'team/review.md': '---\nafter: write\n---\nReview.\n',
+    'team/write.md': '---\nplace: git\nagent: writer\ndisallow: SendMessage\n---\n',
+    'team/review.md': '---\nafter: write\nplace: git\n---\nReview.\n',
     'agents/writer.md': '---\nallow: Edit(**)\n---\nWrite.\n',
     'agents/unused.md': '---\nallow: Edit(**)\n---\nNobody names me.\n',
   });
@@ -1136,7 +1146,7 @@ test('`nemia start` is told which files still write a former name: the steps, th
     formerKeyLine(path.join(dir, 'write.md'), 'disallow'),
     formerKeyLine(path.join(root, 'agents', 'writer.md'), 'allow'),
   ]);
-  assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nallowedTools: Edit(**)\n---\nWrite.\n' })), []);
+  assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nplace: git\nallowedTools: Edit(**)\n---\nWrite.\n' })), []);
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
@@ -1146,8 +1156,8 @@ test('`nemia start` is told which agent a step names still says `systemPrompt:`,
     "w/agents/builder.md: `systemPrompt: own` is read as `harnessPrompt: replace`, what becomes of Claude Code's own prompt. The former line is still read; rename it, or save the file from the board, which writes `harnessPrompt:`.",
   );
   const root = folder({
-    'team/write.md': '---\nagent: writer\n---\n',
-    'team/review.md': '---\nafter: write\nagent: reviewer\n---\n',
+    'team/write.md': '---\nplace: git\nagent: writer\n---\n',
+    'team/review.md': '---\nafter: write\nplace: git\nagent: reviewer\n---\n',
     'agents/writer.md': '---\nsystemPrompt: own\n---\nWrite.\n',
     'agents/reviewer.md': '---\nharnessPrompt: no-coding\n---\nReview.\n',
     'agents/unused.md': '---\nsystemPrompt: default\n---\nNobody names me.\n',
@@ -1163,9 +1173,9 @@ test("`nemia start` is told which codex files still name their sandbox as `permi
     "w/review.md: `permissionMode: bypassPermissions` is read as `sandbox: danger-full-access`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes `sandbox:`.",
   );
   const root = folder({
-    'team/review.md': '---\nharness: codex\npermissionMode: read-only\n---\nReview.\n',
-    'team/check.md': '---\nafter: review\nagent: checker\npermissionMode: read-only\n---\nCheck.\n',
-    'team/implement.md': '---\nafter: check\npermissionMode: dontAsk\n---\nImplement.\n',
+    'team/review.md': '---\nplace: git\nharness: codex\npermissionMode: read-only\n---\nReview.\n',
+    'team/check.md': '---\nafter: review\nplace: git\nagent: checker\npermissionMode: read-only\n---\nCheck.\n',
+    'team/implement.md': '---\nafter: check\nplace: git\npermissionMode: dontAsk\n---\nImplement.\n',
     'agents/checker.md': '---\nharness: codex\npermissionMode: read-only\n---\nYou check.\n',
   });
   const dir = path.join(root, 'team');
@@ -1179,7 +1189,7 @@ test("`nemia start` is told which codex files still name their sandbox as `permi
     ],
     "a Claude Code step's own mode is not named",
   );
-  assert.deepEqual(formerKeyLines(folder({ 'review.md': '---\nharness: codex\nsandbox: read-only\n---\nReview.\n' })), []);
+  assert.deepEqual(formerKeyLines(folder({ 'review.md': '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nReview.\n' })), []);
 });
 
 test('`nemia start` is told which steps still say `workspace: folder`, with the line it is read as, and nothing of `place:` or `workspace: main`', () => {
@@ -1194,7 +1204,7 @@ test('`nemia start` is told which steps still say `workspace: folder`, with the 
   assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former line stops nothing');
   assert.deepEqual(formerKeyLines(dir), [placeLine(path.join(dir, 'review.md')), placeLine(path.join(dir, 'write.md'))]);
   assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nplace: folder\n---\nWrite.\n' })), []);
-  assert.deepEqual(formerKeyLines(folder({ 'ship.md': '---\nworkspace: main\n---\nShip.\n' })), []);
+  assert.deepEqual(formerKeyLines(folder({ 'ship.md': '---\nplace: git\nworkspace: main\n---\nShip.\n' })), []);
 });
 
 test("an effort loads as written: which efforts a step's harness takes is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
@@ -1358,13 +1368,13 @@ test('a frontmatter line that is not `key: value` is refused; blank lines and # 
 
 test('frontmatter that never closes is refused; a file saved on Windows keeps its keys', () => {
   assert.throws(
-    () => parseWorkflow('review', '---\nharness: codex\nafter: implement\nReview it.'),
+    () => parseWorkflow('review', '---\nplace: git\nharness: codex\nafter: implement\nReview it.'),
     /review: the frontmatter opened on the first line never closes/,
   );
-  const crlf = parseWorkflow('review', '\uFEFF---\r\nharness: codex\r\nafter: implement\r\n---\r\nReview it.\r\n');
+  const crlf = parseWorkflow('review', '\uFEFF---\r\nplace: git\r\nharness: codex\r\nafter: implement\r\n---\r\nReview it.\r\n');
   assert.equal(crlf.harness, 'codex');
   assert.deepEqual(crlf.after, ['implement']);
-  assert.equal(parseWorkflow('x', '---\n---\nbody').body, 'body', 'an empty frontmatter is still frontmatter');
+  assert.equal(splitFrontmatter('x', '---\n---\nbody').body, 'body', 'an empty frontmatter is still frontmatter');
 });
 
 /**
@@ -1374,8 +1384,8 @@ test('frontmatter that never closes is refused; a file saved on Windows keeps it
 const outputFolder = (files: Record<string, string | object | null> = {}) => {
   const dir = scratch('wf-output-');
   const all: Record<string, string | object | null> = {
-    'implement.md': 'implement it\n',
-    'review.md': '---\nafter: implement\noutput: review.schema.json\n---\nreview it\n',
+    'implement.md': '---\nplace: git\n---\nimplement it\n',
+    'review.md': '---\nafter: implement\nplace: git\noutput: review.schema.json\n---\nreview it\n',
     'review.schema.json': FINDINGS,
     ...files,
   };
@@ -1413,7 +1423,7 @@ test('`output:` is read at load — the file as the step names it, and the schem
 
   fs.mkdirSync(path.join(dir, 'schemas'));
   fs.renameSync(path.join(dir, 'review.schema.json'), path.join(dir, 'schemas', 'review.json'));
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: schemas/review.json\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\noutput: schemas/review.json\n---\nreview it\n');
   assert.deepEqual(
     loadWorkflows(dir).find((s) => s.name === 'review')!.output?.schema,
     FINDINGS,
@@ -1426,9 +1436,9 @@ test('an `output:` file that is not there is refused at load, with the fix', () 
     refusal({ 'review.schema.json': null }),
     /^review: `output: review\.schema\.json` is not there\. It is a JSON Schema file, relative to the workflow folder — write it beside review\.md/,
   );
-  assert.match(refusal({ 'review.schema.json': null, 'review.schema.json.md': 'not the schema\n' }), /is not there/);
+  assert.match(refusal({ 'review.schema.json': null, 'review.schema.json.md': '---\nplace: git\n---\nnot the schema\n' }), /is not there/);
   assert.throws(
-    () => parseWorkflow('review', '---\noutput: review.schema.json\n---\nreview it\n'),
+    () => parseWorkflow('review', '---\nplace: git\noutput: review.schema.json\n---\nreview it\n'),
     /review: `output: review\.schema\.json` names a file beside the step, and this step was read without its folder/,
     'a step read without its folder has nowhere to read the file from, and does not pretend it has none',
   );
@@ -1437,7 +1447,7 @@ test('an `output:` file that is not there is refused at load, with the fix', () 
 test('REFUSED at load: an `output:` naming a file outside the workflow folder — up and out, or absolute — though the file is there and strict', () => {
   const outside = path.join(scratch('wf-outside-'), 'review.schema.json');
   fs.writeFileSync(outside, JSON.stringify(FINDINGS));
-  const naming = (file: string) => ({ 'review.md': `---\nafter: implement\noutput: ${file}\n---\nreview it\n` });
+  const naming = (file: string) => ({ 'review.md': `---\nafter: implement\nplace: git\noutput: ${file}\n---\nreview it\n` });
   const fix =
     'names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside review.md and name it from there — `output: review.schema.json` — or delete the line, and the step declares no output.';
 
@@ -1529,7 +1539,7 @@ test('an output schema that names a field every closeout already has is refused'
 });
 
 test('`input:` names steps this one waits on — directly, or through `resume` — and is refused on any other', () => {
-  const respond = (keys: string) => ({ 'respond.md': `---\n${keys}\n---\nanswer it\n` });
+  const respond = (keys: string) => ({ 'respond.md': `---\nplace: git\n${keys}\n---\nanswer it\n` });
 
   assert.deepEqual(loadWorkflows(outputFolder(respond('after: review\ninput: review'))).find((s) => s.name === 'respond')!.input, [
     'review',
@@ -1555,7 +1565,7 @@ test('`input:` names steps this one waits on — directly, or through `resume` �
     /respond: `input: review`, but respond does not wait on review, directly or through the steps between — a step cannot read the product of work that has not finished\. Add review to `after:`, or delete the line\./;
   assert.match(refusal(respond('after: implement\ninput: review')), notAfter);
   assert.match(refusal(respond('input: review')), notAfter, 'a root reads nothing');
-  const implementDeclares = { 'implement.md': '---\noutput: review.schema.json\n---\nimplement it\n' };
+  const implementDeclares = { 'implement.md': '---\nplace: git\noutput: review.schema.json\n---\nimplement it\n' };
   assert.deepEqual(
     loadWorkflows(outputFolder({ ...implementDeclares, ...respond('after: review\ninput: implement') })).find((s) => s.name === 'respond')!
       .input,
@@ -1565,7 +1575,7 @@ test('`input:` names steps this one waits on — directly, or through `resume` �
 });
 
 test('`input:` naming no step, or a step that declares no output, is refused — nothing of its closeout would travel', () => {
-  const respond = (keys: string) => ({ 'respond.md': `---\n${keys}\n---\nanswer it\n` });
+  const respond = (keys: string) => ({ 'respond.md': `---\nplace: git\n${keys}\n---\nanswer it\n` });
   assert.match(
     refusal(respond('after: review\ninput: reveiw')),
     /respond: `input: reveiw` names a step that is not here\. Correct the name, or delete the line\./,
@@ -1637,7 +1647,7 @@ test('an output schema is read strict wherever an object can sit — and one tha
  * replace.
  */
 const loopFiles = (reviewKeys: string, files: Record<string, string | object | null> = {}) => ({
-  'review.md': `---\nafter: implement\noutput: review.schema.json\n${reviewKeys}\n---\nreview it\n`,
+  'review.md': `---\nafter: implement\nplace: git\noutput: review.schema.json\n${reviewKeys}\n---\nreview it\n`,
   'review.schema.json': LOOPING,
   ...files,
 });
@@ -1674,13 +1684,13 @@ test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says
 });
 
 test('REFUSED at load: `loop:` naming a step that is not an ancestor — one beside it, one after it, itself, one not here, or two', () => {
-  const docs = { 'docs.md': '---\nafter: implement\n---\ndocument it\n' };
+  const docs = { 'docs.md': '---\nafter: implement\nplace: git\n---\ndocument it\n' };
   assert.match(
     refusal(loopFiles('loop: docs', docs)),
     /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between — a loop runs again work that finished before this step\. Add docs to `after:`, or name a step review waits on\.$/,
   );
   assert.match(
-    refusal(loopFiles('loop: ship', { 'ship.md': '---\nafter: review\n---\nship it\n' })),
+    refusal(loopFiles('loop: ship', { 'ship.md': '---\nafter: review\nplace: git\n---\nship it\n' })),
     /^review: `loop: ship`, but review does not wait on ship/,
   );
   assert.match(refusal(loopFiles('loop: review')), /^review: `loop: review` names this step\. A loop runs an earlier step again/);
@@ -1696,7 +1706,7 @@ test('REFUSED at load: a step with `loop:` whose output does not declare `again`
     /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and `output: review\.schema\.json` does not declare `again`\. Declare it — `"again": \{ "type": "boolean" \}`, listed in `required`/;
   assert.match(refusal(loopFiles('loop: implement', { 'review.schema.json': FINDINGS })), lacks);
   assert.match(
-    refusal({ 'review.md': '---\nafter: implement\nloop: implement\n---\nreview it\n' }),
+    refusal({ 'review.md': '---\nafter: implement\nplace: git\nloop: implement\n---\nreview it\n' }),
     /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and this step declares no `output:`, so its closeout has no `again`\./,
   );
   for (const type of ['string', ['boolean', 'null']]) {
@@ -1763,9 +1773,11 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
     'folder',
     'and a resumed session works in the folder of the step it continues',
   );
-  const bare = fm('write', 'check: npm test');
-  assert.equal(bare.place, undefined, 'a step without the line says no place');
-  assert.equal(stepPlace(bare), 'git', 'and works on a repository, as every step did before the key');
+  assert.equal(
+    stepPlace({ place: undefined }),
+    'git',
+    'a step frozen on a run record before the key says no place, and works on a repository, as every step did then',
+  );
   assert.equal(stepPlace(fm('write', 'place: folder')), 'folder');
   const refusedWord = (lines: string, pattern: RegExp) =>
     assert.throws(
@@ -1790,10 +1802,10 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
       ...(word === 'main' ? { workspace: word } : word ? { place: word } : {}),
     }));
   assert.doesNotThrow(() => validate(team('folder', 'folder')), 'every step says it');
-  assert.doesNotThrow(() => validate(team(undefined, 'git', 'main')), 'or none does');
+  assert.doesNotThrow(() => validate(team(undefined, 'git', 'main')), 'or none does, a step frozen before the key among them');
   assert.equal(isFolderTeam(team('folder', 'folder')), true);
   assert.equal(isFolderTeam(team('folder', 'git')), false);
-  assert.equal(isFolderTeam(team(undefined)), false, 'a step without the line is a git step');
+  assert.equal(isFolderTeam(team(undefined)), false, 'a step frozen on a record before the key is a git step');
   const refused = (steps: Workflow[], pattern: RegExp) =>
     assert.throws(
       () => validate(steps),
@@ -1819,6 +1831,41 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
       ]),
     (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('review says `place: folder`, and write works on a repository'),
     'and at load, from a folder of files, as a person writes them',
+  );
+});
+
+/** What a step file that says no `place:` is refused with: both fixes named, no word picked for it. */
+const NO_PLACE = (step: string) =>
+  `${step}: says no \`place:\`, where the step works, and a step does not work on a repository unless it says so. Write \`place: git\` to work on branches of a repository, or \`place: folder\` to work in folders the run makes, with no git repository — every step of a workflow says the same.`;
+
+test('`place:` is required: REFUSED at load, a step that names none, naming both fixes; accepted, each word and the former spelling', () => {
+  const refusedFor = (load: () => unknown, step: string, why: string) =>
+    assert.throws(load, (e: WorkflowError) => e instanceof WorkflowError && e.exitCode === 2 && e.message === NO_PLACE(step), why);
+  refusedFor(() => parseWorkflow('write', '---\ncheck: npm test\n---\nDo it.\n'), 'write', 'a frontmatter without the line');
+  refusedFor(() => parseWorkflow('write', 'Do it.\n'), 'write', 'a bare body, with no frontmatter');
+  const agents = new Map([['writer', parseAgent('writer', '---\nharness: claude\n---\nYou write.\n')]]);
+  refusedFor(() => parseWorkflow('write', '---\nagent: writer\n---\n', undefined, agents), 'write', 'an agent cannot give it');
+  refusedFor(
+    () => parseWorkflow('write', 'Write.\n', undefined, agents, undefined, { agent: 'writer', factory: 'f', step: 'write' }),
+    'write',
+    'nor can the agent a factory hires into the step',
+  );
+  refusedFor(
+    () =>
+      parseFolder([
+        ['write', '---\nplace: folder\n---\nWrite.\n'],
+        ['review', '---\nafter: write\n---\nReview.\n'],
+      ]),
+    'review',
+    'a folder whose other step says a place is refused for the missing line, not for two kinds of step',
+  );
+  assert.deepEqual(
+    [
+      fm('write', 'place: git').place,
+      fm('write', 'place: folder').place,
+      parseWorkflow('write', '---\nworkspace: folder\n---\nDo it.\n').place,
+    ],
+    ['git', 'folder', 'folder'],
   );
 });
 
@@ -2002,7 +2049,7 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
   const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');
   assert.equal(
     renderStep(step),
-    ['---', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'),
+    ['---', 'place: git', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'),
     'written back after allowedTools, before background',
   );
   assert.deepEqual(parseWorkflow('review', renderStep(step)), step, 'and read back as the step');
@@ -2275,7 +2322,7 @@ test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` doe
 
 test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are not a count above zero', () => {
   assert.match(
-    refusal({ 'review.md': '---\nafter: implement\nrounds: 2\n---\nreview it\n' }),
+    refusal({ 'review.md': '---\nafter: implement\nplace: git\nrounds: 2\n---\nreview it\n' }),
     /^review: `rounds: 2` counts the rounds of a loop, and this step has no `loop:`\. Add `loop: <step>`.*that is `retries:`\./,
   );
   for (const bad of ['0', 'three', '-1', '2.5']) {
@@ -2289,7 +2336,7 @@ test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are 
 
 test('REFUSED at load: a loop a round could not file again as it was — a step in it that forks, merges or resumes, a step in two loops, a target that declares `replies`', () => {
   assert.match(
-    refusal(loopFiles('loop: implement', { 'docs.md': '---\nafter: implement\n---\ndocument it\n' })),
+    refusal(loopFiles('loop: implement', { 'docs.md': '---\nafter: implement\nplace: git\n---\ndocument it\n' })),
     /^review: `loop: implement` files review again after implement each round, in the workspace implement works in, and review does not work there: docs waits on implement too, so review forks a worktree of its own, cut once, which would not have the next round's work\. A loop's steps are a chain/,
     'implement → review (loop: implement), and docs beside review: review forks a worktree cut once, off the first round',
   );
@@ -2315,7 +2362,7 @@ test('REFUSED at load: a loop a round could not file again as it was — a step 
   assert.match(
     refusal(
       loopFiles('loop: implement', {
-        'implement.md': '---\noutput: implement.schema.json\n---\nimplement it\n',
+        'implement.md': '---\nplace: git\noutput: implement.schema.json\n---\nimplement it\n',
         'implement.schema.json': replies,
       }),
     ),
@@ -2438,7 +2485,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
   const review = loadWorkflows(TEAM_DEV).find((s) => s.name === 'review')!;
   assert.equal(
     renderStep(review),
-    ['---', 'after: implement', 'agent: reviewer', 'budget: 20', 'loop: implement', 'rounds: 3', '---', '', ''].join('\n'),
+    ['---', 'after: implement', 'place: git', 'agent: reviewer', 'budget: 20', 'loop: implement', 'rounds: 3', '---', '', ''].join('\n'),
     "a step of the team rendered: the keys it sets in the keys' order, no comments, then its own note, none; the keys its agent gives it " +
       "are the agent's file's, and are not written into the step's",
   );
@@ -2539,45 +2586,45 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'remote: false is a setting the parser reads, and is written; retries: 0 too',
   );
 
-  const ending = parseWorkflow('ship', '---\nafter: review\ngate: true\nworkspace: main\nharness: claude\n---\nShip it.\n');
+  const ending = parseWorkflow('ship', '---\nafter: review\nplace: git\ngate: true\nworkspace: main\nharness: claude\n---\nShip it.\n');
   const rendered = renderStep(ending);
   assert.equal(
     rendered,
-    ['---', 'after: review', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'),
-    'workspace: main, which no step sets beside a check:, is written after input, before harness',
+    ['---', 'after: review', 'place: git', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'),
+    'workspace: main, which no step sets beside a check:, is written after place, before harness',
   );
   assert.deepEqual(parseWorkflow('ship', rendered), ending, 'and read back as the step');
 
-  const watching = parseWorkflow('supervise', '---\nharness: claude\nslot: none\nworkspace: main\n---\nWatch the runs.\n');
+  const watching = parseWorkflow('supervise', '---\nplace: git\nharness: claude\nslot: none\nworkspace: main\n---\nWatch the runs.\n');
   const watched = renderStep(watching);
   assert.equal(
     watched,
-    ['---', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
+    ['---', 'place: git', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
     'slot: none, which only a workflow of one step sets, is written after workspace, before harness',
   );
   assert.deepEqual(parseWorkflow('supervise', watched), watching);
 
-  const session = parseWorkflow('supervise', '---\nremote: true\nbackground: true\nallowedTools: Read\n---\nWatch the runs.\n');
+  const session = parseWorkflow('supervise', '---\nplace: git\nremote: true\nbackground: true\nallowedTools: Read\n---\nWatch the runs.\n');
   const kept = renderStep(session);
   assert.equal(
     kept,
-    ['---', 'allowedTools: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'),
+    ['---', 'place: git', 'allowedTools: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'),
     'background: true, which keeps no budget:, is written after allowedTools, before remote',
   );
   assert.deepEqual(parseWorkflow('supervise', kept), session);
   assert.match(renderStep({ ...session, background: false }), /^background: false$/m, 'background: false is written too');
 
-  const fenced = parseWorkflow('review', '---\nsandbox: read-only\neffort: high\nharness: codex\n---\nReview it.\n');
+  const fenced = parseWorkflow('review', '---\nplace: git\nsandbox: read-only\neffort: high\nharness: codex\n---\nReview it.\n');
   const fence = renderStep(fenced);
   assert.equal(
     fence,
-    ['---', 'harness: codex', 'effort: high', 'sandbox: read-only', '---', 'Review it.', ''].join('\n'),
+    ['---', 'place: git', 'harness: codex', 'effort: high', 'sandbox: read-only', '---', 'Review it.', ''].join('\n'),
     "sandbox:, a codex step's, is written after context, where permissionMode is on Claude Code",
   );
   assert.deepEqual(parseWorkflow('review', fence), fenced, 'and read back as the step');
   assert.equal(
-    renderStep(parseWorkflow('review', '---\nharness: codex\npermissionMode: bypassPermissions\n---\nReview it.\n')),
-    ['---', 'harness: codex', 'sandbox: danger-full-access', '---', 'Review it.', ''].join('\n'),
+    renderStep(parseWorkflow('review', '---\nplace: git\nharness: codex\npermissionMode: bypassPermissions\n---\nReview it.\n')),
+    ['---', 'place: git', 'harness: codex', 'sandbox: danger-full-access', '---', 'Review it.', ''].join('\n'),
     "a sandbox read from the former line is written under Codex's name",
   );
 });
@@ -2632,20 +2679,21 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
     'as the board lists a step: null and [] for what it does not set',
   );
   assert.deepEqual(
-    parseWorkflow('implement', renderStep(bare)),
-    { ...parseWorkflow('implement', 'Implement it.') },
-    'and reads back as the step',
+    parseWorkflow('implement', renderStep({ ...bare, place: 'git' })),
+    { ...parseWorkflow('implement', '---\nplace: git\n---\nImplement it.') },
+    'and, with the place every step file says, reads back as the step',
   );
 
   const draft: StepDraft = {
     name: 'review',
     after: ['implement'],
     body: 'Review it.',
+    place: 'git',
     output: { file: 'review.schema.json' },
     loop: 'implement',
   };
   const text = renderStep(draft);
-  assert.equal(text, '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
+  assert.equal(text, '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
   assert.deepEqual(
     [parseWorkflow('review', text, read).output?.schema, parseWorkflow('review', text, read).rounds],
@@ -2665,15 +2713,15 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
     'an empty block would not do',
   );
   assert.equal(
-    parseWorkflow('implement', renderStep({ ...rule, model: 'opus' })).body,
+    parseWorkflow('implement', renderStep({ ...rule, place: 'git' })).body,
     '---\nThe brief, below a rule.',
     'nor is one needed after keys',
   );
-  assert.equal(parseWorkflow('implement', renderStep(rule)).body, '---\nThe brief, below a rule.');
+  assert.equal(splitFrontmatter('implement', renderStep(rule)).body, '---\nThe brief, below a rule.');
 });
 
 test("REFUSED by `renderStep`, in the parser's words where the parser has them: a key no step has, `guide`; and what a file cannot hold — a line break in a value, a comma in a step's name in a list", () => {
-  const step: StepDraft = { name: 'review', after: ['implement'], body: 'Review it.' };
+  const step: StepDraft = { name: 'review', after: ['implement'], place: 'git', body: 'Review it.' };
   const parsersWords = (lines: string): string => {
     try {
       fm('review', lines);
@@ -2726,18 +2774,26 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   );
   assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
 
-  for (const [draft, lines] of [
-    [{ ...step, tools: [] }, 'tools: '],
-    [{ ...step, model: '' }, 'model: '],
-    [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m'],
-    [{ ...step, gate: false }, 'gate: false'],
-    [{ ...step, harness: 'banana' }, 'harness: banana'],
-    [{ ...step, disallowedTools: ['Bash(git push, git reset)'] }, 'disallowedTools: Bash(git push, git reset)'],
-    [{ ...step, output: {} }, 'output: '],
+  for (const [draft, lines, rule] of [
+    [{ ...step, tools: [] }, 'tools: ', /^review: `tools` has no value, which reads as every tool/],
+    [{ ...step, model: '' }, 'model: ', /^review: `model` has no value\. Delete the line/],
+    [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m', /^review: `deadlineSeconds: 5m` is not a count\./],
+    [{ ...step, gate: false }, 'gate: false', /^review: `gate: false` is what a step without the line already is\./],
+    [{ ...step, harness: 'banana' }, 'harness: banana', /^review: `harness: banana` is not a harness a step can run on\./],
+    [
+      { ...step, disallowedTools: ['Bash(git push, git reset)'] },
+      'disallowedTools: Bash(git push, git reset)',
+      /^review: `disallowedTools: Bash\(git push, git reset\)` has a comma inside an entry/,
+    ],
+    [{ ...step, output: {} }, 'output: ', /^review: `output` has no value\. Delete the line/],
   ] as const) {
     const text = renderStep(draft as unknown as StepDraft);
     assert.ok(text.includes(`\n${lines}\n`), `what the parser judges, renderStep writes as given, for the parser to refuse:\n${text}`);
-    assert.throws(() => parseWorkflow('review', text), WorkflowError, lines);
+    assert.throws(
+      () => parseWorkflow('review', text),
+      (e: unknown) => e instanceof WorkflowError && rule.test(e.message),
+      `${lines}: refused on its own rule`,
+    );
   }
 });
 
@@ -2796,9 +2852,9 @@ test("`stepNameRefusal`: a step's name is its file's in the folder — REFUSED: 
 
 test('`parseFolder` reads steps from their text as `loadWorkflows` reads a folder: in the order of their files, validated, in the order they run — refused in the same words', () => {
   const files: Array<[string, string]> = [
-    ['a', 'first\n'],
-    ['a-b', 'second\n'],
-    ['c', '---\nafter: a\n---\nthird\n'],
+    ['a', '---\nplace: git\n---\nfirst\n'],
+    ['a-b', '---\nplace: git\n---\nsecond\n'],
+    ['c', '---\nafter: a\nplace: git\n---\nthird\n'],
   ];
   const dir = folder(Object.fromEntries(files.map(([name, text]) => [`${name}.md`, text])));
   assert.deepEqual(
@@ -2810,8 +2866,8 @@ test('`parseFolder` reads steps from their text as `loadWorkflows` reads a folde
   assert.deepEqual(parseFolder([...files].reverse()), loadWorkflows(dir), 'whatever order they are given in');
 
   const cycle: Array<[string, string]> = [
-    ['a', '---\nafter: b\n---\nx\n'],
-    ['b', '---\nafter: a\n---\ny\n'],
+    ['a', '---\nafter: b\nplace: git\n---\nx\n'],
+    ['b', '---\nafter: a\nplace: git\n---\ny\n'],
   ];
   const words = folderRefusal(folder(Object.fromEntries(cycle.map(([name, text]) => [`${name}.md`, text])))).message;
   assert.equal(words, 'these steps wait on each other: a, b');
@@ -2845,8 +2901,8 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
     said(() =>
       parseFolder(
         [
-          ['plan', '---\n---\nPlan.\n'],
-          ['build', '---\nagent: builder\nafter: plan\nresume: plan\n---\n'],
+          ['plan', '---\nplace: git\n---\nPlan.\n'],
+          ['build', '---\nplace: git\nagent: builder\nafter: plan\nresume: plan\n---\n'],
         ],
         undefined,
         builder,

@@ -714,7 +714,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   };
 
   const workflowDir = path.join(root, 'workflow-diamond');
-  write(path.join(workflowDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
+  write(path.join(workflowDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement it.\n');
   const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }];
   const record = (run: (typeof DIAMOND_RUNS)[number], minutes: number, implement: object) =>
     write(
@@ -869,18 +869,18 @@ function heldConversation(ago: (minutes: number) => string): object[] {
 const STEPS = [
   {
     file: 'implement.md',
-    text: '---\nharness: claude\ncheck: npm test\n---\nImplement what was asked.\n',
+    text: '---\nplace: git\nharness: claude\ncheck: npm test\n---\nImplement what was asked.\n',
     frozen: { name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude', check: 'npm test' },
   },
   {
     file: 'review.md',
-    text: '---\nharness: codex\nafter: implement\nsandbox: read-only\n---\nReview the change.\n',
+    text: '---\nplace: git\nharness: codex\nafter: implement\nsandbox: read-only\n---\nReview the change.\n',
     /** Frozen with a codex step's sandbox as its `permissionMode`: read as it was frozen, and shown on the board's `sandbox` row. */
     frozen: { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'codex', permissionMode: 'read-only' },
   },
   {
     file: 'respond.md',
-    text: '---\nharness: claude\nafter: review\nresume: implement\ncheck: npm test\n---\nAnswer the review.\n',
+    text: '---\nplace: git\nharness: claude\nafter: review\nresume: implement\ncheck: npm test\n---\nAnswer the review.\n',
     frozen: {
       name: 'respond',
       after: ['review', 'implement'],
@@ -892,12 +892,12 @@ const STEPS = [
   },
   {
     file: 'tokens.md',
-    text: '---\nharness: codex\n---\nPick the colour tokens.\n',
+    text: '---\nplace: git\nharness: codex\n---\nPick the colour tokens.\n',
     frozen: { name: 'tokens', after: [], body: 'Pick the colour tokens.', harness: 'codex' },
   },
   {
     file: 'theme.md',
-    text: `---\nharness: claude\nafter: tokens\ncheck: ${FAKE.check}\n---\nApply them to every page.\n`,
+    text: `---\nplace: git\nharness: claude\nafter: tokens\ncheck: ${FAKE.check}\n---\nApply them to every page.\n`,
     frozen: { name: 'theme', after: ['tokens'], body: 'Apply them to every page.', harness: 'claude', check: FAKE.check },
   },
 ];
@@ -1015,6 +1015,7 @@ export const WORKFLOWS = {
       /** Each key review sets, as the loader reads it: what its page's key table says. */
       keys: {
         after: 'implement',
+        place: 'git',
         harness: 'claude',
         model: 'opus',
         effort: 'high',
@@ -1086,11 +1087,11 @@ export function seedWorkflows(repo: string, root: string): void {
   writeSkill(path.join(repo, 'workflows', 'skills'), good.agent.skill);
   write(
     path.join(dev, 'implement.md'),
-    `---\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallowedTools: ${good.disallowedTools}\n---\nImplement what was asked.\n`,
+    `---\nplace: git\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallowedTools: ${good.disallowedTools}\n---\nImplement what was asked.\n`,
   );
   write(
     path.join(dev, 'review.md'),
-    `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`,
+    `---\nplace: git\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`,
   );
   write(
     path.join(dev, 'review.schema.json'),
@@ -1102,9 +1103,9 @@ export function seedWorkflows(repo: string, root: string): void {
   );
   const bad = path.join(repo, 'workflows', broken.name);
   write(path.join(bad, 'README.md'), `# ${broken.name}\n\nA reviewer whose after is misspelt.\n`);
-  write(path.join(bad, 'implement.md'), 'Implement what was asked.\n');
-  write(path.join(bad, 'review.md'), '---\nafer: implement\n---\nReview the change.\n');
-  write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
+  write(path.join(bad, 'implement.md'), '---\nplace: git\n---\nImplement what was asked.\n');
+  write(path.join(bad, 'review.md'), '---\nplace: git\nafer: implement\n---\nReview the change.\n');
+  write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nplace: git\nharness: codex\n---\nWrite PLAN.md.\n');
   const { seeded } = AGENTS;
   const keys = Object.entries(seeded.keys)
     .map(([key, value]) => `${key}: ${value}\n`)
@@ -1624,10 +1625,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   const done = (summary: string, artifacts: string[] = []) => ({ outcome: 'done', summary, needs: null, artifacts });
 
   const shipDir = path.join(root, 'workflow-ship');
-  write(path.join(shipDir, 'implement.md'), '---\nharness: claude\n---\nImplement what was asked.\n');
-  write(path.join(shipDir, 'review.md'), '---\nharness: claude\nafter: implement\n---\nReview the change.\n');
+  write(path.join(shipDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement what was asked.\n');
+  write(path.join(shipDir, 'review.md'), '---\nplace: git\nharness: claude\nafter: implement\n---\nReview the change.\n');
   const shipBody = `${ENDING.says}\n\nLook at the checkout first: it is a person's, and this step is the run doing what they would do by hand.`;
-  write(path.join(shipDir, 'ship.md'), `---\nharness: claude\nafter: review\nworkspace: main\ngate: true\n---\n${shipBody}\n`);
+  write(path.join(shipDir, 'ship.md'), `---\nplace: git\nharness: claude\nafter: review\nworkspace: main\ngate: true\n---\n${shipBody}\n`);
   const shipWorkflow = [
     { name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' },
     { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'claude' },
@@ -1730,7 +1731,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   );
 
   const aloneDir = path.join(root, 'workflow-alone');
-  write(path.join(aloneDir, 'implement.md'), '---\nharness: claude\n---\nImplement what was asked.\n');
+  write(path.join(aloneDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement what was asked.\n');
   const aloneLane = path.join(root, 'worktrees', UNMERGED.id, 'implement');
   signedOff(`${UNMERGED.id}-implement`, aloneLane, 'Implement what was asked.', 0.7, 0.5, done("Drew the queue at the floor's left edge."));
   write(
@@ -1976,10 +1977,10 @@ export function seed(root: string, now = Date.now()): void {
   write(`${base}.stderr`, checkStderr);
 
   const besideDir = path.join(root, 'workflow-beside');
-  write(path.join(besideDir, 'plan.md'), '---\nharness: claude\n---\nPlan it.\n');
-  write(path.join(besideDir, 'draft.md'), '---\nharness: claude\nafter: plan\n---\nDraft it.\n');
-  write(path.join(besideDir, 'sketch.md'), '---\nharness: codex\n---\nSketch it.\n');
-  write(path.join(besideDir, 'ship.md'), '---\nharness: claude\nafter: sketch\n---\nShip it.\n');
+  write(path.join(besideDir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nPlan it.\n');
+  write(path.join(besideDir, 'draft.md'), '---\nplace: git\nharness: claude\nafter: plan\n---\nDraft it.\n');
+  write(path.join(besideDir, 'sketch.md'), '---\nplace: git\nharness: codex\n---\nSketch it.\n');
+  write(path.join(besideDir, 'ship.md'), '---\nplace: git\nharness: claude\nafter: sketch\n---\nShip it.\n');
   write(
     path.join(root, 'runs', `${NEIGHBOUR.id}.json`),
     JSON.stringify(
@@ -2048,10 +2049,10 @@ export function seed(root: string, now = Date.now()): void {
 
   const loopDir = path.join(root, 'workflow-loop');
   const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
-  write(path.join(loopDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
+  write(path.join(loopDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement it.\n');
   write(
     path.join(loopDir, 'review.md'),
-    '---\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n',
+    '---\nplace: git\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n',
   );
   write(path.join(loopDir, 'review.json'), `${JSON.stringify(again, null, 2)}\n`);
   const loopWorkspace = path.join(root, 'worktrees', LOOPING.id, 'implement');
@@ -2151,8 +2152,8 @@ export function seed(root: string, now = Date.now()): void {
   );
 
   const heldDir = path.join(root, 'workflow-held');
-  write(path.join(heldDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
-  write(path.join(heldDir, 'review.md'), '---\nharness: claude\nafter: implement\n---\nReview it.\n');
+  write(path.join(heldDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement it.\n');
+  write(path.join(heldDir, 'review.md'), '---\nplace: git\nharness: claude\nafter: implement\n---\nReview it.\n');
   const heldTask = `${HELD.id}-implement`;
   write(
     path.join(root, 'runs', `${HELD.id}.json`),
@@ -2230,9 +2231,9 @@ export function seed(root: string, now = Date.now()): void {
       risks: { type: 'array', items: { type: 'string' } },
     },
   };
-  write(path.join(gateDir, 'plan.md'), '---\nharness: claude\noutput: plan.json\n---\nPlan it.\n');
+  write(path.join(gateDir, 'plan.md'), '---\nplace: git\nharness: claude\noutput: plan.json\n---\nPlan it.\n');
   write(path.join(gateDir, 'plan.json'), `${JSON.stringify(planSchema, null, 2)}\n`);
-  write(path.join(gateDir, 'implement.md'), '---\nharness: claude\nafter: plan\n---\nImplement the plan.\n');
+  write(path.join(gateDir, 'implement.md'), '---\nplace: git\nharness: claude\nafter: plan\n---\nImplement the plan.\n');
   const gatedPlan = `${GATED.id}-plan`;
   const gatedLane = path.join(root, 'worktrees', GATED.id, 'plan');
   write(
@@ -2299,14 +2300,14 @@ export function seed(root: string, now = Date.now()): void {
   );
 
   const costDir = path.join(root, 'workflow-cost');
-  write(path.join(costDir, 'implement.md'), '---\nharness: claude\nbudget: 2\n---\nImplement it.\n');
+  write(path.join(costDir, 'implement.md'), '---\nplace: git\nharness: claude\nbudget: 2\n---\nImplement it.\n');
   write(
     path.join(costDir, 'review.md'),
-    '---\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n',
+    '---\nplace: git\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n',
   );
   write(path.join(costDir, 'review.json'), `${JSON.stringify(again, null, 2)}\n`);
-  write(path.join(costDir, 'tokens.md'), '---\nharness: claude\nbudget: 3\ncheck: npm test\n---\nPick the colour tokens.\n');
-  write(path.join(costDir, 'palette.md'), '---\nharness: claude\nbudget: 1\n---\nPick the palette for the dark theme.\n');
+  write(path.join(costDir, 'tokens.md'), '---\nplace: git\nharness: claude\nbudget: 3\ncheck: npm test\n---\nPick the colour tokens.\n');
+  write(path.join(costDir, 'palette.md'), '---\nplace: git\nharness: claude\nbudget: 1\n---\nPick the palette for the dark theme.\n');
   const cost = (name: string) => `${COSTLY.id}-${name}`;
   const costLane = path.join(root, 'worktrees', COSTLY.id, 'implement');
   const tokensLane = path.join(root, 'worktrees', COSTLY.id, 'tokens');

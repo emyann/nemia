@@ -53,16 +53,16 @@ const gitRepo = (prefix: string): string => {
 
 const own = gitRepo('nemia-api-own-');
 process.env.HKB_REPO = own;
-write(path.join(own, 'workflows', 'beta', 'implement.md'), 'Implement it.\n');
+write(path.join(own, 'workflows', 'beta', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 
 const repoR = gitRepo('nemia-api-factory-r-');
-write(path.join(repoR, 'workflows', 'alpha', 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
-write(path.join(repoR, 'workflows', 'gamma', 'plan.md'), 'Plan it.\n');
+write(path.join(repoR, 'workflows', 'alpha', 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement it.\n');
+write(path.join(repoR, 'workflows', 'gamma', 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
 write(path.join(repoR, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
 const repoS = gitRepo('nemia-api-factory-s-');
 
 const stranger = scratch('nemia-api-stranger-');
-write(path.join(stranger, 'workflows', 'x', 'step.md'), 'Do it.\n');
+write(path.join(stranger, 'workflows', 'x', 'step.md'), '---\nplace: git\n---\nDo it.\n');
 const starts = path.join(stranger, 'starts');
 const FIXTURE_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'mcp-server.ts');
 write(
@@ -313,7 +313,7 @@ function asShipped(t: { after: (fn: () => void) => void }): string {
   const was = process.env.WF_DEFAULT_FACTORY_STARTS;
   delete process.env.WF_DEFAULT_FACTORY_STARTS;
   const repoT = gitRepo('nemia-api-factory-t-');
-  write(path.join(repoT, 'workflows', 'delta', 'implement.md'), '---\nharness: claude\nagent: ada\n---\nImplement it.\n');
+  write(path.join(repoT, 'workflows', 'delta', 'implement.md'), '---\nplace: git\nharness: claude\nagent: ada\n---\nImplement it.\n');
   write(path.join(repoT, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
   addFactory({ name: 'trio', repos: [repoT] });
   attachWorkflow({ factory: 'trio', workflow: 'delta' });

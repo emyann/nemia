@@ -33,8 +33,8 @@ const write = (file: string, text: string): void => {
 function planned(name: string): string {
   const dir = path.join(STORE, name);
   write(path.join(dir, 'README.md'), `# ${name}\n`);
-  write(path.join(dir, 'plan.md'), '---\nharness: claude\n---\nWrite PLAN.md.\n');
-  write(path.join(dir, 'build.md'), '---\nafter: plan\n---\nBuild what PLAN.md says.\n');
+  write(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
+  write(path.join(dir, 'build.md'), '---\nafter: plan\nplace: git\n---\nBuild what PLAN.md says.\n');
   write(path.join(dir, 'build.schema.json'), '{ "type": "object" }\n');
   return dir;
 }
@@ -81,7 +81,7 @@ test('a folder of yours removed at the version it was read at is gone, every fil
 test('REFUSED at shipped defaults: a removal of a folder changed since it was read is a 409 naming the version it is at now, and nothing is removed', async () => {
   const dir = planned('edited');
   const read = versionOf(dir);
-  write(path.join(dir, 'ship.md'), '---\nafter: build\n---\nShip it.\n');
+  write(path.join(dir, 'ship.md'), '---\nafter: build\nplace: git\n---\nShip it.\n');
   const before = snapshot(dir);
   const res = await remove('edited', { version: read });
   assert.equal(res.status, 409);
@@ -114,7 +114,7 @@ test("REFUSED at shipped defaults: a removal that does not say the version it re
 
 test("REFUSED at shipped defaults: the repository's workflow is not removed (403), nor a name not there (404), and the folder of the same name in yours is kept", async () => {
   const theirs = path.join(repo, 'workflows', 'shared');
-  write(path.join(theirs, 'implement.md'), '---\nmodel: opus\n---\nImplement it.\n');
+  write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImplement it.\n');
   const mine = planned('shared');
   const before = snapshot(theirs);
   const res = await remove('shared', { version: versionOf(theirs) }, 'repo');

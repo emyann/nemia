@@ -114,9 +114,9 @@ const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter(
 const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();
 
 /**
- * What each agent of yours gives a step it is attached to: a step that names it and sets nothing, read by the parser and shown as the
- * listing shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step saved naming it is refused in
- * its words.
+ * What each agent of yours gives a step it is attached to: a step that names it and sets nothing but the `place:` every step says, read by
+ * the parser and shown as the listing shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step
+ * saved naming it is refused in its words.
  */
 function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
   const agents = loadAgents(path.join(home, 'workflows', AGENTS_FOLDER));
@@ -125,7 +125,7 @@ function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
     if (agent instanceof WorkflowError) continue;
     let spec: WorkflowStepSpec;
     try {
-      spec = specOf(parseWorkflow(name, `---\nagent: ${name}\n---\n`, undefined, agents));
+      spec = specOf(parseWorkflow(name, `---\nplace: folder\nagent: ${name}\n---\n`, undefined, agents));
     } catch (err) {
       if (err instanceof WorkflowError) continue;
       throw err;

@@ -47,30 +47,30 @@ const again = JSON.stringify({
 /** implement ⇄ review, described by its README. */
 const good = path.join(repo, 'workflows', 'good');
 write(path.join(good, 'README.md'), '# good\n\nImplement it, then review it,\ntwo rounds at most.\n\nMore about it.\n');
-write(path.join(good, 'implement.md'), '---\nharness: claude\nmodel: opus\ncheck: npm test\n---\nImplement it.\n');
+write(path.join(good, 'implement.md'), '---\nplace: git\nharness: claude\nmodel: opus\ncheck: npm test\n---\nImplement it.\n');
 write(
   path.join(good, 'review.md'),
-  '---\nharness: claude\nafter: implement\ntools: Read, Grep\npermissionMode: dontAsk\noutput: review.json\nloop: implement\nrounds: 2\n---\nReview it.\n',
+  '---\nplace: git\nharness: claude\nafter: implement\ntools: Read, Grep\npermissionMode: dontAsk\noutput: review.json\nloop: implement\nrounds: 2\n---\nReview it.\n',
 );
 write(path.join(good, 'review.json'), again);
 
 /** A reviewer whose `after` is misspelt, which the loader refuses by name. */
 const broken = path.join(repo, 'workflows', 'broken');
 write(path.join(broken, 'README.md'), '# broken\n\nA reviewer with a misspelt key.\n');
-write(path.join(broken, 'implement.md'), 'Implement it.\n');
-write(path.join(broken, 'review.md'), '---\nafer: implement\n---\nReview it.\n');
+write(path.join(broken, 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
+write(path.join(broken, 'review.md'), '---\nplace: git\nafer: implement\n---\nReview it.\n');
 
 write(path.join(repo, 'workflows', 'NOTES.txt'), 'Ideas for workflows.\n');
 write(path.join(repo, 'workflows', '.vscode', 'settings.json'), '{}\n');
-write(path.join(repo, 'workflows', '.draft', 'implement.md'), 'Implement it.\n');
+write(path.join(repo, 'workflows', '.draft', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nImplement what you are asked.\n');
 
 /** Yours, in the store: one step, and no README — kept in git, as a person's own workflows may be. */
 const mine = path.join(root, 'workflows', 'mine');
-write(path.join(mine, 'plan.md'), '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n');
+write(path.join(mine, 'plan.md'), '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n');
 write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
-/** A spec with every key unset but `fields`. */
+/** A spec with every key unset but `fields` and the `place: git` every step says. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   harness: null,
   model: null,
@@ -79,7 +79,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   after: [],
   resume: null,
   input: [],
-  place: null,
+  place: 'git',
   workspace: null,
   writable: [],
   reads: [],
@@ -235,9 +235,13 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
 /** A step's page, as the board asks for it. */
 const stepPage = (from: string, name: string, step: string) => app.request(`/api/workflows/${from}/${name}/${step}`);
 
-/** Every key a step may set, in the package's order, with the values `set` gives and the package's line of meaning. */
+/** Every key a step may set, in the package's order, with the values `set` gives over the `place: git` every step says, and its meaning. */
 const rows = (set: Record<string, string | null>) =>
-  STEP_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: STEP_KEY_MEANINGS[key] }));
+  STEP_KEYS.map((key) => ({
+    key,
+    value: ({ place: 'git', ...set } as Record<string, string | null>)[key] ?? null,
+    meaning: STEP_KEY_MEANINGS[key],
+  }));
 
 /** A folder as it is: each file's name and text, to show a read wrote nothing. */
 const filesOf = (dir: string): Array<[string, string]> =>
@@ -307,7 +311,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   const plan = (await (await stepPage('yours', 'mine', 'plan')).json()) as WorkflowStepPage;
   assert.deepEqual(
     [plan.from, plan.dir, plan.body, plan.source],
-    ['yours', mine, 'Write PLAN.md.', '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n'],
+    ['yours', mine, 'Write PLAN.md.', '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n'],
   );
   assert.deepEqual(
     plan.keys,
@@ -315,12 +319,12 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
     'yours, and a step that sets counts: each in digits',
   );
 
-  write(path.join(mine, 'notes.md'), 'Take notes.\n');
+  write(path.join(mine, 'notes.md'), '---\nplace: git\n---\nTake notes.\n');
   const notes = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
-  assert.deepEqual([notes.body, notes.keys], ['Take notes.', rows({})], 'a step that sets nothing: every key, none set');
+  assert.deepEqual([notes.body, notes.keys], ['Take notes.', rows({})], 'a step that sets nothing but its place: every key, no other set');
   fs.rmSync(path.join(mine, 'notes.md'));
 
-  write(path.join(mine, 'notes.md'), '---\ncontext: 150000\n---\nTake notes.\n');
+  write(path.join(mine, 'notes.md'), '---\nplace: git\ncontext: 150000\n---\nTake notes.\n');
   const windowed = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
   assert.deepEqual(
     windowed.keys,
@@ -338,7 +342,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
     path.join(root, 'workflows', 'skills', 'take-notes', 'SKILL.md'),
     '---\nname: take-notes\ntitle: Take notes\ndescription: Writes down what was decided.\ntags: ["notes", "writing"]\n---\nWrite it.\n',
   );
-  write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
+  write(path.join(mine, 'notes.md'), '---\nplace: git\nagent: scribe\n---\nTake notes.\n');
   const attached = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
   assert.deepEqual(
     attached.agentSkills,
@@ -356,14 +360,14 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
     [{ name: 'take-notes', from: 'yours' }],
     "each skill of its layers, with where it is found: in your library, so its page is yours'",
   );
-  write(path.join(mine, 'notes.md'), 'Take notes.\n');
+  write(path.join(mine, 'notes.md'), '---\nplace: git\n---\nTake notes.\n');
   assert.equal(
     ((await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage).agentSkills,
     null,
     'the same step with the line taken off: the agent is not named, so the page says nothing it can do',
   );
   fs.rmSync(path.join(mine, 'notes.md'));
-  write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
+  write(path.join(mine, 'notes.md'), '---\nplace: git\nagent: scribe\n---\nTake notes.\n');
   fs.rmSync(path.join(root, 'workflows', 'skills'), { recursive: true });
   const lost = await stepPage('yours', 'mine', 'notes');
   assert.equal(
@@ -598,8 +602,8 @@ test("REFUSED at shipped defaults: what `startRun` refuses is a 422 carrying its
   assert.equal(((await broke.json()) as { error: string }).error, loaderRefusal(broken));
 
   const clash = path.join(root, 'workflows', 'clash');
-  write(path.join(clash, 'build.md'), '---\ncheck: npm run build\n---\nBuild it.\n');
-  write(path.join(clash, 'build-check.md'), '---\nafter: build\n---\nCheck the build by hand.\n');
+  write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
+  write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
   assert.equal(
     (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'clash')?.error,
     null,
@@ -616,7 +620,7 @@ test("REFUSED at shipped defaults: what `startRun` refuses is a 422 carrying its
 
 test('REFUSED: a name both the repository and yours have is a 409 until `from` says which, and then starts that one', async () => {
   const yours = path.join(root, 'workflows', 'good');
-  write(path.join(yours, 'implement.md'), 'Implement it my way.\n');
+  write(path.join(yours, 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
   const before = runFiles();
 
   const both = await post({ workflow: 'good', brief: 'Do it.' });

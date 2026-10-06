@@ -10,7 +10,8 @@ import { Cause, Effect, Exit } from 'effect';
 import { asked, over, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
 import { loadWorkflows } from '../folder/folder.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { type Run, runTasks, unjudgedWords } from '../record/record.ts';
+import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
+import { unloadedOf } from '../record/steps.store.ts';
 import { triesDir } from '../roster/try.store.ts';
 import type { Workflow } from '../step/step.ts';
 import { filingsRead } from '../views/views.verb.ts';
@@ -44,9 +45,10 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
 }
 
 /**
- * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): a task of its
- * own the read left out (`unreadableOf`), or one of a run it waits on, whose view fails in the runtime's words (`unreadableJournal`). As
- * the tick leaves such a run unjudged and counts it in flight. Any other failure fails the same.
+ * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): its unfrozen
+ * workflow folder that does not load (`unloadedOf`), in the folder's words (`unloadedWords`); a task of its own the read left out
+ * (`unreadableOf`); or one of a run it waits on, whose view fails in the runtime's words (`unreadableJournal`). As the tick leaves such a
+ * run unjudged and counts it in flight. Any other failure fails the same.
  */
 /** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */
 export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
@@ -56,6 +58,8 @@ export const judgedUnlessUnreadable = Effect.fn('judgedUnlessUnreadable')(functi
   unreadable: Unreadable,
   judge: () => Effect.Effect<T, E, R>,
 ): Effect.fn.Return<JudgedOrNot<T>, E, R> {
+  const folder = unloadedOf(run);
+  if (folder !== undefined) return { unreadable: unloadedWords(run.id, folder, 'the board') };
   const own = unreadableOf(run, unreadable);
   if (own) return { unreadable: unjudgedWords(run.id, own.taskId, own.why, 'the board') };
   const exit = yield* Effect.exit(judge());
@@ -126,7 +130,8 @@ export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warnin
       steps: null,
       warning: run.workflow
         ? `${why} Nothing here is read from it: the steps, their spec, prose and graph are the workflow the run froze at \`nemia start\`, which is what it is judged by.`
-        : `${why} The steps are listed from the run record, without their spec or prose.`,
+        : `${why} The steps are listed from the run record, without their spec or prose, and the tick leaves the run where it is until ` +
+          `the folder loads again, or nemia rm ${run.id}.`,
     };
   }
 }

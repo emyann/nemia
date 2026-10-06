@@ -44,6 +44,7 @@ const busy = (ms: number) => {
  * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, `running` its sessions at work by harness, and
  * `admitted` has each word said to it.
  * `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a runtime that counts none.
+ * `unobserved` is what each pass says it could not read, as the runtime words it.
  */
 const fake = ({
   passMs = 0,
@@ -53,6 +54,7 @@ const fake = ({
   queued = [] as string[],
   running = {},
   unread = undefined as number | undefined,
+  unobserved = [] as string[],
 } = {}) => {
   const admitted: string[][] = [];
   const io = {
@@ -81,7 +83,7 @@ const fake = ({
         admission: 'queued',
         state: { harness: 'claude', filedAt: '2026-09-25T10:00:00.000Z' },
       }));
-      return { tasks: queued.length, actions: 0, running, views };
+      return { tasks: queued.length, actions: 0, running, views, unobserved };
     },
     admit: async (ids: string[]) => {
       admitted.push(ids);
@@ -127,7 +129,7 @@ const aRepo = (): string => {
 /** A workflow of one step, whose task the fake keeps pending for ever. */
 const oneStep = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'work.md'), 'work\n');
+  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork\n');
   return dir;
 })();
 
@@ -291,6 +293,18 @@ test("the last pass's cost is written to the store and read back; a file that do
   );
   fs.writeFileSync(STATS, '{"at":"2026-09-25T10:00:00.000Z","ms":');
   assert.equal(lastPassCost(), undefined);
+});
+
+test("what a pass could not read of a harness is written with its cost, in the runtime's words, and a pass that read it all writes none", async () => {
+  emptyStore();
+  await started(1);
+  const unobserved = ['harness `claude`: claude agents: timed out'];
+  await runWith(fake({ unobserved }), tickRun());
+  assert.deepEqual(lastPassCost()?.unobserved, unobserved);
+  await runWith(fake(), tickRun());
+  const read = lastPassCost();
+  assert.ok(read);
+  assert.equal(Object.hasOwn(read, 'unobserved'), false);
 });
 
 test('outside a pass the readers count nothing, and a pass inside a metered call is counted as part of it', async () => {

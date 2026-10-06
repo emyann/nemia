@@ -78,43 +78,43 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`. */
 const oneStep = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 };
 
 /** Two steps, `implement` at its gate and `review` after it. */
 const gated = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'gated-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   return dir;
 };
 
 /** Two steps, `implement` and `review` after it. */
 const twoSteps = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'two-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   return dir;
 };
 
 /** Four steps: `a` and `b`, each with a check, `d` with none, and `c` after `d`. */
 const twoChecks = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'checks-'));
-  fs.writeFileSync(path.join(dir, 'a.md'), '---\ncheck: npm test\n---\ndo a\n');
-  fs.writeFileSync(path.join(dir, 'b.md'), '---\ncheck: npm test\n---\ndo b\n');
-  fs.writeFileSync(path.join(dir, 'd.md'), 'do d\n');
-  fs.writeFileSync(path.join(dir, 'c.md'), '---\nafter: d\n---\ndo c\n');
+  fs.writeFileSync(path.join(dir, 'a.md'), '---\nplace: git\ncheck: npm test\n---\ndo a\n');
+  fs.writeFileSync(path.join(dir, 'b.md'), '---\nplace: git\ncheck: npm test\n---\ndo b\n');
+  fs.writeFileSync(path.join(dir, 'd.md'), '---\nplace: git\n---\ndo d\n');
+  fs.writeFileSync(path.join(dir, 'c.md'), '---\nafter: d\nplace: git\n---\ndo c\n');
   return dir;
 };
 
 /** A loop: `implement`, then `review`, which may send it back once. */
 const looping = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'loop-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'review.md'),
-    '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 1\n---\nreview it\n',
+    '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: 1\n---\nreview it\n',
   );
   fs.writeFileSync(
     path.join(dir, 'review.schema.json'),

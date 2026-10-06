@@ -37,7 +37,7 @@ execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q'
 });
 
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
+fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 
 const tasks = new Map<string, Event[]>();
 const journal: AsyncJournal = {

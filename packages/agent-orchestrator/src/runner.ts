@@ -26,7 +26,7 @@
  * the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and
  * `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
-export { verdictWord } from './check/check.ts';
+export { attemptVerdict, verdictWord } from './check/check.ts';
 export { VERSION } from './version/version.ts';
 export { leaseRelease, trialRefusal, type Running } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';

@@ -143,7 +143,7 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionTranscript(params, new ServerCallContext());
   }
 
-  observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[]; unread: string[] }> {
+  observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[]; unread: string[]; why: string[] }> {
     return this.handler.observeSessions(params, new ServerCallContext());
   }
 
@@ -322,10 +322,10 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Observation, RunnerError> =>
     Effect.gen(function* () {
       const seen = new Map<string, Sighting>();
-      const { tasks, unread } = yield* call('observe', () => transport.observeSessions({ expected }));
+      const { tasks, unread, why } = yield* call('observe', () => transport.observeSessions({ expected }));
       yield* sightingsOf('observe', tasks, seen);
       names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
-      return { seen, unread: new Set(unread) };
+      return { seen, unread: new Set(unread), ...(why.length ? { why } : {}) };
     });
 
   const stop = (sessionId: string): Effect.Effect<void, RunnerError> =>

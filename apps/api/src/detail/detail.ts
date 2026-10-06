@@ -606,8 +606,9 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
     : null;
 
 /**
- * A run in full, judged off the views of its tasks; or, when a task it reads does not (`judgedUnlessUnreadable`), why it is not judged, in
- * the words the list says it with (`RunSummary.unreadable`), and nothing else: the page shows no step as the engine's missing record would.
+ * A run in full, judged off the views of its tasks; or, when its unfrozen folder does not load or a task it reads does not
+ * (`judgedUnlessUnreadable`), why it is not judged, in the words the list says it with (`RunSummary.unreadable`), and nothing else: the
+ * page shows no step as the engine's missing record, or a folder the tick does not read, would.
  *
  * The run's tasks, every try's, are read over one look at the harnesses (`viewsFor`), as the list reads them, the record first — never a
  * `view`, an observation, for each task of each try, one after another, on a page polled every five seconds — and only the run's own. A

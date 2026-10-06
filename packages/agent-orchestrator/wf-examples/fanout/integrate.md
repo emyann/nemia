@@ -1,4 +1,5 @@
 ---
+place: git
 harness: claude
 after: docs, tests
 ---

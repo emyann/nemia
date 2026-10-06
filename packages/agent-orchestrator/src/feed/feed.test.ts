@@ -128,8 +128,8 @@ const aRepo = (): string => {
 /** A workflow of `plan → implement`, whose plan waits at its gate for a person. */
 const gated = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'plan.md'), '---\ngate: true\n---\nplan it\n');
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\ngate: true\n---\nplan it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\nplace: git\n---\nimplement it\n');
   return dir;
 })();
 
@@ -234,8 +234,8 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
 /** A workflow of `implement → ship`, whose ending waits at its gate for a person before it is filed: as the shipped `dev` ends. */
 const ending = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nship it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nship it\n');
   return dir;
 })();
 
@@ -299,8 +299,8 @@ test('a step whose ended attempt was denied a call says it on its line in the fe
 /** A workflow of `plan → implement`, with no gate: a run on it finishes once both steps sign off. */
 const ungated = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'plan.md'), '---\n---\nplan it\n');
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\n---\nplan it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\nplace: git\n---\nimplement it\n');
   return dir;
 })();
 

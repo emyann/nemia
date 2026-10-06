@@ -30,6 +30,7 @@ export {
   WORKSPACES,
   PLACES,
   placeNamed,
+  placeRequired,
 } from './keys.ts';
 export { ALLOW_EXAMPLE, allowRuleOf, DISALLOW_EXAMPLE, disallowedBy, rulesOf, TOOLS_EXAMPLE, toolsOf } from './tools.ts';
 export type { DeniedAt } from './tools.ts';

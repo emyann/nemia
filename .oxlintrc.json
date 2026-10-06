@@ -386,7 +386,7 @@
     {
       "files": ["apps/web/src/components/NewWorkflow.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -776,8 +776,8 @@
     {
       "files": ["packages/agent-runtime/src/core/engine/engine.ts"],
       "rules": {
-        "complexity": ["error", { "max": 34 }],
-        "sonarjs/cognitive-complexity": ["error", 53]
+        "complexity": ["error", { "max": 33 }],
+        "sonarjs/cognitive-complexity": ["error", 52]
       }
     },
     {
@@ -813,22 +813,9 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/harness/codex/transcript.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 23 }],
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 164, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/agent-runtime/src/harness/detached/output.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

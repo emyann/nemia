@@ -63,7 +63,7 @@ function refusal(dir: string, write: () => unknown): string {
   return assert.fail(`${dir} was written, and should have been refused`);
 }
 
-const step = (name: string, more: Partial<StepDraft> = {}): StepDraft => ({ name, after: [], body: `${name} it`, ...more });
+const step = (name: string, more: Partial<StepDraft> = {}): StepDraft => ({ name, after: [], place: 'git', body: `${name} it`, ...more });
 
 test("a workflow's steps written back as they were leave every file as it was — comments included — and read back as the steps", () => {
   const dir = devIn('as-it-was');
@@ -103,7 +103,7 @@ test('a step changed is rendered and written, a step unchanged keeps its file, a
     before['review.schema.json'],
     "a schema in the folder is the folder's, and no write of the steps touches it",
   );
-  assert.equal(fs.readFileSync(path.join(dir, 'docs.md'), 'utf8'), '---\nafter: implement\nmodel: sonnet\n---\ndocs it\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'docs.md'), 'utf8'), '---\nafter: implement\nplace: git\nmodel: sonnet\n---\ndocs it\n');
   assert.deepEqual(
     loadWorkflows(dir).map((s) => s.name),
     ['implement', 'docs'],
@@ -145,7 +145,7 @@ test('the README is written only when it is given, to the name the README alread
   assert.equal(fs.existsSync(fresh), false);
   const made = writeWorkflow(fresh, [step('implement')], '# fresh\n\nA first step.\n');
   assert.deepEqual([made.written, made.kept, made.removed], [['README.md', 'implement.md'], [], []]);
-  assert.deepEqual(snapshot(fresh), { 'README.md': '# fresh\n\nA first step.\n', 'implement.md': 'implement it\n' });
+  assert.deepEqual(snapshot(fresh), { 'README.md': '# fresh\n\nA first step.\n', 'implement.md': '---\nplace: git\n---\nimplement it\n' });
   assert.deepEqual(loadWorkflows(fresh), made.steps);
 });
 
@@ -347,7 +347,7 @@ test('REFUSED, with the folder as it was: a step name that is not a file name, o
  */
 const caseSensitive = (() => {
   const probe = fs.mkdtempSync(path.join(ROOT, 'case-'));
-  fs.writeFileSync(path.join(probe, 'a.md'), '');
+  fs.writeFileSync(path.join(probe, 'a.md'), '---\nplace: git\n---\n');
   const apart = !fs.existsSync(path.join(probe, 'A.md'));
   fs.rmSync(probe, { recursive: true, force: true });
   return apart;

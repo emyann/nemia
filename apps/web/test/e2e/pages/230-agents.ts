@@ -286,7 +286,7 @@ export default {
 
     const namingDir = path.join(store!, 'workflows', naming);
     fs.mkdirSync(namingDir, { recursive: true });
-    fs.writeFileSync(path.join(namingDir, 'write.md'), `---\nagent: ${seeded.name}\n---\nWrite the notes.\n`);
+    fs.writeFileSync(path.join(namingDir, 'write.md'), `---\nplace: git\nagent: ${seeded.name}\n---\nWrite the notes.\n`);
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);

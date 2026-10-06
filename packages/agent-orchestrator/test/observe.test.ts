@@ -198,7 +198,7 @@ async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<strin
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   const folder = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(folder, 'work.md'), '---\nharness: codex\n---\nwork it\n');
+  fs.writeFileSync(path.join(folder, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
   const e = engineOf(
     RuntimeEngine.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),

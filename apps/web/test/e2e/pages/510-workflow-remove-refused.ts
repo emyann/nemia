@@ -25,7 +25,7 @@ export default {
     const refused = await page.context().newPage();
     try {
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'plan.md'), '---\nharness: claude\n---\nWrite PLAN.md.\n');
+      fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
       fs.writeFileSync(card, `---\nworkflow: ${dir}\nqueued: 2026-10-01T00:00:00.000Z\n---\nAn idea queued on it.\n`);
       const { problems } = watch(refused);
       await refused.goto(new URL(`/workflows/yours/${NEEDED}`, page.url()).href, { waitUntil: 'load' });

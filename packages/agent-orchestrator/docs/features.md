@@ -5307,10 +5307,12 @@ The run no longer hands the runtime a harness of its own for checks. `HARNESSES.
 name checks have always run under, and `fileCheck` files `sh -c` and the line the run froze (`checkArgv`), with the check's
 environment and niceness, as the task's `config`. The runtime keeps each stream whole and serves it through `output`.
 
-- **The verdict is the attempt's exit code** (`attemptVerdict`), read the same way by the tick, `wf ls`, `wf decide` and the api; one
-  cut short at its deadline or by an operator did not finish. No trailer is printed or read.
-- **What a check said is read through `output`**: the brief of the step after it, `wf decide`'s screen and the run page, which
-  shows every try's stderr and the current try's stdout. A check filed before has no streams kept, and is read off its log, `partial`.
+- **The verdict is the attempt's exit code** (`attemptVerdict`), read the same way by the tick, `nemia ls`, `nemia decide` and the
+  api's run page, every try's, through the package's root entry; one cut short at its deadline or by an operator did not finish. No
+  trailer is printed or read.
+- **What a check said is read through `output`**: the brief of the step after it, `nemia decide`'s screen and the run page, which
+  shows every try's stderr and the current try's stdout. A check with no stdout kept (one filed before, or one stopped before its
+  process wrote) is read off its log, `partial`.
 - **Gone**: the check script, its trailer and the copy of stdout, `WF_STDERR` and `WF_STDOUT`, `checks/<task>.stdout` and
   `.stderr` (`wf rm` still removes those an earlier run wrote), and the api's read of a file.
 - **The daemon is restarted after landing**: until it is, it files and reads checks with the code it loaded.

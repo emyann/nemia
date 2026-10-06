@@ -29,7 +29,8 @@ import type { Monotonic } from '../clock.ts';
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
 import { configForTurn } from '../../harness/args.ts';
-import { Runner, type ExpectedSession, type RunnerOps } from '../../harness/seam.ts';
+import { Runner, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
+import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { CEILING_INSTEAD } from './filing.ts';
@@ -216,6 +217,25 @@ const endFacts = (seen: Sighting | undefined) => ({
 });
 
 /**
+ * What a harness is asked to start for attempt `n` of task `taskId`, named `name`: its brief (or the words that nudge it), folder,
+ * harness and configuration for its turn, the session it continues, and the labels its telemetry says, the task's id among them.
+ */
+const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
+  const attempt = state.attempts.find((a) => a.n === n);
+  return {
+    name,
+    brief: attempt?.nudge ?? state.brief,
+    cwd: state.cwd,
+    harness: state.harness,
+    config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
+    closeoutSchema: state.closeoutSchema,
+    resumeFrom: attempt?.resumeFrom,
+    resource: { ...state.labels, [TASK_LABEL]: taskId },
+    traceparent: state.traceparent,
+  };
+};
+
+/**
  * A step, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `step`'s door does not
  * take. Folds the task's journal, asks `decide` for one action, and carries it out. The actions, in the order an attempt
  * meets them:
@@ -272,21 +292,10 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
       break;
 
     case 'spawn': {
-      const attempt = state.attempts.find((a) => a.n === action.attempt);
-      const failed = yield* runner
-        .spawn({
-          name: action.name,
-          brief: attempt?.nudge ?? state.brief,
-          cwd: state.cwd,
-          harness: state.harness,
-          config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
-          closeoutSchema: state.closeoutSchema,
-          resumeFrom: attempt?.resumeFrom,
-        })
-        .pipe(
-          Effect.as(undefined),
-          Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
-        );
+      const failed = yield* runner.spawn(spawnRequestOf(taskId, state, action.name, action.attempt)).pipe(
+        Effect.as(undefined),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+      );
       if (failed?.refused) {
         const end = spawnRefused(state, action.attempt, failed.message, move);
         if (end.do !== 'record-end') return end;

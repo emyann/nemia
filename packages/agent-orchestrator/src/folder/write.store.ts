@@ -14,6 +14,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
 import { agentsFor, skillsFor, type Places } from './folder.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
+import { readFactories } from '../factory/factory.store.ts';
 
 /**
  * What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already
@@ -45,10 +46,11 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * A draft on codex by its agent's `harness:` alone that sends its sandbox as `permissionMode` is refused (`codexModeWritten`), as
  * `renderStep` refuses one that says `harness: codex`: it would be written under the former name, which the parser still reads.
  *
- * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
- * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. Its
- * agents and skills are found where a run of it would look (`lookupRoots`): in `places`, or else the repository its folder is in and the
- * store (`placesAround`). A run is not changed by any of it: it froze its folder at `nemia start`.
+ * Where: a workflow in the store's `workflows/` or in that of a repository the store knows, a factory's or the `repo` of `places`
+ * (`isWorkflowsHolder`), the two places the board lists workflows from. Anywhere else only with `{ anywhere: true }`, since a write
+ * removes files, and a path mistyped would remove them from a folder that is not a workflow. Its agents and skills are found where a run
+ * of it would look (`lookupRoots`): in `places`, or else the factory's repository its folder is in and the store (`placesAround`). A run
+ * is not changed by any of it: it froze its folder at `nemia start`.
  */
 export function writeWorkflow(
   dir: string,
@@ -61,7 +63,7 @@ export function writeWorkflow(
     if (why) throw new WorkflowError(why);
   };
   refuse(agentsFolderRefusal(at));
-  if (!anywhere) refuse(workflowPlaceRefusal(at));
+  if (!anywhere) refuse(workflowPlaceRefusal(at, places?.repo));
   if (fs.existsSync(at) && !isDirectory(at))
     refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
   let entries: fs.Dirent[] = [];
@@ -167,27 +169,38 @@ export function removeWorkflow(
 
 /**
  * Why `writeWorkflow` does not write `at` unless told it may write anywhere, or `undefined` for a folder it writes: a workflow in the
- * store's `workflows/`, or in a repository's — `<repo>/workflows/<name>`, beside the repository's `.git`. The folder itself, not one below
- * it, nor the `workflows/` that holds it: those are the folders the board lists as workflows.
+ * store's `workflows/`, or in a repository's the store knows — `<repo>/workflows/<name>`, for a `repo` of a factory or the one the caller
+ * names. The folder itself, not one below it, nor the `workflows/` that holds it: those are the folders the board lists as workflows.
  */
-function workflowPlaceRefusal(at: string): string | undefined {
+function workflowPlaceRefusal(at: string, repo?: string): string | undefined {
   const holder = path.dirname(at);
   const store = path.resolve(HOME, 'workflows');
-  if (isWorkflowsHolder(holder)) return undefined;
-  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
+  if (isWorkflowsHolder(holder, repo)) return undefined;
+  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
 }
 
-/** Whether `dir` holds the workflows the board lists: the store's `workflows/`, or a repository's, beside its `.git`. */
-export function isWorkflowsHolder(dir: string): boolean {
-  if (dir === path.resolve(HOME, 'workflows')) return true;
-  return path.basename(dir) === 'workflows' && fs.existsSync(path.join(path.dirname(dir), '.git'));
+/** The repositories the store knows, each resolved: every factory's `repos` that reads, and `repo` when the caller names one. */
+function knownRepos(repo?: string): Set<string> {
+  const known = new Set(readFactories().flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
+  if (repo) known.add(path.resolve(repo));
+  return known;
+}
+
+/**
+ * Whether `dir` holds the workflows the board lists: the store's `workflows/`, or the `workflows/` of a repository the store knows — a
+ * factory's, or `repo` when the caller names one, as the api names its own.
+ */
+export function isWorkflowsHolder(dir: string, repo?: string): boolean {
+  const at = path.resolve(dir);
+  if (at === path.resolve(HOME, 'workflows')) return true;
+  return path.basename(at) === 'workflows' && knownRepos(repo).has(path.dirname(at));
 }
 
 /**
  * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository it is in —
- * `<repo>/workflows/<name>`, a checkout by its `.git` — and the store. A folder of the store's is only the store's.
+ * `<repo>/workflows/<name>`, for a repository a factory names — and the store. A folder of the store's is only the store's.
  */
 export function placesAround(workflowDir: string): Places {
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));
-  return { ...(fs.existsSync(path.join(repo, '.git')) ? { repo } : {}), home: HOME };
+  return { ...(knownRepos().has(repo) ? { repo } : {}), home: HOME };
 }

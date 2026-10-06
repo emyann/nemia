@@ -705,6 +705,8 @@ test('a spawn the harness takes: the request reaches it whole, and the Task is w
         config: { model: 'opus' },
         closeoutSchema: undefined,
         resumeFrom: undefined,
+        resource: undefined,
+        traceparent: undefined,
       },
     ],
   ]);

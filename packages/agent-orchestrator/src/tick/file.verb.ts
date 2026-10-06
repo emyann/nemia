@@ -13,8 +13,8 @@ import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
   checkArgv,
+  checkEnvOf,
   LANDING_CHECK_DEADLINE_SECONDS,
-  type CheckEnv,
   type CheckHanded,
   type LandingSaid,
   type Verdict,
@@ -70,6 +70,7 @@ import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
+import { stepLabels } from '../telemetry/telemetry.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -357,6 +358,7 @@ const trySpec = (
   cwd: record.workspace ?? f.run.workspace,
   harness: step.harness,
   priority: MOMENTUM,
+  labels: stepLabels(f.run.id, step.name),
   ...localFields(step, () => ({
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
@@ -466,6 +468,7 @@ function roundSpec(
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
     priority: MOMENTUM,
+    labels: stepLabels(run.id, target.name),
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
@@ -517,14 +520,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
       f.notes.push(
         `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
       );
-    const env: CheckEnv = {
-      WF_RUN: run.id,
-      WF_STEP: name,
-      ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
-      WF_WORKSPACE: workspace,
-      WF_ARTIFACTS: files,
-      ...(closeout ? { WF_CLOSEOUT: writeCheckCloseout(taskId, closeout) } : {}),
-    };
+    const env = checkEnvOf(run, step, { workspace, files, closeout: closeout && writeCheckCloseout(taskId, closeout) });
     yield* asked(
       'file',
       e.file({
@@ -634,6 +630,7 @@ function readySpec(
     cwd: place.workspace,
     harness: step.harness,
     priority: stepMomentum(step),
+    labels: stepLabels(run.id, step.name),
     deadlineSeconds: step.deadlineSeconds,
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {

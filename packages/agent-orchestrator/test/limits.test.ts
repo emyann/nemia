@@ -128,7 +128,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-runtime/src/a2a/remote.ts': { 'max-lines': 1, 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/cli/main.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/core/domain.ts': { complexity: 2, 'sonarjs/cognitive-complexity': 2 },
-  'packages/agent-runtime/src/core/engine/engine.ts': { 'max-lines-per-function': 1, complexity: 2, 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-runtime/src/core/engine/engine.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/core/engine/journal.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/core/event-schema.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/service/harness-refusal.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },

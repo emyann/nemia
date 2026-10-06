@@ -81,9 +81,10 @@ test('the check refuses every way of opening config, and is not refused by carry
 
 test('engine.ts hands the whole config to every spawn, so a runner is given what the task was filed with, and a spawn that dropped it would run every harness bare', () => {
   const code = codeOf(fs.readFileSync('src/core/engine/engine.ts', 'utf8'));
+  assert.match(code, /runner\s*\.spawn\(spawnRequestOf\(/, 'every spawn is asked with the request `spawnRequestOf` makes');
   assert.match(
     code,
-    /runner\s*\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s,
+    /const spawnRequestOf = [^{]*\{[^}]*\breturn \{[^}]*\bconfig: configForTurn\(state\.config, /s,
     "a turn's own config (an answer's) is laid over the task's by `configForTurn`, in `harness/args.ts`, never in engine.ts",
   );
   assert.match(code, /runner\s*\.release\(\s*session,\s*state\.config\b/);

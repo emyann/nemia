@@ -251,6 +251,13 @@ workflow gives the same value, the rule `workspace: folder` follows today (`isFo
   - Either way the copy is under its name when both are done. At worst, the new run's first pass meets the moment it is aside, and reads
     as unread once.
 
+*Deferred on 2026-10-06, at card C2*: `nemia start` resolves `place: git` to the package's own place (`SHIPPED_PLACE`), reads its
+`place.json` (`readPlaceJson`), refuses a workflow whose run needs a verb it does not declare, runs `open` from it (`openPlace` in
+`src/place/place.store.ts`), and records `placeSkill: { skill, version }`. No copy is made: the copy under `WF_ROOT/places/`, the
+refusal of a copy whose version drifted, prune's part and `nemia refreeze` wait for the card that lets a team supply its own place. Until
+then the only place is the package's code, installed as a release that never changes under a run, so `version` is recorded and not yet
+compared. `placeDirOf` is the one answer to where a run's place runs from, and that card makes it answer the frozen copy.
+
 ## The contracts
 
 Each is an Effect Schema struct in `src/place/place.store.ts`. Its type is re-exported from a pure `src/place/place.ts`, which the pure
@@ -340,7 +347,7 @@ gone, not moved.
 | A3. `report` and `standing`, unused | A1 | Their scripts and tests, and the verbs added to `place.json`. |
 | B1. Codex trust, the runtime's half | now | The runtime takes `config.codex.trustFrom`, a directory, like `config.claude`: it extends the operator's trust in that directory to `cwd`, and never grants it (`codex.ts:187-204`). A task without it is prepared as today, through `repositoryOf`, so no codex step in a worktree loses the project's settings before B2. |
 | B2. Codex trust, the filing half | B1, 6 | The tick passes `trustFrom: run.repo` for a codex step of a repository run, and `repositoryOf` goes in the same card. An `ae` user of codex in a worktree then names the directory. |
-| C. `place:` and the freeze | 4a, 5 | The key, its `FrozenStepSchema` field, the same-value rule, the refusal with no `place:`, `workspace: folder` as a former spelling, `open` at `wf start`, the copy to `WF_ROOT/places/`; `placeSkill` on the repository record and as an optional field of `GitRecordSchema`, with a test that a record carrying it is read, and one that a record without it resolves to the package's copy; `place`, `placeOf`, `isGitRun`, the api's and the web's `PlaceKind` untouched; the shipped folders gain `place: git` or `place: folder`; the api's builder and the web's builder. The tick still calls today's git helpers. |
+| C. `place:` and the freeze | 4a, 5 | The key, its `FrozenStepSchema` field, the same-value rule, the refusal with no `place:`, `workspace: folder` as a former spelling, `open` at `wf start`, the copy to `WF_ROOT/places/`; `placeSkill` on the repository record and as an optional field of `GitRecordSchema`, with a test that a record carrying it is read, and one that a record without it resolves to the package's copy; `place`, `placeOf`, `isGitRun`, the api's and the web's `PlaceKind` untouched; the shipped folders gain `place: git` or `place: folder`; the api's builder and the web's builder. The tick still calls today's git helpers. Split in two: C1, the key; C2, `open` at `wf start` through `openPlace`, `placeSkill` on the record, `placeDirOf` for `trialMerges`, and `makeWorkspace` gone. C2 left the copy, its prune and `refreeze` to a later card (*Freezing*). |
 | D. Briefs' words | C, 4b | `composeBrief`'s git sentences (`run.ts:5037`, `:5078`, `:5100`) and the landing section's (`check/check.ts:239-241`) come from `say` and the skill's prose. |
 | E. `inventory` and `remove` | 5 | `wf rm` and `wf prune` (`forget/forget.verb.ts`, `prune/prune.verb.ts`); `parseWorktrees` leaves the package. |
 | F. `make` and `handoff` | 6 | `workspaceFor`'s git half and `handOff` (`workspace/worktree.store.ts`, `tick/`); `includeFiles` and `check-ignore` into `make`; `provisionDeps` stays and runs on `Made.workspace`; the realpath guard. |
@@ -408,6 +415,8 @@ absorbs. The `say` templates are what make the words match.
 6. **Refreezing a run's place.** A frozen skill with a bug stalls its runs as unread. *Recommend* `wf refreeze <run>`. It writes a
    person's file, `runs/<id>.refreeze`, which the tick reads: it freezes the skill again from the lookup and writes the new version into
    the record's `placeSkill`. The person chose the new copy by name, so no command comes from a checkout unasked.
+   *Deferred on 2026-10-06, at card C2*: no copy is frozen yet (*Freezing*), so there is nothing to refreeze. It comes with the card
+   that lets a team supply its own place.
 7. **A `staged` marker without a process.** If card J's measure shows `status` costs a pass too much, `open` could answer the path of a
    file whose existence means "something is staged" (for git, the checkout's MERGE_HEAD, which the skill locates), and the code would
    `stat` that path without knowing what it is. *Recommend* not building it until measured.

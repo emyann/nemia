@@ -66,6 +66,7 @@ const PINNED: Record<string, string[]> = {
     'addFactory',
     'addPass',
     'addToInbox',
+    'admitted',
     'agentFileOf',
     'agentPlaces',
     'agentRead',

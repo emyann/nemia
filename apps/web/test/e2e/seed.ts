@@ -469,7 +469,8 @@ export const ENDING = {
 /**
  * An eighth run, the same workflow with its ending approved and run: ship was approved with no words, filed in the repository's own
  * checkout, and merged the run's branch onto main. Every step is done and its branch is on the base, so there is nothing left to decide —
- * the folder answered for its own branch — and its card is off the Factory's floor with the rest of the finished.
+ * the folder answered for its own branch — and its card is off the Factory's floor with the rest of the finished. It froze `review` with
+ * another note than ENDING, the run of its folder before it, did: the store's one change mark, which the Stats page draws (`changed`).
  */
 export const SHIPPED = {
   id: 'it-shipped-itself-e2e13',
@@ -485,6 +486,10 @@ export const SHIPPED = {
   prunedFilesBytes: 48 * 1024 ** 2,
   /** The file review's closeout named in its files directory, gone with it. */
   shot: 'review-light.png',
+  /** The note it froze for `review`, where ENDING froze the folder's own. */
+  review: 'Review the change, and picture what it draws.',
+  /** The change mark that note makes, on its day: the step it froze otherwise, and the run it is compared with. */
+  changed: { kind: 'step', name: 'review', since: ENDING.id },
 } as const;
 
 /**
@@ -1629,7 +1634,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     { name: 'ship', after: ['review'], body: shipBody, harness: 'claude', workspace: 'main', gate: true },
   ];
 
-  const shipRun = (id: string, title: string, why: string, branch: string, minutes: number, steps: object) =>
+  const shipRun = (id: string, title: string, why: string, branch: string, minutes: number, steps: object, workflow = shipWorkflow) =>
     write(
       path.join(root, 'runs', `${id}.json`),
       JSON.stringify(
@@ -1642,7 +1647,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
           isolate: true,
           brief: `${title}\n\nA run seeded by npm run e2e: ${why}`,
           workflowDir: shipDir,
-          workflow: shipWorkflow,
+          workflow,
           createdAt: ago(minutes),
           steps,
         },
@@ -1690,7 +1695,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   signedOff(
     `${SHIPPED.id}-review`,
     shippedLane,
-    'Review the change.',
+    SHIPPED.review,
     0.59,
     0.4,
     done('One reading of it, and nothing to change.', [path.join(root, 'runs', SHIPPED.id, 'artifacts', 'review', SHIPPED.shot)]),
@@ -1721,6 +1726,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
       review: { taskId: `${SHIPPED.id}-review`, workspace: shippedLane, branch: SHIPPED.branch },
       ship: { taskId: `${SHIPPED.id}-ship`, workspace: repo },
     },
+    shipWorkflow.map((step) => (step.name === SHIPPED.changed.name ? { ...step, body: SHIPPED.review } : step)),
   );
 
   const aloneDir = path.join(root, 'workflow-alone');

@@ -142,6 +142,19 @@ export function seriesOf(
   return { points, max };
 }
 
+/** What one day's column draws: a bar at its `share` of the scale, a line at the foot for a measured 0, or nothing. */
+export type ColumnDrawn = { kind: 'bar'; share: number } | { kind: 'zero' } | { kind: 'none' };
+
+/**
+ * What a day's column draws for `value` against `scale`, the largest known value: a bar at its share for a number above 0, a line at the
+ * foot for a measured 0, and nothing for a day nothing measured, nor for a number below 0.
+ */
+export function columnDrawn(value: number | null, scale: number): ColumnDrawn {
+  if (value === null || value < 0) return { kind: 'none' };
+  if (value === 0) return { kind: 'zero' };
+  return { kind: 'bar', share: value / scale };
+}
+
 /** The marks by their day, each day's in the order served. */
 export function marksByDay(marks: readonly StatsMark[]): Map<string, StatsMark[]> {
   const byDay = new Map<string, StatsMark[]>();

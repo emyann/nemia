@@ -71,6 +71,7 @@ import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
+import { landingDenies, landingWords } from '../place/landing.store.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -288,6 +289,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         yield* costsFor(f, step, Boolean(resumeFrom)),
+        landingWords(run, told.step),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -366,6 +368,7 @@ const trySpec = (
       runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
       inbox: inboxDir(),
       own: t.told.own,
+      landingDenied: () => landingDenies(f.run),
     }),
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -464,6 +467,7 @@ function roundSpec(
       undefined,
       filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       said.costs,
+      landingWords(run, told.step),
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -479,6 +483,7 @@ function roundSpec(
           stepSpend(run, r.target, reads.spendOf),
         ),
         own: told.own,
+        landingDenied: () => landingDenies(run),
       }),
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -626,6 +631,7 @@ function readySpec(
           said.checked,
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
           said.costs,
+          landingWords(run, told.step),
         ),
     cwd: place.workspace,
     harness: step.harness,
@@ -639,6 +645,7 @@ function readySpec(
         inbox: inboxDir(),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
+        landingDenied: () => landingDenies(run),
       }),
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

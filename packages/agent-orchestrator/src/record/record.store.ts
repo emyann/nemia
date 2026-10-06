@@ -89,6 +89,7 @@ const GitRecordSchema = Kept({
   branch: Schema.String,
   isolate: Schema.Boolean,
   placeSkill: Schema.optional(Schema.StructWithRest(Schema.Struct({ skill: Schema.String, version: Schema.String }), Rest)),
+  stagedFile: Schema.optional(Schema.String),
 });
 
 const FolderRecordSchema = Kept({
@@ -99,6 +100,7 @@ const FolderRecordSchema = Kept({
   branch: Schema.optional(Schema.Undefined),
   isolate: Schema.optional(Schema.Undefined),
   placeSkill: Schema.optional(Schema.Undefined),
+  stagedFile: Schema.optional(Schema.Undefined),
 });
 
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));

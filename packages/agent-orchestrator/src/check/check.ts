@@ -172,9 +172,10 @@ export const checkContract = (command: string): string =>
  * merge, and the run judges and lands it. Appended to its brief, so the shipper's recipe and the run's mechanism cannot say two things: the
  * run executes the command on the merged tree once the step signs off, commits the merge with the closeout's `message` when it exits 0, and
  * aborts it otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a
- * turn it cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself.
+ * turn it cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself. How to stage it, and what the
+ * session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its place's skill.
  */
-export const landingContract = (command: string): string =>
+export const landingContract = (command: string, words?: LandingWords): string =>
   [
     '',
     '## The run checks and lands your merge',
@@ -183,11 +184,14 @@ export const landingContract = (command: string): string =>
     "When it exits 0 the run commits the merge onto the base branch, with the `message` your closeout gives, as the commit's message;",
     'anything else — a refusal, or a check that did not finish — and the run aborts the merge, and nothing lands.',
     '',
-    'So stage the merge and sign off: merge every result branch in one `git merge --no-ff --no-commit`, leave it staged, and do not run',
+    `So stage the merge and sign off: stage every result branch in one merge that commits nothing, ${words ? codeSpan(words.stage) : "as your place's skill says (*Stage a landing*)"}, leave it staged, and do not run`,
     'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
-    '`git commit` and `git merge --continue` are denied you for that reason; a merge without `--no-commit` would commit it all the same.',
+    `${words?.denied.length ? `Your fence denies ${words.denied.map(codeSpan).join(' and ')}` : 'Committing it is denied you'} for that reason; a merge that commits as it merges would land it all the same, unchecked.`,
     "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",
   ].join('\n');
+
+/** What a landing session is told by its place (`landingContract`): the command that stages its merge, and the rules its fence denies. */
+export type LandingWords = { readonly stage: string; readonly denied: readonly string[] };
 
 /** What a check that did not pass said: the command, its verdict, and the last lines of each stream. */
 export type CheckRefusal = { command: string; verdict: Verdict; stdout: string; stderr: string };

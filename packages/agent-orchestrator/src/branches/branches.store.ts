@@ -405,7 +405,7 @@ export function resultBranches(run: Run): string[] {
 
 /**
  * The commit each of a run's result branches is at, as git has it — or, for one git no longer has, the tip the run last saw (`tipsSeen`):
- * what a merge in the repository's checkout is read as this run's by (`mergeState`).
+ * what a merge in the repository's checkout is read as this run's by (`checkoutStatus`).
  */
 export function resultTips(run: GitRun): Record<string, string> {
   const branches = resultBranches(run);

@@ -50,6 +50,11 @@ export type GitRun = RunBase & {
    * the package's own (`placeDirOf`).
    */
   placeSkill?: { skill: string; version: string };
+  /**
+   * The file whose presence says a merge is staged in the repository's checkout, as the place's `open` named it at `nemia start`, read
+   * with a `stat` (`stagedHere`). Absent for a run started before the place named one, whose checkout is read through `status`.
+   */
+  stagedFile?: string;
 };
 
 /** A run of a team whose every step says `place: folder`: no repository, no base, no branch, no worktrees. */
@@ -60,6 +65,7 @@ export type FolderRun = RunBase & {
   branch?: undefined;
   isolate?: undefined;
   placeSkill?: undefined;
+  stagedFile?: undefined;
 };
 
 /** The kinds of workspace a run's steps work in: `git`, which a record without `place` is, and `folder`. */

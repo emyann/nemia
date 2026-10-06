@@ -18,17 +18,24 @@ import { decision, type Decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type AskName } from '../forget/forget.ts';
 import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { gitSays, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
-import { resultTips, shippedOf, standingsOf } from '../branches/branches.store.ts';
+import { gitSays } from '../workspace/worktree.store.ts';
+import { shippedOf, standingsOf } from '../branches/branches.store.ts';
+import { checkoutStatus, stagedHere } from '../place/landing.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../tick/advance.verb.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { Conflict, Invalid } from '../refusal/refusal.ts';
 
-/** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
-export const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>
-  isGitRun(run) && steps?.some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo)
-    ? mergeState(run.repo, resultTips(run)).merging
-    : 'none';
+/**
+ * Whose merge is in the repository's checkout, for a run whose ending lands on its check (`forgetRefusal`): none where the file its place
+ * named at `open` is not there (`stagedHere`), else as its place's `status` reads it (`checkoutStatus`). Refuses (`Conflict`) a checkout
+ * the place did not read, in its words: nothing is removed on a guess.
+ */
+export function merging(run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] {
+  if (!isGitRun(run) || !steps?.some((s) => landsOnCheck(s, run)) || stagedHere(run) === false) return 'none';
+  const read = checkoutStatus(run);
+  if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
+  return read.merging;
+}
 
 /**
  * Remove the worktrees of a run that is over, and nothing else — `nemia prune`. Its record, asks, closeouts and costs, its branches, its

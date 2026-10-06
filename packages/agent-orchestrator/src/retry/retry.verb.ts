@@ -19,6 +19,7 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
+import { landingDenies } from '../place/landing.store.ts';
 
 /**
  * A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files
@@ -119,6 +120,7 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
     runArtifacts,
     inbox: inboxDir(),
     own: toldOf(run, step).own,
+    landingDenied: () => landingDenies(run),
   });
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
   return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));

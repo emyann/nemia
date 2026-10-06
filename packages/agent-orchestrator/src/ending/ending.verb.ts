@@ -19,7 +19,7 @@ import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { abortMerge, commitMerge, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
+import { checkoutStatus, landThrough, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import {
   closeoutAsked,
@@ -33,7 +33,6 @@ import {
 } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
-import { resultTips } from '../branches/branches.store.ts';
 
 /**
  * Which run's `workspace: main` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
@@ -53,6 +52,7 @@ import { resultTips } from '../branches/branches.store.ts';
  *   each run another waits on is read once for the pass. With none given, the store is listed only past the run's own asks, and the cap
  *   read only where a claim waits on a slot.
  * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
+ * @param memo The pass's reading of its places (`StatusMemo`), shared with its `landEnding`, so a checkout is read once a run.
  */
 export const checkoutHold = Effect.fn('checkoutHold')(function* (
   e: Engine,
@@ -60,17 +60,18 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   steps: readonly Workflow[],
   pass?: { read: PassRead; slot: RunSlot | undefined },
   env: NodeJS.ProcessEnv = process.env,
+  memo: StatusMemo = statusMemo(),
 ) {
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
   const read = pass?.read ?? passRead(e, runStore.runs.list(), env);
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
-  const mine = yield* mainClaim(e, run, pass ? Effect.succeed(pass.slot) : slotOf(run.id), read.parents);
+  const mine = yield* mainClaim(e, run, pass ? Effect.succeed(pass.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
   for (const other of read.runs) {
     if (other.id === run.id || !isGitRun(other) || path.resolve(other.repo) !== mine.repo) continue;
-    const claim = yield* mainClaim(e, other, slotOf(other.id), read.parents);
+    const claim = yield* mainClaim(e, other, slotOf(other.id), read.parents, memo);
     if (claim) claims.push(claim);
   }
   return heldCheckouts(claims).get(run.id);
@@ -87,7 +88,9 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  *
  * An ending that lands on its check holds it too, from its filing until the run has landed its merge: while its check runs on that merge,
  * and while the merge is staged there and not yet committed or aborted — a run called off included, whose merge a pass still aborts. Whose
- * merge it is is asked of git only where one is in progress, which the file system says with no git (`mergeInProgress`).
+ * merge it is is asked of its place (`checkoutStatus`) only once its session and its check are done, and only where one is in progress,
+ * which the file the place named at `open` says with no process (`stagedHere`); a record that names none asks the place. A checkout the
+ * place gives no reading of is held: a merge nobody can read is never let go.
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
  * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
@@ -97,7 +100,13 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started. Its `slot` is asked
  * for there alone, and the runs it waits on are read through `parents`.
  */
-const mainClaim = Effect.fnUntraced(function* (e: Engine, run: Run, slot: Effect.Effect<RunSlot | undefined, Refusal>, parents: Parents) {
+const mainClaim = Effect.fnUntraced(function* (
+  e: Engine,
+  run: Run,
+  slot: Effect.Effect<RunSlot | undefined, Refusal>,
+  parents: Parents,
+  memo: StatusMemo,
+) {
   let steps: Workflow[];
   try {
     steps = stepsOf(run);
@@ -113,7 +122,11 @@ const mainClaim = Effect.fnUntraced(function* (e: Engine, run: Run, slot: Effect
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
     const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
-    const merging = mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none';
+    const merging = () => {
+      if (stagedHere(run) === false) return 'none';
+      const read = checkoutStatus(run, memo);
+      return 'unread' in read ? 'ours' : read.merging;
+    };
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
   }
   if (run.cancelledAt) return undefined;
@@ -142,18 +155,22 @@ const mainClaim = Effect.fnUntraced(function* (e: Engine, run: Run, slot: Effect
 
 /**
  * Land the merge the run's ending staged in the repository's checkout, where one lands on its check (`landingDue`): commit it with the
- * message its closeout gave, or abort it, and write on the step's record (in memory — `advance` writes the run) what was done, once for the
- * try. A commit git refuses — a hook, a signature — aborts the merge, and says git's words. An abort git refuses is said, and nothing is
- * written, so the next pass tries again. Nothing is done for a run `nemia rm` forgot while this pass was at work. Level-triggered: after a
- * restart, of the daemon or the machine, the pass reads the checkout and the engine as they are, and lands then a merge whose session and
- * check have both stopped running.
+ * message its closeout gave, or abort it, through the run's place (`landThrough`), and write on the step's record (in memory — `advance`
+ * writes the run) what was done, once for the try. A commit the place refuses — a hook, a signature — aborts the merge, and says the
+ * place's words. An abort the place refuses, a `land` it does not answer, and a checkout its `status` gives no reading of are said, and
+ * nothing is written, so the next pass reads again: none is a verdict. Nothing is done for a run `nemia rm` forgot while this pass was at
+ * work. Level-triggered: after a restart, of the daemon or the machine, the pass reads the checkout and the engine as they are, and lands
+ * then a merge whose session and check have both stopped running.
  *
  * Once it has landed, the pictures its check took of the merged tree are read by nobody (`dropLandedPictures`): they are removed before the
  * record says it landed, so a pass that dies between the two lands again on the next and removes what is left.
  *
- * What the pass does when it finds MERGE_HEAD in the checkout with nothing of the ending running: a merge that is not this run's — every
- * commit it names is not a tip of the run's result branches — is left alone, the person's or the other run's; one that is this run's is
- * committed only if its check passed on it, and aborted otherwise.
+ * What the pass does when the place says a merge is staged in the checkout with nothing of the ending running: a merge that is not this
+ * run's — every commit it names is not a tip of the run's result branches — is left alone, the person's or the other run's; one that is
+ * this run's is committed only if its check passed on it, and aborted otherwise.
+ *
+ * @param memo The pass's reading of its places (`StatusMemo`), shared with its `checkoutHold`: the place to read and land through, in
+ *   place of the run's own, where it names one.
  */
 export function landEnding(
   run: Run,
@@ -163,6 +180,7 @@ export function landEnding(
   asked: (taskId: string) => CloseoutAsked,
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
+  memo?: StatusMemo,
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
@@ -176,8 +194,8 @@ export function landEnding(
     phaseOf,
     typeof said === 'string' ? said : undefined,
     verdictOf(ending.name),
-    mergeInProgress(run.repo),
-    () => mergeState(run.repo, resultTips(run)),
+    stagedHere(run) ?? true,
+    () => checkoutStatus(run, memo),
   );
   if (!due) return { notes: [], landed: false };
   const name = ending.name;
@@ -194,25 +212,26 @@ export function landEnding(
       : [];
     return { notes: [`${name}: ${note}`, ...freed], landed: true };
   };
+  const again = (why: string) => ({ notes: [`${name}: ${why}: the next tick tries again`], landed: false });
+  if (due.act === 'wait') return again(`the run read no state of its checkout, so it neither commits nor aborts its merge (${due.why})`);
   if (due.act === 'record') return write(due.landed, landedWords(run, due.landed));
+  const abort = () => {
+    const taken = landThrough(run, { act: 'abort' }, memo);
+    if ('aborted' in taken) return undefined;
+    return 'commit' in taken ? 'the place answered a commit where the run asked an abort' : 'refused' in taken ? taken.refused : taken.unread;
+  };
   if (due.act === 'commit') {
-    const made = commitMerge(run.repo, due.message);
+    const made = landThrough(run, { act: 'commit', message: due.message }, memo);
     if ('commit' in made) return write(made, `its check passed on the merge, and ${landedWords(run, made)}`);
-    const why = `git refused the commit of its merge: ${made.error}`;
-    const refused = abortMerge(run.repo);
-    if (refused)
-      return {
-        notes: [`${name}: ${why}; and the run could not abort the merge either (${refused.error}): the next tick tries again`],
-        landed: false,
-      };
+    if ('aborted' in made) return again('the place answered an abort where the run asked a commit of its merge');
+    if ('unread' in made) return again(`the run could not commit its merge (${made.unread})`);
+    const why = `the place refused the commit of its merge: ${made.refused}`;
+    const refused = abort();
+    if (refused) return again(`${why}; and the run could not abort the merge either (${refused})`);
     return write({ aborted: why }, `${why}, so the run aborted the merge; nothing landed on ${run.branch}`);
   }
-  const refused = abortMerge(run.repo);
-  if (refused)
-    return {
-      notes: [`${name}: ${due.why}, and the run could not abort its merge (${refused.error}): the next tick tries again`],
-      landed: false,
-    };
+  const refused = abort();
+  if (refused) return again(`${due.why}, and the run could not abort its merge (${refused})`);
   const aborted = { aborted: due.why, ...(due.refusedOn ? { refusedOn: due.refusedOn } : {}) };
   return write(aborted, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
 }

@@ -37,7 +37,7 @@ import {
 import { engineWord, phaseOfView } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
-import { mergeInProgress } from '../workspace/worktree.store.ts';
+import { mergeStaged } from '../place/landing.store.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
 
@@ -181,13 +181,14 @@ type Read = { run: Run; read: RunReading | Unjudged };
 
 /**
  * The checks of `run` the pause keeps from being filed (`paused.checks`, `assess`'s): each landing with its merge staged — an ending that
- * lands on its check (`landsOnCheck`) while MERGE_HEAD is in the repository's own checkout (`mergeInProgress`) — and each other (`held`).
+ * lands on its check (`landsOnCheck`) while a merge is staged in the repository's own checkout, or its place could not say (`mergeStaged`)
+ * — and each other (`held`).
  */
 const heldOf = ({ run, read }: Read): Pick<Paused, 'staged' | 'held'> => {
   const checks = 'assessed' in read ? (read.assessed.paused?.checks ?? []) : [];
   const landings = stepsOf(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
   const staged: PauseStaged[] =
-    landings.length && isGitRun(run) && mergeInProgress(run.repo)
+    landings.length && isGitRun(run) && mergeStaged(run, stepsOf(run))
       ? landings.map((s) => ({ run: run.id, step: s.name, repo: run.repo }))
       : [];
   const held: PauseHeld[] = checks.filter((step) => !staged.some((s) => s.step === step)).map((step) => ({ run: run.id, step }));
@@ -239,13 +240,13 @@ const checkDue = (run: Run): boolean =>
   stepsOf(run).some((s) => s.check !== undefined && run.steps[s.name]?.taskId && !run.steps[s.name]?.check);
 
 /**
- * The readings of those of `runs` the pause can hold a check of (`heldOf`): each whose ending lands on its check while MERGE_HEAD is in
- * its checkout, read as `nemia ls` reads it, and each other with a check due (`checkDue`), read without asking git where its branches
+ * The readings of those of `runs` the pause can hold a check of (`heldOf`): each whose ending lands on its check while a merge is staged
+ * in its checkout (`mergeStaged`), read as `nemia ls` reads it, and each other with a check due (`checkDue`), read without asking git where its branches
  * stand. A run a task journal of which does not read (`unreadableJournal`) is left out, as the tick leaves it unjudged; any other failure
  * throws.
  */
 const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[]) {
-  const staging = (run: Run): boolean => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo);
+  const staging = (run: Run): boolean => mergeStaged(run, stepsOf(run));
   const holding = runs.flatMap((run) =>
     staging(run) ? [{ run, how: {} }] : checkDue(run) ? [{ run, how: { standings: () => [] } satisfies ReadingHow }] : [],
   );

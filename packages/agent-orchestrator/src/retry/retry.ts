@@ -428,6 +428,8 @@ const abortedWords = (
  * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`.
  * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`,
  *   one that did not finish the recheck.
+ * @param landingDenied What the run's place denies a landing session (`landingDenies`), read for a denied ending alone: a call it denies
+ *   is said to be the step's own fence at work, and offered no rule.
  */
 export function retryOffers(
   steps: readonly Workflow[],
@@ -438,6 +440,7 @@ export function retryOffers(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  landingDenied: () => readonly string[] = () => [],
 ): Offer[] {
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   const lines: Offer[] = [];
@@ -492,7 +495,7 @@ export function retryOffers(
     } else if (status === 'denied') {
       offer(
         `${command} --fresh`,
-        `${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it`,
+        `${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run, landingDenied) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it`,
         `  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {

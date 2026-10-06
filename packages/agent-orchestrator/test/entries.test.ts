@@ -424,7 +424,6 @@ const PINNED: Record<string, string[]> = {
   'agent-orchestrator/run': [
     'BY_CAP',
     'GIVEN',
-    'LANDING_DENIED',
     'MOMENTUM',
     'SIGNOFF',
     'WHY_CAP',

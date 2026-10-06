@@ -47,6 +47,7 @@ import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { collisionsDue, type Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
+import { landingDenies } from '../place/landing.store.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -279,7 +280,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(steps, run, d, rounds, phaseOf, reader, asked, spendOf),
-    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf),
+    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run)),
   ];
   const parent = yield* parentsRead(run, git).pipe(over(e));
   const answer: Decided = {

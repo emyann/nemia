@@ -51,7 +51,11 @@ const { roundOf } = await import('../src/run.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { main } = await import('../src/cli/main.ts');
-const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/workspace/worktree.store.ts');
+const { checkoutParts } = await import('../src/workspace/worktree.store.ts');
+const { SHIPPED_PLACE, runPlaceVerb } = await import('../src/place/place.store.ts');
+const { stagedHere } = await import('../src/place/landing.store.ts');
+type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
+type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 
 /** A run this file started on a repository, as `isShipped` reads one: a git run. */
 const gitRun = (run: Run): GitRun => {
@@ -500,7 +504,7 @@ test("an approved ending with no check of its own is filed, in the repository's 
   assert.equal(record.steps.ship.check, undefined, 'nor filed a check');
 });
 
-test('mergeState reads the checkout as a landing needs it: whose merge is staged, a conflict, a result branch it leaves out; commitMerge and abortMerge end it', () => {
+test('the place reads the checkout as a landing needs it: whose merge is staged, a conflict, a result branch it leaves out; land ends it', () => {
   const repo = aRepo();
   const branch = (name: string, file: string, text: string) => {
     git(repo, 'checkout', '-q', '-b', name, 'main');
@@ -510,58 +514,72 @@ test('mergeState reads the checkout as a landing needs it: whose merge is staged
     git(repo, 'checkout', '-q', 'main');
     return git(repo, 'rev-parse', name);
   };
+  const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
+  const answered = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]) => {
+    const outcome = runPlaceVerb(SHIPPED_PLACE, verb, request, { env });
+    assert.ok('answer' in outcome, `${verb} answered: ${JSON.stringify(outcome)}`);
+    return outcome.answer;
+  };
+  const status = (checkout: string, tips: Record<string, string>) => answered('status', { checkout, tips });
+  const land = (checkout: string, act: { act: 'commit'; message: string } | { act: 'abort' }) =>
+    runPlaceVerb(SHIPPED_PLACE, 'land', { checkout, ...act }, { env });
+  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root }).staged });
   const a = branch('wf/r/a', 'a.ts', 'a\n');
   const b = branch('wf/r/b', 'b.ts', 'b\n');
   const base = git(repo, 'rev-parse', 'HEAD');
   const tips = { 'wf/r/a': a, 'wf/r/b': b };
-  assert.deepEqual(mergeState(repo, tips), { merging: 'none', conflicted: false, missing: ['wf/r/a', 'wf/r/b'], head: base });
-  assert.equal(mergeInProgress(repo), false);
+  const marker = stagedIn(repo);
+  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: ['wf/r/a', 'wf/r/b'], head: base });
+  assert.equal(stagedHere(marker), false);
 
   git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/a');
-  assert.equal(mergeInProgress(repo), true, 'read off the file alone, which is all a pass asks of a checkout with no landing due');
+  assert.equal(stagedHere(marker), true, 'read off the file open named alone, which is all a pass asks of a checkout with no landing due');
   assert.deepEqual(
-    mergeState(repo, tips),
+    status(repo, tips),
     { merging: 'ours', conflicted: false, missing: ['wf/r/b'], head: base },
     'one branch of two staged',
   );
-  assert.equal(mergeState(repo, { 'wf/r/b': b }).merging, 'other', "a merge of a commit that is not one of the run's tips is another's");
-  assert.equal(abortMerge(repo), undefined);
+  assert.equal(status(repo, { 'wf/r/b': b }).merging, 'other', "a merge of a commit that is not one of the run's tips is another's");
+  assert.deepEqual(land(repo, { act: 'abort' }), { answer: { aborted: true } });
   assert.equal(git(repo, 'status', '--porcelain'), '');
-  assert.match(abortMerge(repo)!.error, /MERGE_HEAD|no merge/i, 'with nothing to abort, git says why');
+  const nothing = land(repo, { act: 'abort' });
+  assert.ok('refused' in nothing, 'with nothing to abort, the place refuses');
+  assert.match(nothing.refused, /MERGE_HEAD|no merge/i, "and says why, in git's words");
 
   git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/a', 'wf/r/b');
-  assert.deepEqual(mergeState(repo, tips), { merging: 'ours', conflicted: false, missing: [], head: base });
-  const made = commitMerge(repo, 'Add a and b\n\nboth.\n');
-  assert.ok('commit' in made);
+  assert.deepEqual(status(repo, tips), { merging: 'ours', conflicted: false, missing: [], head: base });
+  const made = land(repo, { act: 'commit', message: 'Add a and b\n\nboth.\n' });
+  assert.ok('answer' in made && 'commit' in made.answer);
   assert.equal(git(repo, 'log', '-1', '--format=%B'), 'Add a and b\n\nboth.');
   assert.equal(git(repo, 'log', '-1', '--format=%P').split(' ').length, 3, 'an octopus of the base and both tips');
-  assert.deepEqual(mergeState(repo, tips), { merging: 'none', conflicted: false, missing: [], head: made.commit }, 'both on HEAD');
+  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: [], head: made.answer.commit }, 'both on HEAD');
 
   const c1 = branch('wf/r/c1', 'c.ts', 'one\n');
   const c2 = branch('wf/r/c2', 'c.ts', 'two\n');
   git(repo, 'merge', '-q', '--no-ff', '-m', 'c1', 'wf/r/c1');
   assert.throws(() => git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/c2'));
   assert.deepEqual(
-    mergeState(repo, { 'wf/r/c1': c1, 'wf/r/c2': c2 }).conflicted,
+    status(repo, { 'wf/r/c1': c1, 'wf/r/c2': c2 }).conflicted,
     true,
     'a conflict is staged as a merge in progress, with its paths unmerged',
   );
-  assert.ok('error' in commitMerge(repo, 'never\n'), 'git refuses to commit a conflict');
-  assert.equal(abortMerge(repo), undefined);
+  assert.ok('refused' in land(repo, { act: 'commit', message: 'never\n' }), 'the place refuses to commit a conflict');
+  assert.deepEqual(land(repo, { act: 'abort' }), { answer: { aborted: true } });
   assert.equal(git(repo, 'status', '--porcelain'), '');
-  assert.equal(mergeInProgress(repo), false);
+  assert.equal(stagedHere(marker), false);
 
   const linked = path.join(path.dirname(repo), `${path.basename(repo)}-linked`);
   const d = branch('wf/r/d', 'd.ts', 'd\n');
   git(repo, 'worktree', 'add', '-q', '-b', 'side', linked, 'main');
   assert.ok(fs.statSync(path.join(linked, '.git')).isFile(), "a linked worktree's .git is a file naming its own git directory");
+  const linkedMarker = stagedIn(linked);
   git(linked, 'merge', '--no-ff', '--no-commit', 'wf/r/d');
-  assert.equal(mergeInProgress(linked), true, 'and its merge is read there');
-  assert.equal(mergeInProgress(repo), false, "the main checkout's own merge is its own");
-  assert.equal(mergeState(linked, { 'wf/r/d': d }).merging, 'ours');
-  assert.equal(abortMerge(linked), undefined);
-  assert.equal(mergeInProgress(linked), false);
-  assert.equal(mergeInProgress(path.join(repo, 'no-such')), false, 'no checkout, no merge');
+  assert.equal(stagedHere(linkedMarker), true, 'and its merge is read there, off the file open named for it');
+  assert.equal(stagedHere(marker), false, "the main checkout's own merge is its own");
+  assert.equal(status(linked, { 'wf/r/d': d }).merging, 'ours');
+  assert.deepEqual(land(linked, { act: 'abort' }), { answer: { aborted: true } });
+  assert.equal(stagedHere(linkedMarker), false);
+  assert.equal(stagedHere({ stagedFile: path.join(repo, 'no-such', 'MERGE_HEAD') }), false, 'no checkout, no merge');
 });
 
 const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch: 1 commit; the check on the merged tree.\n';
@@ -1097,13 +1115,13 @@ test('REFUSED at shipped defaults: a merge the run is not to commit is aborted â
     const landed = readRun(id).steps.ship.landed as { aborted: string };
     assert.match(
       landed.aborted,
-      /^git refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
-      "a hook refused the commit: the merge is aborted, and git's lines are on the record, joined on one",
+      /^the place refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
+      "a hook refused the commit: the merge is aborted, and the place's words, git's lines, are on the record, joined on one",
     );
     const note = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!.note!;
     assert.match(
       note,
-      /^nothing landed on main: git refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
+      /^nothing landed on main: the place refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
       "nemia ls prints them on the step's row, never a line break inside it",
     );
     assert.equal(mergeHead(repo), false);

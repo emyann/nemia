@@ -45,6 +45,7 @@ import { filedConfig, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
+import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
 import { levelFile, promptFile, readNemia, storeDenies } from '../src/nemia/level.store.ts';
 import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
@@ -833,7 +834,7 @@ const filedOf = (steps: readonly Step[]): Map<string, Filed> =>
         step,
         steps,
         { gates: [] },
-        { model: undefined, budgetUsd: undefined, runArtifacts: RUN_ARTIFACTS, inbox: INBOX, own: {} },
+        { model: undefined, budgetUsd: undefined, runArtifacts: RUN_ARTIFACTS, inbox: INBOX, own: {}, landingDenied: () => readPlaceJson(SHIPPED_PLACE).denyWhileLanding },
       ),
     ]),
   );

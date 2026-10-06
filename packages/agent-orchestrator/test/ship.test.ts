@@ -2904,3 +2904,21 @@ test('REFUSED: an ending whose place this nemia does not ship is not filed once 
   assert.deepEqual(odd.filings, [`${odd.id}-implement`]);
   assert.deepEqual((await runWith(other.e, advanceRun(readRun(other.id)))).filed, ['ship'], 'and the run beside it files its ending');
 });
+
+test('a run started before its place named a staged-merge file, its ending signed off blocked with its merge staged, has the merge aborted', async () => {
+  const { repo, id, e, settle, base } = await atTheGate();
+  await runWith(e, approveRun(id, 'ship'));
+  assert.deepEqual((await runWith(e, advanceRun(readRun(id)))).filed, ['ship']);
+  const branch = readRun(id).steps.implement.branch!;
+  git(repo, 'merge', '--no-ff', '--no-commit', branch);
+  rewritten(id, (record) => {
+    delete record.stagedFile;
+  });
+  assert.equal(stagedHere(gitRun(readRun(id))), undefined, 'a record with no marker');
+  settle(`${id}-ship`, 'succeeded', BLOCKED);
+  await runWith(e, advanceRun(readRun(id)));
+  assert.equal(mergeHead(repo), false, 'the merge taken back');
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), base);
+  assert.equal(git(repo, 'status', '--porcelain'), '');
+  assert.deepEqual(readRun(id).steps.ship.landed, { aborted: 'ship ended blocked with its merge staged' });
+});

@@ -17,8 +17,18 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
-import { composePrompt, memoryDir, nemiaDir, ownBin, readLevel, readNemia, SHIPPED_NEMIA, storeDenies } from './level.store.ts';
-import { nemiaFence } from '../admission/index.ts';
+import {
+  composePrompt,
+  memoryDir,
+  nemiaDir,
+  ownBin,
+  promptAllows,
+  readLevel,
+  readNemia,
+  SHIPPED_NEMIA,
+  storeDenies,
+} from './level.store.ts';
+import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
 import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, nemiaSettings, type HerTask, type NemiaAct } from './nemia.ts';
@@ -68,15 +78,16 @@ const factoryFolders = (): Mount[] => {
 
 /**
  * Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition; with
- * her fence derived from the command table (`nemiaFence`), the store's denies (`storeDenies`) and the daemon's own bin first on her path
- * (`ownBin`) in the harness's settings, and her admission (`nemia admit`) asked before each of her shell calls.
+ * her fence derived from the command table (`nemiaFence`), less each prompt the person allowed in her folder (`widened`, `promptAllows`),
+ * the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the harness's settings, and her admission
+ * (`nemia admit`) asked before each of her shell calls. A prompt allowed while she runs is widened the next time she is filed.
  */
 export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
   const prompt = composePrompt(step.body);
   const memory = `Edit(/${memoryDir()}/**)`;
   const quota = quotaUrl();
-  const fence = nemiaFence(TABLE);
+  const fence = widened(nemiaFence(TABLE), promptAllows());
   const bin = ownBin();
   const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies()] }, bin, process.env.PATH ?? '');
   return {

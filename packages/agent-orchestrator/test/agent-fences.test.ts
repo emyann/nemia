@@ -46,7 +46,7 @@ import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { levelFile, promptFile, readNemia, storeDenies } from '../src/nemia/level.store.ts';
-import { admissionOf, nemiaFence } from '../src/admission/index.ts';
+import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
@@ -1021,11 +1021,12 @@ type Rules = { allow: readonly string[]; ask: readonly string[]; deny: readonly 
 
 /**
  * Her rules as her keeper files them (`nemiaSpec`) in the store `root`: her own allow list and deny, the fence derived from the table
- * (`nemiaFence`) and the store's denies (`storeDenies`), her memory allowed her; with the person's own allows `local` besides.
+ * (`nemiaFence`) less each prompt `local` allows by its own rule (`widened`) and the store's denies (`storeDenies`), her memory allowed
+ * her; with the person's own allows `local` besides, in her folder's local settings.
  */
 function herRules(root: string, local: readonly string[] = []): Rules {
   const her = nemia();
-  const fence = nemiaFence(TABLE);
+  const fence = widened(nemiaFence(TABLE), local);
   return {
     allow: [...(her.allowedTools ?? []), ...fence.allow, `Edit(/${path.join(root, 'nemia', 'memory')}/**)`, ...local],
     ask: fence.ask,
@@ -1172,6 +1173,16 @@ test('REFUSED to run unasked: an approval, a round, an accept, a raised cap and 
     ['cd /code/app && nemia approve r-1 design'],
     'her static rules allow an answer, but where it follows a command of no rule of hers: her admission alone asks it',
   );
+});
+
+test('a prompt the person allowed by its own rule runs unasked once she is filed again; a broader allow widens no prompt and no answer', () => {
+  const root = herStore();
+  assert.equal(verdictOf(herRules(root), 'nemia cancel r-1'), 'ask');
+  assert.equal(verdictOf(herRules(root, ['Bash(nemia cancel:*)']), 'nemia cancel r-1'), 'allow');
+  const broad = herRules(root, ['Bash(nemia:*)', 'Bash(nemia approve:*)']);
+  assert.equal(verdictOf(broad, 'nemia cancel r-1'), 'ask', 'an ask outranks an allow written anywhere');
+  assert.equal(verdictOf(broad, 'nemia approve r-1 design'), 'ask', 'what waits is asked by her admission over every allow');
+  assert.equal(verdictOf(herRules(root, ['Bash(nemia tick:*)']), 'nemia tick'), 'deny');
 });
 
 test('REFUSED: an edit of the store outside her folder, of her level or of her instruction is denied her, not asked; her memory is hers', () => {

@@ -1,6 +1,7 @@
 /**
  * Her fence, derived from the command table's classes (`CommandClass`): the calls she runs unasked, those asked of the person, and those
- * out of her reach (`nemiaFence`). Pure: her task is filed with it (`nemiaSpec`), beside the store's denies and her admission.
+ * out of her reach (`nemiaFence`), and the prompts the person widened (`widened`). Pure: her task is filed with it (`nemiaSpec`), beside the
+ * store's denies and her admission.
  */
 import type { CommandClass } from './class.ts';
 
@@ -40,3 +41,13 @@ export function nemiaFence(table: readonly Entry[]): Fence {
   }
   return fence;
 }
+
+/**
+ * `fence` with each prompt the person allowed by its own rule (`allows`, her folder's local settings) asked no more: an ask outranks an
+ * allow wherever each is written, so the ask is taken out and the person's allow reaches the call. Only a prompt is widened: an answer
+ * has no ask to take out and its admission asks over every allow, a deny stands over every allow, and a broader allow widens nothing.
+ */
+export const widened = (fence: Fence, allows: readonly string[]): Fence => ({
+  ...fence,
+  ask: fence.ask.filter((rule) => !allows.includes(rule)),
+});

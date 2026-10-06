@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
+import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 
@@ -99,6 +100,9 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   const set = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string; phase: string | null };
   assert.equal(set.phase, null, 'not filed until the keeper beats');
   fs.mkdirSync(path.join(ROOT, 'brand-new'));
+  const local = path.join(nemiaDir(), CONFIG_FOLDERS[0], 'settings.local.json');
+  fs.mkdirSync(path.dirname(local), { recursive: true });
+  fs.writeFileSync(local, JSON.stringify({ permissions: { allow: ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)'] } }));
   const bin = ownBin();
   assert.ok(bin !== undefined, "the checkout's own nemia");
   const searched = process.env.PATH;
@@ -126,7 +130,11 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   const settings = JSON.parse(own.settings) as { permissions: { ask: string[]; deny: string[] }; env: { PATH: string } };
   assert.equal(settings.env.PATH, [bin, '/usr/local/bin', '/usr/bin'].join(path.delimiter), "the daemon's own bin first, and once");
   const fence = nemiaFence(TABLE);
-  assert.deepEqual(settings.permissions.ask, fence.ask, 'her asks, derived from the table');
+  assert.deepEqual(
+    settings.permissions.ask,
+    fence.ask.filter((rule) => rule !== 'Bash(nemia cancel:*)'),
+    'her asks, derived from the table, less the prompt the person allowed in her folder',
+  );
   const denies = settings.permissions.deny;
   assert.deepEqual(denies.slice(0, fence.deny.length), fence.deny, 'tick and up out of her reach');
   assert.ok(fence.deny.includes('Bash(nemia tick:*)') && fence.deny.includes('Bash(nemia up:*)'));
@@ -161,6 +169,7 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   assert.equal(b.filings.filter((id) => id === set.task).length, 1);
   const status = await runWith(e, LEVEL.handler({}));
   assert.equal(status.level, 'semi-auto');
+  assert.deepEqual(status.allows, ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)'], 'what the person allowed in her folder, shown');
   assert.deepEqual(status.spend, { usd: 0.42, measured: 1, unmeasured: 0 });
   assert.ok(LEVEL.print(status, {}).includes('spent $0.42 over 1 session ended; her open one counts once it ends'));
   assert.equal(status.reach[0], `${DEFAULT_HARNESS} attach 01234567`);

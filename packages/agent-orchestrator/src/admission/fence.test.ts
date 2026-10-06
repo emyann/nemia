@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nemiaFence } from './fence.ts';
+import { nemiaFence, widened } from './fence.ts';
 import type { CommandClass } from './class.ts';
 
 /** A fixture table, one command of each class. */
@@ -40,4 +40,11 @@ test('REFUSED to run unasked: a command reclassed as a prompt asks, and one recl
   assert.ok(fence.ask.includes('Bash(nemia hold:*)'));
   assert.ok(fence.deny.includes('Bash(nemia ls:*)'));
   assert.ok(!fence.allow.some((r) => r.startsWith('Bash(nemia hold') || r.startsWith('Bash(nemia ls')));
+});
+
+test('REFUSED to widen what is not a prompt allowed by its own rule: an answer, a deny and a broader allow leave the fence as it is', () => {
+  const fence = nemiaFence(TABLE);
+  const allows = ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)', 'Bash(nemia tick:*)', 'Bash(nemia:*)', 'Bash(nemia level:*)'];
+  assert.deepEqual(widened(fence, allows), { ...fence, ask: ['Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)'] });
+  assert.deepEqual(widened(fence, ['Bash(nemia:*)', 'Bash(nemia level:*)']), fence);
 });

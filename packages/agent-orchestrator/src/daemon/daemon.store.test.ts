@@ -20,6 +20,7 @@ import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
+import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;
@@ -172,39 +173,43 @@ const typed = async (t: TestContext, argv: string[], e: Engine) => {
 
 const clear = () => fs.rmSync(FILE, { force: true });
 
-test('a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout', async (t) => {
-  assert.equal(daemonFile(), FILE);
-  clear();
-  seeded(t);
-  const beats: string[] = [];
-  const kinds = new Set<string>();
-  const e = engineOf(() => {
-    throw STOP;
-  });
-  e.setTick(async () => {
-    e.passes++;
-    const until = performance.now() + 10_000;
-    while (beats.length < 2) {
-      assert.ok(
-        performance.now() < until,
-        "two beats within 10s of one pass that awaits them, as an npm ci does: counted, not timed; without the beat's timer none comes",
+test(
+  'a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout',
+  WAITED,
+  async (t) => {
+    assert.equal(daemonFile(), FILE);
+    clear();
+    seeded(t);
+    const beats: string[] = [];
+    const kinds = new Set<string>();
+    const e = engineOf(() => {
+      throw STOP;
+    });
+    e.setTick(async () => {
+      e.passes++;
+      await until(
+        t,
+        () => {
+          const f = read();
+          assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
+          if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
+          kinds.add(daemonStanding().kind);
+          t.mock.timers.tick(1);
+          return beats.length >= 2;
+        },
+        "two beats of one pass that awaits them, as an npm ci does: counted, not timed; without the beat's timer none comes",
+        { everyMs: 5 },
       );
-      const f = read();
-      assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
-      if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
-      kinds.add(daemonStanding().kind);
-      t.mock.timers.tick(1);
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    throw STOP;
-  });
-  const { threw } = await typed(t, ['up', '10'], e);
-  assert.equal(threw, STOP);
-  assert.equal(e.passes, 1);
-  assert.ok(Date.parse(beats[1]) > Date.parse(beats[0]), beats.join(' '));
-  assert.deepEqual([...kinds], ['ticking']);
-  assert.ok(read().stoppedAt, 'let go as it stopped');
-});
+      throw STOP;
+    });
+    const { threw } = await typed(t, ['up', '10'], e);
+    assert.equal(threw, STOP);
+    assert.equal(e.passes, 1);
+    assert.ok(Date.parse(beats[1]) > Date.parse(beats[0]), beats.join(' '));
+    assert.deepEqual([...kinds], ['ticking']);
+    assert.ok(read().stoppedAt, 'let go as it stopped');
+  },
+);
 
 test("the beat writes only its own daemon's file: not over another holder, not after a stop, not a file it did not take", () => {
   clear();

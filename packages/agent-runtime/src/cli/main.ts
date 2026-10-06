@@ -538,6 +538,21 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
 };
 
 /**
+ * Refuses, with exit code 2, to run with `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`); then runs the verb `argv` names where
+ * it needs no engine — `admission`, the hook's (`admissionHook`), which `bin/ae.ts` runs before any engine loads. Answers whether it ran.
+ */
+function engineless(argv: string[]): boolean {
+  if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
+  switch (argv[0]) {
+    case 'admission':
+      admissionHook(argv.slice(1));
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
  * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
  * `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`).
  *
@@ -548,11 +563,11 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
  *   timer is only the backstop for a store that cannot or an OS event that is dropped, and a drain guard keeps
  *   "at-least-once, in order" true when a push and a tick land together, all behind one method: a CLI that re-implemented
  *   its easy half would be the worst consumer of its own API.
- * - `admission` is the hook's (`admissionHook`): `bin/ae.ts` runs it before any engine loads, and `main` serves it to a caller of its own.
+ * - `admission` is the hook's, served with no engine (`engineless`).
  */
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
-  if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
+  if (engineless(argv)) return;
   const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');
   const engine = await engineAt({ root });
 
@@ -600,9 +615,6 @@ export async function main(argv: string[]): Promise<void> {
       console.log(entryLine(arg, { kind: 'input', ...input }));
       return console.log(`run 'ae tick' (or 'ae up') to start its next turn`);
     }
-
-    case 'admission':
-      return admissionHook(argv.slice(1));
 
     case 'close':
       if (!arg) return console.log(HELP);

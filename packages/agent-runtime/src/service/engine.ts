@@ -2,24 +2,10 @@
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
  * are Effects with typed errors.
  */
-import { Cause, Context, Effect, Exit, Fiber, Layer, Schema } from 'effect';
+import { Context, Effect, Exit, Fiber, Layer, Schema } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import {
-  fold,
-  idleOf,
-  nameFor,
-  isLive,
-  pathOf,
-  phaseWordOf,
-  waitsOnPerson,
-  type Attempt,
-  type Input,
-  type LifecycleStep,
-  type Said,
-  type Sighting,
-  type State,
-} from '../core/index.ts';
+import { fold, nameFor, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
 import {
   argsRefusalOf,
   Runner,
@@ -70,13 +56,13 @@ import {
   type TaskView,
   BodyRefused,
 } from '../core/engine/index.ts';
-import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
 import { forgetVerbOf, journalBytesOf, type ForgetFailure, type ForgetReport } from './forget.ts';
 import { watchOf } from './watch.ts';
+import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
 import {
   handleOf,
   isSpec,
@@ -107,20 +93,6 @@ export class ListRefused extends Schema.TaggedError<ListRefused>()('ListRefused'
 /** A transcript this engine will not read, and why: a task it has no record of, a harness that keeps none, a cursor no read gave. */
 export class TranscriptRefused extends Schema.TaggedError<TranscriptRefused>()('TranscriptRefused', {
   message: Schema.String,
-}) {}
-
-/** Words `say` will not hand to a session, and why, in words that say what to do instead. Nothing was sent or journalled. */
-export class SayRefused extends Schema.TaggedError<SayRefused>()('SayRefused', {
-  message: Schema.String,
-}) {}
-
-/**
- * Words `say` could not hand over, or could not journal, for a reason that may pass: a registry that could not be read, a harness that
- * did not take them, a store that did not write. `cause` is what failed, when something did. Ask again.
- */
-export class SayUnsent extends Schema.TaggedError<SayUnsent>()('SayUnsent', {
-  message: Schema.String,
-  cause: Schema.optional(Schema.Defect()),
 }) {}
 
 /**
@@ -274,7 +246,9 @@ export type EngineShape = {
   /**
    * Tell the task's session something while it runs — `kubectl attach` with its audit line. `text` is handed, as
    * given, to the session of the attempt in flight through the task's own harness, and then journalled as a
-   * `said` entry — `at`, `attempt`, `text` — which is returned, and which `view` carries as `state.said`.
+   * `said` entry — `at`, `attempt`, `text`, `after` — which is returned, and which `view` carries as `state.said`. `after` is
+   * the last event the session's transcript held, read before the words go (`transcriptEndOf`): what the session writes of
+   * them comes after it in its transcript, whatever either clock reads.
    *
    * The words go before the entry: a `said` on the record is words a harness took, and a `say` that fails has
    * journalled nothing. What the session makes of them is its own affair, and `decide` never reads them. Words
@@ -410,23 +384,6 @@ export type EngineShape = {
   }) => Effect.Effect<{ stop: () => void }>;
 };
 
-/**
- * The attempt `say` hands words to, read off the journal: the last, still running. Refused, in words that say what to do,
- * for a task settled, asked to stop, not started, or whose last attempt has ended. `resume` says how to go on instead.
- */
-const openAttemptOf = (taskId: string, state: State, resume: string): { last: Attempt } | { refused: string } => {
-  const last = state.attempts.at(-1);
-  if (state.settled)
-    return { refused: `\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}` };
-  if (state.stopRequested) return { refused: `\`${taskId}\` has been asked to stop: its session is being stopped, not steered. ${resume}` };
-  if (!last)
-    return {
-      refused: `\`${taskId}\` has not started an attempt yet, so there is no session to hear anything. Ask again once \`ae ls\` shows it running.`,
-    };
-  if (last.ended !== null) return { refused: `\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`. ${resume}` };
-  return { last };
-};
-
 /** The W3C trace context of the span this runs in (`traceparentOf`): the filing's, for its sessions to join; undefined where none is. */
 const filingSpan = Effect.currentSpan.pipe(Effect.match({ onFailure: () => undefined, onSuccess: traceparentOf }));
 
@@ -455,9 +412,6 @@ const talliedVerb = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A,
     const fiber = tallied({ counts: noCounts(), observed: {} }, () => Effect.runForkWith(context)(program));
     return Effect.onInterrupt(Fiber.join(fiber), () => Fiber.interrupt(fiber));
   });
-
-/** What failed, in words, off a cause: its error's message, or the value itself. */
-const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
  * `start` over `tick`, a pass: one pass every `intervalMs` (3 s by default), none while the last still runs, each report handed to
@@ -695,77 +649,6 @@ const make = (options: EngineOptions) =>
       return (yield* go(transcriptOf(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     });
 
-    const sayVerb = Effect.fn('Engine.say')(function* (taskId: string, text: string) {
-      const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
-      const resume = 'Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.';
-      if (typeof text !== 'string' || !text.trim()) return yield* refuse('`text` is empty. Give the words the session should hear.');
-      const events = yield* read(taskId);
-      if (!events.length)
-        return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
-      const state = fold(taskId, events);
-      const harness = harnessOf(state);
-      const runner = runners[harness];
-      const h = harnesses[harness];
-      const deliver = runner.say;
-      if (!deliver) {
-        return yield* refuse(
-          (isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`,
-        );
-      }
-      const bgRefuses = () => claudeSayRefuses(state.config ?? {}, text);
-      const cannot = h === 'claude-bg' || (h === 'claude' && state.config?.background) ? bgRefuses() : undefined;
-      if (cannot) return yield* refuse(cannot);
-      const open = openAttemptOf(taskId, state, resume);
-      if ('refused' in open) return yield* refuse(open.refused);
-      const { last } = open;
-      const name = nameFor(taskId, last.n);
-      const unsent = (message: (e: unknown) => string) =>
-        Effect.catchCause((cause: Cause.Cause<unknown>) => {
-          const e = Cause.squash(cause);
-          return Effect.fail(new SayUnsent({ message: message(e), cause: e }));
-        });
-      const observed = yield* go(runner.observe).pipe(
-        unsent(
-          (e) =>
-            `the \`${harness}\` registry could not be read (${wordsOf(e)}), so ${name} could not be found. Nothing was said; ask again.`,
-        ),
-      );
-      const sighting = observed.get(name);
-      if (!sighting && isClaude(h) && runner.find) {
-        const registered = yield* go(runner.find(name)).pipe(Effect.catchCause(() => Effect.succeed(undefined)));
-        if (registered)
-          return yield* Effect.fail(
-            new SayUnsent({
-              message: `the \`${harness}\` registry could not be read, or did not list ${name}, which Claude Code has registered. Nothing was said; ask again.`,
-            }),
-          );
-      }
-      if (!sighting)
-        return yield* refuse(
-          `\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`,
-        );
-      const cannotBg = h === 'claude' && !isClaudeJob(sighting.sessionId) ? bgRefuses() : undefined;
-      if (cannotBg) return yield* refuse(cannotBg);
-      if (!isLive(sighting.state) && !idleOf(state, sighting)) {
-        return yield* refuse(
-          `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: the next pass writes its end. ${resume}`,
-        );
-      }
-      if (isRemote(h) && !waitsOnPerson(sighting.state)) {
-        return yield* refuse(
-          `\`${taskId}\` runs on the \`${harness}\` remote A2A agent, whose Task takes words only once it asks for input, and it is at work. Say them when \`ae ls\` shows it waiting, or ${resume.charAt(0).toLowerCase()}${resume.slice(1)}`,
-        );
-      }
-      yield* go(deliver({ name, sessionId: sighting.sessionId }, text)).pipe(
-        unsent((e) => `${name} was not given the words (${wordsOf(e)}). Nothing was journalled.`),
-      );
-      const said: Said = { at: new Date().toISOString(), attempt: last.n, text };
-      yield* go(Effect.flatMap(Journal, (j) => j.append(taskId, { kind: 'said', ...said }))).pipe(
-        unsent((e) => `${name} was given the words, but they could not be journalled (${wordsOf(e)}): the record does not show them.`),
-      );
-      return said;
-    });
-
     const answerVerb = Effect.fn('Engine.answer')(function* (taskId: string, text: string, options: { config?: HarnessArgs } = {}) {
       const refuse = (message: string) => Effect.fail(new InputRefused({ message }));
       if (Object.hasOwn(options, 'budgetUsd')) {
@@ -803,7 +686,7 @@ const make = (options: EngineOptions) =>
         ),
       transcript: transcriptVerb,
       output: outputVerbOf(read, runners, harnessOf),
-      say: sayVerb,
+      say: sayVerbOf(go, read, runners, harnesses, harnessOf),
       quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),

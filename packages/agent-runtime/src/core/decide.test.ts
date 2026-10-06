@@ -740,7 +740,7 @@ test('a journal with no `said` in it — every journal written before `say` — 
   const { said: none, ...legacy } = fold(TASK, ran('failed'));
   assert.deepEqual(none, []);
   const { said, ...rest } = fold(TASK, told(ran('failed')));
-  assert.deepEqual(said, [{ at: at(1_500), attempt: 1, text: 'widen the scope to the api' }]);
+  assert.deepEqual(said, [{ at: at(1_500), attempt: 1, text: 'widen the scope to the api', after: null }]);
   assert.deepEqual(rest, legacy, 'nothing else on the state moved');
 });
 

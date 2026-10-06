@@ -81,6 +81,9 @@ export type TranscriptEvent = {
   result?: { text: string; isError: boolean };
 };
 
+/** One event of a session's transcript, named as an event is unique: by its `kind` and `id` together. */
+export type TranscriptMark = { kind: TranscriptEvent['kind']; id: string };
+
 /**
  * Where a transcript read stopped, to hand back to the next: the byte offset after the last whole line
  * read, and a hash of the bytes just before it. The offset alone cannot tell a file that was replaced

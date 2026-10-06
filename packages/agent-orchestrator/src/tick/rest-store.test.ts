@@ -36,6 +36,7 @@ const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, r
   await import('../record/record.store.ts');
 const { feedFile } = await import('../feed/feed.store.ts');
 const { runWith } = await import('../runtime-client.ts');
+const { placeDirOf, RunPlace } = await import('../place/place.store.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -431,6 +432,39 @@ test('a result branch moved takes its run out and its tip is written; one delete
   git(run.repo, 'commit', '-q', '--allow-empty', '-m', 'later on the base branch');
   assert.equal(await rested(), before, 'the base branch is none of the key');
   assert.equal(readRun(run.id).tips![branch], moved);
+});
+
+/** A copy of the place the package ships, its `standing` a script that exits 1 unheard: every repository it is asked of reads unread. */
+const unreadPlace = (): string => {
+  const dir = path.join(scratch('wf-rest-place-'), 'git');
+  fs.cpSync(path.join(import.meta.dirname, '..', '..', 'place', 'git'), dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'scripts', 'standing.ts'), "process.stderr.write('the standing broke\\n');\nprocess.exit(1);\n");
+  return dir;
+};
+
+test('REFUSED: a repository whose standing is unread answers none of its runs with result branches from memory, and keeps their tips', async () => {
+  const run = aResting(true);
+  const [branch, tip] = Object.entries(readRun(run.id).tips ?? {})[0] ?? [];
+  assert.ok(branch && tip, 'the run has a tip on its record');
+  const tippedThere = [...MEMO.runs.values()].filter((kept) => kept.run.repo === run.repo && kept.tipped.length > 0).length;
+  assert.ok(tippedThere > 0, 'runs of its repository rest on their tips');
+  const before = await rested();
+  const moved = git(run.repo, 'commit-tree', `${tip}^{tree}`, '-p', tip, '-m', 'moved while unread');
+  git(run.repo, 'update-ref', `refs/heads/${branch}`, moved);
+  const there = new Set(
+    listRuns()
+      .filter((r) => r.repo === run.repo)
+      .map((r) => r.id),
+  );
+  const unread = unreadPlace();
+  const placed = (r: Pick<GitRun, 'id' | 'placeSkill'>) => (there.has(r.id) ? unread : placeDirOf(r));
+  const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }).pipe(Effect.provideService(RunPlace, placed)));
+  assert.equal(pass.cost!.rested, before - tippedThere, 'every run of it whose tips the memo holds is judged in full, and no other');
+  assert.equal(readRun(run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
+  assert.equal(await rested(), before - 1, 'its standing read again, the run whose branch moved is judged afresh');
+  assert.equal(readRun(run.id).tips![branch], moved, 'and its tip written');
+  await rested();
+  assert.equal(await rested(), before, 'and at rest again');
 });
 
 test('a run forgotten leaves the memo, and passes over runs at rest write nothing to the feed', async () => {

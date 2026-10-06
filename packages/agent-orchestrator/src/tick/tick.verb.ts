@@ -43,7 +43,7 @@ import { keepSeries } from '../series/series.store.ts';
 import { advancePass, type Advanced } from './advance.verb.ts';
 import { heldRead } from '../list/list.verb.ts';
 import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
-import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics } from '../meter/meter.verb.ts';
+import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics, talliedIn } from '../meter/meter.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything
@@ -170,12 +170,17 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     memo: memo ?? restMemo(e),
     verify: verifyRest ?? (yield* tried(() => verifiesRest())),
   };
-  const io0 = yield* ioOf(e);
-  const { value, ms, tallies } = yield* meteredPass(pass(meteredEngine(e), options));
+  const { io0, value, ms, tallies, io1 } = yield* talliedIn(
+    e,
+    Effect.gen(function* () {
+      const io0 = yield* ioOf(e);
+      return { io0, ...(yield* meteredPass(pass(meteredEngine(e), options))), io1: yield* ioOf(e) };
+    }),
+  );
   yield* recordStepMetrics(value.runs.flatMap((advanced) => advanced.facts ?? []));
   if (!tallies) return value;
   const t0 = performance.now();
-  const measured = costOf(tallies, ms, io0, yield* ioOf(e));
+  const measured = costOf(tallies, ms, io0, io1);
   const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
   const written = yield* tried(() => {
     const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks });

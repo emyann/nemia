@@ -74,6 +74,7 @@ export const board = () => {
       close: unkept('close'),
       watch: unkept('watch'),
       io: unkept('io'),
+      tallied: unkept('tallied'),
       start: unkept('start'),
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),

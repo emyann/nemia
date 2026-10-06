@@ -4,7 +4,8 @@
  * on each copy, as a restarted daemon makes one, and a tick with a fresh memo, read as much on every pass over the long feed as over the
  * short one: the first pass takes where the feed ends, and each after it reads on from where the last stopped, the orchestrator's
  * (`followedFeed`) and the runtime's (`forgetNamed`) alike. Before the third pass each run in flight is said a word, so that pass reads
- * the lines it appended, and only them.
+ * the lines it appended, and only them. And what another caller reads of the engine while a pass waits on its harness, as the api's
+ * reads do in the daemon's process, counts nothing to that pass.
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT`, set before the import with no cap on runs in flight; a fake harness
  * whose sessions work until `signAll` signs them. The passes that bring the store to rest judge again the runs the memo answered
@@ -31,6 +32,7 @@ delete process.env.WF_MAX_RUNS;
 const { runWith, startRun, tickRun } = await import('../runner.ts');
 const { listRuns } = await import('../record/record.store.ts');
 const { freshRestMemo } = await import('./tick.verb.ts');
+const { filingsRead } = await import('../views/views.verb.ts');
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], {
@@ -45,12 +47,20 @@ const LONG_BY = 20_000;
 
 const sessions = new Map<string, Sighting>();
 let spawned = 0;
+/** When set, the next observe says so (`entered`) and waits for `gate` before it answers; every observe after it answers at once. */
+let holding: { entered: () => void; gate: Promise<void> } | undefined;
 const runner: AsyncRunner = {
   async spawn(r) {
     spawned++;
     sessions.set(r.name, { sessionId: `s-${spawned}`, nativeId: `native-${spawned}`, state: 'working', busy: true });
   },
   async observe() {
+    const held = holding;
+    holding = undefined;
+    if (held) {
+      held.entered();
+      await held.gate;
+    }
     return new Map(sessions);
   },
   async stop() {},
@@ -134,4 +144,33 @@ test("every pass of a restarted tick reads as much over a feed 20,000 lines long
   const longReads = await passesOn(long.root);
   assert.ok(shortReads[2].runtime.bytes > 0 && shortReads[2].journals.bytes > 0, 'the third pass reads the lines the words appended');
   assert.deepEqual(longReads, shortReads);
+});
+
+/** Each harness's observes in a pass, by what they listed and started: their time is the machine's. */
+const observes = (c: PassCost) =>
+  Object.fromEntries(Object.entries(c.harnesses).map(([name, h]) => [name, { calls: h.calls, listed: h.listed, spawned: h.spawned }]));
+
+test('REFUSED: what another caller reads of the engine while a pass waits on its harness counts nothing to the pass: it reads as much as the pass before it', async () => {
+  await toRest();
+  const { root } = copied('engine-beside', 0);
+  const e = engineOn(root);
+  const memo = freshRestMemo();
+  const pass = async () => (await runWith(e, tickRun({ repo: ROOT, memo, verifyRest: false }))).cost!;
+  await pass();
+  const quiet = await pass();
+  let entered = () => {};
+  const waiting = new Promise<void>((r) => (entered = r));
+  let release = () => {};
+  holding = { entered, gate: new Promise<void>((r) => (release = r)) };
+  const besideIt = pass();
+  await waiting;
+  const io0 = Effect.runSync(e.io());
+  await runWith(e, filingsRead(0));
+  for (const run of listRuns().filter((r) => inFlight.some((f) => f.id === r.id))) await Effect.runPromise(e.view(run.steps.work.taskId!));
+  const io1 = Effect.runSync(e.io());
+  release();
+  const beside = await besideIt;
+  const observed = (io: typeof io0) => io.observed.codex?.calls ?? 0;
+  assert.ok(io1.bytesRead > io0.bytesRead && observed(io1) > observed(io0), 'the reads beside the pass read the feed and observed');
+  assert.deepEqual([reads(beside), observes(beside)], [reads(quiet), observes(quiet)]);
 });

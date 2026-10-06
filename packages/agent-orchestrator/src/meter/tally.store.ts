@@ -11,7 +11,8 @@
  * A pass is sequential — `tick` awaits each run before the next — which is what makes a stack right here. The meter is the pass's own,
  * carried by its async context (`AsyncLocalStorage`): what else in the process reads through these readers while a pass is open (the api's
  * own requests) counts nothing to it, and an Effect pass yields to no other fiber but where it waits (`PreventSchedulerYield`), so their
- * work falls in none of its phases either. A wait is the pass's time, whatever the process did meanwhile.
+ * work falls in none of its phases either. A wait is the pass's time, whatever the process did meanwhile. What the runtime reports of
+ * its own reads (`addRuntime`) is the pass's alone too: `tickRun` runs the pass in a tally of the runtime's (`talliedIn`).
  *
  * The bytes are the ones read through `readText` and `countRead`, a thin wrapper around the store's readers: not a syscall tracer, so
  * what a child process reads (git) is not in them, and neither is a read the store makes some other way. Nothing is carried between

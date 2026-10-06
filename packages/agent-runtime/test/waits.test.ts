@@ -199,7 +199,6 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/mcp.test.ts': { count: 1, not: 'to convert' },
   'test/quota.test.ts': { count: 2, not: 'to convert' },
   'test/start-event.test.ts': { count: 3, not: 'to convert' },
-  'test/unread-session.test.ts': { count: 2, not: 'to convert' },
 };
 
 /** A `now()` of `Date` or `performance` with a number added, across line breaks; built in parts, so this file says none. */

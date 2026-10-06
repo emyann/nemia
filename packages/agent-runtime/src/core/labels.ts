@@ -17,8 +17,7 @@ export const TASK_LABEL = 'task';
 
 /** Why a label's value cannot be carried, or `undefined`: anything but a text of 1 to 256 characters with no control character. */
 const labelValueRefusalOf = (key: string, value: unknown): string | undefined => {
-  if (typeof value === 'string' && value.length > 0 && value.length <= LONGEST_LABEL && ![...value].some((c) => c < ' ' || c === '\u007f'))
-    return undefined;
+  if (typeof value === 'string' && value.length > 0 && value.length <= LONGEST_LABEL && !/\p{Cc}/u.test(value)) return undefined;
   return `the label \`${key}\` is ${JSON.stringify(value)}, which is no label's value. Give a text of 1 to ${LONGEST_LABEL} characters with no control character.`;
 };
 

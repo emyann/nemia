@@ -3,7 +3,8 @@
  * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
  * loaded, where their ends say, and the skills whose paths they touched, and each rule its skills declare, kept or broken by those calls
- * (`discipline.ts`); and each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day.
+ * (`discipline.ts`); each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day; and each landing check
+ * that passed in more than half the deadline its task was filed with (`SlowLanding`), which asks for the deadline to be measured again.
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -12,7 +13,7 @@
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
-import { tryOf, type Run } from '../record/record.ts';
+import { isGitRun, tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
@@ -66,7 +67,8 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * not say its files. `rules` holds each rule the step's frozen skills declare, kept or broken by `denied`
  * (`rulesOfTry`), `[]` with none declared; null where `denied` is. `tallies` holds each count the frozen step declares (`tally:`), valued
  * off its session's own closeout (`tallyIn`): `[]` with none declared, and each value null for a try with no session of its own or whose
- * closeout does not hold it.
+ * closeout does not hold it. `landingDeadlineMs` is the deadline its check's task was filed with, where that check lands the run
+ * (`landsOnCheck`); null for any other check, a try with none, and a task filed with no deadline.
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -83,6 +85,7 @@ export type TryFact = RunKeys & {
   due: DueFact[] | null;
   rules: RuleFact[] | null;
   tallies: TallyFact[];
+  landingDeadlineMs: number | null;
 };
 
 /**
@@ -111,7 +114,8 @@ export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
  * closeout, every call a session's task was refused, one per call, worded as a permission rule (`Bash(git push)`), and every skill it
  * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`), and every file it touched, null where an end does not
  * say (`filesTouchedOf`); the rules each skill a step froze declares, by skill, and the paths each declares (`applies:`), by skill;
- * and the closeout a task's current turn made, undefined where it made none that reads.
+ * the closeout a task's current turn made, undefined where it made none that reads; and the deadline in seconds a task was filed with,
+ * null where it was filed with none.
  */
 export type RunRead = {
   run: Run;
@@ -126,6 +130,7 @@ export type RunRead = {
   rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
   appliesOf: (step: Workflow) => ReadonlyMap<string, readonly string[]>;
   closeoutOfTask: (taskId: string) => Closeout | undefined;
+  deadlineOf: (taskId: string) => number | null;
 };
 
 /** The UTC day of a time, `YYYY-MM-DD`. */
@@ -167,6 +172,13 @@ export const keysOf = (run: Run): RunKeys => ({
   repo: run.repo ?? null,
 });
 
+/** The deadline in ms a try's check was filed with, where its step lands the run on that check (`landsOnCheck`); else null. */
+function landingDeadlineOf(r: RunRead, step: Workflow, t: TimelineTry): number | null {
+  if (!t.check || !isGitRun(r.run) || !landsOnCheck(step, r.run)) return null;
+  const seconds = r.deadlineOf(t.check.taskId);
+  return seconds === null ? null : seconds * 1000;
+}
+
 /** A fact per try of `r`'s run that ended (`TryFact`). */
 function tryFactsOf(r: RunRead): TryFact[] {
   const keys = keysOf(r.run);
@@ -195,6 +207,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
             tally,
             value: t.session ? tallyIn(tally, r.closeoutOfTask(t.session.taskId)?.output) : null,
           })),
+          landingDeadlineMs: landingDeadlineOf(r, step, t),
         },
       ];
     }),
@@ -332,13 +345,28 @@ export type StepRow = {
   rules: RuleRow[];
 };
 
+/**
+ * A landing check that passed in more than half the deadline its task was filed with: the try's run, day, step and number, its check's run
+ * time, that deadline, and the share of it the check took.
+ */
+export type SlowLanding = RunKeys & { day: string; step: string; try: number; checkMs: number; deadlineMs: number; share: number };
+
+/** Each try whose landing check passed in more than half its filed deadline (`SlowLanding`), in the order of the tries. */
+export const slowLandingsOf = (tries: readonly TryFact[]): SlowLanding[] =>
+  tries.flatMap(({ run, factory, workflow, repo, day, step, try: n, check, checkMs, landingDeadlineMs: deadlineMs }) =>
+    check === 'passed' && checkMs !== null && deadlineMs !== null && checkMs > deadlineMs / 2
+      ? [{ run, factory, workflow, repo, day, step, try: n, checkMs, deadlineMs, share: checkMs / deadlineMs }]
+      : [],
+  );
+
 /** The last 14 days to today, and the 14 before them, each by its first and last day. */
 export type Tiles = { last: Headline & { from: string; to: string }; before: Headline & { from: string; to: string } };
 
 /**
  * The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles; the changes to what its runs
  * froze on the days of the range (`Mark`, `marks.ts`), sorted by day, run, kind and name; and a row per step and count it declares
- * (`TallyRow`, `tally.ts`), over the range and on each of its days, its sum null where no try of it was measured.
+ * (`TallyRow`, `tally.ts`), over the range and on each of its days, its sum null where no try of it was measured; and each landing check
+ * of the range that passed in more than half its filed deadline (`SlowLanding`).
  */
 export type Group = {
   total: Headline;
@@ -347,6 +375,7 @@ export type Group = {
   tiles: Tiles;
   marks: Mark[];
   tallies: TallyRow[];
+  slowLandings: SlowLanding[];
 };
 
 /**
@@ -461,6 +490,7 @@ function groupOf(f: Kept, from: string | null, to: string, today: string): Group
     tiles: { last: tile(dayPlus(today, -13), today), before: tile(dayPlus(today, -27), dayPlus(today, -14)) },
     marks: kept.marks,
     tallies: tallyRowsOf(kept.tries, from ? daysBetween(from, to) : []),
+    slowLandings: slowLandingsOf(kept.tries),
   };
 }
 

@@ -31,6 +31,7 @@ const aTry = (run: string, step: string, costUsd: number | null, more: Partial<T
   due: null,
   rules: null,
   tallies: [],
+  landingDeadlineMs: null,
   ...more,
 });
 

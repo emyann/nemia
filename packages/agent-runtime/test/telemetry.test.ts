@@ -15,7 +15,7 @@ import type { SpawnRequest } from '../src/harness/seam.ts';
 import { traceparentOf, withoutTelemetry } from '../src/harness/telemetry.ts';
 import { claudeTelemetryEnv, telemeteredFlags } from '../src/harness/claude/telemetry.ts';
 import { CLAUDE_JOB_ENV, claudeJob } from '../src/harness/claude/code.ts';
-import { claudeArgv } from '../src/harness/claude/bg.ts';
+import { claudeArgv, claudeOps } from '../src/harness/claude/bg.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
 import { scratch } from './scratch.ts';
@@ -348,4 +348,24 @@ test("a command of an engine given a collector is handed no telemetry, the engin
   );
   assert.equal((await settled(engine, id)).state.settled, 'succeeded');
   assert.equal(await Effect.runPromise(engine.output(id, 'stdout')), 'OTEL_OWN=mine\n');
+});
+
+test("a background session's claude inherits none of the engine's telemetry: what it exports, its --settings' env alone says", async (t) => {
+  withEnv(t, { ...ENGINE_OWN, SPAWN_OWN: 'mine' });
+  const bin = scratch('ae-telemetry-bin-');
+  const seen = path.join(bin, 'env');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then echo '[]'; exit 0; fi\nenv > '${seen}'\n`, {
+    mode: 0o755,
+  });
+  withEnv(t, { PATH: `${bin}:${process.env.PATH}` });
+  await Effect.runPromise(claudeOps({ root: scratch('ae-telemetry-') }).spawn({ ...told, cwd: scratch('ae-telemetry-cwd-') }));
+  const keys = fs
+    .readFileSync(seen, 'utf8')
+    .split('\n')
+    .map((line) => line.slice(0, line.indexOf('=')));
+  assert.ok(keys.includes('SPAWN_OWN'), "the engine's own environment still reaches it");
+  assert.deepEqual(
+    keys.filter((k) => k in ENGINE_OWN),
+    [],
+  );
 });

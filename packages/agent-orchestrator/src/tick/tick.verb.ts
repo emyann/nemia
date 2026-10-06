@@ -203,6 +203,9 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *
  * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in
  * flight (`judged`). An engine's report that carries no refusals — a test's fake — is read as having none.
+ *
+ * Its span says how many runs the store listed (`runs`) and how many of them were answered from memory (`rested`), which make no span
+ * of their own: a pass traces what it does, as many spans over many runs at rest as over few.
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const report = yield* asked('tick', engine.tick());
@@ -224,6 +227,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
       ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
+  yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
     ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging)),
     ...(forgetting.length ? { forgetting } : {}),
@@ -358,9 +362,16 @@ const restMemo = (e: Engine): RestMemo => {
 };
 
 /**
- * What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository.
+ * What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository;
+ * and how many runs it has answered from memory so far (`rested`), this pass's alone.
  */
-type RestingPass = { memo: RestMemo; stamps: Map<string, string>; heads: (repo: string) => Record<string, string>; verify: boolean };
+type RestingPass = {
+  memo: RestMemo;
+  stamps: Map<string, string>;
+  heads: (repo: string) => Record<string, string>;
+  verify: boolean;
+  rested: number;
+};
 
 /** The memo's run for an id whose stamp is the one it was kept at, for the store to list in place of reading its record; else nothing. */
 const keptOf =
@@ -387,6 +398,7 @@ const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMem
     memo,
     verify,
     stamps,
+    rested: 0,
     heads: (repo) => {
       const at = path.resolve(repo);
       if (!heads.has(at)) heads.set(at, headsOf(at));
@@ -415,7 +427,8 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  * repository). Otherwise a full pass (`advancePass`), kept in the memo if the run is at rest after it and the pass left the run as it read.
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
- * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches.
+ * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches. Untraced: a run
+ * judged in full is traced by its full pass (`advancePass`), and one answered from memory makes no span, counted on the pass's own.
  *
  * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout
  * are read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot`
@@ -423,13 +436,7 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  * any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a
  * step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
  */
-const advanceResting = Effect.fn('advanceResting')(function* (
-  e: Engine,
-  run: Run,
-  pass: PassRead,
-  resting: RestingPass | undefined,
-  slot?: RunSlot,
-) {
+const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRead, resting: RestingPass | undefined, slot?: RunSlot) {
   if (!resting) return (yield* fullPass(e, run, pass, slot)).advanced;
   const { memo, stamps, heads, verify } = resting;
   const stamp = stamps.get(run.id);
@@ -440,6 +447,7 @@ const advanceResting = Effect.fn('advanceResting')(function* (
     (yield* tried(() => !kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined))
   ) {
     countRested();
+    resting.rested++;
     if (verify) yield* verified(e, run, pass, slot, kept.advanced);
     return { ...kept.advanced, run };
   }

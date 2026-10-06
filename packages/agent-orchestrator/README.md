@@ -2944,7 +2944,9 @@ with its `run`, and one about a step with its `step` too; the runtime's journal 
   its spans, its logs and its metrics over OTLP/HTTP as JSON, to `<endpoint>/v1/traces`, `<endpoint>/v1/logs` and `<endpoint>/v1/metrics`,
   through Effect's own exporter (`OtlpTracer`, `OtlpLogger`, `OtlpMetrics`), under one service and resource. The spans are the verbs' own
   (`Effect.fn`): `tick` > `pass` > `advancePass` > a filing (`fileReady`) > the runtime's `file` > its journal's `append`, each annotated
-  with the run, the step and the task it was for. The metrics are every one in the process's registry (the pass's and the steps', below),
+  with the run, the step and the task it was for. A pass spans the work it does: a run answered from memory, a settled task with nothing
+  to release and a harness that reports no quota make no span; `pass` counts the runs it listed and answered from memory (`runs`,
+  `rested`), and the runtime's `tick` its tasks and those it kept (`tasks`, `kept`). The metrics are every one in the process's registry (the pass's and the steps', below),
   cumulative, posted every 10 s and once more as the process ends. A collector that does not answer costs a failed post, never a pass.
 - **`OTEL_SERVICE_NAME`** — the service the export is under, `nemia` unless set. Without an endpoint it does nothing.
 

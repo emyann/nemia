@@ -89,7 +89,7 @@ export const HARNESSES = {
 
 /**
  * The harnesses the daemon asks for their quota (`up`): each of the engine's that is a subscription of its own, so none that counts in
- * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process.
+ * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process, and no span.
  */
 export const quotaHarnesses = (): string[] =>
   Object.entries(HARNESSES)

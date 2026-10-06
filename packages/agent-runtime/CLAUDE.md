@@ -170,6 +170,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`**;
   a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
   `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
+  Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run
+  there may export under the session's labels.
 - **Every child the runtime starts is spawned `withoutTelemetry`** (`harness/telemetry.ts`): a session exports only what its runner hands
   it, never as the engine's process; `test/telemetry.test.ts` sets the engine's own and reads what a stub `claude` and a command see.
 - **A Bash deny reaches each part of `&&`, `||`, `;`, `|`, `&`, a `$(…)`, and a part behind `timeout`, `nohup` or `VAR=`** (2.1.288),

@@ -1715,7 +1715,7 @@ yield* engine.file({ brief: 'do it', cwd, labels: { team: 'a' } }) // its sessio
 Claude Code is handed its metrics, events and spans over `http/json` (`claudeTelemetryEnv`, `harness/claude/telemetry.ts`): a job in
 its environment, with `TRACEPARENT`; a background session in its `--settings`' `env`, since the session runs in Claude Code's own
 process and carries none of the environment it was asked from — and joins no trace there. A process the runtime starts — the detached
-worker, a `claude` verb, an admission command — is started without the engine's own telemetry (`withoutTelemetry`,
+worker, a `claude` verb, an admission command, the quota's ask — is started without the engine's own telemetry (`withoutTelemetry`,
 `harness/telemetry.ts`): OpenTelemetry's variables, the trace context and Claude Code's switches. So a `command` or Codex session
 exports nothing, and a Claude Code session exports only as its runner tells it.
 

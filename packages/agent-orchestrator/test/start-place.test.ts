@@ -57,7 +57,7 @@ const written = (): { runs: string[]; dirs: string[] } => {
   };
 };
 
-/** `startRun` of `workflowDir` on `repo`, with `place` as the place it opens when given: the run's record, or the refusal it failed with. */
+/** `startRun` of `workflowDir` on `repo`, opening `place` when given: the run's record, or the refusal it failed with. */
 function started(workflowDir: string, repo: string, place?: string) {
   const program = startRun({ brief: 'add a flag', repo, workflowDir });
   const exit = Effect.runSyncExit(place ? program.pipe(Effect.provideService(StartPlace, place)) : program);

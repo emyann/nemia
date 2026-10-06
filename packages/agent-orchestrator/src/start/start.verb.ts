@@ -356,8 +356,8 @@ export const placeVerbsNeeded = (steps: readonly Workflow[], run: Pick<Run, 'gat
   steps.some((step) => landsOnCheck(step, run)) ? ['status', 'land'] : [];
 
 /**
- * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out there,
- * and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`).
+ * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
+ * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`).
  */
 const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const placeDir = yield* StartPlace;

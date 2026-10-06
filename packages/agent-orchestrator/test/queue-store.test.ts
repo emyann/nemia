@@ -897,30 +897,29 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
   );
 });
 
-test('a queued card whose start fails without a refusal — its repository no git repository, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
+test('a queued card whose start fails without a refusal — its `.worktreeinclude` a directory, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
-  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
-  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
-  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
-  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+  const broken = aRepoWith('dev');
+  fs.mkdirSync(path.join(broken, '.worktreeinclude'));
+  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a directory');
   aCard('behind-c3d4', { workflow: 'dev', repo, queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
 
   const first = await runWith(b.e, tickRun());
   assert.ok(first.queue && 'failed' in first.queue, JSON.stringify(first.queue));
-  assert.deepEqual([first.queue.card, first.queue.again], ['no-git-a1b2', false]);
+  assert.deepEqual([first.queue.card, first.queue.again], ['odd-include-a1b2', false]);
   assert.match(
     first.queue.failed,
-    /^Command failed: git rev-parse HEAD \/ .*not a git repository/,
-    "a directory with a workflow in it, and no git: the start's `git rev-parse` fails, with no exit code of the package's",
+    /^EISDIR: illegal operation on a directory/,
+    "a repository whose `.worktreeinclude` is a directory: the start's read of it fails, with no exit code of the package's",
   );
-  const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8'));
-  assert.deepEqual([written.refused, written.repo, written.why], [false, bare, first.queue.failed]);
-  const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('no-git-a1b2'))!;
+  const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
+  assert.deepEqual([written.refused, written.repo, written.why], [false, broken, first.queue.failed]);
+  const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
     listed,
-    / {2}queued 1 of 2 — failed at \S+: Command failed: git rev-parse HEAD .* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
+    / {2}queued 1 of 2 — failed at \S+: EISDIR: illegal operation on a directory.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
   );
 
   const up = board();
@@ -940,7 +939,7 @@ test('a queued card whose start fails without a refusal — its repository no gi
   } finally {
     log.mock.restore();
   }
-  const named = printed.filter((l) => l.includes('no-git-a1b2'));
+  const named = printed.filter((l) => l.includes('odd-include-a1b2'));
   assert.equal(
     named.length,
     1,
@@ -948,7 +947,7 @@ test('a queued card whose start fails without a refusal — its repository no gi
   );
   assert.match(
     named[0],
-    /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: EISDIR: illegal operation on a directory.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
   );
   const again = await runWith(b.e, tickRun());
   assert.deepEqual(
@@ -956,15 +955,12 @@ test('a queued card whose start fails without a refusal — its repository no gi
     [true, []],
     'tried again, and nothing started behind it',
   );
-  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8')).at, written.at, 'not written again');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8')).at, written.at, 'not written again');
 
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: bare, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  fs.rmSync(path.join(broken, '.worktreeinclude'), { recursive: true });
   const cleared = await runWith(b.e, tickRun());
-  const [run] = fromCard('no-git-a1b2');
-  assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run.id, removed: true }, 'git put there: the next pass starts it');
+  const [run] = fromCard('odd-include-a1b2');
+  assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id, removed: true }, 'the directory gone: the next pass starts it');
   const behind = await runWith(b.e, tickRun());
   assert.deepEqual(
     [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],
@@ -973,7 +969,7 @@ test('a queued card whose start fails without a refusal — its repository no gi
   );
 });
 
-test("a queued card whose `repo:` is no git repository leaves the daemon's own stderr alone: git's words are read off the failure, not passed through", async (t) => {
+test("REFUSED at shipped defaults: a queued card whose `repo:` is no git repository, in the place's words, left queued; and the daemon's own stderr is left alone: git's words are not passed through", async (t) => {
   emptyStore(undefined);
   const b = board();
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
@@ -998,21 +994,22 @@ test("a queued card whose `repo:` is no git repository leaves the daemon's own s
     "git writes `fatal:` on its stderr, and that stderr is not the daemon's: a pass every four seconds would print it every four seconds",
   );
 
-  assert.ok(pass.queue && 'failed' in pass.queue, JSON.stringify(pass.queue));
-  assert.match(
-    queueLine(pass.queue),
-    /^no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ fatal: not a git repository/,
-    "read all the same, and said once, with the card's name on it",
+  assert.ok(pass.queue && 'refused' in pass.queue, JSON.stringify(pass.queue));
+  assert.ok(
+    queueLine(pass.queue).startsWith(
+      `no-git-a1b2 not started: ${bare} is not a git repository: run git init there and commit once, or name a repository with --repo — left queued as it is`,
+    ),
+    `the place's open refuses it, and the card is said once with its name on it: ${queueLine(pass.queue)}`,
   );
+  assert.deepEqual(listRuns(), [], 'and no run');
 });
 
 test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written', async (t) => {
   emptyStore('1');
   const b = board();
-  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
-  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
-  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
-  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+  const broken = aRepoWith('dev');
+  fs.mkdirSync(path.join(broken, '.worktreeinclude'));
+  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a directory');
   const before = await runWith(b.e, tickRun());
   assert.ok(
     before.queue && 'failed' in before.queue && !before.queue.again,
@@ -1038,13 +1035,13 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     log.mock.restore();
   }
 
-  const named = printed.filter((l) => l.includes('no-git-a1b2'));
+  const named = printed.filter((l) => l.includes('odd-include-a1b2'));
   assert.equal(
     named.length,
     1,
     `a run holds the one slot, so the daemon's first pass reads no queue, and its second tries the card and fails as the pass above did, \`again\`, never said by this daemon:\n${printed.join('\n')}`,
   );
-  assert.match(named[0], /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository/);
+  assert.match(named[0], /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: EISDIR: illegal operation on a directory/);
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
   assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);
 });

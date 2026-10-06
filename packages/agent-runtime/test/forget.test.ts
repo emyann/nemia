@@ -42,11 +42,16 @@ const fakeHarness = (world: World): RunnerOps => ({
 
 const freshWorld = (): World => ({ seen: new Map(), unread: new Set(), kept: new Map() });
 
-/** A store on the files under a scratch root, an engine on the fake harness, and `n` tasks settled on it. */
-const settledStore = async (n: number, world = freshWorld()) => {
+/**
+ * A store on the files under a scratch root, an engine on the fake harness, and `n` tasks settled on it; `counting: false` takes the
+ * store's own count of feed lines (`feedLines`) away.
+ */
+const settledStore = async (n: number, world = freshWorld(), { counting = true } = {}) => {
   const root = scratch('ae-forget-root-');
   const cwd = scratch('ae-forget-cwd-');
-  const engine = builtEngine(Engine.layer({ root, harnesses: { fake: fakeHarness(world) }, defaultHarness: 'fake' }));
+  const { feedLines, ...uncounted } = Journal.filesOps(root);
+  const journal = counting ? { ...uncounted, feedLines } : uncounted;
+  const engine = builtEngine(Engine.layer({ root, journal, harnesses: { fake: fakeHarness(world) }, defaultHarness: 'fake' }));
   const ids: string[] = [];
   for (let i = 0; i < n; i++) ids.push(await Effect.runPromise(engine.file({ brief: `task ${i}`, cwd, harness: 'fake' })));
   await Effect.runPromise(engine.tick());
@@ -101,6 +106,61 @@ test('without yes, forget counts what a settled task keeps and removes nothing; 
     [y],
   );
   assert.equal(Effect.runSync(engine.feed(0)).forgotten, lines, 'a read from the start says how many lines were forgotten');
+});
+
+test('a forget with yes reads the feed once, in the removal, and counts each task off what the removal forgot', async () => {
+  const { root, engine, ids } = await settledStore(20);
+  const [x] = ids as [string];
+  const lines = feedTasks(engine).filter((id) => id === x).length;
+  const feedBytes = fs.statSync(path.join(root, 'feed.jsonl')).size;
+  const journalBytes = fs.statSync(journalOf(root, x)).size;
+  const { done, io } = await Effect.runPromise(
+    engine.tallied(
+      Effect.gen(function* () {
+        const done = yield* engine.forget([x], { yes: true });
+        return { done, io: yield* engine.io() };
+      }),
+    ),
+  );
+  assert.ok(
+    io.bytesRead < journalBytes + 1.5 * feedBytes,
+    `the forget read ${io.bytesRead} bytes, under its journal's ${journalBytes} and one and a half times the feed's ${feedBytes}`,
+  );
+  assert.deepEqual(
+    done.tasks.map((t) => [t.taskId, t.feedLines]),
+    [[x, lines]],
+  );
+  assert.deepEqual(Object.keys(done.feed ?? {}), ['linesForgotten', 'bytesBefore', 'bytesAfter'], 'the feed is told as it was');
+  assert.equal(done.feed?.linesForgotten, lines);
+});
+
+test('a forget counts the feed lines it removes, a line no runtime wrote among them, without and with yes alike', async () => {
+  const { root, engine, ids } = await settledStore(2);
+  const [x] = ids as [string];
+  const decoded = feedTasks(engine).filter((id) => id === x).length;
+  fs.appendFileSync(path.join(root, 'feed.jsonl'), JSON.stringify({ taskId: x, event: { kind: 'nobody wrote this' } }) + '\n');
+  assert.equal(feedTasks(engine).filter((id) => id === x).length, decoded, 'a read of the feed skips the line it cannot decode');
+  const dry = await Effect.runPromise(engine.forget([x]));
+  assert.equal(dry.tasks[0]?.feedLines, decoded + 1, 'the count decodes no line: the one no runtime wrote is counted');
+  const done = await Effect.runPromise(engine.forget([x], { yes: true }));
+  assert.deepEqual([done.tasks[0]?.feedLines, done.feed?.linesForgotten], [decoded + 1, decoded + 1]);
+});
+
+test('a store with no count of its own feed lines gives a forget the same counts, off its feed read whole', async () => {
+  const reports = [];
+  for (const counting of [true, false]) {
+    const { engine, ids } = await settledStore(3, freshWorld(), { counting });
+    const [x, y] = ids as [string, string];
+    const dry = await Effect.runPromise(engine.forget([x, y]));
+    const done = await Effect.runPromise(engine.forget([x, y], { yes: true }));
+    const counts = (r: typeof dry) => r.tasks.map((t) => t.feedLines);
+    assert.ok(
+      counts(dry).every((n) => n > 0),
+      'each task has lines in the feed',
+    );
+    reports.push({ dry: counts(dry), done: counts(done), forgotten: done.feed?.linesForgotten });
+  }
+  assert.deepEqual(reports[1], reports[0]);
 });
 
 test('REFUSED: an id the store does not list, before anything of the listed one is removed', async () => {

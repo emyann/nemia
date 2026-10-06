@@ -1224,9 +1224,13 @@ test('output the engine cannot read is a 502 that says how to read it from the c
 const done = { outcome: 'done', summary: 'It is done.', needs: null, artifacts: [] };
 
 /**
- * A task on the run's `check` harness, as the engine journals one: running, or settled with the exit code its process gave, if it gave one.
+ * A task on the run's `check` harness, as the engine journals one: running, or settled with the exit code its process gave, if it gave one,
+ * its attempt ended by its harness unless `reason` says its deadline or an operator ended it.
  */
-const checkTask = (taskId: string, how: { running: true } | { settled: 'succeeded' | 'failed' | 'stopped'; exitCode?: number }) =>
+const checkTask = (
+  taskId: string,
+  how: { running: true } | { settled: 'succeeded' | 'failed' | 'stopped'; exitCode?: number; reason?: 'deadline' | 'operator' },
+) =>
   journal(taskId, [
     { ...filed(taskId), harness: 'check' },
     { kind: 'starting', at, attempt: 1 },
@@ -1239,7 +1243,7 @@ const checkTask = (taskId: string, how: { running: true } | { settled: 'succeede
             attempt: 1,
             sessionId: `ae/${taskId}/1`,
             observed: how.settled === 'succeeded' ? 'done' : how.settled,
-            reason: 'harness',
+            reason: how.reason ?? 'harness',
             ...(how.exitCode === undefined ? {} : { exitCode: how.exitCode }),
           },
           { kind: 'settled', at, outcome: how.settled },
@@ -1772,10 +1776,79 @@ test("a step with a `check:` carries its command, and once its check refused, th
         unreadable: null,
       },
     },
-    'stopped before it printed: no number, no stderr file, and the word of its harness, read by the id its end was recorded under with no observe, that its session printed nothing',
+    'stopped before it printed: no number, no stderr file, and, as for any check that kept no stdout, its log: the word of its harness, read by the id its end was recorded under with no observe, that its session printed nothing',
   );
   for (const name of ['docs', 'notes', 'plan', 'ship'])
     assert.equal(checkOf(name), null, `${name}: no check: in the workflow the run froze`);
+});
+
+test('a check its deadline or an operator ended reads `unfinished` whatever code it recorded, and one its harness ended reads its exit', async () => {
+  const cases = [
+    ['deadline', { settled: 'failed', exitCode: 1, reason: 'deadline' }],
+    ['operator', { settled: 'failed', exitCode: 1, reason: 'operator' }],
+    ['harness', { settled: 'failed', exitCode: 1 }],
+  ] as const;
+  for (const [name, how] of cases) {
+    settledTask(`t-72-${name}`, done);
+    checkTask(`r-72-${name}-check`, how);
+    checkStreams(`r-72-${name}-check`, { stdout: refusedOutput, stderr: '' });
+  }
+  writeRun({
+    ...r2,
+    id: 'r-72',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: cases.map(([name]) => ({ name, after: [], body: 'Test it.', check: 'npm test' })),
+    steps: Object.fromEntries(cases.map(([name]) => [name, { taskId: `t-72-${name}`, check: { taskId: `r-72-${name}-check` } }])),
+  });
+
+  const { steps } = await detailOf('r-72');
+  const words = Object.fromEntries(steps.map((s) => [s.name, [s.status, s.check?.verdict, s.check?.refused?.exit]]));
+  assert.deepEqual(words, {
+    deadline: ['failed ✗ check (unfinished)', 'unfinished', 'unfinished'],
+    operator: ['failed ✗ check (unfinished)', 'unfinished', 'unfinished'],
+    harness: ['failed ✗ check (exit 1)', 'exit 1', 'exit 1'],
+  });
+});
+
+test("an earlier try's check its deadline ended reads `unfinished` whatever code it recorded", async () => {
+  settledTask('r-73-implement', done);
+  checkTask('r-73-implement-check', { settled: 'failed', exitCode: 1, reason: 'deadline' });
+  settledTask('r-73-implement-try2', done);
+  checkTask('r-73-implement-try2-check', { settled: 'succeeded', exitCode: 0 });
+  writeRun({
+    ...r2,
+    id: 'r-73',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 }],
+    steps: {
+      implement: {
+        taskId: 'r-73-implement-try2',
+        check: { taskId: 'r-73-implement-try2-check' },
+        tries: [{ taskId: 'r-73-implement', check: { taskId: 'r-73-implement-check' }, then: 'retries' }],
+      },
+    },
+  });
+
+  const [implement] = (await detailOf('r-73')).steps;
+  const first = implement.tries[0].check;
+  assert.deepEqual([first?.verdict, first?.refused?.exit], ['unfinished', 'unfinished']);
+  assert.equal(implement.tries[1].check?.verdict, 'passed');
+});
+
+test('a refused check that kept no stdout is read off its log, as `nemia decide` reads it', async () => {
+  settledTask('t-74-e2e', done);
+  checkTask('r-74-e2e-check', { settled: 'stopped' });
+  detachedSession('check', 'r-74-e2e-check', 1, 'starting the browser\n', 1);
+  writeRun({
+    ...r2,
+    id: 'r-74',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: [{ name: 'e2e', after: [], body: 'Try it in a browser.', check: 'npm run e2e' }],
+    steps: { e2e: { taskId: 't-74-e2e', check: { taskId: 'r-74-e2e-check' } } },
+  });
+
+  const [e2e] = (await detailOf('r-74')).steps;
+  assert.deepEqual(e2e.check?.refused?.stdout, { lines: ['starting the browser'], truncated: false });
 });
 
 test('a refused check whose output cannot be read still answers, and says how to read it from the command line', async () => {

@@ -86,6 +86,7 @@ const PINNED: Record<string, string[]> = {
     'artifactsDir',
     'askFile',
     'atWork',
+    'attemptVerdict',
     'attachWorkflow',
     'bare',
     'beat',

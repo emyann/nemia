@@ -1,7 +1,7 @@
 /**
  * Her fence, derived from the command table's classes (`CommandClass`): the calls she runs unasked, those asked of the person, and those
- * out of her reach (`nemiaFence`), and the prompts the person widened (`widened`). Pure: her task is filed with it (`nemiaSpec`), beside the
- * store's denies and her admission.
+ * out of her reach (`nemiaFence`), and the prompts the person widened (`widened`). Pure: her task is filed with it (`nemiaSpec`), beside
+ * the store's denies and her admission.
  */
 import type { CommandClass } from './class.ts';
 

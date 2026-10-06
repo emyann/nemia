@@ -114,6 +114,7 @@ const InventorySchema = Schema.Struct({
       prunable: Schema.Boolean,
       clean: Schema.NullOr(Schema.Boolean),
       onBranch: Schema.Boolean,
+      changes: Schema.optionalKey(Strings),
     }),
   ),
   branches: Schema.Array(Schema.Struct({ branch: Schema.String, merged: Schema.Boolean })),
@@ -159,6 +160,10 @@ const PlaceDeclaredSchema = Schema.Struct({
     drop: Schema.String,
     conflicts: Schema.String,
     unlock: Schema.String,
+    attach: Schema.String,
+    commit: Schema.String,
+    inspect: Schema.String,
+    orphans: Schema.String,
   }),
 }) satisfies Schema.Schema<PlaceDeclared>;
 

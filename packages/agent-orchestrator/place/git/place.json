@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "verbs": ["open", "handoff", "status", "land", "trial", "export", "seal"],
+  "verbs": ["open", "handoff", "status", "land", "trial", "export", "seal", "inventory", "remove"],
   "denyWhileLanding": ["Bash(git commit:*)", "Bash(git merge --continue:*)"],
   "say": {
     "look": ["git diff {baseRef}", "git status"],
@@ -8,6 +8,10 @@
     "ship": "git -C {repo} merge --no-ff {branch}",
     "drop": "git -C {repo} branch -D {branches}",
     "conflicts": "`git status` shows them.",
-    "unlock": "git -C {repo} worktree unlock {path}"
+    "unlock": "git -C {repo} worktree unlock {path}",
+    "attach": "git -C {path} switch -c <branch>",
+    "commit": "git -C {path} commit",
+    "inspect": "git -C {path} status",
+    "orphans": "git worktree list in their repository, and git worktree remove each"
   }
 }

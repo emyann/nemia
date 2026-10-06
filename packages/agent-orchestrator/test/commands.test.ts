@@ -142,6 +142,9 @@ test('each command is served on the api where it was before the table, the lift 
           { method: 'GET', path: '/api/nemia/memory/:fact', status: 200 },
         ],
       ],
+      ['service install', 'cli'],
+      ['service uninstall', 'cli'],
+      ['service status', 'cli'],
       [
         'workflows write',
         [
@@ -193,6 +196,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'paused',
       'pause now',
       'memory',
+      'service status',
       'workflows list',
       'workflows step',
       'watch',

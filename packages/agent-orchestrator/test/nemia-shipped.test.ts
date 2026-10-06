@@ -84,7 +84,7 @@ const gateWordsIn = (files: Map<string, string>): string[] =>
     return [...flat.matchAll(/(?:\S+ ){0,3}\S*\bgat(?:e|es|ed|ing)\b/gi)].map((m) => `${file}: ${m[0]}`);
   });
 
-test("what ships with Nemia, and this factory's instruction to her, say \"gate\" only for a step's gate, but in her generated verbs skill", () => {
+test('what ships with Nemia, and this factory\'s instruction to her, say "gate" only for a step\'s gate, but in her generated verbs skill', () => {
   const files = shipped();
   files.delete('skills/verbs/SKILL.md');
   assert.ok(files.has('nemia.md') && files.has('skills/bring-what-waits/SKILL.md'), 'her instruction and her skills are read');
@@ -92,7 +92,7 @@ test("what ships with Nemia, and this factory's instruction to her, say \"gate\"
   assert.deepEqual(gateWordsIn(files), []);
 });
 
-test("REFUSED: \"gate\" said of what is not a step's gate is named, across a line break; a step's gate is not", () => {
+test('REFUSED: "gate" said of what is not a step\'s gate is named, across a line break; a step\'s gate is not', () => {
   const files = new Map([
     ['NEMIA.md', "His check files cards. Bring each card to the person as a gate. The landing step's gate is the person's."],
     ['skills/recap/SKILL.md', 'Offer to bring a waiting\ngate, rather than unasked.'],
@@ -101,10 +101,7 @@ test("REFUSED: \"gate\" said of what is not a step's gate is named, across a lin
       "A step at its\ngate: a step's gate, the design step's\ngate, its `gate:`, --gate <step>, a run gated at plan.",
     ],
   ]);
-  assert.deepEqual(gateWordsIn(files), [
-    'NEMIA.md: person as a gate',
-    'skills/recap/SKILL.md: bring a waiting gate',
-  ]);
+  assert.deepEqual(gateWordsIn(files), ['NEMIA.md: person as a gate', 'skills/recap/SKILL.md: bring a waiting gate']);
 });
 
 test('each of her skills reads as Claude Code reads her plugin, and the skill bring-what-waits replaced is gone', () => {

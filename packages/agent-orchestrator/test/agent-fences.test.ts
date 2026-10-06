@@ -34,6 +34,8 @@
  *
  * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
  * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
+ * A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence refuses the Skill tool's
+ * load (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,6 +51,7 @@ import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
 import { levelFile, promptFile, readNemia, storeDenies } from '../src/nemia/level.store.ts';
 import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
+import { rulesOfTry } from '../src/stats/discipline.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
@@ -517,12 +520,22 @@ function acting(step: Step): string[] {
  * by `line`.
  */
 function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'disallowedTools', line: string): Step {
+  return shippedEdited(agent, workflow, `a ${key} line to replace`, (text) =>
+    text.replace(new RegExp(`^${key}: .*$`, 'm'), `${key}: ${line}`),
+  );
+}
+
+/**
+ * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team whose agent file `edit` rewrote.
+ * Fails, saying the agent has no `what`, when the edit changes nothing.
+ */
+function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string): Step {
   const root = scratch(`wf-fences-${agent}-`);
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
   const file = path.join(root, 'agents', `${agent}.md`);
   const text = fs.readFileSync(file, 'utf8');
-  const changed = text.replace(new RegExp(`^${key}: .*$`, 'm'), `${key}: ${line}`);
-  assert.notEqual(changed, text, `${agent} has a ${key} line to replace`);
+  const changed = edit(text);
+  assert.notEqual(changed, text, `${agent} has ${what}`);
   fs.writeFileSync(file, changed);
   return loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.agent?.name === agent)!;
 }
@@ -565,6 +578,46 @@ test("build's design, implement and review each give effect, shadcn and change-t
 test('REFUSED: a work step that gives one of the three skills no more is named, read from its file as a run reads it', () => {
   assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn\n')), ['review: change-the-board']);
   assert.deepEqual(workSkillsMissing(buildWith('design', '')), ['design: effect', 'design: shadcn', 'design: change-the-board']);
+});
+
+/** The SKILL.md of a skill a step is given, from the first of `SKILL_FOLDERS` that holds one; undefined where none does. */
+const skillFileOf = (skill: string): string | undefined =>
+  SKILL_FOLDERS.map((dir) => path.join(dir, skill, 'SKILL.md')).find((file) => fs.existsSync(file));
+
+/** The SKILL.md of `skill` when it declares `allowed-tools` (`allowedToolsOf`), which a dontAsk job's Skill tool is refused to load. */
+const grantingFileOf = (skill: string): string | undefined => {
+  const file = skillFileOf(skill);
+  return file !== undefined && allowedToolsOf(file).length > 0 ? file : undefined;
+};
+
+/**
+ * Each skill a step is given whose SKILL.md grants tools (`grantingFileOf`), when the step's instructions do not say to read that file,
+ * by its path from the checkout, with Read. Each as `<step>: <skill>`.
+ */
+function grantingSkillsUnread(step: Step): string[] {
+  return (step.agent?.skills ?? [])
+    .filter((skill) => {
+      const file = grantingFileOf(skill);
+      if (file === undefined) return false;
+      const named = path.relative(REPO, file).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return !new RegExp(`read\\s+\`${named}\`\\s+with\\s+Read`).test(step.body);
+    })
+    .map((skill) => `${step.name}: ${skill}`);
+}
+
+test('every shipped dontAsk job given a skill that grants tools is told to read its SKILL.md with Read', () => {
+  const jobs = shipped()
+    .map(({ step }) => step)
+    .filter(dontAskJob);
+  const granted = jobs.filter((step) => (step.agent?.skills ?? []).some((skill) => grantingFileOf(skill) !== undefined));
+  assert.deepEqual(granted.map((step) => step.name).sort(), ['design', 'review'], 'design and review are given shadcn, which grants');
+  assert.deepEqual(jobs.flatMap(grantingSkillsUnread), []);
+});
+
+test('REFUSED: Seldon or Agora with no line naming shadcn’s SKILL.md to read with Read is named, read from its file as a run reads it', () => {
+  const unread = (text: string): string => text.replace(/read\s+`\.claude\/skills\/shadcn\/SKILL\.md`\s+with\s+Read/, 'read it');
+  assert.deepEqual(grantingSkillsUnread(shippedEdited('seldon', 'build', 'a line naming shadcn’s SKILL.md', unread)), ['design: shadcn']);
+  assert.deepEqual(grantingSkillsUnread(shippedEdited('agora', 'build', 'a line naming shadcn’s SKILL.md', unread)), ['review: shadcn']);
 });
 
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
@@ -718,6 +771,30 @@ test('REFUSED: a call that breaks a shipped rule, allowed to the step given the 
   );
   assert.deepEqual(brokenBy('Bash(git -C:*)'), { tool: 'Bash', command: 'git' }, "a denial keeps a command's first word");
   assert.deepEqual(brokenBy('Read(//etc/**)'), { tool: 'Read' });
+  assert.deepEqual(brokenBy('Glob'), { tool: 'Glob' });
+  const outside = shippedAllowed('seldon', 'build', 'Agent, Bash(npm run lint), Glob, Read(//home/**)');
+  assert.deepEqual(unbreakable(outside, spec.rules), ['design: read-within-reach Glob', 'design: read-within-reach Read']);
+  const [review] = SHIPPED_RULES.filter(({ skill }) => skill === 'review-a-change');
+  assert.ok(review, 'review-a-change declares its rules');
+  const line = (shippedStepOf('agora').allowedTools ?? []).join(', ');
+  assert.deepEqual(unbreakable(agoraAllowed(`${line}, Grep`), review.rules), ['review: read-within-reach Grep']);
+});
+
+test('the shipped read-within-reach rule is broken by a denied Glob, Grep or Read, as nemia stats counts it, and kept by a denied npm', () => {
+  const outside = 'Read(/srv/.agent-workflows/runs/r/artifacts/a.md)';
+  for (const skill of ['write-a-spec', 'review-a-change']) {
+    const [shipped] = SHIPPED_RULES.filter((rules) => rules.skill === skill);
+    assert.ok(shipped, `${skill} declares its rules`);
+    const declared = new Map([[skill, shipped.rules]]);
+    const reach = (denied: string[]) => {
+      const fact = rulesOfTry(denied, declared)?.find((rule) => rule.rule === 'read-within-reach');
+      assert.ok(fact, `${skill} declares read-within-reach`);
+      return { broken: fact.broken, by: fact.by };
+    };
+    assert.deepEqual(reach(['Glob', outside, 'Bash(npm)']), { broken: true, by: ['Glob', outside] }, skill);
+    assert.deepEqual(reach(['Grep']), { broken: true, by: ['Grep'] }, skill);
+    assert.deepEqual(reach(['Bash(npm)']), { broken: false, by: [] }, skill);
+  }
 });
 
 test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where the settings' allow would reach it", () => {

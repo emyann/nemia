@@ -12,7 +12,10 @@ description: "Review a change in this repository as a second engineer would: aga
    `sed` or a pipe in Bash: Bash runs only the checks below and git's read-only questions, each bare, one per call, and never a write:
    `git diff`, `git log`, `git show`, `git status`, `git merge-base`, `git rev-parse` and `git branch --contains`. Whether main is merged
    into the branch is `git merge-base --is-ancestor <commit> HEAD`, answered by its exit code alone, so ask it with nothing after it,
-   never `; echo $?` or `&& echo`; `git branch --contains <commit>` answers in words.
+   never `; echo $?` or `&& echo`; `git branch --contains <commit>` answers in words. Read, Grep and Glob reach this workspace, by
+   paths from its root, and each folder your brief says you may read — those the steps before you handed over — under its own path;
+   never the run's artifacts folder above them, another run's folder, the store (`~/.agent-workflows`), `~/.claude`, `~/.cache` or a
+   system path: your fence refuses them without asking. What your brief quotes from outside them is all you have of it.
 3. **Run the suite yourself**, each check bare and one command per call: `npx turbo run test --force --continue`,
    `npx turbo run typecheck --force`, `npm run lint`. Never wrap one in `timeout` or `( … )`, pipe it or redirect it; paths from the
    workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. A claim you did not run is not a finding.

@@ -3,12 +3,17 @@ import assert from 'node:assert/strict';
 import { admissionOf, type Scope } from './admission.ts';
 import { TABLE } from '../command/commands.verb.ts';
 
-/** The state the fixtures read: `r`'s step `gate` awaits approval, `check` failed its check, and no other run is there. */
-const waitOf = (runId: string, step: string): string | undefined =>
+/**
+ * The state the fixtures read: `r`'s step `gate` awaits approval, `check` failed its check, which a `--recheck` asks no one to run again,
+ * and no other run is there.
+ */
+const waitOf = (runId: string, step: string, recheck: boolean): string | undefined =>
   runId !== 'r'
     ? `is not there: there is no run ${runId}`
     : step === 'check'
-      ? undefined
+      ? recheck
+        ? undefined
+        : 'is failed (check)'
       : step === 'gate'
         ? 'is awaiting approval'
         : 'is not there';
@@ -24,6 +29,8 @@ test('REFUSED to run unasked: an approval, a round and an accept whatever waits,
     'nemia round r',
     'nemia accept r',
     'nemia retry r gate --message "go"',
+    'nemia retry r check',
+    'nemia retry r check --fresh',
     'nemia retry r check --budget 5',
     'nemia retry r check --budget=5',
     'nemia retry q check --recheck',
@@ -33,7 +40,7 @@ test('REFUSED to run unasked: an approval, a round and an accept whatever waits,
 });
 
 test('a retry of a step that waits on no one, a read and her own writes get no answer, and meet her static rules', () => {
-  for (const line of ['nemia retry r check --recheck', 'nemia retry r check && nemia tick', 'nemia show r', 'nemia hold r', 'ls'])
+  for (const line of ['nemia retry r check --recheck', 'nemia retry r check --recheck && nemia tick', 'nemia show r', 'nemia hold r', 'ls'])
     assert.equal(decided(line), undefined, line);
   assert.equal(decided('nemia approve r gate', 'Read'), undefined, 'no shell line');
 });

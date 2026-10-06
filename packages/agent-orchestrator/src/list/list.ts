@@ -18,7 +18,7 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { verdictWord, type Verdict } from '../check/check.ts';
-import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
+import { answerOf, dueNote, modeWord, retriesDue, tryNote, WAITS_ON_PERSON, type RetryAsk } from '../retry/index.ts';
 import {
   acceptanceOf,
   approvedFirst,
@@ -322,16 +322,8 @@ export function listing({
     if (waitingAgain.has(name)) return { name, status: 'waiting', branch };
 
     const status = refiled.has(name) ? own : stands;
-    const onYou =
-      status === 'blocked' ||
-      status === 'unsigned' ||
-      status === 'failed (check)' ||
-      status === 'awaiting approval' ||
-      status === 'exhausted' ||
-      status === 'over budget' ||
-      status === 'budget exhausted' ||
-      status === 'denied';
-    if (onYou && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
+    if (WAITS_ON_PERSON[status] && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
+      waitingOnYou.push(name);
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
       if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);

@@ -145,17 +145,27 @@ function scopeOf(line: string, table: readonly Entry[], scope: Scope): Admission
 /** Whether a command's words raise a step's cap. */
 const raises = (args: readonly string[]): boolean => args.some((a) => a === '--budget' || a.startsWith('--budget='));
 
+/** Whether a retry's words ask for its check again and nothing else (`--recheck`). */
+export const rechecks = (args: readonly string[]): boolean => args.includes('--recheck');
+
+/**
+ * Why a try of `step` of `runId` waits on the person, or undefined where it waits on no one, given whether it is a `--recheck`
+ * (`waitsOnPerson`); a run that does not read says it is not there.
+ */
+export type WaitOf = (runId: string, step: string, recheck: boolean) => string | undefined;
+
 /**
  * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), names
- * no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks, since it only answers what waits.
+ * no run and step, or tries a step `waitOf` says waits on the person, told whether the try is a `--recheck`; any other answer always asks,
+ * since it only answers what waits.
  */
-function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
+function askedOf({ name, args }: Typed, waitOf: WaitOf): string | undefined {
   const line = ['nemia', name, ...args].join(' ');
   if (name !== 'retry') return `${line} answers what waits on you: it is yours to give.`;
   if (raises(args)) return `${line} raises a step's cap: a budget is yours to raise.`;
   const [runId, step] = args.filter((a) => !a.startsWith('-'));
   if (runId === undefined || step === undefined) return `${line} names no run and step, so admission cannot read what it tries.`;
-  const waits = waitOf(runId, step);
+  const waits = waitOf(runId, step, rechecks(args));
   return waits === undefined ? undefined : `${line} answers what waits on you: ${step} of ${runId} ${waits}.`;
 }
 
@@ -166,12 +176,7 @@ function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) =>
  * says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there to read — or undefined where
  * it waits on no one.
  */
-export function admissionOf(
-  call: AdmissionCall,
-  table: readonly Entry[],
-  waitOf: (runId: string, step: string) => string | undefined,
-  scope?: Scope,
-): AdmissionAnswer | undefined {
+export function admissionOf(call: AdmissionCall, table: readonly Entry[], waitOf: WaitOf, scope?: Scope): AdmissionAnswer | undefined {
   const line = call.input.command;
   if (call.tool !== 'Bash' || typeof line !== 'string') return undefined;
   const inScope = scope === undefined ? undefined : scopeOf(line, table, scope);

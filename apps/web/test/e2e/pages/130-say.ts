@@ -55,9 +55,17 @@ export default {
         throw new Refused(
           `the api takes the words, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
         );
-      const entry = (await response.json()) as { at?: unknown; attempt?: unknown; text?: unknown };
-      if (typeof entry.at !== 'string' || entry.attempt !== 1 || entry.text !== SAYING.words || Object.keys(entry).length !== 3) {
-        throw new Refused(`the api answers with the engine's entry, { at, attempt, text } — it answered ${JSON.stringify(entry)}`);
+      const entry = (await response.json()) as { at?: unknown; attempt?: unknown; text?: unknown; after?: unknown };
+      if (
+        typeof entry.at !== 'string' ||
+        entry.attempt !== 1 ||
+        entry.text !== SAYING.words ||
+        JSON.stringify(entry.after) !== JSON.stringify(SAYING.mark) ||
+        Object.keys(entry).length !== 4
+      ) {
+        throw new Refused(
+          `the api answers with the engine's entry, { at, attempt, text, after }, after the seeded conversation's last event — it answered ${JSON.stringify(entry)}`,
+        );
       }
       const inbox = JSON.stringify({ type: 'user', session_id: SAYING.sessionId, message: { role: 'user', content: SAYING.words } });
       await expectNone(

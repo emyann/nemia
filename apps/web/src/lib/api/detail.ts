@@ -52,7 +52,12 @@ import { RunReadSchema, StepUsedSchema, type RunRead, type StepUsed } from './us
 const RetryModeSchema = Schema.Literals(['nudge', 'fresh', 'recheck']) satisfies Schema.Schema<RetryMode>;
 
 /** Decodes a `Said` (asks.ts). */
-const SaidSchema = Schema.Struct({ at: Schema.String, attempt: Schema.Number, text: Schema.String }) satisfies Schema.Schema<Said>;
+const SaidSchema = Schema.Struct({
+  at: Schema.String,
+  attempt: Schema.Number,
+  text: Schema.String,
+  after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
+}) satisfies Schema.Schema<Said>;
 
 /**
  * Mirrors `StepBudget` in apps/api/src/detail/detail.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to

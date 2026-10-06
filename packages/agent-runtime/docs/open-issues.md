@@ -744,7 +744,7 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
 - **A stop of a send another process makes** does nothing here: that process's send is its own. The stop is asked again on
   later passes, and a Task the send brings back is then cancelled; the deadline bounds the rest.
 
-### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, three gaps left)
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, five gaps left)
 
 The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
 pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
@@ -756,7 +756,14 @@ its registry). `decide` reads an unread name as `UNREAD` — nothing in `working
 (found in review); in `stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
 finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
-`src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
+`src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`.
+
+A `--bg` transcript is read the same way (2026-10-06). One that does not decode (`lines.ts`), and one found and then not read, fails
+the `--bg` `observe`: every background session is unread on that pass, never read as no statement and never `LOST`. A failed read is
+any error the OS gives once the file was found (`EACCES`, `EIO`, or `ENOENT` for a file gone since). A refused decode is kept while
+the transcript is unchanged. A failed read is never kept, so the next pass reads the file again (`TranscriptUnread`,
+`harness/claude/transcript.ts`). A session with no transcript at all still reads as none. The tests are in `test/transcript.test.ts`.
+What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
   harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
@@ -773,6 +780,14 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
   to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
   gap above already leaves too wide. Found in review of the run that made a failed observe say so.
+- **One transcript that cannot be read holds every `--bg` session unread.** A transcript whose decode is refused or whose read
+  keeps failing (a lasting `EACCES`) fails the whole `--bg` listing, so every background session waits unread until its deadline,
+  and one with no deadline waits for ever (the gap above). Reading unread per session needs the runner's `observe` to answer an
+  `Observation`, which it does not.
+- **`release` still reads a transcript that cannot be read as no usage.** `releaseFrom` (`harness/claude/bg.ts`) reads what a
+  session consumed after `claude stop` and answers nothing for any failure, a refused decode or a failed read. The end is on record
+  by then, so this never makes a statement absent or an attempt `LOST`, but the end's cost is missing. Retrying the read means
+  deciding whether a release whose stop is already done runs again.
 
 ## Verified live, once
 

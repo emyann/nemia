@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Usage } from '../../core/index.ts';
 import type { TranscriptEvent } from '../seam.ts';
+import { readTextAsync } from '../../core/engine/tally.ts';
 import { isoTime } from '../transcript.ts';
 import { type ContentBlock, decodeLine, type Line, lineOf, writtenAt } from './lines.ts';
 
@@ -33,6 +34,40 @@ export const transcriptFile = (sessionId: string): string | undefined => {
     }
   }
   return undefined;
+};
+
+/**
+ * A transcript found and then not read: the OS refused the read (`code`, as `EACCES`, `EIO`, or `ENOENT` for a file gone since it
+ * was found). Never no transcript: what it says is unknown until a later look reads it.
+ */
+export class TranscriptUnread extends Error {
+  readonly file: string;
+  readonly code: string | undefined;
+  constructor(file: string, cause: unknown) {
+    const code = (cause as { code?: unknown } | null)?.code;
+    super(
+      `the transcript \`${file}\` was found and cannot be read (${cause instanceof Error ? cause.message : String(cause)}); the next look` +
+        ' reads it again',
+      { cause },
+    );
+    this.name = 'TranscriptUnread';
+    this.file = file;
+    this.code = typeof code === 'string' ? code : undefined;
+  }
+}
+
+/**
+ * A session's transcript, found (`transcriptFile`) and read, with where it is; `undefined` only when no project folder holds it.
+ * Throws a `TranscriptUnread` when one found cannot be read, whatever the OS says, a file gone since it was found included.
+ */
+export const readSessionTranscript = async (sessionId: string): Promise<{ file: string; text: string } | undefined> => {
+  const file = transcriptFile(sessionId);
+  if (!file) return undefined;
+  try {
+    return { file, text: await readTextAsync(file) };
+  } catch (cause) {
+    throw new TranscriptUnread(file, cause);
+  }
 };
 
 /** Where line `i` of a transcript is, in a refusal's words: in `file` when it is given. */

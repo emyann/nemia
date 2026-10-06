@@ -93,7 +93,8 @@ owns what*.
   reading is added to the schema; any other line passes undecoded.
 - **A Claude Code transcript line of a kind the runtime reads is decoded by `LINES` (`harness/claude/lines.ts`), by the reader that
   reads it**: one that does not decode fails the `--bg` `observe` (every background session unread) or the `transcript` verb, never
-  read as absent. A field the runtime starts reading is added to the schema; any other line passes undecoded.
+  read as absent; so does a transcript found and not read (`TranscriptUnread`, `harness/claude/transcript.ts`), never kept by
+  `keptRead`. A field the runtime starts reading is added to the schema; any other line passes undecoded.
 - **A stream a runner keeps whole is read through `output`, never off the run directory** (`streamIn`, `detached.ts`, which counts
   the read); a harness that keeps its streams apart says `streams: true`. `config.env` is journalled with the task: no secret there.
 - **A test runs at whatever niceness and IO class its parent gave it, and a worker it starts inherits both**: read a niceness

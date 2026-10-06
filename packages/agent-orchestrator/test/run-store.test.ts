@@ -611,7 +611,7 @@ test("REFUSED: a run's files directory that cannot be removed answers why in one
   assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
 });
 
-test('a path names an inbox card by its file, by its name, through a link to the inbox; and no card outside it', () => {
+test('a path names an inbox card by its file, by its name, through a link to the inbox, and in an inbox that is a link; and no card outside it', () => {
   const inbox = path.join(ROOT, 'inbox');
   fs.mkdirSync(inbox, { recursive: true });
   assert.equal(filesStore.inbox.nameAt(path.join(inbox, 'c-named.md')), 'c-named');
@@ -621,6 +621,15 @@ test('a path names an inbox card by its file, by its name, through a link to the
   assert.equal(filesStore.inbox.nameAt(path.join(linked, 'c-named.md')), 'c-named');
   assert.equal(filesStore.inbox.nameAt(path.join(ROOT, 'elsewhere', 'c-named.md')), null);
   assert.equal(filesStore.inbox.nameAt('add a flag'), null);
+  const real = path.join(scratch('wf-run-store-real-'), 'inbox');
+  fs.renameSync(inbox, real);
+  fs.symlinkSync(real, inbox);
+  try {
+    assert.equal(filesStore.inbox.nameAt(path.join(real, 'c-named.md')), 'c-named', 'an inbox that is itself a link');
+  } finally {
+    fs.rmSync(inbox);
+    fs.renameSync(real, inbox);
+  }
 });
 
 test('a file that imports a run function from record.store.ts is refused, naming the file and the function', () => {

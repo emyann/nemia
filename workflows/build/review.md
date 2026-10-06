@@ -1,7 +1,7 @@
 ---
-place: git
 after: implement
 input: design
+place: git
 agent: agora
 loop: implement
 rounds: 3

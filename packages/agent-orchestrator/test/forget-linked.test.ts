@@ -32,7 +32,7 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   git(repo, 'init', '-q');
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
   const folder = fs.mkdtempSync(path.join(REAL, 'wf-'));
-  fs.writeFileSync(path.join(folder, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const tasks = new Map<string, string>();
   const e = promised({
     view: async (id: string) => ({

@@ -145,7 +145,7 @@ test('the README is written only when it is given, to the name the README alread
   assert.equal(fs.existsSync(fresh), false);
   const made = writeWorkflow(fresh, [step('implement')], '# fresh\n\nA first step.\n');
   assert.deepEqual([made.written, made.kept, made.removed], [['README.md', 'implement.md'], [], []]);
-  assert.deepEqual(snapshot(fresh), { 'README.md': '# fresh\n\nA first step.\n', 'implement.md': 'implement it\n' });
+  assert.deepEqual(snapshot(fresh), { 'README.md': '# fresh\n\nA first step.\n', 'implement.md': '---\nplace: git\n---\nimplement it\n' });
   assert.deepEqual(loadWorkflows(fresh), made.steps);
 });
 
@@ -347,7 +347,7 @@ test('REFUSED, with the folder as it was: a step name that is not a file name, o
  */
 const caseSensitive = (() => {
   const probe = fs.mkdtempSync(path.join(ROOT, 'case-'));
-  fs.writeFileSync(path.join(probe, 'a.md'), '');
+  fs.writeFileSync(path.join(probe, 'a.md'), '---\nplace: git\n---\n');
   const apart = !fs.existsSync(path.join(probe, 'A.md'));
   fs.rmSync(probe, { recursive: true, force: true });
   return apart;

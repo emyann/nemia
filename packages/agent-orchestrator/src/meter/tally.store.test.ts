@@ -127,7 +127,7 @@ const aRepo = (): string => {
 /** A workflow of one step, whose task the fake keeps pending for ever. */
 const oneStep = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'work.md'), 'work\n');
+  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork\n');
   return dir;
 })();
 

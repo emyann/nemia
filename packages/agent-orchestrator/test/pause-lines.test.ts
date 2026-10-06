@@ -50,7 +50,7 @@ const aStart = (): string[] => {
   fs.mkdirSync(dir);
   fs.mkdirSync(path.join(team, 'agents'));
   fs.writeFileSync(path.join(team, 'agents', 'worker.md'), '---\nharness: codex\n---\nDo the work.\n');
-  fs.writeFileSync(path.join(dir, 'work.md'), 'work it\n');
+  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
   const factory = `lines${++factories}`;
   addFactory({ name: factory, repos: [repo] });
   attachWorkflow({ factory, workflow: 'lines' });

@@ -49,10 +49,10 @@ function fresh(): { repos: string[]; loop: string; notes: string } {
   const team = teamCopy();
   const loop = path.join(team, 'loop');
   fs.mkdirSync(loop);
-  fs.writeFileSync(path.join(loop, 'implement.md'), 'Build what was asked.\n');
+  fs.writeFileSync(path.join(loop, 'implement.md'), '---\nplace: git\n---\nBuild what was asked.\n');
   fs.writeFileSync(
     path.join(loop, 'review.md'),
-    '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 2\n---\nReview it.\n',
+    '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: 2\n---\nReview it.\n',
   );
   fs.writeFileSync(
     path.join(loop, 'review.schema.json'),
@@ -251,7 +251,7 @@ test("a step on a remote agent is filed no mounts, and its brief names none, a r
   fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify({ peer: { url: 'https://peer.example' } }));
   const asked = path.join(path.dirname(loop), 'asked');
   fs.mkdirSync(asked);
-  fs.writeFileSync(path.join(asked, 'ask.md'), '---\nharness: a2a:peer\n---\nAsk it.\n');
+  fs.writeFileSync(path.join(asked, 'ask.md'), '---\nplace: git\nharness: a2a:peer\n---\nAsk it.\n');
   attachWorkflow({ factory: 'trio', workflow: 'asked' });
   const run = await Effect.runPromise(startRun({ brief: 'ask it', repo: repos[0], workflowDir: asked, isolate: false, factory: 'trio' }));
   assert.deepEqual(run.mounts, readOnly(repos[1], repos[2]), 'the run mounts them');
@@ -271,7 +271,7 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
   fs.writeFileSync(path.join(team, 'agents', 'coder.md'), '---\nharness: codex\npermissionMode: bypassPermissions\n---\nWrite the code.\n');
   const coded = path.join(team, 'coded');
   fs.mkdirSync(coded);
-  fs.writeFileSync(path.join(coded, 'code.md'), 'Code it.\n');
+  fs.writeFileSync(path.join(coded, 'code.md'), '---\nplace: git\n---\nCode it.\n');
   attachWorkflow({ factory: 'trio', workflow: 'coded' });
   hireAgent({ factory: 'trio', agent: 'coder', step: 'coded/code' });
   const runs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
@@ -328,7 +328,7 @@ test('REFUSED: a factory folder whose path a permission rule cannot name refuses
 
 /** `loop`'s implement step, rewritten to say `writable: <names>`. */
 const writing = (loop: string, names: string) =>
-  fs.writeFileSync(path.join(loop, 'implement.md'), `---\nwritable: ${names}\n---\nBuild what was asked.\n`);
+  fs.writeFileSync(path.join(loop, 'implement.md'), `---\nplace: git\nwritable: ${names}\n---\nBuild what was asked.\n`);
 
 /** The runs in the store, by file. */
 const runFiles = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
@@ -473,7 +473,7 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
   fs.writeFileSync(path.join(team, 'agents', 'coder.md'), '---\nharness: codex\n---\nWrite the code.\n');
   const coded = path.join(team, 'coded');
   fs.mkdirSync(coded);
-  fs.writeFileSync(path.join(coded, 'code.md'), `---\nwritable: ${path.basename(repos[1])}\n---\nCode it.\n`);
+  fs.writeFileSync(path.join(coded, 'code.md'), `---\nplace: git\nwritable: ${path.basename(repos[1])}\n---\nCode it.\n`);
   attachWorkflow({ factory: 'trio', workflow: 'coded' });
   hireAgent({ factory: 'trio', agent: 'coder', step: 'coded/code' });
   assert.equal(
@@ -485,7 +485,7 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
 
 test("a step's `reads: inbox` is filed the store's inbox read-only, on its first filing, a try and a round, and named on each new session's brief; no other step is", async () => {
   const { repos, loop } = fresh();
-  fs.writeFileSync(path.join(loop, 'implement.md'), '---\nreads: inbox\n---\nBuild what was asked.\n');
+  fs.writeFileSync(path.join(loop, 'implement.md'), '---\nplace: git\nreads: inbox\n---\nBuild what was asked.\n');
   const inbox = path.join(ROOT, 'inbox');
   const said = `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: \`${inbox}\`. Each is mounted read-only; read it with Read, Grep and Glob.`;
   const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }));
@@ -547,7 +547,7 @@ test("every folder a local step is filed with is named on its brief, as it is mo
   const { repos, loop } = fresh();
   fs.writeFileSync(
     path.join(loop, 'implement.md'),
-    `---\nwritable: ${path.basename(repos[1])}\nreads: inbox\n---\nBuild what was asked.\n`,
+    `---\nplace: git\nwritable: ${path.basename(repos[1])}\nreads: inbox\n---\nBuild what was asked.\n`,
   );
   const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   const b = board();

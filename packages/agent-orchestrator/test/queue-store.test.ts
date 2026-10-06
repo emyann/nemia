@@ -153,7 +153,7 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`. */
 const oneStep = (() => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 })();
 

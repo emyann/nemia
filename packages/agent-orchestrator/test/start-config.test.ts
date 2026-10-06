@@ -25,8 +25,8 @@ const { SHIPPED_PLACE, readPlaceJson } = await import('../src/place/place.store.
 function folder(name: string, own = 'effort: high', ending = 'gate: true'): string {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${own}\n---\nBuild it.\n`);
-  fs.writeFileSync(path.join(dir, 'ship.md'), `---\nafter: implement\nworkspace: main\n${ending}\ncheck: npm test\n---\nShip it.\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${own}\n---\nBuild it.\n`);
+  fs.writeFileSync(path.join(dir, 'ship.md'), `---\nafter: implement\nplace: git\nworkspace: main\n${ending}\ncheck: npm test\n---\nShip it.\n`);
   return dir;
 }
 

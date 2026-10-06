@@ -1,6 +1,6 @@
 ---
-place: git
 after: implement
+place: git
 # Who does the work is agents/reviewer.md: its keys, its instructions and its schema.
 agent: reviewer
 budget: 20

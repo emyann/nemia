@@ -29,9 +29,9 @@ const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 function workflow(name: string, landing: boolean): string {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\neffort: high\n---\nBuild it.\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\neffort: high\n---\nBuild it.\n');
   if (landing)
-    fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\ncheck: npm test\n---\nShip it.\n');
+    fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\ncheck: npm test\n---\nShip it.\n');
   return dir;
 }
 

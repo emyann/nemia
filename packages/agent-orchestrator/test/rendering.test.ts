@@ -262,7 +262,7 @@ test('REFUSED at shipped defaults: a codex agent with skills or a harness prompt
 test('REFUSED at shipped defaults: skills or a harness prompt on a step that continues another session, which keeps its own (F13)', () => {
   const dir = team(
     '---\nharnessPrompt: no-coding\n---\nYou build.\n',
-    { 'workflows/team/plan.md': '---\n---\nPlan it.\n' },
+    { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
     '---\nagent: builder\nafter: plan\nresume: plan\n---\n',
   );
   assert.match(
@@ -272,7 +272,7 @@ test('REFUSED at shipped defaults: skills or a harness prompt on a step that con
   const told = loadWorkflows(
     team(
       '---\n---\nYou build.\n',
-      { 'workflows/team/plan.md': '---\n---\nPlan it.\n' },
+      { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' },
       '---\nagent: builder\nafter: plan\nresume: plan\n---\nAnd go on.\n',
     ),
   ).find((s) => s.name === 'build')!;
@@ -369,7 +369,7 @@ const WIZARD =
 
 test("an agent Claude Code's /agents wizard wrote into .claude/agents/ runs as it is: `color` read and ignored, every other line the run's", () => {
   const repo = tree({ '.claude/agents/code-reviewer.md': WIZARD });
-  const home = tree({ 'workflows/team/review.md': '---\nagent: code-reviewer\n---\nReview the change.\n' });
+  const home = tree({ 'workflows/team/review.md': '---\nplace: git\nagent: code-reviewer\n---\nReview the change.\n' });
   const [step] = loadWorkflows(path.join(home, 'workflows', 'team'), { repo, home });
   assert.deepEqual([step.model, step.tools, step.permissionMode], ['sonnet', ['Read', 'Grep', 'Glob', 'Bash'], undefined]);
   const agent = agentsFor(path.join(home, 'workflows', 'team'), { repo, home }).get('code-reviewer') as Agent;
@@ -414,7 +414,7 @@ test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would d
 
 test("REFUSED at shipped defaults: a name in both of one repository's places, workflows/ and .claude/ — an agent and a skill — naming both", () => {
   const repo = tree({
-    'workflows/team/build.md': '---\nagent: builder\n---\n',
+    'workflows/team/build.md': '---\nplace: git\nagent: builder\n---\n',
     'workflows/agents/builder.md': '---\nskills: write-a-note\n---\nYou build.\n',
     'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
     '.claude/skills/write-a-note/SKILL.md': SKILL('write-a-note'),
@@ -531,7 +531,7 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
     'nothing to render: an agent with no instructions, no skills and the default prompt',
   );
   assert.equal(
-    renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': 'Just a step.\n' }), 'workflows', 'team'))[0], dir),
+    renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': '---\nplace: git\n---\nJust a step.\n' }), 'workflows', 'team'))[0], dir),
     undefined,
     'nothing to render: a step with no agent',
   );
@@ -724,7 +724,7 @@ test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and th
     name: 'review',
     brief: 'b',
     cwd: scratch('wf-rendering-codex-'),
-    config: { permissionMode: parseWorkflow('review', '---\nharness: codex\nsandbox: read-only\n---\nr\n').permissionMode },
+    config: { permissionMode: parseWorkflow('review', '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nr\n').permissionMode },
   });
   assert.equal(
     args[args.indexOf('-s') + 1],

@@ -51,7 +51,7 @@ const aRepo = (): string => {
 /** A workflow folder of one step, `implement`, with the frontmatter lines it is given. */
 const oneStep = (lines: string): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${lines}\n---\nimplement it\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${lines}\n---\nimplement it\n`);
   return dir;
 };
 

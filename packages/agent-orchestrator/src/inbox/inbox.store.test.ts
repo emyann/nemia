@@ -456,7 +456,7 @@ test("a start says what the card does not, over what it does: --workflows over `
   const repo = aRepoWith('dev');
   const other = aRepoWith('ui');
   const mine = fs.mkdtempSync(path.join(ROOT, 'mine-'));
-  fs.writeFileSync(path.join(mine, 'implement.md'), 'implement it, mine\n');
+  fs.writeFileSync(path.join(mine, 'implement.md'), '---\nplace: git\n---\nimplement it, mine\n');
 
   const over = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
   const run = readRun(

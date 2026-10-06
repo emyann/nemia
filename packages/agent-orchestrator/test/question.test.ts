@@ -87,7 +87,7 @@ test('QUESTIONS_SCHEMA is strict, as every schema handed to a harness is', () =>
 
 /** A step whose `output:` schema holds `properties`, read as the loader reads it. */
 const stepWith = (properties: Record<string, unknown>) =>
-  parseWorkflow('design', '---\noutput: design.schema.json\n---\nDesign it.\n', () =>
+  parseWorkflow('design', '---\nplace: git\noutput: design.schema.json\n---\nDesign it.\n', () =>
     JSON.stringify({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false }),
   );
 

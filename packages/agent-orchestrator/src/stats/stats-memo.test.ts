@@ -246,7 +246,7 @@ test('a run gone from the store is gone from the memo and from the answer', asyn
 test('a run whose workflow is not frozen on its record is never kept: its steps are read off its folder, which no stamp covers', async () => {
   const folder = path.join(ROOT, 'unfrozen');
   fs.mkdirSync(folder, { recursive: true });
-  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nharness: codex\n---\nImplement it.\n');
+  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\nharness: codex\n---\nImplement it.\n');
   await aRun('s-unfrozen', 6, true, folder);
   const memo = freshStatsMemo();
   await runWith(e, statsRun({}, NOW, { memo, ...unverified }));

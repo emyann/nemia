@@ -218,7 +218,7 @@ test('REFUSED at shipped defaults: a step that runs a fenced agent on the other 
 test('REFUSED at shipped defaults: the same widening on an agent a factory hires, and through writeWorkflow, which writes nothing', () => {
   const agents = agentsOf({ ada: '---\ntools: Read, Grep\n---\nWork.\n' });
   const hired = refusal(() =>
-    parseWorkflow('build', '---\ntools: Read, Bash\n---\nDo it.\n', undefined, agents, undefined, {
+    parseWorkflow('build', '---\nplace: git\ntools: Read, Bash\n---\nDo it.\n', undefined, agents, undefined, {
       agent: 'ada',
       factory: 'nemia',
       step: 'dev/build',
@@ -230,7 +230,7 @@ test('REFUSED at shipped defaults: the same widening on an agent a factory hires
   fs.mkdirSync(path.join(dir, 'agents'));
   fs.mkdirSync(path.join(dir, 'dev'));
   fs.writeFileSync(path.join(dir, 'agents', 'ada.md'), '---\ntools: Read, Grep\n---\nWork.\n');
-  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nagent: ada\n---\n');
+  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nplace: git\nagent: ada\n---\n');
   const folder = path.join(dir, 'dev');
   const written = refusal(() =>
     writeWorkflow(folder, [{ name: 'build', after: [], agent: 'ada', tools: ['Read', 'Bash'], body: '' }], undefined, { anywhere: true }),
@@ -260,13 +260,13 @@ test("REFUSED at shipped defaults: `background: true` over an agent in any mode 
   );
   assert.equal(stepOf(agents, 'agent: dontAsk\nbackground: false').background, false, 'a job reads only the checkout');
   assert.equal(
-    parseWorkflow('build', '---\nbackground: true\n---\nDo it.\n').background,
+    parseWorkflow('build', '---\nplace: git\nbackground: true\n---\nDo it.\n').background,
     true,
     'a step with no agent has no fence to widen',
   );
 
   const hired = refusal(() =>
-    parseWorkflow('build', '---\nbackground: true\n---\nDo it.\n', undefined, agents, undefined, {
+    parseWorkflow('build', '---\nplace: git\nbackground: true\n---\nDo it.\n', undefined, agents, undefined, {
       agent: 'dontAsk',
       factory: 'nemia',
       step: 'dev/build',
@@ -278,7 +278,7 @@ test("REFUSED at shipped defaults: `background: true` over an agent in any mode 
   fs.mkdirSync(path.join(dir, 'agents'));
   fs.mkdirSync(path.join(dir, 'dev'));
   fs.writeFileSync(path.join(dir, 'agents', 'ada.md'), '---\npermissionMode: dontAsk\n---\nWork.\n');
-  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nagent: ada\n---\n');
+  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nplace: git\nagent: ada\n---\n');
   const folder = path.join(dir, 'dev');
   const written = refusal(() =>
     writeWorkflow(folder, [{ name: 'build', after: [], agent: 'ada', background: true, body: '' }], undefined, { anywhere: true }),
@@ -324,7 +324,7 @@ test(
     const { parseAgent } = await import('../src/workflow.ts');
     const { renderedFlags } = await import('../src/agents/agents.ts');
     const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
-    const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
+    const step = parseWorkflow('write', '---\nplace: git\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
     const claude = renderedFlags(step, '/runs/r/agents/write');
     assert.deepEqual(
       Object.keys(claude ?? {}).sort(),

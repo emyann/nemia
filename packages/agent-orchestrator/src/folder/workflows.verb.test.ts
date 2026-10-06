@@ -53,14 +53,14 @@ test('a folder written from its steps through the entry is the folder its list a
 });
 
 test('a step the folder does not have is none, with the names of those it has', async () => {
-  const dir = folder('one-step', { 'only.md': 'Do it.\n' });
+  const dir = folder('one-step', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   const read = await runWith(e, WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT));
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
 
 test("REFUSED: a folder that does not load is listed with the loader's words whole, and the folder beside it still loads", async () => {
-  const good = folder('good', { 'only.md': 'Do it.\n' });
-  const bad = folder('bad', { 'only.md': '---\nafter: nowhere\n---\nDo it.\n' });
+  const good = folder('good', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
+  const bad = folder('bad', { 'only.md': '---\nafter: nowhere\nplace: git\n---\nDo it.\n' });
   const listed = await runWith(e, WORKFLOWS_LIST.handler({ dirs: [bad, good] }, undefined, ROOT));
   assert.deepEqual(listed[bad], { error: 'only: waits on "nowhere", which is not a step here' });
   assert.deepEqual(Object.keys(listed), [bad, good]);
@@ -125,8 +125,8 @@ function factoryOf(name: string, repos: string[], workflows: string[], hires: Re
 
 test('a folder of yours removed through the entry is gone, with every file it held named', async () => {
   const dir = folder('gone', {
-    'plan.md': 'Plan it.\n',
-    'build.md': '---\nafter: plan\n---\nBuild it.\n',
+    'plan.md': '---\nplace: git\n---\nPlan it.\n',
+    'build.md': '---\nafter: plan\nplace: git\n---\nBuild it.\n',
     'README.md': 'What it is for.\n',
     'plan.schema.json': '{}',
   });
@@ -144,14 +144,14 @@ test("REFUSED: a repository's workflow is not removed here, and the same folder 
   fs.mkdirSync(path.join(repo, '.git'));
   const theirs = path.join(repo, 'workflows', 'shared');
   fs.mkdirSync(theirs, { recursive: true });
-  fs.writeFileSync(path.join(theirs, 'only.md'), 'Do it.\n');
+  fs.writeFileSync(path.join(theirs, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   const yours = path.join(ROOT, 'workflows');
   await refused(
     theirs,
     Invalid,
     `${theirs} is not a workflow of yours (${path.join(yours, '<name>')}): only yours are removed here, and a repository's workflow is removed from its checkout, as a change to commit. Nothing was removed.`,
   );
-  const nested = folder(path.join('outer', 'inner'), { 'only.md': 'Do it.\n' });
+  const nested = folder(path.join('outer', 'inner'), { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   await assert.rejects(remove(nested), Invalid);
   assert.ok(fs.existsSync(nested));
   fs.renameSync(theirs, path.join(yours, 'shared'));
@@ -173,7 +173,7 @@ test('REFUSED: the folders of agents and of skills are no workflow, and both are
 
 test('REFUSED: a folder that is a link is not removed, nor what it points at', async () => {
   const target = scratch('wf-remove-target-');
-  fs.writeFileSync(path.join(target, 'only.md'), 'Do it.\n');
+  fs.writeFileSync(path.join(target, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   const link = path.join(ROOT, 'workflows', 'linked');
   fs.mkdirSync(path.dirname(link), { recursive: true });
   fs.symlinkSync(target, link);
@@ -200,7 +200,7 @@ test('REFUSED: a name not there, or a file of that name, is missing', async () =
 });
 
 test('REFUSED: a run that froze no workflow reads it from the folder, and one that froze it does not stop the removal', async () => {
-  const dir = folder('run-reads', { 'only.md': 'Do it.\n' });
+  const dir = folder('run-reads', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   runOn('r-reads', dir, false);
   await refused(
     dir,
@@ -215,8 +215,8 @@ test('REFUSED: a run that froze no workflow reads it from the folder, and one th
 });
 
 test('REFUSED: a card queued on the folder, freed by the commands its refusal names, and a card not queued does not stop the removal', async () => {
-  const dir = folder('card-on', { 'only.md': 'Do it.\n' });
-  const other = folder('card-elsewhere', { 'only.md': 'Do it.\n' });
+  const dir = folder('card-on', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
+  const other = folder('card-elsewhere', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   cardOn('queued-idea', dir, true);
   await refused(
     dir,
@@ -228,7 +228,7 @@ test('REFUSED: a card queued on the folder, freed by the commands its refusal na
   queueInInbox('queued-idea', { workflow: other });
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
-  const idle = folder('card-idle', { 'only.md': 'Do it.\n' });
+  const idle = folder('card-idle', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   cardOn('idle-idea', idle, false);
   await remove(idle);
   assert.equal(fs.existsSync(idle), false);
@@ -237,7 +237,7 @@ test('REFUSED: a card queued on the folder, freed by the commands its refusal na
 });
 
 test('REFUSED: a factory offering the name with nothing else to give under it, and neither one whose repository has the workflow nor one offering another name does', async () => {
-  const dir = folder('offered', { 'review.md': 'Read it.\n' });
+  const dir = folder('offered', { 'review.md': '---\nplace: git\n---\nRead it.\n' });
   const repo = scratch('wf-remove-factory-repo-');
   factoryOf('shop', [repo], ['offered'], { 'offered/review': 'reader', 'other/plan': 'planner' });
   factoryOf('elsewhere', [scratch('wf-remove-elsewhere-repo-')], ['other'], { 'other/plan': 'planner' });

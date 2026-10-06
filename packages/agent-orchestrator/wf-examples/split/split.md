@@ -1,4 +1,5 @@
 ---
+place: git
 harness: claude
 ---
 Break the request into parts that can be worked on at the same time without stepping on each other.

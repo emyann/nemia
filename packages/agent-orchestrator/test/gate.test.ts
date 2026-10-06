@@ -295,7 +295,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   const repo = aRepo();
   const b = board();
   const oneStep = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(oneStep, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(oneStep, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const parent = await Effect.runPromise(startRun({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] }));
   await runWith(b.e, advanceRun(readRun(parent.id)));
   const wt = readRun(parent.id).steps.implement.workspace!;

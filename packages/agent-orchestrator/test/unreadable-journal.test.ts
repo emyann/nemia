@@ -44,7 +44,7 @@ git(REPO, 'init', '-q');
 git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
 
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
+fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 
 /** What no runtime writes: a `measured` whose turns are a word. */
 const MISWRITTEN = { kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } };

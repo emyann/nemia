@@ -630,8 +630,8 @@ test('REFUSED: nemia prune does not wait on a hand-off from a worktree that is g
 /** A workflow folder whose `implement` is followed by `ship`, its ending: gated, and worked in the repository's own checkout. */
 const shipping = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nharness: codex\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nharness: codex\nafter: implement\nworkspace: main\ngate: true\n---\nship it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nharness: codex\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nharness: codex\nafter: implement\nworkspace: main\ngate: true\n---\nship it\n');
   return dir;
 };
 

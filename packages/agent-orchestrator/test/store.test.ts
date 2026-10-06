@@ -338,11 +338,11 @@ test("REFUSED at shipped defaults: a run is never started under an id the store 
 
 test('a run reads the workflow it froze at `nemia start` — the folder edited afterwards never reaches it', async () => {
   const folder = fs.mkdtempSync(path.join(ROOT, 'frozen-'));
-  fs.writeFileSync(path.join(folder, 'implement.md'), 'implement it as asked\n');
-  fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nimplement it as asked\n');
+  fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder, isolate: false }));
 
-  fs.writeFileSync(path.join(folder, 'implement.md'), 'something else entirely\n');
+  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nplace: git\n---\nsomething else entirely\n');
   fs.rmSync(path.join(folder, 'review.md'));
 
   const { e, filed } = recording();
@@ -496,7 +496,7 @@ const FORGOT_ONE = '; the engine forgot 1 task of it (1.0 KB of journal, 2 feed 
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), `${implementKeys ? `---\n${implementKeys}\n---\n` : ''}implement it\n`);
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   return dir;
 };
 
@@ -637,7 +637,7 @@ test('UNSIGNED at shipped defaults: a step that ends without the closeout the ru
 test('a `check:` planted in the folder after `nemia start` never reaches the check the run files', async () => {
   const dir = folder('check: npm test');
   const run = await started(dir);
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
 
   const { e, tasks, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -738,7 +738,7 @@ test('cancelling stops a running check — from the verb, and again from every p
 
 test("a step named for another step's check is refused at `nemia start`, before anything is spent", async () => {
   const dir = folder('check: npm test');
-  fs.writeFileSync(path.join(dir, 'implement-check.md'), 'a step of its own\n');
+  fs.writeFileSync(path.join(dir, 'implement-check.md'), '---\nplace: git\n---\na step of its own\n');
   await assert.rejects(
     async () => await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
     (err: Error & { exitCode?: number }) =>
@@ -803,8 +803,8 @@ test('a check filed by a pass that died, on a run then cancelled, is found and s
 
 test("an unchecked step's hand-off stops once the step after it works in the same workspace — the next check's litter stays off the branch", async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\ncheck: npm test\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\ncheck: npm test\n---\nreview it\n');
   const run = await started(dir);
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -863,10 +863,10 @@ const FOUND = [{ file: 'src/flag.ts', line: 12, what: 'the flag is read before i
 /** implement → review, which declares `output: review.schema.json` → respond, with whatever keys it is given. */
 const reviewed = (respondKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\noutput: review.schema.json\n---\nreview it\n');
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(FINDINGS, null, 2));
-  fs.writeFileSync(path.join(dir, 'respond.md'), `---\nafter: review\n${respondKeys}---\nanswer it\n`);
+  fs.writeFileSync(path.join(dir, 'respond.md'), `---\nafter: review\nplace: git\n${respondKeys}---\nanswer it\n`);
   return dir;
 };
 
@@ -978,7 +978,7 @@ test('`nemia start` refuses an `output:` file that is not there, and an `input:`
   );
 
   const early = reviewed('input: review\n');
-  fs.writeFileSync(path.join(early, 'respond.md'), '---\nafter: implement\ninput: review\n---\nanswer it\n');
+  fs.writeFileSync(path.join(early, 'respond.md'), '---\nafter: implement\ninput: review\nplace: git\n---\nanswer it\n');
   await assert.rejects(
     async () => await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: early })),
     (err: Error & { exitCode?: number }) =>
@@ -993,8 +993,8 @@ const declaring = (artifacts: string[]) => ({ outcome: 'done' as const, summary:
 
 test('a step is told where its files go — a directory the run made for it, outside every workspace — and so is a step that resumes', async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\n---\nanswer it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\nplace: git\n---\nanswer it\n');
   const run = await started(dir);
   const { e, tasks, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -1626,7 +1626,7 @@ test('an ask file the run cannot read is not honoured, and not touched: the pass
 
 test("a step named for another step's try is refused at `nemia start`, before anything is spent", async () => {
   const dir = folder();
-  fs.writeFileSync(path.join(dir, 'implement-try2.md'), '---\nafter: implement\n---\na step of its own\n');
+  fs.writeFileSync(path.join(dir, 'implement-try2.md'), '---\nafter: implement\nplace: git\n---\na step of its own\n');
   const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
   await assert.rejects(
     async () => await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir })),
@@ -1659,10 +1659,10 @@ const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { ty
  */
 const looped = (reviewKeys = '', implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
   fs.writeFileSync(
     path.join(dir, 'review.md'),
-    `---\nafter: implement\noutput: review.schema.json\nloop: implement\n${reviewKeys}---\nreview it\n`,
+    `---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\n${reviewKeys}---\nreview it\n`,
   );
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(LOOPING, null, 2));
   return dir;
@@ -1967,7 +1967,7 @@ test('REFUSED at the cap, at shipped defaults: `again: true` on round 3 files no
 /** implement ⇄ review as `looped()` builds it, and a gated ship after the loop: the ending an acceptance exists to reach. */
 const loopedThenShip = (reviewKeys = '') => {
   const dir = looped(reviewKeys);
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: review\ngate: true\n---\nship it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: review\nplace: git\ngate: true\n---\nship it\n');
   return dir;
 };
 const acceptAsksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('accept-')) : []);
@@ -2082,7 +2082,7 @@ test('an acceptance file the run cannot read is not honoured, and not touched: t
 /** The same loop, closed by a step with no gate: what waits on the loop runs the moment the loop is over, and nobody is asked. */
 const loopedThenDocs = () => {
   const dir = looped();
-  fs.writeFileSync(path.join(dir, 'docs.md'), '---\nafter: review\n---\nwrite it up\n');
+  fs.writeFileSync(path.join(dir, 'docs.md'), '---\nafter: review\nplace: git\n---\nwrite it up\n');
   return dir;
 };
 
@@ -2330,8 +2330,8 @@ test('a step with `context:` reaches `e.file` as its tokens, `contextTokens` —
 
 test("a step that continues another's session (`resume:`) is filed with that session's window, and with no line of its own inherits it — a retry of it too", async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncontext: 200k\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\ncheck: npm test\n---\nanswer it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncontext: 200k\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\nplace: git\ncheck: npm test\n---\nanswer it\n');
   const run = await started(dir);
   const { e, tasks, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -2686,9 +2686,9 @@ test('a run in flight keeps its momentum: its first step has none, and everythin
 
 test("a run's first steps are every step that waits on nothing: two roots with no momentum, and the step that joins them with 1", async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'left.md'), 'the left half\n');
-  fs.writeFileSync(path.join(dir, 'right.md'), 'the right half\n');
-  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\n---\njoin them\n');
+  fs.writeFileSync(path.join(dir, 'left.md'), '---\nplace: git\n---\nthe left half\n');
+  fs.writeFileSync(path.join(dir, 'right.md'), '---\nplace: git\n---\nthe right half\n');
+  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\nplace: git\n---\njoin them\n');
   const run = await Effect.runPromise(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
   const b = board();
   assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed.sort(), ['left', 'right']);
@@ -2700,9 +2700,9 @@ test("a run's first steps are every step that waits on nothing: two roots with n
 
 test("a fan-in whose two parents wrote one file differently is filed told the path its place's make left conflicted and the place's words for seeing it; a clean one is told of no conflict", async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'left.md'), 'the left half\n');
-  fs.writeFileSync(path.join(dir, 'right.md'), 'the right half\n');
-  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\n---\njoin them\n');
+  fs.writeFileSync(path.join(dir, 'left.md'), '---\nplace: git\n---\nthe left half\n');
+  fs.writeFileSync(path.join(dir, 'right.md'), '---\nplace: git\n---\nthe right half\n');
+  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\nplace: git\n---\njoin them\n');
   const joined = async (left: [string, string], right: [string, string]) => {
     const run = await Effect.runPromise(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
     const b = board();
@@ -3371,7 +3371,7 @@ const gitIn = (cwd: string, ...args: string[]) =>
 /** A workflow of one step, `implement`: its branch is the run's result. */
 const oneStep = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 };
 
@@ -4114,7 +4114,7 @@ const aRepoWith = (name: string): { repo: string; dir: string } => {
   const repo = aRepo();
   const dir = path.join(repo, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return { repo, dir };
 };
 
@@ -4177,7 +4177,7 @@ test("REFUSED at shipped defaults, before the first `start()`: `nemia plan` on a
   const repo = aRepo();
   const b = board();
   const broken = fs.mkdtempSync(path.join(ROOT, 'broken-'));
-  fs.writeFileSync(path.join(broken, 'implement.md'), '---\nafer: plan\n---\nimplement it\n');
+  fs.writeFileSync(path.join(broken, 'implement.md'), '---\nplace: git\nafer: plan\n---\nimplement it\n');
   const first = oneStep();
   const plan = aPlan(() => ({
     'a.md': cardText(`workflow: ${first}`, 'the first card'),
@@ -4327,7 +4327,7 @@ test("a run that waited on runs has its roots filed with `## From run <parent>` 
   const repo = aRepo();
   const c = board();
   const declaring = fs.mkdtempSync(path.join(ROOT, 'declaring-'));
-  fs.writeFileSync(path.join(declaring, 'implement.md'), '---\noutput: implement.schema.json\n---\nimplement it\n');
+  fs.writeFileSync(path.join(declaring, 'implement.md'), '---\nplace: git\noutput: implement.schema.json\n---\nimplement it\n');
   fs.writeFileSync(path.join(declaring, 'implement.schema.json'), JSON.stringify(FINDINGS));
   const p = await aParent(repo, c, {
     work: 'parent.txt',
@@ -4689,9 +4689,9 @@ test("a round that continues the loop's target hands it what was said to its las
 /** `plan → implement ⇄ review`, whose files sort implement, plan, review. */
 const plannedFolder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'planned-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'plan.md'), 'plan it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nloop: implement\noutput: review.schema.json\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\n---\nplan it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\nloop: implement\noutput: review.schema.json\n---\nreview it\n');
   fs.writeFileSync(
     path.join(dir, 'review.schema.json'),
     JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),
@@ -5347,7 +5347,7 @@ test("`nemia decide` of a run whose declared file is only on its branch says not
 test("a step's `budget:` is frozen on the run with the rest of its keys: the folder edited afterwards never raises it, nor takes it off", async () => {
   const dir = folder('budget: 2.50');
   const run = await started(dir);
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 500\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 500\n---\nimplement it\n');
   assert.deepEqual(
     stepsOf(readRun(run.id)).map((s) => [s.name, s.budget]),
     [
@@ -5989,7 +5989,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
 test('a run whose tasks the engine no longer knows is forgotten; so is a record from before runs froze their workflow whose folder is gone — which every pass, `nemia ls` and `nemia decide` read and died on — and the line says so; a run with no record is `no such run`, and what was left under its id is removed and named', async (t) => {
   const { e: neverHeardOfAnything } = recording();
   const legacyDir = fs.mkdtempSync(path.join(ROOT, 'legacy-'));
-  fs.writeFileSync(path.join(legacyDir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(legacyDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const legacy = { ...aRun('legacy-run-9z9z', { implement: { taskId: 'legacy-run-9z9z-implement' } }), workflowDir: legacyDir };
   writeRun(legacy);
   assert.equal(stepsOf(readRun(legacy.id)).length, 1, 'read from the folder, since the record froze nothing');
@@ -7046,7 +7046,7 @@ test('the whole screen of a step whose closeout does not read, never nudged', as
 
 test('the whole screen of a run whose every step passed its check', async (t) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
   const run = await started(dir);
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -7157,8 +7157,8 @@ test("REFUSED as a typed failure at `nemia start`: each refusal is the start pro
   const s = await startProgram();
   const repo = aRepo();
   const fan = fs.mkdtempSync(path.join(ROOT, 'fan-'));
-  fs.writeFileSync(path.join(fan, 'a.md'), 'side a\n');
-  fs.writeFileSync(path.join(fan, 'b.md'), 'side b\n');
+  fs.writeFileSync(path.join(fan, 'a.md'), '---\nplace: git\n---\nside a\n');
+  fs.writeFileSync(path.join(fan, 'b.md'), '---\nplace: git\n---\nside b\n');
   const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
     ['--repo on a folder team', { brief: 'x', repo, repoNamed: true, workflowDir: folderTeam() }],
     ['a gate naming no step', { brief: 'x', repo, workflowDir: folder(), gates: ['nowhere'] }],

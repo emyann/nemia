@@ -153,10 +153,10 @@ fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nafter: design\n---\n
  */
 const LOOPED = path.join(ROOT, 'looped', 'costed');
 fs.mkdirSync(LOOPED, { recursive: true });
-fs.writeFileSync(path.join(LOOPED, 'implement.md'), '---\nreads: costs\n---\nBuild it.\n');
+fs.writeFileSync(path.join(LOOPED, 'implement.md'), '---\nplace: git\nreads: costs\n---\nBuild it.\n');
 fs.writeFileSync(
   path.join(LOOPED, 'review.md'),
-  '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview it.\n',
+  '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview it.\n',
 );
 fs.writeFileSync(
   path.join(LOOPED, 'review.schema.json'),

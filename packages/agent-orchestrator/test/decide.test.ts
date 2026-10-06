@@ -161,8 +161,8 @@ const USAGE = { turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 
  */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   return dir;
 };
 
@@ -600,8 +600,8 @@ test("a measured cost on both screens: `nemia decide` prints each step's beside 
 test('REFUSED to hide why a step stopped past its budget: `nemia decide` on a step whose session failed after spending its budget says FAILED with its logs, and one that ended unsigned says UNSIGNED, each beside the OVER BUDGET line — and the offer names both', async (t) => {
   const budgeted = () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 3\n---\nimplement it\n');
-    fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 3\n---\nimplement it\n');
+    fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
     return dir;
   };
   const cases = [
@@ -688,7 +688,7 @@ test("the branch's standing against the base is a fact on every screen — on it
 test("a folder whose last step is an ending: `nemia decide` says what that step would do in the folder's words, and the word that runs it — and prints no git command, since the step is the one that merges", async (t) => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
     "---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
@@ -735,8 +735,8 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
 /** A folder of `implement`, then `ship`, its ending, gated and merging on the base branch. */
 const shipping = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it.\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it.\n');
   return dir;
 };
 
@@ -793,8 +793,8 @@ test("REFUSED: an ending led by an agent that says `You are …` — `nemia deci
   const LANDS = "Land this run's result on main: stage the merge of its branch, and sign off with the commit message.";
   const atGate = async (note: string) => {
     const dir = fs.mkdtempSync(path.join(team, 'wf-'));
-    fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
-    fs.writeFileSync(path.join(dir, 'land.md'), `---\nafter: implement\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`);
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+    fs.writeFileSync(path.join(dir, 'land.md'), `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`);
     const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
     const { e, settle } = board();
     await runWith(e, advanceRun(readRun(run.id)));
@@ -883,7 +883,7 @@ test('a run that worked on the base branch itself says so, and still says what i
 test("a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it", async (t) => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nworkspace: main\nslot: none\n---\nWatch the runs.\n');
+  fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: main\nslot: none\n---\nWatch the runs.\n');
   const run = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -939,8 +939,8 @@ test("a run whose one step works in the checkout is not shown the base branch's 
 test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', async () => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it.\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it.\n');
   const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   await assert.rejects(
     async () => await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
@@ -971,7 +971,7 @@ test('`nemia ls` views each task once, and runs added in a repository it already
     }
   };
   const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(oneStep, 'work.md'), 'work it\n');
+  fs.writeFileSync(path.join(oneStep, 'work.md'), '---\nplace: git\n---\nwork it\n');
   const first = (await Effect.runPromise(startRun({ brief: 'first', repo, workflowDir: oneStep, isolate: true }))).id;
   await runWith(e, advanceRun(readRun(first)));
   settle(`${first}-work`, 'succeeded', SIGNED);
@@ -1246,8 +1246,8 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
 
 test('the whole screen of a step past its budget: FAILED and OVER BUDGET, and the offer', async (t) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 3\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 3\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await Effect.runPromise(startRun({ brief: 'add sub, failed', repo: aRepo(), workflowDir: dir, isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -1361,7 +1361,7 @@ test('the whole screen of a shipped run: the branch merged by hand', async (t) =
 test("the whole screen of an ending at its gate: the folder's words, approve it and send it back", async (t) => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
     "---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
@@ -1576,8 +1576,8 @@ test('the whole screen of `nemia decide --help`, of `nemia decide` with no run, 
 
 test('the whole screen of a run on two branches, one with a note longer than the screen shows', async (t) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  fs.writeFileSync(path.join(dir, 'docs.md'), 'write it down\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
   const run = await Effect.runPromise(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));

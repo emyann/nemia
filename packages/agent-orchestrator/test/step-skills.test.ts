@@ -109,7 +109,7 @@ test('REFUSED at shipped defaults: the same skill added over a factory hire, and
   const agents = agentsOf({ tooled: '---\ntools: Read, Bash\n---\nWork.\n' });
   const hire = { agent: 'tooled', factory: 'nemia', step: 'dev/build' };
   holds(
-    refusal(() => parseWorkflow('build', '---\nskills: look\n---\nDo it.\n', undefined, agents, undefined, hire)),
+    refusal(() => parseWorkflow('build', '---\nplace: git\nskills: look\n---\nDo it.\n', undefined, agents, undefined, hire)),
     'look',
     'tooled',
   );
@@ -118,7 +118,7 @@ test('REFUSED at shipped defaults: the same skill added over a factory hire, and
   fs.mkdirSync(path.join(dir, 'agents'));
   fs.mkdirSync(path.join(dir, 'dev'));
   fs.writeFileSync(path.join(dir, 'agents', 'tooled.md'), '---\ntools: Read, Bash\n---\nWork.\n');
-  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nagent: tooled\n---\n');
+  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nplace: git\nagent: tooled\n---\n');
   const folder = path.join(dir, 'dev');
   holds(
     refusal(() =>
@@ -131,10 +131,10 @@ test('REFUSED at shipped defaults: the same skill added over a factory hire, and
 });
 
 test('REFUSED: `skills:` on a step with no agent, naming the fix; the same file over a factory hire loads', () => {
-  const said = refusal(() => parseWorkflow('build', '---\nskills: look\n---\nDo it.\n'));
+  const said = refusal(() => parseWorkflow('build', '---\nplace: git\nskills: look\n---\nDo it.\n'));
   assert.ok(said.startsWith('build: `skills: look`'), said);
   assert.ok(said.includes('`agent: <name>`'), said);
-  const hired = parseWorkflow('build', '---\nskills: look\n---\nDo it.\n', undefined, AGENTS, undefined, {
+  const hired = parseWorkflow('build', '---\nplace: git\nskills: look\n---\nDo it.\n', undefined, AGENTS, undefined, {
     agent: 'ada',
     factory: 'nemia',
     step: 'dev/build',
@@ -196,7 +196,7 @@ test("`nemia start` freezes the step's own line and the session's list, renders 
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   const run = await Effect.runPromise(startRun({ brief: 'add a skill', repo, workflowDir: path.join(root, 'dev') }));
-  fs.writeFileSync(path.join(root, 'dev', 'implement.md'), '---\nagent: implementer\n---\n');
+  fs.writeFileSync(path.join(root, 'dev', 'implement.md'), '---\nplace: git\nagent: implementer\n---\n');
   const frozen = (readRun(run.id).workflow ?? []).find((s) => s.name === 'implement')!;
   assert.deepEqual(frozen.skills, ['review-a-change']);
   assert.deepEqual(frozen.agent?.skills, ['implement-a-change', 'review-a-change']);

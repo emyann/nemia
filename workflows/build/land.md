@@ -1,6 +1,6 @@
 ---
-place: git
 after: review
+place: git
 workspace: main
 agent: otto
 gate: true

@@ -89,7 +89,7 @@ test('a step filed with its rendered folder gone is told its layers in its brief
 });
 
 test('a step with no agent: its own words are the policy, no agent layer, and a brief not filed is no task', () => {
-  const step = parseWorkflow('build', 'Build it.\n');
+  const step = parseWorkflow('build', '---\nplace: git\n---\nBuild it.\n');
   const told = toldLayers(step, null);
   assert.deepEqual(told, {
     agent: null,
@@ -109,7 +109,7 @@ test("a skill both the agent and the step name is the agent's; only what the ste
   assert.deepEqual(skillLayers(stepOf('agent: ada\nskills: beta, gamma')), { agent: ['alpha', 'beta'], added: ['gamma'] });
   assert.deepEqual(skillLayers(stepOf('agent: ada')), { agent: ['alpha', 'beta'], added: [] });
   assert.deepEqual(skillLayers(stepOf('agent: bare\nskills: gamma')), { agent: [], added: ['gamma'] });
-  assert.deepEqual(skillLayers(parseWorkflow('build', 'Build it.\n')), { agent: [], added: [] });
+  assert.deepEqual(skillLayers(parseWorkflow('build', '---\nplace: git\n---\nBuild it.\n')), { agent: [], added: [] });
 });
 
 test("a record frozen before the added skills were: every skill the step's line names counts as the step's", () => {

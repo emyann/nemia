@@ -289,7 +289,7 @@ test('REFUSED at shipped defaults: a worktree with a change no commit has — un
   for (const change of ['untracked', 'modified'] as const) {
     const b = board();
     const { run, wt } = await aFinished(b, { merged: true });
-    if (change === 'untracked') fs.writeFileSync(path.join(wt, 'notes.md'), 'notes\n');
+    if (change === 'untracked') fs.writeFileSync(path.join(wt, 'notes.md'), '---\nplace: git\n---\nnotes\n');
     else fs.appendFileSync(path.join(wt, 'README.md'), 'more\n');
     const refused = await runWith(b.e, prune(run.id, { yes: true }));
     assert.equal(refused.kind, 'refused', change);
@@ -389,8 +389,8 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
 test('REFUSED at shipped defaults: whatever holds `nemia rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async (t) => {
   const b = board();
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
-  fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
-  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await Effect.runPromise(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
@@ -857,8 +857,8 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   kept(folder.id, folderShot);
 
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
-  fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
-  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const atGate = await Effect.runPromise(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
   await runWith(b.e, advanceRun(readRun(atGate.id)));
   b.settle(`${atGate.id}-implement`, 'succeeded', SIGNED);
@@ -871,7 +871,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   kept(atGate.id, gateShot);
 
   const dirty = await aFinished(b, { merged: true });
-  fs.writeFileSync(path.join(dirty.wt, 'notes.md'), 'notes\n');
+  fs.writeFileSync(path.join(dirty.wt, 'notes.md'), '---\nplace: git\n---\nnotes\n');
   const dirtyShot = aShot(dirty.run.id);
   assert.match(
     (await runWith(b.e, prune(dirty.run.id, { artifacts: true, yes: true }))).refusal!,

@@ -97,7 +97,13 @@ test("PUT /api/inbox/:name/from sets a card's from:, DELETE takes it off — REF
 test("a step's taskParts label each From run section by how its run was handed it: waited on for --after, read for --from", async () => {
   const brief = ['Do the work.', section('waited-a1', 'Build the cache.'), section('read-b2', 'Measure the cache.'), ''].join('\n');
   queuedTask('t-context', brief);
-  writeRun({ id: 'child-c3', after: ['waited-a1'], context: ['read-b2'], steps: { implement: { taskId: 't-context' } } });
+  writeRun({
+    id: 'child-c3',
+    after: ['waited-a1'],
+    context: ['read-b2'],
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+    steps: { implement: { taskId: 't-context' } },
+  });
 
   const res = await app.request('/api/runs/child-c3');
   assert.equal(res.status, 200);

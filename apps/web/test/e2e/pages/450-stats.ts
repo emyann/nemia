@@ -147,7 +147,10 @@ async function byStepLayout(page: Page): Promise<'side by side' | 'stacked'> {
   throw new Refused(`the step tables neither sit side by side nor stack — ${JSON.stringify({ skills, denials })}`);
 }
 
-/** The page on a phone's screen, photographed whole with every day's mark: nothing wider than the screen, every tile read whole; then the window put back. */
+/**
+ * The page on a phone's screen, photographed whole with every day's mark: nothing wider than the screen, every tile read whole; then the
+ * window put back.
+ */
 async function onPhone(page: Page): Promise<void> {
   const size = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });

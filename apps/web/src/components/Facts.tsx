@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Collisions, PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
+import type { Bridge, Collisions, PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
 import { stepAnchor } from '../lib/asks';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
@@ -94,7 +94,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * one. `workspace` is a row only where the step says it (`main`, the repository's own checkout rather than a worktree of the run's): a
  * detail from an api that does not carry the key has none. `loop` and `rounds`, the edge back and how many rounds it may run, are rows
  * beside `after` on a looping step only. A codex step's fence is its sandbox, which the engine's task files as its permission mode: the
- * same row, under Codex's name (`fenceLabel`).
+ * same row, under Codex's name (`fenceLabel`). A step filed bridged has a `reach` row: its session's web link, or why it is not up.
  */
 export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> =>
   isRemote(spec, filed)
@@ -116,7 +116,23 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
         [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
         ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
+        ...(filed?.bridge
+          ? ([['reach', <BridgeWords key="reach" bridge={filed.bridge} data-step-bridge />]] satisfies Array<[string, ReactNode]>)
+          : []),
       ];
+
+/**
+ * A bridged session's web link, opened in a new tab, where its bridge is up; why not, in the runtime's words, where it is not. `data` marks
+ * the link for the page that draws it.
+ */
+export function BridgeWords({ bridge, ...data }: { bridge: Bridge } & Record<`data-${string}`, boolean>) {
+  if (bridge.url === null) return <span data-bridge-why>{`The web link is not up: ${bridge.why ?? 'its bridge says nothing'}`}</span>;
+  return (
+    <a href={bridge.url} target="_blank" rel="noreferrer" className={cn(LINK, 'break-all')} {...data}>
+      {bridge.url}
+    </a>
+  );
+}
 
 /** A step on a remote A2A agent: its harness names one (`a2a:<name>`), or the api says its try was sent to one. */
 const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');

@@ -9,6 +9,7 @@ import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
+import { BridgeSchema, type Bridge } from './bridge.ts';
 import { StepLayersSchema, TaskPartSchema, type StepLayers, type TaskPart } from './layers.ts';
 import {
   AtWorkSchema,
@@ -206,6 +207,11 @@ export type StepFiled = {
    * ours.
    */
   remote: { name: string; address: string | null } | null;
+  /**
+   * The session's web link, for a step whose sessions are bridged (`remote: true`): its `url` where the bridge is up, else `why` it is
+   * not. Null for a step not bridged.
+   */
+  bridge: Bridge | null;
 };
 
 /** Decodes a `StepFiled`. */
@@ -219,6 +225,7 @@ const StepFiledSchema = Schema.Struct({
   tools: Schema.NullOr(StringsSchema),
   deadlineSeconds: Schema.NullOr(Schema.Number),
   remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: Schema.NullOr(Schema.String) })),
+  bridge: Schema.NullOr(BridgeSchema),
 }) satisfies Schema.Schema<StepFiled>;
 
 /**

@@ -1999,6 +1999,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     tools: null,
     deadlineSeconds: null,
     remote: null,
+    bridge: null,
   };
   assert.deepEqual(
     ranWith(rowsOf(unset, bare)),
@@ -2015,6 +2016,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     tools: ['Read', 'Grep'],
     deadlineSeconds: 3600,
     remote: null,
+    bridge: null,
   };
   assert.deepEqual(ranWith(rowsOf(unset, given)), [
     'opus · default',
@@ -2098,6 +2100,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     tools: [],
     deadlineSeconds: 600,
     remote: null,
+    bridge: null,
   };
   assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s'], "the workflow's words");
   assert.equal(
@@ -2166,6 +2169,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     tools: null,
     deadlineSeconds: null,
     remote: { name: 'reviewer', address: 'https://agents.example.com/reviewer' },
+    bridge: null,
   };
   const rows = rowsOf(spec, bare);
   assert.deepEqual(Object.keys(rows), ['harness', 'agent', 'after', 'deadline']);
@@ -2192,6 +2196,52 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     'a harness of ours keeps its rows, and no agent row',
   );
   assert.ok('model' in rowsOf({ ...spec, harness: 'claude' }, { ...bare, remote: null }));
+});
+
+test("a step filed bridged has a reach row: its session's web link to open in a new tab, or why it is not up; a step not bridged has none", () => {
+  const spec: StepSpec = {
+    harness: 'claude',
+    model: null,
+    effort: null,
+    context: null,
+    after: [],
+    workspace: null,
+    resume: null,
+    permissionMode: null,
+    sandbox: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: null,
+    rounds: null,
+  };
+  const filed = (bridge: StepFiled['bridge']): StepFiled => ({
+    model: null,
+    askedModel: null,
+    effort: null,
+    contextTokens: null,
+    permissionMode: null,
+    runsIn: null,
+    tools: null,
+    deadlineSeconds: null,
+    remote: null,
+    bridge,
+  });
+  const html = (bridge: StepFiled['bridge']) => renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed(bridge)) }));
+  const link = 'https://example.test/code/session_01StepLink';
+
+  const up = html({ url: link, why: null });
+  assert.match(up, /data-fact="reach"/);
+  assert.match(
+    up,
+    /<a href="https:\/\/example\.test\/code\/session_01StepLink" target="_blank" rel="noreferrer"[^>]*data-step-bridge="true"[^>]*>https:\/\/example\.test\/code\/session_01StepLink<\/a>/,
+  );
+
+  const down = html({ url: null, why: 'no `bridgeSessionId` yet.' });
+  assert.match(down, /data-fact="reach"/);
+  assert.doesNotMatch(down, /<a /, 'no link while it is not up');
+  assert.match(down, /data-bridge-why[^>]*>The web link is not up: no `bridgeSessionId` yet\.</);
+
+  assert.doesNotMatch(html(null), /data-fact="reach"/, 'not bridged: no row');
 });
 
 const Answering = await import('../src/components/Decide.tsx');
@@ -6445,6 +6495,7 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
     phase: null,
     sessionId: null,
     reach: [],
+    bridge: null,
     stopped: false,
     spend: null,
     allows: [],
@@ -6464,7 +6515,8 @@ const nemiaUp = {
   task: 'nemia-1',
   phase: 'running',
   sessionId: '0123456789abcdef',
-  reach: ['attach 01234567', 'or the web link her session shows once its bridge is up, from a phone too'],
+  reach: ['attach 01234567', 'https://example.test/code/session_0123'],
+  bridge: { url: 'https://example.test/code/session_0123', why: null },
 };
 
 test("REFUSED to offer: the default factory's own switch or raise, a raise over a raise, a raise of a factory at Semi-auto by default", async () => {
@@ -6524,11 +6576,33 @@ test('Nemia up: the switch selected, her task and phase, the attach line as code
   assert.match(html, /data-nemia-task[^>]*>nemia-1</);
   assert.match(html, /data-nemia-phase[^>]*>running</);
   assert.match(html, /data-nemia-attach[^>]*>attach 01234567<\/code><button[^>]*data-copy/);
-  assert.match(html, />or the web link her session shows once its bridge is up, from a phone too</);
+  assert.match(html, /<a href="https:\/\/example\.test\/code\/session_0123" target="_blank" rel="noreferrer"[^>]*data-nemia-bridge="true"/);
+  assert.equal(
+    html.split('https://example.test/code/session_0123</').length,
+    2,
+    'her link is drawn once, as a link: never again as her reach line',
+  );
   assert.match(html, /data-nemia-spend[^>]*>Spent \$1\.25 over 2 sessions ended; her open one counts once it ends\./);
   assert.match(html, /data-nemia-allows[\s\S]*>Bash\(git status\)</);
   assert.match(html, /data-nemia-fact="owner"[\s\S]*data-nemia-fact="style"/);
   assert.doesNotMatch(html, /data-nemia-fact-text|What style says\./, "a fact's words are drawn only while it is open, read or not");
+});
+
+test('Nemia asked bridged and not up: why, in place of her link; not asked: her attach line alone', async () => {
+  const why = 'no `bridgeSessionId` yet.';
+  const down = await nemiaWith({
+    ...nemiaUp,
+    reach: ['attach 01234567', `her web link is not up: ${why}`],
+    bridge: { url: null, why },
+  });
+  assert.doesNotMatch(down, /data-nemia-bridge|<a /, 'no link while it is not up');
+  assert.match(down, /data-bridge-why[^>]*>The web link is not up: no `bridgeSessionId` yet\.</);
+  assert.equal(down.split('is not up: no `bridgeSessionId`').length, 2, 'said once');
+  assert.match(down, /data-nemia-attach[^>]*>attach 01234567<\/code><button[^>]*data-copy/, 'the attach line still to copy');
+
+  const unasked = await nemiaWith({ ...nemiaUp, reach: ['attach 01234567'], bridge: null });
+  assert.match(unasked, /data-nemia-attach[^>]*>attach 01234567</);
+  assert.doesNotMatch(unasked, /data-nemia-bridge|data-bridge-why/, 'not asked: nothing of a bridge');
 });
 
 test('Nemia stopped from outside: said so, with a way to a fresh session', async () => {

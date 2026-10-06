@@ -25,6 +25,7 @@ const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
   phase: null,
   sessionId: null,
   reach: [],
+  bridge: null,
   stopped: false,
   spend: null,
   allows: [],
@@ -48,7 +49,8 @@ const up = nemiaLevel({
   task: 'nemia-1',
   phase: 'running',
   sessionId: '0123456789abcdef',
-  reach: ['attach 01234567', 'or the web link her session shows once its bridge is up, from a phone too'],
+  reach: ['attach 01234567', 'https://example.test/code/session_0123'],
+  bridge: { url: 'https://example.test/code/session_0123', why: null },
 });
 
 test('her session reads off with no task, not filed with no phase, starting while nothing reaches it, and up once something does', () => {

@@ -65,6 +65,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     tools: null,
     deadlineSeconds: 3600,
     remote: { name: 'far', address: 'https://far.example/a2a' },
+    bridge: null,
   },
   body: 'Build it.',
   told: null,

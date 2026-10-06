@@ -2210,6 +2210,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     context: null,
     after: [],
     workspace: null,
+    place: null,
     resume: null,
     permissionMode: null,
     sandbox: null,

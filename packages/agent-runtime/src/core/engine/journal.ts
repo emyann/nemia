@@ -94,8 +94,9 @@ export type PlainJournalOps = {
    */
   readonly forget?: (taskIds: readonly string[]) => Effect.Effect<ForgottenFeed | undefined, JournalError>;
   /**
-   * Optional: how many of the feed's lines name each task of `taskIds`, read once and resolving no body; a line forgotten is not
-   * counted, and a task with none counts 0. A store that offers it answers from `forget` the lines it forgot of each task
+   * Optional: how many of the feed's lines name each task of `taskIds`, read once and resolving no body: each line whose `taskId` is
+   * one of them, a line no runtime wrote included, since `forget` removes it too; a line forgotten is not counted, and a task with
+   * none counts 0. A store that offers it answers from `forget` the lines it forgot of each task
    * (`ForgottenFeed.linesByTask`), so a count before a removal and the removal read the feed once between them.
    */
   readonly feedLines?: (taskIds: readonly string[]) => Effect.Effect<Readonly<Record<string, number>>, JournalError>;

@@ -52,7 +52,7 @@ export const transcriptWrittenAt = async (sessionId: string): Promise<number | u
 };
 
 /**
- * A transcript found and then not read:the OS refused the read (`code`, as `EACCES`, `EIO`, or `ENOENT` for a file gone since it
+ * A transcript found and then not read: the OS refused the read (`code`, as `EACCES`, `EIO`, or `ENOENT` for a file gone since it
  * was found). Never no transcript: what it says is unknown until a later look reads it.
  */
 export class TranscriptUnread extends Error {

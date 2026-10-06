@@ -338,8 +338,9 @@ export const withFeedLock = <A>(root: string, fn: () => A): A => {
 const taskIdOf = (entry: unknown): unknown => (typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined);
 
 /**
- * How many of the feed's lines under `root` name each task of `taskIds`, the feed read once (`readFeed`), each line parsed and no
- * body resolved: a line a rotation forgot is not counted, and a task with none counts 0.
+ * How many of the feed's lines under `root` name each task of `taskIds`, the feed read once (`readFeed`), each line parsed for its
+ * `taskId` alone and no body resolved, so a line no runtime wrote is counted as a rotation forgets it; a line a rotation forgot is
+ * not counted, and a task with none counts 0.
  */
 export const feedLinesOf = (root: string, taskIds: readonly string[]): Record<string, number> => {
   const counts = new Map(taskIds.map((id) => [id, 0]));

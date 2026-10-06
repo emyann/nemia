@@ -2263,8 +2263,9 @@ runtime's to remove (a conversation Claude Code or Codex keeps, the Task a remot
 session's files go through its harness (`RunnerOps.forget`, `forgetSession` across the A2A seam), then the feed's lines and
 the journal in one call to the store (`JournalOps.forget`), the journal last, so a forget cut short is finished by asking
 again. The feed is read once either way: the files store counts each task's lines off its raw lines (`feedLines`), and with
-`--yes` its rotation answers the lines it forgot of each (`ForgottenFeed.linesByTask`); a store with neither is counted off
-its feed read whole. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
+`--yes` its rotation answers the lines it forgot of each (`ForgottenFeed.linesByTask`). So a line of the task that no runtime
+wrote, which a read of the feed skips and the rotation removes, is counted, and a count says what `--yes` removes; a store with
+neither is counted off its feed read whole, decoded lines alone. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
 
 Every guard is asked of every id before anything is removed, and a refusal (`ForgetRefused`, exit 2) ends "nothing was
 forgotten": an id the store does not list; a journal that cannot be read; a task not settled (stop it, let it settle,

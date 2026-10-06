@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: nemia
+    folder: Nemia
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/nemia/dashboards
+      foldersFromFilesStructure: false

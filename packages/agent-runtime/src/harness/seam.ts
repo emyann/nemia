@@ -23,7 +23,7 @@ import { Context, Effect, Layer } from 'effect';
 import type { Sighting, Usage } from '../core/index.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { claudeOps, type ClaudeOptions } from './claude/bg.ts';
-import { RunnerError } from './error.ts';
+import { causeWords, RunnerError } from './error.ts';
 
 export { RunnerError } from './error.ts';
 
@@ -130,9 +130,10 @@ export type ExpectedSession = { name: string; harness?: string; since?: number }
  * not look for this time — a harness, or one mode of it, whose read failed (`claude agents` timing out, the registry busy). A name
  * in `unread` is neither there nor gone: nobody looked. Kept apart from `seen` because the pass reads an absence as the session
  * gone — it forgets a finished one it was letting go, and ends an attempt past its grace `lost` — and a look that failed is not
- * an absence.
+ * an absence. `why` is what each part of the look that failed said, one sentence each, in the harness's words; absent when every
+ * part read. Said for a person, never decided on.
  */
-export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string> };
+export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string>; why?: readonly string[] };
 
 /**
  * The seam itself, as a plain value.
@@ -292,7 +293,8 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
  * Every harness is observed at once and the listings merged (`observeAll`, what `observe` and `observeFor` both are). A
  * harness whose look failed is unread — nothing listed, and every name it was to find there not looked for — so one
  * harness being unreachable blinds the engine neither to the others nor to the fact that it could not look: read as an
- * empty listing, a failed look would have the pass read each session on it gone.
+ * empty listing, a failed look would have the pass read each session on it gone. What each harness's look said failed (`why`:
+ * its failure's words, or the words of the parts of it that failed) is kept, each sentence after the harness's name.
  *
  * Which harness runs which session (`owner`) is learned from the last observation: `stop`, `logs` and `release` are given
  * a session id and nothing else, and a session id means something different to each harness. It is never persisted — a
@@ -339,7 +341,9 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
         const { read, expected } = look(name, ops);
         return read.pipe(
           Effect.map((o) => [name, o] as const),
-          Effect.catchCause(() => Effect.succeed([name, { seen: new Map<string, Sighting>(), unread: new Set(expected) }] as const)),
+          Effect.catchCause((cause) =>
+            Effect.succeed([name, { seen: new Map<string, Sighting>(), unread: new Set(expected), why: [causeWords(cause)] }] as const),
+          ),
         );
       },
       { concurrency: 'unbounded' },
@@ -354,7 +358,8 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
           }
           for (const name of o.unread) unread.add(name);
         }
-        return { seen, unread };
+        const why = results.flatMap(([harness, o]) => (o.why ?? []).map((words) => `harness \`${harness}\`: ${words}`));
+        return { seen, unread, ...(why.length ? { why } : {}) };
       }),
     );
 
@@ -380,7 +385,7 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
       }).pipe(
         Effect.map((o): Observation => {
           const nowhere = expected.filter((e) => routeOf(e.harness) === undefined);
-          return nowhere.length ? { seen: o.seen, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o;
+          return nowhere.length ? { ...o, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o;
         }),
       ),
 

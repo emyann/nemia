@@ -2,7 +2,7 @@
  * The one error a harness fails with, whichever verb it was asked: what it was asked, what went wrong, and whether it
  * vouches that nothing started.
  */
-import { Schema } from 'effect';
+import { Cause, Schema } from 'effect';
 
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
   verb: Schema.String,
@@ -26,4 +26,15 @@ export const TRANSIENT_ERRNOS: readonly string[] = ['EAGAIN', 'EMFILE', 'ENFILE'
 export const refusedOsError = (cause: unknown): boolean => {
   const code = (cause as NodeJS.ErrnoException | undefined)?.code;
   return typeof code !== 'string' || !TRANSIENT_ERRNOS.includes(code);
+};
+
+/**
+ * What a failure said, in its own words: the first error's `message` (a `RunnerError`'s), or a defect's text.
+ *
+ * @param cause Why an Effect failed, as `Effect.catchCause` is handed it.
+ * @returns One sentence a person can be shown as it is.
+ */
+export const causeWords = (cause: Cause.Cause<unknown>): string => {
+  const error = Cause.squash(cause);
+  return error instanceof Error ? error.message : String(error);
 };

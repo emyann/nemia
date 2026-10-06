@@ -770,16 +770,26 @@ its transcript has been unwritten for the quiet floor (`QUIESCENT_AFTER_MS`), or
 a file gone since), never kept, so the next pass reads the file again (`TranscriptUnread`, `harness/claude/transcript.ts`); a
 refused decode is kept while the transcript is unchanged. A session with no transcript at all still reads as none. The tests are
 in `test/transcript.test.ts`, `test/completion.test.ts`, `test/claude-code.test.ts` and `test/unread-session.test.ts`.
+
+A failed look's words reach a person (2026-10-06). Claude Code's `observeFor` and the composite's `observeAll` keep what a failed read
+said (`Observation.why`) where they dropped it: a registry row of ours that does not decode in `registryOf`'s words for the row and its
+field, a harness that fails outright in its failure's message, each after the harness's name. The pass says them on
+`TickReport.unobserved`, off its own look, on every report while the failure lasts and on none after; nothing decides on them.
+`nemia up` says each once while it lasts, and the board's footer turns the daemon's dot amber, `ticking, harness unread`, the words in
+its title. A session alone unread (a transcript, a detached output) is not a failed look: its words stay a warning in the log. The tests
+are in `test/claude-code.test.ts`, `test/engine.test.ts` and `test/a2a.test.ts`.
 What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
   harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
   is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before. A `--bg` session whose transcript cannot
   be read, while it has not ended, is left out of that `observe` too (it answers only what the look `seen`), so `ae ls` and a view
-  show its task as if its session were not listed, with the warning beside it, until it reads as ended or readable again.
+  show its task as if its session were not listed, with the warning beside it, until it reads as ended or readable again. Its
+  failure's words are dropped there too: only the pass's look says them.
 - **A harness never read again holds its tasks in flight until their deadline.** `UNREAD` ends nothing, by design, so a task with
   no deadline on a harness that is gone for good waits for ever, where before it failed `lost` 30 s after its spawn. A person's
-  stop on such a task without a deadline waits too. The board shows it working; `wf up --stats` shows the harness's unread count.
+  stop on such a task without a deadline waits too. The board shows it working, and the daemon's dot why the harness is not read;
+  `wf up --stats` shows the harness's unread count.
 - **The deadline ends an unread attempt without stopping what may run under it.** Past its deadline, an attempt whose harness could
   not be read gets `DEADLINE_PASSED` with no sighting, so `live` is false and the edge records the end, `failed`, `deadline`, with no
   `stop`: the session was unread, not gone. A `--bg` session is let go by `release` on the next pass that reads it, since the memo

@@ -75,6 +75,11 @@ export type Pass = {
    */
   unreadable?: string[];
   /**
+   * Why the runtime could not read a harness on this pass, as it said it (`TickReport.unobserved`): on every pass while it lasts, the
+   * names that harness was to find neither there nor gone. Absent when every harness read. `nemia up` says each once while it lasts.
+   */
+  unobserved?: string[];
+  /**
    * What the pass forgot of the tasks of runs `nemia rm` removed while one waited, or what refused it (`finishForgetting`): a line a run.
    * Absent when there was nothing to say. `nemia up` says each once while it lasts.
    */
@@ -180,7 +185,11 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
   if (!tallies) return value;
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, io1);
-  const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
+  const cost: PassCost = {
+    ...measured,
+    overheadMs: measured.overheadMs + (performance.now() - t0),
+    ...(value.unobserved ? { unobserved: value.unobserved } : {}),
+  };
   const written = yield* tried(() => {
     const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks });
     return recordPassCost(cost) + recent.ms + seriesKept(recent.kept);
@@ -327,6 +336,7 @@ const passOf = (
   feedError: string | undefined,
 ): Pass => {
   const refused = report.refused ?? [];
+  const unobserved = report.unobserved ?? [];
   const causes = new Set(judging.unjudged.values());
   const unreadable = [
     ...(report.unreadable ?? []).filter((why) => !causes.has(why)),
@@ -338,6 +348,7 @@ const passOf = (
     ...(feedError ? { feedError } : {}),
     ...(refused.length ? { refused } : {}),
     ...(unreadable.length ? { unreadable } : {}),
+    ...(unobserved.length ? { unobserved } : {}),
   };
 };
 

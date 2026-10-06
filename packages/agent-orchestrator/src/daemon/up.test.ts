@@ -67,6 +67,26 @@ test('a failure is a warning, said once while it stands and again once it cleare
   assert.equal(back.logs.length, 2, 'and again once it came back');
 });
 
+test("a harness the pass could not read is a warning in the runtime's words, said once while it lasts and again once it came back", async () => {
+  const why = 'harness `h`: the registry lists `ae/t-1/1`, a session of ours, and its `sessionId` is missing.';
+  const unread = { runs: [], unobserved: [why] } as never as Pass;
+  const first = await logged(unread);
+  assert.deepEqual(
+    first.logs.map((l) => [l.level, l.text]),
+    [['Warn', `a harness could not be read: ${why}`]],
+  );
+  const again = await logged(unread, first.said);
+  assert.deepEqual(again.logs, [], 'said once while it lasts');
+  const read = await logged({ runs: [] }, again.said);
+  assert.deepEqual(read.logs, [], 'a pass that read it says nothing');
+  const back = await logged(unread, read.said);
+  assert.deepEqual(
+    back.logs.map((l) => [l.level, l.text]),
+    [['Warn', `a harness could not be read: ${why}`]],
+    'and again once it came back',
+  );
+});
+
 test('passSaid is the words alone, the lines logPass logs, read with no logger', () => {
   const { lines } = passSaid(advanced(), NOTHING_SAID, Date.parse('2026-10-05T08:00:00Z'));
   assert.deepEqual(

@@ -295,5 +295,6 @@ export const daemon = (extra: Partial<Daemon> = {}): Daemon => ({
   staleAfterMs: 60_000,
   identity: 'same',
   line: 'wf up ticks, pid 4242',
+  unobserved: [],
   ...extra,
 });

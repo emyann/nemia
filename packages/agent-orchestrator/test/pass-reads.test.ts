@@ -1,7 +1,8 @@
 /**
  * What one pass of the tick reads, counted on a store of runs not at rest: each task's view once a pass (`reportedEngine`), the cap's slots
  * once a pass and only where a claim on a repository's checkout waits on one (`passRead`, `checkoutHold`), each run another waits on once a
- * pass (`Parents`), and a run's asks folder listed once a read (`readAsks`, `readRun`). Identities on the reads, never a time.
+ * pass (`Parents`), one `standing` for each repository, place and base branch (`passStanding`), and a run's asks folder listed once a read
+ * (`readAsks`, `readRun`). Identities on the reads, never a time.
  *
  * The store: on one repository, three runs whose ending ended failed, a run whose ending works in the checkout, two whose approved endings
  * wait for it, two runs started `--after` the first of those and a run held until it, a run at its third try, and ten finished runs. The
@@ -39,6 +40,8 @@ const { passParents, reportedEngine } = await import('../src/views/views.verb.ts
 const { metered } = await import('../src/meter/tally.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
+const { readStanding } = await import('../src/standing/standing.store.ts');
+const { RunPlace } = await import('../src/place/place.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
@@ -339,4 +342,68 @@ test('a forget drops the views of the tasks it forgets, and keeps the others the
   await Effect.runPromise(e.view('a'));
   await Effect.runPromise(e.view('b'));
   assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
+});
+
+/** The place the package ships, its `standing` a script that says `said` on stderr and exits 1: a reading never heard. */
+function standingUnread(said: string): string {
+  const dir = path.join(scratch('wf-pass-reads-place-'), 'git');
+  fs.cpSync(path.join(import.meta.dirname, '..', 'place', 'git'), dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'scripts', 'standing.ts'), `process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
+  return dir;
+}
+
+test('a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one', async () => {
+  const { b, repo } = await theStore();
+  const { tallies: before } = await onePass(b);
+  assert.deepEqual(
+    readStanding()?.places.map((p) => [p.repo, p.base]),
+    [[path.resolve(repo), 'main']],
+  );
+  git(repo, 'switch', '-q', '-c', 'other');
+  try {
+    await settledOne(b, repo, 'succeeded');
+  } finally {
+    git(repo, 'switch', '-q', 'main');
+  }
+  const { tallies: after } = await onePass(b);
+  assert.deepEqual(
+    readStanding()
+      ?.places.map((p) => p.base)
+      .sort(),
+    ['main', 'other'],
+  );
+  assert.equal(after.kinds.git.spawned, before.kinds.git.spawned + 1, 'one process more, for the second base');
+});
+
+test('REFUSED: a run waits on one whose standing is unread, though it has shipped, says why, and is filed once standing answers', async () => {
+  const { b, repo } = await theStore();
+  const parent = await atTheGate(b, repo);
+  const child = await Effect.runPromise(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+  const unread = standingUnread('the standing broke');
+  const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, () => unread)));
+  assert.equal(readRun(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
+  assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
+    { run: parent.id, unread: 'the place was not heard: the standing broke' },
+  ]);
+  const places = readStanding()?.places ?? [];
+  assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads shipped');
+  assert.equal(readRun(child.id).baseRef, git(repo, 'rev-parse', 'main').trim(), 'cut from the base as the pass read it, the merge on it');
+});
+
+test('REFUSED: a standing.json that is not the one the tick writes reads as none', async () => {
+  await theStore();
+  const { standingFile } = await import('../src/standing/standing.store.ts');
+  const was = fs.readFileSync(standingFile(), 'utf8');
+  try {
+    fs.writeFileSync(standingFile(), JSON.stringify({ ...JSON.parse(was), v: 2 }));
+    assert.equal(readStanding(), undefined);
+    fs.writeFileSync(standingFile(), was.slice(0, -1));
+    assert.equal(readStanding(), undefined);
+  } finally {
+    fs.writeFileSync(standingFile(), was);
+  }
+  assert.equal(readStanding()?.v, 1);
 });

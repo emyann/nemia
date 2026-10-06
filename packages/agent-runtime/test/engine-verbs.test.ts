@@ -272,8 +272,11 @@ test(
         },
       }),
     );
-    await until(t, () => seen.inFlight > 0, 'a pass under way', { bell: begun });
-    loop.stop();
+    try {
+      await until(t, () => seen.inFlight > 0, 'a pass under way', { bell: begun });
+    } finally {
+      loop.stop();
+    }
     assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
     assert.equal(ticks.count(), 0, 'and it has not reported yet');
 
@@ -412,13 +415,16 @@ test(
         intervalMs: 20,
       }),
     );
-    await until(
-      t,
-      () => seen.length >= 5,
-      () => `five entries; saw ${seen.join(', ') || 'none'}`,
-      { bell: entered },
-    );
-    w.stop();
+    try {
+      await until(
+        t,
+        () => seen.length >= 5,
+        () => `five entries; saw ${seen.join(', ') || 'none'}`,
+        { bell: entered },
+      );
+    } finally {
+      w.stop();
+    }
     assert.deepEqual(seen, ['filed', 'starting', 'spawned', 'ended', 'settled']);
     assert.deepEqual(
       told,

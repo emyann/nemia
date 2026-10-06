@@ -1,6 +1,7 @@
 /**
- * What makes a run at rest (`atRest`), and which runs the engine's feed takes out of the tick's memo (`evictedBy`), and which tasks it says settled (`settledIn`): pure, so each guard is
- * made to refuse on data. What the memo saves a pass, and that every input moves it, is proven on a store in rest-store.test.ts.
+ * What makes a run at rest (`atRest`), and which runs the engine's feed takes out of the tick's memo (`evictedBy`), and which tasks it says
+ * settled (`settledIn`): pure, so each guard is made to refuse on data. What the memo saves a pass, and that every input moves it, is
+ * proven on a store in rest-store.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

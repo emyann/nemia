@@ -1,7 +1,7 @@
 /**
  * The daemon's process's telemetry, one layer that process provides around what it runs (`telemetryLayer`): each log printed as `nemia up`
- * prints its lines, and, only when its environment names an OTLP collector, its spans, its logs and its metrics exported there too. And what a pass's
- * work on one step says of itself, the run and the step, on the spans and logs under it (`forStep`).
+ * prints its lines, and, only when its environment names an OTLP collector, its spans, its logs and its metrics exported there too. And
+ * what a pass's work on one step says of itself, the run and the step, on the spans and logs under it (`forStep`).
  */
 import { Effect, Layer, Logger, LogLevel } from 'effect';
 import { FetchHttpClient } from 'effect/http';

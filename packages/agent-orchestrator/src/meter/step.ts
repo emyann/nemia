@@ -1,5 +1,5 @@
 /**
- * What a pass records of each step in the process's metrics (`STEP_METRICS`, `step.verb.ts`): a try or a check that settled, a round a
+ * What a pass records of each step in the process's metrics (`STEP_METRICS`, `meter.verb.ts`): a try or a check that settled, a round a
  * loop was granted or ran out of, each with the attributes a series is kept by — the factory, the workflow, the step, its agent and the
  * outcome, and nothing else (`boundedAttributes`): a run's or a task's id would make a series of every run.
  *
@@ -15,8 +15,7 @@ import type { StepStatus } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import type { SpendOf } from '../status/status.ts';
-import { taskUsage, type AttemptClock, type TaskClock } from '../timeline/timeline.ts';
-import { ranMs } from '../timeline/took.ts';
+import { ranMs, taskUsage, type AttemptClock, type TaskClock } from '../timeline/index.ts';
 
 /** The only attributes a step's metric carries: a series for each, never one for each run. */
 export const STEP_ATTRIBUTE_KEYS: readonly string[] = ['factory', 'workflow', 'step', 'agent', 'outcome'];
@@ -29,13 +28,15 @@ export function boundedAttributes(attributes: Readonly<Record<string, string>>):
   const loose = Object.keys(attributes).find((key) => !STEP_ATTRIBUTE_KEYS.includes(key));
   if (loose !== undefined) {
     throw new Invalid({
-      message: `a step's metric carries the attribute "${loose}", which is not one of ${STEP_ATTRIBUTE_KEYS.join(', ')}: a run's or a task's id makes a series of every run, so record it by those five alone.`,
+      message:
+        `a step's metric carries the attribute "${loose}", which is not one of ${STEP_ATTRIBUTE_KEYS.join(', ')}: ` +
+        "a run's or a task's id makes a series of every run, so record it by those five alone.",
     });
   }
   return { ...attributes };
 }
 
-/** The attributes of `step`'s metric in `run`, for `outcome`: its factory, its workflow's folder, the step, and its agent, `none` for none. */
+/** The attributes of `step`'s metric in `run`, for `outcome`: its factory, its workflow's folder, the step, its agent or `none`. */
 export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: Workflow, outcome: string): Record<string, string> =>
   boundedAttributes({
     factory: run.factory ?? DEFAULT_FACTORY,

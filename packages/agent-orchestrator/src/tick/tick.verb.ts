@@ -38,13 +38,12 @@ import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
-import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass } from '../meter/meter.ts';
+import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass } from '../meter/index.ts';
 import { keepSeries } from '../series/series.store.ts';
 import { advancePass, type Advanced } from './advance.verb.ts';
 import { heldRead } from '../list/list.verb.ts';
 import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
-import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
-import { recordStepMetrics } from '../meter/step.verb.ts';
+import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics } from '../meter/meter.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything

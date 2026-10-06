@@ -1,6 +1,7 @@
 /**
- * A step's metrics (`step.ts`, `step.verb.ts`): the facts read off the tasks a pass saw settle, recorded by the five attributes alone, and a
- * fact whose attributes carry a run's id refused. The tick that hands them over is proven on a store in `test/step-metrics.test.ts`.
+ * A step's metrics (`step.ts`, `recordStepMetrics`): the facts read off the tasks a pass saw settle, recorded by the five attributes
+ * alone, and a fact whose attributes carry a run's id refused. The tick that hands them over is proven on a store in
+ * `test/step-metrics.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpend } from '../status/status.ts';
 import { boundedAttributes, roundsGranted, settledFacts, stepAttributes, type FactReads, type FactView, type StepFact } from './step.ts';
-import { recordStepMetrics } from './step.verb.ts';
+import { recordStepMetrics } from './meter.verb.ts';
 
 const WORK = { name: 'work', agent: { name: 'ada' } } as Workflow;
 const REVIEW = { name: 'review' } as Workflow;

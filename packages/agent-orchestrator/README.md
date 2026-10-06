@@ -2992,7 +2992,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   `PASS_BOUNDS`; `pass.journal_reads`; and the gauges `store.runs`, `sessions.queued` and `sessions.admitted`, as the last pass saw them.
   The api serves its own process's at `GET /api/metrics`, with `api.poll.reads`: the files the runtime read for each request, by the
   route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's.
-- **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/step.verb.ts`), recorded by the tick once a pass, off
+- **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/meter.verb.ts`), recorded by the tick once a pass, off
   what each run's full pass already read — no read of the store or the engine of their own. The pass that reads the engine's feed takes
   the tasks it says settled since the read before (`settledIn`); a run with one is judged in full, and its pass reads each of its facts
   (`settledFacts`, `src/meter/step.ts`): `step.cost` (USD, where measured), `step.tokens.input` and `step.tokens.output` (where

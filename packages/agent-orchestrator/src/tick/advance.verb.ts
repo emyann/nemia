@@ -52,7 +52,7 @@ import {
 } from '../views/views.verb.ts';
 import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
-import { roundsGranted, settledFacts, type StepFact } from '../meter/step.ts';
+import { roundsGranted, settledFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type PassReads } from './file.verb.ts';

@@ -61,7 +61,7 @@ async function aCancelledRun() {
   git(repo, 'init', '-q', '-b', 'main');
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
   const workflowDir = fs.mkdtempSync(path.join(DIR, 'one-'));
-  fs.writeFileSync(path.join(workflowDir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(workflowDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir }));
   const wt = path.join(STORE, 'worktrees', run.id, 'implement');
   git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/implement`, wt);

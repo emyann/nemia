@@ -177,17 +177,17 @@ test('a secret not given is refused naming the variable to set, where to set it,
 });
 
 test('harness: a2a:<name> is a harness a step can run on, and a name of another shape is refused', () => {
-  assert.equal(parseWorkflow('ask', '---\nharness: a2a:reviewer\n---\nReview it.\n').harness, 'a2a:reviewer');
-  assert.equal(parseWorkflow('ask', '---\nharness: a2a:second-opinion\n---\nReview it.\n').harness, 'a2a:second-opinion');
+  assert.equal(parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\n---\nReview it.\n').harness, 'a2a:reviewer');
+  assert.equal(parseWorkflow('ask', '---\nplace: git\nharness: a2a:second-opinion\n---\nReview it.\n').harness, 'a2a:second-opinion');
   for (const bad of ['a2a:', 'a2a:Reviewer', 'a2a:code_review', 'a2a:-x', 'a2a:a b']) {
     assert.match(
-      loadRefusal(() => parseWorkflow('ask', `---\nharness: ${bad}\n---\nReview it.\n`)),
+      loadRefusal(() => parseWorkflow('ask', `---\nplace: git\nharness: ${bad}\n---\nReview it.\n`)),
       /names a remote A2A agent, and `.*` is not a name one is declared under/,
       bad,
     );
   }
   assert.match(
-    loadRefusal(() => parseWorkflow('ask', '---\nharness: remote\n---\nx\n')),
+    loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: remote\n---\nx\n')),
     /The harnesses are: .*`a2a:<name>` for a remote A2A agent/,
   );
 });
@@ -218,17 +218,17 @@ const LOCAL_ONLY: Record<string, string> = {
 test('each key that tells a harness of ours how to run is refused on a remote step, naming the key and the harness', () => {
   for (const [key, value] of Object.entries(LOCAL_ONLY)) {
     const refused = loadRefusal(() =>
-      parseWorkflow('ask', `---\nharness: a2a:reviewer\n${key}: ${value}\n---\nx\n`, () => '{"type":"object"}'),
+      parseWorkflow('ask', `---\nplace: git\nharness: a2a:reviewer\n${key}: ${value}\n---\nx\n`, () => '{"type":"object"}'),
     );
     assert.ok(refused.startsWith(`ask: \`${key}: ${value}\` `), `${key}: ${refused}`);
     assert.match(refused, /`harness: a2a:reviewer` is a remote A2A agent\. Delete the line/, key);
   }
   assert.match(
-    loadRefusal(() => parseWorkflow('ask', '---\nharness: a2a:reviewer\nloop: plan\n---\nx\n')),
+    loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nloop: plan\n---\nx\n')),
     /^ask: `loop: plan` .*remote A2A agent/,
   );
   assert.match(
-    loadRefusal(() => parseWorkflow('ask', '---\nharness: a2a:reviewer\nworkspace: main\n---\nx\n')),
+    loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nworkspace: main\n---\nx\n')),
     /^ask: `workspace: main` runs the step in the repository's own checkout/,
   );
   assert.deepEqual(
@@ -238,7 +238,7 @@ test('each key that tells a harness of ours how to run is refused on a remote st
   );
   const ok = parseWorkflow(
     'ask',
-    '---\nharness: a2a:reviewer\nafter: plan\ninput: plan\ngate: true\nretries: 1\ndeadlineSeconds: 600\n---\nReview the plan.\n',
+    '---\nplace: git\nharness: a2a:reviewer\nafter: plan\ninput: plan\ngate: true\nretries: 1\ndeadlineSeconds: 600\n---\nReview the plan.\n',
   );
   assert.equal(ok.harness, 'a2a:reviewer', 'a remote step may say where it sits, its gate, its tries, its deadline, what it reads');
 });
@@ -250,7 +250,7 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
   const refused = loadRefusal(() =>
     parseWorkflow(
       'ask',
-      '---\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
+      '---\nplace: git\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
       undefined,
       agentsOf({ critic: '---\nmodel: opus\n---\nCriticise.\n' }),
     ),
@@ -260,7 +260,7 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
     loadRefusal(() =>
       parseWorkflow(
         'ask',
-        '---\nagent: critic\n---\nx\n',
+        '---\nplace: git\nagent: critic\n---\nx\n',
         undefined,
         agentsOf({ critic: '---\nharness: a2a:reviewer\ntools: Read\n---\nCriticise.\n' }),
       ),
@@ -271,7 +271,7 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
   const skilled = loadRefusal(() =>
     parseWorkflow(
       'ask',
-      '---\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
+      '---\nplace: git\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
       undefined,
       agentsOf({ critic: '---\nskills: look\n---\nCriticise.\n' }),
       new Map([['look', { dir: ROOT }]]) as never,
@@ -284,7 +284,7 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
   const prompted = loadRefusal(() =>
     parseWorkflow(
       'ask',
-      '---\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
+      '---\nplace: git\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
       undefined,
       agentsOf({ critic: '---\nharnessPrompt: keep\n---\nCriticise.\n' }),
     ),
@@ -292,7 +292,7 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
   assert.match(prompted, /`harnessPrompt: keep` shapes Claude Code's own prompt, and `harness: a2a:reviewer` is a remote A2A agent/);
   const told = parseWorkflow(
     'ask',
-    '---\nagent: critic\nharness: a2a:reviewer\n---\nThe plan.\n',
+    '---\nplace: git\nagent: critic\nharness: a2a:reviewer\n---\nThe plan.\n',
     undefined,
     agentsOf({ critic: '---\ndescription: Criticises\n---\nCriticise.\n' }),
   );
@@ -310,8 +310,8 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
   const refused = loadRefusal(() =>
     parseFolder(
       [
-        ['build', '---\nharness: a2a:builder\n---\nBuild.\n'],
-        ['review', '---\nafter: build\nloop: build\noutput: again.json\n---\nReview.\n'],
+        ['build', '---\nplace: git\nharness: a2a:builder\n---\nBuild.\n'],
+        ['review', '---\nafter: build\nplace: git\nloop: build\noutput: again.json\n---\nReview.\n'],
       ],
       read,
     ),
@@ -322,9 +322,9 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
   );
   const inside = parseFolder(
     [
-      ['build', '---\n---\nBuild.\n'],
-      ['ask', '---\nafter: build\nharness: a2a:second-opinion\n---\nGive a second opinion.\n'],
-      ['review', '---\nafter: ask\nloop: build\noutput: again.json\n---\nReview.\n'],
+      ['build', '---\nplace: git\n---\nBuild.\n'],
+      ['ask', '---\nafter: build\nplace: git\nharness: a2a:second-opinion\n---\nGive a second opinion.\n'],
+      ['review', '---\nafter: ask\nplace: git\nloop: build\noutput: again.json\n---\nReview.\n'],
     ],
     read,
   );
@@ -488,9 +488,9 @@ test('nemia retry refuses --model and --budget on a remote step, in the words it
 });
 
 test("a remote step after a run (`--after`) is told that run's work stays here and is summarised below, never that it is in its workspace", () => {
-  const steps = parseFolder([['ask', '---\nharness: a2a:reviewer\n---\nReview it.\n']]);
+  const steps = parseFolder([['ask', '---\nplace: git\nharness: a2a:reviewer\n---\nReview it.\n']]);
   const run = { id: 'r-1', brief: 'a review', steps: {}, workflowDir: '/store/workflows/w' } as never;
-  const built = parseFolder([['build', '---\n---\nBuild.\n']])[0];
+  const built = parseFolder([['build', '---\nplace: git\n---\nBuild.\n']])[0];
   const parents = [
     {
       run: 'r-0',
@@ -513,7 +513,7 @@ test("a remote step after a run (`--after`) is told that run's work stays here a
 });
 
 test("a remote step's try is a new task, told which try and what a person said, with no path", () => {
-  const steps = parseFolder([['ask', '---\nharness: a2a:reviewer\nretries: 1\n---\nReview it.\n']]);
+  const steps = parseFolder([['ask', '---\nplace: git\nharness: a2a:reviewer\nretries: 1\n---\nReview it.\n']]);
   const run = { id: 'r-1', brief: 'a review', steps: {}, workflowDir: '/store/workflows/w' } as never;
   const brief = remoteBrief(steps[0], run, steps, undefined, {
     try: 2,

@@ -757,7 +757,7 @@ test("a diff is cut a file at a time: named by its header, a rename as both ends
 
 test("a run `assess` calls running while a step waits on a person is decided on: its terminal steps' branches read, and no command yet", async () => {
   const folder = fs.mkdtempSync(path.join(root, 'workflow-'));
-  fs.writeFileSync(path.join(folder, 'tokens.md'), '---\nharness: codex\n---\nPick the colour tokens.\n');
+  fs.writeFileSync(path.join(folder, 'tokens.md'), '---\nplace: git\nharness: codex\n---\nPick the colour tokens.\n');
   branchOff(repo, 'wf/r-d6/implement', () =>
     write(repo, 'package.json', `${JSON.stringify({ name: 'app', workspaces: ['packages/*'] })}\n`),
   );

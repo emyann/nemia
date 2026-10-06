@@ -80,8 +80,8 @@ export type WorkflowStepSpec = {
   resume: string | null;
   input: string[];
   /**
-   * `place: folder`: the step works in a folder the run makes, in a run with no repository; `git`: on branches of a repository. Null for a
-   * step without the line, which works on a repository.
+   * `place: folder`: the step works in a folder the run makes, in a run with no repository; `git`: on branches of a repository. Every step
+   * file says one; null only for a step frozen on a run record before the key, which worked on a repository.
    */
   place: 'git' | 'folder' | null;
   /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line. */

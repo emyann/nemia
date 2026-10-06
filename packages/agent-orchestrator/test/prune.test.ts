@@ -59,7 +59,10 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`, whose closeout names a file it leaves in its workspace — with a `budget:`, when given one. */
 const oneStep = (budget?: number) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `${budget === undefined ? '' : `---\nbudget: ${budget}\n---\n`}implement it\n`);
+  fs.writeFileSync(
+    path.join(dir, 'implement.md'),
+    `---\nplace: git\n${budget === undefined ? '' : `budget: ${budget}\n`}---\nimplement it\n`,
+  );
   return dir;
 };
 
@@ -389,8 +392,8 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
 test('REFUSED at shipped defaults: whatever holds `nemia rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async (t) => {
   const b = board();
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
-  fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
-  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await Effect.runPromise(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
@@ -857,8 +860,8 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   kept(folder.id, folderShot);
 
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
-  fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
-  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const atGate = await Effect.runPromise(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
   await runWith(b.e, advanceRun(readRun(atGate.id)));
   b.settle(`${atGate.id}-implement`, 'succeeded', SIGNED);

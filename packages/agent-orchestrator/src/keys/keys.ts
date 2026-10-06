@@ -203,17 +203,31 @@ export function gateOf(step: string, gate: string | undefined): true | undefined
 export const WORKSPACES: readonly string[] = ['main'];
 
 /**
- * The words `place:` takes: where a step works. `git`: on branches of a repository, what a step without the line does. `folder`: in a
- * folder the run makes, in a run that needs no git repository.
+ * The words `place:` takes: where a step works. `git`: on branches of a repository. `folder`: in a folder the run makes, in a run that
+ * needs no git repository. A step file says one (`placeRequired`); no word is the default.
  */
 export const PLACES = ['git', 'folder'] as const;
 
-/** `place:` as written: `git`, `folder`, or refused, naming both words. A step without the line says nothing (`stepPlace` reads it). */
+/**
+ * `place:` as written: `git`, `folder`, or refused, naming both words. Undefined for a step that says nothing: a step file is refused for
+ * it first (`placeRequired`), and a step frozen on a run record before the key reads as `git` (`stepPlace`).
+ */
 export function placeNamed(step: string, place: string | undefined): (typeof PLACES)[number] | undefined {
   if (place === undefined) return undefined;
   if ((PLACES as readonly string[]).includes(place)) return place as (typeof PLACES)[number];
   return refuse(
-    `${step}: \`place: ${place}\` is not a place a step works in. \`place: git\` works on branches of a repository; \`place: folder\` works in folders the run makes, with no git repository. Without the line, the step works on a repository, as \`place: git\`.`,
+    `${step}: \`place: ${place}\` is not a place a step works in. \`place: git\` works on branches of a repository; \`place: folder\` works in folders the run makes, with no git repository.`,
+  );
+}
+
+/**
+ * `place:` as a step file writes it, read past its former spelling (`placeSpelled`): the words given, or refused when the file says
+ * none, naming both fixes. An agent cannot give a step its place, so a step that names one is refused all the same.
+ */
+export function placeRequired(step: string, place: string | undefined): string {
+  if (place !== undefined) return place;
+  return refuse(
+    `${step}: says no \`place:\`, where the step works, and a step does not work on a repository unless it says so. Write \`place: git\` to work on branches of a repository, or \`place: folder\` to work in folders the run makes, with no git repository — every step of a workflow says the same.`,
   );
 }
 

@@ -36,7 +36,8 @@ function aRepo(): string {
 /** A workflow folder of steps on Claude Code, by name and frontmatter, each with a one-line body. */
 function folderOf(steps: Record<string, string>): string {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  for (const [name, front] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${front}\n---\n${name} it\n`);
+  for (const [name, front] of Object.entries(steps))
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
   return dir;
 }
 

@@ -51,7 +51,7 @@ const aRepo = (): string => {
 const folder = (steps: Record<string, string>, extra: Record<string, string> = {}): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, keys] of Object.entries(steps))
-    fs.writeFileSync(path.join(dir, `${name}.md`), `${keys ? `---\n${keys}\n---\n` : ''}${name} it\n`);
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${keys ? `${keys}\n` : ''}---\n${name} it\n`);
   for (const [name, text] of Object.entries(extra)) fs.writeFileSync(path.join(dir, name), text);
   return dir;
 };

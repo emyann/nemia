@@ -43,7 +43,7 @@ test("a mounted router's route reads the engine of the app it was asked through"
 test("a mounted router's route reads the store's root of the app it was asked through", async () => {
   const home = scratch('nemia-api-layer-home-');
   fs.mkdirSync(path.join(home, 'workflows', 'elsewhere'), { recursive: true });
-  fs.writeFileSync(path.join(home, 'workflows', 'elsewhere', 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
+  fs.writeFileSync(path.join(home, 'workflows', 'elsewhere', 'plan.md'), '---\nplace: git\nharness: codex\n---\nWrite PLAN.md.\n');
   const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
   assert.deepEqual(await yoursOn(own), ['elsewhere'], "yours, read under the layer's root");
   assert.deepEqual(await yoursOn(app), [], "the process's app reads yours under WF_ROOT, which has none");

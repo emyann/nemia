@@ -40,7 +40,7 @@ execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q'
   stdio: 'ignore',
 });
 const ONE = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-fs.writeFileSync(path.join(ONE, 'work.md'), '---\nharness: codex\n---\nwork it\n');
+fs.writeFileSync(path.join(ONE, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 
 /** The lines a long feed carries before the store's own: each a task admitted and long gone. */
 const LONG_BY = 20_000;

@@ -36,7 +36,7 @@ function aRepo(): string {
 /** A run of one step `implement`, on Claude Code at the model `opus`, filed and failed: a try of it is the person's to ask for. */
 async function failed() {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nmodel: opus\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nimplement it\n');
   const run = await Effect.runPromise(startRun({ brief: 'the flag', repo: aRepo(), workflowDir: dir, isolate: false }));
   const b = engineBoard();
   const e = engineOf(b.layer);

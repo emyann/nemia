@@ -38,7 +38,7 @@ const signedOff = (taskId: string, closeout: object) =>
 
 /** A step declaring `open` in its schema, and every field of `more`, as the loader reads it and the run freezes it. */
 const declaring = (name: string, open: object, more: Record<string, object> = {}) =>
-  parseWorkflow(name, '---\noutput: spec.schema.json\n---\nDesign it.\n', () =>
+  parseWorkflow(name, '---\nplace: git\noutput: spec.schema.json\n---\nDesign it.\n', () =>
     JSON.stringify({
       type: 'object',
       properties: { open, ...more },

@@ -47,8 +47,8 @@ const aRepo = (): string => {
 const planned = (keys: { plan?: string; implement?: string; review?: string } = {}) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   const write = (name: string, after: string | null, lines = '') => {
-    const front = [...(after ? [`after: ${after}`] : []), ...(lines ? [lines] : [])];
-    fs.writeFileSync(path.join(dir, `${name}.md`), `${front.length ? `---\n${front.join('\n')}\n---\n` : ''}${name} it\n`);
+    const front = [...(after ? [`after: ${after}`] : []), 'place: git', ...(lines ? [lines] : [])];
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${front.join('\n')}\n---\n${name} it\n`);
   };
   write('plan', null, keys.plan);
   write('implement', 'plan', keys.implement);
@@ -295,7 +295,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   const repo = aRepo();
   const b = board();
   const oneStep = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(oneStep, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(oneStep, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const parent = await Effect.runPromise(startRun({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] }));
   await runWith(b.e, advanceRun(readRun(parent.id)));
   const wt = readRun(parent.id).steps.implement.workspace!;

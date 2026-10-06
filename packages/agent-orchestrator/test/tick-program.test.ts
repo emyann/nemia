@@ -49,7 +49,7 @@ git(REPO, 'init', '-q');
 git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
 
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
+fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 
 const tasks = new Map<string, Awaited<ReturnType<AsyncJournal['read']>>>();
 /** When the journal says each attempt began, in milliseconds, by its session's name: a closeout counts only when made after it. */
@@ -225,7 +225,7 @@ test('a check filed by a pass is kept with its labels among the recent passes, a
   const { readRun } = await import('../src/record/record.store.ts');
   const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
   const folder = fs.mkdtempSync(path.join(ROOT, 'checked-'));
-  fs.writeFileSync(path.join(folder, 'work.md'), '---\nharness: codex\ncheck: node -e 0\n---\nwork it\n');
+  fs.writeFileSync(path.join(folder, 'work.md'), '---\nplace: git\nharness: codex\ncheck: node -e 0\n---\nwork it\n');
   const run = await Effect.runPromise(startRun({ brief: 'a checked run', repo: REPO, workflowDir: folder }));
   const before = recentPasses().length;
   for (let k = 0; k < 8 && !readRun(run.id).steps.work?.check; k++) {

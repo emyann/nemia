@@ -22,7 +22,7 @@ const NO_ENGINE = promised({});
 /** A folder workflow of one step. */
 const oneStep = (): string => {
   const dir = scratch('wf-pages-one-');
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 };
 

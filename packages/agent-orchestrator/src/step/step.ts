@@ -37,11 +37,12 @@ export type Workflow = {
    */
   workspace?: 'main';
   /**
-   * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is
-   * not the git kind (`place` on the run record). `place: git`: on branches of a repository, what a step without the line does
-   * (`stepPlace`). A team is of one kind: every step says `place: folder`, or none does (`validate`). A step that continues another's
-   * session (`resume:`) works in that step's folder, as it would in its worktree; any other step gets a folder of its own, empty, and what
-   * the steps before it made reaches it as their output and their files. `workspace: folder` is its former spelling (`placeSpelled`).
+   * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is not
+   * the git kind (`place` on the run record). `place: git`: on branches of a repository. A step file says one (`placeRequired`); only a
+   * step frozen on a run record before the key has none, and reads as `git` (`stepPlace`). A team is of one kind: every step says
+   * `place: folder`, or none does (`validate`). A step that continues another's session (`resume:`) works in that step's folder, as it
+   * would in its worktree; any other step gets a folder of its own, empty, and what the steps before it made reaches it as their output and
+   * their files. `workspace: folder` is its former spelling (`placeSpelled`).
    */
   place?: 'git' | 'folder';
   /**
@@ -346,7 +347,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
   input: 'the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on',
   place:
-    '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository, what a step without the line does',
+    '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository. Every step says one; none is the default',
   workspace:
     "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   writable:
@@ -398,8 +399,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
 export const CLOSEOUT_FIELDS = ['outcome', 'summary', 'artifacts', 'needs'] as const;
 
 /**
- * Where a step works: its `place:`, or `git` for a step without the line, as every step worked before the key. The one reader of a step's
- * place, so the default lives here alone. Pure.
+ * Where a step works: its `place:`, or `git` for a step frozen on a run record before the key, as every step worked then; a step file
+ * without the line is refused at load (`placeRequired`). The one reader of a step's place. Pure.
  */
 export const stepPlace = (step: Pick<Workflow, 'place'>): 'git' | 'folder' => step.place ?? 'git';
 

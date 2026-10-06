@@ -1,5 +1,6 @@
 ---
 after: review
+place: git
 # The repository's own checkout, where the base branch is.
 workspace: main
 agent: shipper

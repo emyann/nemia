@@ -28,7 +28,7 @@ fs.writeFileSync(
 /** A team of the store's own that works on a repository, to hold the two apart. */
 const onRepo = path.join(root, 'workflows', 'change');
 fs.mkdirSync(onRepo, { recursive: true });
-fs.writeFileSync(path.join(onRepo, 'implement.md'), '---\n---\nMake the change.\n');
+fs.writeFileSync(path.join(onRepo, 'implement.md'), '---\nplace: git\n---\nMake the change.\n');
 
 const at = '2026-09-19T00:10:00.000Z';
 const work = path.join(root, 'runs', 'f-notes', 'work');

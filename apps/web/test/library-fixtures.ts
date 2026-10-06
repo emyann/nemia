@@ -116,7 +116,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   resume: null,
   input: ['review'],
   workspace: 'main',
-  place: null,
+  place: 'git',
   writable: [],
   reads: [],
   slot: 'none',
@@ -175,7 +175,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
   dir: '/work/workflows/build',
   step: 'ship',
   body: 'Land it.',
-  source: '---\nworkspace: main\n---\nLand it.\n',
+  source: '---\nplace: git\nworkspace: main\n---\nLand it.\n',
   keys: [
     { key: 'workspace', value: 'main', meaning: 'Where the step works.' },
     { key: 'model', value: null, meaning: 'The model.' },

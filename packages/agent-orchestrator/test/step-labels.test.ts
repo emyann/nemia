@@ -114,10 +114,10 @@ const aRepo = (): string => {
 
 /** A loop: `implement`, then `review`, which may send it back twice (`rounds: 3`). */
 const LOOPED = fs.mkdtempSync(path.join(ROOT, 'looped-'));
-fs.writeFileSync(path.join(LOOPED, 'implement.md'), 'Build it.\n');
+fs.writeFileSync(path.join(LOOPED, 'implement.md'), '---\nplace: git\n---\nBuild it.\n');
 fs.writeFileSync(
   path.join(LOOPED, 'review.md'),
-  '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview it.\n',
+  '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview it.\n',
 );
 fs.writeFileSync(
   path.join(LOOPED, 'review.schema.json'),

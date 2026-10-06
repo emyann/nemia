@@ -42,17 +42,17 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`. */
 const oneStep = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 };
 
 /** A loop: `implement`, then `review`, which may send it back once. */
 const looping = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'loop-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'review.md'),
-    '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 1\n---\nreview it\n',
+    '---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: 1\n---\nreview it\n',
   );
   fs.writeFileSync(
     path.join(dir, 'review.schema.json'),

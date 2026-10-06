@@ -113,7 +113,7 @@ const aRepo = (): string => {
 /** The workflow folder `metered`: one step, `implement`. */
 const WORKFLOW = path.join(ROOT, 'metered');
 fs.mkdirSync(WORKFLOW);
-fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\n---\nBuild it.\n');
+fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nBuild it.\n');
 
 test("a step that settles with a cost records its cost once, by its factory, workflow, step, agent and outcome, and no run's id", async () => {
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));

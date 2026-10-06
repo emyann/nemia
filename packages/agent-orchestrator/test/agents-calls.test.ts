@@ -43,7 +43,7 @@ git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
 /** A workflow folder of one claude step, with the keys given. */
 const folder = (keys = '') => {
   const dir = scratch('wf-agents-calls-folder-');
-  fs.writeFileSync(path.join(dir, 'work.md'), `---\nharness: claude\n${keys}---\nwork it\n`);
+  fs.writeFileSync(path.join(dir, 'work.md'), `---\nplace: git\nharness: claude\n${keys}---\nwork it\n`);
   return dir;
 };
 

@@ -56,9 +56,9 @@ function fresh(attached: readonly string[] = ['build']): { repo: string; build: 
   const team = teamCopy();
   const build = path.join(team, 'build');
   fs.mkdirSync(build);
-  fs.writeFileSync(path.join(build, 'implement.md'), 'Build what was asked.\n');
-  fs.writeFileSync(path.join(build, 'review.md'), '---\nafter: implement\n---\nReview it.\n');
-  fs.writeFileSync(path.join(build, 'named.md'), '---\nafter: review\nagent: reviewer\n---\nSay what you found.\n');
+  fs.writeFileSync(path.join(build, 'implement.md'), '---\nplace: git\n---\nBuild what was asked.\n');
+  fs.writeFileSync(path.join(build, 'review.md'), '---\nafter: implement\nplace: git\n---\nReview it.\n');
+  fs.writeFileSync(path.join(build, 'named.md'), '---\nafter: review\nplace: git\nagent: reviewer\n---\nSay what you found.\n');
   const repo = aRepo();
   addFactory({ name: 'pipao', repos: [repo] });
   for (const workflow of attached) attachWorkflow({ factory: 'pipao', workflow });

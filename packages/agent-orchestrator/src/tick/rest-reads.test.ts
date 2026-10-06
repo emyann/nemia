@@ -38,7 +38,7 @@ execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q'
   stdio: 'ignore',
 });
 const ONE = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-fs.writeFileSync(path.join(ONE, 'work.md'), '---\nharness: codex\n---\nwork it\n');
+fs.writeFileSync(path.join(ONE, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 
 /**
  * The runtime over its own journal on disk, with a harness whose sessions work until `signAll` signs all but those of `keep`, and take

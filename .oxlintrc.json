@@ -386,7 +386,7 @@
     {
       "files": ["apps/web/src/components/NewWorkflow.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

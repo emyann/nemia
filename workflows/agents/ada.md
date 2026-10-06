@@ -1,7 +1,7 @@
 ---
 role: Software engineer
 description: Builds the change a spec describes, with the tests that prove it, and answers each review finding in the next round.
-skills: implement-a-change, look, shadcn
+skills: implement-a-change, git, look, shadcn
 harness: claude
 model: opus
 effort: high

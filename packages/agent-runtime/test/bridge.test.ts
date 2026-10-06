@@ -101,7 +101,10 @@ test('a `bridgeSessionId` not of the form `session_…` is refused by name and q
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };
 
-/** A fake `claude`. `agents` prints its rows; `--bg --name <n>` adds one, idle and blocked, held by this test's process; `stop` stops it. */
+/**
+ * A fake `claude`. `agents` prints its rows; `--bg --name <n>` adds one, idle and blocked, held by this test's process; `stop` stops
+ * it.
+ */
 const fakeClaude = () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');

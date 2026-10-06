@@ -10,39 +10,51 @@ import path from 'node:path';
 import type { HarnessSpec } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { asyncOps, type AsyncRunner, type AsyncSighting } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** A harness whose session exits 0 at once, run by the engine's detached worker. */
 const quick: HarnessSpec = { name: 'quick', command: () => ({ cmd: 'true', args: [] }) };
 
-const settledEngine = async () => {
+/** Ticks `engine` in test `t`, every 50ms, until task `id` has settled. */
+const settle = (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) =>
+  until(
+    t,
+    async () => {
+      if ((await Effect.runPromise(engine.view(id))).state.settled) return true;
+      await Effect.runPromise(engine.tick());
+      return false;
+    },
+    `${id} settled`,
+    { everyMs: 50 },
+  );
+
+/** An engine over a fresh store with one `quick` task, ticked in test `t` until it has settled. */
+const settledEngine = async (t: Waiter) => {
   const root = scratch('ae-io-root-');
   const engine = builtEngine(Engine.layer({ root, harnesses: { quick }, defaultHarness: 'quick' }));
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') }));
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled && Date.now() < until) {
-    await Effect.runPromise(engine.tick());
-    await sleep(50);
-  }
-  assert.ok((await Effect.runPromise(engine.view(id))).state.settled, 'the task settled');
+  await settle(t, engine, id);
   return { root, engine, id };
 };
 
-test('a tick says what it took and what each harness listed, and a directory of run files starts no process to be read', async () => {
-  const { engine } = await settledEngine();
-  const report = await Effect.runPromise(engine.tick());
-  assert.equal(typeof report.ms, 'number');
-  assert.ok(report.ms >= 0);
-  assert.deepEqual(Object.keys(report.observed), ['quick'], 'one entry per harness observed in the pass');
-  const o = report.observed.quick;
-  assert.ok(o.calls >= 1, 'the pass observed the harness');
-  assert.equal(o.listed, o.calls, 'each observe listed the one run file there is');
-  assert.equal(o.spawned, 0, 'reading run files starts nothing');
-  assert.ok(o.ms >= 0 && o.ms <= report.ms + 1, 'an observe inside the pass takes no longer than the pass');
-});
+test(
+  'a tick says what it took and what each harness listed, and a directory of run files starts no process to be read',
+  WAITED,
+  async (t) => {
+    const { engine } = await settledEngine(t);
+    const report = await Effect.runPromise(engine.tick());
+    assert.equal(typeof report.ms, 'number');
+    assert.ok(report.ms >= 0);
+    assert.deepEqual(Object.keys(report.observed), ['quick'], 'one entry per harness observed in the pass');
+    const o = report.observed.quick;
+    assert.ok(o.calls >= 1, 'the pass observed the harness');
+    assert.equal(o.listed, o.calls, 'each observe listed the one run file there is');
+    assert.equal(o.spawned, 0, 'reading run files starts nothing');
+    assert.ok(o.ms >= 0 && o.ms <= report.ms + 1, 'an observe inside the pass takes no longer than the pass');
+  },
+);
 
 test('a tick counts the observes that could not read their harness (`unread`), and the attempt they could not read is left as it was', async () => {
   const sessions = new Map<string, AsyncSighting>();
@@ -78,29 +90,29 @@ test('a tick counts the observes that could not read their harness (`unread`), a
   assert.equal((await Effect.runPromise(engine.view(id))).state.attempts[0].ended, null, 'the attempt still runs');
 });
 
-test("a tick counts only the observes made during it; io() counts every observe, a view's too — a view of a task not settled, on a harness that cannot find, observes", async () => {
-  const { engine } = await settledEngine();
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') }));
-  const first = await Effect.runPromise(engine.tick());
-  const before = Effect.runSync(engine.io()).observed.quick;
-  await Effect.runPromise(engine.view(id));
-  const afterView = Effect.runSync(engine.io()).observed.quick;
-  assert.ok(afterView.calls > before.calls, 'a view observes, and is counted');
-  const second = await Effect.runPromise(engine.tick());
-  assert.equal(second.observed.quick.calls, first.observed.quick.calls, "the view's observe is not charged to the next pass");
-  assert.equal(
-    Effect.runSync(engine.io()).observed.quick.calls,
-    afterView.calls + second.observed.quick.calls,
-    'the running total has both',
-  );
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled && Date.now() < until) {
-    await Effect.runPromise(engine.tick());
-    await sleep(50);
-  }
-});
+test(
+  "a tick counts only the observes made during it; io() counts every observe, a view's too — a view of a task not settled, on a harness that cannot find, observes",
+  WAITED,
+  async (t) => {
+    const { engine } = await settledEngine(t);
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') }));
+    const first = await Effect.runPromise(engine.tick());
+    const before = Effect.runSync(engine.io()).observed.quick;
+    await Effect.runPromise(engine.view(id));
+    const afterView = Effect.runSync(engine.io()).observed.quick;
+    assert.ok(afterView.calls > before.calls, 'a view observes, and is counted');
+    const second = await Effect.runPromise(engine.tick());
+    assert.equal(second.observed.quick.calls, first.observed.quick.calls, "the view's observe is not charged to the next pass");
+    assert.equal(
+      Effect.runSync(engine.io()).observed.quick.calls,
+      afterView.calls + second.observed.quick.calls,
+      'the running total has both',
+    );
+    await settle(t, engine, id);
+  },
+);
 
-test('io() counts the bytes of a journal a view reads, and the worker a pass starts', async () => {
+test('io() counts the bytes of a journal a view reads, and the worker a pass starts', WAITED, async (t) => {
   const root = scratch('ae-io-root-');
   const engine = builtEngine(Engine.layer({ root, harnesses: { quick }, defaultHarness: 'quick' }));
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') }));
@@ -118,11 +130,7 @@ test('io() counts the bytes of a journal a view reads, and the worker a pass sta
   const spawn0 = Effect.runSync(engine.io()).spawned;
   await Effect.runPromise(engine.tick());
   assert.ok(Effect.runSync(engine.io()).spawned - spawn0 >= 1, 'the pass that started the attempt started its worker');
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled && Date.now() < until) {
-    await Effect.runPromise(engine.tick());
-    await sleep(50);
-  }
+  await settle(t, engine, id);
 });
 
 test("a view on an engine that never read the task reads its journal once, settled or observed: it views the fold it chose what to ask by, and a harness held in memory makes every read counted the journal's", async () => {

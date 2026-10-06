@@ -63,10 +63,7 @@ test('REFUSED: a word that is no level; manual, semi-auto and auto are levels', 
   assert.equal(levelRefusal('manual'), undefined);
   assert.equal(levelRefusal('semi-auto'), undefined);
   assert.equal(levelRefusal('auto'), undefined);
-  assert.equal(
-    levelRefusal('on'),
-    '"on" is no level: nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]].',
-  );
+  assert.equal(levelRefusal('on'), '"on" is no level: nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]].');
 });
 
 test("her task's id is nemia- and the digits of the moment a factory was put above manual", () => {

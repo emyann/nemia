@@ -230,6 +230,7 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
  */
 export async function admitRun(args: Args, e: Engine): Promise<void> {
   const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[2]) : undefined;
-  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor));
+  const auto = typeof args.auto === 'string' ? args.auto : undefined;
+  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto));
   if (answer !== undefined) console.log(JSON.stringify(answer));
 }

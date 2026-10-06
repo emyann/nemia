@@ -232,7 +232,7 @@ export const LEVEL: Command<NemiaLevel> = {
     "her session: what waits on you (a gate, a step's question, a loop out of",
     'rounds, a cap) is asked of you, and a write that cannot be undone or',
     'changes your settings or a factory; the rest is hers. auto is semi-auto,',
-    'but an answer your confirmed list allows in the run\'s state is given',
+    "but an answer your confirmed list allows in the run's state is given",
     'unasked (nemia auto <agent>); a factory at manual is left alone, and her',
     'session stops once none is above manual',
   ],

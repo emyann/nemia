@@ -654,7 +654,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
         <div key={branch} className="space-y-1.5">
           {sensitive.length > 1 && <p className="break-all font-mono text-xs text-neutral-500">{branch}</p>}
           {error ? (
-            <p className="text-sm text-red-700 dark:text-red-400">not read: {error}</p>
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
           ) : files.length ? (
             files.map((file) => (
               <DiffFileView

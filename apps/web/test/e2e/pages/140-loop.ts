@@ -32,6 +32,10 @@ export default {
     );
     await expectVisible(decide.locator('[data-lesson="unknown"]'), 'the lesson chip says nobody can know, not that nothing was written');
     await expectVisible(
+      decide.locator('section[aria-label="In full"]').getByText(/^what this run changed is not known: /),
+      'the check-affecting files in full say they are not known, in the sentence alone',
+    );
+    await expectVisible(
       decide.locator('[data-command="once more"] code', { hasText: `nemia round ${LOOPING.id} ${LOOPING.exhausted}` }),
       `once more: the wf round that takes ${LOOPING.exhausted}'s loop round again, as a line`,
     );

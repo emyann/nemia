@@ -1,0 +1,20 @@
+name: nemia-observe
+
+services:
+  lgtm:
+    image: grafana/otel-lgtm@sha256:2de1094c593c671cbfca878a28ffcd7e46ff5e32f2ce966c0cf33003f6cf4266
+    container_name: nemia-lgtm
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    environment:
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/nemia/dashboards/system.json
+    volumes:
+      - ./provisioning/nemia.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/nemia.yaml:ro
+      - ./dashboards:/otel-lgtm/nemia/dashboards:ro
+      - data:/data
+
+volumes:
+  data:

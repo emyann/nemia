@@ -1,13 +1,14 @@
 /**
  * What a pass costs, as the runtime reports it: a tick's wall time and each harness's observes (`TickReport.ms`, `.observed`), and the
- * running totals of what the runtime read and started (`Engine.io()`). Facts for the layer above to compose; nothing here decides on them.
+ * running totals of what the runtime read and started (`Engine.io()`), the process's or, inside `Engine.tallied`, the program's own.
+ * Facts for the layer above to compose; nothing here decides on them.
  */
 import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { HarnessSpec } from '../src/index.ts';
+import type { EngineIo, HarnessSpec } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner, type AsyncSighting } from './promise-runner.ts';
@@ -155,4 +156,67 @@ test("a view on an engine that never read the task reads its journal once, settl
   const again = Effect.runSync(later.io()).reads;
   await Effect.runPromise(later.view(id));
   assert.equal(Effect.runSync(later.io()).reads - again, 0, 'and once read, a journal nothing has written to since is not read again');
+});
+
+/** What was read and observed between two of `io()`'s answers, on the harness `held`. */
+const spent = (a: EngineIo, b: EngineIo) => ({
+  bytesRead: b.bytesRead - a.bytesRead,
+  reads: b.reads - a.reads,
+  observes: (b.observed.held?.calls ?? 0) - (a.observed.held?.calls ?? 0),
+});
+
+test("REFUSED: io() inside `tallied` counts the program's own work alone: a feed read and a view another caller makes while the program's pass waits on its harness count in the process's totals, never in the program's", async () => {
+  const sessions = new Map<string, AsyncSighting>();
+  let gate: Promise<void> | undefined;
+  let entered = () => {};
+  const held: AsyncRunner = {
+    spawn: async (r) => {
+      sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
+    },
+    observe: async () => {
+      const wait = gate;
+      gate = undefined;
+      if (wait) {
+        entered();
+        await wait;
+      }
+      return new Map(sessions);
+    },
+    stop: async () => {},
+    logs: async () => '',
+  };
+  const engine = builtEngine(Engine.layer({ root: scratch('ae-io-root-'), harnesses: { held: asyncOps(held) }, defaultHarness: 'held' }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') }));
+  await Effect.runPromise(engine.tick());
+  const io = () => Effect.runSync(engine.io());
+  const waiting = new Promise<void>((r) => (entered = r));
+  let release = () => {};
+  gate = new Promise<void>((r) => (release = r));
+  const process0 = io();
+  const pass = Effect.runPromise(
+    engine.tallied(
+      Effect.gen(function* () {
+        const a = yield* engine.io();
+        yield* engine.tick();
+        return spent(a, yield* engine.io());
+      }),
+    ),
+  );
+  await waiting;
+  const beside0 = io();
+  await Effect.runPromise(Effect.andThen(engine.feed(0), engine.view(id)));
+  const beside = spent(beside0, io());
+  release();
+  const own = await pass;
+  const all = spent(process0, io());
+  assert.ok(
+    beside.bytesRead > 0 && beside.observes > 0,
+    `the feed read and the view beside the pass read and observed: ${JSON.stringify(beside)}`,
+  );
+  assert.equal(own.observes, 1, "the program's one pass observed once");
+  assert.deepEqual(
+    all,
+    { bytesRead: own.bytesRead + beside.bytesRead, reads: own.reads + beside.reads, observes: own.observes + beside.observes },
+    "the process's totals are the program's and the reads beside it, each counted once",
+  );
 });

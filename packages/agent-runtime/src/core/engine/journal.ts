@@ -80,7 +80,9 @@ export type PlainJournalOps = {
    * Everything that has happened on this board since `after`, and where to resume.
    *
    * The cursor never expires: the feed is append-only, so a consumer that was away for a week
-   * replays rather than being told to start over. Pass 0 to read the whole history.
+   * replays rather than being told to start over. Pass 0 to read the whole history. A cursor at or past the feed's end reads nothing
+   * and answers the end, so `Number.MAX_SAFE_INTEGER` asks where the feed ends; a store with no feed written yet answers the cursor
+   * it was given, which such a caller reads as 0.
    */
   readonly feed: (
     after: Cursor,

@@ -310,6 +310,15 @@ export function unknownHoleRefusal(file: string, key: SayKey, hole: string): str
 }
 
 /**
+ * The sections of a place skill's SKILL.md a brief sends a step to where it is handed no `say`: how to read what a step's work changed
+ * (`read`), and how to merge the base into it when a person asks (`merge`).
+ */
+export const SKILL_SECTIONS = { read: 'Read what changed', merge: 'Merge the base when a person asks' } as const;
+
+/** Where a brief sends a step for the place's own commands it was not handed: the section of its place skill named `section`. Pure. */
+export const skillSaid = (section: keyof typeof SKILL_SECTIONS): string => `as your place's skill says under *${SKILL_SECTIONS[section]}*`;
+
+/**
  * Why the place declared in `file` cannot serve a run: the verbs of `needed` its `declared` verbs leave out, each named, with the fix.
  * Undefined when it declares every one. Pure.
  */

@@ -17,7 +17,6 @@ import {
   LANDING_CHECK_DEADLINE_SECONDS,
   type CheckHanded,
   type LandingSaid,
-  type LandingWords,
   type Verdict,
 } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
@@ -68,7 +67,7 @@ import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
-import { landingTold, toldOf, type Landing, type Told } from './told.verb.ts';
+import { placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -185,7 +184,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
-  const landing = landingTold(run, step, notes);
+  const landing = placeTold(run, step, notes);
   if (!landing) return;
   const answers = answersHeld(f, r, step, record);
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
@@ -216,10 +215,10 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
 });
 
 /**
- * Send a try to the engine, told what its place says of its landing (`words`): filed as a task of its own, or given as the answer to the
+ * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
  */
-const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: Landing) {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: PlaceTold) {
   const { e, run, reads } = f;
   const record = run.steps[r.step];
   const files = artifactsDir(run, r.step);
@@ -254,7 +253,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         checked,
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        told.words,
+        { words: told.words, say: told.say },
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -362,7 +361,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
-  const landing = landingTold(run, target, notes);
+  const landing = placeTold(run, target, notes);
   if (!landing) return;
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
@@ -376,6 +375,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
     const said = {
       words: landing.words,
+      say: landing.say,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
@@ -406,7 +406,7 @@ function roundSpec(
   looping: Workflow,
   target: Workflow,
   taskId: string,
-  said: { words: LandingWords | undefined; landing?: LandingSaid; costs?: WorkflowCosts },
+  said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts },
 ): Spec {
   const { run, reads } = f;
   const record = run.steps[r.target];
@@ -435,7 +435,7 @@ function roundSpec(
       undefined,
       filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       said.costs,
-      said.words,
+      { words: said.words, say: said.say },
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -529,7 +529,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
-    const landing = landingTold(run, step, f.notes);
+    const landing = placeTold(run, step, f.notes);
     if (!landing) continue;
     const place = yield* awaited(() => within('act', () => workspaceFor(run, f.reads.steps, step)));
     f.notes.push(...place.notes.map((note) => `${name}: ${note}`));
@@ -543,6 +543,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
       costs: yield* costsFor(f, step, false),
       words: landing.words,
+      say: landing.say,
     };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
@@ -566,12 +567,11 @@ function readySpec(
   step: Workflow,
   place: Place,
   files: string,
-  said: {
+  said: PlaceTold & {
     parents: ParentCloseout[] | undefined;
     checked: readonly CheckHanded[];
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
-    words: LandingWords | undefined;
   },
 ): Spec {
   const { parents, closeoutOf } = said;
@@ -603,7 +603,7 @@ function readySpec(
           said.checked,
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
           said.costs,
-          said.words,
+          { words: said.words, say: said.say },
         ),
     cwd: place.workspace,
     harness: step.harness,

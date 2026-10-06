@@ -1,7 +1,8 @@
 /**
  * What one pass of the tick reads, counted on a store of runs not at rest: each task's view once a pass (`reportedEngine`), the cap's slots
  * once a pass and only where a claim on a repository's checkout waits on one (`passRead`, `checkoutHold`), each run another waits on once a
- * pass (`Parents`), and a run's asks folder listed once a read (`readAsks`, `readRun`). Identities on the reads, never a time.
+ * pass (`Parents`), one `standing` for each repository, place and base branch (`passStanding`), and a run's asks folder listed once a read
+ * (`readAsks`, `readRun`). Identities on the reads, never a time.
  *
  * The store: on one repository, three runs whose ending ended failed, a run whose ending works in the checkout, two whose approved endings
  * wait for it, two runs started `--after` the first of those and a run held until it, a run at its third try, and ten finished runs. The
@@ -39,6 +40,8 @@ const { passParents, reportedEngine } = await import('../src/views/views.verb.ts
 const { metered } = await import('../src/meter/tally.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
+const { readStanding } = await import('../src/standing/standing.store.ts');
+const { RunPlace } = await import('../src/place/place.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
@@ -339,4 +342,118 @@ test('a forget drops the views of the tasks it forgets, and keeps the others the
   await Effect.runPromise(e.view('a'));
   await Effect.runPromise(e.view('b'));
   assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
+});
+
+/** The place the package ships. */
+const GIT_PLACE = path.join(import.meta.dirname, '..', 'place', 'git');
+
+/** A copy of the place the package ships, its `standing` the script `source`. */
+function standingOf(source: string): string {
+  const dir = path.join(scratch('wf-pass-reads-place-'), 'git');
+  fs.cpSync(GIT_PLACE, dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'scripts', 'standing.ts'), source);
+  return dir;
+}
+
+/** The place the package ships, its `standing` a script that says `said` on stderr and exits 1: a reading never heard. */
+const standingUnread = (said: string): string => standingOf(`process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
+
+test('a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one', async () => {
+  const { b, repo } = await theStore();
+  const { tallies: before } = await onePass(b);
+  assert.deepEqual(
+    readStanding()?.places.map((p) => [p.repo, p.base]),
+    [[path.resolve(repo), 'main']],
+  );
+  git(repo, 'switch', '-q', '-c', 'other');
+  try {
+    await settledOne(b, repo, 'succeeded');
+  } finally {
+    git(repo, 'switch', '-q', 'main');
+  }
+  const { tallies: after } = await onePass(b);
+  assert.deepEqual(
+    readStanding()
+      ?.places.map((p) => p.base)
+      .sort(),
+    ['main', 'other'],
+  );
+  assert.equal(after.kinds.git.spawned, before.kinds.git.spawned + 1, 'one process more, for the second base');
+});
+
+test('REFUSED: a run waits on one whose standing is unread, though it has shipped, says why, and is filed once standing answers', async () => {
+  const { b, repo } = await theStore();
+  const parent = await atTheGate(b, repo);
+  const child = await Effect.runPromise(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+  const unread = standingUnread('the standing broke');
+  const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, () => unread)));
+  assert.equal(readRun(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
+  assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
+    { run: parent.id, unread: 'the place was not heard: the standing broke' },
+  ]);
+  const places = readStanding()?.places ?? [];
+  assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads shipped');
+  assert.equal(readRun(child.id).baseRef, git(repo, 'rev-parse', 'main').trim(), 'cut from the base as the pass read it, the merge on it');
+});
+
+test('REFUSED: a standing.json that is not the one the tick writes is refused, naming the file and what to do', async () => {
+  await onePass((await theStore()).b);
+  const { standingFile } = await import('../src/standing/standing.store.ts');
+  const was = fs.readFileSync(standingFile(), 'utf8');
+  const refused = (): string => {
+    try {
+      readStanding();
+    } catch (err) {
+      return (err as Error).message;
+    }
+    return 'read';
+  };
+  try {
+    fs.writeFileSync(standingFile(), JSON.stringify({ ...JSON.parse(was), v: 2 }));
+    assert.match(refused(), /standing\.json: its v .*: only the tick writes it, and its next pass writes it whole/);
+    fs.writeFileSync(standingFile(), was.slice(0, -1));
+    assert.match(refused(), /standing\.json is not JSON: only the tick writes it/);
+  } finally {
+    fs.writeFileSync(standingFile(), was);
+  }
+  assert.equal(readStanding()?.v, 1);
+});
+
+test('a step that left its work uncommitted is handed off on the pass that finishes its run, and the tip that pass keeps is the hand-off', async () => {
+  const { b, repo } = await theStore();
+  const run = await Effect.runPromise(startRun({ brief: 'left uncommitted', repo, workflowDir: oneStep }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const work = readRun(run.id).steps.implement;
+  fs.writeFileSync(path.join(work.workspace!, 'left.ts'), 'export const left = 1;\n');
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+  const tip = git(repo, 'rev-parse', work.branch!).trim();
+  assert.notEqual(tip, readRun(run.id).baseRef, 'the hand-off committed the work on its branch');
+  assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
+});
+
+test('REFUSED: a run filed while its own standing is unread keeps the base it was started on, its parent read shipped off its own', async () => {
+  const { b, repo } = await theStore();
+  const parent = await atTheGate(b, repo);
+  const child = await Effect.runPromise(startRun({ brief: 'after it, unread', repo, workflowDir: oneStep, after: [parent.id] }));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
+  const unread = standingUnread('the standing broke');
+  const placed = (run: { id: string }) => (run.id === child.id ? unread : GIT_PLACE);
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, placed)));
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads shipped off its own place');
+  assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
+  assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
+});
+
+test('REFUSED at the shipped deadline: a standing that never answers is stopped at 15 s, and its repository reads unread on that pass', async () => {
+  const { b } = await theStore();
+  const hung = standingOf('setInterval(() => {}, 1_000);\n');
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provideService(RunPlace, () => hung)));
+  const places = readStanding()?.places ?? [];
+  assert.ok(places.length > 0, 'the pass read a repository');
+  for (const p of places)
+    assert.match('unread' in p ? p.unread : 'answered', /^the place was not heard: it gave no answer within 15 s, its deadline/);
 });

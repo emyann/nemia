@@ -32,7 +32,8 @@ import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../r
 import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { collectArtifacts } from '../artifacts/artifacts.store.ts';
-import { oneByOne, refsOf } from '../branches/branches.store.ts';
+import { oneByOne } from '../branches/branches.store.ts';
+import { headsFor } from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/rest.ts';
 import {
   answersIn,
@@ -57,7 +58,7 @@ import { roundsGranted, settledFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type PassReads } from './file.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 
 /**
@@ -339,13 +340,14 @@ export const advancePass = Effect.fn('advancePass')(
     const feed = wordFeed(run, reads, assessed, admission, checkout);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
-    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes };
+    const heads = headsOf(run, handed.marked ? undefined : pass);
+    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
     const filed = yield* fileReady(f, admission.ready, admission.starting);
     const heldFirst = holdFirst(f, admission.held, assessed.ready);
-    const { tipped, tips } = keepTips(run, steps, assessed.status);
+    const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
       Boolean(tips || heldFirst || handed.marked || landing.landed);
@@ -592,10 +594,32 @@ function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[
   return heldFirst;
 }
 
-/** Keep each result branch's tip as git has it (`tipsSeen`), on the record where one moved: the branches read, and the tips kept. */
-function keepTips(run: Run, steps: readonly Workflow[], status: Assessment['status']): { tipped: string[]; tips: Run['tips'] | undefined } {
+/**
+ * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`headsFor`), undefined where it
+ * did not, or asked of git where no pass read them (`advanceRun`) or the run committed a hand-off since (`handOffAll`).
+ */
+const headsOf = (run: Run, pass: PassRead | undefined): Heads => {
+  let read: { heads: Readonly<Record<string, string>> | undefined } | undefined;
+  return () => {
+    if (!isGitRun(run)) return undefined;
+    read ??= { heads: pass?.standing ? headsFor(pass.standing, run) : Object.fromEntries(oneByOne.heads(run.repo)) };
+    return read.heads;
+  };
+};
+
+/**
+ * Keep each result branch's tip as the pass read it (`tipsSeen`, off `heads`), on the record where one moved: the branches read, and the
+ * tips kept. None kept where the pass did not read them.
+ */
+function keepTips(
+  run: Run,
+  steps: readonly Workflow[],
+  status: Assessment['status'],
+  heads: () => Readonly<Record<string, string>> | undefined,
+): { tipped: string[]; tips: Run['tips'] | undefined } {
   const tipped = isGitRun(run) ? tipBranches(run, steps, status) : [];
-  const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
+  const seen = tipped.length ? heads() : undefined;
+  const tips = seen && isGitRun(run) ? tipsSeen(run, tipped, seen) : undefined;
   if (tips) run.tips = tips;
   return { tipped, tips };
 }

@@ -25,6 +25,7 @@ import {
   type Parents,
 } from '../views/views.verb.ts';
 import { oneByOne } from '../branches/branches.store.ts';
+import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
@@ -140,7 +141,8 @@ export const runSlots = Effect.fn('runSlots')(function* (
  * What one pass reads once for every run it judges, and hands each: its one listing of the store (`runs`); the runs the cap holds over it
  * (`runSlots`), read on the first claim on a checkout that asks for them and kept for the rest of the pass, a read that failed asked again;
  * and the runs others wait on (`Parents`); and the tasks the engine's feed said settled since the pass before (`settled`, `followedFeed`),
- * which the metrics record once (`settledFacts`), absent where the pass read no feed. Made by the pass and dropped with it: the next reads
+ * which the metrics record once (`settledFacts`), absent where the pass read no feed; and where the pass read its repositories stand
+ * (`passStanding`), which its parents are read off, absent outside the tick's pass. Made by the pass and dropped with it: the next reads
  * the world again.
  */
 export type PassRead = {
@@ -148,11 +150,12 @@ export type PassRead = {
   slots: Effect.Effect<Map<string, RunSlot>, Refusal>;
   parents: Parents;
   settled?: ReadonlySet<string>;
+  standing?: PassStanding;
 };
 
 /** What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it. */
-export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv = process.env): PassRead => {
-  const parents = passParents();
+export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv = process.env, standing?: PassStanding): PassRead => {
+  const parents = passParents(standing && standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
   const slots = Effect.suspend(() => {
@@ -166,5 +169,5 @@ export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv
       }),
     );
   });
-  return { runs, slots, parents };
+  return { runs, slots, parents, ...(standing ? { standing } : {}) };
 };

@@ -119,7 +119,10 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   decides on is never on `Date`: the daemon's silence is `elapsedMs` over `instantNow()`, a place verb's grace on `performance.now()`.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
-- **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).
+- **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` and the place's `standing` list again without it
+  (pinned against `oneByOne`).
+- **The tick reads git through one `standing` a repository, place and base a pass** (`passStanding`, `standingReader`): a question it
+  did not ask goes to `oneByOne`, so a new git read in the pass belongs in the ask (`asksOf`), held by `test/pass-reads.test.ts`.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).
 - **What `engine()` reads, it reads without throwing** (`readRemote`): a bad file is left out and said on stderr.
 - **A task journal that does not read stops its own run, never the pass**: `pass` in `tick/tick.verb.ts` leaves the run unjudged, in

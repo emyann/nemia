@@ -124,6 +124,7 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     'remove',
     'report',
     'seal',
+    'standing',
     'status',
     'trial',
   ]);
@@ -138,7 +139,20 @@ test("SKILL.md holds the sections a brief told no command sends a step to, every
 });
 
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
-  for (const script of ['open', 'make', 'handoff', 'status', 'land', 'trial', 'report', 'export', 'seal', 'inventory', 'remove']) {
+  for (const script of [
+    'open',
+    'make',
+    'handoff',
+    'status',
+    'land',
+    'trial',
+    'report',
+    'standing',
+    'export',
+    'seal',
+    'inventory',
+    'remove',
+  ]) {
     const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
       input: JSON.stringify({ v: 2, root: '/' }),
       encoding: 'utf8',

@@ -23,10 +23,10 @@ import {
 } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/index.ts';
-import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { isGitRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import type { Said } from '../say/say.ts';
 import { taskSpend, type SpendOf, type Consumed } from '../status/status.ts';
-import { gated, type ParentRun } from '../wait/wait.ts';
+import { waitedOn, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/index.ts';
@@ -559,7 +559,8 @@ export const closeoutReader =
  * A result branch git no longer has is read by the tip the parent's own tick recorded once it had finished (`tipsSeen`, `isShipped`), so
  * the diamond's first parent merged and cleaned up while the second is still in review still counts. One whose tip git cannot find on
  * the base — dropped unmerged, or deleted before any tick saw its run finish — is `gone`, and not shipped. A run that started before the
- * branch was deleted never asks (`gated`).
+ * branch was deleted never asks (`gated`). Where `git` read the parent's branches once for the pass and could not (`unread`), it has not
+ * shipped, and says why.
  *
  * A parent whose frozen steps cannot be read has not shipped: that is its answer, neither a failure nor a defect. Fails with a refusal a
  * read of the store, git or the engine failed with; dies of anything else.
@@ -568,6 +569,8 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   const known = yield* tried(() => parentRecord(id, git));
   const { record } = known;
   if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false } satisfies ParentRun;
+  const unread = isGitRun(record) ? git.unread?.(record) : undefined;
+  if (unread !== undefined) return { ...known, shipped: false, unread } satisfies ParentRun;
   const steps = yield* tried((): Workflow[] | undefined => {
     try {
       return stepsOf(record);
@@ -609,14 +612,15 @@ export const keptParent = Effect.fn('keptParent')(function* (id: string, git: Br
 });
 
 /**
- * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id, over one listing of branches per
- * repository and base (`branchReader`): what the pass's `admit`, `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs
- * (`needOf`) all read through. Made by the pass and dropped with it, so a parent the pass lands is read shipped on the next.
+ * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id, off what the tick's pass read of
+ * where the branches stand (`standingReader`), else over one listing of branches per repository and base (`branchReader`): what the pass's
+ * `admit`, `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs (`needOf`) all read through. Made by the pass and dropped
+ * with it, so a parent the pass lands is read shipped on the next.
  */
 export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
 
-/** The runs a pass reads as runs others wait on (`Parents`), none read yet. */
-export const passParents = (): Parents => ({ git: branchReader(), read: new Map() });
+/** The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`. */
+export const passParents = (git: BranchReader = branchReader()): Parents => ({ git, read: new Map() });
 
 /**
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
@@ -624,9 +628,8 @@ export const passParents = (): Parents => ({ git: branchReader(), read: new Map(
  * and every run read is kept there. Fails with a refusal a read failed with; dies of anything else.
  */
 export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader = oneByOne, read = new Map<string, ParentRun>()) {
-  const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
   const mine = new Map<string, ParentRun>();
-  for (const id of new Set(ids)) mine.set(id, yield* keptParent(id, git, read));
+  for (const id of new Set(waitedOn(run))) mine.set(id, yield* keptParent(id, git, read));
   return (id: string): ParentRun => mine.get(id) ?? { shipped: false };
 });
 

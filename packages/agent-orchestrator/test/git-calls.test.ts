@@ -48,7 +48,7 @@ const CARDS: Readonly<Record<string, string>> = {
   F: "git-out-card-f-a-step-s-work-84on: `make` and `handoff`, `workspaceFor`'s git half, `handOff`, `includeFiles`'s check-ignore",
   H: 'git-out-card-h-what-a-result-wv83: `report`, what a result changed, its artifacts, and the base a merge is read against',
   I1: 'git-out-card-i1-where-a-resu-8xlp, row I, its first half: `standing`, whether a result is on its base and how far ahead',
-  I2: 'workflow-build-repo-home-yrn-bvyk, row I, its second half: `standing` read by the tick, the heads and the tips',
+  I2: 'workflow-build-repo-home-yrn-bvyk, row I, its second half: everyone else reads the snapshot: wf ls, the api, decide, …',
   J: 'git-out-card-j-the-code-says-vdub: the last callers go, and with them the `git` and `gitSays` helpers',
 };
 
@@ -57,8 +57,7 @@ type Baseline = Readonly<Record<string, Entry>>;
 
 /** Each file that calls git today, with its count and the cards that remove its calls. */
 const GIT_SITES: Baseline = {
-  'packages/agent-orchestrator/src/branches/branches.store.ts': { count: 7, cards: ['I1', 'I2'] },
-  'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 1, cards: ['I1', 'I2'] },
+  'packages/agent-orchestrator/src/branches/branches.store.ts': { count: 7, cards: ['I2'] },
   'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 1, cards: ['J'] },
 };
 

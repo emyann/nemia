@@ -5,7 +5,6 @@
  * with `runWith`.
  */
 import os from 'node:os';
-import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Cause, Data, Effect, Exit } from 'effect';
 import {
@@ -33,7 +32,7 @@ import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../d
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
-import { headsOf } from '../branches/branches.store.ts';
+import { headsFor, passStanding } from '../standing/standing.verb.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
@@ -198,7 +197,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *   (`forgotten`).
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
  *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue; with it, the cap's
- *   slots and the runs others wait on, each read once for the pass where a run asks (`passRead`).
+ *   slots and the runs others wait on, each read once for the pass where a run asks (`passRead`), off where the pass read their
+ *   repositories stand, one `standing` for each repository, place and base branch (`passStanding`).
  * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of
  *   their own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
@@ -206,11 +206,11 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
- * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in
- * flight (`judged`). An engine's report that carries no refusals — a test's fake — is read as having none.
+ * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in flight
+ * (`judged`). An engine's report that carries no refusals — a test's fake — is read as having none.
  *
- * Its span says how many runs the store listed (`runs`) and how many of them were answered from memory (`rested`), which make no span
- * of their own: a pass traces what it does, as many spans over many runs at rest as over few.
+ * Its span says how many runs the store listed (`runs`) and how many of them were answered from memory (`rested`), which make no span of
+ * their own: a pass traces what it does, as many spans over many runs at rest as over few.
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const report = yield* asked('tick', engine.tick());
@@ -224,7 +224,11 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
-  const read: PassRead = { ...passRead(e, runs), ...(resting?.memo.settled ? { settled: resting.memo.settled } : {}) };
+  const standing = yield* passStanding(runs);
+  const read: PassRead = {
+    ...passRead(e, runs, process.env, standing),
+    ...(resting?.memo.settled ? { settled: resting.memo.settled } : {}),
+  };
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const queue =
@@ -367,13 +371,12 @@ const restMemo = (e: Engine): RestMemo => {
 };
 
 /**
- * What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository;
- * and how many runs it has answered from memory so far (`rested`), this pass's alone.
+ * What a pass answers runs at rest by: the memo, read up to date with the feed, and the store's stamps; and how many runs it has answered
+ * from memory so far (`rested`), this pass's alone.
  */
 type RestingPass = {
   memo: RestMemo;
   stamps: Map<string, string>;
-  heads: (repo: string) => Record<string, string>;
   verify: boolean;
   rested: number;
 };
@@ -398,18 +401,7 @@ const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMem
   if (typeof e.feed !== 'function') return undefined;
   if (!(yield* followedFeed(e, memo))) return undefined;
   const stamps = yield* tried(() => runStore.runs.stamps());
-  const heads = new Map<string, Record<string, string>>();
-  const resting: RestingPass = {
-    memo,
-    verify,
-    stamps,
-    rested: 0,
-    heads: (repo) => {
-      const at = path.resolve(repo);
-      if (!heads.has(at)) heads.set(at, headsOf(at));
-      return heads.get(at)!;
-    },
-  };
+  const resting: RestingPass = { memo, verify, stamps, rested: 0 };
   return resting;
 });
 
@@ -426,31 +418,29 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
 });
 
 /**
- * One run's pass, answered from the memo where the run was at rest on its last full pass and nothing it was judged by has changed:
- * its files in the store stamp the same, the pass was handed the memo's own run for it (`keptOf`), nothing of its tasks is on the feed
- * since (`restingPass`), and every result branch it would read the tip of is where its record says (`tipsSeen`, off one `for-each-ref` a
- * repository). Otherwise a full pass (`advancePass`), kept in the memo if the run is at rest after it and the pass left the run as it read.
+ * One run's pass, answered from the memo where the run was at rest on its last full pass and nothing it was judged by has changed: its
+ * files in the store stamp the same, the pass was handed the memo's own run for it (`keptOf`), nothing of its tasks is on the feed since
+ * (`restingPass`), and every result branch it would read the tip of is where its record says (`tipsSeen`, off the heads the pass's one
+ * `standing` a repository read, `tipsHold`). Otherwise a full pass (`advancePass`), kept in the memo if the run is at rest after it and the
+ * pass left the run as it read.
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches. Untraced: a run
  * judged in full is traced by its full pass (`advancePass`), and one answered from memory makes no span, counted on the pass's own.
  *
- * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout
- * are read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot`
- * is `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like
- * any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a
- * step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
+ * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout are
+ * read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot` is
+ * `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like any
+ * other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a step
+ * ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
  */
 const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRead, resting: RestingPass | undefined, slot?: RunSlot) {
   if (!resting) return (yield* fullPass(e, run, pass, slot)).advanced;
-  const { memo, stamps, heads, verify } = resting;
+  const { memo, stamps, verify } = resting;
   const stamp = stamps.get(run.id);
   const kept = memo.runs.get(run.id);
   const unchanged = kept !== undefined && stamp !== undefined && kept.stamp === stamp && kept.run === run;
-  if (
-    unchanged &&
-    (yield* tried(() => !kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined))
-  ) {
+  if (unchanged && tipsHold(run, kept.tipped, pass)) {
     countRested();
     resting.rested++;
     if (verify) yield* verified(e, run, pass, slot, kept.advanced);
@@ -465,6 +455,16 @@ const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: P
   }
   return advanced;
 });
+
+/**
+ * Whether every result branch the run rests on is where its record says (`tipsSeen`), off the heads the pass read (`headsFor`): never where
+ * the pass did not read them, and the run is then judged in full.
+ */
+const tipsHold = (run: Run, tipped: readonly string[], pass: PassRead): boolean => {
+  if (!tipped.length || !isGitRun(run)) return true;
+  const heads = pass.standing && headsFor(pass.standing, run);
+  return heads !== undefined && tipsSeen(run, tipped, heads) === undefined;
+};
 
 /**
  * A run the memo answered, its record read afresh and judged in full as well (`fullPass`): nothing where the two agree, and a defect naming

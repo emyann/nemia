@@ -20,6 +20,15 @@ export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((
 export const gated = (run: Run): boolean => Boolean(run.after?.length) && !run.cancelledAt && !hasStarted(run);
 
 /**
+ * The runs this run's pass reads as runs it waits on: its `after` while the gate applies (`gated`), and the runs a person holds it until
+ * while the hold stands (`Run.hold`), in that order, a run named twice named twice. Pure.
+ */
+export const waitedOn = (run: Run): string[] => [
+  ...(gated(run) ? run.after! : []),
+  ...(run.hold && !run.cancelledAt ? run.hold.until : []),
+];
+
+/**
  * The runs in `after` that have not shipped, in the order they were given. Pure; none, and `shipped` never called, for a run not `gated`.
  */
 export function waitingOn(run: Run, shipped: (runId: string) => boolean): string[] {
@@ -36,33 +45,40 @@ export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean
 
 /**
  * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in views.verb.ts): its record, when the store has one;
- * whether it shipped, as its own `nemia decide` would say; and the result branches it recorded that git no longer has, when there are any.
+ * whether it shipped, as its own `nemia decide` would say; the result branches it recorded that git no longer has, when there are any; and
+ * why where its branches stand was not read, when it was not (`unread`): it then has not shipped, and is asked again on the next pass.
  */
-export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };
+export type ParentRun = { record?: Run; shipped: boolean; gone?: string[]; unread?: string };
 
 /**
  * A run this one waits on, as `nemia ls` and `nemia decide` name it: its id and, when it may never ship without a person, why — the store
  * has no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base. `shipped` only on a hold
- * whose every run has shipped, in the moment before the tick lifts it (`holdsOf`).
+ * whose every run has shipped, in the moment before the tick lifts it (`holdsOf`). `unread`, why where its branches stand was not read,
+ * which the next pass asks again.
  */
-export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[]; shipped?: true };
+export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[]; shipped?: true; unread?: string };
 
 /** Each run this one waits on that has not shipped (`waitingOn`), and why it may never. Pure. */
 export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
-  return waitingOn(run, (id) => parentOf(id).shipped).map((id) => {
-    const { record, gone } = parentOf(id);
-    if (!record) return { run: id, missing: true };
-    if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt };
-    return gone?.length ? { run: id, gone } : { run: id };
-  });
+  return waitingOn(run, (id) => parentOf(id).shipped).map((id) => waitOf(id, parentOf(id)));
 }
+
+/** A run this one waits on that has not shipped, as `parent` reads it (`Wait`): why it may never, else why it was not read. */
+function waitOf(id: string, { record, gone, unread }: ParentRun): Wait {
+  if (!record) return { run: id, missing: true };
+  if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt };
+  return gone?.length ? { run: id, gone } : unread ? { run: id, unread } : { run: id };
+}
+
+/** A run waited on as the status column names it: `a-1x2y (cancelled)`, with why it may never ship or why it was not read. */
+const waitName = (w: Wait): string =>
+  `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : w.unread ? ` (where it stands is unread: ${w.unread})` : ''}`;
 
 /** Whether a person has to act for this run to ship: nothing the tick can read will change on its own. */
 const neverShips = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w.gone?.length);
 
 /** A run's roots, waiting, as `nemia ls` says it in the status column: `waiting on a-1x2y (cancelled), b-3z4w`. */
-export const waitWord = (waits: readonly Wait[]): string =>
-  `waiting on ${waits.map((w) => `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : ''}`).join(', ')}`;
+export const waitWord = (waits: readonly Wait[]): string => `waiting on ${waits.map(waitName).join(', ')}`;
 
 /**
  * What a run waiting on runs leaves a person to do, in one line, for `nemia decide` and for `nemia ls`'s `→ waiting on you`. Pure. Nothing,
@@ -91,14 +107,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
  */
 export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
   if (!run.hold) return [];
-  const waits: Wait[] = run.hold.until
-    .filter((id) => !parentOf(id).shipped)
-    .map((id) => {
-      const { record, gone } = parentOf(id);
-      if (!record) return { run: id, missing: true };
-      if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt };
-      return gone?.length ? { run: id, gone } : { run: id };
-    });
+  const waits: Wait[] = run.hold.until.filter((id) => !parentOf(id).shipped).map((id) => waitOf(id, parentOf(id)));
   return waits.length ? waits : run.hold.until.map((id) => ({ run: id, shipped: true as const }));
 }
 
@@ -128,12 +137,7 @@ const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
 export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> = {}): string {
   const words = saidWord(said);
   if (!waits.length) return `held, on a hold that names no run${words}`;
-  const named = runList(
-    waits.map(
-      (w) =>
-        `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : ''}`,
-    ),
-  );
+  const named = runList(waits.map(waitName));
   const one = waits.length === 1;
   const held = `held until ${named} ${one ? 'ships' : 'ship'}${words}`;
   if (waits.every((w) => w.shipped)) return `${held} — ${one ? 'it has' : 'they have'} shipped, and the next tick lifts the hold`;

@@ -67,6 +67,10 @@ froze when it started; you need not run them. Each reads one JSON request on std
 - `status` — the merge staged in a checkout: `{ "checkout", "tips" }` answers `{ "merging", "conflicted", "missing", "head" }`.
 - `report` — what each result branch changed against a run's base, from git's object store: `{ "repo", "baseRef", "onto", "branches",
   "diffOf", "present", "atBase" }` answers `{ "at", "files", "diffs", "present", "atBase" }`.
+- `standing` — where result branches stand against the base they land on, in one listing of the repository's branches:
+  `{ "repo", "branches": [{ "branch", "tip", "baseRef" }], "base" }` answers `{ "heads", "branches" }`, every branch and its commit, and
+  for each asked its tip (null once git no longer has it), whether it is within `base` (`onBase`: yes, no or unknown), whether it holds
+  work past its `baseRef` (`pastBase`), and how many commits it is ahead of `base`.
 - `trial` — whether branches merge, by a merge made in git's object store alone, which touches no checkout, index or ref:
   `{ "repo", "trials": [{ "onto", "branch" }] }` answers `{ "at", "trials" }`, the commit each `onto` names now and each trial in the
   order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.

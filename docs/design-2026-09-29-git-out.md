@@ -348,7 +348,7 @@ gone, not moved.
 | H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`; the snapshot and its refresh; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
 | I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. |
 | J. The api and the web | H, I | The api reads the two snapshots, `report.json` (`decide/decision.ts`) and `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through the package, and no request runs a script; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
-| K. The guard | last | A test over `packages/*/src` and `apps/*/src` that refuses a `'git'` command handed to a spawn, and a `.git` or `MERGE_HEAD` path, with a plant that makes it refuse. The `.git` probe in `authoring.ts` is settled first (open question 5). |
+| K. The guard | now | Landed first, as a baseline that only shrinks (`GIT_SITES` in `test/git-calls.test.ts`), each later card lowering its own entries. A test over `packages/*/src` and `apps/*/src` that refuses a `'git'` command handed to a spawn, and a `.git` or `MERGE_HEAD` path, with a plant that makes it refuse. The `.git` probe in `authoring.ts` is settled first (open question 5). |
 
 **The pin.** `test/fixtures/git-runs-before.json` holds what every shipped folder's git runs read as: briefs, plans, decisions, listings
 and `wf rm`'s words (`git-before-after.test.ts`). Each card from C to J leaves it unchanged, except for the lines a card says it
@@ -402,6 +402,9 @@ absorbs. The `say` templates are what make the words match.
    `.git` beside `workflows/`. *Recommend* reading the repositories the store already knows: the `repo` of runs and the api's home
    repository. A folder is a repository's when it is `<one of them>/workflows`. If the owner prefers, keep the probe as the one named
    exception the guard test lists.
+   *Settled at card K's gate, on 2026-10-06*: a folder is a repository's when it is `<repo>/workflows` for a `repo` a factory names, or
+   the one the caller passes (the api's home repository). The runs' repositories are left out: reading every record on a write cost a
+   median of 79 ms over 526 runs, over the 50 ms line set at the gate. `isWorkflowsHolder` and `placesAround` read no `.git`.
 6. **Refreezing a run's place.** A frozen skill with a bug stalls its runs as unread. *Recommend* `wf refreeze <run>`. It writes a
    person's file, `runs/<id>.refreeze`, which the tick reads: it freezes the skill again from the lookup and writes the new version into
    the record's `placeSkill`. The person chose the new copy by name, so no command comes from a checkout unasked.

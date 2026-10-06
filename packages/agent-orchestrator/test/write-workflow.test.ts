@@ -18,7 +18,7 @@ import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-write-');
 process.env.WF_ROOT = ROOT;
-const { writeWorkflow } = await import('../src/runner.ts');
+const { addFactory, writeWorkflow } = await import('../src/runner.ts');
 
 const STORE = path.join(ROOT, 'workflows');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
@@ -149,16 +149,25 @@ test('the README is written only when it is given, to the name the README alread
   assert.deepEqual(loadWorkflows(fresh), made.steps);
 });
 
-test("written where the board lists workflows from — the store's workflows/ and a repository's — and anywhere else with `{ anywhere: true }`", () => {
+test("written where the board lists workflows from — the store's workflows/ and a known repository's — and anywhere else with `{ anywhere: true }`", () => {
   const repo = scratch('wf-write-repo-');
-  fs.mkdirSync(path.join(repo, '.git'));
-  assert.deepEqual(writeWorkflow(path.join(repo, 'workflows', 'dev'), [step('implement')]).written, ['implement.md'], "a repository's");
-  const worktree = scratch('wf-write-worktree-');
-  fs.writeFileSync(path.join(worktree, '.git'), 'gitdir: /elsewhere\n');
+  addFactory({ name: 'write-known', repos: [repo] });
+  assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'a repository a factory names is known with no .git read');
+  fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, '.claude', 'agents', 'only-here.md'),
+    '---\nrole: Engineer\ndescription: Only in the repository.\n---\nYou are.\n',
+  );
   assert.deepEqual(
-    writeWorkflow(path.join(worktree, 'workflows', 'dev'), [step('implement')]).written,
+    writeWorkflow(path.join(repo, 'workflows', 'dev'), [step('implement', { agent: 'only-here' })]).written,
     ['implement.md'],
-    "a worktree's: its .git is a file, and a worktree is a repository all the same",
+    "a factory's repository's, its agents found in its .claude/",
+  );
+  const named = scratch('wf-write-named-');
+  assert.deepEqual(
+    writeWorkflow(path.join(named, 'workflows', 'dev'), [step('implement')], undefined, { places: { repo: named, home: ROOT } }).written,
+    ['implement.md'],
+    'the repository the caller names in its places',
   );
 
   const elsewhere = path.join(scratch('wf-write-elsewhere-'), 'dev');
@@ -171,7 +180,7 @@ test("written where the board lists workflows from — the store's workflows/ an
 
 test("REFUSED at shipped defaults, with the folder as it was: a folder outside the store's workflows/ and a repository's — or the workflows/ itself, or one below a workflow", () => {
   const fix = (at: string) =>
-    `${at} is not a workflow in the store's workflows/ (${path.join(STORE, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
+    `${at} is not a workflow in the store's workflows/ (${path.join(STORE, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
   const outside = scratch('wf-write-outside-');
   fs.writeFileSync(path.join(outside, 'old.md'), 'a step nobody meant to remove\n');
   assert.equal(
@@ -182,7 +191,15 @@ test("REFUSED at shipped defaults, with the folder as it was: a folder outside t
   assert.equal(
     refusal(notYet, () => writeWorkflow(notYet, [step('implement')])),
     fix(notYet),
-    "a workflows/ with no .git beside it is no repository's",
+    "a workflows/ of a folder no factory names is no repository's",
+  );
+  const unknown = scratch('wf-write-unknown-');
+  fs.mkdirSync(path.join(unknown, '.git'));
+  const checkout = path.join(unknown, 'workflows', 'dev');
+  assert.equal(
+    refusal(checkout, () => writeWorkflow(checkout, [step('implement')])),
+    fix(checkout),
+    'a checkout with a .git that no factory names is not known by it',
   );
   assert.equal(
     refusal(STORE, () => writeWorkflow(STORE, [step('implement')])),

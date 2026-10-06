@@ -196,15 +196,15 @@ const SIDECARS = [
 
 /**
  * Why no agent may be written to or removed from `dir`, or `undefined`: an agent is a file in `agents/` beside the workflows the board
- * lists — the store's (`<store>/workflows/agents`) or a repository's (`<repo>/workflows/agents`). Anywhere else only with
- * `{ anywhere: true }`.
+ * lists — the store's (`<store>/workflows/agents`) or a repository's the store knows (`<repo>/workflows/agents`, for a factory's repo or
+ * the `repo` the caller names). Anywhere else only with `{ anywhere: true }`.
  */
-function agentPlaceRefusal(dir: string, anywhere: boolean): string | undefined {
+function agentPlaceRefusal(dir: string, anywhere: boolean, repo?: string): string | undefined {
   if (path.basename(dir) !== AGENTS_FOLDER) {
     return `${dir} is not a folder of agents: the agents the workflows name are in the ${AGENTS_FOLDER}/ beside them. Name <workflows>/${AGENTS_FOLDER}.`;
   }
-  if (anywhere || isWorkflowsHolder(path.dirname(dir))) return undefined;
-  return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), AGENTS_FOLDER)}) nor a repository's (<repo>/workflows/${AGENTS_FOLDER}, beside its .git), the two places the board lists agents from. Write it to one of the two, or pass { anywhere: true } to write ${dir} all the same.`;
+  if (anywhere || isWorkflowsHolder(path.dirname(dir), repo)) return undefined;
+  return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), AGENTS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${AGENTS_FOLDER}, for a factory's repo), the two places the board lists agents from. Write it to one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${dir} all the same.`;
 }
 
 /** Whether two paths are one file on disk: a rename by case, where the filesystem does not tell case apart. */
@@ -272,7 +272,7 @@ export function writeAgent(
   };
   if (Object.hasOwn(rest, 'card'))
     refuse('`card` is not written with an agent: its card is generated from its skills. Send the agent without it.');
-  refuse(agentPlaceRefusal(at, anywhere));
+  refuse(agentPlaceRefusal(at, anywhere, repo));
   const name = draft?.name;
   refuse(agentNameRefusal(name));
   const old = from ?? name;
@@ -414,7 +414,7 @@ export function removeAgent(
   const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => {
     if (why) throw new AgentWriteError(why, kind, users);
   };
-  refuse(agentPlaceRefusal(at, anywhere));
+  refuse(agentPlaceRefusal(at, anywhere, repo));
   refuse(agentNameRefusal(name));
   const file = path.join(at, `${name}.md`);
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink())

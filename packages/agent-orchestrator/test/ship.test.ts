@@ -2060,7 +2060,7 @@ test("the whole screen of an ending whose check did not finish on the merge, wit
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '  merges    wf/<id>/implement merges cleanly onto main',
@@ -2111,7 +2111,7 @@ test("the whole screen of an ending whose check refused the merge, with the chec
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '  merges    wf/<id>/implement merges cleanly onto main',
@@ -2169,7 +2169,7 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<second>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<second>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<second>/implement is ahead of main by 1 commit',
   ]);
@@ -2296,6 +2296,37 @@ test('nemia decide offers the merge where the work conflicts with the base, and 
   assert.ok(decided.offers.includes(decided.commands.find((c) => c.label === 'merge')!.said!), decided.offers.join('\n'));
   await runWith(e, mergeRun(id));
   assert.deepEqual(await merges(), [], 'nor once it is asked');
+});
+
+/** A `git` on PATH that answers every command as git does but reading the commit `branch` names, which it says it has none of. */
+function blindTo(branch: string): string {
+  const real = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  const dir = scratch('wf-ship-blind-git-');
+  fs.writeFileSync(
+    path.join(dir, 'git'),
+    `#!/bin/sh\ncase "$*" in *"rev-parse --verify --quiet ${branch}^{commit}"*) exit 1;; esac\nexec ${real} "$@"\n`,
+    { mode: 0o755 },
+  );
+  return dir;
+}
+
+test('REFUSED at shipped defaults: a merge whose trial read no commit of the base says git cannot read it, and `nemia decide` offers none', async () => {
+  const { repo, id, e } = await stoppedOnBase();
+  mainMoves(repo);
+  const before = process.env.PATH;
+  process.env.PATH = `${blindTo('main')}${path.delimiter}${before}`;
+  try {
+    await assert.rejects(
+      runWith(e, mergeRun(id)),
+      mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia merge ${id}\\.$`)),
+    );
+    assert.deepEqual(
+      (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'merge'),
+      [],
+    );
+  } finally {
+    process.env.PATH = before;
+  }
 });
 
 test("a merge send-back leaves the round count unchanged: the loop's target merges the base at the commit asked, the run's base moves there, and the reviewer reads the merge", async () => {

@@ -1683,7 +1683,7 @@ A failed run is decided too. The first run this was pointed at had been sitting 
 `failed`, and its branch held a real fix plus a design question addressed to a person — none of
 which anything in this tool had ever shown anyone.
 
-`wf decide` is read-only. It reports facts and runs nothing. It ends with where each result branch stands
+`wf decide` is read-only. It reports facts and changes nothing: what it reads of git, it asks the run's place. It ends with where each result branch stands
 against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
 then with what is left to decide: a last step waiting at its gate, with the `wf approve` that answers it — in
 its own prose where that step is an ending that has not run, since approving is what runs it — or, where no
@@ -1697,7 +1697,8 @@ branch, classifies its steps like any other, and prints the diff against the bas
 
 A summary is the agent's word and a green check is the suite's, and neither says what the branch did
 to get there. So on a run waiting on you, between the run's verdicts and the steps' closeouts, the
-screen shows what the branch touched, read out of git:
+screen shows what the branch touched, read from the run's place — its `report` verb, run live each time the screen is read, its answer
+kept nowhere:
 
 ```
   touched  wf/add-sub-3j75
@@ -1724,7 +1725,8 @@ screen shows what the branch touched, read out of git:
   timeline  run  queued 13s  ran 20m40s  wall 20m55s
 ```
 
-- **touched** is `git diff --numstat` against the run's base, grouped by workspace package (the base's
+- **touched** is the files the place's `report` says the branch changed against the run's base — git's numstat, renames found — counted
+  in our words (`3 files: +14 −1`, and `, 1 binary` where there is one), grouped by workspace package (the base's
   own `workspaces`, which no step could edit, read as npm reads them: `./packages/*` is `packages/*`) or
   else by top-level directory. A `workspaces` glob with `**` is not refused, since the repository's file is
   not ours, but a `workspaces` line names it: a file still counts once, in the outermost package on its
@@ -1732,7 +1734,7 @@ screen shows what the branch touched, read out of git:
   places it touched, a binary file as a file with no lines. Then, each only when true, the
   *agent-facing* files — what an agent reads as instructions: `CLAUDE.md`, `AGENTS.md`, `.claude/`,
   `.codex/`, `.mcp.json`, a `README.md` — and the *check-affecting* ones: every `package.json`, the
-  lockfile, `tsconfig*.json`, `turbo.json`, `*.test.*`, anything under `test/` or `.e2e/`. Before a
+  lockfile, `tsconfig*.json`, `turbo.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `*.test.*`, anything under `test/` or `.e2e/`. Before a
   terminal step has a branch — the first step's check refused it — the screen reads every branch a
   step worked on.
 - **in full** is the whole diff of the check-affecting files, because a check that passed says
@@ -1743,6 +1745,10 @@ screen shows what the branch touched, read out of git:
   `AGENTS.md`, the root's `docs/` or a workspace package's own — or that it wrote nothing there. Not any
   `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
   this line holds a person to it.
+- **not known**: where the place refused the report or was not heard — git not there, a repository gone, a branch it has not — each
+  line says `what this run changed is not known: <what the place said>`, and the lesson that it could not be read, never that the
+  branch changed nothing. A declared file the workspace no longer has is looked for on the step's branch the same way, and said to
+  be not known, never not there, when the place cannot say.
 - **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.
   A count nobody measured says `not measured`, never `0`, and so does a cost. Beside the counts, the time the
   harness counted waiting on the model and running tools, once either was measured (`api 8m06s · tools 2s`).

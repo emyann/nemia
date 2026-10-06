@@ -51,8 +51,8 @@ called from about 40 places. Two more sites read git's files off disk with no pr
 | `branches.ts:43` `askGit`, `:34` `isShipped` (`merge-base --is-ancestor`) | whether a result branch is on its base, and whether it holds work past the run's base | `standing` |
 | `branches.ts:122` `oneByOne`, `:140` `branchReader` (`rev-parse --verify`, `rev-list --count`, `for-each-ref` with `ahead-behind`) | has git the branch; commits ahead of the base; the batched reader for `wf ls` and the board | `standing` |
 | `branches.ts:265` `parentRecord`, `:284` `refsOf`, `:405` `headsOf` | a parent run's gone branches (`--after`); result tips (`tipsSeen`, `tick.ts:923`); every head, for the memo of runs at rest (`tick.ts:1424`, the api's `runs/resting.ts:85`) | `standing` |
-| `branches.ts:305` `artifacts`, `:317` `readArtifact`, `:326` `diffStat`, `:339` `touchedBy`, `:354` `workspacesOf`, `:368` `sensitiveDiff` | files added, one file's text, the shortstat, the numstat behind `radius`, the base's npm workspaces, the diff of check-affecting files | `report` |
-| `artifacts.ts:62` `workspaceArtifact` (`cat-file -t branch:path`) | whether a declared artifact is on the step's branch when its workspace no longer has it | `report` |
+| ~~`branches.ts:305` `artifacts`, `:317` `readArtifact`, `:326` `diffStat`, `:339` `touchedBy`, `:354` `workspacesOf`, `:368` `sensitiveDiff`~~ moved to the place's `report` verb (`changesOf`), read live (open question 2) | files added, one file's text, the shortstat, the numstat behind `radius`, the base's npm workspaces, the diff of check-affecting files | `report` |
+| ~~`artifacts.ts:62` `workspaceArtifact` (`cat-file -t branch:path`)~~ moved to `report`'s `present` (`presentOn`), read live | whether a declared artifact is on the step's branch when its workspace no longer has it | `report` |
 | `forget.ts:163`, `:288` (`worktree list --porcelain`, parsed by `parseWorktrees`, `run.ts:3576`); `:174-176` (`status`, `for-each-ref --contains`); `:204` (`for-each-ref refs/heads/wf/<id>/`); `:211` (`merge-base --is-ancestor`) | what the run left on disk and in the repository, and what of it is safe to remove | `inventory` |
 | `forget.ts:191`, `:383` (`worktree remove`), `:197` (`worktree prune`), `:220` (`branch -D`) | remove it (`wf rm`, `wf prune`) | `remove` |
 | `tick.ts:827` `WF_BASE_REF`; `run.ts:768` `LANDING_DENIED` (`Bash(git commit:*)`, `Bash(git merge --continue:*)`) | the base a round's check diffs against; what a landing session is denied | `open`'s answer; `place.json` |
@@ -60,7 +60,7 @@ called from about 40 places. Two more sites read git's files off disk with no pr
 | `meter/meter.ts:16`, `meter/tally.store.ts:195` | the pass's `git` phase, counted by the command's name | the `place` phase |
 | `authoring.ts:152`, `:628` (`.git` beside `workflows/`) | whether a folder is a repository's, for the board's lookup of workflows, agents and skills | open question 5 |
 | ~~api `decide/merge.ts:21` `mergesOnto` (`merge-tree --write-tree`)~~ moved to the place's `trial` verb (`trialMerges`), read live (open question 2) | the board's trial merge: does a result still merge onto the base as it is now | `report` |
-| api `decide/decision.ts:333-359` (`touchedBy`, `sensitiveDiff`, `diffStat`, `branchStandings`), `:246`, `:253-254` (`git -C … diff`, `merge --no-ff`, `branch -D`) | the decision page's diff, standings and offered commands | the report snapshot; `place.json` `say` |
+| api `decide/decision.ts:333-359` (~~`touchedBy`, `sensitiveDiff`, `diffStat`~~ read live through `changesOf`, `branchStandings`), `:246`, `:253-254` (`git -C … diff`, `merge --no-ff`, `branch -D`) | the decision page's diff, standings and offered commands | `report`, read live; `place.json` `say` |
 | runtime `harness/codex/codex.ts:41-53` `repositoryOf` (`rev-parse --git-common-dir`), used at `:202-204` | the repository a Codex worktree belongs to, to extend the operator's trust to it | a task field (below) |
 
 A count of spawn sites understates the dependency. The api spawns git once, but it reaches git through the package in six more files
@@ -109,7 +109,7 @@ The brief's example contracts were closeout fields an agent fills in (`changes`,
 - **The closeout is read forgivingly on purpose.** `parseCloseout` (`closeout/closeout.ts:102`) turns odd answers into defaults so that a
   run never becomes unreadable. `declaredOutput` (`:133`) checks that a field is present, not what it holds.
 
-So `Changes` comes from the place's `report` script, run by the tick, decoded strictly. `landed` is the tick's own record of what `land`
+So `Changes` comes from the place's `report` script, run when a decision is read, decoded strictly. `landed` is the tick's own record of what `land`
 answered. The closeout keeps what only the agent knows: its summary, its artifacts, and a landing's commit message.
 
 ### 3. Strict decoding is new, and it has a place
@@ -140,7 +140,7 @@ worked out in code today with no git: the parent's workspace, the checkout, the 
 | `open` | `wf start`, once | `{ root }`: the directory `--repo` names | `Opened { repo, baseRef, branch }` | `makeWorkspace` |
 | `make` | before filing a `fork` or `merge` step of an isolated run | `{ repo, at, name, from, also[] }`: `at` is `WF_ROOT/worktrees/<id>/<step>`, `name` is `wf/<id>/<step>`, `from` a branch or the base | `Made { workspace, branch, conflicts[], notes[] }` | `workspaceFor`'s git half, `includeFiles` |
 | `handoff` | each pass a finished step's hand-off is due, and before `wf rm` removes a workspace | `{ workspace, step, why }` | `HandedOff { commit: string \| null }` | `handOff` |
-| `report` | when a run's result tips or its base moved since the last report (below) | `{ repo, baseRef, onto, branches[], diffOf[], present[], atBase[] }` | `Changes` (below) | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, the trial merges `trial` reads live today |
+| `report` | live, each time a decision is read: `nemia decide`, the api's decision, a declared file's branch (below) | `{ repo, baseRef, onto, branches[], diffOf[], present[], atBase[] }` | `Changes` (below) | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62` |
 | `standing` | by the tick, each pass: one call per repository and frozen copy, over every result branch the store's records name there; written to a snapshot the api and `wf ls` read (below) | `{ repo, branches: [{ branch, tip?, baseRef }], base }` | `Standing { heads, branches: [{ branch, tip, onBase, pastBase, ahead }] }` | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`'s reads |
 | `status` | only while an ending that lands on its check holds the checkout (`landingOpen`) | `{ checkout, tips }` | `Status { merging, conflicted, missing[], head? }` | `mergeInProgress`, `mergeState` |
 | `land` | when `landingDue` says `commit` or `abort` | `{ checkout, act: 'commit', message }` or `{ checkout, act: 'abort' }` | `Landed { commit }` or `{ aborted: true }` | `commitMerge`, `abortMerge` |
@@ -268,7 +268,7 @@ judgements (`landingDue`, `shippedBy`, `radius`) take. **The place's script alwa
 | `Opened` | `repo`, `baseRef`, `branch` | `wf start`, on the record (as today) | everything that reads a git run's record today |
 | `Made` | `workspace`, `branch`, `conflicts: string[]`, `notes: string[]` | the tick, on the step's record (`workspace`, `branch`); `conflicts` and `notes` into the brief | the brief (*Where to look*, the fan-in's conflict section), the check's `cwd` |
 | `HandedOff` | `commit: string \| null` | the tick's note; `wf rm`'s `handedOff` | `wf rm`'s words |
-| `Changes` | `at: { baseRef, onto, tips }`; `files: [{ path, from?, status, added: int \| null, removed: int \| null }]` per branch; `diffs: { path: text }` for `diffOf`; `merges: { clean: true } \| { clean: false, conflicts[] } \| { unknown: words }` per branch; `present: { path: 'file' \| 'directory' \| 'absent' }`; `atBase: { path: text \| null }` | the tick, to `runs/<id>/place/report.json`: one file, one writer | `radius` (pure, as today, from `files` and the npm workspaces it parses out of `atBase['package.json']`); `wf decide`; the board's decision page, through a reader the package exports on `agent-orchestrator/run`; `workspaceArtifact`'s branch fallback |
+| `Changes` | `at: { baseRef, onto, tips }`; `files: [{ path, from?, status, added: int \| null, removed: int \| null }]` per branch; `diffs: { path: text }` for `diffOf`, per branch; `present: { path: 'file' \| 'directory' \| 'absent' }` per branch; `atBase: { path: text \| null }`; a branch git has not is in none of them | nobody: read live by each reader, when a decision is read (`changesOf`, `presentOn` in `branches/changes.store.ts`), and kept nowhere | `radius` (pure, from `files` and the npm workspaces it parses out of `atBase['package.json']`); `nemia decide`; the api's decision, through `changesOf` on `agent-orchestrator`; `workspaceArtifact`'s branch fallback |
 | `Standing` | `heads: { branch: commit }`; `branches: [{ branch, tip: string \| null, onBase: 'yes' \| 'no' \| 'unknown', pastBase: boolean \| null, ahead: int \| null }]` | the tick, each pass, to `WF_ROOT/standing.json`: one file, one writer, each repository's answer (or its unread words) with the time it was read; `tipsSeen` writes `run.tips` as today | in the tick, from its own call: `shippedBy`, `parentOf` and `runReady` (`--after`), the memo of runs at rest. From the snapshot, running nothing: `wf ls`, and the api's list, decision page and memo of runs at rest (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through a reader the package exports on `agent-orchestrator/run` |
 | `Status` | `merging: 'ours' \| 'other' \| 'none'`, `conflicted`, `missing: string[]`, `head?` | not stored | `landingDue`, `landingOpen`, `mainClaim` |
 | `Landed` | `{ commit }` or `{ aborted: true }` | the tick, on the step's `landed` (as today) | `landedWords`, `wf ls`, the board |
@@ -278,14 +278,10 @@ judgements (`landingDue`, `shippedBy`, `radius`) take. **The place's script alwa
 What the board and `wf decide` render:
 
 - **The diff.** `Changes.files` grouped by `radius`, the counts written in our words, and the check-affecting `diffs` cut as
-  `inFullLines` cuts them now (`decide/decision.ts:124-166`). `diffStat`'s git sentence ("3 files changed, …") goes. The api reads the
-  snapshot and runs nothing.
-- **The trial merge.** `Changes.merges`, as `mergeWord` words it today. Until cards H and J it is read live through the `trial` verb
-  (open question 2). It is to be a snapshot, not a live `merge-tree`, and it says the base
-  commit it was made at. The tick makes a new report when a result tip or the base branch's head moves from the `at` it was made at. It
-  sees that from the `Standing.heads` it reads anyway for the memo of runs at rest. So a merge onto the base makes the waiting runs'
-  reports stale, and the next pass refreshes them. That happens only for runs with something to decide (`toDecide`, or an ending at its
-  gate), and at most a few per pass, so one merge does not start a report for every run in the store.
+  `inFullLines` cuts them now (`decide/decision.ts:124-166`). `diffStat`'s git sentence ("3 files changed, …") goes: the counts read
+  "3 files: +14 −1", and ", 1 binary" where there is one (`countsLine`). The api reads `report` live, when a decision is read.
+- **The trial merge.** The `trial` verb, as `mergeWord` words it, read live (open question 2); `Changes` has no `merges`. `nemia
+  merge` takes the base's commit from the trial's `at`, and refuses ("git cannot read <branch>") where the trial read none.
 - **The offers.** `ship it`, `drop it` and `read it` are `place.json`'s `say` with the run's names filled in. `ToDecide`'s `kind: 'git'`
   (`run.ts:1073`) is renamed `kind: 'result'`. It is computed, never stored, so the api and the web change with it in one card.
 - **Unread.** A report that is unread is shown as such ("what this run changed is not known: <said>"), never as no change.
@@ -352,9 +348,9 @@ gone, not moved.
 | E. `inventory` and `remove` | 5 | `wf rm` and `wf prune` (`forget/forget.verb.ts`, `prune/prune.verb.ts`); `parseWorktrees` leaves the package. Done: both read a run's worktrees and branches by `inventory` (`{ repo, under, prefix, base }`, each worktree a `Held`), commit what one holds by `handoff`, and take them away by `remove`, never forced; the api's `DELETE /api/runs/:runId` and `POST …/prune` with them. An inventory refused or not heard refuses the verb in its words and touches nothing, never read as nothing left; a repository that is no longer there answers an empty one. The commands they print are the place's `say` (`attach`, `commit`, `inspect`, `orphans`, `unlock`). |
 | F. `make` and `handoff` | 6 | `workspaceFor`'s git half and `handOff` (`workspace/worktree.store.ts`, `tick/`); `includeFiles` and `check-ignore` into `make`; `provisionDeps` stays and runs on `Made.workspace`; the realpath guard. |
 | G. The landing | 6 | `status` and `land` in `landEnding` and `mainClaim` (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. |
-| H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`; the snapshot and its refresh; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
+| H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, read live through `report` (no snapshot); `nemia merge`'s base off the trial's `at`; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
 | I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. |
-| J. The api and the web | H, I | The api reads the two snapshots, `report.json` (`decide/decision.ts`) and `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through the package, and no request runs a script; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
+| J. The api and the web | H, I | The api reads the snapshot `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`) through the package, and reads `report` live as card H left it, with no snapshot; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
 | K. The guard | now | Landed first, as a baseline that only shrinks (`GIT_SITES` in `test/git-calls.test.ts`), each later card lowering its own entries. A test over `packages/*/src` and `apps/*/src` that refuses a `'git'` command handed to a spawn, and a `.git` or `MERGE_HEAD` path, with a plant that makes it refuse. The `.git` probe in `authoring.ts` is settled first (open question 5). |
 
 **The pin.** `test/fixtures/git-runs-before.json` holds what every shipped folder's git runs read as: briefs, plans, decisions, listings
@@ -379,11 +375,11 @@ absorbs. The `say` templates are what make the words match.
 
 - **Processes.** A verb is a node process (tens of milliseconds) where today's call was an `execFileSync` of git or a `stat`. Per pass:
   one `standing` per repository and frozen copy (it replaces a `for-each-ref` per repository), one `handoff` per step whose hand-off is
-  due, one `status` per ending holding a checkout, and a few `report`s when something moved. Measured by card A1 on the owner's machine
+  due, and one `status` per ending holding a checkout; `report` runs at a decision's read, never in a pass (open question 2). Measured by card A1 on the owner's machine
   (12 cores, WSL), `runPlaceVerb` on a scratch repository, ten runs each, a floor: `open`, `status`, `handoff` and `land` take 50 to 60
   ms at the median, against 1 ms for one `git rev-parse`; node's start is most of it. Card J compares the pass's `place` phase with
-  today's `git` phase in `tick-stats.json`. A board request spawns nothing, where today the list, the decision page and the memo of runs at rest run git on each request
-  (`branchReader`, `headsOf`).
+  today's `git` phase in `tick-stats.json`. The board's list and memo of runs at rest spawn nothing, where today they run git on each
+  request (`branchReader`, `headsOf`); its decision page runs the place's `report` and `trial`, live.
 - **Code.** The git code does not disappear; it moves into the skill's scripts. The package loses `worktree.ts`'s git half, most of
   `branches.ts`, the git calls of `forget.ts`, and the api's `merge.ts`. It gains `place/` and the decoders.
 
@@ -398,7 +394,10 @@ absorbs. The `say` templates are what make the words match.
    *Departed from, for the trial merges, on 2026-10-05*: the decision's `merges`, `nemia merge`'s trial and a land gate's collisions
    are read live, through the git place's `trial` verb (`trialMerges` in `src/place/place.store.ts`), when a decision is read — never by
    the tick, never on a poll. The decision already ran `merge-tree` live, so nothing new runs at a click; it now runs in the place.
-   Cards H (`report`) and J (the api reads snapshots) replace it.
+   *Departed from, for the report, on 2026-10-06 (card H)*: `report` is read live too, when a decision is read — by `nemia decide`, the
+   api's decision and a declared file's branch — and nothing of it is kept: no `report.json`, no refresh. It costs a decision read two
+   node processes and a `git diff` per check-affecting path, 150 to 450 ms where today's git calls took 20 to 120 (card H's measure).
+   Card J reads the `standing.json` snapshot, and no snapshot of `report`.
 3. **Codex trust: a task field, or leave `repositoryOf` in the runtime?** *Recommend* `config.codex.trustFrom` (cards B1, B2). The runtime
    is finished, but this is a harness's own flag, the shape `config.claude` already has. batch/v1 has no field for it, and neither does
    it for `config.claude`.

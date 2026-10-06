@@ -45,11 +45,11 @@ test("the Factory card's line: every group once, each change's lines once — a 
   );
   assert.equal(
     touchedSummary([read, read, unread('wf/r/gone')]),
-    'touched 3 packages · +12 −3 · 1 not read',
+    'touched 3 packages · +12 −3 · 1 not known',
     'two branches with the same changes count each package and each file once, and a branch that could not be read is said, not dropped',
   );
-  assert.equal(touchedSummary([unread('wf/r/gone')]), 'touched not known — its branch could not be read');
-  assert.equal(touchedSummary([unread('a'), unread('b')]), 'touched not known — 2 branches could not be read');
+  assert.equal(touchedSummary([unread('wf/r/gone')]), 'touched not known — what its branch changed was not said');
+  assert.equal(touchedSummary([unread('a'), unread('b')]), 'touched not known — what its 2 branches changed was not said');
   assert.equal(touchedSummary([]), 'touched nothing — no branch to read');
 });
 

@@ -1024,7 +1024,7 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',
     '',
-    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '  wf/<id>/implement  — 1 file: +1 −0',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '',

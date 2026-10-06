@@ -69,9 +69,8 @@ const ANSWERS: PlaceAnswers = {
         { path: 'b.ts', from: 'c.ts', status: 'R', added: 0, removed: 0 },
       ],
     },
-    diffs: { 'a.ts': '@@ -1 +1 @@' },
-    merges: { 'wf/x/a': { clean: true }, 'wf/x/b': { clean: false, conflicts: ['a.ts'] }, 'wf/x/c': { unknown: 'git is too old' } },
-    present: { 'shot.png': 'file', out: 'directory', gone: 'absent' },
+    diffs: { 'wf/x/a': { 'a.ts': '@@ -1 +1 @@' } },
+    present: { 'wf/x/a': { 'shot.png': 'file', out: 'directory', gone: 'absent' } },
     atBase: { 'package.json': null, 'README.md': '# r' },
   },
   standing: {

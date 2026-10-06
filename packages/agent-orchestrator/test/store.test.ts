@@ -5178,6 +5178,52 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   assert.deepEqual(artifactFiles(run, 'implement'), [], 'the branch is where the run reads it');
 });
 
+test("`nemia decide` of a run whose declared file is only on its branch says nothing is missing — the place says the branch has it — and, where the place's report is not heard, that whether it has it is not known, never that it is not there", async (t) => {
+  const run = await started(folder());
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  fs.mkdirSync(path.join(run.repo, 'docs'));
+  fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
+  gitIn(run.repo, 'add', '-A');
+  gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md']));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  fs.rmSync(path.join(run.repo, 'docs'), { recursive: true });
+  fs.rmSync(artifactsDir(run, 'implement'), { recursive: true, force: true });
+  b.settle(`${run.id}-review`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'a person' });
+  const { main } = await import('../src/cli/main.ts');
+  const flagged = async (): Promise<string[]> => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+      out.push(args.map(String).join(' '));
+    });
+    try {
+      await main(['decide', run.id], b.e);
+    } finally {
+      log.mock.restore();
+    }
+    const lines = out.join('\n').split('\n');
+    return lines.slice(lines.indexOf('  implement')).filter((l) => l.startsWith('    !! '));
+  };
+
+  assert.ok(!fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'nowhere but on the branch');
+  assert.deepEqual(await flagged(), [], 'the place says the branch has it: it is there');
+
+  const before = process.env.PATH;
+  process.env.PATH = scratch('wf-artifacts-no-git-');
+  let unheard: string[];
+  try {
+    unheard = await flagged();
+  } finally {
+    process.env.PATH = before;
+  }
+  assert.equal(unheard.length, 1, unheard.join('\n'));
+  assert.match(
+    unheard[0],
+    /^ {4}!! declared and not collected, and whether its branch has it is not known: docs\/RESPONSE\.md {2}— the place's report was not heard: /,
+  );
+});
+
 test("a step's `budget:` is frozen on the run with the rest of its keys: the folder edited afterwards never raises it, nor takes it off", async () => {
   const dir = folder('budget: 2.50');
   const run = await started(dir);

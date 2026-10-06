@@ -4,6 +4,7 @@ export {
   CHECK_AFFECTING,
   LESSON,
   branchesToRead,
+  countsLine,
   inFullLines,
   lessonLine,
   parseGlobs,

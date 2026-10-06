@@ -255,7 +255,7 @@ export const decidable = (extra: Partial<Decidable> = {}): Decidable => ({
       where: 'ahead',
       commits: 2,
       said: 'ahead by 2',
-      stat: '2 files changed',
+      stat: '2 files: +3 −1',
       merge: { clean: false, conflicts: ['a.ts'], said: 'conflicts in a.ts' },
     },
     { branch: 'wf/r-1/c', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { clean: true, said: 'merges clean' } },

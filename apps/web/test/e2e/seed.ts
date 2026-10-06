@@ -437,7 +437,7 @@ export const GATED = {
  * (`workspace: main`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
  * what files it — and nothing of the run moves. So it is finished, and it stays on the Factory's floor all the same: nobody has decided it.
  *
- * Its branch is committed in FAKE's repository, two commits ahead of main, so the gate panel has a standing and a diff stat to show, and
+ * Its branch is committed in FAKE's repository, two commits ahead of main, so the gate panel has a standing and its counts to show, and
  * `review`'s files directory holds the file it named. The `decide` page reads the banner and the panel, and sends the work back — to
  * review, which the send-back at an ending's gate names, and never to ship — then takes that back.
  */
@@ -455,9 +455,9 @@ export const ENDING = {
   says: 'Merge this run onto the base branch, or abort on any failure.',
   /** Its result branch, which review worked on and ship would merge. */
   branch: 'wf/ship-it-or-send-it-back-e2e12/implement',
-  /** Where that branch stands against the base, and git's own diff stat of it, as `wf decide` prints them under the run. */
+  /** Where that branch stands against the base, and how much it changed, as `wf decide` prints them under the run. */
   standing: 'wf/ship-it-or-send-it-back-e2e12/implement is ahead of main by 2 commits',
-  stat: '3 files changed, 14 insertions(+), 1 deletion(-)',
+  stat: '3 files: +14 −1',
   /** What review handed on, which is what a person approves: rendered as the markdown it is. */
   review: { heading: 'What I found', items: ['The cap is read on every pass', 'One finding left: the queue has no test'] },
   /** The file review named in its closeout, in its files directory, which the api serves. */
@@ -1534,7 +1534,7 @@ function seedRepo(repo: string, branch: string): string {
  * `base` on main: ENDING at its ending's gate, SHIPPED with that ending approved and merged, and UNMERGED with a branch nobody took.
  *
  * Real commits, because what the board says about each is read out of git on every request: where the branch stands against the base, and
- * git's own diff stat of it. ENDING's two commits are three files, fourteen insertions and one deletion against the base — `stat` — with
+ * how much it changed. ENDING's two commits are three files, fourteen lines added and one removed against the base — `stat` — with
  * `CLAUDE.md` among them, so its radius has a lesson line too: eight lines of source, then five of docs and CLAUDE.md's line rewritten.
  * SHIPPED's branch is merged into main with `--no-ff`, as its ending step would have merged it, which is what makes the run read as shipped
  * with nothing left to decide.

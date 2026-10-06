@@ -52,6 +52,9 @@ export type MergeReads = {
  */
 export type Trial = { clean: boolean } | { error: string };
 
+/** A trial merge of a branch onto the base branch, and the commit the base branch was at as the place tried it: null where it read none. */
+export type Tried = { readonly trial: Trial; readonly base: string | null };
+
 /** A person's merge ask, whole: the looping step and the round it is on, when, and what merges (`MergeOf`). */
 export type MergeAsk = RoundAsk & { merge: MergeOf };
 
@@ -156,9 +159,10 @@ export const mergeAskedLine = (a: MergeAsk, looping: Workflow): string =>
  * or held run; a folder run, which has no base; a step that is not here, or in no loop; several loops and none named; a run with no loop,
  * pointed to `nemia retry` of the step its ending waits on; a merge or a round already asked; a loop that goes round itself, whose round is
  * still running, or whose step stopped; a step waiting on the loop that runs, landed or is approved; and a trial merge (`trial`) of the
- * target's branch that is clean — nothing to merge, so the landing is approved — or that git could not make.
+ * target's branch that is clean — nothing to merge, so the landing is approved — that git could not make, or whose base commit git could
+ * not read. `tried` makes the trial; the ask merges the base at the commit the trial read, and is dated `at`.
  *
- * A clean trial merge is asked all the same where the ending's last landing check refused the merge staged on `base.sha`
+ * A clean trial merge is asked all the same where the ending's last landing check refused the merge staged on that commit
  * (`refusedLanding`): the conflict is semantic, and the ask carries that landing (`MergeOf.landing`). One refused on another commit of the
  * base, or a check that did not finish, lets nothing through: the landing is tried again on the base as it is.
  */
@@ -168,8 +172,8 @@ export function mergeAsk(
   name: string | undefined,
   reads: MergeReads,
   asks: readonly RoundAsk[],
-  trial: (branch: string) => Trial,
-  base: { sha: string; at: string },
+  tried: (branch: string) => Tried,
+  at: string,
 ): { ask: MergeAsk } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
   if (run.cancelledAt)
@@ -188,16 +192,17 @@ export function mergeAsk(
   const target = looping.loop!;
   const branch = run.steps[target]?.branch;
   if (!branch) return no(`${target} has no branch to merge into yet. See it: nemia ls ${run.id}.`);
-  const tried = trial(branch);
-  if ('error' in tried)
+  const { trial, base } = tried(branch);
+  if ('error' in trial)
     return no(
-      `whether ${branch} merges onto ${run.branch} is not known: ${tried.error}. Try again once git can say: nemia merge ${run.id} ${looping.name}.`,
+      `whether ${branch} merges onto ${run.branch} is not known: ${trial.error}. Try again once git can say: nemia merge ${run.id} ${looping.name}.`,
     );
-  const landing = tried.clean ? refusedLanding(steps, run, looping, base.sha) : undefined;
-  if (tried.clean && !landing)
+  if (!base) return no(`git cannot read ${run.branch} in ${run.repo}. Check the repository, then: nemia merge ${run.id}.`);
+  const landing = trial.clean ? refusedLanding(steps, run, looping, base) : undefined;
+  if (trial.clean && !landing)
     return no(`${branch} merges cleanly onto ${run.branch}: nothing to merge — ${cleanNext(steps, run, looping, reads)}.`);
-  const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base.sha, ...(landing ? { landing } : {}) };
-  return { ask: { step: looping.name, round: roundOf(run, looping.name), at: base.at, merge } };
+  const merge = { target, try: tryOf(run, target) + 1, onto: run.branch, sha: base, ...(landing ? { landing } : {}) };
+  return { ask: { step: looping.name, round: roundOf(run, looping.name), at, merge } };
 }
 
 /** The looping step `name` names — itself, or a step of its loop — or the run's one loop; or why there is none to merge through. */

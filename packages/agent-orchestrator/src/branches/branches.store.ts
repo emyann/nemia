@@ -1,22 +1,21 @@
 /**
  * What git says of a git run's result branches once it has them: whether each is on its base branch (`isShipped`) and where it stands
- * (`branchStandings`), a run another waits on as its record and git say it (`parentRecord`), the tips of the branches git has (`refsOf`),
- * and what a branch holds against the run's base — the files it added, one file's text, its diff stat, what it touched and the diff of
- * what decides a check.
+ * (`branchStandings`), a run another waits on as its record and git say it (`parentRecord`), and the tips of the branches git has
+ * (`refsOf`). What a branch changed against the run's base is the place's to say (`changes.store.ts`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`, whose `git` helpers it reads through, and reading a run
  * through `runStore` (`files.store.ts`): it imports neither the engine nor a controller, and `runner.ts` re-exports most of what it
  * exports. What asks the engine as well — `parentOf`, `decide` — is the controllers' (`views.verb.ts`, `decide.verb.ts`).
  */
 import { execCounted } from '../meter/tally.store.ts';
-import { resultSteps, radius, sensitivePaths, type Radius, type Touched } from './branches.ts';
+import { resultSteps } from './branches.ts';
 import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import type { ParentRun } from '../wait/wait.ts';
 import type { Shipped } from '../decide/decide.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { git, gitSays } from '../workspace/worktree.store.ts';
+import { gitSays } from '../workspace/worktree.store.ts';
 
 /**
  * Has this branch landed on the base branch? Git's answer, not ours — and which yes it is (`Shipped`).
@@ -296,98 +295,6 @@ export function refsOf(repo: string, branches: readonly string[]): Record<string
     if (space > 0 && branches.includes(branch)) refs[branch] = line.slice(0, space);
   }
   return refs;
-}
-
-/**
- * The files this run ADDED — what its steps wrote for whoever reads next.
- *
- * Read out of git rather than off disk, because the worktree a step ran in is gone by the time
- * anybody decides anything, while the branch is exactly as it was left.
- *
- * "Added" is the whole rule. A step that wants to tell a person something writes a file, the same
- * way it tells the next step — so the artifacts are the new files, and no frontmatter key has to
- * be invented to declare them.
- */
-export function artifacts(run: GitRun, branch: string): string[] {
-  try {
-    return git(run.repo, 'diff', '--diff-filter=A', '--name-only', `${run.baseRef}...${branch}`)
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-/** One artifact's text, out of the branch. */
-export function readArtifact(run: GitRun, branch: string, file: string): string {
-  try {
-    return git(run.repo, 'show', `${branch}:${file}`);
-  } catch {
-    return '';
-  }
-}
-
-/** How much the run changed, in one line. */
-export function diffStat(run: GitRun, branch: string): string {
-  try {
-    return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`);
-  } catch {
-    return '';
-  }
-}
-
-/**
- * What a branch touched (`radius`), off `git diff --numstat` against the run's base, renames found
- * whatever the repository's config says. An error when git cannot say, or says what `radius` cannot
- * read: a branch that is gone is not a branch that changed nothing.
- */
-export function touchedBy(run: GitRun, branch: string): Radius | { error: string } {
-  const numstat = gitSays(run.repo, '-c', 'core.quotePath=false', 'diff', '--numstat', '--find-renames', `${run.baseRef}...${branch}`);
-  if (numstat === undefined) return { error: `git could not diff ${run.baseRef.slice(0, 12)}...${branch}` };
-  try {
-    return radius(numstat, workspacesOf(run));
-  } catch (err) {
-    return { error: (err as Error).message };
-  }
-}
-
-/**
- * The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them, and handed on
- * as written: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` on the screen (`workspaceGlob`, `deepWorkspaces`).
- */
-function workspacesOf(run: GitRun): string[] {
-  try {
-    const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');
-    const globs: unknown = Array.isArray(workspaces) ? workspaces : workspaces?.packages;
-    return Array.isArray(globs) ? globs.filter((g): g is string => typeof g === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * The whole diff, base to branch, of the changed files these globs name — by default the ones that decide
- * what a check means. Both ends of a rename are asked for, so git shows it as one. Empty when no changed
- * file is named; undefined when the branch could not be read, or git cannot say.
- */
-export function sensitiveDiff(run: GitRun, t: Touched, globs: readonly string[]): string | undefined {
-  if ('error' in t.radius) return undefined;
-  const paths = sensitivePaths(t.radius.changes, globs);
-  if (!paths.length) return '';
-  return gitSays(
-    run.repo,
-    '-c',
-    'core.quotePath=false',
-    '--literal-pathspecs',
-    'diff',
-    '--no-color',
-    '--no-ext-diff',
-    '--find-renames',
-    `${run.baseRef}...${t.branch}`,
-    '--',
-    ...paths,
-  );
 }
 
 /**

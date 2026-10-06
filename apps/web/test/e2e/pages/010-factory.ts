@@ -173,7 +173,7 @@ export default {
       .map((l) => l.split(':')[0])
       .join(' ');
     if (
-      phasesSaid !== 'records asks journals observe runtime git assess act' ||
+      phasesSaid !== 'records asks journals observe runtime place assess act' ||
       passLines[4] !== 'observe: 120 ms, 1 call, 0 B read, 1 process started'
     ) {
       throw new Refused(

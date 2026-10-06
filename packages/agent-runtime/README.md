@@ -1538,7 +1538,7 @@ names one. Words said to a session while it works are a `queued_command` attachm
 a `system` event, and its own user's — a person typing into it, or a job's next line on its stdin, with no origin at
 all (2.1.280) — a `user` text event, as the words that started its turn are.
 
-**Codex, as far as its records allow** (codex-cli 0.154.0, read on the 34 rollouts on this machine). A
+**Codex, as far as its records allow** (codex-cli 0.154.0, read on the 37 rollouts on this machine, 2026-10-06). A
 rollout says most things twice — as the model was given them, and as the thread items Codex itself
 shows — and the items are read: the prompt without the instructions and context Codex puts around it,
 each command with its exit code, each file change with its status. The model's own call is an `exec`
@@ -1552,6 +1552,12 @@ could not say whether a result was an error. What the records do not give, and s
   `Bash` or `Edit`; its input is the command and its cwd, or the changes.
 - **Anything before the worker has the thread id**, and any item of a type not in those rollouts beyond
   a `system` event naming it.
+
+A record the runtime reads — an `event_msg` whose payload is `task_complete` or `item_completed` — is decoded by its
+schema in `ROLLOUT` (`src/harness/codex/rollout.ts`) before any of its fields is read; all 428 in those rollouts decode.
+An absent field means what it always has; a field there in another shape refuses the `transcript` verb with words that
+name the line by its byte offset and the rollout, its kind, its first wrong field and the fix, so a rollout whose format
+moved is never read as saying nothing. Any other record passes undecoded.
 
 **Which session is read.** An attempt that has ended — or whose task settled with it open — is read by the
 session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
@@ -2102,6 +2108,7 @@ of pure code sits beside it.
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
+| `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, decoded by `print.ts` or refused, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |

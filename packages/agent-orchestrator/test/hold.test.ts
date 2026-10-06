@@ -682,19 +682,11 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   const folder = await Effect.runPromise(
     startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() }),
   );
+  await refused(t, b.e, new RegExp(`^${folder.id}'s team works in folders \\(place: folder\\)`), 'hold', folder.id, '--until', target.id);
   await refused(
     t,
     b.e,
-    new RegExp(`^${folder.id}'s team works in folders \\(workspace: folder\\)`),
-    'hold',
-    folder.id,
-    '--until',
-    target.id,
-  );
-  await refused(
-    t,
-    b.e,
-    new RegExp(`^--until ${folder.id}: ${folder.id} is a folder run \\(workspace: folder\\), which never ships onto a branch`),
+    new RegExp(`^--until ${folder.id}: ${folder.id} is a folder run \\(place: folder\\), which never ships onto a branch`),
     'hold',
     id,
     '--until',

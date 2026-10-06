@@ -127,6 +127,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   after: [],
   resume: null,
   input: [],
+  place: null,
   workspace: null,
   writable: [],
   reads: [],
@@ -559,6 +560,45 @@ test('a folder that writes a list under its former name — `disallow:`, `allow:
   );
 });
 
+test('a folder that says `workspace: folder` is listed with `place: folder`, a folder team, and a save writes `place:`; REFUSED: a page that sends `workspace: folder`, and a place that is not `git` or `folder` — nothing written', async () => {
+  const dir = path.join(STORE, 'placed');
+  write(path.join(dir, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite the note.\n');
+  const listed = (await (await app.request('/api/workflows')).json()) as Array<{ name: string; from: string; folderTeam: boolean }>;
+  const folder = listed.find((w) => w.name === 'placed' && w.from === 'yours');
+  assert.equal(folder?.folderTeam, true, 'the former spelling is still a folder team');
+  const [step] = (await listedSteps('placed')) as [ListedStep];
+  assert.deepEqual([step.spec.place, step.spec.workspace], ['folder', null], 'listed under the key it has now');
+
+  const before = snapshot(dir);
+  for (const [spec, error] of [
+    [
+      { ...step.spec, place: null, workspace: 'folder' },
+      /^write: `workspace: folder` is the former spelling of `place: folder`, which a file may still say but nothing writes\. Send `place: folder`/,
+    ],
+    [
+      { ...step.spec, place: 'cloud' },
+      /^write: `place: cloud` is not a place a step works in\. `place: git` works on branches of a repository; `place: folder`/,
+    ],
+  ] as const) {
+    const refused = await put('placed', { steps: [{ ...step, spec }] });
+    const said = (await refused.json()) as BuildRefused;
+    assert.equal(refused.status, 422, JSON.stringify(said));
+    assert.match(said.error, error);
+    assert.deepEqual(snapshot(dir), before, 'nothing written');
+  }
+
+  const saved = await put('placed', { steps: [{ ...step, spec: { ...step.spec, permissionMode: 'acceptEdits' } }] });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  assert.equal(
+    fs.readFileSync(path.join(dir, 'write.md'), 'utf8'),
+    '---\nplace: folder\npermissionMode: acceptEdits\n---\nWrite the note.\n',
+    'a save of the step writes `place: folder`, and no `workspace:` line',
+  );
+  const git = await put('placed', { steps: [{ ...step, spec: { ...step.spec, place: 'git' } }] });
+  assert.equal(git.status, 200, await git.clone().text());
+  assert.match(fs.readFileSync(path.join(dir, 'write.md'), 'utf8'), /^---\nplace: git\n/, 'and `place: git` as set');
+});
+
 test('a codex step that names its sandbox under the former key `permissionMode:` is listed with its `sandbox`, and a save writes `sandbox:`; REFUSED: a page that sends `permissionMode` for it, and `sandbox` on a Claude Code step — nothing written', async () => {
   const dir = path.join(STORE, 'fenced');
   write(path.join(dir, 'review.md'), '---\nharness: codex\npermissionMode: read-only\n---\nReview it.\n');
@@ -639,7 +679,7 @@ test('the form offers each remote A2A agent the store declares as a harness, and
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(
     fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'),
-    '---\nworkspace: folder\nharness: a2a:reviewer\n---\nAsk it.\n',
+    '---\nplace: folder\nharness: a2a:reviewer\n---\nAsk it.\n',
     'saved, the step says its harness as the package reads it',
   );
   assert.equal((await listedSteps('asked'))[0].spec.harness, 'a2a:reviewer', "the listing carries the agent's name in the harness");

@@ -196,18 +196,18 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
   const before = fs.readdirSync(path.join(ROOT, 'runs')).sort();
   const named = await rejection(() => Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, repoNamed: true, workflowDir: TEAM })));
   assert.equal(named.exitCode, 2);
-  assert.match(named.message, /^--repo .*: this workflow's steps say `workspace: folder`/);
+  assert.match(named.message, /^--repo .*: this workflow's steps say `place: folder`/);
   assert.match(named.message, /Start it without --repo/);
 
   const inPlace = await rejection(() => Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, isolate: false })));
   assert.equal(inPlace.exitCode, 2);
-  assert.match(inPlace.message, /^--no-worktree: this workflow's steps say `workspace: folder`/);
+  assert.match(inPlace.message, /^--no-worktree: this workflow's steps say `place: folder`/);
 
   const waiting = await rejection(() =>
     Effect.runPromise(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: TEAM, after: ['some-run-a1b2'] })),
   );
   assert.equal(waiting.exitCode, 2);
-  assert.match(waiting.message, /^--after some-run-a1b2: this run's team works in folders \(workspace: folder\)/);
+  assert.match(waiting.message, /^--after some-run-a1b2: this run's team works in folders \(place: folder\)/);
 
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), before, 'nothing was written');
   assert.deepEqual(gitAsked(), []);
@@ -323,7 +323,7 @@ test('nemia start from a directory that is no repository: a folder team starts, 
     await assert.rejects(
       main(['start', 'a note on tides', '--workflows', TEAM, '--repo', '.']),
       (err: Error & { exitCode?: number }) =>
-        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``),
+        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`place: folder\``),
     );
   } finally {
     process.chdir(cwd);
@@ -339,7 +339,7 @@ test('REFUSED: a card filed for a folder team with a repository — the card nam
       () => addToInbox({ text: 'a note on tides', workflow: TEAM, repo: NOT_A_REPO }),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 &&
-        err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``) &&
+        err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``) &&
         err.message.endsWith('File the card without a repository, or name a workflow whose steps work on one.'),
     );
     const inbox = path.join(ROOT, 'inbox');
@@ -365,7 +365,7 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
     await assert.rejects(
       main(['start', file, '--repo', '.']),
       (err: Error & { exitCode?: number }) =>
-        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``),
+        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`place: folder\``),
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
     const out = await printed(['start', file]);
@@ -533,7 +533,7 @@ test("REFUSED: a card with a repository queued onto a folder team — `--workflo
     const refused = refusal(() => queueInInbox('a-card-with-a-repo', { workflow: TEAM }));
     assert.equal(refused.exitCode, 2);
     assert.ok(
-      refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``),
+      refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``),
       refused.message,
     );
     assert.match(refused.message, /File the card without a repository, or name a workflow whose steps work on one\.$/);
@@ -550,7 +550,7 @@ test("REFUSED: a card with a repository queued onto a folder team — `--workflo
     const queued = fs.readFileSync(file, 'utf8');
     const off = refusal(() => queueInInbox('a-card-with-a-repo', { off: true, workflow: TEAM }));
     assert.equal(off.exitCode, 2, 'taken off the queue with --workflow writes the key just the same, so it is refused just the same');
-    assert.ok(off.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``), off.message);
+    assert.ok(off.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``), off.message);
     assert.equal(fs.readFileSync(file, 'utf8'), queued, 'and again nothing is written: the card is still queued, on its own team');
     assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
 

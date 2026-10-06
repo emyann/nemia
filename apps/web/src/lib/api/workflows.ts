@@ -77,7 +77,7 @@ export type WorkflowListing = {
   /** The `.json` files beside the steps, which an `output:` may name. */
   schemas: string[];
   /**
-   * Whether every step says `workspace: folder`: a team that works in folders the run makes and never looks at a repository. A card
+   * Whether every step says `place: folder`: a team that works in folders the run makes and never looks at a repository. A card
    * for one is filed with no `repo:` (the api refuses one), and a run of one has no branch to read.
    */
   folderTeam: boolean;

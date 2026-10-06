@@ -20,7 +20,8 @@ import {
   type StepKey,
   type Workflow,
 } from '../step/step.ts';
-import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, harnessPromptLine } from '../former/former.ts';
+import { PLACES } from '../keys/index.ts';
+import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, harnessPromptLine, placeLine } from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
 import {
   CUSTOM_INSTRUCTIONS_FOLDER,
@@ -263,7 +264,8 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
  *
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
  * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`
- * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`.
+ * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`, and a step file that still says `workspace: folder` (`placeLine`),
+ * which the parser reads as `place: folder`.
  */
 export function formerKeyLines(dir: string): string[] {
   const steps = stepTexts(dir);
@@ -275,7 +277,11 @@ export function formerKeyLines(dir: string): string[] {
   return [
     ...steps.flatMap(({ file, text, harness }) => {
       const at = path.join(dir, file);
-      return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, harness)];
+      return [
+        ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
+        ...codexMode(at, text, harness),
+        ...(frontmatterKey(text, 'workspace') === 'folder' ? [placeLine(at)] : []),
+      ];
     }),
     ...agents.flatMap((agent) => {
       const at = agentAt(dir, agent);
@@ -653,6 +659,7 @@ const frozenStepFields = {
   after: Strings,
   resume: Schema.optionalKey(Schema.String),
   input: Schema.optionalKey(Strings),
+  place: Schema.optionalKey(Schema.Literals(PLACES)),
   workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
   writable: Schema.optionalKey(Strings),
   reads: Schema.optionalKey(Strings),

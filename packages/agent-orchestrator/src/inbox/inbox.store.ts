@@ -46,7 +46,7 @@ export const readInbox = (): InboxListing[] =>
 
 /**
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
- * step says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
+ * step says `place: folder` works on none — the card would keep on disk a path no run of it will ever look at.
  *
  * Refused wherever a card's `workflow:` is written — `addToInbox` (`nemia inbox add`, and the board's Inbox) and `queueInInbox`
  * (`nemia inbox queue --workflow`, which writes that key over the card's own) — in the words `nemia start --repo` is refused in: the same
@@ -67,7 +67,7 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
   }
   if (!isFolderTeam(steps)) return null;
   return (
-    `--repo ${opts.repo}: this card's workflow has steps that say \`workspace: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
+    `--repo ${opts.repo}: this card's workflow has steps that say \`place: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
     `File the card without a repository, or name a workflow whose steps work on one.`
   );
 }

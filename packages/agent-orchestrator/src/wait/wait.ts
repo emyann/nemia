@@ -199,7 +199,7 @@ export function holdRefusal(
     return `${id} is already ${holdWord(run.hold.until.map((u) => ({ run: u })))} (nemia hold, at ${run.hold.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — nemia hold ${id} --off, then ${holdAgain(id, all, run.hold.why)}.`;
   }
   if (run.repo === undefined) {
-    return `${id}'s team works in folders (workspace: folder), and a hold waits for runs to ship onto its git branch, which a folder run has none of. Cancel it (nemia cancel ${id}) and start it again once the work it waits on is done.`;
+    return `${id}'s team works in folders (place: folder), and a hold waits for runs to ship onto its git branch, which a folder run has none of. Cancel it (nemia cancel ${id}) and start it again once the work it waits on is done.`;
   }
   const seen = new Set<string>();
   for (const u of until) {
@@ -212,7 +212,7 @@ export function holdRefusal(
     const { record, gone, shipped } = parentOf(u);
     if (!record) return `--until ${u}: the store has no run ${u}. --until takes a run ${id} waits on, by its id — nemia ls lists them.`;
     if (record.repo === undefined)
-      return `--until ${u}: ${u} is a folder run (workspace: folder), which never ships onto a branch, so ${id} would wait for ever. When ${u}'s work is done, there is nothing to hold for: ${drop}.`;
+      return `--until ${u}: ${u} is a folder run (place: folder), which never ships onto a branch, so ${id} would wait for ever. When ${u}'s work is done, there is nothing to hold for: ${drop}.`;
     if (path.resolve(record.repo) !== path.resolve(run.repo)) {
       return `--until ${u}: ${u} works on ${record.repo}, and ${id} on ${run.repo}. A run waits for another to ship onto its own base branch, which a run on another repository never does: ${drop}.`;
     }
@@ -274,13 +274,13 @@ export function afterRefusal(
     if (seen.has(id)) return `--after ${id} is given twice, and a run waits on another once. Give each run one --after.`;
     seen.add(id);
     if (child.repo === undefined) {
-      return `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`;
+      return `--after ${id}: this run's team works in folders (place: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`;
     }
     const { record, gone } = parentOf(id);
     if (!record)
       return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — nemia ls lists them.`;
     if (record.repo === undefined) {
-      return `--after ${id}: ${id} is a folder run (workspace: folder), which never ships onto a branch, so this run would wait for ever. When ${id}'s work is done, ${without}.`;
+      return `--after ${id}: ${id} is a folder run (place: folder), which never ships onto a branch, so this run would wait for ever. When ${id}'s work is done, ${without}.`;
     }
     if (path.resolve(record.repo) !== path.resolve(child.repo)) {
       return `--after ${id}: ${id} works on ${record.repo}, and this run on ${child.repo}. A run waits for another to ship onto its own base branch, which a run on another repository never does: start it with --repo ${record.repo}, or ${without}.`;

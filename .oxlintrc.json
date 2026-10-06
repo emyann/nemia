@@ -345,7 +345,7 @@
     {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
-        "complexity": ["error", { "max": 25 }]
+        "complexity": ["error", { "max": 22 }]
       }
     },
     {

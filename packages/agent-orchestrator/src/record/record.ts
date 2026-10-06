@@ -47,7 +47,7 @@ export type GitRun = RunBase & {
   isolate: boolean;
 };
 
-/** A run of a team whose every step says `workspace: folder`: no repository, no base, no branch, no worktrees. */
+/** A run of a team whose every step says `place: folder`: no repository, no base, no branch, no worktrees. */
 export type FolderRun = RunBase & {
   place: { kind: 'folder' };
   repo?: undefined;

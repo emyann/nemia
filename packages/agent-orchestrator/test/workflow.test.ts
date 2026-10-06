@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fansOut, orderSteps, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { isFolderTeam, stepPlace } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
@@ -35,6 +36,7 @@ import {
   renderAgent,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
+import { placeLine } from '../src/former/former.ts';
 import { readsMounts } from '../src/filed/filed.ts';
 import { FILED_AS } from '../src/keys/filed-as.ts';
 import { scratch } from './scratch.ts';
@@ -474,6 +476,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     after: 'implement',
     resume: 'implement',
     input: 'implement',
+    place: 'folder',
     writable: 'web, docs',
     reads: 'inbox',
     harness: 'claude-detached',
@@ -583,7 +586,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
   const list =
-    "A step's keys are: after, resume, input, workspace, writable, reads, slot, agent, skills, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
+    "A step's keys are: after, resume, input, place, workspace, writable, reads, slot, agent, skills, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
   assert.throws(
     () => fm('review', 'colour: red'),
     (e: unknown) => {
@@ -1179,6 +1182,21 @@ test("`nemia start` is told which codex files still name their sandbox as `permi
   assert.deepEqual(formerKeyLines(folder({ 'review.md': '---\nharness: codex\nsandbox: read-only\n---\nReview.\n' })), []);
 });
 
+test('`nemia start` is told which steps still say `workspace: folder`, with the line it is read as, and nothing of `place:` or `workspace: main`', () => {
+  assert.equal(
+    placeLine('w/write.md'),
+    'w/write.md: `workspace: folder` is read as `place: folder`, where the step works. The former line is still read; rename it, or save the file from the board, which writes `place:`.',
+  );
+  const dir = folder({
+    'write.md': '---\nworkspace: folder\n---\nWrite.\n',
+    'review.md': '---\nafter: write\nworkspace: folder\n---\nReview.\n',
+  });
+  assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former line stops nothing');
+  assert.deepEqual(formerKeyLines(dir), [placeLine(path.join(dir, 'review.md')), placeLine(path.join(dir, 'write.md'))]);
+  assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nplace: folder\n---\nWrite.\n' })), []);
+  assert.deepEqual(formerKeyLines(folder({ 'ship.md': '---\nworkspace: main\n---\nShip.\n' })), []);
+});
+
 test("an effort loads as written: which efforts a step's harness takes is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
   assert.equal(fm('implement', 'effort: extreme').effort, 'extreme');
   assert.equal(fm('review', 'harness: codex\neffort: ultra').effort, 'ultra');
@@ -1730,39 +1748,52 @@ test("`workspace: main` runs a step in the repository's own checkout, and a step
     /^ship: `workspace: worktree` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues\. Delete the line, or write `workspace: main` to run the step in the repository's own checkout\.$/,
   );
   for (const word of ['Main', 'repo', '/tmp/x', 'true']) {
-    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\` or \`folder\`\\.`));
+    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\`\\.`));
   }
   refused('workspace:', /^ship: `workspace` has no value\. Delete the line rather than leaving it blank/);
   refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
 });
 
-test('`workspace: folder` runs a step in a folder the run makes, with a check and a resume as a worktree takes them; REFUSED at load: `Folder`, `folders`, a team only some of whose steps say it', () => {
-  assert.equal(fm('write', 'workspace: folder').workspace, 'folder');
-  assert.equal(fm('review', 'workspace: folder\ncheck: test -s note.md').workspace, 'folder', "a check runs in the step's folder");
+test('`place: folder` runs a step in a folder the run makes, with a check and a resume as a worktree takes them, and `place: git` on a repository; REFUSED at load: another word, a team only some of whose steps say `place: folder`', () => {
+  assert.equal(fm('write', 'place: folder').place, 'folder');
+  assert.equal(fm('write', 'place: git').place, 'git');
+  assert.equal(fm('review', 'place: folder\ncheck: test -s note.md').place, 'folder', "a check runs in the step's folder");
   assert.equal(
-    fm('review', 'workspace: folder\nresume: write').workspace,
+    fm('review', 'place: folder\nresume: write').place,
     'folder',
     'and a resumed session works in the folder of the step it continues',
   );
+  const bare = fm('write', 'check: npm test');
+  assert.equal(bare.place, undefined, 'a step without the line says no place');
+  assert.equal(stepPlace(bare), 'git', 'and works on a repository, as every step did before the key');
+  assert.equal(stepPlace(fm('write', 'place: folder')), 'folder');
   const refusedWord = (lines: string, pattern: RegExp) =>
     assert.throws(
       () => fm('write', lines),
       (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message),
       lines,
     );
-  for (const word of ['Folder', 'folders', 'dir'])
-    refusedWord(`workspace: ${word}`, new RegExp(`^write: \`workspace: ${word}\` is not \`main\` or \`folder\`\\. `));
+  for (const word of ['Folder', 'folders', 'cloud'])
+    refusedWord(
+      `place: ${word}`,
+      new RegExp(
+        `^write: \`place: ${word}\` is not a place a step works in\\. \`place: git\` works on branches of a repository; \`place: folder\` works in folders the run makes, with no git repository\\.`,
+      ),
+    );
 
-  const team = (...words: Array<'folder' | 'main' | undefined>): Workflow[] =>
-    words.map((workspace, i) => ({
+  const team = (...words: Array<'folder' | 'git' | 'main' | undefined>): Workflow[] =>
+    words.map((word, i) => ({
       name: `s${i}`,
       after: i ? [`s${i - 1}`] : [],
       body: 'x',
       permissionMode: 'dontAsk',
-      ...(workspace ? { workspace } : {}),
+      ...(word === 'main' ? { workspace: word } : word ? { place: word } : {}),
     }));
   assert.doesNotThrow(() => validate(team('folder', 'folder')), 'every step says it');
-  assert.doesNotThrow(() => validate(team(undefined, undefined, 'main')), 'or none does');
+  assert.doesNotThrow(() => validate(team(undefined, 'git', 'main')), 'or none does');
+  assert.equal(isFolderTeam(team('folder', 'folder')), true);
+  assert.equal(isFolderTeam(team('folder', 'git')), false);
+  assert.equal(isFolderTeam(team(undefined)), false, 'a step without the line is a git step');
   const refused = (steps: Workflow[], pattern: RegExp) =>
     assert.throws(
       () => validate(steps),
@@ -1771,22 +1802,64 @@ test('`workspace: folder` runs a step in a folder the run makes, with a check an
     );
   refused(
     team('folder', undefined),
-    /^s0 says `workspace: folder`, and s1 does not — every step of a team says workspace: folder, or none does\. A run works in folders it makes, with no git repository, or on branches of one: it cannot do both\. Add the line to s1, or delete it from s0\.$/,
+    /^s0 says `place: folder`, and s1 works on a repository, as `place: git` — every step of a team says `place: folder`, or none does\. A run works in folders it makes, with no git repository, or on branches of one: it cannot do both\. Write `place: folder` on s1, or `place: git` on s0\.$/,
   );
   refused(
     team(undefined, 'folder', 'folder'),
-    /^s1, s2 say `workspace: folder`, and s0 does not — every step of a team says workspace: folder, or none does\./,
+    /^s1, s2 say `place: folder`, and s0 works on a repository, as `place: git` — every step of a team says `place: folder`, or none does\./,
   );
-  refused(team('folder', 'main'), /^s0 says `workspace: folder`, and s1 does not/);
+  refused(team('folder', 'git'), /^s0 says `place: folder`, and s1 works on a repository/);
+  refused(team('folder', 'main'), /^s0 says `place: folder`, and s1 works on a repository/);
 
   assert.throws(
     () =>
       parseFolder([
-        ['write', '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite.\n'],
-        ['review', '---\nafter: write\n---\nReview.\n'],
+        ['write', '---\nplace: git\npermissionMode: dontAsk\n---\nWrite.\n'],
+        ['review', '---\nafter: write\nplace: folder\n---\nReview.\n'],
       ]),
-    (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('write says `workspace: folder`, and review does not'),
+    (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('review says `place: folder`, and write works on a repository'),
     'and at load, from a folder of files, as a person writes them',
+  );
+});
+
+test('`workspace: folder` is read as its former spelling, `place: folder`, and never written; REFUSED at load: the former line beside a `place:`', () => {
+  const former = fm('write', 'workspace: folder');
+  assert.equal(former.place, 'folder', 'read as `place: folder`');
+  assert.equal(former.workspace, undefined, 'and says no workspace');
+  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main', '`workspace: main` is still its own word');
+  const attached = parseWorkflow(
+    'write',
+    '---\nagent: writer\nworkspace: folder\n---\nWrite.\n',
+    undefined,
+    new Map([['writer', { name: 'writer', keys: {}, body: 'You write.', read: () => undefined }]]),
+  );
+  assert.deepEqual(attached.agent?.keys, ['place'], "the step's own keys say `place`, as a save from the board writes it");
+  const team = parseFolder([
+    ['write', '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite.\n'],
+    ['review', '---\nafter: write\nworkspace: folder\n---\nReview.\n'],
+  ]);
+  assert.equal(isFolderTeam(team), true, 'a team spelled the former way is still a folder team');
+  assert.equal(renderStep(former), '---\nplace: folder\n---\nDo the work.\n', 'a save writes `place: folder` and no `workspace:` line');
+  assert.throws(
+    () => renderStep({ ...former, workspace: 'folder' as never }),
+    (e: WorkflowError) =>
+      e.exitCode === 2 &&
+      e.message ===
+        'write: `workspace: folder` is the former spelling of `place: folder`, which a file may still say but nothing writes. Send `place: folder` — a page that sends the former spelling is stale: reload it, and save again.',
+  );
+  for (const place of ['folder', 'git'])
+    assert.throws(
+      () => fm('write', `workspace: folder\nplace: ${place}`),
+      (e: WorkflowError) =>
+        e.exitCode === 2 &&
+        e.message ===
+          `write: \`workspace: folder\` and \`place: ${place}\` are both set, and they say one thing: \`workspace: folder\` is the former spelling of \`place: folder\`. Delete the \`workspace: folder\` line, and keep \`place:\`.`,
+      place,
+    );
+  assert.throws(
+    () => parseAgent('writer', '---\nplace: folder\n---\nYou write.\n'),
+    (e: WorkflowError) => e.exitCode === 2 && e.message.includes('`place` is wiring, and belongs on the step'),
+    'an agent may not say where its steps work',
   );
 });
 
@@ -1796,7 +1869,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
       name: `s${i}`,
       after: i ? [`s${i - 1}`] : [],
       body: 'x',
-      workspace: 'folder',
+      place: 'folder',
       background: true,
       ...(permissionMode ? { permissionMode } : {}),
     }));
@@ -1815,13 +1888,13 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
     refused(
       team('dontAsk', mode),
       new RegExp(
-        `^s1: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — a read or a write outside the folder can`,
+        `^s1: \`place: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — a read or a write outside the folder can`,
       ),
     );
   }
   refused(
     team('dontAsk', undefined),
-    /^s1: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/,
+    /^s1: `place: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/,
   );
   refused(
     team(undefined),
@@ -1833,7 +1906,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
       name: `s${i}`,
       after: i ? [`s${i - 1}`] : [],
       body: 'x',
-      workspace: 'folder',
+      place: 'folder',
       ...(harness ? { harness } : {}),
       ...(background !== undefined ? { background } : {}),
       ...(mode ? { [harness === 'codex' ? 'sandbox' : 'permissionMode']: mode } : {}),
@@ -1869,7 +1942,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
     (e: WorkflowError) =>
       e.exitCode === 2 &&
       e.message.startsWith(
-        'write: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can',
+        'write: `place: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can',
       ),
     'at load, from files: the same refusal reaches a person writing a folder of markdown',
   );
@@ -2384,6 +2457,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     after: 'implement',
     resume: 'implement',
     input: 'implement',
+    place: 'folder',
     writable: 'web, docs',
     reads: 'inbox',
     harness: 'claude-detached',
@@ -2429,6 +2503,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
       'after: implement',
       'resume: implement',
       'input: implement',
+      'place: folder',
       'writable: web, docs',
       'reads: inbox',
       'harness: claude-detached',

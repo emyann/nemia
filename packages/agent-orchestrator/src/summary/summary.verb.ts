@@ -47,7 +47,7 @@ export type RunSummary = {
   repo: string | null;
   /** The factory the run was started in, as its record names it; null for a run in the default factory, whose record names none. */
   factory: string | null;
-  /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `workspace: folder`. */
+  /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `place: folder`. */
   place: PlaceKind;
   /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a git run. */
   work: string | null;

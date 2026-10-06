@@ -37,7 +37,6 @@ import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
   AGENTS_FOLDER,
-  DENIALS,
   HARNESSES,
   parseFolder,
   parseWorkflow,
@@ -45,11 +44,9 @@ import {
   REMOTE_PREFIX,
   REMOTE_REFUSED_KEYS,
   renderStep,
-  SLOTS,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
   stepNameRefusal,
-  WORKSPACES,
   WorkflowError,
   type StepDraft,
   type StepKey,
@@ -57,67 +54,9 @@ import {
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import { schemaNameRefusal, workflowNameRefusal } from './names.ts';
+import { KINDS, schemaNameRefusal, WORDS, workflowNameRefusal, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
 import { folderOf, listed, loadedOf, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
-
-/**
- * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`);
- * `step`, one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
- * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key); `text`, one line (`model`,
- * `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number; `dollars`, an amount; `tokens`, a number of tokens, which
- * the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as `choices` has them (`background`, `remote`, `gate`);
- * `schema`, a file beside the step (`output`). `workspace` is a `choice` of its words, `main` and `folder`, `slot` of one word, `none`, and
- * `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a `choice` of the agents in yours' `agents/`, the only
- * folder the builder writes the steps of.
- */
-export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
-
-/**
- * Each key's kind, in `STEP_KEYS`' order: a key added to the package without one does not typecheck. `count` is the package's `COUNTS`,
- * which it does not export: `builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
- */
-const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps',
-  resume: 'step',
-  input: 'steps',
-  workspace: 'choice',
-  writable: 'list',
-  reads: 'list',
-  slot: 'choice',
-  agent: 'choice',
-  skills: 'list',
-  harness: 'choice',
-  model: 'text',
-  effort: 'harness-word',
-  context: 'tokens',
-  permissionMode: 'harness-word',
-  sandbox: 'harness-word',
-  tools: 'list',
-  disallowedTools: 'list',
-  allowedTools: 'list',
-  denials: 'choice',
-  background: 'flag',
-  remote: 'flag',
-  deadlineSeconds: 'count',
-  budget: 'dollars',
-  check: 'text',
-  retries: 'count',
-  gate: 'flag',
-  output: 'schema',
-  tally: 'list',
-  loop: 'step',
-  rounds: 'count',
-};
-
-/** A flag that says either word. */
-const EITHER = ['true', 'false'] as const;
-
-/**
- * What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a
- * step without the line.
- */
-const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { background: EITHER, remote: EITHER, gate: ['true'] };
 
 /**
  * The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The
@@ -208,9 +147,6 @@ function harnessChoices(): readonly string[] {
     return [...HARNESSES];
   }
 }
-
-/** The words a key of a fixed list may be set to, the flags' among them; the harness and the agent are offered as the store has them. */
-const WORDS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { ...FLAGS, workspace: WORKSPACES, slot: SLOTS, denials: DENIALS };
 
 export const keyForm = (home: string): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({

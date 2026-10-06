@@ -166,7 +166,7 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
 
   const file = path.join(TRIES, 'scribe', 'try.md');
   const text = fs.readFileSync(file, 'utf8');
-  for (const line of ['workspace: folder', 'agent: scribe', 'budget: 1', 'permissionMode: dontAsk', 'allowedTools: Edit(**)']) {
+  for (const line of ['place: folder', 'agent: scribe', 'budget: 1', 'permissionMode: dontAsk', 'allowedTools: Edit(**)']) {
     assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
   }
   const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as AgentListing;

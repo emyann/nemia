@@ -39,8 +39,18 @@ import {
   toolsOf,
   wordOf,
   workspaceOf,
+  placeNamed,
 } from '../keys/index.ts';
-import { codexModeWritten, codexSandboxNamed, FORMER_KEYS, formerKeyWritten, readKeys, type Spelled } from '../former/former.ts';
+import {
+  codexModeWritten,
+  codexSandboxNamed,
+  FORMER_KEYS,
+  formerKeyWritten,
+  placeSpelled,
+  placeWritten,
+  readKeys,
+  type Spelled,
+} from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
 import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
@@ -79,6 +89,7 @@ export function parseWorkflow(
     block === null
       ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
       : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+  meta = placeSpelled(name, meta);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
@@ -252,6 +263,7 @@ export function stepFrom(
     name,
     after,
     resume: meta.resume,
+    place: placeNamed(name, meta.place),
     workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.gate, meta.retries, harness),
     writable: writableNamesOf(name, meta.writable),
     reads: readsNamesOf(name, meta.reads),
@@ -353,7 +365,8 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'writable', 'reads
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
  * see: a key no step has, in the parser's words, since it would be dropped; a line break in a value, which ends the line and makes what
- * follows a line of its own — a key, even; and a comma inside a step's name in `after:` or `input:`, which would be read as two names.
+ * follows a line of its own — a key, even; a comma inside a step's name in `after:` or `input:`, which would be read as two names; and
+ * `workspace: folder`, the former spelling of `place: folder`, which the parser reads but nothing writes (`placeWritten`).
  *
  * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
  * would be read as the frontmatter, and after an empty one, as its block.
@@ -365,6 +378,7 @@ export function renderStep(step: StepDraft): string {
   if (unknown !== undefined)
     refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
   if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
+  if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);

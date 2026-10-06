@@ -198,18 +198,32 @@ export function gateOf(step: string, gate: string | undefined): true | undefined
 
 /**
  * The words `workspace:` takes. `main`: a step of a git run works in the repository's checkout rather than where the workflow's shape puts
- * it. `folder`: the run is not a git run at all, and the step works in a folder the run makes — a kind a workspace can be beside git's,
- * which is what a step without the line is.
+ * it. `folder` was its other word, and is now `place: folder` (`placeSpelled`).
  */
-export const WORKSPACES: readonly string[] = ['main', 'folder'];
+export const WORKSPACES: readonly string[] = ['main'];
 
 /**
- * `workspace:` as written: `main`, `folder`, or refused. A step without the line works where the shape of the workflow puts it
+ * The words `place:` takes: where a step works. `git`: on branches of a repository, what a step without the line does. `folder`: in a
+ * folder the run makes, in a run that needs no git repository.
+ */
+export const PLACES = ['git', 'folder'] as const;
+
+/** `place:` as written: `git`, `folder`, or refused, naming both words. A step without the line says nothing (`stepPlace` reads it). */
+export function placeNamed(step: string, place: string | undefined): (typeof PLACES)[number] | undefined {
+  if (place === undefined) return undefined;
+  if ((PLACES as readonly string[]).includes(place)) return place as (typeof PLACES)[number];
+  return refuse(
+    `${step}: \`place: ${place}\` is not a place a step works in. \`place: git\` works on branches of a repository; \`place: folder\` works in folders the run makes, with no git repository. Without the line, the step works on a repository, as \`place: git\`.`,
+  );
+}
+
+/**
+ * `workspace:` as written: `main`, or refused. A step without the line works where the shape of the workflow puts it
  * (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is
- * a directory the run would have to invent. `main` takes a `check:` only beside `gate: true` — the run executes it on the merge the step
+ * a directory the run would have to invent; `workspace: folder` reaches here only when read past `placeSpelled`, and is refused naming
+ * `place: folder`. `main` takes a `check:` only beside `gate: true` — the run executes it on the merge the step
  * stages, and commits or aborts that merge onto the base branch on its word (`landingDue`); and not on codex, which cannot be denied the
- * commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a
- * `resume:` as a worktree does: its folder is the run's, and the session's.
+ * commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for.
  */
 export function workspaceOf(
   step: string,
@@ -219,9 +233,13 @@ export function workspaceOf(
   gate: string | undefined,
   retries: string | undefined,
   harness: string | undefined,
-): 'main' | 'folder' | undefined {
+): 'main' | undefined {
   if (workspace === undefined) return undefined;
-  if (workspace === 'folder') return 'folder';
+  if (workspace === 'folder') {
+    refuse(
+      `${step}: \`workspace: folder\` is now \`place: folder\`: where a step works is its \`place:\`, and \`workspace:\` says only \`main\`. Write \`place: folder\` instead.`,
+    );
+  }
   if (workspace === 'worktree') {
     refuse(
       `${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: main\` to run the step in the repository's own checkout.`,
@@ -229,7 +247,7 @@ export function workspaceOf(
   }
   if (workspace !== 'main') {
     refuse(
-      `${step}: \`workspace: ${workspace}\` is not \`main\` or \`folder\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. \`workspace: folder\` runs it in a folder the run makes, in a run that needs no git repository. Without the line, the step works where the workflow's shape puts it.`,
+      `${step}: \`workspace: ${workspace}\` is not \`main\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. A step that works in a folder the run makes, with no git repository, says \`place: folder\`. Without the line, the step works where the workflow's shape puts it.`,
     );
   }
   if (check !== undefined && gate?.trim() !== 'true') {

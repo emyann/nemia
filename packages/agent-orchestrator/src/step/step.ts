@@ -25,7 +25,7 @@ export type Workflow = {
   /**
    * `workspace: main`: the step runs in the repository's own checkout rather than a worktree of its own.
    *
-   * A structural key, and the only one that is about a directory: everything else about where a step works is the shape of
+   * A structural key, and with `place:` the only one about a directory: everything else about where a step works is the shape of
    * the workflow (`workspacePlan`). A run's work happens on branches in worktrees, which is what keeps two steps out of each other's
    * way — and merging one of those branches onto the base branch is the one thing a worktree cannot do, since the base branch is
    * checked out in the repository. So the step that ends a run works where a person would.
@@ -34,12 +34,16 @@ export type Workflow = {
    * with a `resume:`, whose session ran in another directory and was told none of what an ending needs, and on a step anything waits on,
    * or one that ends a workflow beside another: a run has one ending (`validate`).
    *
-   * `workspace: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of
-   * workspace that is not the git kind (`place` on the run record). A team is of one kind: every step says it, or none does
-   * (`validate`). A step that continues another's session (`resume:`) works in that step's folder, as it would in its worktree; any
-   * other step gets a folder of its own, empty, and what the steps before it made reaches it as their output and their files.
    */
-  workspace?: 'main' | 'folder';
+  workspace?: 'main';
+  /**
+   * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is
+   * not the git kind (`place` on the run record). `place: git`: on branches of a repository, what a step without the line does
+   * (`stepPlace`). A team is of one kind: every step says `place: folder`, or none does (`validate`). A step that continues another's
+   * session (`resume:`) works in that step's folder, as it would in its worktree; any other step gets a folder of its own, empty, and what
+   * the steps before it made reaches it as their output and their files. `workspace: folder` is its former spelling (`placeSpelled`).
+   */
+  place?: 'git' | 'folder';
   /**
    * `writable: [web]`: the folders of the run's factory this step may write, each by its directory's name. A run in a factory mounts its
    * other repositories read-only for every local step; this step alone is given the ones it names writable, and one that is the run's
@@ -293,6 +297,7 @@ export const STEP_KEYS = [
   'after',
   'resume',
   'input',
+  'place',
   'workspace',
   'writable',
   'reads',
@@ -340,8 +345,10 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     'the steps that must finish first, verified, or unverified where one has no check — the step `resume:` names included; none, and it starts at once',
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
   input: 'the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on',
+  place:
+    '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository, what a step without the line does',
   workspace:
-    "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
+    "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   writable:
     "the folders of the run's factory this step may write, each by its directory's name — every other step of the run only reads them; one that is the run's own repository is the step's workspace already — over a fence that writes",
   reads:
@@ -389,6 +396,12 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
  * itself is `CLOSEOUT_SCHEMA` in closeout.ts, and a test holds the two to each other.
  */
 export const CLOSEOUT_FIELDS = ['outcome', 'summary', 'artifacts', 'needs'] as const;
+
+/**
+ * Where a step works: its `place:`, or `git` for a step without the line, as every step worked before the key. The one reader of a step's
+ * place, so the default lives here alone. Pure.
+ */
+export const stepPlace = (step: Pick<Workflow, 'place'>): 'git' | 'folder' => step.place ?? 'git';
 
 /** The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none. */
 export const outputFields = (step: Workflow): string[] => Object.keys(step.output?.schema.properties ?? {});

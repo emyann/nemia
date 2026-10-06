@@ -86,6 +86,7 @@ test('REFUSED at shipped defaults: every wiring key in an agent file, by name, s
     'after',
     'resume',
     'input',
+    'place',
     'workspace',
     'writable',
     'reads',

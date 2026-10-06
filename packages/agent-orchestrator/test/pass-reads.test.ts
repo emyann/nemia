@@ -522,7 +522,9 @@ test("a pass where no branch moved asks no distance from a run's base: a kept me
     const columns = async (memo: ReturnType<typeof freshRestMemo>) => {
       const before = planted.said().length;
       await runWith(b.e, tickRun({ memo }));
-      return columnsListed(planted.said().slice(before)).filter((n) => n > 0);
+      return columnsListed(planted.said().slice(before))
+        .filter((n) => n > 0)
+        .sort((a, b) => a - b);
     };
     const kept = freshRestMemo();
     const cold = await columns(kept);

@@ -196,7 +196,6 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/fixtures/leak-failing.ts': { count: 1, not: 'to convert' },
   'test/fixtures/leak-unguarded.ts': { count: 1, not: 'to convert' },
   'test/leaks.test.ts': { count: 1, not: 'to convert' },
-  'test/mcp.test.ts': { count: 1, not: 'to convert' },
 };
 
 /** A `now()` of `Date` or `performance` with a number added, across line breaks; built in parts, so this file says none. */

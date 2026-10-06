@@ -268,9 +268,10 @@ function readNames(source: ts.SourceFile, seam: 'get' | 'send'): Set<string> {
 
 /**
  * A function a read or write is called through, by the name `source` calls it: read.ts's `get` or `send`, or a wrapper that hands its
- * schema on to one. `word` names it in a fault, `kind` says whether it reads or writes, and `at` is the index of its schema argument.
+ * schema on to one (`wraps`). `word` names it in a fault, `kind` says whether it reads or writes, and `at` is the index of its schema
+ * argument.
  */
-type Seam = { word: string; kind: 'get' | 'send'; at: number };
+type Seam = { word: string; kind: 'get' | 'send'; at: number; wraps: boolean };
 
 /** Whether `name` binds `text`: as the name itself (`plain`), or anywhere inside an object or array pattern. */
 const binds = (name: ts.BindingName, text: string): 'plain' | 'destructured' | undefined => {
@@ -343,15 +344,15 @@ const seamOf = (node: ts.Node, seams: ReadonlyMap<string, Seam>) =>
  */
 function seamsOf(source: ts.SourceFile): Map<string, Seam> {
   const seams = new Map<string, Seam>();
-  for (const name of readNames(source, 'get')) seams.set(name, { word: 'get', kind: 'get', at: 1 });
-  for (const name of readNames(source, 'send')) seams.set(name, { word: 'send', kind: 'send', at: 2 });
+  for (const name of readNames(source, 'get')) seams.set(name, { word: 'get', kind: 'get', at: 1, wraps: false });
+  for (const name of readNames(source, 'send')) seams.set(name, { word: 'send', kind: 'send', at: 2, wraps: false });
   for (let grew = true; grew;) {
     grew = false;
     const visit = (node: ts.Node): void => {
       const seam = seamOf(node, seams);
       const from = seam && ts.isCallExpression(node) ? handedOn(node, seam, source) : undefined;
       if (seam && typeof from === 'object' && !seams.has(from.wrapper)) {
-        seams.set(from.wrapper, { word: from.wrapper, kind: seam.kind, at: from.at });
+        seams.set(from.wrapper, { word: from.wrapper, kind: seam.kind, at: from.at, wraps: true });
         grew = true;
       }
       ts.forEachChild(node, visit);
@@ -359,6 +360,17 @@ function seamsOf(source: ts.SourceFile): Map<string, Seam> {
     visit(source);
   }
   return seams;
+}
+
+/**
+ * Whether `name` is a function used as a value: anywhere but the callee of a call, its own declaration's name, or a property's name
+ * (`api.write`, `{ write: … }`), as an alias, a property's value or an argument is.
+ */
+function usedAsValue(name: ts.Identifier): boolean {
+  const at = name.parent;
+  if (ts.isCallExpression(at) && at.expression === name) return false;
+  if ((ts.isVariableDeclaration(at) || ts.isFunctionDeclaration(at)) && at.name === name) return false;
+  return !((ts.isPropertyAccessExpression(at) || ts.isPropertyAssignment(at)) && at.name === name);
 }
 
 const GET_FIX = 'decode the read through `get(path, schema)` (lib/api/read.ts), with a schema beside its type';
@@ -369,8 +381,8 @@ const SEND_FIX = 'decode the answer through `send(method, path, schema, how)` (l
  * write; a `get` of read.ts with no schema or one that decodes nothing, a `send` of read.ts the same by its third argument, and any
  * `getUndecoded`. A wrapper in the same file that hands its schema parameter on to `get` or `send` is held the same at each of its calls,
  * by that argument, and its call inside is counted nowhere; a schema parameter handed on from a function the scan cannot follow — no name
- * of its own, exported, or destructured — is refused where it is handed on. Each fault names the file and the line, and says to decode
- * through `get(path, schema)` or `send(method, path, schema, how)`.
+ * of its own, exported, or destructured — is refused where it is handed on, and a wrapper used as a value where it is so used. Each fault
+ * names the file and the line, and says to decode through `get(path, schema)` or `send(method, path, schema, how)`.
  */
 export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
   const scan: ReadScan = { faults: [], schemed: 0, sent: 0 };
@@ -393,6 +405,11 @@ export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
       }
       const seam = seamOf(node, seams);
       if (seam && ts.isCallExpression(node)) judge(node, seam);
+      const named = ts.isIdentifier(node) ? seams.get(node.text) : undefined;
+      if (named?.wraps && ts.isIdentifier(node) && usedAsValue(node)) {
+        const [answer, fix] = named.kind === 'get' ? ['an answer', GET_FIX] : ['its answer', SEND_FIX];
+        fault(node, `a ${named.word} used as a value is a wrapper the scan cannot follow, and reads ${answer} undecoded`, fix);
+      }
       ts.forEachChild(node, visit);
     };
     const judge = (call: ts.CallExpression, seam: Seam) => {
@@ -546,6 +563,26 @@ export const r = () => read('/api/x');`,
   ]);
   assert.deepEqual(unschemedReads(texts), {
     faults: [`lib/api/r.ts:5: a read that passes no schema, or one that decodes nothing, reads an answer undecoded: ${GET_FIX}`],
+    schemed: 0,
+    sent: 0,
+  });
+});
+
+test('REFUSED: a wrapper used as a value, by an alias, a property or a shorthand, where it is used', () => {
+  const texts = new Map([
+    [
+      'lib/api/u.ts',
+      `${AGENT_WRITE}
+const w = agentWrite;
+export const x = () => w('DELETE', '/api/x', Schema.Unknown, {});
+const api = { write: agentWrite };
+export const y = () => api.write('PUT', '/api/x', Schema.Any, {});
+export const z = { agentWrite };`,
+    ],
+  ]);
+  const value = 'a agentWrite used as a value is a wrapper the scan cannot follow, and reads its answer undecoded';
+  assert.deepEqual(unschemedReads(texts), {
+    faults: [`lib/api/u.ts:5: ${value}: ${SEND_FIX}`, `lib/api/u.ts:7: ${value}: ${SEND_FIX}`, `lib/api/u.ts:9: ${value}: ${SEND_FIX}`],
     schemed: 0,
     sent: 0,
   });

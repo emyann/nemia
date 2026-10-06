@@ -118,6 +118,37 @@ test('REFUSED: a wait whose test is aborted, before it or while it waits, fails 
   assert.equal(asked, asks, 'its pace stopped as it failed');
 });
 
+test('REFUSED: a wait that says what it waits for by a function says it as it stands when the wait fails, stuck where it is', async (of) => {
+  const stuck = waiter(of);
+  let phase = 'queued';
+  const waiting = until(
+    stuck.t,
+    () => phase === 'succeeded',
+    () => `c1 succeeded; c1 ${phase}`,
+    { everyMs: 1 },
+  ).catch((e: unknown) => e);
+  phase = 'running (working)';
+  await new Promise((r) => setTimeout(r, 10));
+  stuck.abort();
+  const err = await waiting;
+  assert.ok(err instanceof Error);
+  assert.equal(err.message, 'never came: c1 succeeded; c1 running (working)', 'asked as the wait fails, not as it began');
+  assert.deepEqual(stuck.said, ['never came: c1 succeeded; c1 running (working)']);
+
+  const unsaid = waiter(of);
+  const failing = until(
+    unsaid.t,
+    () => false,
+    () => {
+      throw new Error('the journal does not read');
+    },
+  ).catch((e: unknown) => e);
+  unsaid.abort();
+  const still = await failing;
+  assert.ok(still instanceof Error);
+  assert.equal(still.message, 'never came: (the wait could not say what: the journal does not read)', 'it fails all the same');
+});
+
 test('REFUSED: a wait that never comes fails its test at the timeout, and the runner says what never came', () => {
   const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
   const ran = spawnSync(

@@ -108,7 +108,7 @@ for (const [what, text] of [
             await said(['tick']);
             return false;
           },
-          `${away} spawned and sent to the agent`,
+          () => `${away} spawned and sent to the agent; ${server.sent.length} sent, its journal ${JSON.stringify(journal(away))}`,
           { everyMs: 0 },
         );
         const queued = await started();

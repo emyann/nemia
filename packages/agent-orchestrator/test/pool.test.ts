@@ -125,13 +125,18 @@ const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string
 const attempts = async (id: string) => (await Effect.runPromise(e.view(id))).state.attempts.length;
 
 /** Waits in test `t`, every 50ms, until every task is `phase` — a detached worker publishes a moment after the pass spawns it. */
-const reached = (t: Waiter, ids: string[], phase: string) =>
-  until(
+const reached = (t: Waiter, ids: string[], phase: string) => {
+  let phases: string[] = [];
+  return until(
     t,
-    async () => (await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase))).every((p) => p === phase),
-    `${ids.join(', ')} ${phase}`,
+    async () => {
+      phases = await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase));
+      return phases.every((p) => p === phase);
+    },
+    () => `${ids.join(', ')} ${phase}; ${ids.map((id, i) => `${id} ${phases[i] ?? 'not read yet'}`).join(', ')}`,
     { everyMs: 50 },
   );
+};
 
 /** Every task on the board stopped and settled in test `t`, so the next case starts on an empty pool. */
 const drain = async (t: Waiter) => {

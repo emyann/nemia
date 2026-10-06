@@ -50,18 +50,20 @@ const file = (id: string, held = false) =>
   });
 
 /** Ticks in test `t`, every 50ms, until every task of `ids` is in a phase `done` accepts, said as `what`. */
-const reached = (t: Waiter, ids: string[], done: (phase: string) => boolean, what: string) =>
-  until(
+const reached = (t: Waiter, ids: string[], done: (phase: string) => boolean, what: string) => {
+  let phases: string[] = [];
+  return until(
     t,
     async () => {
-      const phases = await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase));
+      phases = await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase));
       if (phases.every(done)) return true;
       await runWith(e, tickRun());
       return false;
     },
-    `${ids.join(', ')} ${what}`,
+    () => `${ids.join(', ')} ${what}; ${ids.map((id, i) => `${id} ${phases[i] ?? 'not read yet'}`).join(', ')}`,
     { everyMs: 50 },
   );
+};
 
 test(
   "a pass that views a run's every check observes the check harness once, and once more for each check in flight — none for a settled one",

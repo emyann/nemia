@@ -30,18 +30,21 @@ const { checksHandedRead } = await import('../src/views/views.verb.ts');
 const e = engine();
 
 /** Ticks in test `t`, every 50ms, until the task has settled; answers how. */
-const settled = (t: Waiter, id: string) =>
-  until(
+const settled = (t: Waiter, id: string) => {
+  let phase = 'not read yet';
+  return until(
     t,
     async () => {
       const v = await Effect.runPromise(e.view(id));
       if (v.state.settled) return v.state.settled;
+      phase = v.phase;
       await runWith(e, tickRun());
       return undefined;
     },
-    `${id} settled`,
+    () => `${id} settled; phase ${phase}`,
     { everyMs: 50 },
   );
+};
 
 const KILLED = Array.from({ length: 10 }, (_, i) => `wf mutants: killed #${i + 1} src/a.ts: "x" → "y", by test/a.test.ts (failed)`);
 const MARKED = [

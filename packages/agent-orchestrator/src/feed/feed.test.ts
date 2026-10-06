@@ -676,111 +676,117 @@ test('a line a writer died in the middle of is ended by the next pass, and costs
   assert.equal(new Set(plan).size, plan.length, `nothing after it is said twice: ${plan.join(' → ')}`);
 });
 
-test('`nemia feed` prints each line and the cursor to read on from; `nemia watch` follows the lines as they are written, until stopped', async (t) => {
-  emptyStore();
-  const b = board();
-  const run = await started('the watch');
-  await runWith(b.e, tickRun());
-  const printed = await printedBy(t, b.e, 'feed');
-  assert.equal(printed.at(-1), `cursor: ${size()}`);
-  assert.ok(
-    printed.some((l) => l.includes(run.id) && l.endsWith('running')),
-    printed.join('\n'),
-  );
-  assert.deepEqual(await printedBy(t, b.e, 'feed', String(size())), [`cursor: ${size()}`], 'from the end, nothing but the cursor');
-
-  const got: FeedLine[] = [];
-  let arrived: () => void = () => {};
-  const from = size();
-  const watch = watchFeed({
-    from,
-    intervalMs: 20,
-    onLine: (l) => {
-      got.push(l);
-      if (got.length >= 2) arrived();
-    },
-  });
-  try {
-    const two = new Promise<void>((resolve) => {
-      arrived = resolve;
-    });
-    b.set(`${run.id}-plan`, 'succeeded', SIGNED);
+test(
+  '`nemia feed` prints each line and the cursor to read on from; `nemia watch` follows the lines as they are written, until stopped',
+  WAITED,
+  async (t) => {
+    emptyStore();
+    const b = board();
+    const run = await started('the watch');
     await runWith(b.e, tickRun());
-    await Promise.race([
-      two,
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`the watch delivered ${got.length} lines in 5s`)), 5_000)),
-    ]);
-    assert.deepEqual(got, readFeed(from).lines.slice(0, got.length), 'the lines, in order, as the feed has them');
-  } finally {
-    watch.stop();
-  }
-  const stopped = got.length;
-  await runWith(b.e, tickRun());
-  fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-after', word: 'running' })}\n`);
-  await new Promise((r) => setTimeout(r, 100));
-  assert.equal(got.length, stopped, 'a watch stopped delivers nothing more');
-});
+    const printed = await printedBy(t, b.e, 'feed');
+    assert.equal(printed.at(-1), `cursor: ${size()}`);
+    assert.ok(
+      printed.some((l) => l.includes(run.id) && l.endsWith('running')),
+      printed.join('\n'),
+    );
+    assert.deepEqual(await printedBy(t, b.e, 'feed', String(size())), [`cursor: ${size()}`], 'from the end, nothing but the cursor');
 
-test('a watch hands each line on with its own cursor: the byte after it, in bytes not characters, where a reader resumes with the lines after it and no other', async () => {
-  emptyStore();
-  const line = (run: string, word: string, note?: string) =>
-    JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word, ...(note ? { note } : {}) });
-  fs.writeFileSync(
-    FEED,
-    [
-      line('r-a', 'running'),
-      line('r-a', 'awaiting approval', 'round 2 — asked — approve it'),
-      '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo',
-      line('r-b', 'running'),
-      line('r-a', 'done'),
-    ]
-      .map((l) => `${l}\n`)
-      .join(''),
-  );
-  const whole = readFeed(0);
-  assert.equal(
-    whole.lines.length,
-    4,
-    'a note of three-byte dashes, then a line a writer died in, ended by the next: its bytes move the cursor and it is handed on to nobody',
-  );
+    const got: FeedLine[] = [];
+    const arrived = bell();
+    const from = size();
+    const watch = watchFeed({
+      from,
+      intervalMs: 20,
+      onLine: (l) => {
+        got.push(l);
+        arrived.ring();
+      },
+    });
+    try {
+      b.set(`${run.id}-plan`, 'succeeded', SIGNED);
+      await runWith(b.e, tickRun());
+      await until(
+        t,
+        () => got.length >= 2,
+        () => `two lines handed by the watch; it handed ${got.length}`,
+        { bell: arrived },
+      );
+      assert.deepEqual(got, readFeed(from).lines.slice(0, got.length), 'the lines, in order, as the feed has them');
+    } finally {
+      watch.stop();
+    }
+    const stopped = got.length;
+    await runWith(b.e, tickRun());
+    fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-after', word: 'running' })}\n`);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(got.length, stopped, 'a watch stopped delivers nothing more');
+  },
+);
 
-  const got: { line: FeedLine; cursor: number }[] = [];
-  let arrived: () => void = () => {};
-  const all = new Promise<void>((resolve) => {
-    arrived = resolve;
-  });
-  const watch = watchFeed({
-    intervalMs: 20,
-    onLine: (l, cursor) => {
-      got.push({ line: l, cursor });
-      if (got.length >= whole.lines.length) arrived();
-    },
-  });
-  try {
-    await Promise.race([
-      all,
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`the watch delivered ${got.length} lines in 5s`)), 5_000)),
-    ]);
-  } finally {
-    watch.stop();
-  }
+test(
+  'a watch hands each line on with its own cursor: the byte after it, in bytes not characters, where a reader resumes with the lines after it and no other',
+  WAITED,
+  async (t) => {
+    emptyStore();
+    const line = (run: string, word: string, note?: string) =>
+      JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word, ...(note ? { note } : {}) });
+    fs.writeFileSync(
+      FEED,
+      [
+        line('r-a', 'running'),
+        line('r-a', 'awaiting approval', 'round 2 — asked — approve it'),
+        '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo',
+        line('r-b', 'running'),
+        line('r-a', 'done'),
+      ]
+        .map((l) => `${l}\n`)
+        .join(''),
+    );
+    const whole = readFeed(0);
+    assert.equal(
+      whole.lines.length,
+      4,
+      'a note of three-byte dashes, then a line a writer died in, ended by the next: its bytes move the cursor and it is handed on to nobody',
+    );
 
-  assert.deepEqual(
-    got.map((g) => g.line),
-    whole.lines,
-    'every line, once, in order',
-  );
-  for (const [i, { cursor }] of got.entries()) {
-    assert.equal(feedCursorRefusal(cursor), undefined, `line ${i}'s cursor is one the feed takes`);
-    assert.deepEqual(readFeed(cursor).lines, whole.lines.slice(i + 1), `from line ${i}'s cursor, the lines after it and no other`);
-  }
-  assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
-  assert.equal(
-    got[2].cursor - got[1].cursor > Buffer.byteLength(line('r-b', 'running')) + 1,
-    true,
-    "the torn line's bytes are counted into the next line's cursor",
-  );
-});
+    const got: { line: FeedLine; cursor: number }[] = [];
+    const arrived = bell();
+    const watch = watchFeed({
+      intervalMs: 20,
+      onLine: (l, cursor) => {
+        got.push({ line: l, cursor });
+        arrived.ring();
+      },
+    });
+    try {
+      await until(
+        t,
+        () => got.length >= whole.lines.length,
+        () => `all ${whole.lines.length} lines handed by the watch; it handed ${got.length}`,
+        { bell: arrived },
+      );
+    } finally {
+      watch.stop();
+    }
+
+    assert.deepEqual(
+      got.map((g) => g.line),
+      whole.lines,
+      'every line, once, in order',
+    );
+    for (const [i, { cursor }] of got.entries()) {
+      assert.equal(feedCursorRefusal(cursor), undefined, `line ${i}'s cursor is one the feed takes`);
+      assert.deepEqual(readFeed(cursor).lines, whole.lines.slice(i + 1), `from line ${i}'s cursor, the lines after it and no other`);
+    }
+    assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
+    assert.equal(
+      got[2].cursor - got[1].cursor > Buffer.byteLength(line('r-b', 'running')) + 1,
+      true,
+      "the torn line's bytes are counted into the next line's cursor",
+    );
+  },
+);
 
 test('`nemia watch` survives a feed cut under it: truncated, deleted or replaced, it says so once and delivers the next transition', async () => {
   emptyStore();
@@ -972,7 +978,12 @@ test(
     });
     try {
       fs.truncateSync(FEED, 0);
-      await until(t, () => errors.length >= 2, 'the cut feed refused on two beats', { bell: refused });
+      await until(
+        t,
+        () => errors.length >= 2,
+        () => `the cut feed refused on two beats; refused ${errors.length} times`,
+        { bell: refused },
+      );
       assert.ok(errors.every(refusedWith(/is past the end of the feed/)), errors.map((e) => e.message).join('\n'));
     } finally {
       watch.stop();
@@ -989,7 +1000,8 @@ test(
     fs.writeFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' })}\n`);
     const said: string[] = [];
     const spoke = bell();
-    const heard = (ok: () => boolean, what: string) => until(t, ok, what, { bell: spoke });
+    const heard = (ok: () => boolean, what: string) =>
+      until(t, ok, () => `${what}; the watch said ${said.join(', ') || 'nothing'}`, { bell: spoke });
     const count = (word: string) => said.filter((w) => w === word).length;
     const watch = watchFeed({
       intervalMs: 20,

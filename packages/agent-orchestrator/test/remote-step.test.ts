@@ -73,13 +73,16 @@ async function started(dir: string): Promise<string> {
 
 /** Ticks in test `t`, every 100ms, until the step's task settles, a pass after, and once more so the run reads what it came to. */
 async function settle(t: Waiter, e: Engine, id: string): Promise<void> {
+  let seen = 'not read yet';
   await until(
     t,
     async () => {
       await runWith(e, tickRun({ repo: ROOT }));
-      return (await Effect.runPromise(e.view(`${id}-ask`))).state.settled;
+      const v = await Effect.runPromise(e.view(`${id}-ask`));
+      seen = JSON.stringify(v);
+      return v.state.settled;
     },
-    `${id}-ask settled`,
+    () => `${id}-ask settled; it reads ${seen}`,
     { everyMs: 100 },
   );
   await runWith(e, tickRun({ repo: ROOT }));
@@ -179,14 +182,17 @@ test(
       declare({ asker: { url: server.url } });
       const id = await started(team('asker-team', 'asker'));
       const e = engine();
+      let seen = 'not read yet';
       await until(
         t,
         async () => {
-          if ((await Effect.runPromise(e.view(`${id}-ask`))).phase === 'needs-human') return true;
+          const v = await Effect.runPromise(e.view(`${id}-ask`));
+          if (v.phase === 'needs-human') return true;
+          seen = JSON.stringify(v);
           await runWith(e, tickRun({ repo: ROOT }));
           return false;
         },
-        `${id}-ask waiting on a question`,
+        () => `${id}-ask waiting on a question; it reads ${seen}`,
         { everyMs: 100 },
       );
       await runWith(e, tickRun({ repo: ROOT }));

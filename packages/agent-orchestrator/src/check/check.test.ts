@@ -188,17 +188,20 @@ test('the last lines of some output, without the blank ones at its end', () => {
 });
 
 /** Ticks `e` in test `t` every 150ms until `id` is in a phase `done` accepts, and answers its view. */
-const reached = (t: Waiter, e: Engine, id: string, done: (v: Effect.Success<ReturnType<Engine['view']>>) => boolean, what: string) =>
-  until(
+const reached = (t: Waiter, e: Engine, id: string, done: (v: Effect.Success<ReturnType<Engine['view']>>) => boolean, what: string) => {
+  let phase = 'not read yet';
+  return until(
     t,
     async () => {
       await Effect.runPromise(e.tick());
       const v = await Effect.runPromise(e.view(id));
+      phase = v.phase;
       return done(v) && v;
     },
-    `${id} ${what}`,
+    () => `${id} ${what}; phase ${phase}`,
     { everyMs: 150 },
   );
+};
 
 const settled = (t: Waiter, e: Engine, id: string) => reached(t, e, id, (v) => Boolean(v.state.settled), 'settled');
 

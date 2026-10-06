@@ -32,8 +32,7 @@ const into = <In, Out>(metric: Metric.Metric<In, Out>, attributes: Record<string
 /** One fact into the metrics: a session's tally, cost, tokens, time and denials; a check's or a round's count. */
 function recordFact(fact: StepFact): Effect.Effect<void> {
   const { attributes } = fact;
-  if (fact.metric === 'check') return into(STEP_METRICS.checks, attributes, 1);
-  if (fact.metric === 'round') return into(STEP_METRICS.rounds, attributes, 1);
+  if (fact.metric !== 'try') return into(fact.metric === 'check' ? STEP_METRICS.checks : STEP_METRICS.rounds, attributes, 1);
   return Effect.all(
     [
       into(STEP_METRICS.tries, attributes, 1),

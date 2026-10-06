@@ -44,6 +44,7 @@ import { advancePass, type Advanced } from './advance.verb.ts';
 import { heldRead } from '../list/list.verb.ts';
 import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
+import { recordStepMetrics } from '../meter/step.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything
@@ -154,7 +155,8 @@ export type TickOptions = { repo?: string; memo?: RestMemo; verifyRest?: boolean
  * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`), kept among the recent passes (`recordRecentPass`) with
  * the quota `quota` reads and the checks the pass filed, rolled from there into the series (`keepSeries`), put into the pass's metrics
  * (`recordPassMetrics`) and returned. A pass run inside another's meter — a
- * test that meters its own — is counted as part of that one and carries no cost of its own.
+ * test that meters its own — is counted as part of that one and carries no cost of its own. What each run's full pass read of its steps
+ * (`Advanced`'s `facts`) goes into the steps' metrics (`recordStepMetrics`), once, on every pass.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
  * before every pass, which answers every run afresh. `verifyRest` judges every run the memo answers again as a full pass would, and dies
@@ -171,6 +173,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
   };
   const io0 = yield* ioOf(e);
   const { value, ms, tallies } = yield* meteredPass(pass(meteredEngine(e), options));
+  yield* recordStepMetrics(value.runs.flatMap((advanced) => advanced.facts ?? []));
   if (!tallies) return value;
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, yield* ioOf(e));
@@ -214,7 +217,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
-  const read = passRead(e, runs);
+  const read: PassRead = { ...passRead(e, runs), ...(resting?.memo.settled ? { settled: resting.memo.settled } : {}) };
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const queue =
@@ -330,7 +333,9 @@ const passOf = (
  * What the tick remembers of the runs at rest (`atRest`), in memory and nowhere else: for each, what its last full pass answered, and the
  * inputs it answered on — its files in the store (`restStamps`), the run as read, and the result branches whose tips it would read. And
  * `cursor`, where on the engine's feed the memo has read to: every task of every run appends to it (the runtime's journal), so an event for
- * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed.
+ * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed. And `settled`, the
+ * tasks the last read of the feed said settled (`settledIn`): a run with one is judged in full on the pass, which reads its facts
+ * (`StepFact`), and its answer is kept without them, so a run answered from memory records none again.
  *
  * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and reads
  * and judges every run afresh, and no verb, `nemia ls` or the api reads it. While a run's stamp holds, the pass is handed the memo's run in
@@ -338,7 +343,8 @@ const passOf = (
  */
 export type RestMemo = {
   cursor?: number;
-  runs: Map<string, { stamp: string; run: Run; tipped: string[]; advanced: Omit<Advanced, 'run'> }>;
+  runs: Map<string, { stamp: string; run: Run; tipped: string[]; advanced: Omit<Advanced, 'run' | 'facts'> }>;
+  settled?: ReadonlySet<string>;
 };
 
 /** A memo that holds nothing: what a daemon starts with, and what a test hands each pass to play a restart. */
@@ -442,7 +448,7 @@ const advanceResting = Effect.fn('advanceResting')(function* (
   const record = JSON.stringify(run);
   const { advanced, rest } = yield* fullPass(e, run, pass, slot);
   if (rest && stamp !== undefined && JSON.stringify(run) === record) {
-    const { run: _, ...answered } = advanced;
+    const { run: _, facts: __, ...answered } = advanced;
     memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
   }
   return advanced;

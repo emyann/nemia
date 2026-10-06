@@ -52,6 +52,7 @@ import {
 } from '../views/views.verb.ts';
 import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
+import { roundsGranted, settledFacts, type StepFact } from '../meter/step.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type PassReads } from './file.verb.ts';
@@ -209,6 +210,8 @@ export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
  * each line starting with its step: what cutting a worktree had to say (a path `.worktreeinclude` lists that the main checkout does not
  * have, a line it refused, an `npm ci` that ran or failed), each try and each round filed and on whose word, a blocked session the engine
  * was asked to stop for a try, and an ask file that cannot be read. `looped` names the looping steps whose loop this pass took round again.
+ * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass was handed as settled since the pass
+ * before (`PassRead`'s `settled`), and each round granted; absent where there is none.
  * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
@@ -226,6 +229,7 @@ export type Advanced = {
   waiting: Wait[];
   inFlight: boolean;
   held?: RunSlot;
+  facts?: StepFact[];
   /** What the pass judged of the run and of each step, in the words the feed keeps (`feedWords`): what `tick` writes where they changed. */
   feed: FeedWords;
 };
@@ -325,6 +329,7 @@ export const advancePass = Effect.fn('advancePass')(
     const checkout = yield* checkoutHold(e, run, steps, pass && { read: pass, slot });
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
+    const settled = settledOf(run, reads, pass?.settled);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
@@ -344,11 +349,25 @@ export const advancePass = Effect.fn('advancePass')(
     if (wrote) runStore.runs.rewrite(run);
     runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
-    const done = { filed, checked, tried, looped, notes, feed };
+    const done = { filed, checked, tried, looped, notes, feed, facts: [...settled, ...roundsGranted(run, steps, looped)] };
     return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
   },
   (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
 );
+
+/**
+ * The facts of the run's tasks the pass was handed as settled (`settledFacts`), off what it read of them, before it files anything over
+ * them: a try filed moves the step's task among its earlier tries.
+ */
+const settledOf = (run: Run, r: PassReads, settled: ReadonlySet<string> | undefined): StepFact[] =>
+  settled?.size
+    ? settledFacts(run, r.steps, settled, {
+        views: r.views,
+        spendOf: r.spendOf,
+        signedOff: r.signedOff,
+        statusOf: (step) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf),
+      })
+    : [];
 
 /**
  * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
@@ -564,7 +583,7 @@ function keepTips(run: Run, steps: readonly Workflow[], status: Assessment['stat
 }
 
 /** What a pass filed and said, as `Advanced` carries it. */
-type Done = Pick<Advanced, 'filed' | 'checked' | 'tried' | 'looped' | 'notes' | 'feed'>;
+type Done = Pick<Advanced, 'filed' | 'checked' | 'tried' | 'looped' | 'notes' | 'feed' | 'facts'>;
 
 /**
  * The pass's answer: what it did (`Advanced`), what holds the run out of rest (`restBlockers`), and at rest the branches it read the tips
@@ -611,6 +630,7 @@ function answerOf(
     waiting,
     inFlight,
     ...(held ? { held } : {}),
+    ...(done.facts?.length ? { facts: done.facts } : {}),
     feed: blockers.length ? feed : { ...feed, atRest: true },
   };
   return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped: pass.tipped } }) };

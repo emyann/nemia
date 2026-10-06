@@ -96,8 +96,9 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
 }
 
 /**
- * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`: or, when a task it reads
- * does not, why it is not judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
+ * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`: or, when its unfrozen
+ * folder does not load or a task it reads does not, why it is not judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads
+ * die of.
  */
 export const judgedOn = (e: Engine['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) =>
   runWith(

@@ -208,10 +208,10 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
 });
 
 /**
- * A run a task of which does not read, answered off its record: what it asked, where, its steps and their graph, and each step's word off
- * the views that did read — `unreadable` for a step any task of which does not, its check's or an earlier try's among them (`unjudgedWord`)
- * — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and counts it in flight, so it is `running` and
- * moving until the journal reads again.
+ * A run a task of which does not read, or whose unfrozen folder does not load, answered off its record: what it asked, where, its steps
+ * and their graph, and each step's word off the views that did read — `unreadable` for a step any task of which does not, its check's or
+ * an earlier try's among them (`unjudgedWord`) — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and
+ * counts it in flight, so it is `running` and moving until the journal reads, or the folder loads, again.
  */
 function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string): Omit<RunSummary, 'startedAt'> {
   const folder = workflowsOf(run, home).steps;
@@ -261,7 +261,10 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
   };
 }
 
-/** A run judged, or answered off its record (`unjudged`) when a task it reads does not (`judgedUnlessUnreadable`). */
+/**
+ * A run judged, or answered off its record (`unjudged`) when its unfrozen folder does not load or a task it reads does not
+ * (`judgedUnlessUnreadable`).
+ */
 const judgedOrNot = Effect.fnUntraced(function* (
   run: Run,
   views: Views,

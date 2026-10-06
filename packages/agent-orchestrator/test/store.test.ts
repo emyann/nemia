@@ -5999,7 +5999,9 @@ test('a run whose tasks the engine no longer knows is forgotten; so is a record 
   fs.rmSync(legacyDir, { recursive: true });
   assert.throws(
     () => stepsOf(readRun(legacy.id)),
-    (err: Error) => err.message.startsWith('no workflow folder at '),
+    (err: Error) =>
+      err.message.startsWith(`run ${legacy.id}: it froze no workflow at nemia start`) &&
+      err.message.includes(`does not load: no workflow folder at ${legacyDir}`),
   );
 
   const { printed, error } = await rmTyped(t, neverHeardOfAnything, legacy.id);

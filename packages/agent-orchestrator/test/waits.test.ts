@@ -2,9 +2,9 @@
  * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's held here byte for byte, and the guard
  * that keeps a hand-written deadline out of the package's tests (`DEADLINES`). The helper's own tests are the runtime's.
  *
- * `DEADLINES` counts, file by file, each `now()` of `Date` or `performance` a number is added to in the package's tests: each left is a
- * mocked clock, a timestamp or a spin, never a wait, and a count only shrinks (`deadlineBreaks`). A change that takes one out lowers
- * its count in the same commit.
+ * `DEADLINES` counts, file by file, each `now()` of `Date` or `performance` a number is added to, or a start taken from and held under a
+ * bound, in the package's tests: each left is a mocked clock, a timestamp or a spin, never a wait, and a count only shrinks
+ * (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,8 +28,8 @@ test("the helper is the runtime's, byte for byte", () => {
 type Allowance = { count: number; not: string };
 
 /**
- * The `now()` of `Date` or `performance` a number is added to, file by file in the package's tests, each no wait; a file not here has
- * none. A count only shrinks.
+ * The `now()` of `Date` or `performance` a number is added to, or a start taken from and held under a bound, file by file in the
+ * package's tests, each no wait; a file not here has none. A count only shrinks.
  */
 const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/git-skill.test.ts': { count: 1, not: 'a commit date a minute ahead' },
@@ -42,8 +42,11 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   'src/meter/tally.store.test.ts': { count: 1, not: 'a spin that spends its time on the thread the meter measures' },
 };
 
-/** A `now()` of `Date` or `performance` with a number added, across line breaks; built in parts, so this file says none. */
-const DEADLINE = new RegExp(['(?:Date|performance)', '\\.now\\(\\)\\s*\\+'].join(''), 'g');
+/**
+ * A `now()` of `Date` or `performance` with a number added, or a start taken from it and compared under a bound, across line breaks;
+ * built in parts, so this file says none.
+ */
+const DEADLINE = new RegExp(['(?:Date|performance)', '\\.now\\(\\)\\s*', '(?:\\+|-\\s*[\\w.]+\\s*<)'].join(''), 'g');
 
 /** How many hand-written deadlines `text` holds. */
 const deadlinesIn = (text: string): number => text.match(DEADLINE)?.length ?? 0;
@@ -87,12 +90,16 @@ test("the package's tests hold no hand-written deadline but those `DEADLINES` al
 test('REFUSED: a deadline written into a test is over its allowance, and an allowance left above its count is loose', () => {
   const planted = ['  const bound = performance', '.now()\n    + 10_000;'].join('');
   assert.equal(deadlinesIn(planted), 1, 'matched across the line break a formatter puts in');
+  const compared = ['  while (!ok() && Date', '.now()\n    - start < 5_000) await turn();'].join('');
+  assert.equal(deadlinesIn(compared), 1, 'a start held under a bound is a deadline too');
   const counts = measured();
-  counts.set('src/feed/feed.test.ts', (counts.get('src/feed/feed.test.ts') ?? 0) + deadlinesIn(planted));
-  assert.deepEqual(deadlineBreaks(counts, DEADLINES), [
-    'src/feed/feed.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (test/waits.ts) instead',
-  ]);
-  counts.set('src/feed/feed.test.ts', 0);
+  for (const deadline of [planted, compared]) {
+    counts.set('src/feed/feed.test.ts', (counts.get('src/feed/feed.test.ts') ?? 0) + deadlinesIn(deadline));
+    assert.deepEqual(deadlineBreaks(counts, DEADLINES), [
+      'src/feed/feed.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (test/waits.ts) instead',
+    ]);
+    counts.set('src/feed/feed.test.ts', 0);
+  }
   counts.set('src/nemia/keep.verb.test.ts', 1);
   assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['src/nemia/keep.verb.test.ts is allowed 2 but has 1: lower its count in DEADLINES']);
 });

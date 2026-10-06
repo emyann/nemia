@@ -261,6 +261,14 @@ export const decidable = (extra: Partial<Decidable> = {}): Decidable => ({
     { branch: 'wf/r-1/c', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { clean: true, said: 'merges clean' } },
     { branch: 'wf/r-1/d', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { error: 'no git', said: 'cannot tell' } },
     { branch: 'wf/r-1/e', where: 'gone', said: 'gone', stat: null, merge: null },
+    {
+      branch: 'wf/r-1/f',
+      where: 'unread',
+      why: 'the place was not heard: timed out',
+      said: 'wf/r-1/f: where it stands is not read (the place was not heard: timed out)',
+      stat: null,
+      merge: null,
+    },
   ],
   touched: [
     {

@@ -4,6 +4,8 @@
  * `setStore`, `setApiEnv` and `setPhotographing`; a page reads them when it is visited, never as it is imported, when the runner has set
  * up nothing yet.
  */
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 export const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -31,3 +33,38 @@ export function setPhotographing(to: boolean): void {
 }
 /** Every line draft's stand-in inbox (SAYING, INBOX) has been sent, in order: what the `say` page holds its words to. */
 export const heard: unknown[] = [];
+
+/** A pass's read of where the store's branches stand, as the tick's pass reads it and writes it down (`passStanding`). */
+const PASS =
+  "import { engine, passStanding, runStore, runWith } from 'agent-orchestrator'; await runWith(engine(), passStanding(runStore.runs.list()));";
+
+/**
+ * Where the store's result branches stand, read now and written to its `standing.json` as the tick's pass writes it, in a process of the
+ * api's package on the api's environment: the api ticks nothing in the e2e (`--no-tick`), and the board's list reads where a run's result
+ * stands off that file alone. Throws, with what the process printed, where the pass failed.
+ */
+export function standingPass(): void {
+  try {
+    execFileSync(process.execPath, ['--input-type=module', '--eval', PASS], { cwd: API, env: apiEnv, stdio: 'pipe' });
+  } catch (err) {
+    const { stdout, stderr } = err as { stdout?: Buffer; stderr?: Buffer };
+    throw new Error(`a pass over the e2e's store did not read where its branches stand:\n${String(stdout ?? '')}${String(stderr ?? '')}`, {
+      cause: err,
+    });
+  }
+}
+
+/**
+ * The run `id` as a wait or a hold names it where its place did not read where it stands: the run, with the words the e2e's pass wrote to
+ * the store's `standing.json` for its repository (`standingPass`) — a repository the seed names and no machine has, never said to be on
+ * the base or not. Throws where the pass read that repository, or did not ask it.
+ */
+export function unreadName(id: string): string {
+  const { repo } = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as { repo: string };
+  const { places } = JSON.parse(fs.readFileSync(path.join(store!, 'standing.json'), 'utf8')) as {
+    places: { repo: string; unread?: string }[];
+  };
+  const unread = places.find((p) => p.repo === repo)?.unread;
+  if (unread === undefined) throw new Error(`the e2e's pass read where ${repo} stands, or did not ask it: ${id} is not unread`);
+  return `${id} (where it stands is unread: ${unread})`;
+}

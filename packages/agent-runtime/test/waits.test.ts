@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { bell, until, type Waiter } from './waits.ts';
+import { bell, until, WAITED, type Waiter } from './waits.ts';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
@@ -186,6 +186,38 @@ test("the helper is the runtime's, byte for byte", () => {
     fs.readFileSync(RUNTIME, 'utf8'),
     'copy packages/agent-runtime/test/waits.ts over this one: a change to it is made there and copied to every package',
   );
+});
+
+/** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
+const defaultTimeout = (script: string): number | null => {
+  const word = script.split(/\s+/).find((w) => /^--test-timeout=[1-9]\d*$/.test(w));
+  return word ? Number(word.slice('--test-timeout='.length)) : null;
+};
+
+/**
+ * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a `test` script whose default
+ * timeout is not `WAITED`'s, since node's is none.
+ *
+ * @param script the package's `test` script
+ * @returns one line per break, empty when every test is bounded at `WAITED`'s timeout
+ */
+const timeoutBreaks = (script: string): string[] =>
+  defaultTimeout(script) === WAITED.timeout
+    ? []
+    : [`the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
+
+test("the package's test script bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } };
+  assert.deepEqual(timeoutBreaks(scripts.test), []);
+});
+
+test("REFUSED: a test script with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
+  const refused = [
+    `the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
+  ];
+  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 'test/*.test.ts'"), refused, 'none');
+  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 --test-timeout=600000 'test/*.test.ts'"), refused, 'a longer one');
+  assert.deepEqual(timeoutBreaks(`node --test --test-concurrency=2 --test-timeout=${WAITED.timeout} 'test/*.test.ts'`), [], 'its own');
 });
 
 /** What a count is held to: how many a file has, and why each is no wait. */

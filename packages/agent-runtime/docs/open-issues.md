@@ -781,9 +781,11 @@ the Codex harness's whole look, so every Codex session is unread, by design (iss
 Nothing makes it go: `ae forget` takes only a settled task, refuses a session its harness could not be read for (`sessionsHeld`,
 `service/forget.ts`), and a task with no deadline on that harness never settles — the gap issue 35 names. The one way out today is a
 hand removal of the run, which the repository's rules forbid. The same trap was found, and closed, for a session whose start event
-does not decode: unread only while its process runs, then read as failed with no id (`refusedAtWork`, `harness/detached/detached.ts`;
-`test/start-event.test.ts`). A refused output is not closed here: it is read off a run whose process may have ended, so the same
-answer — read the run that refused as failed once it has ended, and its harness's others as read — is the candidate fix.
+does not decode, under every detached harness: unread only while its process runs, then read as failed with no id
+(`refusedAtWork`, `harness/detached/detached.ts`), and under Codex its output's refusal of the same line is its alone, read as
+nothing said (`outputFor`), so its harness's other sessions stay read (`test/start-event.test.ts`). Any other refused output is
+not closed here: it is read off a run whose process may have ended, so the same answer — read the run that refused as failed
+once it has ended, and its harness's others as read — is the candidate fix.
 
 ## Verified live, once
 

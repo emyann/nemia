@@ -386,6 +386,22 @@ const sightingOf = (
 });
 
 /**
+ * What the output of the run under `name` says (`told`), for its sighting; a refusal of it fails the look, in words naming the run
+ * and `log`, its output's file. A run whose start was refused (`startRefused`) is read as failed, and its output's refusal, often
+ * of that same start event, is its alone: read as nothing said, so the look reads it and the harness's other runs.
+ */
+const outputFor = (
+  name: string,
+  run: RunFile,
+  told: { read: HarnessOutput } | { wrong: string } | undefined,
+  log: string,
+): { read: HarnessOutput } | undefined => {
+  if (!told || 'read' in told) return told;
+  if (run.startRefused) return undefined;
+  throw new Error(`\`${name}\`'s output, ${log}, cannot be read: ${told.wrong}`);
+};
+
+/**
  * Why the run under `name` has no session id: its harness printed its start event with no id this runtime reads (`startRefused`).
  * Names the run, the line of its stdout, the event, the field and what was there, quoted, what the run is read as, and what to do.
  */
@@ -665,7 +681,8 @@ const startWorker = (file: string, cwd: string): void => {
  *   and that is reported as no code, not as a code. A run whose output the spec refuses fails the whole look, in the
  *   spec's words, naming the run and its output file: every session of the harness is unread, never gone. A run whose start
  *   event its worker refused (`startRefused`) is left out while its process runs, and read as `failed`, with no id, once it
- *   has ended (`refusedAtWork`); why is said as a warning on every look (`startRefusalOf`), and the harness's others are read.
+ *   has ended (`refusedAtWork`), whatever its output's refusal (`outputFor`); why is said as a warning on every look
+ *   (`startRefusalOf`), and the harness's others are read.
  * - `observeFor`: the same sighting for each name expected that has a run file, and the name `unread` for one whose file is
  *   there and unreadable, or whose start was refused and whose process still runs, said as `observe` says it. A refused output
  *   fails it as it fails `observe`.
@@ -752,8 +769,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       : lessCarried(usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)));
 
   const sightingAt = (name: string, run: RunFile, now: Instant, all: () => readonly Run[]): Sighting => {
-    const output = outputOf(name, run);
-    if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
+    const output = outputFor(name, run, outputOf(name, run), logFile(name));
     return sightingOf(name, run, now, statementOf(name), output, usageOf(run, output?.read.usage, all));
   };
 

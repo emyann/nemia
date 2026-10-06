@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessSpec, type StartEvent } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
-import { CODEX_START } from '../src/harness/codex/stream.ts';
+import { CODEX_START, codexOutput } from '../src/harness/codex/stream.ts';
 import { CLAUDE_INIT_START, CLAUDE_RESULT_START, claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
@@ -177,6 +177,22 @@ test('REFUSED: a start whose id is a number, once its process has ended, reads a
   const forgot = await Effect.runPromise(engine.forget([id], { yes: true }));
   assert.equal(forgot.forgotten, true);
   assert.deepEqual(fs.readdirSync(path.join(root, 'runs', 'sh')), [], 'its run files went with it');
+});
+
+test('REFUSED: a Codex start whose thread_id is a number, once ended, reads as failed beside a Codex session read: its output’s refusal is its own', async () => {
+  const root = scratch('ae-start-');
+  const codexLike = (line: string) => sh(printed(line), CODEX_START, { readOutput: codexOutput });
+  await ran(codexLike(threadStarted(12345)), 'ae/bad/1', root);
+  const { ops } = await ran(codexLike(threadStarted(THREAD)), 'ae/good/1', root);
+  const listed = await warned(ops.observe);
+  assert.equal(listed.value.get('ae/bad/1')?.state, 'failed');
+  assert.equal(listed.value.get('ae/bad/1')?.nativeId, undefined);
+  assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
+  for (const w of REFUSAL_WORDS) assert.match(listed.warnings[0] ?? '', w);
+  const asked = await Effect.runPromise(ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
+  assert.deepEqual([...asked.unread], []);
+  assert.equal(asked.seen.get('ae/bad/1')?.state, 'failed');
+  assert.equal(asked.seen.get('ae/good/1')?.nativeId, THREAD);
 });
 
 test('REFUSED: a start whose id is a string of no id’s shape', async () => {

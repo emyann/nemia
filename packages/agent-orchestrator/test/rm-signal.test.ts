@@ -1,8 +1,9 @@
 /**
  * `nemia rm` removes a git run's worktrees through its place's `remove`, which runs in a process group of its own. A SIGINT to `nemia rm`
- * ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop halfway. The
- * run is started in this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone.
- * `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop halfway. Once
+ * that group is gone, `nemia rm` again forgets the run: what the first left is read again by the place's inventory. The run is started in
+ * this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone. `WF_ROOT` is set
+ * before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,6 +47,11 @@ function killGroup(pgid: number): boolean {
   }
 }
 
+/** Until `ok()` holds, asked every 20ms: a group killed is gone once `ps` no longer lists it. */
+async function waitFor(ok: () => boolean): Promise<void> {
+  while (!ok()) await new Promise((resolve) => setTimeout(resolve, 20));
+}
+
 /**
  * A cancelled run of one step, `implement`, on a scratch repository, with its worktree where a pass puts it — `worktrees/<id>/implement`,
  * on `wf/<id>/implement` — clean, so `nemia rm` asks its place to remove it without a hand-off.
@@ -63,7 +69,7 @@ async function aCancelledRun() {
   return { id: run.id, repo, wt };
 }
 
-test("a SIGINT to nemia rm is not passed on to its place's remove: the rm ends by the signal, and remove's process group is still there", async (t) => {
+test("a SIGINT to nemia rm is not passed on to its place's remove: the rm ends by the signal, and remove's process group is still there; once it is gone, nemia rm again forgets the run", async (t) => {
   const { id, wt } = await aCancelledRun();
   const bin = path.join(DIR, 'bin');
   const said = path.join(DIR, 'git-said');
@@ -84,10 +90,12 @@ test("a SIGINT to nemia rm is not passed on to its place's remove: the rm ends b
     { mode: 0o755 },
   );
   const env = { ...process.env, WF_ROOT: STORE, AE_ROOT: path.join(DIR, 'engine'), PATH: `${bin}${path.delimiter}${process.env.PATH}` };
-  const rm = nodeChild(
-    `process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'rm', ${JSON.stringify(id)}]; await import(${JSON.stringify(BIN)});`,
-    env,
-  );
+  const rmIn = (envOf: NodeJS.ProcessEnv) =>
+    nodeChild(
+      `process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'rm', ${JSON.stringify(id)}]; await import(${JSON.stringify(BIN)});`,
+      envOf,
+    );
+  const rm = rmIn(env);
   let pgid = 0;
   t.after(() => {
     rm.child.kill('SIGKILL');
@@ -103,4 +111,12 @@ test("a SIGINT to nemia rm is not passed on to its place's remove: the rm ends b
   assert.equal(ended.signal, 'SIGINT', `nemia rm ended by SIGINT; it said: ${rm.err()}`);
   assert.ok(groupOf(pgid).includes(String(pgid)), "remove's group outlives the rm");
   assert.ok(fs.existsSync(wt) && fs.existsSync(path.join(STORE, 'runs', `${id}.json`)), 'the worktree and the record are still there');
+  assert.ok(killGroup(pgid), "remove's group is killed");
+  await waitFor(() => groupOf(pgid).length === 0);
+  const again = rmIn({ ...env, PATH: process.env.PATH });
+  t.after(() => again.child.kill('SIGKILL'));
+  const ended2 = await again.closed;
+  assert.equal(ended2.code, 0, `nemia rm again forgets the run; it said: ${again.err()}`);
+  assert.ok(!fs.existsSync(wt), 'its worktree is gone');
+  assert.ok(!fs.existsSync(path.join(STORE, 'runs', `${id}.json`)), 'its record is gone');
 });

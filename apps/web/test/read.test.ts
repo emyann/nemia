@@ -250,9 +250,22 @@ const isWrite = (call: ts.CallExpression) => {
   );
 };
 
-/** Whether `schema` decodes nothing: `Schema.Unknown` or `Schema.Any`, which take any answer as read. */
-const decodesNothing = (schema: ts.Expression | undefined) =>
-  !schema || (ts.isPropertyAccessExpression(schema) && ['Unknown', 'Any'].includes(schema.name.text));
+/** `argument` without the parentheses, casts and assertions around it (`(x)`, `x as T`, `x!`, `x satisfies T`), as a scan reads it. */
+const bare = (argument: ts.Expression | undefined): ts.Expression | undefined =>
+  argument &&
+  (ts.isParenthesizedExpression(argument) ||
+  ts.isAsExpression(argument) ||
+  ts.isTypeAssertionExpression(argument) ||
+  ts.isNonNullExpression(argument) ||
+  ts.isSatisfiesExpression(argument)
+    ? bare(argument.expression)
+    : argument);
+
+/** Whether `argument` decodes nothing: `Schema.Unknown` or `Schema.Any`, which take any answer as read, however cast. */
+const decodesNothing = (argument: ts.Expression | undefined) => {
+  const schema = bare(argument);
+  return !schema || (ts.isPropertyAccessExpression(schema) && ['Unknown', 'Any'].includes(schema.name.text));
+};
 
 /** The names `seam` of read.ts (`get` or `send`) is bound to in `source`: the seam's own, or what `import { get as … }` calls it. */
 function readNames(source: ts.SourceFile, seam: 'get' | 'send'): Set<string> {
@@ -325,7 +338,7 @@ function exported({ name, declaration }: { name: string; declaration: ts.Declara
  * parameter destructured). Undefined when the schema is no parameter.
  */
 function handedOn(call: ts.CallExpression, seam: Seam, source: ts.SourceFile): { wrapper: string; at: number } | 'unfollowed' | undefined {
-  const schema = call.arguments[seam.at];
+  const schema = bare(call.arguments[seam.at]);
   if (!schema || !ts.isIdentifier(schema)) return undefined;
   const bound = bindingParameter(call, schema.text);
   if (!bound) return undefined;
@@ -566,6 +579,32 @@ export const r = () => read('/api/x');`,
     schemed: 0,
     sent: 0,
   });
+});
+
+test('REFUSED: a schema cast, parenthesised or asserted on its way to send, by a wrapper or its caller', () => {
+  const texts = new Map([
+    [
+      'lib/api/c.ts',
+      `import { send } from './read.ts';
+import { Schema } from 'effect';
+const cast = <T>(route: string, schema: Schema.Decoder<T>) => send('PUT', route, (schema as Schema.Decoder<T>), how);
+export const a = () => cast('/api/x', Schema.Unknown);
+export const b = () => cast('/api/x', Schema.Any as never);
+const sure = <T>(schema: Schema.Decoder<T>) => send('PUT', '/api/x', schema!, how);
+export const c = () => sure((Schema.Unknown));
+export const d = () => send('POST', '/api/x', Schema.Unknown satisfies unknown, how);`,
+    ],
+  ]);
+  const { faults } = unschemedReads(texts);
+  assert.deepEqual(
+    faults.map((f) => f.slice(0, f.indexOf(': decode'))),
+    [
+      'lib/api/c.ts:4: a cast that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/c.ts:5: a cast that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/c.ts:7: a sure that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/c.ts:8: a send that passes no schema, or one that decodes nothing, reads its answer undecoded',
+    ],
+  );
 });
 
 test('REFUSED: a wrapper used as a value, by an alias, a property or a shorthand, where it is used', () => {

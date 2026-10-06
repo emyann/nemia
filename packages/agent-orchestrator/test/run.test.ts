@@ -54,7 +54,6 @@ import {
   forgetRefusal,
   heldWorktree,
   idRefusal,
-  parseWorktrees,
   runWorktrees,
   type Forgot,
   budgetOf,
@@ -133,6 +132,7 @@ import {
   type StepRecord,
   type TaskPhase,
 } from '../src/run.ts';
+import type { Held } from '../src/place/place.ts';
 import {
   CLOSEOUT_SCHEMA,
   closeoutSchemaOf,
@@ -7067,45 +7067,23 @@ test('`forgetRefusal` names every reason at once — and a record from before th
   );
 });
 
-test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists inside its own directory — never the repository a `--no-worktree` run worked in, nor those of a run whose id starts with this one's — each with the step a hand-off commits under", () => {
-  const porcelain = [
-    'worktree /repo',
-    'HEAD abc',
-    'branch refs/heads/main',
-    '',
-    'worktree /wf/worktrees/r-1/implement',
-    'HEAD def',
-    'branch refs/heads/wf/r-1/implement',
-    '',
-    'worktree /wf/worktrees/r-1/cut',
-    'HEAD def',
-    'branch refs/heads/wf/r-1/cut',
-    'locked a person holds it',
-    '',
-    'worktree /wf/worktrees/r-1/lost',
-    'HEAD def',
-    'detached',
-    'prunable gitdir file points to non-existent location',
-    '',
-    'worktree /wf/worktrees/r-1-x2/implement',
-    'HEAD 123',
-    'branch refs/heads/wf/r-1-x2/implement',
-    '',
-  ].join('\n');
-  const listed = parseWorktrees(porcelain);
-  assert.deepEqual(listed, [
-    { path: '/repo', head: 'abc', branch: 'main' },
-    { path: '/wf/worktrees/r-1/implement', head: 'def', branch: 'wf/r-1/implement' },
-    { path: '/wf/worktrees/r-1/cut', head: 'def', branch: 'wf/r-1/cut', locked: 'a person holds it' },
-    { path: '/wf/worktrees/r-1/lost', head: 'def', detached: true, prunable: true },
-    { path: '/wf/worktrees/r-1-x2/implement', head: '123', branch: 'wf/r-1-x2/implement' },
-  ]);
-  assert.deepEqual(
-    parseWorktrees('worktree /a b\nlocked\n'),
-    [{ path: '/a b', locked: '' }],
-    'a path with a space, and a lock with no reason',
-  );
-
+test("`runWorktrees`: a run's worktrees are those its place lists inside its own directory — never the repository a `--no-worktree` run worked in, nor those of a run whose id starts with this one's — each with the step a hand-off commits under", () => {
+  const at = (p: string, more: Partial<Held> = {}): Held => ({
+    path: p,
+    head: 'def',
+    detached: false,
+    prunable: false,
+    clean: true,
+    onBranch: true,
+    ...more,
+  });
+  const listed: Held[] = [
+    at('/repo', { branch: 'main' }),
+    at('/wf/worktrees/r-1/implement', { branch: 'wf/r-1/implement' }),
+    at('/wf/worktrees/r-1/cut', { branch: 'wf/r-1/cut', locked: 'a person holds it', clean: null }),
+    at('/wf/worktrees/r-1/lost', { detached: true, prunable: true, clean: null }),
+    at('/wf/worktrees/r-1-x2/implement', { branch: 'wf/r-1-x2/implement' }),
+  ];
   const r = run(
     {},
     {
@@ -7130,23 +7108,31 @@ test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists
 
   const direct = run({}, { isolate: false, steps: { implement: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
   assert.deepEqual(
-    runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, { path: '/wf/worktrees/r-1' }]).worktrees.map((w) => w.path),
+    runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, at('/wf/worktrees/r-1')]).worktrees.map((w) => w.path),
     ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/cut', '/wf/worktrees/r-1/lost'],
     "never the repository, nor the run's directory itself",
   );
   assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', listed.slice(0, 1)), { worktrees: [], unlisted: [] });
 });
 
-test('REFUSED at shipped defaults: `heldWorktree` leaves a locked worktree, and one on no branch — unless nothing is uncommitted in it and its HEAD is on a branch already; one on a branch is removed', () => {
-  const on = { path: '/wf/worktrees/r-1/implement', head: 'abc', branch: 'wf/r-1/implement' };
-  const detached = { path: '/wf/worktrees/r-1/implement', head: 'abc', detached: true as const };
-  assert.equal(heldWorktree(on), null);
-  assert.deepEqual(heldWorktree({ ...on, locked: '' }), { locked: '' });
-  assert.deepEqual(heldWorktree({ ...detached, locked: 'mine' }, { clean: true, onBranch: true }), { locked: 'mine' });
-  assert.deepEqual(heldWorktree(detached), { detached: 'abc' }, 'git not asked: held');
-  assert.deepEqual(heldWorktree(detached, { clean: true, onBranch: false }), { detached: 'abc' }, 'a commit on no branch');
-  assert.deepEqual(heldWorktree(detached, { clean: false, onBranch: true }), { detached: 'abc' }, 'a hand-off would commit onto no branch');
-  assert.equal(heldWorktree(detached, { clean: true, onBranch: true }), null, 'nothing a removal loses');
+test('REFUSED at shipped defaults: `heldWorktree` leaves a locked worktree, and one on no branch — unless it is clean and its HEAD is on a branch already; one on a branch is removed', () => {
+  const on: Held = {
+    path: '/wf/worktrees/r-1/implement',
+    head: 'abc',
+    branch: 'wf/r-1/implement',
+    detached: false,
+    prunable: false,
+    clean: false,
+    onBranch: true,
+  };
+  const detached: Held = { ...on, branch: undefined, detached: true, clean: true, onBranch: true };
+  assert.equal(heldWorktree(on), null, 'what it holds uncommitted is handed off onto its branch');
+  assert.deepEqual(heldWorktree({ ...on, locked: '', clean: null }), { locked: '' });
+  assert.deepEqual(heldWorktree({ ...detached, locked: 'mine' }), { locked: 'mine' });
+  assert.deepEqual(heldWorktree({ ...detached, clean: null }), { detached: 'abc' }, 'its status not read: held');
+  assert.deepEqual(heldWorktree({ ...detached, onBranch: false }), { detached: 'abc' }, 'a commit on no branch');
+  assert.deepEqual(heldWorktree({ ...detached, clean: false }), { detached: 'abc' }, 'a hand-off would commit onto no branch');
+  assert.equal(heldWorktree(detached), null, 'nothing a removal loses');
 });
 
 test("REFUSED at shipped defaults: `branchFates` keeps every branch unless asked; asked, deletes one merged into the base and keeps one that is not unless forced — and never names the base branch, nor a branch of a run whose id starts with this one's", () => {
@@ -7264,10 +7250,11 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
         { branch: 'wf/r-1/fix', deleted: true, why: 'forced' },
         { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
         { branch: 'wf/r-1/odd', deleted: false, why: { git: 'error: it is checked out elsewhere' } },
+        { branch: 'wf/r-1/plan', deleted: false, why: { unread: 'it exited 1' } },
       ],
       unfrozen: 'no workflow folder at /wf/dev',
     }),
-    'r-1  forgotten: 1 worktree was already gone; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; deleted wf/r-1/implement (merged into main), wf/r-1/fix (not merged into main, forced); kept wf/r-1/review: not merged into main — --force-unmerged deletes it, and the work on it; kept wf/r-1/odd: git would not delete it — error: it is checked out elsewhere; its workflow was never frozen, and no workflow folder at /wf/dev',
+    "r-1  forgotten: 1 worktree was already gone; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; deleted wf/r-1/implement (merged into main), wf/r-1/fix (not merged into main, forced); kept wf/r-1/review: not merged into main — --force-unmerged deletes it, and the work on it; kept wf/r-1/odd: git would not delete it — error: it is checked out elsewhere; kept wf/r-1/plan: the place's remove did not answer — it exited 1; nemia rm r-1 again deletes it once it does; its workflow was never frozen, and no workflow folder at /wf/dev",
   );
   assert.equal(
     forgetLine({ ...forgotten, isolate: false, removed: [], handedOff: [], branches: [], files: ['runs/r-1.json'] }),
@@ -7282,10 +7269,15 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       removed: ['/wf/worktrees/r-1/review'],
       files: [],
       left: [
-        { path: '/wf/worktrees/r-1/implement', locked: 'a person holds it' },
+        {
+          path: '/wf/worktrees/r-1/implement',
+          locked: 'a person holds it',
+          fix: 'git -C /repo worktree unlock /wf/worktrees/r-1/implement',
+        },
         {
           path: '/wf/worktrees/r-1/fix',
           git: "fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it",
+          fix: 'git -C /wf/worktrees/r-1/fix status',
         },
         { path: '/wf/worktrees/r-1/stray', unknown: true },
       ],
@@ -7301,16 +7293,23 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       removed: [],
       files: [],
       left: [
-        { path: '/wf/worktrees/r-1/implement', detached: '9d2bd34db7ead0116fa7062827675f3a801e940d' },
+        {
+          path: '/wf/worktrees/r-1/implement',
+          detached: '9d2bd34db7ead0116fa7062827675f3a801e940d',
+          fix: 'git -C /wf/worktrees/r-1/implement switch -c <branch>',
+        },
         {
           path: '/wf/worktrees/r-1/review',
           step: 'review',
           uncommitted: 'lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1)',
+          fix: 'git -C /wf/worktrees/r-1/review commit',
         },
+        { path: '/wf/worktrees/r-1/fix', step: 'fix', unread: { verb: 'handoff', said: 'it did not answer within 120s' } },
       ],
     }),
     'r-1  not forgotten: /wf/worktrees/r-1/implement is on no branch — its HEAD is detached at 9d2bd34, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C /wf/worktrees/r-1/implement switch -c <branch>, or finish or abort what left it there), then nemia rm r-1 again; ' +
-      '/wf/worktrees/r-1/review holds what review left uncommitted, and the hand-off could not commit it — lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C /wf/worktrees/r-1/review commit), then nemia rm r-1 again. Its record, files and branches are kept until every worktree is gone: nemia rm r-1 again then.',
+      '/wf/worktrees/r-1/review holds what review left uncommitted, and the hand-off could not commit it — lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C /wf/worktrees/r-1/review commit), then nemia rm r-1 again; ' +
+      "/wf/worktrees/r-1/fix is left as it is: the place's handoff did not answer — it did not answer within 120s. nemia rm r-1 again once it does. Its record, files and branches are kept until every worktree is gone: nemia rm r-1 again then.",
   );
 
   assert.equal(
@@ -7332,6 +7331,13 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
   assert.equal(
     forgetLine({ ...missing, files: ['runs/r-9.asks/', 'runs/r-9.cancelled'] }),
     'r-9  no such run — nothing to forget but what was left under its id: removed runs/r-9.asks/, runs/r-9.cancelled',
+  );
+  assert.equal(
+    forgetLine({
+      ...missing,
+      left: [{ path: '/wf/worktrees/r-9', orphaned: true, fix: 'git worktree list in their repository, and git worktree remove each' }],
+    }),
+    'r-9  no such run — nothing to forget; /wf/worktrees/r-9 is still there, and with no record nemia rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each',
   );
 });
 

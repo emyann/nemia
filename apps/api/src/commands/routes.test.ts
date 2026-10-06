@@ -364,6 +364,79 @@ test("REFUSED at shipped defaults: a try whose worktree git will not remove — 
   assert.ok(fs.existsSync(worktree), 'and the worktree');
 });
 
+/** A git repository at `repo` with one commit on `main`; git with a fixed identity and no hook or signing, in it. */
+function aGitRepo(repo: string) {
+  const git = (...args: string[]) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+      { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    ).trim();
+  git('init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'README.md'), '# app\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  return git;
+}
+
+/** A try of one step, `implement`, signed off and handed off, on `repo`: with its clean worktree on its branch when `repo` is git's. */
+function aGitTry(id: string, repo: string, git?: ReturnType<typeof aGitRepo>): string {
+  const worktree = path.join(root, 'worktrees', id, 'implement');
+  if (git) git('worktree', 'add', '-q', '-b', `wf/${id}/implement`, worktree);
+  signedOff(`${id}-implement`, DONE);
+  runRecord(
+    id,
+    [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
+    { implement: { taskId: `${id}-implement`, workspace: worktree, branch: `wf/${id}/implement`, handedOff: `${id}-implement` } },
+    { repo, workspace: repo, baseRef: git ? git('rev-parse', 'HEAD') : 'abc123', workflowDir: path.join(triesDir(root), 'scribe') },
+  );
+  return worktree;
+}
+
+/** What `nemia rm <id>` answers for one run, as the CLI asks the entry once for each run it is given. */
+function rmTyped(id: string) {
+  const command = entry('rm');
+  const args = parseArgv(command.spec, [id]);
+  assert.ok(args && command.check?.(args) == null, `nemia rm ${id} passes its check`);
+  return runWith(engine(), command.handler({ ...args, runId: id }));
+}
+
+test('a try removed on its route answers what `nemia rm` answers: removed, its worktree gone through its place, its branch kept, and what the engine forgot', async () => {
+  const repo = fs.mkdtempSync(path.join(root, 'repo-'));
+  const git = aGitRepo(repo);
+  const cli = aGitTry('r-cli-rm', repo, git);
+  const api = aGitTry('r-api-rm', repo, git);
+  const typed = await rmTyped('r-cli-rm');
+  const res = await remove('r-api-rm');
+  assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
+  const answered = (await res.json()) as Record<string, unknown>;
+  assert.deepEqual(
+    answered,
+    JSON.parse(JSON.stringify({ id: typed.id, removed: typed.removed, engine: typed.engine }).replaceAll('r-cli-rm', 'r-api-rm')),
+  );
+  assert.equal(answered.removed, true);
+  assert.ok(!fs.existsSync(cli) && !fs.existsSync(api), 'both worktrees are gone');
+  assert.equal(git('branch', '--list', 'wf/r-*-rm/implement', '--format=%(refname:short)'), 'wf/r-api-rm/implement\nwf/r-cli-rm/implement');
+  assert.ok(!fs.existsSync(path.join(root, 'runs', 'r-api-rm.json')) && !fs.existsSync(path.join(root, 'runs', 'r-cli-rm.json')));
+});
+
+test("REFUSED at shipped defaults: a try whose repository its place cannot read — no git repository — is a 409 in `nemia rm`'s words, never removed as one with nothing left, and its record kept", async () => {
+  const plain = fs.mkdtempSync(path.join(root, 'plain-'));
+  aGitTry('r-cli-unread', plain);
+  aGitTry('r-api-unread', plain);
+  const typed = await rmTyped('r-cli-unread');
+  const res = await remove('r-api-unread');
+  assert.equal(res.status, 409);
+  const said = ((await res.json()) as { error: string }).error;
+  assert.equal(said, String((typed.forgot as { refusal?: string }).refusal).replaceAll('r-cli-unread', 'r-api-unread'));
+  assert.ok(
+    said.startsWith(`its place's inventory of what it left in ${plain} was not heard — `) && /not a git repository/.test(said),
+    said,
+  );
+  assert.ok(said.endsWith('nothing was touched, as nothing says what is there: nemia rm r-api-unread again once the place reads it'), said);
+  assert.ok(fs.existsSync(path.join(root, 'runs', 'r-api-unread.json')) && fs.existsSync(path.join(root, 'runs', 'r-cli-unread.json')));
+});
+
 test("REFUSED at shipped defaults: a key the route fixes is none of the body's — `yes` sent to a prune is a 400 naming it, and nothing is touched", async () => {
   gatedRun('r-prune-yes');
   const before = fs.readdirSync(path.join(root, 'runs')).sort();

@@ -531,7 +531,6 @@ const PINNED: Record<string, string[]> = {
     'ownNote',
     'ownStatus',
     'parseCloseout',
-    'parseWorktrees',
     'placeOf',
     'pruneAgain',
     'pruneLines',

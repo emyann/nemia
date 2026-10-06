@@ -29,6 +29,11 @@ froze when it started; you need not run them. Each reads one JSON request on std
   order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.
 - `land` — commit the staged merge, or take it back: `{ "checkout", "act": "commit", "message" }` answers `{ "commit" }`, and
   `{ "checkout", "act": "abort" }` answers `{ "aborted": true }`.
+- `inventory` — what a run left, read and touched not at all: `{ "repo", "under", "prefix", "base" }` answers `{ "workspaces",
+  "branches" }`, each worktree git lists inside `under` with its HEAD, branch, lock, whether it is clean and what it holds uncommitted, and
+  each branch under `refs/heads/<prefix>` with whether it is merged into `base`. A `repo` that is no directory answers both empty.
+- `remove` — take it away: `{ "repo", "workspaces", "branches" }` removes each worktree, never forced, prunes git's list, and deletes each
+  branch; it answers `{ "removed", "left", "deleted", "kept" }`, what git would not remove or delete in its words.
 - `export` — a tag's tree written into an empty folder, from git's object store, never a working tree, for `nemia upgrade`:
   `{ "repo", "tag", "into" }` answers `{ "commit" }`. The tree gets an empty repository of its own, nothing committed, so its checks can
   list its files.

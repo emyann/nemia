@@ -79,6 +79,7 @@ const {
   runWith,
 } = await import('../src/runner.ts');
 const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
+const { RunPlace, SHIPPED_PLACE } = await import('../src/place/place.store.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
 const aRun = (id: string, steps: Run['steps']): Run => ({
@@ -5673,6 +5674,22 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
   );
 });
 
+test("REFUSED at shipped defaults: `nemia rm --delete-branches` never deletes a branch its hand-off just committed onto — the inventory read it merged, at its base, before the step's work was committed there — and says it kept it, not merged", async () => {
+  const repo = aRepo();
+  const b = board();
+  const p = await aParent(repo, b, { signed: true });
+  fs.writeFileSync(path.join(p.wt, 'left.txt'), 'left uncommitted\n');
+  const forgot = await runWith(b.e, forgetRun(p.run.id, { deleteBranches: true }));
+  assert.equal(forgot.kind, 'forgotten');
+  assert.deepEqual(
+    forgot.handedOff.map((h) => h.branch),
+    [p.branch],
+  );
+  assert.ok(hasBranch(repo, p.branch), 'the branch with the work the hand-off committed is kept');
+  assert.equal(gitIn(repo, 'show', '--name-only', '--format=', p.branch), 'left.txt');
+  assert.match(forgetLineOf(forgot), new RegExp(`kept ${escaped(p.branch)}: not merged into ${escaped(p.run.branch)}`));
+});
+
 test("`nemia rm --delete-branches` deletes a branch merged into its run's base and keeps one that is not, saying why; `--force-unmerged` beside it deletes that one too; the base branch a `--no-worktree` run worked on is never touched — and the CLI refuses `--force-unmerged` alone, a flag it does not take, and an id that is not a name, before anything is read", async (t) => {
   const repo = aRepo();
   const b = board();
@@ -5948,6 +5965,35 @@ test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-comm
   const forgot = await runWith(b.e, forgetRun(p.run.id));
   assert.deepEqual([forgot.kind, forgot.handedOff], ['forgotten', []]);
   assert.equal(gitIn(repo, 'log', '-1', '--format=%s', p.branch), 'the flag, committed by a person');
+});
+
+/** A copy of the package's place whose `inventory` says `said` on stderr and exits 1, as a place that cannot read its repository does. */
+function placeUnread(said: string): string {
+  const dir = path.join(scratch('wf-store-place-'), 'git');
+  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'scripts', 'inventory.ts'), `process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
+  return dir;
+}
+
+test("REFUSED at shipped defaults: a place whose inventory exits 1 refuses `nemia rm` as not read, never as nothing to remove — its worktree with the step's work, its branch, its record and its cancellation are all still there, and no task is written down to forget", async () => {
+  const repo = aRepo();
+  const b = board();
+  const p = await aParent(repo, b, { work: 'kept.txt' });
+  fs.writeFileSync(path.join(p.wt, 'uncommitted.txt'), 'work\n');
+  markCancelled(p.run.id);
+  const planted = placeUnread('the inventory broke');
+
+  const forgot = await runWith(b.e, forgetRun(p.run.id).pipe(Effect.provideService(RunPlace, () => planted)));
+  assert.equal(forgot.kind, 'refused');
+  assert.equal(
+    forgot.refusal,
+    `its place's inventory of what it left in ${repo} was not heard — the inventory broke; nothing was touched, as nothing says what is there: nemia rm ${p.run.id} again once the place reads it`,
+  );
+  assert.ok(fs.existsSync(path.join(p.wt, 'uncommitted.txt')) && worktreesOf(repo).includes(p.wt), 'the worktree and its work stay');
+  assert.equal(gitIn(repo, 'branch', '--list', p.branch).replace(/^[*+ ]+/, ''), p.branch, 'the branch stays');
+  assert.ok(under('runs', `${p.run.id}.json`) && under('runs', `${p.run.id}.cancelled`), 'the record and its cancellation stay');
+  assert.ok(!under('forgetting', `${p.run.id}.json`), 'no task written down to forget');
+  assert.equal((await runWith(b.e, forgetRun(p.run.id))).kind, 'forgotten', 'the shipped place reads it, and the run is forgotten');
 });
 
 test('REFUSED at shipped defaults: a worktree on no branch — its session stopped with HEAD detached, a commit made there — is held and named with its commit, not removed with the commit on no branch; put on a branch, `nemia rm` again forgets the run and the branch keeps the commit. One detached, clean, at a commit on a branch loses nothing, and is removed', async () => {

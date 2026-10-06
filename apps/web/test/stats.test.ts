@@ -5,6 +5,7 @@ import { StatsSchema, type Stats, type StatsDay } from '../src/lib/api/stats.ts'
 import {
   apiQueryOf,
   byStepOf,
+  columnDrawn,
   HEADLINES,
   marksByDay,
   NONE,
@@ -84,6 +85,13 @@ test('a day nothing measured stays apart from a measured 0: its value is null, i
   assert.equal(rounds.words(null), NONE);
   assert.equal(rounds.words(0), '0');
   assert.equal(seriesOf([day('2026-09-30')], 'rounds').max, null, 'refused: a scale of 0 where nothing was measured');
+});
+
+test('REFUSED: a measured 0 draws a line at the foot of its column, apart from a day nothing measured, which draws nothing', () => {
+  assert.deepEqual(columnDrawn(0, 2), { kind: 'zero' });
+  assert.deepEqual(columnDrawn(null, 2), { kind: 'none' }, 'refused: a line for a day nothing measured');
+  assert.deepEqual(columnDrawn(2, 4), { kind: 'bar', share: 0.5 });
+  assert.deepEqual(columnDrawn(-1, 4), { kind: 'none' }, 'refused: a bar below the foot');
 });
 
 test('each number is worded as wf stats words it', () => {

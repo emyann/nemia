@@ -69,13 +69,13 @@ const answerOf = (listing: FactoryListing): FactoryAnswer =>
  *   (factories/place.ts). Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
-  served(c, async ({ e, env }) => {
+  served(c, async ({ e, env, running }) => {
     const listed = await runWith(e, FACTORY.handler({}));
     return c.json([
       {
         name: DEFAULT_FACTORY,
         default: true,
-        repos: [repoOf(env)],
+        repos: [repoOf(env, running)],
         workflows: null,
         hires: {},
         error: null,

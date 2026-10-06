@@ -8,8 +8,7 @@ import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { unjudgedWord } from '../views/views.verb.ts';
-import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run, unloadedWords } from '../record/record.ts';
-import { unloadedOf } from '../record/steps.store.ts';
+import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { prunedKept } from '../prune/prune.ts';
 import { type BranchReader, branchReader } from '../branches/branches.store.ts';
@@ -263,8 +262,8 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
 }
 
 /**
- * A run judged, or answered off its record (`unjudged`) when its unfrozen folder does not load, as the tick reads it (`unloadedOf`), in
- * the folder's words (`unloadedWords`), or when a task it reads does not (`judgedUnlessUnreadable`).
+ * A run judged, or answered off its record (`unjudged`) when its unfrozen folder does not load or a task it reads does not
+ * (`judgedUnlessUnreadable`).
  */
 const judgedOrNot = Effect.fnUntraced(function* (
   run: Run,
@@ -274,8 +273,6 @@ const judgedOrNot = Effect.fnUntraced(function* (
   git: BranchReader,
   home: string,
 ) {
-  const folder = unloadedOf(run);
-  if (folder !== undefined) return { unjudged: unjudged(run, views, unreadable, unloadedWords(run.id, folder, 'the board'), home) };
   const one = yield* judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git, home));
   return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable, home) };
 });

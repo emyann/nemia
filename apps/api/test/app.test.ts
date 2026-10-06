@@ -176,6 +176,16 @@ const listed = async (id: string) => {
 /** A run as GET /api/runs/:id answers it. */
 const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
 
+/** That run `id`'s page and its decision are refused as the list leaves it unjudged, in the list's words. */
+const saysAsListed = async (id: string) => {
+  const { unreadable } = await listed(id);
+  assert.ok(unreadable, `${id} is unjudged on the list`);
+  for (const route of [`/api/runs/${id}`, `/api/runs/${id}/decision`]) {
+    const res = await app.request(route);
+    assert.deepEqual([res.status, ((await res.json()) as { error?: string }).error], [502, unreadable], `${route} says what the list says`);
+  }
+};
+
 test('health answers', async () => {
   const res = await app.request('/api/health');
   assert.equal(res.status, 200);
@@ -597,118 +607,17 @@ test('the api words a step as list does — `unknown` for a task the engine has 
   }
 });
 
-test('a run whose workflow folder is gone still answers, from its record', async () => {
+test('a run whose workflow folder is gone, and froze none, is answered unjudged: its list off its record, its page and decision in its words', async () => {
   const gone = path.join(NOWHERE, 'no-such-workflow');
   writeRun({ ...r2, id: 'r-3', workflowDir: gone });
 
-  const res = await app.request('/api/runs/r-3');
-  assert.equal(res.status, 200);
-  const run = (await res.json()) as RunDetail;
-  assert.ok(run.warning);
-  assert.match(run.warning, /is gone/);
-  assert.ok(run.warning.includes(gone), run.warning);
-  assert.match(run.warning, /without their spec or prose/);
+  const listing = await listed('r-3');
   assert.deepEqual(
-    run.graph,
+    listing.graph,
     { roots: ['implement', 'review'], edges: [] },
     'a record with no frozen workflow and its folder gone: nothing says what waits on what, so every step is a root',
   );
-  assert.deepEqual((await listed('r-3')).graph, run.graph);
-  assert.deepEqual(run.waitingOnYou, ['implement']);
-  const implementTry = {
-    taskId: 't-2',
-    status: 'succeeded · BLOCKED',
-    check: null,
-    closeout: blockedCloseout,
-    unreadable: null,
-    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
-  };
-  const reviewTry = {
-    taskId: null,
-    status: 'waiting',
-    check: null,
-    closeout: null,
-    unreadable: null,
-    attempts: { count: 0, latest: null },
-  };
-  assert.deepEqual(run.steps, [
-    {
-      name: 'implement',
-      spec: null,
-      filed: filedBare,
-      body: null,
-      told: filedBrief('t-2'),
-      layers: null,
-      taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
-      workspace: '/code/app/.wt/r-2/implement',
-      branch: 'wf/r-2/implement',
-      files: [],
-      filesError: null,
-      note: null,
-      roundDue: false,
-      commands: { approve: 'nemia approve r-3 implement', retry: 'nemia retry r-3 implement', say: 'nemia say r-3 implement' },
-      needs: 'Which database?',
-      blockedByHarness: false,
-      waitingFor: null,
-      approve: null,
-      denied: null,
-      gate: null,
-      accepted: null,
-      lastLine: null,
-      said: [],
-      asked: null,
-      ...implementTry,
-      used: {
-        usage: null,
-        used: 'not measured',
-        cost: 'not measured',
-        costUsd: null,
-        apiMs: null,
-        toolMs: null,
-        read: null,
-        peak: null,
-        rebuilt: 0,
-      },
-      spent: null,
-      budget: null,
-      raise: null,
-      tries: firstTry(implementTry),
-      timeline: settledTimeline('t-2'),
-    },
-    {
-      name: 'review',
-      spec: null,
-      filed: null,
-      body: null,
-      told: null,
-      layers: null,
-      taskParts: null,
-      workspace: null,
-      branch: null,
-      files: [],
-      filesError: null,
-      note: null,
-      roundDue: false,
-      commands: { approve: 'nemia approve r-3 review', retry: 'nemia retry r-3 review', say: 'nemia say r-3 review' },
-      needs: null,
-      blockedByHarness: false,
-      waitingFor: null,
-      approve: null,
-      denied: null,
-      gate: null,
-      accepted: null,
-      lastLine: null,
-      said: [],
-      asked: null,
-      ...reviewTry,
-      used: null,
-      spent: null,
-      budget: null,
-      raise: null,
-      tries: firstTry(reviewTry),
-      timeline: [],
-    },
-  ]);
+  await saysAsListed('r-3');
 
   const unjudged = (listing: RunSummary, why: string) => {
     const said = listing.unreadable ?? '';
@@ -1420,11 +1329,12 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
     assert.equal(summary.stoppedOn, stoppedOn, `${id} stopped on: ${why}`);
     assert.equal((await detailOf(id)).status, status, `${id} in full: ${why}`);
   }
-  assert.deepEqual(
-    [(await listed('r-3')).status, (await detailOf('r-3')).status],
-    ['running', 'cancelled'],
-    'called off, its folder gone and no workflow frozen: listed as the tick leaves it, unjudged; its page judged from its record',
+  assert.equal(
+    (await listed('r-3')).status,
+    'running',
+    'called off, its folder gone and no workflow frozen: unjudged, as the tick leaves it',
   );
+  await saysAsListed('r-3');
 });
 
 test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
@@ -1503,13 +1413,13 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
     assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
   }
-  const [summary, detail] = [await listed('r-26'), await detailOf('r-26')];
+  const summary = await listed('r-26');
   assert.deepEqual(
-    [summary.status, summary.moving, detail.status, detail.moving],
-    ['running', true, 'failed', false],
-    'a record with no frozen workflow, its folder gone and not called off: listed as the tick leaves it, unjudged and in flight; its ' +
-      'page judged from its record, where its bare review reads as ready and nothing files it',
+    [summary.status, summary.moving],
+    ['running', true],
+    'a record with no frozen workflow, its folder gone and not called off: unjudged and in flight, as the tick leaves it',
   );
+  await saysAsListed('r-26');
 });
 
 test('a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you', async () => {

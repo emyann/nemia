@@ -47,6 +47,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     context: null,
     after: ['design'],
     workspace: null,
+    place: null,
     resume: null,
     permissionMode: 'dontAsk',
     sandbox: null,

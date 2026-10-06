@@ -91,10 +91,10 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
  *
  * The context is the session's window as the step writes it — `200k` — and the model's whole window where neither the step nor the try has
- * one. `workspace` is a row only where the step says it (`main`, the repository's own checkout rather than a worktree of the run's): a
- * detail from an api that does not carry the key has none. `loop` and `rounds`, the edge back and how many rounds it may run, are rows
- * beside `after` on a looping step only. A codex step's fence is its sandbox, which the engine's task files as its permission mode: the
- * same row, under Codex's name (`fenceLabel`).
+ * one. `workspace` is a row only where the step says it (`main`, the repository's own checkout rather than a worktree of the run's), and
+ * `place` only where it says `folder` (`placeRows`): a detail from an api that does not carry the key has none. `loop` and `rounds`, the
+ * edge back and how many rounds it may run, are rows beside `after` on a looping step only. A codex step's fence is its sandbox, which the
+ * engine's task files as its permission mode: the same row, under Codex's name (`fenceLabel`).
  */
 export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> =>
   isRemote(spec, filed)
@@ -106,6 +106,7 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
         ['context', ranWith(tokensWord(spec.context), filed, (f) => tokensWord(f.contextTokens), "model's whole window")],
         ['after', spec.after.length ? code(spec.after.join(', ')) : null],
         ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
+        ...placeRows(spec),
         ...(spec.loop === null
           ? []
           : ([
@@ -118,14 +119,17 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
         ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
       ];
 
+/** The `place` row of a step that works in a folder the run makes: none for one on a repository, which every step was before the key. */
+const placeRows = (spec: StepSpec): Array<[string, ReactNode]> => (spec.place === 'folder' ? [['place', code(spec.place)]] : []);
+
 /** A step on a remote A2A agent: its harness names one (`a2a:<name>`), or the api says its try was sent to one. */
 const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
 
 /**
- * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, the
- * deadline. No model, effort, context, fence, tools or resume: the agent runs as its own party configured it, and a
- * `harness's own · default` row there would say the run chose what nobody here chose. The address is the store's current word; where the
- * store does not declare the agent, it says so.
+ * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, `place`,
+ * the deadline. No model, effort, context, fence, tools or resume: the agent runs as its own party configured it, and a `harness's own ·
+ * default` row there would say the run chose what nobody here chose. The address is the store's current word; where the store does not
+ * declare the agent, it says so.
  */
 function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, ReactNode]> {
   const address = filed?.remote === undefined || filed.remote === null ? null : (filed.remote.address ?? 'no longer in a2a-agents.json');
@@ -134,6 +138,7 @@ function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, Rea
     ['agent', filed?.remote?.address ? code(address) : address],
     ['after', spec.after.length ? code(spec.after.join(', ')) : null],
     ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
+    ...placeRows(spec),
     ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
   ];
 }

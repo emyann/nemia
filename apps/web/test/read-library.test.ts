@@ -1,8 +1,8 @@
 /**
  * The library's reads decode the api's answers where they enter (`get`): the agents, the skills, the workflows and a step's page, the
  * builder's form, the repository and the machines. Each reads back what the api gave; each refuses an answer it does not read, at the key,
- * with the fix; a key the board does not know is dropped, and one the api leaves out stays out. A step's `workspace` and `slot` are read,
- * so a save of the builder puts them back.
+ * with the fix; a key the board does not know is dropped, and one the api leaves out stays out. A step's `place`, `workspace` and `slot`
+ * are read, so a save of the builder puts them back.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -120,6 +120,20 @@ test("a listed step's workspace and slot are read, so the builder's save puts th
     ['workspace', 'slot', 'effort'],
   );
   assert.deepEqual(form.remote.refuses, ['tools', 'workspace']);
+});
+
+test("a listed step's place is read; REFUSED: a step that says `workspace: folder`, the former spelling the api no longer sends", async (t) => {
+  const [step] = workflow().steps;
+  const folder = { ...step, spec: { ...step.spec, place: 'folder' as const, workspace: null } };
+  answering(t, [workflow({ steps: [folder] })]);
+  const [listed] = await readWorkflows();
+  assert.equal(listed.steps[0].spec.place, 'folder');
+
+  answering(t, [workflow({ steps: [{ ...folder, spec: { ...folder.spec, place: null, workspace: 'folder' as never } }] })]);
+  await assert.rejects(readWorkflows(), unread('/api/workflows', '[0].steps[0].spec.workspace', '"folder", where'));
+
+  answering(t, [workflow({ steps: [{ ...folder, spec: { ...folder.spec, place: 'cloud' as never } }] })]);
+  await assert.rejects(readWorkflows(), unread('/api/workflows', '[0].steps[0].spec.place', '"cloud", where'));
 });
 
 test('the step keys the board reads are every key of a step it reads, no fewer and no more', () => {

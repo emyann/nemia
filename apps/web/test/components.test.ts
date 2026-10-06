@@ -763,6 +763,7 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
     context: null,
     after: ['implement'],
     workspace: null,
+    place: null,
     resume: null,
     permissionMode: null,
     sandbox: null,
@@ -1082,6 +1083,7 @@ const unset: WorkflowStepSpec = {
   resume: null,
   input: [],
   workspace: null,
+  place: null,
   writable: [],
   reads: [],
   slot: null,
@@ -1980,6 +1982,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     context: null,
     after: [],
     workspace: null,
+    place: null,
     resume: null,
     permissionMode: null,
     sandbox: null,
@@ -2148,6 +2151,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
     context: null,
     after: ['draft'],
     workspace: null,
+    place: null,
     resume: null,
     permissionMode: null,
     sandbox: null,
@@ -2933,6 +2937,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
       after: ['review'],
       context: null,
       workspace: 'main',
+      place: null,
       resume: null,
       permissionMode: null,
       sandbox: null,
@@ -3146,6 +3151,16 @@ test("a step's facts say `workspace` only where the step says it: the step that 
     'nor a detail from an api without the key',
   );
   assert.ok(!implement.spec, 'and the work of this fixture has no spec at all, which is not a row either');
+});
+
+test("a step's facts say `place` only for a step in a folder the run makes, on a remote agent too: none for a step on a repository", () => {
+  const [, ship] = endingRun().steps;
+  const placeOf = (spec: StepSpec) => specRows(spec).find(([key]) => key === 'place')?.[1];
+  const inFolder = { ...ship.spec!, workspace: null, place: 'folder' };
+  assert.equal(renderToStaticMarkup(createElement(Facts, { rows: [['place', placeOf(inFolder)]] })).includes('>folder</span>'), true);
+  assert.ok(placeOf({ ...inFolder, harness: 'a2a:scribe' }), 'a remote step in a folder says it too');
+  assert.equal(placeOf({ ...inFolder, place: 'git' }), undefined, 'a step that says `place: git` works where every step did before');
+  assert.equal(placeOf({ ...inFolder, place: null }), undefined, 'nor one without the line');
 });
 
 test("the gate's own words at an ending: the approval's box says the step is handed them, and the word taken names the step it was about", () => {
@@ -6274,7 +6289,7 @@ async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const form = keyForm({
     keys: [
-      { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main', 'folder'], byHarness: null },
+      { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main'], byHarness: null },
       { key: 'disallowedTools', meaning: 'What it may never run.', kind: 'list', choices: null, byHarness: null },
       { key: 'agent', meaning: 'Who it is.', kind: 'choice', choices: ['writer'], byHarness: null },
     ],

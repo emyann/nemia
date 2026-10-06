@@ -89,10 +89,12 @@ export type WorkflowStepSpec = {
   resume: string | null;
   input: string[];
   /**
-   * `workspace: main`: the step runs in the repository's own checkout; `folder`: in a folder the run makes, in a run with no repository.
-   * Null for a step without the line.
+   * `place: folder`: the step works in a folder the run makes, with no git repository; `git`: on branches of a repository. Null for a
+   * step without the line, which works on a repository.
    */
-  workspace: 'main' | 'folder' | null;
+  place: 'git' | 'folder' | null;
+  /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line. */
+  workspace: 'main' | null;
   /** The factory's folders the step may write (`writable:`), by their directory names: empty where it only reads them. */
   writable: string[];
   /** What of the store the step reads and never writes (`reads:`), each by its name (`inbox`, `costs`): empty where it reads none. */
@@ -147,6 +149,7 @@ export const StepKeySchema = Schema.Literals([
   'after',
   'resume',
   'input',
+  'place',
   'workspace',
   'writable',
   'reads',
@@ -185,7 +188,8 @@ export const WorkflowStepSpecSchema = Schema.Struct({
   after: Strings,
   resume: Schema.NullOr(Schema.String),
   input: Strings,
-  workspace: Schema.NullOr(Schema.Literals(['main', 'folder'])),
+  place: Schema.NullOr(Schema.Literals(['git', 'folder'])),
+  workspace: Schema.NullOr(Schema.Literal('main')),
   writable: Strings,
   reads: Strings,
   slot: Schema.NullOr(Schema.Literal('none')),

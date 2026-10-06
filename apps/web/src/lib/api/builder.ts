@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 import { get } from './read.ts';
 import { StepKeySchema, StepSpecPartSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
 
-/** Mirrors `KeyKind` in apps/api/src/workflows/builder.ts: how a key is set on a step's form. */
+/** Mirrors `KeyKind` in apps/api/src/workflows/words.ts: how a key is set on a step's form. */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
 /** Decodes a `KeyKind`. */

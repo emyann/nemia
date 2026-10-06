@@ -162,6 +162,7 @@ const filedBare = {
   permissionMode: null,
   runsIn: { mode: 'workspace-write', by: 'default' },
   remote: null,
+  bridge: null,
   tools: null,
   deadlineSeconds: null,
 };
@@ -2194,6 +2195,7 @@ test("a step says what it runs with: the workflow's effort, context window and t
       permissionMode: null,
       runsIn: { mode: 'auto', by: 'default' },
       remote: null,
+      bridge: null,
       tools: ['Read', 'Grep'],
       deadlineSeconds: null,
     },

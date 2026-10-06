@@ -131,6 +131,7 @@ const pass = (said: Partial<TickReport> = {}): TickReport => ({
   observed: {},
   refused: [],
   unreadable: [],
+  unobserved: [],
   ...said,
 });
 
@@ -795,6 +796,13 @@ test('a cost reads back as written, and REFUSED: half a file, another shape, a p
   const { runs: _runs, tasks: _tasks, queued: _queued, admitted: _admitted, ...older } = COST;
   assert.deepEqual(parsePassCost(JSON.stringify(older)), older, 'a file an older tick wrote, which kept nothing of what it saw, reads');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, queued: 'two' })), undefined, 'REFUSED: what it saw, not a count');
+});
+
+test('a cost reads back with what its pass could not read of a harness, and REFUSED: a reason that is not words', () => {
+  const unobserved = ['harness `claude`: claude agents: timed out'];
+  assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, unobserved })), { ...COST, unobserved });
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, unobserved: [1] })), undefined);
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, unobserved: 'harness `claude`: down' })), undefined);
 });
 
 test('the recent passes keep the last `keep`, the oldest left out first, and an entry that does not read is left out, the file named once', (t) => {

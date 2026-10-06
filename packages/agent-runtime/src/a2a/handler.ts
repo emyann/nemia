@@ -178,12 +178,13 @@ export interface SessionMethods {
    * The sessions the harness lists, each a Task as `listTasks` gives it, told which ones the journal expects: every one of
    * those it lists, and whatever else it lists for no more (`RunnerOps.observeFor`). Answered whole, on no page: its caller
    * is a pass in this process, which reads every task at once. `unread` is every expected name the driver could not look for
-   * this time (`Observation`): neither listed nor gone.
+   * this time (`Observation`): neither listed nor gone. `why` is what each part of the look that failed said, one sentence each,
+   * and empty when every part read.
    */
   observeSessions(
     params: { expected: readonly ExpectedSession[] },
     context: ServerCallContext,
-  ): Promise<{ tasks: Task[]; unread: string[] }>;
+  ): Promise<{ tasks: Task[]; unread: string[]; why: string[] }>;
   /** What the harness's subscription has left, asked of the harness and of no session (`RunnerOps.quota`): one ask each call. */
   harnessQuota(params: Record<string, never>, context: ServerCallContext): Promise<HarnessQuota>;
   /**
@@ -481,7 +482,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   async observeSessions(
     params: { expected: readonly ExpectedSession[] },
     _context: ServerCallContext,
-  ): Promise<{ tasks: Task[]; unread: string[] }> {
+  ): Promise<{ tasks: Task[]; unread: string[]; why: string[] }> {
     if (!this.ops.observeFor) {
       throw new UnsupportedOperationError(
         `the \`${this.harness}\` harness lists its sessions in full, told nothing: list them (listTasks).`,
@@ -490,8 +491,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     if (!Array.isArray(params.expected) || !params.expected.every((e) => typeof e?.name === 'string' && nameParts(e.name))) {
       throw new RequestMalformedError('`expected` is not a list of sessions: send `[{ name }]`, each name `ae/<task>/<n>`, n from 1.');
     }
-    const { seen, unread } = await this.run(this.ops.observeFor(params.expected));
-    return { tasks: [...seen].map(([name, s]) => taskOfSighting(name, s)), unread: [...unread] };
+    const { seen, unread, why } = await this.run(this.ops.observeFor(params.expected));
+    return { tasks: [...seen].map(([name, s]) => taskOfSighting(name, s)), unread: [...unread], why: [...(why ?? [])] };
   }
 
   async harnessQuota(_params: Record<string, never>, _context: ServerCallContext): Promise<HarnessQuota> {

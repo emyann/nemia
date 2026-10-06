@@ -75,6 +75,23 @@ export const journalBytesOf =
     return events.reduce((n, e) => n + Buffer.byteLength(JSON.stringify(e)) + 1, 0);
   };
 
+/** A task's count in `counts`, 0 where it has none. */
+const countOf = (counts: Readonly<Record<string, number>> | undefined, taskId: string): number =>
+  counts && Object.hasOwn(counts, taskId) ? counts[taskId] : 0;
+
+/**
+ * Each task of `ids`' lines in the feed, read once, for a `forget` that removes nothing (`dry`) or one that removes them: off the
+ * store's own count (`feedLines`) when it removes nothing, and `undefined` when it removes them, for the store's `forget` answers
+ * them (`linesByTask`) off the one read it makes; off the whole feed, read and decoded, from a store with no count of its own.
+ */
+const feedCountsOf = (go: Go, ids: readonly string[], dry: boolean) =>
+  Effect.gen(function* () {
+    const counted = yield* go(Effect.map(Journal, (j) => j.feedLines));
+    if (counted) return dry ? yield* go(counted(ids)) : undefined;
+    const { entries } = yield* go(Effect.flatMap(Journal, (j) => j.feed(0)));
+    return Object.fromEntries(ids.map((id) => [id, entries.filter((e) => e.taskId === id).length]));
+  });
+
 /** Whether a session its harness lists is still held: at work, or its process kept (`held`). One listed ended is let go. */
 const stillHeld = (seen: Sighting | undefined): boolean => seen !== undefined && (atWorkState(seen.state) || seen.held === true);
 
@@ -167,16 +184,20 @@ export const forgetVerbOf = (
     for (const taskId of ids) held.push(yield* heldOf(taskId, listed));
     for (const h of held) yield* sessionsHeld(go, h);
     const dry = options?.yes !== true;
-    const { entries } = yield* go(Effect.flatMap(Journal, (j) => j.feed(0)));
+    const before = yield* feedCountsOf(go, ids, dry);
     const tasks: ForgetReport['tasks'] = [];
     for (const h of held) {
       const journalBytes = bytesOf(h.taskId, h.events);
-      const feedLines = entries.filter((e) => e.taskId === h.taskId).length;
-      tasks.push({ taskId: h.taskId, journalBytes, feedLines, sessions: yield* sessionsOf(h, dry) });
+      tasks.push({ taskId: h.taskId, journalBytes, feedLines: countOf(before, h.taskId), sessions: yield* sessionsOf(h, dry) });
     }
     if (dry) return { forgotten: false, tasks } satisfies ForgetReport;
     const feed = yield* go(forgetStore(ids));
-    return { forgotten: true, tasks, ...(feed ? { feed } : {}) } satisfies ForgetReport;
+    const counts = before ?? feed?.linesByTask;
+    return {
+      forgotten: true,
+      tasks: tasks.map((t) => ({ ...t, feedLines: countOf(counts, t.taskId) })),
+      ...(feed ? { feed: { linesForgotten: feed.linesForgotten, bytesBefore: feed.bytesBefore, bytesAfter: feed.bytesAfter } } : {}),
+    } satisfies ForgetReport;
   });
 };
 

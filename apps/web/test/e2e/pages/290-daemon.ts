@@ -37,12 +37,16 @@ export default {
    * start one: the api. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: the dot warns, and the
    * gauges say it stalled, with its silence and the command, each card on the floor beside them clear of the one beneath it and of the
    * panels. Then an api holder silent as long: said by its kind. Then each heard from just now: the dot is ok, the gauges say the api's
-   * own line and no sentence, and the cap is still over the floor. The file is taken back, and the store reads as seeded again.
+   * own line and no sentence, and the cap is still over the floor. Then the api's last pass could not read a harness (`tick-stats.json`'s
+   * `unobserved`): the dot warns, `ticking, harness unread`, its title the api's line and each reason on a line of its own. The files are
+   * taken back, and the store reads as seeded again.
    */
   name: 'daemon',
   route: '/factories/default?bar=gauges',
   expect: async (page) => {
     const file = path.join(store!, 'daemon.json');
+    const stats = path.join(store!, 'tick-stats.json');
+    const seeded = fs.readFileSync(stats, 'utf8');
     if (fs.existsSync(file)) throw new Refused(`the seeded store has no daemon.json — ${file} is there`);
     const line = page.locator('[data-gauges] [data-daemon]');
     const dot = (kind: string, tone: string, why: string) =>
@@ -119,8 +123,22 @@ export default {
         );
         await shoot(what === 'api' ? 'api-fresh' : 'fresh');
       }
+
+      const unobserved = ['harness `claude`: claude agents: timed out', 'harness `codex`: its transcripts folder cannot be listed'];
+      fs.writeFileSync(stats, JSON.stringify({ ...JSON.parse(seeded), at: new Date().toISOString(), unobserved }, null, 2));
+      await reload(page);
+      await dot('ticking', 'warn', "a daemon that ticks while its last pass could not read a harness warns on the bottom bar's dot");
+      const warned = page.locator('footer[data-frame-footer] [data-daemon-dot="ticking"]');
+      await expectVisible(warned.getByText(/^daemon ticking, harness unread$/), 'and says so beside it');
+      const hover = (await warned.getAttribute('title'))?.split(String.fromCharCode(10)) ?? [];
+      const [said = '', ...why] = hover;
+      if (!said.startsWith(`api: ticking, pid ${process.pid}`) || why.join() !== unobserved.join()) {
+        throw new Refused(`the dot's hover says the api's line, then each reason on its own line — ${JSON.stringify(hover)}`);
+      }
+      await shoot('unobserved');
     } finally {
       fs.rmSync(file, { force: true });
+      fs.writeFileSync(stats, seeded);
     }
     await reload(page);
     await expectCount(

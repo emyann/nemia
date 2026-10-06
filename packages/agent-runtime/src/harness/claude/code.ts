@@ -24,6 +24,7 @@ import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
 import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
+import { causeWords } from '../error.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec, type StartEvent } from '../detached/detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 import {
@@ -204,6 +205,12 @@ export const claudeJob: HarnessSpec = {
   resumeCostCarried: true,
 };
 
+/** A part of a look, read: what it answered, or what its failure said (`causeWords`). */
+type Read<A> = { value: A; why?: undefined } | { value?: undefined; why: string };
+
+/** The registry's part of a look that never asked it: nothing listed, nothing unread, nothing failed. */
+const NOTHING_ASKED: Read<Observation> = { value: { seen: new Map<string, Sighting>(), unread: new Set<string>() } };
+
 /** Whether a session id is a job's: the name the engine gave it, where a background session's is Claude Code's own. */
 export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undefined;
 
@@ -236,10 +243,10 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
   const read = <A, E>(look: Effect.Effect<A, E>) =>
     look.pipe(
-      Effect.map((m): A | undefined => m),
-      Effect.catchCause(() => Effect.succeed(undefined)),
+      Effect.map((value): Read<A> => ({ value })),
+      Effect.catchCause((cause) => Effect.succeed<Read<A>>({ why: causeWords(cause) })),
     );
-  const seen = (look: RunnerOps['observe']) => read(look).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
+  const seen = (look: RunnerOps['observe']) => read(look).pipe(Effect.map((m) => m.value ?? new Map<string, Sighting>()));
 
   return {
     spawn: (r) => (r.config?.background ? bg : job).spawn(r),
@@ -259,21 +266,21 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its run file
      * there and unreadable, or the registry once asked, or it left the name unread: listed, its transcript unreadable. A job's name the
      * registry was asked for and does not list, with its run file not there, is absent. The registry is told what it is told
-     * (`observeFor`), so a long-lived attempt's usage is counted from when the journal says it began.
+     * (`observeFor`), so a long-lived attempt's usage is counted from when the journal says it began. What a failed read said is
+     * kept (`why`): a registry row of ours that does not decode, in the words that name the row, its field and the fix.
      */
     observeFor: (expected) =>
-      job.observeFor!(expected).pipe(
-        Effect.map((o): Observation | undefined => o),
-        Effect.catchCause(() => Effect.succeed(undefined)),
+      read(job.observeFor!(expected)).pipe(
         Effect.flatMap((jobs) =>
-          !jobs || expected.some((e) => !jobs.seen.has(e.name))
+          !jobs.value || expected.some((e) => !jobs.value.seen.has(e.name))
             ? read(bg.observeFor!(expected)).pipe(Effect.map((sessions) => ({ jobs, sessions })))
-            : Effect.succeed({ jobs, sessions: { seen: new Map<string, Sighting>(), unread: new Set<string>() } }),
+            : Effect.succeed({ jobs, sessions: NOTHING_ASKED }),
         ),
-        Effect.map(({ jobs, sessions }): Observation => {
+        Effect.map(({ jobs: { value: jobs, ...j }, sessions: { value: sessions, ...s } }): Observation => {
           const seen = new Map([...(jobs?.seen ?? []), ...(sessions?.seen ?? [])]);
           const unread = (name: string) => !seen.has(name) && (!jobs || !sessions || jobs.unread.has(name) || sessions.unread.has(name));
-          return { seen, unread: new Set(expected.map((e) => e.name).filter(unread)) };
+          const why = [j.why, ...(jobs?.why ?? []), s.why, ...(sessions?.why ?? [])].filter((w) => w !== undefined);
+          return { seen, unread: new Set(expected.map((e) => e.name).filter(unread)), ...(why.length ? { why } : {}) };
         }),
       ),
 

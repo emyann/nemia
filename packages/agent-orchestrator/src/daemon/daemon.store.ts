@@ -136,6 +136,7 @@ const isPassCost = Schema.is(
       tasks: Schema.optionalKey(Count),
       queued: Schema.optionalKey(Count),
       admitted: Schema.optionalKey(Count),
+      unobserved: Schema.optionalKey(Schema.Array(Schema.String)),
     }),
     Rest,
   ),

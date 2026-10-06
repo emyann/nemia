@@ -1169,7 +1169,7 @@ unchanged: with no statement it is left to the deadline exactly as before.
 **What that read costs, and why it is kept.** A busy session costs its transcript's mtime and nothing else until that
 has been cold for ninety seconds — which every tool call longer than ninety seconds is, `npm ci` and this repository's
 own suite included. The read that follows is then kept for as long as the transcript stays as it found it, by the same
-mtime machinery a finished session's read uses, so a long call costs one read rather than one per pass: measured on a
+mtime machinery every look's read uses, so a long call costs one read rather than one per pass: measured on a
 39.5 MB transcript, a read is 174–282 ms against 17–60 ms for the mtime. Keeping it changes no answer, because the
 branch is only reached while nothing has been written — which is exactly the condition under which reading again would
 say the same thing.
@@ -1343,10 +1343,10 @@ real runs:
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
-Claude Code's runner reads the statement from the transcript on every idle pass while a session
-works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
-and the start `claude agents` gave it — and only while the transcript has not been written since: its mtime, asked again, equals the one asked just
-before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
+Claude Code's runner reads the statement and the usage from the transcript in one read a look, in any state — a busy
+session's once its transcript is cold, above. What it read it keeps for that attempt only — the row's name, its session, and the start `claude agents` gave it — and
+only while the transcript has not been written since, as a turn writes it: its mtime, a stat (`transcriptWrittenAt`), asked
+again, equals the one asked just before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
 stepped back is read again.
 Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
 final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
@@ -1463,8 +1463,9 @@ Two measured traps shape the transcript count. A response is written as one line
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
 transcript holds its parent's conversation with the parent's timestamps, so only what came after
 the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
-usage rather than a wrong one. A count read from a finished session is kept as its statement is: for
-that start, while the transcript is unchanged. `ae show` prints one line per attempt — when it ran, then what it
+usage rather than a wrong one. A count is kept as the statement is, off the same read: for
+that start, while the transcript is unchanged. So a look at an idle or blocked session, or a long-lived one between turns,
+reads none of its transcript until a turn writes it, and the next look sees what that turn said and spent. `ae show` prints one line per attempt — when it ran, then what it
 consumed, naming what was not measured, and its cost to the cent (`<$0.01` under one: `$0.00` would read as free) — and an
 attempt still running as `running since <start>`. After the cost, what the attempt read by class and its peak context, each named not measured where its runner could not see it. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
 
@@ -2261,7 +2262,10 @@ task: its journal's bytes, its lines in the feed, each session's files, and what
 runtime's to remove (a conversation Claude Code or Codex keeps, the Task a remote agent keeps), named. With it, each
 session's files go through its harness (`RunnerOps.forget`, `forgetSession` across the A2A seam), then the feed's lines and
 the journal in one call to the store (`JournalOps.forget`), the journal last, so a forget cut short is finished by asking
-again. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
+again. The feed is read once either way: the files store counts each task's lines off its raw lines (`feedLines`), and with
+`--yes` its rotation answers the lines it forgot of each (`ForgottenFeed.linesByTask`). So a line of the task that no runtime
+wrote, which a read of the feed skips and the rotation removes, is counted, and a count says what `--yes` removes; a store with
+neither is counted off its feed read whole, decoded lines alone. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
 
 Every guard is asked of every id before anything is removed, and a refusal (`ForgetRefused`, exit 2) ends "nothing was
 forgotten": an id the store does not list; a journal that cannot be read; a task not settled (stop it, let it settle,

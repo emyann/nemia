@@ -3,7 +3,7 @@ import type { Page } from 'playwright';
 import { pick, pickerOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectUncut, expectVisible, idle, Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
-import { FACTORIES, FAKE } from '../seed.ts';
+import { ENDING, FACTORIES, FAKE, SHIPPED } from '../seed.ts';
 import { OUT } from '../world.ts';
 
 /** The headline numbers the page draws as tiles, by the api's key, in its order. */
@@ -34,7 +34,7 @@ type Served = {
   all: {
     days: Array<Record<string, unknown> & { day: string }>;
     tiles: { last: Record<string, unknown> };
-    marks: Array<{ day: string }>;
+    marks: Array<{ day: string; kind: string; name: string; run: string; since: string }>;
     steps: Array<Record<string, unknown> & { step: string; tries: number }>;
   };
 };
@@ -48,6 +48,16 @@ async function served(page: Page, query: string): Promise<Served> {
   const answer = await page.request.get(new URL(`/api/stats?${query}`, page.url()).href);
   if (!answer.ok()) throw new Refused(`GET /api/stats?${query} answers — ${answer.status()}`);
   return (await answer.json()) as Served;
+}
+
+/** The served marks are the seed's one: SHIPPED's `review`, against ENDING's, so the page has a rule and a row to draw. */
+function expectSeedMark(stats: Served, assertion: string): void {
+  const marks = stats.all.marks.map(({ kind, name, run, since }) => ({ kind, name, run, since }));
+  const seeded = [{ kind: SHIPPED.changed.kind, name: SHIPPED.changed.name, run: SHIPPED.id, since: SHIPPED.changed.since }];
+  if (JSON.stringify(marks) !== JSON.stringify(seeded))
+    throw new Refused(
+      `${assertion}: the api serves the seed's one change mark — served ${JSON.stringify(marks)}, seeded ${JSON.stringify(seeded)}`,
+    );
 }
 
 /** Each chart has a column per served day, each holding the day's served value, null kept; and a rule on each day a mark was served. */
@@ -68,13 +78,36 @@ async function expectCharts(page: Page, stats: Served, assertion: string): Promi
       throw new Refused(
         `${assertion}: the ${key} chart draws what the api serves — drew ${JSON.stringify(drawn)}, served ${JSON.stringify(wanted)}`,
       );
-    const marked = new Set(stats.all.marks.map((m) => m.day)).size;
+    const marked = [...new Set(stats.all.marks.map((m) => m.day))];
     await expectCount(
       chart.locator('[data-mark-day]'),
-      marked,
-      `${assertion}: the ${key} chart has a rule on each of the ${marked} days marked`,
+      marked.length,
+      `${assertion}: the ${key} chart has a rule on each of the ${marked.length} days marked`,
     );
+    for (const day of marked)
+      await expectCount(
+        chart.locator(`[data-day="${day}"] [data-mark-day="${day}"]`),
+        1,
+        `${assertion}: the ${key} chart has its rule on ${day}, the day marked`,
+      );
   }
+}
+
+/**
+ * "What changed" has a row per served mark, and the seed's says what changed, links to the run that froze it and names the run before it;
+ * with none served, it says nothing changed.
+ */
+async function expectChanged(page: Page, stats: Served, assertion: string): Promise<void> {
+  const section = page.locator('section[aria-label="What changed"]');
+  await expectCount(section.locator('[data-mark]'), stats.all.marks.length, `${assertion}: a row in What changed for each served mark`);
+  if (!stats.all.marks.length) {
+    await expectVisible(section.getByText('Nothing a run froze changed in this period.'), `${assertion}: What changed says nothing did`);
+    return;
+  }
+  const row = section.locator(`[data-mark="${stats.all.marks[0].day}"]`);
+  await expectVisible(row.locator(`a[href="/runs/${SHIPPED.id}"]`), `${assertion}: the row links to ${SHIPPED.id}, the run that froze it`);
+  await expectVisible(row.getByText(`${SHIPPED.changed.kind} ${SHIPPED.changed.name}`), `${assertion}: the row says what changed`);
+  await expectVisible(row.getByText(ENDING.id), `${assertion}: the row names ${ENDING.id}, the run it is compared with`);
 }
 
 /**
@@ -134,10 +167,11 @@ async function onPhone(page: Page): Promise<void> {
 export default {
   /**
    * The Stats page: the sidebar lights Stats; each tile holds what the api serves for the last 14 days, null kept; each chart a column per
-   * served day of the 28, with a rule on each day marked, skills loaded drawn as a chart with no tile; a row per served step in the skills
-   * loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws each; and a
-   * factory picked in the sidebar's picker keeps the period, is asked for as `ofFactory`, never `factory`, and has no picker of its own
-   * on the page.
+   * served day of the 28, with a rule on each day marked — the seed's one mark, SHIPPED's `review`, on its day — skills loaded drawn as a
+   * chart with no tile; "What changed" a row per mark, linking to the run that froze it, or a line saying nothing did; a row per served
+   * step in the skills loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws
+   * each; and a factory picked in the sidebar's picker keeps the period, is asked for as `ofFactory`, never `factory`, and has no picker
+   * of its own on the page.
    */
   name: 'stats',
   route: '/stats',
@@ -148,6 +182,7 @@ export default {
       'the sidebar lights Stats on its page',
     );
     const month = await served(page, `from=${daysAgo(27)}`);
+    expectSeedMark(month, 'over 28 days');
     await expectCount(page.locator('[data-tile]'), KEYS.length, `a tile for each of the ${KEYS.length} headline numbers`);
     for (const key of KEYS) {
       const value = await page.locator(`[data-tile="${key}"]`).getAttribute('data-value');
@@ -159,6 +194,8 @@ export default {
     await expectUncut(page.locator('[data-tile] [data-words]'), 'every tile says its name and its numbers whole at 1280 wide');
     await expectCharts(page, month, 'over 28 days');
     await photograph(page.locator('section[aria-label="A day at a time"]'), path.join(OUT, `stats-charts-${await themeOf(page)}.png`));
+    await expectChanged(page, month, 'over 28 days');
+    await photograph(page.locator('section[aria-label="What changed"]'), path.join(OUT, `stats-changed-${await themeOf(page)}.png`));
     await expectByStep(page, month, 'over 28 days');
     if ((await byStepLayout(page)) !== 'side by side') throw new Refused('the step tables sit side by side at 1280 wide');
     await photograph(
@@ -171,7 +208,10 @@ export default {
     await every;
     await idle(page);
     await expectVisible(page.locator('[data-period="all"][data-active]'), 'All lit once chosen');
-    await expectCharts(page, await served(page, ''), 'over every day');
+    const all = await served(page, '');
+    expectSeedMark(all, 'over every day');
+    await expectCharts(page, all, 'over every day');
+    await expectChanged(page, all, 'over every day');
 
     await expectCount(page.locator('[data-filter="factory"]'), 0, "the page has no factory picker: the sidebar's picks it");
     const factory = FACTORIES.hiring.name;
@@ -188,7 +228,9 @@ export default {
     if (at.pathname !== '/stats' || at.searchParams.get('factory') !== factory || at.searchParams.get('period') !== 'all')
       throw new Refused(`picked in the sidebar, ${factory} is kept in the address with the period — it is ${at.pathname}${at.search}`);
     await expectVisible(pickerOf(page).getByText(factory, { exact: true }), `the sidebar's picker reads ${factory}`);
-    await expectCharts(page, await served(page, `ofFactory=${encodeURIComponent(factory)}`), `over every day of ${factory}`);
+    const ofFactory = await served(page, `ofFactory=${encodeURIComponent(factory)}`);
+    await expectCharts(page, ofFactory, `over every day of ${factory}`);
+    await expectChanged(page, ofFactory, `over every day of ${factory}`);
     await onPhone(page);
   },
 } satisfies PageSpec;

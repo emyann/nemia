@@ -7,12 +7,20 @@
  * The stream is refused as a whole at the first line of a type the runtime reads that does not decode: one Codex binary prints
  * every session's stream, so an event printed otherwise says its format moved under every session. A refused stream is no absence:
  * `observe` fails, and each Codex session stays unread.
+ *
+ * Its first line is its start, `thread.started`, whose `thread_id` the worker reads as the session's own id (`CODEX_START`).
  */
 import { Result, Schema } from 'effect';
 import { firstRefusal, type Usage } from '../../core/index.ts';
-import type { HarnessOutput } from '../detached/detached.ts';
+import type { HarnessOutput, StartEvent } from '../detached/detached.ts';
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
+/** A thread begun or resumed, which names it: the session's own id, which a resume and the rollout are found by. */
+const ThreadStartedSchema = Schema.Struct({ type: Schema.Literal('thread.started'), thread_id: Schema.NonEmptyString });
+
+/** How a Codex stream's start decodes for the worker (`HarnessSpec.start`): `thread.started`, and its `thread_id`. */
+export const CODEX_START: StartEvent = { event: { type: 'thread.started' }, id: 'thread_id' };
 
 const TurnStartedSchema = Schema.Struct({ type: Schema.Literal('turn.started') });
 
@@ -35,7 +43,13 @@ const ItemStartedSchema = Schema.Struct({ type: Schema.Literal('item.started'), 
 const ItemCompletedSchema = Schema.Struct({ type: Schema.Literal('item.completed'), item: ItemSchema });
 
 /** The events of a Codex `exec --json` stream the runtime reads, in what it reads of each. A field it starts reading is added here. */
-export const CodexEventSchema = Schema.Union([TurnStartedSchema, TurnCompletedSchema, ItemStartedSchema, ItemCompletedSchema]);
+export const CodexEventSchema = Schema.Union([
+  ThreadStartedSchema,
+  TurnStartedSchema,
+  TurnCompletedSchema,
+  ItemStartedSchema,
+  ItemCompletedSchema,
+]);
 
 /** An event of a Codex stream as `CodexEventSchema` decodes it. */
 export type CodexEvent = typeof CodexEventSchema.Type;
@@ -95,6 +109,9 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
 const CODEX_CALL_ITEMS: readonly string[] = ['command_execution', 'file_change'];
 const CODEX_SAID_ITEMS: readonly string[] = ['agent_message'];
 
+/** An event that says what a session consumed: any but its start, which says which thread it is. */
+const consumed = (event: CodexEvent): event is Exclude<CodexEvent, { type: 'thread.started' }> => event.type !== 'thread.started';
+
 type Turn = { input?: number; read?: number; output: number };
 
 /**
@@ -132,7 +149,7 @@ export const codexOutput = (output: string): HarnessOutput => {
   const completed: Turn[] = [];
   const calls = new Set<string>();
   let uncounted = false;
-  for (const event of read.events) {
+  for (const event of read.events.filter(consumed)) {
     if (event.type === 'turn.started') started++;
     else if (event.type === 'turn.completed') completed.push(turnOf(event));
     else if (CODEX_CALL_ITEMS.includes(event.item.type)) calls.add(event.item.id);

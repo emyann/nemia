@@ -2929,7 +2929,7 @@ before the store is taken: `wf up -5` would write an interval the file does not 
 - **A command that files work starts the daemon where none ticks** (`ticks` in the command table, `ensureDaemon` in
   `src/demand/demand.verb.ts`): the store's login service if one is installed, else the daemon it would run, detached, into
   `$WF_ROOT/daemon.log`, waited for up to 60 s and named in one line with `kill <pid>`. It has the service's environment, not the shell's:
-  `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` and `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`. A daemon that ticks is
+  `PORT`, `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` and `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`. A daemon that ticks is
   left alone; `NEMIA_DAEMON_START=off` starts none, and says so.
 - **`wf tick` by hand is refused the same way while a daemon ticks**, with no force: the daemon runs the same pass within its interval,
   and every case a hand tick helps in — the daemon stopped, gone or stalled — already passes. A hand tick never writes the file.

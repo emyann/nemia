@@ -79,7 +79,15 @@ test("the daemon's environment is the service's and the login's: nothing else of
 
 test('the lines name the pid, where it logs, how to stop it, and where the settings it lacks come from', () => {
   const started = startedLine({ pid: 77, entry: '/srv/nemia/apps/api/src/main.ts', root: '/store', log: '/store/daemon.log' });
-  for (const said of ['pid 77', '/store/daemon.log', 'kill 77', 'nemia service install --take-over 77', 'WF_MAX_CONCURRENT', '--env'])
+  for (const said of [
+    'pid 77',
+    '/store/daemon.log',
+    'kill 77',
+    'nemia service install --take-over 77',
+    'PORT',
+    'WF_MAX_CONCURRENT',
+    '--env',
+  ])
     assert.ok(started.includes(said), `${said}: ${started}`);
   const systemd = { system: 'systemd', name: 'nemia', unit: 'nemia.service', home: '/srv/ann', uid: 1000 } as const;
   assert.match(

@@ -34,8 +34,8 @@ and answers `/api` on :8787. The board itself is the web's server: `npm run buil
 `/api` to :8787. `npx wf up` is the same daemon on a machine that serves no board. One store takes one daemon: each refuses the other
 while it ticks, naming its pid. Where none ticks, a command that files work (`nemia start`, `approve`, `retry` and the like) starts it:
 the store's login service if `nemia service install` put one, else the same daemon detached, logging to `$WF_ROOT/daemon.log`, which it
-names with how to stop it. That daemon has the service's environment, not your shell's: settings such as `WF_MAX_CONCURRENT`,
-`WF_MAX_RUNS` or `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`. `NEMIA_DAEMON_START=off` turns the start off.
+names with how to stop it. That daemon has the service's environment, not your shell's: settings such as `PORT` (8787 by default),
+`WF_MAX_CONCURRENT`, `WF_MAX_RUNS` or `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`. `NEMIA_DAEMON_START=off` turns the start off.
 
 ## No build step, except the web app
 

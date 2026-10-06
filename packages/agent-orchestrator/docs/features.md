@@ -2236,7 +2236,7 @@ A person typed `nemia start` on a store nothing ticked, and the run waited, said
   with the service's environment: `WF_ROOT`, its `PATH` and the login's own keys, nothing else of the shell. It waits for the lease up to
   60 s, read every 200 ms, and ends early if the child exits. A daemon that holds the lease is left alone, and nothing is said.
 - **One line says what it did**: the pid, what it runs, where it logs, `kill <pid>` and `nemia service install --take-over <pid>`, and
-  that `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` or `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`, since the shell's are
+  that `PORT`, `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` or `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`, since the shell's are
   not passed on; or the service's journal and its stop; or, where nothing came up, why, and that the command went on. Nothing is thrown.
 - **`NEMIA_DAEMON_START=off` starts nothing and says so**: set in Nemia's settings (`nemiaSettings`), so a `nemia` she types never starts
   a second kind of daemon beside the one that keeps her, and in every test process (`test/ambient.ts`, the api's `test/harness.ts`).

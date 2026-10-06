@@ -52,8 +52,8 @@ export function daemonEnv(env: Readonly<Record<string, string | undefined>>, roo
 
 /** What the started daemon is not given, and where it would come from. */
 const ENV_WORDS =
-  "it runs with the service's environment (WF_ROOT, PATH and the login's): settings such as WF_MAX_CONCURRENT, WF_MAX_RUNS or " +
-  'OTEL_EXPORTER_OTLP_ENDPOINT come from nemia service install --env';
+  "it runs with the service's environment (WF_ROOT, PATH and the login's): settings such as PORT, WF_MAX_CONCURRENT, WF_MAX_RUNS " +
+  'or OTEL_EXPORTER_OTLP_ENDPOINT come from nemia service install --env';
 
 /** Said once a daemon this command spawned holds the store: its pid, what it runs, where it logs, how to stop or keep it. */
 export const startedLine = (s: { pid: number; entry: string; root: string; log: string }): string =>

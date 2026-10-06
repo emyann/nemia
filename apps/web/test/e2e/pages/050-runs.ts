@@ -165,6 +165,7 @@ export default {
       deciding.locator(`li a[href="/runs/${UNMERGED.id}"] [data-to-decide="result"]`, { hasText: `to decide: ${UNMERGED.said}` }),
       'the row of a finished run whose branch nobody merged says so, and names wf decide',
     );
+    await expectCount(page.locator('[data-to-decide="git"]'), 0, 'and no row says its kind in the old word, git');
     await expectCount(
       finished.locator(`li a[href="/runs/${SHIPPED.id}"]`),
       1,

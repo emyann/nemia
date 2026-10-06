@@ -356,6 +356,7 @@ export default {
       unmerged.locator('[data-to-decide="result"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
       'its card says the branch is ahead, a link to where it is decided',
     );
+    await expectCount(page.locator('[data-to-decide="git"]'), 0, 'and no card on the floor says its kind in the old word, git');
     await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
     await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
     await expectCount(

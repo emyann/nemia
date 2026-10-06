@@ -50,7 +50,7 @@ test("a step's file is read off the run the store lists, never off a path made o
   const started = await Effect.runPromise(startRun({ brief: 'files', repo: aRepo(), workflowDir: oneStep() }));
   const dir = path.join(ROOT, 'runs', started.id, 'artifacts', 'implement');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'notes.md'), '---\nplace: git\n---\nnotes');
+  fs.writeFileSync(path.join(dir, 'notes.md'), 'notes');
   const asked = { step: 'implement', name: 'notes.md' };
   assert.equal((await runWith(NO_ENGINE, STEP_ARTIFACT.handler({ id: started.id, ...asked }))).file?.toString(), 'notes');
   assert.deepEqual(await runWith(NO_ENGINE, STEP_ARTIFACT.handler({ id: `x/../${started.id}`, ...asked })), { file: null });

@@ -47,8 +47,8 @@ const aRepo = (): string => {
 const planned = (keys: { plan?: string; implement?: string; review?: string } = {}) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   const write = (name: string, after: string | null, lines = '') => {
-    const front = [...(after ? [`after: ${after}`] : []), ...(lines ? [lines] : [])];
-    fs.writeFileSync(path.join(dir, `${name}.md`), `${front.length ? `---\n${front.join('\n')}\n---\n` : ''}${name} it\n`);
+    const front = [...(after ? [`after: ${after}`] : []), 'place: git', ...(lines ? [lines] : [])];
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${front.join('\n')}\n---\n${name} it\n`);
   };
   write('plan', null, keys.plan);
   write('implement', 'plan', keys.implement);

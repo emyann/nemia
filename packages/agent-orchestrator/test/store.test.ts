@@ -45,8 +45,8 @@ const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 fs.mkdirSync(WORKFLOW, { recursive: true });
-fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), 'implement it\n');
-fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
@@ -495,7 +495,7 @@ const FORGOT_ONE = '; the engine forgot 1 task of it (1.0 KB of journal, 2 feed 
 /** A workflow folder: `implement`, with whatever frontmatter it is given, and `review` after it. */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `${implementKeys ? `---\n${implementKeys}\n---\n` : ''}implement it\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${implementKeys ? `${implementKeys}\n` : ''}---\nimplement it\n`);
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   return dir;
 };

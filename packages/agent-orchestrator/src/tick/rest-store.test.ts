@@ -58,7 +58,7 @@ const aRepo = (): string => {
 const folder = (...steps: string[]) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   steps.forEach((name, k) =>
-    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n${k ? `after: ${steps[k - 1]}\n` : ''}---\n${name} it\n`),
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\nharness: codex\n${k ? `after: ${steps[k - 1]}\n` : ''}---\n${name} it\n`),
   );
   return dir;
 };

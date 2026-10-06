@@ -59,7 +59,7 @@ const aRepo = (): string => {
 /** A workflow of one step, `implement`, whose closeout names a file it leaves in its workspace — with a `budget:`, when given one. */
 const oneStep = (budget?: number) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `${budget === undefined ? '' : `---\nbudget: ${budget}\n---\n`}implement it\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${budget === undefined ? '' : `budget: ${budget}\n`}---\nimplement it\n`);
   return dir;
 };
 
@@ -289,7 +289,7 @@ test('REFUSED at shipped defaults: a worktree with a change no commit has — un
   for (const change of ['untracked', 'modified'] as const) {
     const b = board();
     const { run, wt } = await aFinished(b, { merged: true });
-    if (change === 'untracked') fs.writeFileSync(path.join(wt, 'notes.md'), '---\nplace: git\n---\nnotes\n');
+    if (change === 'untracked') fs.writeFileSync(path.join(wt, 'notes.md'), 'notes\n');
     else fs.appendFileSync(path.join(wt, 'README.md'), 'more\n');
     const refused = await runWith(b.e, prune(run.id, { yes: true }));
     assert.equal(refused.kind, 'refused', change);
@@ -871,7 +871,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   kept(atGate.id, gateShot);
 
   const dirty = await aFinished(b, { merged: true });
-  fs.writeFileSync(path.join(dirty.wt, 'notes.md'), '---\nplace: git\n---\nnotes\n');
+  fs.writeFileSync(path.join(dirty.wt, 'notes.md'), 'notes\n');
   const dirtyShot = aShot(dirty.run.id);
   assert.match(
     (await runWith(b.e, prune(dirty.run.id, { artifacts: true, yes: true }))).refusal!,

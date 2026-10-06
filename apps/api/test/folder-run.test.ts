@@ -64,7 +64,7 @@ fs.writeFileSync(
   path.join(root, 'runs', 'f-notes.json'),
   JSON.stringify({
     id: 'f-notes',
-    /** A folder run whose one step signed off: its record as `nemia start` writes one, with `place` and none of a repository run's fields. */
+    /** A folder run whose one step signed off: its record as `nemia start` writes one, with `place`, none of a repository run's fields. */
     place: { kind: 'folder' },
     workspace: work,
     brief: 'Write a note.',

@@ -115,15 +115,10 @@ export type Closer = {
  * pass's notes, which each filing adds to in the order it runs, and `heads`, every branch of the run's repository and its commit as the
  * pass read them, undefined where it did not.
  */
-export type Filing = {
-  e: Engine;
-  run: Run;
-  reads: PassReads;
-  closer: Closer;
-  mayFile: () => boolean;
-  notes: string[];
-  heads?: () => Readonly<Record<string, string>> | undefined;
-};
+export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[]; heads?: Heads };
+
+/** Every branch of a run's repository and its commit, read when first asked, as a pass read them; undefined where it did not. */
+export type Heads = () => Readonly<Record<string, string>> | undefined;
 
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
 const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);

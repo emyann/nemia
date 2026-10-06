@@ -60,7 +60,7 @@ export function readStanding(): StandingFile | undefined {
     return undefined;
   }
   const decoded = Schema.decodeUnknownResult(StandingFileSchema)(json);
-  return Result.isSuccess(decoded) ? (decoded.success as StandingFile) : undefined;
+  return Result.isSuccess(decoded) ? decoded.success : undefined;
 }
 
 /**

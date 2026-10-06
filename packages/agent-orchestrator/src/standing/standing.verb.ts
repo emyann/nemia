@@ -62,16 +62,19 @@ function asksOf(runs: readonly Run[], placeOf: PassStanding['placeOf']): Ask[] {
   for (const run of runs) {
     if (!isGitRun(run)) continue;
     askOf(run);
-    for (const id of waitedOn(run)) {
-      const parent = byId.get(id);
-      const ask = parent && isGitRun(parent) && !parent.cancelledAt ? askOf(parent) : undefined;
-      for (const branch of ask ? branchesOf(parent!) : []) {
-        const tip = parent!.tips?.[branch];
-        ask!.branches.set(branch, { branch, baseRef: (parent as GitRun).baseRef, ...(tip ? { tip } : {}) });
-      }
+    for (const parent of waitedOn(run).map((id) => byId.get(id))) {
+      if (parent && isGitRun(parent) && !parent.cancelledAt) askedOf(askOf(parent), parent);
     }
   }
   return [...asks.values()];
+}
+
+/** `ask`, where there is one, asked of each result branch of `parent` too, with the tip it recorded and the commit it was cut at. */
+function askedOf(ask: Ask | undefined, parent: GitRun): void {
+  for (const branch of ask ? branchesOf(parent) : []) {
+    const tip = parent.tips?.[branch];
+    ask!.branches.set(branch, { branch, baseRef: parent.baseRef, ...(tip ? { tip } : {}) });
+  }
 }
 
 /** The environment a `standing` runs in: this process's, with node's compile cache on, which more than halves the script's start. */

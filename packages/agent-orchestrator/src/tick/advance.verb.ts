@@ -58,7 +58,7 @@ import { roundsGranted, settledFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type PassReads } from './file.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 
 /**
@@ -598,7 +598,7 @@ function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[
  * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`headsFor`), undefined where it
  * did not, or asked of git where no pass read them (`advanceRun`).
  */
-const headsOf = (run: Run, pass: PassRead | undefined): (() => Readonly<Record<string, string>> | undefined) => {
+const headsOf = (run: Run, pass: PassRead | undefined): Heads => {
   let read: { heads: Readonly<Record<string, string>> | undefined } | undefined;
   return () => {
     if (!isGitRun(run)) return undefined;

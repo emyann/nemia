@@ -9,10 +9,11 @@
  *   `run` declared in one function is not the `run` of another;
  * - **`returns`**: a function whose `return` holds one is tainted too, an arrow's body and a function declaration's alike;
  * - **`named`**: a name imported from `node:fs` or `node:fs/promises` is called as `fs` is, a default, a namespace or a named import;
- * - **`wrappers`**: a call of one of `record.store.ts`'s `fs` wrappers (`WRAPPERS`) hands its first argument to `fs`.
+ * - **`wrappers`**: a call of one of `record.store.ts`'s `fs` wrappers (`WRAPPERS`) hands its first argument to `fs`;
+ * - **`targets`**: an `fs` call that takes two paths (`TWO_PATHS`), a copy, a move or a link, hands `fs` its second argument too.
  *
- * A path is an `fs` call's first argument, and its second for a call that takes two (`TWO_PATHS`): what is written is no path, so a text
- * that names the inbox passes. A file whose path reaches `fs` on purpose is named in `EXCEPTIONS`, through the declarations whose paths
+ * A path is an `fs` call's first argument, and its second under `targets`: what is written is no path, so a text that names the inbox
+ * passes. A file whose path reaches `fs` on purpose is named in `EXCEPTIONS`, through the declarations whose paths
  * may reach it, and why; any other root of that file is still refused, and so is an exception with no why, one whose `through` names no
  * declaration of its file, and one its file is clean without.
  *
@@ -49,10 +50,10 @@ const WRAPPERS = ['lstatOf', 'isDirectory', 'fileNames'];
 /** The `fs` calls whose second argument is a path too. */
 const TWO_PATHS = ['copyFile', 'cp', 'rename', 'link', 'symlink'].flatMap((name) => [name, `${name}Sync`]);
 
-type Rule = 'aliases' | 'propagation' | 'returns' | 'named' | 'wrappers';
+type Rule = 'aliases' | 'propagation' | 'returns' | 'named' | 'wrappers' | 'targets';
 
 /** The parts of the matcher, each of which a fixture proves. */
-const RULES: readonly Rule[] = ['aliases', 'propagation', 'returns', 'named', 'wrappers'];
+const RULES: readonly Rule[] = ['aliases', 'propagation', 'returns', 'named', 'wrappers', 'targets'];
 
 type Exception = { through: readonly string[]; why: string };
 
@@ -199,7 +200,7 @@ function pathArguments(call: ts.CallExpression, fsNames: Bindings['fsNames'], ru
   if (!first) return [];
   if (root && fsNames.has(root.text)) {
     const name = ts.isPropertyAccessExpression(callee) ? callee.name.text : fsNames.get(root.text);
-    return name !== undefined && TWO_PATHS.includes(name) && second ? [first, second] : [first];
+    return rules.includes('targets') && name !== undefined && TWO_PATHS.includes(name) && second ? [first, second] : [first];
   }
   if (rules.includes('wrappers') && ts.isIdentifier(callee) && WRAPPERS.includes(callee.text)) return [first];
   return [];
@@ -319,6 +320,10 @@ const FIXTURES: Readonly<Record<Rule, readonly string[]>> = {
   ],
   wrappers: [
     "import path from 'node:path';\nimport { lstatOf, runsDir } from '../record/record.store.ts';\nlstatOf(path.join(runsDir(), id, 'artifacts'));\n",
+  ],
+  targets: [
+    `${HEAD}fs.copyFileSync(given, path.join(runsDir(), id, 'inputs', 'notes.md'), fs.constants.COPYFILE_EXCL);\n`,
+    "import fsp from 'node:fs/promises';\nimport { inboxDir } from '../record/files.store.ts';\nawait fsp.rename(draft, inboxDir());\n",
   ],
 };
 

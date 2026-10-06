@@ -54,16 +54,16 @@ test('each command is served on the api where it was before the table, the lift 
       [
         'factory instruction',
         [
-          { method: 'GET', path: '/api/factories/:name/instruction', status: 200, hand: true },
-          { method: 'PUT', path: '/api/factories/:name/instruction', status: 200, sets: { clear: false } },
-          { method: 'DELETE', path: '/api/factories/:name/instruction', status: 200, sets: { clear: true } },
+          { method: 'GET', path: '/api/factories/:factory/instruction', status: 200, hand: true },
+          { method: 'PUT', path: '/api/factories/:factory/instruction', status: 200, sets: { clear: false } },
+          { method: 'DELETE', path: '/api/factories/:factory/instruction', status: 200, sets: { clear: true } },
         ],
       ],
       [
         'factory instruct',
         [
-          { method: 'PUT', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: false } },
-          { method: 'DELETE', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: true } },
+          { method: 'PUT', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: false } },
+          { method: 'DELETE', path: '/api/factories/:factory/instruction/words', status: 200, sets: { clear: true } },
         ],
       ],
       ['factory rm', 'cli'],

@@ -2,23 +2,28 @@
  * The deliverer over the feed on disk and an engine of the test's, whose `say` records what each task is told and fails where a test says:
  * a wake line said once, with the digest riding it; a digest said alone once due, and never before; a restart that neither repeats nor
  * drops a line; the cursor held while `say` fails; an unsubscribe that stops delivery; a name subscribed again that starts from its own
- * `from`; and a feed cut under the cursor read again from its start. Each test
+ * `from`; a feed cut under the cursor read again from its start; and a subscription scoped by a floor told only of the runs of factories
+ * at it or above. Each test
  * runs a deliverer of its own and waits for what it counts. A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { Duration, Effect, Fiber, Metric, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 
-process.env.WF_ROOT = scratch('wf-deliver-');
+const ROOT = scratch('wf-deliver-');
+process.env.WF_ROOT = ROOT;
 const { SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deliver.verb.ts');
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
 const { feedFile, feedSize } = await import('../feed/feed.store.ts');
 const { engineOf, over } = await import('../runtime-client.ts');
+const { addFactory } = await import('../factory/factory.store.ts');
+const { writeFactoryLevel } = await import('../level/level.store.ts');
 
 /** What each task was told, in order; how many times each was asked; and the tasks whose `say` fails for now. */
 const told = new Map<string, string[]>();
@@ -222,4 +227,42 @@ test('a feed cut under the cursor is read again from its start', async (t) => {
   await until(() => readDelivery('cut')?.cursor === feedSize(), 'the cursor at the end of the new feed');
   await stop();
   dropSubscription('cut');
+});
+
+/** Writes the run `id`'s record, started in the factory `factory`. */
+function writeRun(id: string, factory: string) {
+  fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
+  const record = {
+    id,
+    workspace: ROOT,
+    brief: `The brief of ${id}`,
+    createdAt: '2026-10-06T08:00:00.000Z',
+    workflowDir: path.join(ROOT, 'no-such-workflow'),
+    place: { kind: 'folder' },
+    workflow: [{ name: 'build', after: [], body: 'Build it.', harness: 'codex' }],
+    steps: {},
+    factory,
+  };
+  fs.writeFileSync(path.join(ROOT, 'runs', `${id}.json`), JSON.stringify(record));
+}
+
+test('REFUSED: a subscription scoped by a floor is told nothing of a run whose factory is below it; one unscoped is told of both', async (t) => {
+  for (const name of ['pipao', 'hkb']) addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+  writeFactoryLevel('hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
+  writeRun('r-pipao', 'pipao');
+  writeRun('r-hkb', 'hkb');
+  const from = feedSize();
+  putSubscription('floored', { task: 't-floored', wake: [...DEFAULT_WAKE], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
+  putSubscription('everything', { task: 't-everything', wake: [...DEFAULT_WAKE], digestEvery: 60, from });
+  const stop = running(t);
+  appended(line('r-pipao', 'running'), line('r-pipao', 'awaiting approval'), line('r-gone', 'awaiting approval'));
+  appended(line('r-hkb', 'awaiting approval'));
+  await until(() => toldTo('t-everything').length === 3, 'every wake said to the one unscoped');
+  await until(() => readDelivery('floored')?.cursor === feedSize(), "the floored one's cursor past every line");
+  assert.equal(toldTo('t-floored').length, 1);
+  assert.match(toldTo('t-floored')[0], /^The feed needs your judgement:\n {2}\S+ {2}r-hkb {2}build {2}awaiting approval$/);
+  assert.deepEqual(readDelivery('floored')?.digest, [], 'a line below the floor is not folded either');
+  await stop();
+  dropSubscription('floored');
+  dropSubscription('everything');
 });

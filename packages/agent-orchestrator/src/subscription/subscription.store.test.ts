@@ -1,7 +1,7 @@
 /**
  * The store's subscriptions on disk: the person's file put once and removed with the deliverer's, the deliverer's written whole and read
- * back, and a file that does not read left out and said, never a stop. `WF_ROOT` is read as the module loads, so it is set before the
- * import.
+ * back, a scope's floor kept, and a file that does not read left out and said, never a stop. `WF_ROOT` is read as the module loads, so it
+ * is set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -121,4 +121,21 @@ test("a deliverer's file that does not read is said and read as not begun, so th
   assert.match(said.join('\n'), /its cursor is -1/);
   assert.equal(readDelivery('never'), undefined, 'none written is none begun, and nothing said');
   fs.rmSync(deliveryFile('odd'));
+});
+
+test('REFUSED: a scope whose floor is no level leaves the subscription out, said; a floor that is one round-trips', () => {
+  putSubscription('floored', { ...SUB, scope: { atLeast: 'semi-auto' } });
+  assert.deepEqual(listSubscriptions(), [{ name: 'floored', subscription: { ...SUB, scope: { atLeast: 'semi-auto' } } }]);
+  fs.writeFileSync(subscriptionFile('unfloored'), JSON.stringify({ ...SUB, scope: { atLeast: 'auto' } }));
+  const { said, say } = saying();
+  assert.deepEqual(
+    listSubscriptions(say).map((s) => s.name),
+    ['floored'],
+  );
+  assert.ok(
+    said.some((l) => l.includes(subscriptionFile('unfloored')) && l.includes('scope.atLeast')),
+    said.join('\n'),
+  );
+  fs.rmSync(subscriptionFile('unfloored'));
+  dropSubscription('floored');
 });

@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { execFileSync } from 'node:child_process';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, runtime } from '../app.ts';
@@ -336,6 +337,46 @@ test('REFUSED: a finished run whose branches no pass has read is not kept, and i
   await aPass();
   assert.equal((await unverified(() => listed('r-unread')))?.toDecide?.kind, 'git', 'read by the pass: ahead of the base');
   assert.ok(resting.runs.has('r-unread'), 'and kept, against the tips the pass read');
+});
+
+/**
+ * How many child processes `f` started, by any of `node:child_process`'s ways, the named imports of every module included
+ * (`syncBuiltinESMExports`): a count the package's own meter does not hold, so a reader that starts one it does not count is counted too.
+ */
+async function processesOf(f: () => Promise<unknown>): Promise<string[]> {
+  const started: string[] = [];
+  const kept = WAYS.map((way) => [way, childProcess[way]] as const);
+  for (const [way, real] of kept)
+    Object.assign(childProcess, {
+      [way]: (...args: unknown[]) => {
+        started.push(`${way} ${String(args[0])}`);
+        return (real as (...a: unknown[]) => unknown)(...args);
+      },
+    });
+  syncBuiltinESMExports();
+  try {
+    await f();
+  } finally {
+    for (const [way, real] of kept) Object.assign(childProcess, { [way]: real });
+    syncBuiltinESMExports();
+  }
+  return started;
+}
+const childProcess = createRequire(import.meta.url)('node:child_process') as typeof import('node:child_process');
+const WAYS = ['spawn', 'spawnSync', 'execFile', 'execFileSync', 'exec', 'execSync', 'fork'] as const;
+
+test('the list and a run page read where branches stand off standing.json, and start no process, with a snapshot or none', async () => {
+  aFinishedRun('r-quiet');
+  await aPass();
+  const read = async () => {
+    await list();
+    const res = await app.request('/api/runs/r-quiet');
+    assert.equal(res.status, 200, await res.clone().text());
+  };
+  assert.deepEqual(await processesOf(read), [], 'off the snapshot');
+  fs.rmSync(path.join(root, 'standing.json'));
+  assert.deepEqual(await processesOf(read), [], 'no snapshot: unread, and still no process');
+  assert.notDeepEqual(await processesOf(aPass), [], 'and a pass, which the count sees, starts one');
 });
 
 test('a run removed from the store leaves the memo', async () => {

@@ -1,7 +1,6 @@
 /**
  * A git run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read back
- * only where it was asked for, the `node_modules` it is given (`workspace.ts` decides, this applies), and `gitSays`, the quiet git read
- * `branches.store.ts` and the tick still make.
+ * only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's

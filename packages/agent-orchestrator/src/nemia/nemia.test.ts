@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
-import { DEMAND_OFF } from '../service/demand.ts';
+import { DEMAND_OFF } from '../demand/demand.ts';
 import {
   NEMIA_WAKE,
   levelRefusal,

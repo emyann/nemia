@@ -4,7 +4,7 @@
  * line alone starts one (`ensureDaemon` in `demand.verb.ts`): the api is the daemon, and Nemia runs under it with the start turned off.
  */
 import { START_WORDS, type DaemonStanding } from '../daemon/daemon.ts';
-import { OWN_KEYS, type ServiceSystem } from './service.ts';
+import { OWN_KEYS, type ServiceSystem } from '../service/service.ts';
 
 /** The setting that turns the start off for a caller: `NEMIA_DAEMON_START=off`, in Nemia's settings and in every test's process. */
 export const DEMAND_OFF = 'NEMIA_DAEMON_START';

@@ -72,7 +72,7 @@ or, run from an install, from `releases/current`. A release is a tag built and c
 and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
 A checkout is refused a store whose pointer names an install, but for `version` and a help, unless `NEMIA_ON_INSTALLED=1`
 (`trialRefusal`, in the CLI's `main` and the api's). Where nothing ticks the store, a command whose work waits on the next pass (`ticks`
-in the command table) starts the daemon before it runs (`ensureDaemon`, `src/service/demand.verb.ts`): the store's login service where
+in the command table) starts the daemon before it runs (`ensureDaemon`, `src/demand/demand.verb.ts`): the store's login service where
 one is installed, else the daemon that service would run, detached, into `$WF_ROOT/daemon.log`; the CLI's `main` alone does, since the
 api is the daemon, and Nemia's session turns it off (`NEMIA_DAEMON_START=off`).
 

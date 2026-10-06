@@ -15,7 +15,7 @@ process.env.WF_ROOT = ROOT;
 const { ensureDaemon, liveDemandHost } = await import('./demand.verb.ts');
 const { daemonStanding, releaseStore, takeStore } = await import('../daemon/daemon.store.ts');
 const { DEMAND_OFF } = await import('./demand.ts');
-const { plistText, unitText } = await import('./service.ts');
+const { plistText, unitText } = await import('../service/service.ts');
 type DemandHost = import('./demand.verb.ts').DemandHost;
 
 const PACKAGE = path.resolve(import.meta.dirname, '..', '..');

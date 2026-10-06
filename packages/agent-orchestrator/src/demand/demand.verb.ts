@@ -23,9 +23,9 @@ import {
   type ServiceNamed,
   type Unstarted,
 } from './demand.ts';
-import { DEFAULT_NAME, plistRead, systemOf, unitName, unitPathOf, unitRead } from './service.ts';
-import { spawnDetached, unitsOf, type SpawnEnded } from './service.store.ts';
-import { liveHost, serviceForUpgrade, type ServiceHost } from './service.verb.ts';
+import { DEFAULT_NAME, plistRead, systemOf, unitName, unitPathOf, unitRead } from '../service/service.ts';
+import { spawnDetached, unitsOf, type SpawnEnded } from '../service/service.store.ts';
+import { liveHost, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
 
 /** What the start reaches of the machine: the service's host, a spawn of the daemon, and the caller's environment. */
 export type DemandHost = ServiceHost & {

@@ -14,10 +14,10 @@ const ROOT = scratch('wf-demand-cli-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { main } = await import('../src/cli/main.ts');
-const { liveDemandHost } = await import('../src/service/demand.verb.ts');
-const { DEMAND_OFF } = await import('../src/service/demand.ts');
+const { liveDemandHost } = await import('../src/demand/demand.verb.ts');
+const { DEMAND_OFF } = await import('../src/demand/demand.ts');
 const { TABLE } = await import('../src/runner.ts');
-type DemandHost = import('../src/service/demand.verb.ts').DemandHost;
+type DemandHost = import('../src/demand/demand.verb.ts').DemandHost;
 
 const NOWHERE = scratch('wf-demand-cli-nowhere-');
 const { [DEMAND_OFF]: _off, ...ON } = process.env;

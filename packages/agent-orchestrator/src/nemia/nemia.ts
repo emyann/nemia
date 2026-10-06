@@ -9,7 +9,7 @@
  */
 import path from 'node:path';
 import { DEFAULT_WAKE } from '../subscription/subscription.ts';
-import { DEMAND_OFF } from '../service/demand.ts';
+import { DEMAND_OFF } from '../demand/demand.ts';
 import { FACTORY_LEVEL_FORM, LEVELS, type Level } from '../level/level.ts';
 
 export { LEVELS, type Level } from '../level/level.ts';

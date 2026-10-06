@@ -2225,7 +2225,7 @@ release holds no repository at all.
 ## Shipped: the daemon started on demand (card 4e, from the command line)
 
 A person typed `nemia start` on a store nothing ticked, and the run waited, said only by a line of `nemia ls`. What was built, in
-`src/service/demand.ts` (pure) and `src/service/demand.verb.ts`:
+`src/demand/demand.ts` (pure) and `src/demand/demand.verb.ts`:
 
 - **The ten commands whose work waits on the next pass declare `ticks`** in the command table — `start`, `plan`, `inbox queue`, `retry`,
   `approve`, `round`, `accept`, `merge`, `resume`, `cancel` — and `runBreaks` refuses `ticks` on one that writes nothing. The CLI's `main`
@@ -2243,8 +2243,8 @@ A person typed `nemia start` on a store nothing ticked, and the run waited, said
 - **A SIGTERM in the daemon's first moments lets go of the store**: `runMain` takes its signals before it forks the program, whose fiber
   runs at once as far as it can; before, a signal there was node's default and left the lease `gone`.
 
-Tested in `src/service/demand.test.ts` (each lease's plan, the switch, the service before a spawn, the environment, the lines),
-`src/service/demand.verb.test.ts` (a daemon spawned for real on a scratch store and found by its lease; none beside a live lease, a second
+Tested in `src/demand/demand.test.ts` (each lease's plan, the switch, the service before a spawn, the environment, the lines),
+`src/demand/demand.verb.test.ts` (a daemon spawned for real on a scratch store and found by its lease; none beside a live lease, a second
 start failing the test; the store's systemd unit and launchd agent started, another store's left alone; a child that ends, one that
 cannot spawn, another daemon taking the store, the switch), `test/demand-cli.test.ts` (each of the ten through `main` over a host that
 starts nothing, no read asking, and no `daemon.log` or lease in the store), `test/ambient.test.ts`, `src/command/command.test.ts`,

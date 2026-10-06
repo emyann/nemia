@@ -152,7 +152,10 @@ export const userOf = (): { name: string; uid: number } => {
   return { name: info.username, uid: info.uid };
 };
 
-/** The service files of the folder `dir` holds, by name, with their text: `nemia.service` or `nemia.plist` is `nemia`. None where it is not. */
+/**
+ * The service files of the folder `dir` holds, by name, with their text: `nemia.service` or `nemia.plist` is `nemia`. None where it is
+ * not.
+ */
 export function unitsOf(dir: string): { name: string; text: string }[] {
   let names: string[];
   try {

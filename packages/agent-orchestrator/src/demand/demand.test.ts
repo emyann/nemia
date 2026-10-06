@@ -51,7 +51,7 @@ test('NEMIA_DAEMON_START=off starts nothing; an installed service is started bef
 
 test("the daemon's environment is the service's and the login's: nothing else of the command's shell", () => {
   const shell = {
-    HOME: '/home/ann',
+    HOME: '/srv/ann',
     USER: 'ann',
     LOGNAME: 'ann',
     SHELL: '/bin/bash',
@@ -65,7 +65,7 @@ test("the daemon's environment is the service's and the login's: nothing else of
     NEMIA_DAEMON_START: 'on',
   };
   assert.deepEqual(daemonEnv(shell, '/store', '/usr/bin:/bin'), {
-    HOME: '/home/ann',
+    HOME: '/srv/ann',
     USER: 'ann',
     LOGNAME: 'ann',
     SHELL: '/bin/bash',
@@ -81,7 +81,7 @@ test('the lines name the pid, where it logs, how to stop it, and where the setti
   const started = startedLine({ pid: 77, entry: '/srv/nemia/apps/api/src/main.ts', root: '/store', log: '/store/daemon.log' });
   for (const said of ['pid 77', '/store/daemon.log', 'kill 77', 'nemia service install --take-over 77', 'WF_MAX_CONCURRENT', '--env'])
     assert.ok(started.includes(said), `${said}: ${started}`);
-  const systemd = { system: 'systemd', name: 'nemia', unit: 'nemia.service', home: '/home/ann', uid: 1000 } as const;
+  const systemd = { system: 'systemd', name: 'nemia', unit: 'nemia.service', home: '/srv/ann', uid: 1000 } as const;
   assert.match(
     serviceStartedLine({ ...systemd, root: '/store', pid: 9 }),
     /journalctl --user -u nemia\.service; stop it with systemctl --user stop nemia\.service/,

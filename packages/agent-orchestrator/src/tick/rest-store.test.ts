@@ -604,7 +604,7 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
 
 test('REFUSED: nemia prune does not wait on a hand-off from a worktree that is gone — no pass could make one there', async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  for (const name of ['left', 'right']) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n---\n${name} it\n`);
+  for (const name of ['left', 'right']) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\nharness: codex\n---\n${name} it\n`);
   const run = await Effect.runPromise(startRun({ brief: 'two roots', repo: ISOLATED_REPOS[1], workflowDir: dir, isolate: true }));
   touched.add(run.id);
   for (let k = 0; k < 12 && (await answered(run.id)).status !== 'succeeded'; k++) h.signAll(inFlight);

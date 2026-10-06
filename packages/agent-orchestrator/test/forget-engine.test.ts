@@ -51,7 +51,7 @@ const aRepo = (): string => {
 /** A workflow folder of one step, `implement`, with the frontmatter lines it is given. */
 const oneStep = (lines: string): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${lines}\n---\nimplement it\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${/^place:/m.test(lines) ? '' : 'place: git\n'}${lines}\n---\nimplement it\n`);
   return dir;
 };
 
@@ -210,7 +210,7 @@ test("`nemia rm` of a git run that is over forgets every task of it on the engin
 
 test('`nemia rm` of a folder run forgets its task on the engine as it removes its folders', async () => {
   const notARepo = fs.mkdtempSync(path.join(ROOT, 'plain-'));
-  const run = await signed(oneStep('harness: codex\nworkspace: folder\npermissionMode: workspace-write'), SIGNED, notARepo);
+  const run = await signed(oneStep('harness: codex\nplace: folder\npermissionMode: workspace-write'), SIGNED, notARepo);
   assert.equal(readRun(run.id).steps.implement.workspace?.startsWith(path.join(ROOT, 'runs', run.id)), true, 'a folder run');
   const forgot = await runWith(e, forgetRun(run.id));
   assert.deepEqual([forgot.kind, forgot.folder, forgot.engine?.forgotten], ['forgotten', true, [`${run.id}-implement`]]);

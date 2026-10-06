@@ -691,7 +691,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
-    "---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
+    "---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
   );
   const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const { e, settle } = board();
@@ -1364,7 +1364,7 @@ test("the whole screen of an ending at its gate: the folder's words, approve it 
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
-    "---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
+    "---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
   );
   const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const { e, settle } = board();

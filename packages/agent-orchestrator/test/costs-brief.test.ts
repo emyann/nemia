@@ -144,8 +144,8 @@ const aRepo = (): string => {
 /** The workflow folder `costed`: `design`, reading `costs`, then `implement`, reading nothing. */
 const WORKFLOW = path.join(ROOT, 'costed');
 fs.mkdirSync(WORKFLOW);
-fs.writeFileSync(path.join(WORKFLOW, 'design.md'), '---\nreads: costs\n---\nDesign it.\n');
-fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nafter: design\n---\nBuild it.\n');
+fs.writeFileSync(path.join(WORKFLOW, 'design.md'), '---\nplace: git\nreads: costs\n---\nDesign it.\n');
+fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nafter: design\nplace: git\n---\nBuild it.\n');
 
 /**
  * The same workflow `costed`, in another folder, as a loop: `implement`, reading `costs`, then `review`, which may send it back twice

@@ -86,7 +86,10 @@ function refusal(fn: () => unknown): string {
 const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
 
-/** A team of one step `build` on `place: git` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
+/**
+ * A team of one step `build` on `place: git` naming `agent: <name>` in `<dir>/workflows/team`, the agent and skills beside it as `files`
+ * gives them.
+ */
 const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
   path.join(
     tree({ 'workflows/team/build.md': step.replace(/^---\n/, '---\nplace: git\n'), 'workflows/agents/builder.md': agent, ...files }),

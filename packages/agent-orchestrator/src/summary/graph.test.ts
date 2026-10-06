@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from '../workflow.ts';
 import { graphOf, runGraph } from './graph.ts';
 
-/** Steps as `nemia start` freezes them: parsed and validated, so the graph is read off what the run is judged by. */
+/**
+ * Steps as `nemia start` freezes them, each file given `place: git`: parsed and validated, so the graph is read off what the run is judged
+ * by.
+ */
 const workflow = (files: Record<string, string>, schemas: Record<string, string> = {}): Workflow[] => {
-  const steps = Object.entries(files).map(([name, text]) => parseWorkflow(name, text, (file) => schemas[file]));
+  const placed = (text: string) => `---\nplace: git\n${text.startsWith('---\n') ? text.slice(4) : `---\n${text}`}`;
+  const steps = Object.entries(files).map(([name, text]) => parseWorkflow(name, placed(text), (file) => schemas[file]));
   validate(steps);
   return steps;
 };

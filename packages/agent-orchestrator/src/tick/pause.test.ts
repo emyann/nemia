@@ -64,7 +64,7 @@ const folder = (steps: readonly string[], more: (name: string) => string = () =>
   steps.forEach((name, k) =>
     fs.writeFileSync(
       path.join(dir, `${name}.md`),
-      `---\n${more(name).includes('harness:') ? '' : 'harness: codex\n'}${k ? `after: ${steps[k - 1]}\n` : ''}${more(name)}---\n${name} it\n`,
+      `---\nplace: git\n${more(name).includes('harness:') ? '' : 'harness: codex\n'}${k ? `after: ${steps[k - 1]}\n` : ''}${more(name)}---\n${name} it\n`,
     ),
   );
   return dir;

@@ -32,8 +32,8 @@ function folder(name: string, files: Record<string, string>): string {
 test('a folder written from its steps through the entry is the folder its list and its step read back', async () => {
   const dir = path.join(ROOT, 'workflows', 'written');
   const draft = JSON.stringify([
-    { name: 'plan', after: [], body: 'Plan it.' },
-    { name: 'build', after: ['plan'], body: 'Build it.' },
+    { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
+    { name: 'build', after: ['plan'], place: 'git', body: 'Build it.' },
   ]);
   const done = await runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', dir, draft }, undefined, ROOT));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
@@ -70,8 +70,8 @@ test("REFUSED: a folder that does not load is listed with the loader's words who
 test("REFUSED: a draft the writer refuses is thrown in the writer's words whole, and nothing is written", async () => {
   const dir = path.join(ROOT, 'workflows', 'twice');
   const draft = JSON.stringify([
-    { name: 'plan', after: [], body: 'Plan it.' },
-    { name: 'plan', after: [], body: 'Plan it again.' },
+    { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
+    { name: 'plan', after: [], place: 'git', body: 'Plan it again.' },
   ]);
   await assert.rejects(runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', dir, draft }, undefined, ROOT)), (err: Error) => {
     assert.equal(err.message, 'two steps are named plan, and a step is its file, plan.md. Rename one of them.');

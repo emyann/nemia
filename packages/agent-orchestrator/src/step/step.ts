@@ -37,11 +37,12 @@ export type Workflow = {
    */
   workspace?: 'main';
   /**
-   * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is
-   * not the git kind (`place` on the run record). `place: git`: on branches of a repository. A step file says one (`placeRequired`);
-   * only a step frozen on a run record before the key has none, and reads as `git` (`stepPlace`). A team is of one kind: every step says `place: folder`, or none does (`validate`). A step that continues another's
-   * session (`resume:`) works in that step's folder, as it would in its worktree; any other step gets a folder of its own, empty, and what
-   * the steps before it made reaches it as their output and their files. `workspace: folder` is its former spelling (`placeSpelled`).
+   * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is not
+   * the git kind (`place` on the run record). `place: git`: on branches of a repository. A step file says one (`placeRequired`); only a
+   * step frozen on a run record before the key has none, and reads as `git` (`stepPlace`). A team is of one kind: every step says
+   * `place: folder`, or none does (`validate`). A step that continues another's session (`resume:`) works in that step's folder, as it
+   * would in its worktree; any other step gets a folder of its own, empty, and what the steps before it made reaches it as their output and
+   * their files. `workspace: folder` is its former spelling (`placeSpelled`).
    */
   place?: 'git' | 'folder';
   /**

@@ -2854,3 +2854,32 @@ test('REFUSED: a record whose place this nemia does not ship stops its own landi
   await runWith(other.e, advanceRun(readRun(other.id)));
   assert.ok(readRun(other.id).steps.ship.landed && 'commit' in readRun(other.id).steps.ship.landed!, 'and the run beside it lands');
 });
+
+test('a landed run started before its place named a staged-merge file is removed with no `status`, its checkout gone', async () => {
+  const done = await stagedAndSigned();
+  done.settle(done.checkId, 'succeeded', undefined, 0);
+  await runWith(done.e, advanceRun(readRun(done.id)));
+  rewritten(done.id, (record) => {
+    delete record.stagedFile;
+  });
+  fs.rmSync(done.repo, { recursive: true, force: true });
+  const run = readRun(done.id);
+  assert.ok(run.steps.ship.landed && 'commit' in run.steps.ship.landed);
+  assert.equal(merging(run, stepsOf(run)), 'none', 'a landing already made owes no read of a checkout that is gone');
+});
+
+test('REFUSED: a staged merge its place gives no reading of holds the checkout — another run approved on the same repository waits for it', async () => {
+  const shared = board();
+  const repo = aRepo();
+  const waiting = await atTheGate({ repo, board: shared });
+  const staging = await atTheGate({ repo, board: shared });
+  await runWith(shared.e, approveRun(staging.id, 'ship'));
+  assert.deepEqual((await runWith(shared.e, advanceRun(readRun(staging.id)))).filed, ['ship']);
+  git(repo, 'merge', '--no-ff', '--no-commit', staging.branch);
+  shared.settle(`${staging.id}-ship`, 'succeeded', BLOCKED);
+  await runWith(shared.e, approveRun(waiting.id, 'ship'));
+  const run = readRun(waiting.id);
+  const held = await runWith(shared.e, checkoutHold(shared.e, run, stepsOf(run), undefined, process.env, statusMemo(failingPlace())));
+  assert.deepEqual(held, { run: staging.id, step: 'ship' }, 'held by the run whose merge nobody can read');
+  assert.equal(mergeHead(repo), true);
+});

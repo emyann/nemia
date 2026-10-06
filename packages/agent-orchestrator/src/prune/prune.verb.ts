@@ -27,11 +27,16 @@ import { Conflict, Invalid } from '../refusal/refusal.ts';
 
 /**
  * Whose merge is in the repository's checkout, for a run whose ending lands on its check (`forgetRefusal`): none where the file its place
- * named at `open` is not there (`stagedHere`), else as its place's `status` reads it (`checkoutStatus`). Refuses (`Conflict`) a checkout
- * the place did not read, in its words: nothing is removed on a guess.
+ * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not landed; else as
+ * its place's `status` reads it (`checkoutStatus`). Refuses (`Conflict`) a checkout the place did not read, in its words: nothing is
+ * removed on a guess.
  */
 export function merging(run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] {
-  if (!isGitRun(run) || !steps?.some((s) => landsOnCheck(s, run)) || stagedHere(run) === false) return 'none';
+  if (!isGitRun(run)) return 'none';
+  const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
+  const marked = stagedHere(run);
+  if (!landings.length || marked === false) return 'none';
+  if (marked === undefined && !landings.some((s) => run.steps[s.name]?.taskId && !run.steps[s.name]?.landed)) return 'none';
   const read = checkoutStatus(run);
   if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
   return read.merging;

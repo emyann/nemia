@@ -221,7 +221,7 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
  */
 export const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const settings = task.config?.claude?.settings;
-  if (task.config?.admission === undefined || settings === undefined) return undefined;
+  if (task.config?.callAdmission === undefined || settings === undefined) return undefined;
   if (settingsObject(settings) !== undefined) return undefined;
   return `\`claude.settings\` is given as ${JSON.stringify(settings)}, and admission is merged into the session's settings as a hook: the runtime rewrites no file. Give the settings as a JSON object, like {"env":{"CI":"1"}}, or leave admission off.`;
 };

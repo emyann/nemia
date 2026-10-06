@@ -103,7 +103,7 @@ export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
 export { commandHarness } from './harness/command/command.ts';
 export { composite } from './harness/index.ts';
-export { sdkRunner } from './harness/index.ts';
+export { admissionHook, sdkRunner } from './harness/index.ts';
 export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/index.ts';

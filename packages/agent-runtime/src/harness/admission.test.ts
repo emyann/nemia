@@ -35,39 +35,39 @@ test('REFUSED at shipped defaults: admission that is not one — no object, a ke
   const cases: [unknown, string][] = [
     [
       'my-admit',
-      '`admission: "my-admit"` is not admission. Give an object, like { "command": ["my-admit"], "tools": ["Bash"] }, or leave it out.',
+      '`callAdmission: "my-admit"` is not admission. Give an object, like { "command": ["my-admit"], "tools": ["Bash"] }, or leave it out.',
     ],
-    [{ ...ADMISSION, matcher: 'Bash' }, "`admission.matcher` is not one of admission's keys. It has `command` and `tools` alone."],
+    [{ ...ADMISSION, matcher: 'Bash' }, "`callAdmission.matcher` is not one of admission's keys. It has `command` and `tools` alone."],
     [
       { command: [], tools: ['Bash'] },
-      '`admission.command: []` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].',
+      '`callAdmission.command: []` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].',
     ],
     [
       { command: [nul], tools: ['Bash'] },
-      `\`admission.command: ${JSON.stringify([nul])}\` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].`,
+      `\`callAdmission.command: ${JSON.stringify([nul])}\` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].`,
     ],
     [
       { command: ['a'], tools: [] },
-      '`admission.tools: []` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].',
+      '`callAdmission.tools: []` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].',
     ],
     [
       { command: ['a'], tools: ['Bash|Edit'] },
-      '`admission.tools: ["Bash|Edit"]` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].',
+      '`callAdmission.tools: ["Bash|Edit"]` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].',
     ],
   ];
   for (const [admission, words] of cases) {
-    const { said, journalled } = await filed({ admission });
+    const { said, journalled } = await filed({ callAdmission: admission });
     assert.equal(said, words, JSON.stringify(admission));
     assert.equal(journalled, 0, 'nothing journalled');
   }
-  assert.equal((await filed({ admission: ADMISSION })).said, 'filed', 'a command and the tools it sees are filed on Claude Code');
+  assert.equal((await filed({ callAdmission: ADMISSION })).said, 'filed', 'a command and the tools it sees are filed on Claude Code');
 });
 
 test('REFUSED at shipped defaults: admission on a harness that runs no command before a call — Codex, a command, a remote agent — naming the harnesses that do', async () => {
   for (const harness of ['codex', 'command', 'remote']) {
     assert.equal(
-      (await filed({ admission: ADMISSION }, harness)).said,
-      `\`admission\` asks a command before each of the session's calls, and the \`${harness}\` harness runs none before a call: its session would make every call unadmitted. File the task on \`claude\`, or leave \`admission\` off.`,
+      (await filed({ callAdmission: ADMISSION }, harness)).said,
+      `\`callAdmission\` asks a command before each of the session's calls, and the \`${harness}\` harness runs none before a call: its session would make every call unadmitted. File the task on \`claude\`, or leave \`callAdmission\` off.`,
       harness,
     );
   }
@@ -90,7 +90,7 @@ test("admission is a PreToolUse hook merged into the caller's --settings, matche
   const ae = path.join(import.meta.dirname, '..', '..', 'bin', 'ae.ts');
   const before = { matcher: 'Edit', hooks: [{ type: 'command', command: 'mine' }] };
   const claude = { settings: JSON.stringify({ env: { CI: '1' }, hooks: { PreToolUse: [before] } }) };
-  for (const [what, settings] of settingsGiven({ admission: { ...ADMISSION, tools: ['Bash', 'mcp__x__y'] }, claude })) {
+  for (const [what, settings] of settingsGiven({ callAdmission: { ...ADMISSION, tools: ['Bash', 'mcp__x__y'] }, claude })) {
     assert.deepEqual(settings.env, { CI: '1' }, `${what}: the caller's settings are kept`);
     assert.deepEqual(
       (settings.hooks as { PreToolUse: unknown[] }).PreToolUse,
@@ -104,7 +104,7 @@ test("admission is a PreToolUse hook merged into the caller's --settings, matche
       `${what}: after the caller's own hooks, quoted for the shell`,
     );
   }
-  for (const [what, settings] of settingsGiven({ admission: ADMISSION })) {
+  for (const [what, settings] of settingsGiven({ callAdmission: ADMISSION })) {
     assert.deepEqual(Object.keys(settings), ['hooks'], `${what}: no settings of the caller's, the hook alone`);
   }
   assert.deepEqual(
@@ -116,10 +116,13 @@ test("admission is a PreToolUse hook merged into the caller's --settings, matche
 
 test('REFUSED: admission beside Claude Code settings given as a file, which the runtime does not rewrite; taken beside settings given as JSON', () => {
   assert.equal(
-    claudeRefuses({ brief: 'b', cwd: '/r', config: { admission: ADMISSION, claude: { settings: '/a/settings.json' } } }),
+    claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '/a/settings.json' } } }),
     '`claude.settings` is given as "/a/settings.json", and admission is merged into the session\'s settings as a hook: the runtime rewrites no file. Give the settings as a JSON object, like {"env":{"CI":"1"}}, or leave admission off.',
   );
-  assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', config: { admission: ADMISSION, claude: { settings: '{"env":{}}' } } }), undefined);
+  assert.equal(
+    claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '{"env":{}}' } } }),
+    undefined,
+  );
   assert.equal(
     claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { settings: '/a/settings.json' } } }),
     undefined,

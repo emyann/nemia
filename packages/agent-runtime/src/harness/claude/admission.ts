@@ -1,9 +1,11 @@
 /**
  * A task's admission as Claude Code runs it: a `PreToolUse` hook, matched to the tools admission sees, merged into the session's
  * `--settings`, whose command is the runtime's own adapter (`ae admission -- <command…>`); and the adapter, which turns Claude Code's
- * hook input into the call admission reads and its answer into the hook's decision.
+ * hook input into the call admission reads and its answer into the hook's decision (`admissionHook`). Loads no engine, so `bin/ae.ts`
+ * runs the hook through this file alone and a call pays one small process.
  */
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { ADMISSION_DECISIONS, type Admission, type AdmissionAnswer, type AdmissionCall } from '../admission.ts';
 import type { SpawnRequest } from '../seam.ts';
@@ -30,7 +32,7 @@ export const admissionHookCommand = (admission: Admission): string =>
  * any the caller's settings already hold. The flags as given where the task has no admission.
  */
 export const admittedFlags = (config: SpawnRequest['config']): ClaudeFlags | undefined => {
-  const admission = config?.admission;
+  const admission = config?.callAdmission;
   if (admission === undefined) return config?.claude;
   const settings = settingsObject(config?.claude?.settings ?? '{}') ?? {};
   const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
@@ -97,3 +99,15 @@ export const admitCall = (hookInput: string, command: string[], run: typeof runA
   const answer = answerOf(ran.stdout.trim());
   return answer === undefined ? askFor(`${command[0]} printed no answer`) : hookOutput(answer);
 };
+
+/**
+ * `ae admission -- <command…>`: reads the hook's input on stdin, hands the call to admission's command (`admitCall`), and prints the
+ * hook's output. Refused, exit 2, where no command follows `--`.
+ */
+export function admissionHook(argv: string[]): void {
+  const command = argv.indexOf('--') === -1 ? [] : argv.slice(argv.indexOf('--') + 1);
+  if (command.length === 0)
+    throw Object.assign(new Error('ae admission needs its command after --: ae admission -- my-admit --strict'), { exitCode: 2 });
+  const out = admitCall(fs.readFileSync(0, 'utf8'), command);
+  if (out !== '') process.stdout.write(`${out}\n`);
+}

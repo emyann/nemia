@@ -143,7 +143,7 @@ export const claudeDetached: HarnessSpec = {
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
-  admission: true,
+  callAdmission: true,
 };
 
 /**
@@ -192,7 +192,7 @@ export const claudeJob: HarnessSpec = {
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
-  admission: true,
+  callAdmission: true,
   resumeCostCarried: true,
 };
 

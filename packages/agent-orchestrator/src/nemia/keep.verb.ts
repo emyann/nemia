@@ -91,7 +91,7 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
       permissionMode: step.permissionMode,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
       allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
-      admission: { command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit'], tools: ['Bash'] },
+      callAdmission: { command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit'], tools: ['Bash'] },
       background: true,
       mounts: factoryFolders(),
       ...ownOf(

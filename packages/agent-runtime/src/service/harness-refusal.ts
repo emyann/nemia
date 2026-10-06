@@ -29,13 +29,13 @@ import { isClaude, isRemote, isSpec, type HarnessConfig, type TaskSpec } from '.
  *    session would run something else than the process they name;
  * 7b. a mount in `mounts` on a harness that does not hold its mode (`mountsMisplaced`): a remote agent, a `HarnessSpec` whose
  *    `mounts` leaves the mode out; its session would not reach the folder as asked;
- * 7c. an `admission` on a harness that runs no command before a call (`admissionMisplaced`): Codex, a remote agent, a `HarnessSpec`
- *    that does not declare `admission`; its session would make every call unadmitted;
+ * 7c. a `callAdmission` on a harness that runs no command before a call (`admissionMisplaced`): Codex, a remote agent, a `HarnessSpec`
+ *    that does not declare `callAdmission`; its session would make every call unadmitted;
  * 8. a long-lived task on a harness whose session ends with its turn (`longLivedMisplaced`);
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `RunnerOps` brought as its own is the consumer's: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a
- * `codex`, a `command`, an `env`, a `niceness`, `mounts` and `admission`, and asked nothing here: its own `refuses`, if it has one, is asked by
+ * `codex`, a `command`, an `env`, a `niceness`, `mounts` and `callAdmission`, and asked nothing here: its own `refuses`, if it has one, is asked by
  * `file` through the `Runner`.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
@@ -146,21 +146,21 @@ const argsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<s
   admissionMisplaced(spec, harnesses);
 
 /** Whether a harness runs admission before a call: Claude Code, a `HarnessSpec` that declares it, a remote agent never. */
-const admits = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.admission === true);
+const admits = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.callAdmission === true);
 
 /**
- * Why a task's `config.admission` cannot go on its harness — or `undefined`: a harness that runs no command before a call (Codex, a
- * `HarnessSpec` that does not declare `admission`, a remote agent), whose session would make every call unadmitted. The refusal names
+ * Why a task's `config.callAdmission` cannot go on its harness — or `undefined`: a harness that runs no command before a call (Codex, a
+ * `HarnessSpec` that does not declare `callAdmission`, a remote agent), whose session would make every call unadmitted. The refusal names
  * the harnesses of this engine that admit. A `RunnerOps` brought as its own is handed it, and not asked.
  */
 const admissionMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   const h = harnesses[spec.harness];
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
-  if (spec.config?.admission === undefined || ownRunner || admits(h)) return undefined;
+  if (spec.config?.callAdmission === undefined || ownRunner || admits(h)) return undefined;
   const takers = Object.keys(harnesses)
     .filter((name) => admits(harnesses[name]))
     .map((name) => `\`${name}\``);
-  return `\`admission\` asks a command before each of the session's calls, and the \`${spec.harness}\` harness runs none before a call: its session would make every call unadmitted. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`admission\` off.` : "Leave `admission` off: none of this engine's harnesses admits a call."}`;
+  return `\`callAdmission\` asks a command before each of the session's calls, and the \`${spec.harness}\` harness runs none before a call: its session would make every call unadmitted. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`callAdmission\` off.` : "Leave `callAdmission` off: none of this engine's harnesses admits a call."}`;
 };
 
 /** Whether a harness holds a mount in a mode: Claude Code in both, a `HarnessSpec` in those it declares, a remote agent in none. */

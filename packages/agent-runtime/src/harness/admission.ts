@@ -38,16 +38,16 @@ const isWord = (v: unknown): v is string => typeof v === 'string' && v !== '' &&
 export const admissionRefusalOf = (admission: unknown): string | undefined => {
   if (admission === undefined) return undefined;
   if (typeof admission !== 'object' || admission === null || Array.isArray(admission)) {
-    return `\`admission: ${JSON.stringify(admission)}\` is not admission. Give an object, like { "command": ["my-admit"], "tools": ["Bash"] }, or leave it out.`;
+    return `\`callAdmission: ${JSON.stringify(admission)}\` is not admission. Give an object, like { "command": ["my-admit"], "tools": ["Bash"] }, or leave it out.`;
   }
   const stray = Object.keys(admission).find((key) => !ADMISSION_KEYS.includes(key));
-  if (stray) return `\`admission.${stray}\` is not one of admission's keys. It has \`command\` and \`tools\` alone.`;
+  if (stray) return `\`callAdmission.${stray}\` is not one of admission's keys. It has \`command\` and \`tools\` alone.`;
   const { command, tools } = admission as Partial<Admission>;
   if (!(Array.isArray(command) && command.length > 0 && command.every(isWord))) {
-    return `\`admission.command: ${JSON.stringify(command)}\` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].`;
+    return `\`callAdmission.command: ${JSON.stringify(command)}\` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].`;
   }
   if (!(Array.isArray(tools) && tools.length > 0 && tools.every((tool) => typeof tool === 'string' && TOOL.test(tool)))) {
-    return `\`admission.tools: ${JSON.stringify(tools)}\` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].`;
+    return `\`callAdmission.tools: ${JSON.stringify(tools)}\` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].`;
   }
   return undefined;
 };

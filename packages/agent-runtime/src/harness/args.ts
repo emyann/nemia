@@ -130,7 +130,7 @@ export type HarnessArgs = {
    * before it is journalled: Claude Code runs it as a hook, through the runtime's own adapter (`ae admission`). Refused unless a
    * command and the tools it sees (`admissionRefusalOf`).
    */
-  admission?: Admission;
+  callAdmission?: Admission;
 };
 
 /**
@@ -160,7 +160,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   env: true,
   niceness: true,
   mounts: true,
-  admission: true,
+  callAdmission: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -295,7 +295,7 @@ const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
   codexArgsRefusalOf(config.codex) ??
   commandArgsRefusalOf(config) ??
   mountsRefusalOf(config.mounts) ??
-  admissionRefusalOf(config.admission);
+  admissionRefusalOf(config.callAdmission);
 
 /** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
 const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;

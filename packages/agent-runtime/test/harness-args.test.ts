@@ -27,12 +27,12 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test("HARNESS_ARGS is the eighteen arguments a harness takes — the spend cap, the mounts, admission, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
+test("HARNESS_ARGS is the eighteen arguments a harness takes — the spend cap, the mounts, a call's admission, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
-    'admission',
     'allowedTools',
     'background',
     'budgetUsd',
+    'callAdmission',
     'claude',
     'codex',
     'command',
@@ -84,7 +84,7 @@ test('a harness argument filed beside config is refused, naming where it goes �
     env: { CI: '1' },
     niceness: 10,
     mounts: [{ path: '/repo', readOnly: true }],
-    admission: { command: ['my-admit'], tools: ['Bash'] },
+    callAdmission: { command: ['my-admit'], tools: ['Bash'] },
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);

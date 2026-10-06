@@ -41,6 +41,7 @@ const PINNED: Record<string, string[]> = {
     'TickRefused',
     'TranscriptRefused',
     'a2aRunner',
+    'admissionHook',
     'admit',
     'answer',
     'argsRefusalOf',

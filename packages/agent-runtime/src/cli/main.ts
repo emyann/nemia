@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
-import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
+import { admissionHook, Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
 import { refusedText, retiredKeyRefusal, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
 import type { SweepReport, TaskSpec } from '../index.ts';
 import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
@@ -548,6 +548,7 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
  *   timer is only the backstop for a store that cannot or an OS event that is dropped, and a drain guard keeps
  *   "at-least-once, in order" true when a push and a tick land together, all behind one method: a CLI that re-implemented
  *   its easy half would be the worst consumer of its own API.
+ * - `admission` is the hook's (`admissionHook`): `bin/ae.ts` runs it before any engine loads, and `main` serves it to a caller of its own.
  */
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
@@ -599,6 +600,9 @@ export async function main(argv: string[]): Promise<void> {
       console.log(entryLine(arg, { kind: 'input', ...input }));
       return console.log(`run 'ae tick' (or 'ae up') to start its next turn`);
     }
+
+    case 'admission':
+      return admissionHook(argv.slice(1));
 
     case 'close':
       if (!arg) return console.log(HELP);

@@ -7,7 +7,7 @@
 const argv = process.argv.slice(2);
 const run =
   argv[0] === 'admission'
-    ? import('../src/cli/admission.ts').then(({ admission }) => admission(argv.slice(1)))
+    ? import('../src/harness/claude/admission.ts').then(({ admissionHook }) => admissionHook(argv.slice(1)))
     : import('../src/cli/main.ts').then(({ main }) => main(argv));
 
 run.catch((e) => {

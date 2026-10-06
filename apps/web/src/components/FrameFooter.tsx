@@ -7,7 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { daemonQuery, quotaQuery, runsQuery, versionQuery } from '@/lib/api';
 import type { Bar } from '@/lib/bar';
 import type { FeedStatus } from '@/lib/feed';
-import { atWork, atWorkWords, type DaemonTone, daemonDot, feedWords, footerParts, quotaShort } from '@/lib/footer';
+import { atWork, atWorkWords, type DaemonTone, daemonDot, feedWords, footerParts, quotaShort, versionWords } from '@/lib/footer';
 import { useBar } from '@/lib/useBar';
 import { useNow } from '@/lib/useNow';
 
@@ -54,6 +54,17 @@ function Part({
   );
 }
 
+/** The bottom bar's version (`GET /api/version`): the orchestrator's, and the release serving the board (`versionWords`). */
+function VersionPart() {
+  const version = useQuery(versionQuery);
+  const words = version.data ? versionWords(version.data) : { text: 'v…', title: version.error?.message ?? '' };
+  return (
+    <Part title={words.title} data={{ 'data-version': version.data?.version, 'data-release': version.data?.release?.kind }}>
+      <span className="truncate">{words.text}</span>
+    </Part>
+  );
+}
+
 /**
  * The frame's bottom bar, across the foot of every page, `h-8`, under the rail, the sidebar and the page, its height whatever it says.
  * Left, the daemon's dot — the api's own standing as the store's daemon (`GET /api/daemon`) — the pause (`PauseButton`), and
@@ -68,7 +79,6 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
   const daemon = useQuery(daemonQuery);
   const quota = useQuery(quotaQuery);
   const runs = useQuery(runsQuery);
-  const version = useQuery(versionQuery);
   const dot = daemonDot(daemon.data, daemon.error, now);
   const live = feedWords(feed);
   const short = quotaShort(quota.data, quota.error, now);
@@ -108,14 +118,7 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
           quota {short.text}
         </span>
       </Part>
-      {parts.includes('version') && (
-        <Part
-          title={version.data ? `Nemia's orchestrator, version ${version.data.version}` : (version.error?.message ?? '')}
-          data={{ 'data-version': version.data?.version }}
-        >
-          <span className="truncate">{version.data ? `v${version.data.version}` : 'v…'}</span>
-        </Part>
-      )}
+      {parts.includes('version') && <VersionPart />}
     </footer>
   );
 }

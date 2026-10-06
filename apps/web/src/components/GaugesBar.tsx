@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { daemonQuery, quotaQuery, runsQuery, versionQuery } from '@/lib/api';
 import type { FeedStatus } from '@/lib/feed';
-import { atWork, atWorkWords, feedWords } from '@/lib/footer';
+import { atWork, atWorkWords, feedWords, versionWords } from '@/lib/footer';
 import { DaemonLine } from './DaemonLine';
 import { FloatingBar } from './FloatingBar';
 import { QuotaLine } from './QuotaLine';
@@ -64,7 +64,7 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
         <Gauge name="Version">
           <p data-version-sentence className="text-sm">
             {version.data
-              ? `Nemia's orchestrator, version ${version.data.version}, as the api serving this board answers it.`
+              ? `${versionWords(version.data).title}, as the api serving this board answers it.`
               : version.error
                 ? `The version could not be read: ${version.error.message}`
                 : 'Reading the version…'}

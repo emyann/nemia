@@ -682,6 +682,26 @@ test('a FAILED step is handed off: what it left is committed where the run can s
   assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^implement: hand off/);
 });
 
+test('REFUSED at shipped defaults: a hand-off the place refuses is not marked done — the notes say why, the work stays uncommitted, and the next pass asks again', async () => {
+  const run = await started(folder());
+  const { e, settle } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
+  fs.writeFileSync(path.join(run.repo, 'half-done.txt'), 'work\n');
+  settle(`${run.id}-implement`, 'failed');
+  const place = placeAnswering('handoff', `process.stdout.write('{"refused":"a hook said no"}');`);
+
+  for (const pass of [1, 2]) {
+    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provideService(RunPlace, () => place.dir)));
+    assert.deepEqual(ticked.notes, ['implement: not handed off — the place refused: a hook said no; asked again on the next pass']);
+    assert.equal(readRun(run.id).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
+    assert.equal(place.asked(), pass, `pass ${pass}: the place was asked`);
+  }
+  assert.match(gitOut(run.repo, 'status', '--porcelain'), /half-done\.txt/, 'the work is where the step left it');
+  await runWith(e, advanceRun(readRun(run.id)));
+  assert.equal(readRun(run.id).steps.implement.handedOff, `${run.id}-implement`, 'the shipped place commits it, and the mark is made');
+  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^implement: hand off/);
+});
+
 test("nothing is committed for a step once its check is filed — the suite's litter stays off the branch", async () => {
   const run = await started(folder('check: npm test'));
   const { e, settle } = board();
@@ -1267,6 +1287,59 @@ test('a pass that dies after cutting a worktree does not wedge every pass after 
   const pass = await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual([pass.filed, filings], [['implement'], [`${run.id}-implement`]]);
   assert.equal(readRun(run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
+});
+
+/** A copy of the package's place whose `verb` runs `body`, each call first appending a line to `asked` in the copy. */
+function placeAnswering(verb: 'make' | 'handoff', body: string): { dir: string; asked: () => number } {
+  const dir = path.join(scratch('wf-store-place-'), 'git');
+  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
+  const asked = path.join(dir, 'asked');
+  fs.writeFileSync(
+    path.join(dir, 'scripts', `${verb}.ts`),
+    `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(asked)}, '${verb}\\n');\n${body}\n`,
+  );
+  return { dir, asked: () => (fs.existsSync(asked) ? fs.readFileSync(asked, 'utf8').split('\n').length - 1 : 0) };
+}
+
+test('REFUSED at shipped defaults: a make that answers a workspace other than the one it was asked for is read as not heard — the step is not filed, the notes say both, its record holds no workspace, and the next pass asks again', async () => {
+  const run = await isolated(aNodeRepo());
+  const elsewhere = scratch('wf-store-elsewhere-');
+  const place = placeAnswering(
+    'make',
+    `process.stdout.write(JSON.stringify({ workspace: ${JSON.stringify(elsewhere)}, branch: 'b', conflicts: [], notes: [] }));`,
+  );
+  const { e, filings } = board();
+  const at = path.join(ROOT, 'worktrees', run.id, 'implement');
+  for (const pass of [1, 2]) {
+    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provideService(RunPlace, () => place.dir)));
+    assert.deepEqual(ticked.notes, [
+      `implement: not cut — the place's make answered ${elsewhere}, where it was asked for ${at}: read as not heard, and asked again on the next pass`,
+    ]);
+    assert.deepEqual([ticked.filed, filings], [[], []], `pass ${pass}: nothing filed`);
+    assert.ok(!('workspace' in readRun(run.id).steps.implement), `pass ${pass}: the record holds no workspace, not even undefined`);
+    assert.equal(place.asked(), pass, `pass ${pass}: the place was asked again`);
+  }
+  const shipped = await runWith(e, advanceRun(readRun(run.id)));
+  assert.deepEqual(shipped.filed, ['implement'], 'a place that answers where it was asked files the step');
+  assert.equal(readRun(run.id).steps.implement.workspace, at);
+});
+
+test('a make the place refuses, or that is not heard, files nothing and leaves no workspace or branch on the record, saying why', async () => {
+  const run = await isolated(aNodeRepo());
+  const { e, filings } = board();
+  for (const [body, said] of [
+    [`process.stdout.write('{"refused":"no room"}');`, 'the place refused: no room'],
+    [
+      `process.stderr.write('fatal: broke\\n');\nprocess.exit(1);`,
+      "the place's make was not heard: fatal: broke; asked again on the next pass",
+    ],
+  ]) {
+    const place = placeAnswering('make', body);
+    const ticked = await runWith(e, advanceRun(readRun(run.id)).pipe(Effect.provideService(RunPlace, () => place.dir)));
+    assert.deepEqual([ticked.notes, ticked.filed, filings], [[`implement: not cut — ${said}`], [], []]);
+    const step = readRun(run.id).steps.implement;
+    assert.ok(!('workspace' in step) && !('branch' in step), JSON.stringify(step));
+  }
 });
 
 /** `nemia start` over `implement` (with `keys`) → `review`, run until implement's check settles `phase`, with the exit code given. */

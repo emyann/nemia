@@ -828,10 +828,10 @@ function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sigh
   return last ? 'between attempts' : 'pending';
 }
 
-/** Why the look left a task's last session unread, by its name in `unreadWhy`; none for a task settled or never spawned. */
+/** Why the look left a task's last session unread, by its name in `unreadWhy`; none for a task never spawned. */
 const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | undefined): string | undefined => {
   const last = state.attempts.at(-1);
-  return last && state.settled === null ? unreadWhy?.get(nameFor(state.taskId, last.n)) : undefined;
+  return last ? unreadWhy?.get(nameFor(state.taskId, last.n)) : undefined;
 };
 
 /**
@@ -858,8 +858,7 @@ const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | und
  * observation, and that id is what `logs` reads then. `waitingFor` is carried only where the phase is `needs-human`: the
  * word answers "waiting for what?", and there is no question to answer about a session nobody is waiting on. Carried, not
  * judged — `decide` never saw it. So is its `bridge`, which only a task that asked for one carries (`bridgeOfTask`), and why the
- * look left its session unread (`unreadWhy`, the look's words by the last attempt's name), only for a task not settled and a session
- * not seen.
+ * look left its session unread (`unreadWhy`, the look's words by the last attempt's name), only for a session not seen.
  */
 export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>, unreadWhy?: ReadonlyMap<string, string>): TaskView {
   const taskId = state.taskId;

@@ -1849,7 +1849,7 @@ reads an unread harness as nothing.
 
 A session left unread alone — a `--bg` transcript or a detached run's output or start event that does not decode, while it runs — is
 said why, in its harness's words, on the `Observation` that left it so (`unreadWhy`, by name, across the A2A seam too), and on its task's
-view (`TaskView.unreadWhy`) for a task not settled, off the pass's look, `list`'s and `view`'s. Rebuilt on every look and kept by none:
+view (`TaskView.unreadWhy`) by its last attempt, off the pass's look, `list`'s and `view`'s. Rebuilt on every look and kept by none:
 the first look that reads the session drops it, and the full `observe` says none. The warning is still logged on every look.
 
 What `claude agents --all --json` prints is decoded where it is read (`registryOf`, `harness/claude/registry.ts`). A row is ours when it

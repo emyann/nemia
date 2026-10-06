@@ -1698,6 +1698,27 @@ end is idle here, not a wait), `deadlineSeconds` (only a stop ends a session tha
 attempt); and, at the engine's `file`, a harness that ends its session with its turn — `claude` without
 `config.background: true`, Codex, `claude-detached`, a remote agent. A consumer's own runner is asked only its own `refuses`.
 
+## What a session exports: `telemetry` and `labels`
+
+An engine given a collector, `Engine.layer({ telemetry: { endpoint } })` (the absolute http(s) URL of an OTLP/HTTP collector,
+refused otherwise), tells each spawn where to export, and a harness that can export hands it to its session; an engine given none hands
+nothing. A task filed with `labels`, a Pod's `metadata.labels` — at most 16, each a lowercase word to a text of 1 to 256 characters
+with no control character — is journalled with them, and each of its sessions says them on its resource beside the key the runtime says
+itself, `task`, the task's id (a label `task` is refused). The engine also hands a spawn the W3C trace context of the span the task was
+filed in, journalled with it, so a session that reads it joins the trace of whoever filed it.
+
+```ts
+const engine = yield* Engine // built with Engine.layer({ root, telemetry: { endpoint: 'http://localhost:4318' } })
+yield* engine.file({ brief: 'do it', cwd, labels: { team: 'a' } }) // its sessions' resource: team=a, task=<id>
+```
+
+Claude Code is handed its metrics, events and spans over `http/json` (`claudeTelemetryEnv`, `harness/claude/telemetry.ts`): a job in
+its environment, with `TRACEPARENT`; a background session in its `--settings`' `env`, since the session runs in Claude Code's own
+process and carries none of the environment it was asked from — and joins no trace there. A process the runtime starts — the detached
+worker, a `claude` verb, an admission command — is started without the engine's own telemetry (`withoutTelemetry`,
+`harness/telemetry.ts`): OpenTelemetry's variables, the trace context and Claude Code's switches. So a `command` or Codex session
+exports nothing, and a Claude Code session exports only as its runner tells it.
+
 ## A harness's quota: `quota`
 
 A subscription has limits of its own — Claude Code's plan, five hours and a week — that no session's spend says. `quota(harness?)`
@@ -2093,6 +2114,7 @@ of pure code sits beside it.
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
+| `test/telemetry.test.ts` | what a session is handed to export: the collector, the labels with the task's id and the filing's trace through the engine, Claude Code's variables in a job's environment and a background session's settings, no child inheriting the engine's own, and each refusal — the real worker, a scratch collector and a stub `claude` on `PATH` |
 | `src/core/engine/counted.test.ts` | a long-lived attempt's counts journalled once a reading, none for a job, and how `fold` and the view read them |
 | `src/core/engine/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
 | `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |

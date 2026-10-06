@@ -78,6 +78,7 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workfl
     rulesOf: (step) => renderedSkillRules(run, step),
     appliesOf: (step) => renderedSkillApplies(run, step),
     closeoutOfTask: (taskId) => taskCloseout(everyTry, taskId),
+    deadlineOf: (taskId) => everyTry.get(taskId)?.state.deadlineSeconds ?? null,
   });
   return { ...of, settled };
 });

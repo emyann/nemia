@@ -33,7 +33,7 @@ const TEAM = [
  * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one,
  * why the try after it was filed, whether its session failed, the calls its session was refused, the skills it loaded (unmeasured
  * unless given), whether it is a recheck, sharing the try before it's session, and the fields its session's closeout declared, where it
- * made one.
+ * made one; and, for its check, how many seconds it ran (an hour unless given) and the deadline in seconds its task was filed with.
  */
 type Try = {
   end: string;
@@ -46,18 +46,20 @@ type Try = {
   files?: string[];
   recheck?: true;
   closeout?: Record<string, unknown>;
+  checkRan?: number;
+  deadline?: number;
 };
 
-/** A session or a check that ran an hour, filed ten minutes before, and ended at `end`: succeeded, unless `failed`. */
-const ended = (end: string, cost: number | null, failed = false): TaskClock => ({
+/** A session or a check that ran `ranMs`, an hour unless given, and ended at `end`: succeeded, unless `failed`. */
+const ended = (end: string, cost: number | null, failed = false, ranMs = 60 * MIN): TaskClock => ({
   phase: failed ? 'failed' : 'succeeded',
   state: {
     brief: 'x',
     settled: failed ? 'failed' : 'succeeded',
     attempts: [
       {
-        startedAt: minus(end, 60 * MIN),
-        spawnedAt: minus(end, 60 * MIN),
+        startedAt: minus(end, ranMs),
+        spawnedAt: minus(end, ranMs),
         endedAt: end,
         reason: 'harness',
         usage: cost === null ? null : { costUsd: cost },
@@ -78,6 +80,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
   const skills = new Map<string, string[]>();
   const files = new Map<string, string[]>();
   const closeouts = new Map<string, Record<string, unknown>>();
+  const deadlines = new Map<string, number>();
   const record: Run['steps'] = {};
   for (const [name, list] of Object.entries(tries)) {
     const ids: EarlierTry[] = [];
@@ -92,7 +95,8 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
       if (t.files) files.set(taskId, t.files);
       if (t.closeout) closeouts.set(taskId, t.closeout);
       if (t.check) {
-        views.set(`${own}-check`, ended(t.end, null));
+        views.set(`${own}-check`, ended(t.end, null, false, t.checkRan === undefined ? 60 * MIN : t.checkRan * 1000));
+        if (t.deadline !== undefined) deadlines.set(`${own}-check`, t.deadline);
         filed.set(`${own}-check`, minus(t.end, 9 * MIN));
         verdicts.set(`${own}-check`, t.check);
       }
@@ -113,6 +117,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     filesOf: (taskId: string) => files.get(taskId) ?? null,
     rulesOf: (_step: Workflow): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
     appliesOf: (_step: Workflow): ReadonlyMap<string, readonly string[]> => new Map(),
+    deadlineOf: (taskId: string) => deadlines.get(taskId) ?? null,
     closeoutOfTask: (taskId: string) => {
       const output = closeouts.get(taskId);
       return output && { outcome: 'done' as const, summary: '', artifacts: [], output };
@@ -818,4 +823,116 @@ test("the system's health is read over the days the stats answer, and said under
     '  quota h week: 42% used, 50% at most',
   ]);
   assert.ok(!statsLines(statsOf(factsOfAll(twoRounds('h1')), {}, NOW)).includes('system'), 'none kept, none said');
+});
+
+/** A run of the team whose ending's one try's check ended `check`, after `checkRan` seconds, its task filed with `deadline` seconds. */
+const landingAt = (id: string, check: CheckVerdict, checkRan: number, deadline?: number, steps = TEAM) =>
+  readOf(id, steps, {
+    design: [{ end: at(1) }],
+    implement: [{ end: at(2) }],
+    review: [{ end: at(3) }],
+    land: [{ end: at(7), check, checkRan, ...(deadline === undefined ? {} : { deadline }) }],
+  });
+
+const SLOW_HEADER = /^landing checks over half their deadline: measure .* LANDING_CHECK_DEADLINE_SECONDS/;
+
+test('a passed landing check over half the deadline its task was filed with is named, with its time, the deadline and the share', () => {
+  const s = statsOf(factsOfAll(landingAt('slow', 'passed', 1377, 2700)), {}, NOW);
+  assert.deepEqual(
+    s.all.slowLandings.map(({ share: _share, ...rest }) => rest),
+    [
+      {
+        run: 'slow',
+        factory: 'default',
+        workflow: 'build',
+        repo: '/r',
+        day: DAY,
+        step: 'land',
+        try: 1,
+        checkMs: 1_377_000,
+        deadlineMs: 2_700_000,
+      },
+    ],
+  );
+  assert.equal(Math.round(s.all.slowLandings[0].share * 100), 51);
+  const lines = statsLines(s);
+  assert.ok(
+    lines.some((line) => SLOW_HEADER.test(line)),
+    lines.join('\n'),
+  );
+  assert.ok(
+    lines.some((line) => /\bslow\s+land\s+1\s+22m57s\s+45m00s\s+51%/.test(line)),
+    lines.join('\n'),
+  );
+});
+
+test('a passed landing check at half its deadline or less is not named, and neither is a landing check that did not pass', () => {
+  const quick = statsOf(factsOfAll(landingAt('quick', 'passed', 1323, 2700)), {}, NOW);
+  assert.deepEqual(quick.all.slowLandings, [], 'at 49%');
+  assert.ok(!statsLines(quick).some((line) => SLOW_HEADER.test(line)));
+  assert.deepEqual(statsOf(factsOfAll(landingAt('half', 'passed', 1350, 2700)), {}, NOW).all.slowLandings, [], 'at exactly half');
+  for (const verdict of ['refused', 'unfinished'] as const)
+    assert.deepEqual(statsOf(factsOfAll(landingAt(verdict, verdict, 2430, 2700)), {}, NOW).all.slowLandings, [], `${verdict} at 90%`);
+});
+
+test('a landing check is judged against the deadline its task was filed with, and not measured where it was filed with none', () => {
+  const old = statsOf(factsOfAll(landingAt('old', 'passed', 1033, 1200)), {}, NOW).all.slowLandings;
+  assert.deepEqual(
+    old.map((x) => [x.run, x.deadlineMs, Math.round(x.share * 100)]),
+    [['old', 1_200_000, 86]],
+  );
+  assert.deepEqual(statsOf(factsOfAll(landingAt('new', 'passed', 1033, 2700)), {}, NOW).all.slowLandings, [], 'at 38% of 2700');
+  const [unfiled] = factsOf(landingAt('unfiled', 'passed', 2430)).tries.filter((t) => t.step === 'land');
+  assert.equal(unfiled.landingDeadlineMs, null);
+  assert.deepEqual(statsOf(factsOfAll(landingAt('unfiled', 'passed', 2430)), {}, NOW).all.slowLandings, []);
+});
+
+test("a round's check is no landing, whatever its time, and a step is a landing by its structure, not its name", () => {
+  const checked = TEAM.map((s) => (s.name === 'implement' ? { ...s, check: 'npm test' } : s));
+  const round = readOf('round', checked, {
+    design: [{ end: at(1) }],
+    implement: [{ end: at(2), check: 'passed', checkRan: 1080, deadline: 1200 }],
+  });
+  assert.deepEqual(statsOf(factsOfAll(round), {}, NOW).all.slowLandings, []);
+  const landing = checked.map((s) => (s.name === 'implement' ? { ...s, workspace: 'main' as const, gate: true as const } : s));
+  const lands = readOf('lands', landing, {
+    design: [{ end: at(1) }],
+    implement: [{ end: at(2), check: 'passed', checkRan: 1080, deadline: 1200 }],
+  });
+  assert.deepEqual(
+    statsOf(factsOfAll(lands), {}, NOW).all.slowLandings.map((x) => x.step),
+    ['implement'],
+  );
+});
+
+test("the slow landings keep to the query's filters and days, and each group has its own", () => {
+  const facts = factsOfAll(landingAt('slow', 'passed', 2430, 2700));
+  assert.deepEqual(statsOf(facts, { factory: 'other' }, NOW).all.slowLandings, []);
+  assert.deepEqual(statsOf(facts, { from: '2026-09-11', to: '2026-09-11' }, NOW).all.slowLandings, []);
+  const byStep = statsOf(facts, { by: 'step' }, NOW).groups;
+  assert.deepEqual(
+    byStep.map((g) => [g.key, g.slowLandings.length]),
+    [
+      ['design', 0],
+      ['implement', 0],
+      ['land', 1],
+      ['review', 0],
+    ],
+  );
+});
+
+test('the recap line counts the slow landings of the last 14 days where there are any, and says nothing of them where none', () => {
+  const slow = statsLine(statsOf(factsOfAll(landingAt('slow', 'passed', 1377, 2700)), {}, NOW));
+  assert.match(slow, /, 1 landing check over half its deadline: measure again$/);
+  const two = statsLine(statsOf(factsOfAll(landingAt('a', 'passed', 1377, 2700), landingAt('b', 'passed', 2000, 2700)), {}, NOW));
+  assert.match(two, /, 2 landing checks over half their deadline: measure again$/);
+  const quick = statsLine(statsOf(factsOfAll(landingAt('quick', 'passed', 1323, 2700)), {}, NOW));
+  assert.doesNotMatch(quick, /over half/);
+  assert.match(quick, /skills loaded$/);
+  const later = new Date(Date.parse(NOW.toISOString()) + 20 * 86_400_000);
+  assert.doesNotMatch(
+    statsLine(statsOf(factsOfAll(landingAt('slow', 'passed', 1377, 2700)), {}, later)),
+    /over half/,
+    'older than 14 days',
+  );
 });

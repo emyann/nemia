@@ -1,4 +1,5 @@
 ---
+place: git
 after: review
 workspace: main
 agent: otto

@@ -1763,9 +1763,11 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
     'folder',
     'and a resumed session works in the folder of the step it continues',
   );
-  const bare = fm('write', 'check: npm test');
-  assert.equal(bare.place, undefined, 'a step without the line says no place');
-  assert.equal(stepPlace(bare), 'git', 'and works on a repository, as every step did before the key');
+  assert.equal(
+    stepPlace({ place: undefined }),
+    'git',
+    'a step frozen on a run record before the key says no place, and works on a repository, as every step did then',
+  );
   assert.equal(stepPlace(fm('write', 'place: folder')), 'folder');
   const refusedWord = (lines: string, pattern: RegExp) =>
     assert.throws(
@@ -1819,6 +1821,37 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
       ]),
     (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('review says `place: folder`, and write works on a repository'),
     'and at load, from a folder of files, as a person writes them',
+  );
+});
+
+/** What a step file that says no `place:` is refused with: both fixes named, no word picked for it. */
+const NO_PLACE = (step: string) =>
+  `${step}: says no \`place:\`, where the step works, and a step does not work on a repository unless it says so. Write \`place: git\` to work on branches of a repository, or \`place: folder\` to work in folders the run makes, with no git repository — every step of a workflow says the same.`;
+
+test('`place:` is required: REFUSED at load, a step that names none, naming both fixes; accepted, each word and the former spelling', () => {
+  const refusedFor = (load: () => unknown, step: string, why: string) =>
+    assert.throws(load, (e: WorkflowError) => e instanceof WorkflowError && e.exitCode === 2 && e.message === NO_PLACE(step), why);
+  refusedFor(() => parseWorkflow('write', '---\ncheck: npm test\n---\nDo it.\n'), 'write', 'a frontmatter without the line');
+  refusedFor(() => parseWorkflow('write', 'Do it.\n'), 'write', 'a bare body, with no frontmatter');
+  const agents = new Map([['writer', parseAgent('writer', '---\nharness: claude\n---\nYou write.\n')]]);
+  refusedFor(() => parseWorkflow('write', '---\nagent: writer\n---\n', undefined, agents), 'write', 'an agent cannot give it');
+  refusedFor(
+    () => parseWorkflow('write', 'Write.\n', undefined, agents, undefined, { agent: 'writer', factory: 'f', step: 'write' }),
+    'write',
+    'nor can the agent a factory hires into the step',
+  );
+  refusedFor(
+    () =>
+      parseFolder([
+        ['write', '---\nplace: folder\n---\nWrite.\n'],
+        ['review', '---\nafter: write\n---\nReview.\n'],
+      ]),
+    'review',
+    'a folder whose other step says a place is refused for the missing line, not for two kinds of step',
+  );
+  assert.deepEqual(
+    [fm('write', 'place: git').place, fm('write', 'place: folder').place, parseWorkflow('write', '---\nworkspace: folder\n---\nDo it.\n').place],
+    ['git', 'folder', 'folder'],
   );
 });
 

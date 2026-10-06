@@ -40,6 +40,7 @@ import {
   wordOf,
   workspaceOf,
   placeNamed,
+  placeRequired,
 } from '../keys/index.ts';
 import {
   codexModeWritten,
@@ -72,6 +73,8 @@ import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
  *
  * `hired` is the agent a factory hires into a step (`Hire`): a step whose file names no agent is resolved with it exactly as if its file
  * said `agent: <name>`. A step whose file names its own agent and is hired one too is refused, naming both (`attachedAgent`).
+ *
+ * A file that says no `place:` is refused before any line is judged against its agent (`placeRequired`): no agent gives a step its place.
  */
 export function parseWorkflow(
   name: string,
@@ -90,6 +93,7 @@ export function parseWorkflow(
       ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
       : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
   meta = placeSpelled(name, meta);
+  placeRequired(name, meta.place);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);

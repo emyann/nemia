@@ -1,4 +1,5 @@
 ---
+place: git
 after: review
 # The repository's own checkout, where the base branch is.
 workspace: main

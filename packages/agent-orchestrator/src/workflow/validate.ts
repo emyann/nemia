@@ -111,8 +111,8 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
  * The one way a team cannot work in folders (`place: folder`): some of its steps do not say so.
  *
  * A run is of one kind — a git run, whose steps work on branches of one repository, or a folder run, which needs no repository — and the
- * kind is the run's, frozen on its record at start (`place`). A step without the line is a git step (`stepPlace`), so a team that says it
- * on some steps and not on others would be both. Refused, rather than one of the two guessed.
+ * kind is the run's, frozen on its record at start (`place`). A loaded step always says its place (`placeRequired`), and one frozen
+ * before the key reads as git (`stepPlace`), so a team that says `place: folder` on some steps and not on others would be both. Refused, rather than one of the two guessed.
  */
 function validateFolder(steps: readonly Workflow[]): void {
   const folder = steps.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);

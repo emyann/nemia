@@ -13,6 +13,8 @@ import {
   judgedUnlessUnreadable,
   runStore,
   runWith,
+  standingReader,
+  standingSnapshot,
   standingsOf,
   stepNames,
   type Unreadable,
@@ -96,17 +98,19 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
 }
 
 /**
- * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`: or, when a task it reads
- * does not, why it is not judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
+ * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`, where its branches stand
+ * read off `standing.json` (`standingSnapshot`): or, when a task it reads does not, why it is not judged (`judgedUnlessUnreadable`).
+ * Rejects with what the engine's reads die of.
  */
 export const judgedOn = (e: Engine['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) =>
   runWith(
     e,
     Effect.gen(function* () {
       const { views, reader, unreadable } = yield* viewsFor(e, [run]);
+      const git = standingReader(yield* standingSnapshot());
       const standings = (status: Parameters<typeof standingsOf>[2], steps: Parameters<typeof standingsOf>[1]) =>
-        standingsOf(run, steps, status);
-      const read = yield* judgedUnlessUnreadable(run, unreadable, () => judge(run, names, workflows, views, { reader, standings }));
+        standingsOf(run, steps, status, git);
+      const read = yield* judgedUnlessUnreadable(run, unreadable, () => judge(run, names, workflows, views, { reader, git, standings }));
       return { views, read };
     }),
   );

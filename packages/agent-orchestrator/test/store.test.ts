@@ -77,8 +77,14 @@ const {
   startPlan,
   stepsOf,
   runWith,
+  standingLiveOf,
 } = await import('../src/runner.ts');
+/** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
+const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
+const { passStanding } = await import('../src/standing/standing.verb.ts');
+/** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
+const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
 const { RunPlace, SHIPPED_PLACE } = await import('../src/place/place.store.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
@@ -3427,8 +3433,9 @@ test("REFUSED at shipped defaults: a run whose parent has not shipped files noth
     [],
     'the step did its work on its branch: still running, and not on the base branch',
   );
-  assert.equal((await runWith(c.e, parentRead(p.run.id))).shipped, false);
+  assert.equal((await runWith(c.e, parentNow(p.run.id))).shipped, false);
 
+  await aPass(c.e);
   assert.deepEqual(
     (await runWith(c.e, list(c.e, readRun(child.id)))).steps.map((s) => s.status),
     [`waiting on ${p.run.id}`, 'waiting'],
@@ -3489,7 +3496,7 @@ test("REFUSED before review, now shipped: a parent whose step signs off with not
     'it found the work already done, and signed off with nothing past its base',
   );
   assert.deepEqual((await runWith(c.e, decideRun(p.run.id))).decision, { kind: 'shipped', branches: [p.branch] });
-  assert.equal((await runWith(c.e, parentRead(p.run.id))).shipped, true, 'the gate says what its `nemia decide` says');
+  assert.equal((await runWith(c.e, parentNow(p.run.id))).shipped, true, 'the gate says what its `nemia decide` says');
   const r = await runWith(c.e, advanceRun(readRun(child.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
   assert.deepEqual((await Effect.runPromise(startRun({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] }))).after, [
@@ -3517,7 +3524,7 @@ test("REFUSED before review, now shipped: a parent merged and then its branch de
   gitIn(repo, 'worktree', 'remove', '--force', p.wt);
   gitIn(repo, 'branch', '-q', '-d', p.branch);
   assert.deepEqual(
-    await runWith(c.e, parentRead(p.run.id)),
+    await runWith(c.e, parentNow(p.run.id)),
     { record: readRun(p.run.id), shipped: true },
     'the merge stays, and the branch goes, its worktree first: `git branch -d` refuses a branch a worktree uses',
   );
@@ -3563,6 +3570,7 @@ test("the diamond's D, after B and C: B merged and its branch deleted while C is
       `pass ${pass + 1}: B finished, its tip recorded by \`nemia up\`'s pass, and a person shipped it and cleaned up while C is in review`,
     );
   }
+  await aPass(c.e);
   assert.deepEqual(
     (await runWith(c.e, list(c.e, readRun(d.id)))).steps.map((s) => s.status),
     [`waiting on ${cc.run.id}`, 'waiting'],
@@ -3611,6 +3619,7 @@ test('REFUSED at shipped defaults: a parent dropped unmerged after its tip was r
     ],
     'no pass over the unseen parent since it signed off: no tip was recorded, and git keeps no trace of what its branch named',
   );
+  await aPass(c.e);
   assert.deepEqual(
     (await runWith(c.e, list(c.e, readRun(child.id)))).steps.map((s) => s.status),
     [`waiting on ${dropped.run.id} (${dropped.branch} gone), ${unseen.run.id} (${unseen.branch} gone)`, 'waiting'],
@@ -3832,7 +3841,7 @@ test("REFUSED at shipped defaults: a one-step run whose step failed with nothing
     ['failed', ['implement'], [p.branch]],
     '`nemia decide` shows the failure',
   );
-  assert.equal((await runWith(c.e, parentRead(p.run.id))).shipped, false);
+  assert.equal((await runWith(c.e, parentNow(p.run.id))).shipped, false);
   const child = await Effect.runPromise(startRun({ brief: 'the child of a failure', repo, workflowDir: folder(), after: [p.run.id] }));
   for (let pass = 0; pass < 3; pass++) {
     const r = await runWith(c.e, advanceRun(readRun(child.id)));
@@ -4161,6 +4170,7 @@ test('`nemia plan` on the diamond starts four runs, parents first, each `after` 
   assert.match(printed[3], new RegExp(`^d  ${escaped(ids.d)} +dev +waits on b \\(${escaped(ids.b)}\\), c \\(${escaped(ids.c)}\\)$`));
   assert.deepEqual(printed.slice(4), ["run 'nemia tick' (or 'nemia up') to start them"]);
 
+  await aPass(b.e);
   assert.deepEqual(
     (await runWith(b.e, list(b.e, record('d')))).steps.map((s) => s.status),
     [`waiting on ${ids.b}, ${ids.c}`],
@@ -6680,13 +6690,15 @@ const viewPrograms = async () => {
   const { Effect } = await import('effect');
   const { EngineService } = await import('../src/runtime-client.ts');
   const views = await import('../src/views/views.verb.ts');
+  const { NOTHING_READ, standingLiveOf: liveOf, standingReader } = await import('../src/standing/standing.verb.ts');
+  const live = (ids: readonly string[]) => Effect.runPromise(liveOf(ids));
   const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>): Promise<A> =>
     Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
   const fed = (e: Engine, entries: Effect.Success<ReturnType<Engine['feed']>>['entries']): Engine => ({
     ...e,
     feed: (after = 0) => Effect.succeed({ entries: entries.slice(after), cursor: entries.length }),
   });
-  return { Effect, over, fed, ...views };
+  return { Effect, over, fed, live, nothingRead: () => standingReader(NOTHING_READ), ...views };
 };
 
 test('the programs of the views, given the engine as a service, answer what their plain faces answer on the same store: each face runs its program and adds nothing', async () => {
@@ -6752,12 +6764,13 @@ test('the programs of the views, given the engine as a service, answer what thei
     startRun({ brief: 'the child', repo, workflowDir: folder(), after: [shipped.run.id, running.run.id] }),
   );
   const ids = [shipped.run.id, running.run.id, 'no-such-run'];
-  const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id))));
+  const git = await v.live(ids);
+  const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id, git))));
   assert.deepEqual(
     read.map((p) => p.shipped),
     [true, false, false],
   );
-  const lookup = await v.over(b.e, v.parentsRead(readRun(child.id)));
+  const lookup = await v.over(b.e, v.parentsRead(readRun(child.id), git));
   assert.deepStrictEqual(ids.map(lookup), read);
 });
 
@@ -6774,14 +6787,15 @@ test("REFUSED as a death in the runtime's words: a refusal the engine's view, lo
     (await Effect.runPromise(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
   );
   const failed = (): TaskPhase => 'failed';
+  const live = await v.live([parent.run.id]);
   const reads = (err: unknown) => {
     const refuse = () => Effect.fail(err);
     return [
       ['taskPhases', 'view', v.taskPhasesRead(record), { ...e, view: refuse }],
       ['checkReports', 'logs', v.checkReportsRead(record, stepsOf(record), failed, () => true), { ...e, logs: refuse }],
       ['refusalOf', 'logs', v.refusalRead('npm test', check), { ...e, logs: refuse }],
-      ['parentOf', 'view', v.parentRead(parent.run.id), { ...b.e, view: refuse }],
-      ['parentsOf', 'view', v.parentsRead(child), { ...b.e, view: refuse }],
+      ['parentOf', 'view', v.parentRead(parent.run.id, live), { ...b.e, view: refuse }],
+      ['parentsOf', 'view', v.parentsRead(child, live), { ...b.e, view: refuse }],
       ['readFilings', 'feed', v.filingsRead(), { ...e, feed: refuse }],
     ] as unknown as Array<[string, string, EffectOf<unknown, Refusal, EngineService>, Engine]>;
   };
@@ -6802,10 +6816,9 @@ test("REFUSED as a death in the runtime's words: a refusal the engine's view, lo
     assert.equal(await rejection(v.over(broken, program), what), boom, `${what}: the program rejects with the error itself`);
   }
 
-  const { oneByOne } = await import('../src/branches/branches.store.ts');
   const unreadable = new Missing({ message: 'git has no such repository' });
   const git: BranchReader = {
-    ...oneByOne,
+    ...live,
     has: () => {
       throw unreadable;
     },
@@ -6816,7 +6829,6 @@ test("REFUSED as a death in the runtime's words: a refusal the engine's view, lo
 
 test('a parent whose frozen steps cannot be read has not shipped: its views program answers so, neither failing nor dying, and asks git nothing of its branches', async () => {
   const v = await viewPrograms();
-  const { oneByOne } = await import('../src/branches/branches.store.ts');
   const repo = aRepo();
   const b = board();
   const dir = oneStep();
@@ -6828,11 +6840,12 @@ test('a parent whose frozen steps cannot be read has not shipped: its views prog
   fs.rmSync(dir, { recursive: true });
   assert.throws(() => stepsOf(readRun(p.run.id)), 'its steps do not read');
   const asked: string[] = [];
+  const read = await v.live([p.run.id]);
   const git: BranchReader = {
-    ...oneByOne,
+    ...read,
     shipped: (run, branch) => {
       asked.push(branch);
-      return oneByOne.shipped(run, branch);
+      return read.shipped(run, branch);
     },
   };
   const unshipped = { record: readRun(p.run.id), shipped: false };
@@ -6852,13 +6865,13 @@ test("the views' programs say in their types what they need and what they refuse
     >,
     v.checkReportsRead(run, [], failed, () => true) satisfies EffectOf<Map<string, CheckReport>, Refusal, EngineService>,
     v.refusalRead('x', 'y') satisfies EffectOf<CheckRefusal, Refusal, EngineService>,
-    v.parentRead('x') satisfies EffectOf<ParentRun, Refusal, EngineService>,
-    v.parentsRead(run) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
+    v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, Refusal, EngineService>,
+    v.parentsRead(run, v.nothingRead()) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
     v.filingsRead() satisfies EffectOf<{ filed: Map<string, string>; cursor: number }, Refusal, EngineService>,
   ];
   const infallible = [
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-    v.parentRead('x') satisfies EffectOf<ParentRun, never, EngineService>,
+    v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, never, EngineService>,
   ];
   const cannotFail = [
     v.taskPhasesRead(run) satisfies EffectOf<unknown, never, EngineService>,
@@ -7151,7 +7164,7 @@ test('the start program answers what its plain face answers on the same store: a
   const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];
   const same = (r: Run) => Object.fromEntries(Object.entries(r).filter(([k]) => !differ.includes(k)));
   for (const [what, opts] of cases) {
-    const ran = s.Effect.runSync(s.startRun(opts));
+    const ran = await s.Effect.runPromise(s.startRun(opts));
     const face = await Effect.runPromise(startRun(opts));
     const written = (r: Run) => JSON.parse(JSON.stringify(r)) as Run;
     assert.deepStrictEqual(written(ran), readRun(ran.id), `${what}: the program's run is on the record`);

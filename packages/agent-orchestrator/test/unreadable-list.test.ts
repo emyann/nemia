@@ -5,7 +5,7 @@
  * Walked through the runtime itself, `plainEngine` over an in-memory journal that hands back what was put in it, as a store does.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads; `WF_MAX_RUNS` caps the runs, so `nemia ls`
- * reads the slots.
+ * reads the slots. A pass has read where the runs' branches stand (`passStanding`), which `nemia ls` reads off `standing.json`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +14,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import { Engine } from 'agent-runtime';
+import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
 
@@ -23,6 +24,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_RUNS = '4';
 const { main } = await import('../src/cli/main.ts');
+const { passStanding } = await import('../src/standing/standing.verb.ts');
+const { listRuns } = await import('../src/record/record.store.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
@@ -141,6 +144,7 @@ writeRun('r-try', {
 });
 
 writeRun('r-waiting', {}, { after: ['r-check'] });
+await Effect.runPromise(passStanding(listRuns()));
 
 const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];

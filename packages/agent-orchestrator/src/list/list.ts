@@ -38,12 +38,13 @@ import {
   type RoundAsk,
   type SpendOf,
   budgetWord,
+  durationWord,
 } from '../status/status.ts';
 import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsDue } from '../round/round.ts';
 import { saidWord } from '../say/say.ts';
 import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
-import { daemonLine, type DaemonStanding } from '../daemon/daemon.ts';
+import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
 
 export type Listing = {
@@ -100,13 +101,30 @@ export type Unjudged = { said: string; steps: Array<{ name: string; status: stri
 
 /**
  * `nemia ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
- * (`resultBranches`); whether a nemia up ticks the store; and, while the store is paused, the pause and the checks it holds.
+ * (`resultBranches`); whether a nemia up ticks the store; when the tick's last pass read where the branches stand (`standing.json`), or
+ * that none has; and, while the store is paused, the pause and the checks it holds.
  */
 export type RunsListed = {
   runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>;
   daemon: DaemonStanding;
+  standing: ListedStanding;
   paused?: Paused;
 };
+
+/** When the tick's last pass read where the branches stand, as `standing.json` says (`at`), or that no pass has (`none`). */
+export type ListedStanding = { at: string } | { none: true };
+
+/**
+ * `nemia ls`'s line on where the branches it shows stand, at `now`: none while a daemon ticks and its last reading is within
+ * `staleAfterMs` of its interval; how long ago it was read where it is older, or nothing ticks; and that it is not read where no pass has
+ * read it, with what reads it.
+ */
+export function standingLine(standing: ListedStanding, daemon: DaemonStanding, now: number): string | undefined {
+  if ('none' in standing) return 'where branches stand: not read — nemia up reads them';
+  const age = now - Date.parse(standing.at);
+  if (daemon.kind === 'ticking' && age <= staleAfterMs(daemon.file.every)) return undefined;
+  return `where branches stand: read ${durationWord(age)} ago`;
+}
 
 /** What `listing` reads a run's steps off: the run, the engine's words for its tasks, and what people and git said of it. */
 export interface ListingInput {
@@ -545,8 +563,11 @@ function runLines({ run, listed, result }: RunsListed['runs'][number]): string[]
   ];
 }
 
-/** Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, and whether a nemia up ticks the store. */
-export const lsLines = ({ runs, daemon }: RunsListed, now: number): string[] => [
-  ...(runs.length ? runs.flatMap(runLines) : ['no runs']),
-  daemonLine(daemon, now),
-];
+/**
+ * Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, how old what it shows of where the branches
+ * stand is (`standingLine`), and last whether a nemia up ticks the store.
+ */
+export const lsLines = ({ runs, daemon, standing }: RunsListed, now: number): string[] => {
+  const stood = standingLine(standing, daemon, now);
+  return [...(runs.length ? runs.flatMap(runLines) : ['no runs']), ...(stood ? [stood] : []), daemonLine(daemon, now)];
+};

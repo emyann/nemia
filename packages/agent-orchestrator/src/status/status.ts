@@ -247,30 +247,34 @@ export const heldByCheckout = (steps: readonly Workflow[], name: string, checkou
 
 /**
  * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in
- * branches.store.ts): `on` it — merged, or with nothing committed past the run's base — `ahead` of it by N commits, or `gone`, a branch git
- * no longer has and no recorded tip puts on the base.
+ * branches.store.ts): `on` it — merged, or with nothing committed past the run's base — `ahead` of it by N commits, `gone`, a branch git
+ * no longer has and no recorded tip puts on the base, or `unread`: the place's `standing` was not read for it, and `why` says so.
  */
 export type BranchStanding =
   | { branch: string; where: 'on' }
   | { branch: string; where: 'ahead'; commits: number }
-  | { branch: string; where: 'gone' };
+  | { branch: string; where: 'gone' }
+  | { branch: string; where: 'unread'; why: string };
 
 /**
- * One branch's standing, for a person: `wf/r-1/implement is on main`, `… is ahead of main by 3 commits`, `… is gone: git no longer has it`.
- * Pure.
+ * One branch's standing, for a person: `wf/r-1/implement is on main`, `… is ahead of main by 3 commits`, `… is gone: git no longer has it`,
+ * `…: where it stands is not read (the place was not heard: …)`. Pure.
  */
 export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string =>
   s.where === 'on'
     ? `${s.branch} is on ${run.branch}`
     : s.where === 'ahead'
       ? `${s.branch} is ahead of ${run.branch} by ${s.commits} commit${s.commits === 1 ? '' : 's'}`
-      : `${s.branch} is gone: git no longer has it`;
+      : s.where === 'gone'
+        ? `${s.branch} is gone: git no longer has it`
+        : `${s.branch}: where it stands is not read (${s.why})`;
 
 /**
  * Whether git has already taken a run's result: every result branch is on the base branch (`branchStandings`), so an ending step that
  * merges has nothing left to merge — a person merged it by hand, or the work committed nothing past the run's base. Pure.
  *
- * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks.
+ * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks. False over a
+ * branch whose standing is `unread`: a result not read is never called taken.
  */
 export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
   standings.length > 0 && standings.every((b) => b.where === 'on');

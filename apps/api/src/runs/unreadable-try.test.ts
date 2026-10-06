@@ -2,7 +2,8 @@
  * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the list marks the step whose check or
  * try it is `unreadable`, not the word its session's view would give; and the decision `nemia decide` shows (`GET
  * /api/runs/:runId/decision`) is refused as the run's page is, a 502 in the list's words — for a run waiting on such a run too — while a
- * run whose tasks read is answered.
+ * run whose tasks read is answered. A pass has read where the runs' branches stand (`passStanding`), which the list reads off
+ * `standing.json`.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -13,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { type RunSummary } from 'agent-orchestrator';
+import { engine, passStanding, runStore, runWith, type RunSummary } from 'agent-orchestrator';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -113,6 +114,7 @@ writeRun('r-try', {
 });
 
 writeRun('r-child', {}, { after: ['r-check'] });
+await runWith(engine(), passStanding(runStore.runs.list()));
 
 const listed = async (): Promise<Map<string, RunSummary>> => {
   const res = await app.request('/api/runs');

@@ -32,7 +32,7 @@ import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../d
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
-import { headsFor, passStanding } from '../standing/standing.verb.ts';
+import { headsFor, passStanding, standingReader } from '../standing/standing.verb.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
@@ -240,7 +240,11 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   return {
     ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging)),
     ...(forgetting.length ? { forgetting } : {}),
-    ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []), ...(yield* heldRead(e, runs)) } } : {}),
+    ...(pause
+      ? {
+          pause: { pause, finishing: finishingReported(runs, report.views ?? []), ...(yield* heldRead(e, runs, standingReader(standing))) },
+        }
+      : {}),
   };
 });
 

@@ -91,7 +91,7 @@ export type Decision =
     };
 
 /**
- * Whether a result branch is on the run's base branch, as git says it (`isShipped` in branches.store.ts):
+ * Whether a result branch is on the run's base branch, as its place's `standing` says it (`shipped` on a `BranchReader`):
  *
  *   false        it is not
  *   'unchanged'  it is, and only because nothing is committed on it past the run's base — where it was cut

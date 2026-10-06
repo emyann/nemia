@@ -251,3 +251,21 @@ test('REFUSED: a baselined reader reaching more, an entry listing a reach gone, 
     "src/a.ts's entry in MOVES names zzzz, a card CARDS does not know: name a filed card, or the move and where it goes",
   ]);
 });
+
+/**
+ * The files of `texts` that name the tick's own write of where the branches stand (`passStanding`) outside their comment lines: none,
+ * since only the tick writes `standing.json`, and the api's tests call it alone, to stand for a pass.
+ */
+const tickWritersIn = (texts: ReadonlyMap<string, string>): string[] =>
+  [...texts].filter(([, text]) => /\bpassStanding\b/.test(withoutComments(text))).map(([file]) => file);
+
+test('only the tick writes standing.json: no file under src calls `passStanding`', () => {
+  assert.deepEqual(tickWritersIn(sourceTexts()), []);
+});
+
+test('REFUSED: a file under src that calls `passStanding`, imported or named off the package', () => {
+  const planted = (text: string): string[] => tickWritersIn(new Map([...sourceTexts(), ['src/x/x.ts', text]]));
+  assert.deepEqual(planted("import { passStanding } from 'agent-orchestrator';\n"), ['src/x/x.ts']);
+  assert.deepEqual(planted('export const pass = (o: typeof import("agent-orchestrator")) => o.passStanding([]);\n'), ['src/x/x.ts']);
+  assert.deepEqual(planted('/** Never calls `passStanding`: the tick does. */\nexport const x = 1;\n'), [], 'a JSDoc that names it');
+});

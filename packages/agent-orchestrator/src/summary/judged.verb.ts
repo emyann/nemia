@@ -1,13 +1,14 @@
 /**
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `nemia ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result. The board's reading
- * of a run, as the list and a run's page give it. A controller: it reads the run through `runReading` and git through `branchStandings`.
+ * of a run, as the list and a run's page give it. A controller: it reads the run through `runReading` and its branches through
+ * `branchStandings`.
  */
 import { Effect } from 'effect';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
 import { runReading } from '../list/list.verb.ts';
-import { type BranchReader, branchReader, branchStandings } from '../branches/branches.store.ts';
+import { type BranchReader, branchStandings } from '../branches/branches.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf } from '../views/views.verb.ts';
@@ -254,11 +255,12 @@ type Judged = {
 
 /**
  * The result branches whose standing against the base branch decides anything, for this run: none unless it finished with every step
- * satisfied, it was not called off, it cut worktrees of its own, and no step of its workflow merges (`merges`) — a folder whose ending
- * merges answers for its own branch. Pure, and off the record alone: what `standingsOf` asks git about, and nothing more.
+ * satisfied, it was neither called off nor pruned (its branches are deleted), it cut worktrees of its own, and no step of its workflow
+ * merges (`merges`) — a folder whose ending merges answers for its own branch. Pure, and off the record alone: what `standingsOf` asks git
+ * about, and nothing more.
  */
 const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatus): string[] =>
-  run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
+  run.cancelledAt || run.pruned || status !== 'succeeded' || !run.isolate || merges(steps)
     ? []
     : [
         ...new Set(
@@ -274,15 +276,14 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
  *
  * A branch merged into the base does not come off it again short of a history rewrite, and it is the answer that says there is nothing
  * left to decide: remembering it can only forget a decision, never invent one, which is the safe direction of the level-triggered rule
- * (the dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh process asks git again.
- * It spares the store's long tail — finished runs whose branches are already on the base — two `git` calls a branch on every poll of the
- * list.
+ * (the dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh process reads again.
+ * It spares the store's long tail — finished runs whose branches are already on the base — a reading a branch on every poll of the list.
  *
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
- * a run whose branch had nothing on it past its base reads `on` too (`isShipped`'s `unchanged`), and its next try may commit. A try or a
- * round files a task, which the record carries, so the memo is dropped and git is asked afresh. What is left is a person committing to a
- * finished run's branch by hand, which nothing on the board is told of either: `nemia decide` reads git every time, and so does a fresh
- * process.
+ * a run whose branch had nothing on it past its base reads `on` too (`shippedOver`'s `unchanged`), and its next try may commit. A try or a
+ * round files a task, which the record carries, so the memo is dropped and the branch read afresh. What is left is a person committing
+ * to a finished run's branch by hand, which nothing on the board is told of either: `nemia decide` asks where it stands every time, and a
+ * fresh process reads it afresh.
  */
 const onTheBase = new Map<string, string>();
 
@@ -296,27 +297,27 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
     .join(' ');
 
 /**
- * Where each of a run's result branches stands against the base branch, as git says it now (`branchStandings`): what says a finished run
+ * Where each of a run's result branches stands against the base branch, as `git` read it (`branchStandings`): what says a finished run
  * whose folder has no ending step is one nobody has decided (`toDecide`'s git kind).
  *
- * Asked of the runs where the answer can decide anything and of no other (`toDecideBranches`), because it is a few `git` calls a branch and
- * the list is polled every five seconds: a gate says a run is one to decide without git being asked at all. Level-triggered, as the package
- * is: read on the request that asks, stored nowhere but the memo of branches already on the base (`onTheBase`), so a branch a person merged
- * by hand stops being one to decide with nobody telling the run. A record whose branches cannot be read is no branch: git said nothing, and
- * only a gate says there is something to decide.
+ * Asked of the runs where the answer can decide anything and of no other (`toDecideBranches`): a gate says a run is one to decide without
+ * a branch being read at all. Level-triggered, as the package is: read on the request that asks, off the tick's last reading, stored
+ * nowhere but the memo of branches already on the base (`onTheBase`), so a branch a person merged by hand stops being one to decide with
+ * nobody telling the run. A record whose branches cannot be read is no branch: git said nothing, and only a gate says there is something
+ * to decide. A branch no reading has is unread, and decides nothing either.
  *
  * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it. A
  * folder run has no branch, and stands nowhere.
  *
- * `git` is the request's reader (`branchReader`: one listing of a repository's branches for every run of it). `asked`, where given, is told
- * what git was asked of — the branches it did not find on the base, which only their tips can move, a branch on the base staying there as
- * `onTheBase` has it; and whether git answered — which is what the list's memo of runs at rest watches (`RestingMemo`).
+ * `git` is the request's reader (`standingReader`, off `standing.json`). `asked`, where given, is told what was read of — the branches not
+ * on the base, which only their tips can move, a branch on the base staying there as `onTheBase` has it; and whether a branch was unread or
+ * the read failed (`failed`) — which is what the list's memo of runs at rest watches (`RestingMemo`).
  */
 export function standingsOf(
   run: Run,
   steps: readonly Workflow[],
   status: RunStatus,
-  git: BranchReader = branchReader(),
+  git: BranchReader,
   asked?: GitAsked,
 ): BranchStanding[] {
   if (!isGitRun(run)) return [];
@@ -327,6 +328,7 @@ export function standingsOf(
     const read = branchStandings(run, branches, git);
     for (const stood of read) if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, filed);
     asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
+    if (asked && read.some((stood) => stood.where === 'unread')) asked.failed = true;
     return read;
   } catch {
     if (asked) asked.failed = true;
@@ -334,18 +336,21 @@ export function standingsOf(
   }
 }
 
-/** What `standingsOf` asked git about for one run: the result branches git did not find on the base, and whether git failed to answer. */
+/**
+ * What `standingsOf` read for one run: the result branches not found on the base, and whether one was unread or the read failed
+ * (`failed`).
+ */
 export type GitAsked = { branches: string[]; failed: boolean };
 
 /**
  * What `judge` reads with: the request's reader (`seenBy`), which answers the run's tasks and those of the runs it waits on off the views
- * already read; the request's branch reader (`branchReader`), one listing of a repository's branches for every run of it, a fresh one
- * left out; where the run's result branches stand once its status is known (`standingsOf`), no branch read left out; and the runs it
- * waits on and is held until as the caller read them (`parentsRead`), read afresh left out.
+ * already read; the request's branch reader (`standingReader`), off the tick's last reading of where the branches stand; where the run's
+ * result branches stand once its status is known (`standingsOf`), no branch read left out; and the runs it waits on and is held until as
+ * the caller read them (`parentsRead`), read afresh left out.
  */
 export type JudgeHow = {
   reader: Engine;
-  git?: BranchReader;
+  git: BranchReader;
   standings?: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[];
   parent?: (id: string) => ParentRun;
 };
@@ -379,7 +384,7 @@ export const judge = Effect.fn('judge')(function* (
 ) {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
-  const read = yield* runReading(reader, run, { views, steps, shown, standings, ...(git ? { git } : {}), ...(parent ? { parent } : {}) });
+  const read = yield* runReading(reader, run, { views, steps, shown, standings, git, ...(parent ? { parent } : {}) });
   const { status, stoppedOn, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);

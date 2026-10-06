@@ -33,7 +33,7 @@ process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '40';
 delete process.env.WF_MAX_CONCURRENT;
 const { advanceRun, approveRun, hold, retryRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
-const { acceptFile, askFile, asksDir, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
+const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { passParents, reportedEngine } = await import('../src/views/views.verb.ts');
@@ -41,6 +41,8 @@ const { metered } = await import('../src/meter/tally.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { readStanding } = await import('../src/standing/standing.store.ts');
+const { NOTHING_READ, standingReader, standingSnapshot } = await import('../src/standing/standing.verb.ts');
+const { statusMemo } = await import('../src/place/landing.store.ts');
 const { RunPlace } = await import('../src/place/place.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
@@ -229,7 +231,7 @@ test("a pass reads each task's view once, and once more after a write of the pas
 
 test("the cap's slots are read once for the pass, however many claims ask", async () => {
   const { b } = await theStore();
-  const read = passRead(b.e, runStore.runs.list());
+  const read = passRead(b.e, runStore.runs.list(), process.env, NOTHING_READ);
   b.lists.calls = 0;
   const first = await Effect.runPromise(read.slots);
   const second = await Effect.runPromise(read.slots);
@@ -246,7 +248,14 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
     return new Map();
   });
   const hold = await Effect.runPromise(
-    checkoutHold(b.e, run, stepsOf(run), { read: { runs: [run], slots, parents: passParents() }, slot: undefined }),
+    checkoutHold(
+      b.e,
+      run,
+      stepsOf(run),
+      { read: { runs: [run], slots, parents: passParents(standingReader(NOTHING_READ)), standing: NOTHING_READ }, slot: undefined },
+      process.env,
+      statusMemo(() => undefined),
+    ),
   );
   assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
@@ -267,6 +276,28 @@ test('a pass spends no git process more for more runs waiting on runs of the sam
     after.records - before.records,
     added + 1,
     'each run waited on read once for the pass: the runs added cost their own records, and the one they newly wait on its, once',
+  );
+});
+
+test("a pass's one standing for the repository asks of a finished run, a pruned run handed to one not started and one held until", async () => {
+  const { b, repo } = await theStore();
+  const done = await settledOne(b, repo, 'succeeded');
+  const handed = await settledOne(b, repo, 'succeeded');
+  const until = await atTheGate(b, repo);
+  await Effect.runPromise(startRun({ brief: 'handed one', repo, workflowDir: oneStep, context: [handed.id] }));
+  const held = await Effect.runPromise(startRun({ brief: 'held until one', repo, workflowDir: oneStep }));
+  await runWith(b.e, hold(held.id, [until.id]));
+  for (const r of [handed, until]) fs.writeFileSync(pruneFile(r.id), JSON.stringify({ at: new Date().toISOString(), worktrees: [] }));
+  await onePass(b);
+  const { value: git, tallies } = await metered(() => runWith(b.e, standingSnapshot().pipe(Effect.map(standingReader))));
+  for (const r of [done, handed, until]) {
+    const branch = r.steps.implement.branch!;
+    assert.equal(git.unread(readRun(r.id) as never, branch), undefined, `${r.id}'s ${branch} answered off the pass`);
+  }
+  assert.equal(
+    Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0),
+    0,
+    'read off standing.json',
   );
 });
 

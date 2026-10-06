@@ -2,9 +2,10 @@
  * The list's memo of runs at rest (`restingRead`, the package's rest/resting.verb.ts): `GET /api/runs` answers a finished run from memory
  * while nothing it was judged on has moved, so a poll reads the journals of the runs still moving and of none other — and answers afresh
  * the moment anything it watches does: the run's record, a file a person writes beside it, a line of its tasks on the engine's feed, a tip
- * of a branch git was asked about, or the record gone. Every api test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each
- * kept answer afresh too and fails the request on a difference; the tests here turn it off where they measure what the memo saves, or ask
- * whether it saw a change on its own. What a poll read is what the api's `api.poll.reads` counts for it (`served`, layer.ts).
+ * of a branch as the tick's last pass read it (`standing.json`, written here as a pass writes it: `aPass`), or the record gone. Every api
+ * test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each kept answer afresh too and fails the request on a difference; the
+ * tests here turn it off where they measure what the memo saves, or ask whether it saw a change on its own. What a poll read is what the
+ * api's `api.poll.reads` counts for it (`served`, layer.ts).
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -19,10 +20,28 @@ import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import type { MetricRead } from '../factory/ceilings.ts';
 import { Engine, findRun } from '../store.ts';
-import { approveRun, engine, restingRead, runWith, type RunSummary, verifiesRest } from 'agent-orchestrator';
+import {
+  approveRun,
+  engine,
+  passStanding,
+  restingRead,
+  runStore,
+  runWith,
+  type RunSummary,
+  standingReader,
+  standingSnapshot,
+  verifiesRest,
+} from 'agent-orchestrator';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
+/** Where branches stand as the board reads them, off `standing.json` (`standingSnapshot`). */
+const snapshotGit = async () => standingReader(await runWith(e, standingSnapshot()));
+/**
+ * A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what the list reads, and a tip it
+ * read is one the memo watches.
+ */
+const aPass = () => runWith(e, passStanding(runStore.runs.list()));
 /** The list's memo of runs at rest, the app's own (`ReadMemo`). */
 const { resting } = await runtime.runPromise(ReadMemo.useSync((memo) => memo));
 
@@ -212,6 +231,7 @@ aFinishedRun('r-rest');
 running('r-moving-implement');
 branchOff('wf/r-moving/implement');
 writeRun('r-moving', 'Still going');
+await aPass();
 
 test("a finished run is kept and a moving one is not, and a poll then reads the moving run's journal alone", async () => {
   await list();
@@ -255,6 +275,7 @@ test('a record rewritten is judged afresh', async () => {
 
 test('a file a person writes beside the run is judged afresh: a retry asked of a failed run', async () => {
   aFinishedRun('r-ask');
+  await aPass();
   blocked('r-ask-implement');
   await list();
   assert.ok(resting.runs.has('r-ask'));
@@ -268,6 +289,7 @@ test('a file a person writes beside the run is judged afresh: a retry asked of a
 
 test("a line on the engine's feed for a task of the run is judged afresh: its journal changed", async () => {
   aFinishedRun('r-fed');
+  await aPass();
   await list();
   assert.ok(resting.runs.has('r-fed'));
   blocked('r-fed-implement');
@@ -277,6 +299,7 @@ test("a line on the engine's feed for a task of the run is judged afresh: its jo
 
 test("a journal changed with no line on the feed is not seen: the feed is what the memo watches, as the tick's does", async () => {
   aFinishedRun('r-unfed');
+  await aPass();
   await list();
   const was = resting.runs.get('r-unfed');
   assert.ok(was);
@@ -288,17 +311,26 @@ test("a journal changed with no line on the feed is not seen: the feed is what t
   assert.equal((await listed('r-unfed'))?.status, 'failed');
 });
 
-test("a branch tip that moves is judged afresh: the base branch taking the run's work", async () => {
+test("a branch tip that moves is judged afresh once a pass reads it: the base branch taking the run's work", async () => {
   aFinishedRun('r-merged');
+  await aPass();
   await list();
   assert.ok(resting.runs.has('r-merged'));
   assert.equal((await listed('r-merged'))?.toDecide?.kind, 'git');
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-merged/implement');
-  assert.equal((await unverified(() => listed('r-merged')))?.toDecide, null, 'on the base now: nothing to decide');
+  assert.equal((await unverified(() => listed('r-merged')))?.toDecide?.kind, 'git', 'no pass has read the merge: the list cannot know it');
+  assert.ok(resting.runs.has('r-merged'), 'and it is kept, against the tips the last pass read');
+  await aPass();
+  assert.equal(
+    (await unverified(() => listed('r-merged')))?.toDecide,
+    null,
+    'on the base now, as the next pass read it: nothing to decide',
+  );
 });
 
 test('a run removed from the store leaves the memo', async () => {
   aFinishedRun('r-gone');
+  await aPass();
   await list();
   assert.ok(resting.runs.has('r-gone'));
   fs.rmSync(path.join(root, 'runs', 'r-gone.json'));
@@ -309,6 +341,7 @@ test('a run removed from the store leaves the memo', async () => {
 test("runs waiting on the same run read its journals once between them, off the request's one list", async () => {
   aFinishedRun('r-parent');
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-parent/implement');
+  await aPass();
   const child = (id: string) =>
     write(
       path.join(root, 'runs', `${id}.json`),
@@ -346,15 +379,16 @@ test("runs waiting on the same run read its journals once between them, off the 
 
 test('two requests at once: the first reads the feed and judges the run succeeded, a line of its task lands, the second reads on past the line while the run is not yet kept, and the first then keeps nothing', async () => {
   aFinishedRun('r-raced');
+  await aPass();
   const answer = await listed('r-raced');
   assert.ok(answer && resting.runs.has('r-raced'));
   resting.runs.delete('r-raced');
   const { startedAt: _, ...judged } = answer;
 
-  const first = await runWith(e, restingRead(e, resting, false));
+  const first = await runWith(e, restingRead(e, resting, false, await snapshotGit()));
   blocked('r-raced-implement');
   fed('r-raced-implement');
-  await runWith(e, restingRead(e, resting, false));
+  await runWith(e, restingRead(e, resting, false, await snapshotGit()));
   first.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(
     !resting.runs.has('r-raced'),
@@ -362,7 +396,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   );
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
 
-  const alone = await runWith(e, restingRead(e, resting, false));
+  const alone = await runWith(e, restingRead(e, resting, false, await snapshotGit()));
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
@@ -457,6 +491,7 @@ test("a poll's reads: a run at rest, a moving one and one whose check refused it
   branchOff('wf/r-count-moving/implement');
   writeRun('r-count-moving', 'Still counting');
   aRefusedRun('r-count-refused');
+  await aPass();
   const fresh = await cost();
   assert.equal(fresh - before, 4, "judged afresh: each new run's journals once, the refused check's included, and no output of it");
   assert.equal((await cost()) - before, 1, "then from memory: the moving run's one journal");
@@ -490,6 +525,7 @@ test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is r
 
 test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {
   aFinishedRun('r-poisoned');
+  await aPass();
   await list();
   const kept = resting.runs.get('r-poisoned');
   assert.ok(kept);

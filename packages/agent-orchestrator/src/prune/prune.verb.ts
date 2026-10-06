@@ -21,24 +21,25 @@ import { runStore } from '../record/files.store.ts';
 import { readRunPlace, RunPlace, runPlaceVerb, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { shippedOf, standingsOf } from '../branches/branches.store.ts';
-import { checkoutStatus, stagedHere } from '../place/landing.store.ts';
+import { checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
+import { headsOver, standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 
 /**
  * Whose merge is in the repository's checkout, for a run whose ending lands on its check (`forgetRefusal`): none where the file its place
- * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not landed; else as
- * its place's `status` reads it (`checkoutStatus`). Refuses (`Conflict`) a checkout the place did not read, in its words: nothing is
- * removed on a guess.
+ * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not landed; else as its
+ * place's `status` reads it (`checkoutStatus`), through `memo`. Refuses (`Conflict`) a checkout the place did not read, in its words:
+ * nothing is removed on a guess.
  */
-export function merging(run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] {
+export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: StatusMemo): MergeState['merging'] {
   if (!isGitRun(run)) return 'none';
   const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
   const marked = stagedHere(run);
   if (!landings.length || marked === false) return 'none';
   if (marked === undefined && !landings.some((s) => run.steps[s.name]?.taskId && !run.steps[s.name]?.landed)) return 'none';
-  const read = checkoutStatus(run);
+  const read = checkoutStatus(run, memo);
   if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
   return read.merging;
 }
@@ -162,6 +163,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
 ) {
   const judged: Pick<PruneFacts, 'decided' | 'held' | 'owed'> = { decided: undefined, held: null, owed: [] };
   if (!steps) return judged;
+  const git = yield* standingLive([run]);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const { asks, rounds } = runStore.asks.read(run.id);
   const reader = closeoutReader(views, run);
@@ -175,9 +177,10 @@ const judgedOf = Effect.fn('prune.judged')(function* (
     run.steps[name] = { ...run.steps[name], taskId };
   }
   const askAt = (a: AskName) => runStore.asks.where(run.id, a);
-  const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
+  const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, git) : [];
   return {
-    decided: decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind,
+    decided: decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf)
+      .kind,
     held: forgetRefusal(
       steps,
       run,
@@ -192,7 +195,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
       askAt,
       standings,
       'prune',
-      merging(run, steps),
+      merging(run, steps, statusMemo(headsOver(git))),
       pruneAgain(run.id, flags),
     ),
     owed: handOffOwed(steps, run, phaseOf),

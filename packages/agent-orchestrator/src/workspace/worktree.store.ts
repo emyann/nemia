@@ -29,7 +29,7 @@ import { folderPlace } from '../record/places.store.ts';
 import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
-import { countSpawn, execCounted, withinEffect } from '../meter/tally.store.ts';
+import { countSpawn, withinEffect } from '../meter/tally.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
 import { readPlaceJson } from '../place/place.store.ts';
 import type { PlaceRequests } from '../place/place.ts';
@@ -423,15 +423,3 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
     notes: [...made.notes, ...depsNotes(deps)],
   });
 });
-
-/**
- * Git's output, or undefined when it cannot answer — quietly, as a person reads the screen this
- * feeds, and untrimmed, as a name may end in a space. A lockfile's diff is large, so is the buffer.
- */
-export const gitSays = (repo: string, ...args: string[]): string | undefined => {
-  try {
-    return execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
-  } catch {
-    return undefined;
-  }
-};

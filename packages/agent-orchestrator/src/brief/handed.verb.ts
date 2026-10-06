@@ -11,6 +11,7 @@ import { resultSteps } from '../branches/index.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { ParentCloseout, ParentStep } from './handed.ts';
 
@@ -46,9 +47,14 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
  *
  * A parent whose record or workflow does not read, a step never filed, a task the engine holds no closeout for — a failed step whose work
  * a person merged all the same — and a closeout that does not parse each say so in the section, and the roots are filed all the same.
- * Fails with a refusal the read of whether a run read has shipped failed with (`parentRead`).
+ * Whether a run read has shipped is read through `git` (`parentRead`), and fails with the refusal that read failed with.
  */
-export const parentCloseouts = Effect.fn('parentCloseouts')(function* (e: Engine, ids: readonly string[], how: ParentCloseout['how']) {
+export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
+  e: Engine,
+  ids: readonly string[],
+  how: ParentCloseout['how'],
+  git: BranchReader,
+) {
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {
     let record: Run;
@@ -62,7 +68,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (e: Engine
     }
     const said: ParentStep[] = [];
     for (const step of resultSteps(steps)) said.push(yield* stepSaid(e, record, step));
-    const shipped = how === 'waited' || (yield* parentRead(id).pipe(over(e))).shipped;
+    const shipped = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).shipped;
     out.push({ run: id, asked: record.brief.split('\n')[0], steps: said, how, shipped });
   }
   return out;
@@ -72,8 +78,8 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (e: Engine
  * What a run's roots are handed of other runs, on the pass that files them: what each run it waited on concluded, shipped, then what each
  * run it was handed as context concluded, shipped or not (`parentCloseouts`). Undefined for a run with neither.
  */
-export const handedOf = Effect.fn('handedOf')(function* (e: Engine, run: Run) {
-  const waited = run.after?.length ? yield* parentCloseouts(e, run.after, 'waited') : [];
-  const read = run.context?.length ? yield* parentCloseouts(e, run.context, 'read') : [];
+export const handedOf = Effect.fn('handedOf')(function* (e: Engine, run: Run, git: BranchReader) {
+  const waited = run.after?.length ? yield* parentCloseouts(e, run.after, 'waited', git) : [];
+  const read = run.context?.length ? yield* parentCloseouts(e, run.context, 'read', git) : [];
   return waited.length || read.length ? [...waited, ...read] : undefined;
 });

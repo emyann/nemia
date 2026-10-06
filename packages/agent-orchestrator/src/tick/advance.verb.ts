@@ -20,7 +20,7 @@ import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isGitRun, stepTaskId, tryOf, type CloseoutAsked, type GitRun, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
-import { hasStarted, holdsOf, runReady, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
+import { hasStarted, holdsOf, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
@@ -32,8 +32,16 @@ import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../r
 import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { collectArtifacts } from '../artifacts/artifacts.store.ts';
-import { oneByOne } from '../branches/branches.store.ts';
-import { headsFor } from '../standing/standing.verb.ts';
+import {
+  headsFor,
+  headsNow,
+  NOTHING_READ,
+  placeReader,
+  standingLive,
+  standingNow,
+  standingReader,
+  type PassStanding,
+} from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/rest.ts';
 import {
   answersIn,
@@ -44,6 +52,7 @@ import {
   harnessBlocked,
   keptParent,
   parentsRead,
+  passParents,
   saidCount,
   spendReader,
   taskPhasesRead,
@@ -288,7 +297,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   its check, for a step filed without one.
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
- *   branch a person deleted after its merge is on the base (`isShipped`).
+ *   branch a person deleted after its merge is on the base (`BranchReader.shipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
  *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `nemia pause --now` wrote that is
  *   void on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
@@ -327,10 +336,13 @@ export const advancePass = Effect.fn('advancePass')(
     const adopted = yield* adoptAll(e, run, reads);
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
     const handed = yield* withinEffect('act', handOffAll(run, reads, yield* RunPlace));
-    const memo = statusMemo();
+    const placeOf = yield* placeReader;
+    const heads = headsOf(run, handed.marked ? undefined : pass?.standing, placeOf);
+    const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, placeOf)));
     const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
-    const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
-    const checkout = yield* checkoutHold(e, run, steps, pass && { read: pass, slot }, undefined, memo);
+    const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
+    const from = pass ? { read: pass, slot } : { standing: standingNow(runStore.runs.list()) };
+    const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo);
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
     const settled = settledOf(run, reads, pass?.settled);
@@ -340,12 +352,11 @@ export const advancePass = Effect.fn('advancePass')(
     const feed = wordFeed(run, reads, assessed, admission, checkout);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
-    const heads = headsOf(run, handed.marked ? undefined : pass);
     const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
-    const filed = yield* fileReady(f, admission.ready, admission.starting);
+    const filed = yield* fileReady(f, admission.ready, admission.starting, parents.git);
     const heldFirst = holdFirst(f, admission.held, assessed.ready);
     const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
@@ -594,15 +605,19 @@ function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[
   return heldFirst;
 }
 
+/** Whether `run` reads other runs: one it waits on (`waitedOn`), or one it is handed as context before it starts. */
+const readsOthers = (run: Run): boolean => waitedOn(run).length > 0 || (!hasStarted(run) && Boolean(run.context?.length));
+
 /**
- * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`headsFor`), undefined where it
- * did not, or asked of git where no pass read them (`advanceRun`) or the run committed a hand-off since (`handOffAll`).
+ * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`standing`, `headsFor`),
+ * undefined where it did not, or asked of its place now (`headsNow`, through `placeOf`) where no pass read them (`advanceRun`) or the run
+ * committed a hand-off since (`handOffAll`).
  */
-const headsOf = (run: Run, pass: PassRead | undefined): Heads => {
+const headsOf = (run: Run, standing: PassStanding | undefined, placeOf: PassStanding['placeOf']): Heads => {
   let read: { heads: Readonly<Record<string, string>> | undefined } | undefined;
   return () => {
     if (!isGitRun(run)) return undefined;
-    read ??= { heads: pass?.standing ? headsFor(pass.standing, run) : Object.fromEntries(oneByOne.heads(run.repo)) };
+    read ??= { heads: standing ? headsFor(standing, run) : headsNow(run, placeOf) };
     return read.heads;
   };
 };

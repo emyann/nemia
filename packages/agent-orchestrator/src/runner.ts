@@ -289,15 +289,8 @@ export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub
 export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
-export {
-  branchReader,
-  branchStandings,
-  headsOf,
-  isShipped,
-  parentRecord,
-  resultBranches,
-  type BranchReader,
-} from './branches/branches.store.ts';
+export { branchStandings, parentRecord, resultBranches, type BranchReader } from './branches/branches.store.ts';
+export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';

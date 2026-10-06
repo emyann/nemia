@@ -18,6 +18,10 @@ const ROOT = scratch('wf-slots-');
 process.env.WF_ROOT = ROOT;
 const { runWith, runSlots, slotsOf } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
+const { passParents } = await import('../src/views/views.verb.ts');
+const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
+/** The runs waited on as a read with no standing reads them: none of their branches asked. */
+const noParents = () => passParents(standingReader(NOTHING_READ));
 
 const at = (minute: number) => `2026-10-02T09:0${minute}:00.000Z`;
 const tasks = new Map<string, unknown[]>();
@@ -110,7 +114,7 @@ const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map(readRun);
 test('slotsOf: the runs in flight in the order a pass admits them, one unreadable among them, and the runs the cap holds — off one list', async () => {
   process.env.WF_MAX_RUNS = '2';
   calls.list = calls.view = 0;
-  const slots = await runWith(e, slotsOf(e, RUNS()));
+  const slots = await runWith(e, slotsOf(e, RUNS(), process.env, noParents()));
   assert.deepEqual(
     { ...slots, held: [...slots.held] },
     {
@@ -123,13 +127,17 @@ test('slotsOf: the runs in flight in the order a pass admits them, one unreadabl
     },
   );
   assert.deepEqual(calls, { list: 1, view: 0 }, 'one look at the harnesses for the whole store, and no task viewed again');
-  assert.deepEqual([...(await runWith(e, runSlots(e, RUNS())))], [...slots.held], 'runSlots answers slotsOf’s held runs');
+  assert.deepEqual(
+    [...(await runWith(e, runSlots(e, RUNS(), process.env, noParents())))],
+    [...slots.held],
+    'runSlots answers slotsOf’s held runs',
+  );
 });
 
 test('slotsOf with no cap reads nothing, and runSlots reads nothing on a store with no run waiting to start', async () => {
   process.env.WF_MAX_RUNS = '0';
   calls.list = calls.view = 0;
-  assert.deepEqual(await runWith(e, slotsOf(e, RUNS())), { cap: 0, inFlight: null, held: new Map() });
+  assert.deepEqual(await runWith(e, slotsOf(e, RUNS(), process.env, noParents())), { cap: 0, inFlight: null, held: new Map() });
   process.env.WF_MAX_RUNS = '2';
   assert.deepEqual(
     [
@@ -138,6 +146,8 @@ test('slotsOf with no cap reads nothing, and runSlots reads nothing on a store w
         runSlots(
           e,
           RUNS().filter((r) => Object.keys(r.steps).length),
+          process.env,
+          noParents(),
         ),
       )),
     ],

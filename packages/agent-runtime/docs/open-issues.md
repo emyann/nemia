@@ -706,10 +706,9 @@ What is left:
   have a restarted engine read a feed line the record lacks, which is worse. A hand edit of `tasks/*.jsonl` under a running
   `wf up` is the same — one more reason never to make one — and so is a consumer's `StoreOps` whose `feed` drops an
   append, which its doc now forbids.
-- **An engine's first pass reads the whole feed** to learn where it ends, since a store gives a cursor only by reading
-  (`JournalOps.feed`): 14 MB here, about as much again as the journals. `wf up` pays it once; a one-shot `wf tick` or `ae tick`
-  pays it every time, about half as much again as before (41.6 MB where 27.5 MB was read). The lever, if it matters, is an
-  optional `JournalOps.end()` that answers a cursor at the feed's end, on a line boundary, with no read.
+- ~~**An engine's first pass reads the whole feed**~~ — fixed 2026-10-06: a memo with no cursor keeps nothing to forget, so
+  `forgetNamed` asks the feed from past its end, which the files store answers with the end and no line read
+  (`test/tick-memo.test.ts`, *a fresh engine on the same store*). The feed had grown to 72 MB on this machine.
 - **`wf ls`, `wf decide` and the api's reads still fold every journal they read**: they `view`, not `tick`, and the memo is the
   pass's (agent-orchestrator's features, *What `wf ls` and `/api/runs` still pay*).
 
@@ -801,6 +800,24 @@ does not decode, under every detached harness: unread only while its process run
 nothing said (`outputFor`), so its harness's other sessions stay read (`test/start-event.test.ts`). Any other refused output is
 not closed here: it is read off a run whose process may have ended, so the same answer — read the run that refused as failed
 once it has ended, and its harness's others as read — is the candidate fix.
+
+### 37. What still reads the whole feed, and the feed's size on disk (2026-10-06)
+
+The feed is never rotated but by a forget (`rotateFeed`), so it grows by every line of every task ever filed: 72 MB on this
+machine on 2026-10-06, with no sealed file, beside 76 MB of journals over 3,935 tasks. A pass reads none of it but what was
+appended since the last (`forgetNamed`, and the orchestrator's `followedFeed`; `agent-orchestrator/src/tick/feed-reads.test.ts`
+holds a restarted tick's passes to the same reads over a feed 20,000 lines longer). What still reads it whole, each once a call
+and never on a pass:
+
+- **`forget` decodes the whole feed to count each task's lines** (`service/forget.ts`, `feed(0)`), every body resolved, for a
+  `feedLines` per task; then the files store rotates it, which reads it once more (`rotateFeed`). A count off the raw lines, or a
+  rotation that answers the count, would read it once and decode none.
+- **`sweep` reads the whole feed for the bodies it names** (`feedNaming` in `core/engine/sweep.ts`), as it must before removing one.
+- **`ae feed` from the start** (`src/cli/main.ts`), as asked.
+- **An engine's first pass folds every journal** (76 MB here): what the memo is made of, paid once per engine, and O(tasks).
+
+The size itself is the lever not taken: a feed rotated on a size or an age, its sealed half kept for a cursor from before, would
+keep the disk and those reads bounded. Not changed with the reads, so a store's format stays as it is.
 
 ## Verified live, once
 

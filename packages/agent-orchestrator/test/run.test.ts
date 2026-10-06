@@ -80,6 +80,7 @@ import {
   handOffDue,
   inFlight,
   listing,
+  feedWords,
   inputRefusal,
   inputsLine,
   inputsNote,
@@ -159,6 +160,9 @@ import {
   type RetryMode,
 } from '../src/retry/retry-ask.ts';
 import { tryOf } from '../src/record/record.ts';
+import { admissionOf } from '../src/admission/index.ts';
+import { TABLE } from '../src/command/commands.verb.ts';
+import { waitsOnPerson } from '../src/retry/index.ts';
 import {
   firstFiledAt,
   runStartedAt,
@@ -1853,7 +1857,8 @@ test('REFUSED past `retries:`: no try is due, and the step waits on you as it di
   assert.deepEqual(assess(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1).retry, [], 'nor at all, with no `retries:`');
   assert.deepEqual(
     cancelPlan(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1),
-    { kind: 'finished', status: 'failed' },
+    { kind: 'cancel', stop: [] },
+    'a refused check with no try due waits on a person, so the run is not finished: calling it off sets it aside',
   );
   const yours: EarlierTry[] = [
     { ...SPENT[0], then: 'nudge' },
@@ -1912,7 +1917,11 @@ test('a check that did not finish is no refusal: `retries:` spends nothing on it
     unread,
     'the same as the tick, which reads no exit code',
   );
-  assert.deepEqual(cancelPlan(RETRIED, onTry(), deadline, signedDone, asked), { kind: 'finished', status: 'failed' });
+  assert.deepEqual(
+    cancelPlan(RETRIED, onTry(), deadline, signedDone, asked),
+    { kind: 'cancel', stop: [] },
+    'a check stopped at its deadline waits on a person, who is offered --recheck: the run is not finished',
+  );
   const told = decision(RETRIED, onTry(), deadline, nothingShipped, signedDone, asked);
   assert.deepEqual(told.kind === 'awaiting' && [told.failedCheck, told.unfinishedCheck], [[], ['implement']]);
   const d = decision(RETRIED, onTry(SPENT), phases({ t1: 'succeeded', c1: 'failed' }), nothingShipped, signedDone, asked, () => 1);
@@ -3228,7 +3237,11 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   assert.equal(stepStatus(LOOPING_REVIEW, r, ALL_SUCCEEDED, said, asked, LOOP), 'exhausted');
   const a = assess(LOOP, r, ALL_SUCCEEDED, said, asked);
   assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'failed'], 'nothing filed, and ship never will be');
-  assert.deepEqual(cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked), { kind: 'finished', status: 'failed' });
+  assert.deepEqual(
+    cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked),
+    { kind: 'cancel', stop: [] },
+    'only a person takes the loop on, with nemia accept or nemia round: the run is not finished',
+  );
 
   const l = listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked });
   assert.deepEqual(
@@ -5364,8 +5377,8 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   );
   assert.deepEqual(
     cancelPlan(BUDGETED, r, p, signedDone, asked, () => 1, [], [], spent),
-    { kind: 'finished', status: 'failed' },
-    'no tick would file anything',
+    { kind: 'cancel', stop: [] },
+    'no tick would file anything, and a person raises the budget or calls the run off: the run is not finished',
   );
 
   const l = listing({
@@ -9930,4 +9943,121 @@ test('`forgetRefusal` keeps its order between every two reasons that can stand t
     forgetRefusal(CHECKED, withCheck(null), phases({ t1: 'succeeded' }), [], signedDone, asked, undefined, [askFor(5)], [], undefined, at),
     "implement's check is due, and a pass may be filing it now; try 5 of implement is asked for, and no pass files it as the run stands. Forgetting is not cancelling: nemia cancel r-1 files nothing more, then nemia rm r-1. Take that ask back, then nemia rm r-1: rm /wf/runs/r-1.asks/retry-implement-5.",
   );
+});
+
+/** implement signed off blocked, and review never filed: a failed run with nothing in flight that waits on a person. */
+const blockedRun = (rest: Partial<GitRun> = {}) => run({ implement: 't1', review: null }, rest);
+const BLOCKED_SAID = signedOff({ implement: said('blocked') });
+
+test('REFUSED to be finished: a failed run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
+  const p = phases({ t1: 'succeeded' });
+  const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
+  assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'failed');
+  assert.deepEqual(
+    listing({ steps: STEPS, run: blockedRun(), phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked })
+      .waitingOnYou,
+    ['implement'],
+  );
+  assert.deepEqual(
+    cancelPlan(STEPS, blockedRun(), p, blocked, asked),
+    { kind: 'cancel', stop: [] },
+    'nothing is in flight, but the blocked step is asked of a person: calling the run off is how they set it aside and keep its record',
+  );
+});
+
+test('a blocked run called off waits on no one in `nemia ls`, `nemia decide` or the feed, and its steps say what they said', () => {
+  const p = phases({ t1: 'succeeded' });
+  const listed = (r: GitRun) =>
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked });
+  const called = blockedRun(CANCELLED);
+  const l = listed(called);
+  assert.deepEqual(l.waitingOnYou, []);
+  assert.deepEqual(l.steps, listed(blockedRun()).steps, "the steps' words stand as they were");
+  assert.deepEqual(
+    decision(STEPS, called, p, nothingShipped, () => said('blocked'), asked),
+    {
+      kind: 'cancelled',
+      at: CANCELLED.cancelledAt,
+    },
+  );
+  const words = feedWords(
+    l,
+    called,
+    assess(STEPS, called, p, () => said('blocked'), asked),
+  );
+  assert.deepEqual([words.run.word, words.run.note], ['cancelled', undefined], 'no `waiting on you:` note');
+  assert.ok(
+    feedWords(
+      listed(blockedRun()),
+      blockedRun(),
+      assess(STEPS, blockedRun(), p, () => said('blocked'), asked),
+    ).run.note,
+  );
+});
+
+test('REFUSED to be finished: a run waiting on a person in any status `nemia ls` says so of — unsigned, budget exhausted, denied, an unreadable closeout — is called off by `nemia cancel`', () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+  const cases: Array<[string, Workflow[], GitRun, ReturnType<typeof signedOff>, SpendOf, StepStatus]> = [
+    ['unsigned, its nudge spent', STEPS, signedOffOnce(blockedRun()) as GitRun, signedOff({}), () => undefined, 'unsigned'],
+    ['cut off at its budget', STEPS, blockedRun(), signedOff({ implement: said('done') }), spends({}, ['t1']), 'budget exhausted'],
+    ['denied a call', DENYING, blockedRun(), signedOff({ implement: said('done') }), deniedSpend({ t1: ['Bash(x)'] }), 'denied'],
+    [
+      'a closeout that does not read, nudge spent',
+      STEPS,
+      signedOffOnce(blockedRun()) as GitRun,
+      signedOff({ implement: { error: 'outcome: not done or blocked' } }),
+      () => undefined,
+      'unsigned',
+    ],
+  ];
+  for (const [why, steps, r, closeouts, spendOf, status] of cases) {
+    const readable = (name: string) => {
+      const c = closeouts(name);
+      return c && !('error' in c) ? c : undefined;
+    };
+    const p = phases({ t1: 'succeeded' });
+    assert.equal(stepStatus(steps[0], r, p, readable, asked, steps, spendOf), status, why);
+    assert.deepEqual(
+      listing({ steps, run: r, phaseOf: shown({ t1: 'succeeded' }), closeoutOf: closeouts, askedCloseout: asked, spendOf }).waitingOnYou,
+      ['implement'],
+      why,
+    );
+    assert.deepEqual(
+      cancelPlan(steps, r, p, readable, asked, () => undefined, [], [], spendOf),
+      { kind: 'cancel', stop: [] },
+      `${why}: cancelPlan reads the closeout as the run's reader hands it, only a well-formed one`,
+    );
+  }
+});
+
+test('a stopped step holds its run but waits on no one for admission: Nemia retries an unsigned step and a failed check unasked, and `nemia cancel` calls the run off', () => {
+  const cases: Array<[StepStatus, Workflow[], GitRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
+    ['unsigned', STEPS, signedOffOnce(blockedRun()) as GitRun, { t1: 'succeeded' }, () => undefined],
+    ['failed (check)', CHECKED, withCheck('c1'), { t1: 'succeeded', c1: 'failed' }, signedDone],
+  ];
+  for (const [status, steps, r, ended, closeoutOf] of cases) {
+    const p = phases(ended);
+    assert.equal(stepStatus(steps[0], r, p, closeoutOf, asked, steps), status);
+    const waitOf = (_: string, name: string) =>
+      waitsOnPerson(
+        retryable(
+          steps.find((s) => s.name === name)!,
+          r,
+          p,
+          closeoutOf,
+          asked,
+          steps,
+        ),
+      );
+    const admitted = (command: string) => admissionOf({ tool: 'Bash', input: { command }, cwd: '/' }, TABLE, waitOf);
+    assert.equal(admitted('nemia retry r implement'), undefined, `${status}: a try of a stopped step is Nemia's to give`);
+    assert.ok(admitted('nemia retry r implement --budget 5'), `${status}: a budget is the person's`);
+    assert.deepEqual(cancelPlan(steps, r, p, closeoutOf, asked), { kind: 'cancel', stop: [] }, `${status}: the run is not finished`);
+    const closeouts = (name: string) => (name === 'implement' ? closeoutOf(name) : undefined);
+    assert.deepEqual(
+      listing({ steps, run: r, phaseOf: shown(ended), closeoutOf: closeouts, askedCloseout: asked }).waitingOnYou,
+      ['implement'],
+      `${status}: nemia ls says it waits on you`,
+    );
+  }
 });

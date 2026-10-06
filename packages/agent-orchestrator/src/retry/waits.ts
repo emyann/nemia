@@ -1,7 +1,8 @@
 /**
  * What waits on the person, from a step's standing: a step at its gate, a step's question to them, a loop out of rounds, a step over its
  * cap (`WAITS_ON_PERSON`, `waitsOnPerson`). Pure: admission asks the person of a try of such a step (`admissionOf`), and lets any other
- * through.
+ * through. And what holds a run until someone acts, the person or Nemia (`HOLDS_THE_RUN`): `nemia ls` says such a step waits on you
+ * (`listing`), and a run with nothing in flight and such a step is not finished to `nemia cancel` (`cancelPlan`).
  */
 import type { StepStatus } from '../record/record.ts';
 import type { retryable } from './retry.ts';
@@ -26,6 +27,20 @@ export const WAITS_ON_PERSON: Record<StepStatus, boolean> = {
   'failed (check)': false,
   failed: false,
   stopped: false,
+};
+
+/**
+ * Whether a step in each status holds its run until someone acts, the person or Nemia: what waits on the person (`WAITS_ON_PERSON`), and
+ * the steps that stopped on what they were asked, `unsigned` without its closeout, `failed (check)` on a check that refused or did not
+ * finish, `denied` a call under `denials: fail`; never a step the engine ended on its own (`failed`, `stopped`). Admission does not read
+ * it: a try of a stopped step is Nemia's to give unasked. A try or a round the run has due moves such a step on, and its readers read
+ * that first.
+ */
+export const HOLDS_THE_RUN: Record<StepStatus, boolean> = {
+  ...WAITS_ON_PERSON,
+  unsigned: true,
+  denied: true,
+  'failed (check)': true,
 };
 
 /**

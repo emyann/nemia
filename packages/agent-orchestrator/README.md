@@ -3090,8 +3090,11 @@ reconciles toward it — the same level-triggered rule the engine runs on one la
 
 Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
 normal things for a person to do, so none of them is an error and each says which it was. A run
-waiting at a gate is not finished — an approval would file what follows — so it is called off. A
-finished run is deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
+with a step waiting on a person is not finished — at its gate, blocked, unsigned, a refused check,
+out of rounds or budget, denied (`HOLDS_THE_RUN`, the rule `wf ls` says *waiting on you* by) — so
+it is called off: that is how a person sets it aside and keeps its record, and it stops being listed
+as waiting on them. A finished run, one that succeeded or failed with nothing waiting on anyone, is
+deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
 cancelled would make `wf ls` lie about work that actually landed. Cancelling twice keeps the first
 time and re-asks for whatever is *still* in flight, because the engine carries a stop out on its
 next tick: running it again is how a person deals with one that slipped through, not a no-op.

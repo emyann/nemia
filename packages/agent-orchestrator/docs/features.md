@@ -4829,8 +4829,8 @@ next turn: the same task, the same id, in the session that signed.
 - **Old runs.** A task filed before this has no `holdOpen`: it settles at its sign-off, and a send-back is a `-try2` task, as it was.
 
 **What it leaves.** A closed task reads `between attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
-a pass. The timeline and the said attribution count a turn's session once; `consumption` sums every turn of the task. A blocked run is
-`finished` to `wf cancel`, so its waiting task stays open until it is answered, or the run is forgotten with `wf rm`. Rounds stay
+a pass. The timeline and the said attribution count a turn's session once; `consumption` sums every turn of the task. `wf cancel` calls a
+blocked run off and closes its waiting task (`closeWaitingTasks`), as it does at a gate. Rounds stay
 `-try<n>` tasks, and a step's tries as attempts of one task (4c) wait on the owner. Since 2026-09-28 that item is called *tries as
 attempts*, because the runtime's stage 4c is admission, which is done.
 

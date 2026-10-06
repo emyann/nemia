@@ -1,5 +1,5 @@
 /**
- * `nemia start` opens a git run's place (`openPlace`): the package's own place (`SHIPPED_PLACE`) unless a layer gives another
+ * `nemia start` opens a repository run's place (`openPlace`): the package's own place (`SHIPPED_PLACE`) unless a layer gives another
  * (`StartPlace`). Its `open` answers the record's base, branch and repository, and the record names the place it ran (`placeSkill`). A
  * place that refuses, or that leaves out a verb the workflow's run needs of it, refuses the start in its words, and nothing is written. A
  * SIGINT to `nemia start` is not passed on to `open`'s process group, which outlives it. `WF_ROOT` is set before the import, since the

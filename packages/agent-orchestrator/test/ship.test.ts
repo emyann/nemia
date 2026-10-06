@@ -73,7 +73,7 @@ const isShipped = async (run: RepositoryRun, branch: string) => (await Effect.ru
 /** Every branch of a run's repository and its commit, asked of the shipped place now (`headsNow`): what a memo reads a run's tips off. */
 const liveHeads = (run: RepositoryRun) => headsNow(run, () => SHIPPED_PLACE);
 
-/** A run this file started on a repository, as `isShipped` reads one: a git run. */
+/** A run this file started on a repository, as `isShipped` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;

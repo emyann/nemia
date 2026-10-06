@@ -124,8 +124,9 @@ type RunBase = {
    */
   gates?: string[];
   /**
-   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is
-   * one of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
+   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a repository run's
+   * `repo` is one of its repositories. Absent on a run in the default factory, which is every record written before a run named its
+   * factory.
    */
   factory?: string;
   /**

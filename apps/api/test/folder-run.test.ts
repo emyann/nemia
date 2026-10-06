@@ -161,7 +161,7 @@ test("a folder run's detail has no repository, base, branch or isolation — whe
     ['folder', null],
     'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`',
   );
-  assert.equal(run.work, work, 'the one thing a person needs to find what it made, where a git run has a repository and a branch');
+  assert.equal(run.work, work, 'the one thing a person needs to find what it made, where a repository run has a repository and a branch');
   const [write] = run.steps;
   assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
   for (const said of [run.warning, run.fromNote, ...run.steps.map((s) => s.note)]) {

@@ -222,7 +222,10 @@ export type ConfigRefused = (
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
 export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });
 
-/** The place skill's directory a git run is opened with at start (`openPlace`): the package's own place, unless a layer gives another. */
+/**
+ * The place skill's directory a repository run is opened with at start (`openPlace`): the package's own place, unless a layer gives
+ * another.
+ */
 export const StartPlace = Context.Reference<string>('orchestrator/StartPlace', { defaultValue: () => SHIPPED_PLACE });
 
 /**
@@ -377,8 +380,9 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
 });
 
 /**
- * The verbs a git run's place must declare for this build to run `steps` through it: `make` and `handoff` when the run cuts worktrees
- * (`isolate`) and a step forks or merges (`workspacePlan`); `status` and `land` when an ending lands on its check (`landsOnCheck`).
+ * The verbs a repository run's place must declare for this build to run `steps` through it: `make` and `handoff` when the run cuts
+ * worktrees (`isolate`) and a step forks or merges (`workspacePlan`); `status` and `land` when an ending lands on its check
+ * (`landsOnCheck`).
  */
 export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gates'>, isolate: boolean): PlaceVerb[] {
   const cuts = isolate && steps.some((step) => ['fork', 'merge'].includes(workspacePlan(steps, step).kind));
@@ -387,9 +391,9 @@ export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gat
 }
 
 /**
- * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
- * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on stand
- * read now (`standingLiveOf`).
+ * A repository run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked
+ * out there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on
+ * stand read now (`standingLiveOf`).
  */
 const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const placeDir = yield* StartPlace;
@@ -494,11 +498,11 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  *
  * `factory` names the factory the run is started in (`nemia start --factory`): its hires fill the workflow's steps (`stepsToStart`), read
  * as they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
- * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a git run, when
- * `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left out, or the
- * default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
+ * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a repository
+ * run, when `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left
+ * out, or the default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
  *
- * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
+ * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a repository run works on, each
  * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `nemia start`
  * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). A step's
  * `writable:` names the folders it alone is filed writable (`stepMounts`), each refused unless one folder of the factory has the name and

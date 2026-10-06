@@ -35,7 +35,7 @@ function repoOf() {
   return { repo, git, commit };
 }
 
-/** A git run `id` on `repo`, branched from `main`, its record written as `nemia start` would. */
+/** A repository run `id` on `repo`, branched from `main`, its record written as `nemia start` would. */
 function runOn(id: string, repo: string): void {
   const file = path.join(process.env.WF_ROOT ?? '', 'runs', `${id}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -107,7 +107,7 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
 };
 
 /**
- * The folder the step `step` of the run `id` works in — null for a step of a git run, which works on a branch, and for one not filed
+ * The folder the step `step` of the run `id` works in — null for a step of a repository run, which works on a branch, and for one not filed
  * yet — and its file `name` (`fileIn`), or null where there is none.
  */
 export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> = {

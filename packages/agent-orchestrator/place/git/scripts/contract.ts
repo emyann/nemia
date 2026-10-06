@@ -84,7 +84,7 @@ export function failedWords(err: unknown, lines = 4): string {
   return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
 }
 
-/** Git run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws with git's words when git fails. */
+/** Repository run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws with git's words when git fails. */
 export const git = (cwd: string, args: readonly string[], input?: string): string =>
   execFileSync('git', args, {
     cwd,

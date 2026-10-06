@@ -455,8 +455,8 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassR
 
 /**
  * Hand off every step owed it (`handOffOwed`) while the run is there, and collect what each named: answers with the notes collecting said,
- * and with why a hand-off was not made, and whether a hand-off was marked on the record. A git run's step is handed off by its place's
- * `handoff`, from the place `dirOf` names, and marked only on its answer: one refused or not heard is asked again on the next pass.
+ * and with why a hand-off was not made, and whether a hand-off was marked on the record. A repository run's step is handed off by its
+ * place's `handoff`, from the place `dirOf` names, and marked only on its answer: one refused or not heard is asked again on the next pass.
  */
 const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, dirOf: (run: RepositoryRun) => string) {
   let marked = false;

@@ -465,7 +465,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
     workspace: '/code/app/.wt/r-2/implement',
     branch: 'wf/r-2/implement',
-    /** A git run's step works on a branch: it lists no files, whatever its worktree holds. */
+    /** A repository run's step works on a branch: it lists no files, whatever its worktree holds. */
     files: [],
     filesError: null,
     note: null,

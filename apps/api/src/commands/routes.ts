@@ -314,10 +314,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   its deliverer was with it; it reads no body. None by that name is a 404 (`Missing`). Its 200 is `{ name }`.
  * - `DELETE /api/runs/:id` — a try's run removed, as `nemia rm <run>` removes it (`forgetRun`): its record, and the folders it worked in
  *   with it; it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `nemia rm`, which says what it hands
- *   off and what it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in
- *   `nemia rm`'s line (`RM.apiRefusal`): a try still working, and a worktree a session holds — the record kept — are a 409, a record gone
- *   since the route read it a 404; any other failure is a 502. Its 200 is `{ id, removed: true, engine }`, `engine` what the engine
- *   forgot of the records of its tasks, their journals and session files, and what waits to be forgotten until it settles; null with none.
+ *   off and what it leaves, and a repository run's worktrees and branches are a person's to read before they go. What removed nothing is
+ *   thrown in `nemia rm`'s line (`RM.apiRefusal`): a try still working, and a worktree a session holds — the record kept — are a 409, a
+ *   record gone since the route read it a 404; any other failure is a 502. Its 200 is `{ id, removed: true, engine }`, `engine` what the
+ *   engine forgot of the records of its tasks, their journals and session files, and what waits to be forgotten until it settles; null with
+ *   none.
  * - `POST /api/runs/:id/prune` — a finished run pruned, as `nemia prune <run> --yes` prunes it (`prune`), its route setting `yes`, with
  *   `artifacts` its `--artifacts` and `unmerged` its `--unmerged`, each true or false, and no other key, every one named at once (400):
  *   its worktrees removed, and its files with `artifacts`; its record and every branch kept. The page asks twice before it sends this, so

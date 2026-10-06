@@ -680,7 +680,7 @@ test('a rendered step whose plugin is under another name, as a start before the 
   assert.equal(fs.readdirSync(agentFilesDir(run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin, and names none');
 });
 
-test("a git run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
+test("a repository run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
   git('init', '-q', '-b', 'main');

@@ -46,7 +46,7 @@ const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: []
 /** What `nemia rm` is left with once a run's record is read and what a pass filed and never wrote down is adopted onto it. */
 type Forgetting = Effect.Success<ReturnType<typeof readForgetting>>;
 
-/** What was done to a git run's worktrees (`removeWorktrees`). */
+/** What was done to a repository run's worktrees (`removeWorktrees`). */
 type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
 
 /**
@@ -60,8 +60,8 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *
  * Once nothing refuses, a task held open that waits for a word is closed, as no pass reads the run again to close it; one the engine
  * refuses to close, answered, settled or stopped since it was read, waits for nothing. A folder run's folders are under its own directory,
- * and go with its record: no worktree, no branch, and no git asked. A git run goes in an order `nemia rm` can finish when it is interrupted
- * and run again:
+ * and go with its record: no worktree, no branch, and no git asked. A repository run goes in an order `nemia rm` can finish when it is
+ * interrupted and run again:
  *
  * 0. **What it left, read by its place** (`inventory`, from the place `RunPlace` names), before anything is written: its worktrees inside
  *    `worktrees/<id>` and its branches under `wf/<id>/`. An inventory refused or not heard is no answer, never an empty one: the run is
@@ -233,8 +233,8 @@ function refusalOf(id: string, f: Forgetting, git: BranchReader): string | null 
 }
 
 /**
- * Remove a git run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and answer
- * what was removed, handed off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
+ * Remove a repository run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and
+ * answer what was removed, handed off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
  */
 function removeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
   const within = resolved(dir);
@@ -253,8 +253,8 @@ function removeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefi
 }
 
 /**
- * Whether one of a git run's worktrees is to be removed, adding to `done` what is not: one git can prune and nobody locked is gone, or
- * pruned by the `remove`; one held (`heldWorktree`) is left with the place's command for it; one not clean is handed off first, and left
+ * Whether one of a repository run's worktrees is to be removed, adding to `done` what is not: one git can prune and nobody locked is gone,
+ * or pruned by the `remove`; one held (`heldWorktree`) is left with the place's command for it; one not clean is handed off first, and left
  * when its hand-off is refused, uncommitted, or does not answer.
  */
 function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees): boolean {
@@ -300,9 +300,9 @@ function strays(within: string): string[] {
 }
 
 /**
- * Delete the git run's branches, as asked (`branchFates`): those its place's inventory read under `wf/<id>/`, merged into the run's base
- * branch as it read them — never one `handedOff` just committed onto, which the base has not — or forced, through the place's `remove`.
- * One git refuses to delete is kept, in git's words; all of them, when the `remove` does not answer.
+ * Delete the repository run's branches, as asked (`branchFates`): those its place's inventory read under `wf/<id>/`, merged into the run's
+ * base branch as it read them — never one `handedOff` just committed onto, which the base has not — or forced, through the place's
+ * `remove`. One git refuses to delete is kept, in git's words; all of them, when the `remove` does not answer.
  */
 function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead, handedOff: Forgot['handedOff']): BranchFate[] {
   const read = place.inventory.branches;

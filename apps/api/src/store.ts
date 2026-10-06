@@ -73,7 +73,7 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
 }
 
 /**
- * The folder a step of a folder run works in, off the run's record (`folderPlace` made it): null for a step of a git run, which
+ * The folder a step of a folder run works in, off the run's record (`folderPlace` made it): null for a step of a repository run, which
  * works on a branch, and for one the run has not filed yet, which has no folder.
  */
 export const workFolderOf = (run: Run, step: string): string | null => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));

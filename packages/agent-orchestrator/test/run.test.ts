@@ -4266,7 +4266,7 @@ test('REFUSED at `nemia start --after`, on either side, when a folder run is inv
     assert.equal(
       afterRefusal([id], { place: { kind: 'folder' } }, parentOf),
       `--after ${id}: this run's team works in folders (place: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`,
-      `${id}: a folder run's own --after is refused whatever it names: a git run, a folder run, or no run at all`,
+      `${id}: a folder run's own --after is refused whatever it names: a repository run, a folder run, or no run at all`,
     );
   }
   assert.equal(afterRefusal([], { place: { kind: 'folder' } }, parentOf), null);
@@ -9438,7 +9438,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
       [write, a, b, join].map((s) => ({ ...s, workspace: undefined })),
     ),
     /has been merged into this branch/,
-    "the same shapes on a git run still say git's words: the folder's are said only on a folder run",
+    "the same shapes on a repository run still say git's words: the folder's are said only on a folder run",
   );
 });
 

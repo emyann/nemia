@@ -1981,7 +1981,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
 
   assert.doesNotThrow(
     () => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' }]),
-    "a team that is not a folder team is not judged on this: a git run's steps work in a checkout a person opened, with its settings",
+    "a team that is not a folder team is not judged on this: a repository run's steps work in a checkout a person opened, with its settings",
   );
 
   assert.throws(

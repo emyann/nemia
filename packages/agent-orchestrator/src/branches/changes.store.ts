@@ -1,5 +1,5 @@
 /**
- * What a git run's branches changed, as its place's `report` says it on each read (`changesOf`), and what is at a path on a branch
+ * What a repository run's branches changed, as its place's `report` says it on each read (`changesOf`), and what is at a path on a branch
  * (`presentOn`). Nothing is kept between reads: a decision reads the place live, and an answer the place refuses or never gives is said
  * as not known (`notKnown`), never as a branch that changed nothing.
  *

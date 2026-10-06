@@ -15,7 +15,7 @@ const STEPS: Workflow[] = [
   { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'main' },
 ];
 
-/** A git run `id` on /code/app's main, gated at its ship, with `more` over it. */
+/** A repository run `id` on /code/app's main, gated at its ship, with `more` over it. */
 const run = (id: string, more: Partial<RepositoryRun> = {}): RepositoryRun => ({
   id,
   workspace: '/code/app',

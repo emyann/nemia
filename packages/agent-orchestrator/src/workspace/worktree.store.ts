@@ -1,6 +1,6 @@
 /**
- * A git run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read back
- * only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
+ * A repository run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read
+ * back only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
@@ -34,8 +34,8 @@ import { readPlaceJson } from '../place/place.store.ts';
 import type { PlaceRequests } from '../place/place.ts';
 
 /**
- * The real path of a git run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there to
- * resolve, so a filing that reads it goes on without it rather than stopping the pass.
+ * The real path of a repository run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there
+ * to resolve, so a filing that reads it goes on without it rather than stopping the pass.
  */
 export const realRepoOf = (run: Run): string | undefined => {
   if (!isRepositoryRun(run)) return undefined;

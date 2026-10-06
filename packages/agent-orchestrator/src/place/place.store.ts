@@ -416,8 +416,8 @@ export const SHIPPED_PLACE_SKILL = 'git';
 export const SHIPPED_PLACE = path.join(PLACE_SKILLS, SHIPPED_PLACE_SKILL);
 
 /**
- * The directory a git run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one that
- * names `SHIPPED_PLACE_SKILL`. Refuses (`Invalid`) a record that names another skill, which this nemia does not ship.
+ * The directory a repository run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one
+ * that names `SHIPPED_PLACE_SKILL`. Refuses (`Invalid`) a record that names another skill, which this nemia does not ship.
  */
 export function placeDirOf(run: Pick<RepositoryRun, 'id' | 'placeSkill'>): string {
   const skill = run.placeSkill?.skill;
@@ -432,11 +432,13 @@ export const RunPlace = Context.Reference<(run: Pick<RepositoryRun, 'id' | 'plac
   defaultValue: () => placeDirOf,
 });
 
-/** A started git run's place as `nemia rm` and `nemia prune` read it: where its verbs run, its `say`, and what its inventory read. */
+/**
+ * A started repository run's place as `nemia rm` and `nemia prune` read it: where its verbs run, its `say`, and what its inventory read.
+ */
 export type RunPlaceRead = { readonly dir: string; readonly say: PlaceDeclared['say']; readonly inventory: Inventory };
 
 /**
- * What the place in `placeDir` reads the git run left (`inventory`): its worktrees inside `under` and its branches under `wf/<id>/`,
+ * What the place in `placeDir` reads the repository run left (`inventory`): its worktrees inside `under` and its branches under `wf/<id>/`,
  * merged or not into its base branch, with the place's `say` (`readPlaceJson`, which refuses one that does not read) — or the outcome
  * that is no answer: refused, or not heard. Never an empty inventory in its place.
  */
@@ -454,11 +456,11 @@ export function readRunPlace(
 export type OpenedPlace = { readonly opened: Opened; readonly placeSkill: { readonly skill: string; readonly version: string } };
 
 /**
- * A git run's place, opened at `nemia start` on `root`: the skill in `skillDir` read (`readPlaceJson`), every verb of `needed` declared,
- * its version taken (`skillVersion`), and its `open` verb run, told whether the run cuts worktrees (`isolate`). Refuses (`Invalid`) a
- * `place.json` that does not read or leaves out a verb of `needed` (`missingVerbsRefusal`), a folder with no SKILL.md, and an `open` that
- * refuses, in its own words. An `open` that is not heard is no refusal: it throws a plain `Error`, with why, so a queued card is tried
- * again.
+ * A repository run's place, opened at `nemia start` on `root`: the skill in `skillDir` read (`readPlaceJson`), every verb of `needed`
+ * declared, its version taken (`skillVersion`), and its `open` verb run, told whether the run cuts worktrees (`isolate`). Refuses
+ * (`Invalid`) a `place.json` that does not read or leaves out a verb of `needed` (`missingVerbsRefusal`), a folder with no SKILL.md, and an
+ * `open` that refuses, in its own words. An `open` that is not heard is no refusal: it throws a plain `Error`, with why, so a queued card
+ * is tried again.
  */
 export function openPlace(skillDir: string, root: string, needed: readonly PlaceVerb[], isolate: boolean): OpenedPlace {
   const declared = readPlaceJson(skillDir);

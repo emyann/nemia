@@ -506,7 +506,7 @@ const folder = (implementKeys = '') => {
   return dir;
 };
 
-/** A run this file started on a repository: a git run, whose repository and base branch are on its record. */
+/** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
 const repositoryRunOf = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
@@ -7156,14 +7156,14 @@ const rejected = async (fn: () => Promise<unknown>, what: string): Promise<unkno
   return assert.fail(`${what} resolved`);
 };
 
-test('the start program answers what its plain face answers on the same store: a git run with an input, a gate and a parent, and a folder run', async () => {
+test('the start program answers what its plain face answers on the same store: a repository run with an input, a gate and a parent, and a folder run', async () => {
   const s = await startProgram();
   const repo = aRepo();
   const parent = await Effect.runPromise(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
   const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
   fs.writeFileSync(input, 'the notes\n');
   const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
-    ['a git run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
+    ['a repository run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
     ['a folder run', { brief: 'the note', repo: ROOT, workflowDir: folderTeam(), inputs: [input] }],
   ];
   const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];

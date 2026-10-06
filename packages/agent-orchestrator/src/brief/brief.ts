@@ -33,7 +33,7 @@ import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 
 /**
  * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
- * place's own commands (`say`). A folder run's place gives none; a git run's absent `say` sends the step to its place's skill.
+ * place's own commands (`say`). A folder run's place gives none; a repository run's absent `say` sends the step to its place's skill.
  */
 export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSay };
 

@@ -49,7 +49,7 @@ const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
 const { metered } = await import('../src/meter/tally.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
-/** A run this file started on a repository, as `changesOf` reads one: a git run. */
+/** A run this file started on a repository, as `changesOf` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;

@@ -1,8 +1,8 @@
 /**
  * `nemia rm` forgets the engine's tasks of the run it removes, through the runtime's `forget`: every task its record names, earlier tries
- * and checks among them, gone from the engine's list, of a git run and of a folder run; a task it closed and the engine has not settled
- * waits, with the run's marker (`runStore.forgetting`), until a pass of the daemon forgets it, or `nemia rm` again; a settled task the
- * engine refuses by name is said refused, on rm and each pass, and the rest forgotten; a refusal writes no marker and asks nothing; and
+ * and checks among them, gone from the engine's list, of a repository run and of a folder run; a task it closed and the engine has not
+ * settled waits, with the run's marker (`runStore.forgetting`), until a pass of the daemon forgets it, or `nemia rm` again; a settled task
+ * the engine refuses by name is said refused, on rm and each pass, and the rest forgotten; a refusal writes no marker and asks nothing; and
  * `nemia prune` counts what rm would forget, in one dry call over every run it prunes, and forgets nothing.
  *
  * Walked through the runtime itself, `plainEngine` over its files store under a scratch root and a harness the test signs by hand, so the
@@ -138,8 +138,8 @@ const signed = async (workflowDir: string, closeout: object, repo = aRepo()) => 
 };
 
 /**
- * A git run whose step signed blocked, was tried again with a word, signed done on its second try and passed its check: over, with three
- * tasks.
+ * A repository run whose step signed blocked, was tried again with a word, signed done on its second try and passed its check: over, with
+ * three tasks.
  */
 const finished = async () => {
   const run = await signed(oneStep('harness: codex\ncheck: true'), BLOCKED);
@@ -183,7 +183,7 @@ const typedOn = async (t: TestContext, engine: Engine, ...args: string[]) => {
   }
 };
 
-test("`nemia rm` of a git run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed's filings then read with the lines forgotten counted", async () => {
+test("`nemia rm` of a repository run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed's filings then read with the lines forgotten counted", async () => {
   const { run, tasks } = await finished();
   const kept = await signed(oneStep('harness: codex'), SIGNED);
   const before = forgets.length;

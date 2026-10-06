@@ -42,7 +42,7 @@ export type Collisions = {
 };
 
 /**
- * The other runs whose branches may collide with `run`'s: git runs on the same repository and the same base branch, each step in a
+ * The other runs whose branches may collide with `run`'s: repository runs on the same repository and the same base branch, each step in a
  * worktree of its own, neither called off nor pruned. A held run is kept: its branches still land on the same base.
  */
 export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]): RepositoryRun[] =>

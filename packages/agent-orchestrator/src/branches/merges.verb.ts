@@ -8,8 +8,8 @@ import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
 
 /**
  * Whether each of `branches` merges onto the base branch of the run `runId` (`StandingMerge`), keyed by branch, by the place's trial
- * merges (`trialMerges`); none for a run that is not a git run, which has no base to merge onto. Throws `Missing` for a run the store
- * does not have.
+ * merges (`trialMerges`); none for a run that is not a repository run, which has no base to merge onto. Throws `Missing` for a run the
+ * store does not have.
  */
 export function mergesOf(runId: string, branches: readonly string[]): Record<string, StandingMerge> {
   const run = runStore.runs.read(runId);

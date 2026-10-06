@@ -45,13 +45,13 @@ import {
 
 export type RunSummary = {
   id: string;
-  /** The repository a git run is about; null for a folder run (`place`), which has none. */
+  /** The repository a repository run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
   /** The factory the run was started in, as its record names it; null for a run in the default factory, whose record names none. */
   factory: string | null;
   /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `place: folder`. */
   place: PlaceKind;
-  /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a git run. */
+  /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a repository run. */
   work: string | null;
   brief: string;
   /** The workflow folder the run was started from, as `nemia start` resolved it: its last segment names the workflow. */

@@ -317,7 +317,7 @@ export type RunDetail = {
     workspace: string | null;
     /**
      * For a step of a folder run, every file its folder holds now, each as `folderFiles` reads it: the whole of what it made, not
-     * only what its closeout named. Empty for a step of a git run, whose work is a branch to read, and for one not filed yet.
+     * only what its closeout named. Empty for a step of a repository run, whose work is a branch to read, and for one not filed yet.
      */
     files: StepArtifact[];
     /**

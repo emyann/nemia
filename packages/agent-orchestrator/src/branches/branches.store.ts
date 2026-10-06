@@ -1,5 +1,5 @@
 /**
- * What is said of a git run's result branches once they are named: where each stands (`branchStandings`), whether one is on its base
+ * What is said of a repository run's result branches once they are named: where each stands (`branchStandings`), whether one is on its base
  * (`shippedOf`), and a run another waits on as its record and a reader say it (`parentRecord`) — each read through a `BranchReader`, which
  * answers off what the place's `standing` said (`standingReader`), never off a git process of its own. What a branch changed against the
  * run's base is the place's to say (`changes.store.ts`).

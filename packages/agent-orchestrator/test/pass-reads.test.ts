@@ -394,7 +394,7 @@ test('REFUSED: a run waits on one whose standing is unread, though it has shippe
 });
 
 test('REFUSED: a standing.json that is not the one the tick writes reads as none', async () => {
-  await theStore();
+  await onePass((await theStore()).b);
   const { standingFile } = await import('../src/standing/standing.store.ts');
   const was = fs.readFileSync(standingFile(), 'utf8');
   try {

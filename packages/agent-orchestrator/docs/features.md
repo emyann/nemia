@@ -4896,7 +4896,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   any way but `done` with its merge staged; git refusing the commit (a hook), after which the merge is aborted too. A sign-off with
   nothing staged checks and commits nothing, and says so. A result already on the base branch when the check refused is said beside it.
 - **Nothing is left mid-merge on the base branch.** While the landing is owed the checkout stays the run's (`landingOpen`, so no other
-  run's ending is filed there) and `wf rm` refuses the run. The tick reads `MERGE_HEAD` off disk on every pass (`mergeInProgress`),
+  run's ending is filed there) and `wf rm` refuses the run. The tick reads `MERGE_HEAD` off disk on every pass (`stagedHere` since git-out card G),
   whatever the daemon did before a restart, and spawns git in the person's checkout only once a landing can be due, reading conflicts
   with `ls-files --unmerged`, which takes no index lock (review round 1). A merge whose heads are not this run's result branches is never touched; this run's is committed only on an exit 0 on
   record and aborted on anything else; a commit already on HEAD is recorded as landed, and a merge a person aborted by hand is recorded
@@ -4910,7 +4910,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   command for an ending whose check did not finish.
 - **Tests that refuse**, each proven against a mutant: a commit on any settled check, another merge touched, no abort on cancel, a
   blank message committed, the checkout released before the landing (`ship.test.ts`, `run.test.ts`, with real git for
-  `mergeState`, `commitMerge` and `abortMerge`).
+  the place's `status` and `land` since git-out card G).
 - **Departures from the plan.** No guard that the approval still stands at the landing: a try 2 is filed by `wf retry` with no new
   approval, so such a guard would abort it, and filing is already gated on the approval. The git fixture's `succeeded` pin moves from
   `succeeded` to checking/running, since a signed ending with a check is now judged by it (`git-before-after.test.ts`'s doc).

@@ -351,7 +351,7 @@ gone, not moved.
 | D. Briefs' words | C, 4b | `composeBrief`'s git sentences (`run.ts:5037`, `:5078`, `:5100`) and the landing section's (`check/check.ts:239-241`) come from `say` and the skill's prose. |
 | E. `inventory` and `remove` | 5 | `wf rm` and `wf prune` (`forget/forget.verb.ts`, `prune/prune.verb.ts`); `parseWorktrees` leaves the package. |
 | F. `make` and `handoff` | 6 | `workspaceFor`'s git half and `handOff` (`workspace/worktree.store.ts`, `tick/`); `includeFiles` and `check-ignore` into `make`; `provisionDeps` stays and runs on `Made.workspace`; the realpath guard. |
-| G. The landing | 6 | `status` and `land` in `landEnding` and `mainClaim` (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. |
+| G. The landing | 6 | `status` and `land` in `landEnding` and `mainClaim` (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. As built: the reads and acts in `place/landing.store.ts` (`checkoutStatus`, `landThrough`, `mergeStaged`, `landingWords`); `open` answers `stagedFile`, recorded at `nemia start`, and the pause, `nemia rm` and the tick's `mergeStaged` `stat` it, falling back to `status` for a record without one; the brief's git words come from `say.stage`. |
 | H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`; the snapshot and its refresh; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
 | I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. |
 | J. The api and the web | H, I | The api reads the two snapshots, `report.json` (`decide/decision.ts`) and `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through the package, and no request runs a script; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
@@ -420,3 +420,6 @@ absorbs. The `say` templates are what make the words match.
 7. **A `staged` marker without a process.** If card J's measure shows `status` costs a pass too much, `open` could answer the path of a
    file whose existence means "something is staged" (for git, the checkout's MERGE_HEAD, which the skill locates), and the code would
    `stat` that path without knowing what it is. *Recommend* not building it until measured.
+   *Answered on 2026-10-06, at card G*: built, since `status` would otherwise run on every pass that reads a pause or a run to remove.
+   Measured in `ship.test.ts` (*asked only where a landing needs it*): a pause read over ten landed runs asks `status` 0 times, a busy
+   ending 0 times, and two holds of one checkout in a pass once; a run started before G, with no `stagedFile`, asks `status`.

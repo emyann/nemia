@@ -47,7 +47,6 @@ const GIT_SEGMENTS = ['.git', 'MERGE_HEAD'];
 const CARDS: Readonly<Record<string, string>> = {
   E: 'git-out-card-e-nemia-rm-and-excf: `inventory` and `remove` for `nemia rm` and `nemia prune`',
   F: "git-out-card-f-a-step-s-work-84on: `make` and `handoff`, `workspaceFor`'s git half, `handOff`, `includeFiles`'s check-ignore",
-  G: 'git-out-card-g-the-landing-r-5fbg: `status` and `land` for the landing, `mergeInProgress`, `mergeState`, `commitMerge`, `abortMerge`',
   H: 'git-out-card-h-what-a-result-wv83: `report`, what a result changed, its artifacts, and the base a merge is read against',
   I1: 'git-out-card-i1-where-a-resu-8xlp, row I, its first half: `standing`, whether a result is on its base and how far ahead',
   I2: 'workflow-build-repo-home-yrn-bvyk, row I, its second half: `standing` read by the tick, the heads and the tips',

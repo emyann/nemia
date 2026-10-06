@@ -13,6 +13,7 @@ import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { until, WAITED } from './waits.ts';
 
 const bin = scratch('ae-quota-bin-');
 /** Every ask the fake took: its arguments, then what it ran in, then that it ended, each with its pid. */
@@ -197,12 +198,11 @@ test('REFUSED: an answer to another request — or a line that is not one — is
   }
 });
 
-test('an answered ask closes its stdin, and the process ends of its own', async () => {
+test('an answered ask closes its stdin, and the process ends of its own', WAITED, async (t) => {
   assert.equal((await Effect.runPromise(claudeQuota())).kind, 'windows');
   const pid = Number(lastEnv().pid);
   const ended = () => fs.readFileSync(calls, 'utf8').split('\n').includes(`ended pid=${pid}`);
-  for (const bound = Date.now() + 5_000; !ended() && Date.now() < bound;) await new Promise((r) => setTimeout(r, 20));
-  assert.ok(ended(), `the ask's claude (pid ${pid}) ended of its own once its stdin was closed`);
+  await until(t, ended, `the ask's claude (pid ${pid}) ended of its own once its stdin was closed`, { everyMs: 20 });
 });
 
 test('REFUSED: no claude on PATH is missing; one that ends before it answers is failed, with its exit code and the last line on stderr', async () => {
@@ -233,13 +233,13 @@ test('REFUSED: an ask that times out has ended its claude by the time it resolve
   }
 });
 
-test('REFUSED: an ask interrupted before it has an outcome ends its claude before the interruption returns', async () => {
+test('REFUSED: an ask interrupted before it has an outcome ends its claude before the interruption returns', WAITED, async (t) => {
   usageAnswer('', 'silent');
   try {
     const earlier = lastEnv().pid;
     const stop = new AbortController();
     const exit = Effect.runPromiseExit(claudeQuota(), { signal: stop.signal });
-    for (const bound = Date.now() + 5_000; lastEnv().pid === earlier && Date.now() < bound;) await new Promise((r) => setTimeout(r, 20));
+    await until(t, () => lastEnv().pid !== earlier, 'the ask started its claude, which wrote its pid', { everyMs: 20 });
     const pid = Number(lastEnv().pid);
     assert.notEqual(String(pid), earlier, 'the ask started its claude');
     stop.abort();

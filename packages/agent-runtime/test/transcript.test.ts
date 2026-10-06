@@ -21,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import type { TranscriptEvent } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { warned } from './warned.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import type { AsyncRunner } from './promise-runner.ts';
 
 const tmp = (label: string) => scratch(`ae-transcript-${label}-`);
@@ -773,8 +774,6 @@ const { Engine } = await import('../src/index.ts');
 const { builtEngine } = await import('./engine.ts');
 type Sighting = import('../src/index.ts').Sighting;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
@@ -898,39 +897,42 @@ test("at shipped defaults, a Claude background session's transcript is its sessi
   });
 });
 
-test("at shipped defaults, a Codex task's transcript is read from its rollout, by the thread id its worker saw — and logs is its output, as it was", async () => {
-  const thread = randomUUID();
-  writeRollout(thread, jsonl(rolloutLines(thread)));
-  await onPath(fakeCodex(thread), async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(engine.file({ brief: 'Review the change.', cwd: tmp('cwd'), harness: 'codex' }));
-    await Effect.runPromise(engine.tick());
-    let read = await Effect.runPromise(engine.transcript(id));
-    for (
-      const until = Date.now() + 15_000;
-      !read.events.length && Date.now() < until;
-      read = await Effect.runPromise(engine.transcript(id))
-    )
-      await sleep(50);
-    assert.deepEqual(
-      read.events,
-      CODEX_EVENTS,
-      'the worker runs the harness a moment after the tick returns, and keeps the thread id it prints',
-    );
-    let logs = await Effect.runPromise(engine.logs(id));
-    for (
-      const until = Date.now() + 15_000;
-      !/"thread\.started"/.test(logs) && Date.now() < until;
-      logs = await Effect.runPromise(engine.logs(id))
-    )
-      await sleep(50);
-    assert.match(
-      logs,
-      /"thread\.started"/,
-      'the worker keeps the thread id the moment it reads it, and its capture of the output reaches the disk after',
-    );
-  });
-});
+test(
+  "at shipped defaults, a Codex task's transcript is read from its rollout, by the thread id its worker saw — and logs is its output, as it was",
+  WAITED,
+  async (t) => {
+    const thread = randomUUID();
+    writeRollout(thread, jsonl(rolloutLines(thread)));
+    await onPath(fakeCodex(thread), async () => {
+      const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+      const id = await Effect.runPromise(engine.file({ brief: 'Review the change.', cwd: tmp('cwd'), harness: 'codex' }));
+      await Effect.runPromise(engine.tick());
+      let read = await Effect.runPromise(engine.transcript(id));
+      await until(t, async () => (read = await Effect.runPromise(engine.transcript(id))).events.length > 0, `${id}'s transcript read`, {
+        everyMs: 50,
+      });
+      assert.deepEqual(
+        read.events,
+        CODEX_EVENTS,
+        'the worker runs the harness a moment after the tick returns, and keeps the thread id it prints',
+      );
+      let logs = '';
+      await until(
+        t,
+        async () => /"thread\.started"/.test((logs = await Effect.runPromise(engine.logs(id)))),
+        `${id}'s logs show its thread`,
+        {
+          everyMs: 50,
+        },
+      );
+      assert.match(
+        logs,
+        /"thread\.started"/,
+        'the worker keeps the thread id the moment it reads it, and its capture of the output reaches the disk after',
+      );
+    });
+  },
+);
 
 test('refused, each naming what to do: a task the engine has no record of, a cursor no read gave, a harness that keeps no conversation', async () => {
   const refusal = (pattern: RegExp) => (e: Error & { _tag?: string }) => e._tag === 'TranscriptRefused' && pattern.test(e.message);
@@ -1338,85 +1340,98 @@ const shiftedEngine = (claude: ReturnType<typeof fakeClaude>) => {
   return { clock, engine, transcriptOf, verbs };
 };
 
-/** Ticks `engine` until the task `id` has settled, failing after 20 s; answers its state. */
-const settledOf = async (engine: ReturnType<typeof builtEngine>, id: string) => {
-  const deadline = performance.now() + 20_000;
-  for (;;) {
-    const { state } = await Effect.runPromise(engine.view(id));
-    if (state.settled) return state;
-    assert.ok(performance.now() < deadline, `${id} never settled: ${JSON.stringify(state.attempts.at(-1))}`);
-    await Effect.runPromise(engine.tick());
-    await sleep(50);
-  }
+/** Ticks `engine` until the task `id` has settled, and answers its state; `t`'s test fails if it never does. */
+const settledOf = async (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) => {
+  let state = (await Effect.runPromise(engine.view(id))).state;
+  await until(
+    t,
+    async () => {
+      state = (await Effect.runPromise(engine.view(id))).state;
+      if (state.settled) return true;
+      await Effect.runPromise(engine.tick());
+      return false;
+    },
+    () => `${id} settled: its last attempt is ${JSON.stringify(state.attempts.at(-1))}`,
+    { everyMs: 50 },
+  );
+  return state;
 };
 
 /** How many names `report` says a harness left unread. */
 const unreadIn = (report: { observed: Record<string, { unread: number }> }) =>
   Object.values(report.observed).reduce((n, o) => n + o.unread, 0);
 
-test('REFUSED: a background session whose transcript cannot be read stays in flight and unread while its sibling ends stated; cold, it settles failed, its session stopped and removed, and is forgotten', async (t: TestContext) => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { clock, engine, transcriptOf, verbs } = shiftedEngine(claude);
-    const file = () => Effect.runPromise(engine.file({ brief: 'Write the word.', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } }));
-    const [bad, good] = [await file(), await file()];
-    await Effect.runPromise(engine.tick());
-    const row = (id: string) => claude.rows().find((r) => r.name === `ae/${id}/1`)!;
-    for (const id of [bad, good]) transcriptOf(row(id).sessionId);
-    const short = row(bad).sessionId.split('-')[0];
-    const reads = failingReads(t, claudeFile(row(bad).sessionId));
-    reads.fails('EACCES');
-    claude.set(row(bad).name, { pid: 999999 });
-    claude.set(row(good).name, { state: 'done' });
-
-    const report = await Effect.runPromise(engine.tick());
-    assert.ok(unreadIn(report) >= 1, JSON.stringify(report.observed));
-    const ended = (await Effect.runPromise(engine.view(good))).state.attempts[0];
-    assert.equal(ended.stated, true, 'the sibling is read on the same pass and ends stated');
-    for (const pass of [1, 2]) {
+test(
+  'REFUSED: a background session whose transcript cannot be read stays in flight and unread while its sibling ends stated; cold, it settles failed, its session stopped and removed, and is forgotten',
+  WAITED,
+  async (t: TestContext) => {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const { clock, engine, transcriptOf, verbs } = shiftedEngine(claude);
+      const file = () => Effect.runPromise(engine.file({ brief: 'Write the word.', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } }));
+      const [bad, good] = [await file(), await file()];
       await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(bad))).state.attempts[0].ended, null, `pass ${pass}: in flight while unread`);
-    }
+      const row = (id: string) => claude.rows().find((r) => r.name === `ae/${id}/1`)!;
+      for (const id of [bad, good]) transcriptOf(row(id).sessionId);
+      const short = row(bad).sessionId.split('-')[0];
+      const reads = failingReads(t, claudeFile(row(bad).sessionId));
+      reads.fails('EACCES');
+      claude.set(row(bad).name, { pid: 999999 });
+      claude.set(row(good).name, { state: 'done' });
 
-    clock.shift += QUIESCENT_AFTER_MS;
-    const state = await settledOf(engine, bad);
-    assert.equal(state.settled, 'failed');
-    assert.deepEqual(
-      verbs().filter((v) => v[1] === short),
-      [
-        ['stop', short],
-        ['rm', short],
-      ],
-      'its held process stopped, and the session removed',
-    );
-    assert.equal(
-      claude.rows().some((r) => r.sessionId.startsWith(short)),
-      false,
-      'no longer listed',
-    );
-    assert.equal((await Effect.runPromise(engine.forget([bad], { yes: true }))).forgotten, true);
-  });
-});
+      const report = await Effect.runPromise(engine.tick());
+      assert.ok(unreadIn(report) >= 1, JSON.stringify(report.observed));
+      const ended = (await Effect.runPromise(engine.view(good))).state.attempts[0];
+      assert.equal(ended.stated, true, 'the sibling is read on the same pass and ends stated');
+      for (const pass of [1, 2]) {
+        await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(bad))).state.attempts[0].ended, null, `pass ${pass}: in flight while unread`);
+      }
 
-test('REFUSED: a stop asked while a background session is unread settles its task once the session reads as ended, and it is forgotten', async (t: TestContext) => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { clock, engine, transcriptOf } = shiftedEngine(claude);
-    const id = await Effect.runPromise(engine.file({ brief: 'Write the word.', cwd: tmp('cwd') }));
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    transcriptOf(row.sessionId);
-    failingReads(t, claudeFile(row.sessionId)).fails('EIO');
+      clock.shift += QUIESCENT_AFTER_MS;
+      const state = await settledOf(t, engine, bad);
+      assert.equal(state.settled, 'failed');
+      assert.deepEqual(
+        verbs().filter((v) => v[1] === short),
+        [
+          ['stop', short],
+          ['rm', short],
+        ],
+        'its held process stopped, and the session removed',
+      );
+      assert.equal(
+        claude.rows().some((r) => r.sessionId.startsWith(short)),
+        false,
+        'no longer listed',
+      );
+      assert.equal((await Effect.runPromise(engine.forget([bad], { yes: true }))).forgotten, true);
+    });
+  },
+);
 
-    assert.ok(unreadIn(await Effect.runPromise(engine.tick())) >= 1, 'unread');
-    await Effect.runPromise(engine.stop(id));
-    for (const pass of [1, 2]) {
+test(
+  'REFUSED: a stop asked while a background session is unread settles its task once the session reads as ended, and it is forgotten',
+  WAITED,
+  async (t: TestContext) => {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const { clock, engine, transcriptOf } = shiftedEngine(claude);
+      const id = await Effect.runPromise(engine.file({ brief: 'Write the word.', cwd: tmp('cwd') }));
       await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(id))).state.settled, null, `pass ${pass}: unsettled while it is unread`);
-    }
+      const [row] = claude.rows();
+      transcriptOf(row.sessionId);
+      failingReads(t, claudeFile(row.sessionId)).fails('EIO');
 
-    clock.shift += QUIESCENT_AFTER_MS;
-    assert.ok((await settledOf(engine, id)).settled, 'settled');
-    assert.equal((await Effect.runPromise(engine.forget([id], { yes: true }))).forgotten, true);
-  });
-});
+      assert.ok(unreadIn(await Effect.runPromise(engine.tick())) >= 1, 'unread');
+      await Effect.runPromise(engine.stop(id));
+      for (const pass of [1, 2]) {
+        await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(id))).state.settled, null, `pass ${pass}: unsettled while it is unread`);
+      }
+
+      clock.shift += QUIESCENT_AFTER_MS;
+      assert.ok((await settledOf(t, engine, id)).settled, 'settled');
+      assert.equal((await Effect.runPromise(engine.forget([id], { yes: true }))).forgotten, true);
+    });
+  },
+);

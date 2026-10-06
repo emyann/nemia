@@ -5,7 +5,7 @@
  *
  * A process is found in a root by its environment too: a harness a fake exec'd — `exec sleep 30` — names no root in its
  * arguments and runs elsewhere, and still has the root on its PATH, or in an AE_ROOT it inherited. Until it has exec'd, its
- * environment is its parent's, so the test waits for it, under a bound.
+ * environment is its parent's, so the test waits for it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +13,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { leftBehind, reap, runningIn, scratch } from './scratch.ts';
+import { until, WAITED } from './waits.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
@@ -74,7 +75,7 @@ test('REFUSED: a test file that leaves a root scratch cannot remove fails, and n
   assert.ok(out.includes(path.join(tmp, kept[0])), 'the root it left named');
 });
 
-test('a process whose only tie to a root is its environment is found in it, and reaped', async () => {
+test('a process whose only tie to a root is its environment is found in it, and reaped', WAITED, async (t) => {
   const tmp = scratch('ae-leaks-');
   const child = spawn('sleep', ['30'], {
     cwd: '/',
@@ -83,10 +84,7 @@ test('a process whose only tie to a root is its environment is found in it, and 
     stdio: 'ignore',
   });
   child.unref();
-  for (const bound = performance.now() + 10_000; !runningIn([tmp]).length;) {
-    if (performance.now() > bound) break;
-    await new Promise((r) => setTimeout(r, 25));
-  }
+  await until(t, () => runningIn([tmp]).length > 0, `sleep (pid ${child.pid}) found running in ${tmp}`, { everyMs: 25 });
   assert.deepEqual(
     runningIn([tmp]).map((p) => p.pid),
     [child.pid],

@@ -5,14 +5,14 @@
  * after two minutes, should the guard's reaping ever fail, so the fixture never leaks for real.
  */
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { detachedOps, type HarnessSpec } from '../../src/harness/detached/detached.ts';
+import { until, WAITED } from '../waits.ts';
 
-test('a worker started in a root made by hand, and never stopped', async () => {
+test('a worker started in a root made by hand, and never stopped', WAITED, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-detached-'));
   const script = path.join(dir, 'listener.cjs');
   fs.writeFileSync(script, "require('node:fs').writeFileSync('started', ''); process.stdin.resume(); setTimeout(() => process.exit(0), 120_000).unref();\n");
@@ -21,8 +21,5 @@ test('a worker started in a root made by hand, and never stopped', async () => {
     input: { line: (text) => JSON.stringify({ said: text }), closesOn: { key: 'kind', value: 'end' } },
   };
   await Effect.runPromise(detachedOps(spec, dir).spawn({ name: 'ae/leak/3', brief: 'b', cwd: dir }));
-  for (const bound = performance.now() + 15_000; !fs.existsSync(path.join(dir, 'started'));) {
-    if (performance.now() > bound) assert.fail('never started');
-    await new Promise((r) => setTimeout(r, 25));
-  }
+  await until(t, () => fs.existsSync(path.join(dir, 'started')), `started: ${dir}`, { everyMs: 25 });
 });

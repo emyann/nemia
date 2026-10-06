@@ -18,10 +18,11 @@ import { detachedOps, type HarnessSpec } from '../src/harness/detached/detached.
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import type { Sighting } from '../src/core/domain.ts';
-import { Engine } from '../src/index.ts';
+import { Engine, type TaskView } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
 const USED = { toolCalls: 0, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 };
@@ -102,37 +103,43 @@ const scripted: HarnessSpec = { name: 'sh', command: (r) => ({ cmd: 'sh', args: 
 /** A script that prints each of `lines` as a line of JSON. */
 const printing = (lines: object[]) => lines.map((l) => `printf '%s\\n' '${JSON.stringify(l)}'`).join('; ');
 
-/** Ticks `engine` until every task of `ids` has settled, or fails after 20 s. */
-const settled = async (engine: ReturnType<typeof builtEngine>, ids: string[]) => {
-  const until = performance.now() + 20_000;
-  for (;;) {
-    const views = await Promise.all(ids.map((id) => Effect.runPromise(engine.view(id))));
-    if (views.every((v) => v.state.settled)) return views.map((v) => v.state);
-    assert.ok(
-      performance.now() < until,
-      `never settled: ${views.map((v) => `${v.state.taskId} ${JSON.stringify(v.state.attempts.at(-1))}`).join(', ')}`,
-    );
-    await Effect.runPromise(engine.tick());
-    await new Promise((r) => setTimeout(r, 50));
-  }
+/** Ticks `engine` until every task of `ids` has settled, and answers their states; `t`'s test fails if one never does. */
+const settled = async (t: Waiter, engine: ReturnType<typeof builtEngine>, ids: string[]) => {
+  let views: TaskView[] = [];
+  await until(
+    t,
+    async () => {
+      views = await Promise.all(ids.map((id) => Effect.runPromise(engine.view(id))));
+      if (views.every((v) => v.state.settled)) return true;
+      await Effect.runPromise(engine.tick());
+      return false;
+    },
+    () => `settled: ${views.map((v) => `${v.state.taskId} ${JSON.stringify(v.state.attempts.at(-1))}`).join(', ')}`,
+    { everyMs: 50 },
+  );
+  return views.map((v) => v.state);
 };
 
-test('REFUSED: a task whose output does not decode settles failed and is forgotten, while a task of the same harness settles succeeded', async () => {
-  const root = scratch('ae-unread-root-');
-  const engine = builtEngine(Engine.layer({ root, harnesses: { sh: scripted }, defaultHarness: 'sh' }));
-  const cwd = scratch('ae-unread-cwd-');
-  const bad = await Effect.runPromise(engine.file({ brief: printing(BAD), cwd }));
-  const good = await Effect.runPromise(engine.file({ brief: printing(GOOD), cwd }));
-  const [b, g] = await settled(engine, [bad, good]);
-  assert.equal(b.settled, 'failed');
-  assert.equal(g.settled, 'succeeded');
-  const forgot = await Effect.runPromise(engine.forget([bad], { yes: true }));
-  assert.equal(forgot.forgotten, true);
-  const left = fs.readdirSync(path.join(root, 'runs', 'sh'));
-  assert.ok(left.length > 0 && left.every((f) => !f.startsWith(`ae_${bad.replace(/[^a-zA-Z0-9]+/g, '_')}_`)), left.join(', '));
-});
+test(
+  'REFUSED: a task whose output does not decode settles failed and is forgotten, while a task of the same harness settles succeeded',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-unread-root-');
+    const engine = builtEngine(Engine.layer({ root, harnesses: { sh: scripted }, defaultHarness: 'sh' }));
+    const cwd = scratch('ae-unread-cwd-');
+    const bad = await Effect.runPromise(engine.file({ brief: printing(BAD), cwd }));
+    const good = await Effect.runPromise(engine.file({ brief: printing(GOOD), cwd }));
+    const [b, g] = await settled(t, engine, [bad, good]);
+    assert.equal(b.settled, 'failed');
+    assert.equal(g.settled, 'succeeded');
+    const forgot = await Effect.runPromise(engine.forget([bad], { yes: true }));
+    assert.equal(forgot.forgotten, true);
+    const left = fs.readdirSync(path.join(root, 'runs', 'sh'));
+    assert.ok(left.length > 0 && left.every((f) => !f.startsWith(`ae_${bad.replace(/[^a-zA-Z0-9]+/g, '_')}_`)), left.join(', '));
+  },
+);
 
-test('a stop asked while a session is unread settles its task once its process has ended, and it is forgotten', async () => {
+test('a stop asked while a session is unread settles its task once its process has ended, and it is forgotten', WAITED, async (t) => {
   const root = scratch('ae-unread-root-');
   const engine = builtEngine(Engine.layer({ root, harnesses: { sh: scripted }, defaultHarness: 'sh' }));
   const cwd = scratch('ae-unread-cwd-');
@@ -140,13 +147,9 @@ test('a stop asked while a session is unread settles its task once its process h
   const id = await Effect.runPromise(
     engine.file({ brief: `${printing(BAD)}; timeout 60 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`, cwd }),
   );
-  const until = performance.now() + 20_000;
-  for (;;) {
-    const report = await Effect.runPromise(engine.tick());
-    if ((report.observed.sh?.unread ?? 0) > 0) break;
-    assert.ok(performance.now() < until, `${id} never read unread`);
-    await new Promise((r) => setTimeout(r, 100));
-  }
+  await until(t, async () => ((await Effect.runPromise(engine.tick())).observed.sh?.unread ?? 0) > 0, `${id} read unread`, {
+    everyMs: 100,
+  });
   try {
     await Effect.runPromise(engine.stop(id));
     for (const pass of [1, 2, 3]) {
@@ -156,7 +159,7 @@ test('a stop asked while a session is unread settles its task once its process h
   } finally {
     fs.writeFileSync(marker, '');
   }
-  const [state] = await settled(engine, [id]);
+  const [state] = await settled(t, engine, [id]);
   assert.ok(state.settled, 'settled');
   assert.equal((await Effect.runPromise(engine.forget([id], { yes: true }))).forgotten, true);
 });

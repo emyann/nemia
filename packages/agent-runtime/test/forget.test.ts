@@ -13,6 +13,7 @@ import { RunnerError, type RunnerOps } from '../src/harness/index.ts';
 import { forgetAsked, forgetLines, main } from '../src/cli/main.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
+import { until, WAITED } from './waits.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 
 const refusing: AsyncRunner = {
@@ -294,16 +295,20 @@ test('a pass over settled tasks the memo skips writes nothing and takes no lock'
 
 const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'echo checked'] }) };
 
-test("forget removes the run files a detached harness keeps of a settled session, and no other session's", async () => {
+test("forget removes the run files a detached harness keeps of a settled session, and no other session's", WAITED, async (t) => {
   const root = scratch('ae-forget-root-');
   const engine = builtEngine(Engine.layer({ root, harnesses: { check }, defaultHarness: 'check' }));
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-forget-cwd-') }));
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled) {
-    assert.ok(Date.now() < until, `${id} settled`);
-    await Effect.runPromise(engine.tick());
-    await new Promise((r) => setTimeout(r, 50));
-  }
+  await until(
+    t,
+    async () => {
+      if ((await Effect.runPromise(engine.view(id))).state.settled) return true;
+      await Effect.runPromise(engine.tick());
+      return false;
+    },
+    `${id} settled`,
+    { everyMs: 50 },
+  );
   await Effect.runPromise(engine.tick());
   const runs = path.join(root, 'runs', 'check');
   const files = fs.readdirSync(runs);

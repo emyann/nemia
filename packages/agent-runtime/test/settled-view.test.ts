@@ -16,10 +16,9 @@ import path from 'node:path';
 import type { HarnessSpec, Sighting } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { builtEngine } from './engine.ts';
 import { asyncOps } from './promise-runner.ts';
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * A harness shaped as the orchestrator's `check`: a command and nothing else — no `find`, no `start` — run by the engine's
@@ -35,30 +34,49 @@ const check: HarnessSpec = {
 
 const calls = (engine: ReturnType<typeof builtEngine>) => Effect.runSync(engine.io()).observed.check?.calls ?? 0;
 
-const settle = async (engine: ReturnType<typeof builtEngine>, id: string) => {
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled) {
-    assert.ok(Date.now() < until, `${id} settled`);
-    await Effect.runPromise(engine.tick());
-    await sleep(50);
-  }
+/** Ticks `engine` in test `t`, every 50ms, until task `id` has settled. */
+const settle = (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) =>
+  until(
+    t,
+    async () => {
+      if ((await Effect.runPromise(engine.view(id))).state.settled) return true;
+      await Effect.runPromise(engine.tick());
+      return false;
+    },
+    `${id} settled`,
+    { everyMs: 50 },
+  );
+
+/** Views task `id` in test `t`, every 50ms, until its attempt runs. */
+const runs = (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) => {
+  let phase = 'not viewed yet';
+  return until(
+    t,
+    async () => (phase = (await Effect.runPromise(engine.view(id))).phase).startsWith('running'),
+    () => `${id} running; it is ${phase}`,
+    { everyMs: 50 },
+  );
 };
 
-test('REFUSED at shipped defaults: a view of a settled `check` task observes nothing, and its logs are still read by the session it ended as', async () => {
-  const engine = builtEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') }));
-  await settle(engine, id);
+test(
+  'REFUSED at shipped defaults: a view of a settled `check` task observes nothing, and its logs are still read by the session it ended as',
+  WAITED,
+  async (t) => {
+    const engine = builtEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') }));
+    await settle(t, engine, id);
 
-  const before = calls(engine);
-  const v = await Effect.runPromise(engine.view(id));
-  assert.equal(v.phase, 'failed');
-  assert.equal(v.state.attempts[0]?.exitCode, 3);
-  assert.equal(v.sessionId, `ae/${id}/1`, 'the handle its end was recorded under: the name a detached run goes by');
-  assert.match(await Effect.runPromise(engine.logs(id)), /checked/, 'what the check printed, which is its verdict to the layer above');
-  assert.equal(calls(engine) - before, 0, 'viewed, and its logs read, with no observe of the check harness');
-});
+    const before = calls(engine);
+    const v = await Effect.runPromise(engine.view(id));
+    assert.equal(v.phase, 'failed');
+    assert.equal(v.state.attempts[0]?.exitCode, 3);
+    assert.equal(v.sessionId, `ae/${id}/1`, 'the handle its end was recorded under: the name a detached run goes by');
+    assert.match(await Effect.runPromise(engine.logs(id)), /checked/, 'what the check printed, which is its verdict to the layer above');
+    assert.equal(calls(engine) - before, 0, 'viewed, and its logs read, with no observe of the check harness');
+  },
+);
 
-test('an unsettled `check` task is still observed: in flight, and before its first attempt', async () => {
+test('an unsettled `check` task is still observed: in flight, and before its first attempt', WAITED, async (t) => {
   const engine = builtEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
   const cwd = scratch('ae-settled-cwd-');
   fs.writeFileSync(path.join(cwd, 'hold'), '');
@@ -69,17 +87,13 @@ test('an unsettled `check` task is still observed: in flight, and before its fir
   assert.equal(calls(engine) - before, 1, 'a pending task on a harness that cannot find is observed');
 
   await Effect.runPromise(engine.tick());
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).phase.startsWith('running')) {
-    assert.ok(Date.now() < until, 'the check runs');
-    await sleep(50);
-  }
+  await runs(t, engine, id);
   before = calls(engine);
   assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)');
   assert.equal(calls(engine) - before, 1, "an attempt in flight is observed: its phase is its session's state");
 
   fs.rmSync(path.join(cwd, 'hold'));
-  await settle(engine, id);
+  await settle(t, engine, id);
   before = calls(engine);
   await Effect.runPromise(engine.view(id));
   assert.equal(calls(engine) - before, 0, 'and once settled, not');
@@ -122,27 +136,27 @@ test('REFUSED: a settled task on a harness that has `find` observes nothing eith
   assert.equal(counts.find, 2, 'asked by name once a read, and found nothing');
 });
 
-test('a pass and a view of every task, as the orchestrator makes each pass: the check harness is observed once for the pass and once for each check in flight', async () => {
-  const engine = builtEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
-  const done = await Promise.all(
-    [1, 2, 3, 4, 5].map(async () => Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') }))),
-  );
-  for (const id of done) await settle(engine, id);
-  const cwd = scratch('ae-settled-cwd-');
-  fs.writeFileSync(path.join(cwd, 'hold'), '');
-  const running = await Effect.runPromise(engine.file({ brief: 'b', cwd }));
-  await Effect.runPromise(engine.tick());
-  const until = Date.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(running))).phase.startsWith('running')) {
-    assert.ok(Date.now() < until, 'the check runs');
-    await sleep(50);
-  }
+test(
+  'a pass and a view of every task, as the orchestrator makes each pass: the check harness is observed once for the pass and once for each check in flight',
+  WAITED,
+  async (t) => {
+    const engine = builtEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
+    const done = await Promise.all(
+      [1, 2, 3, 4, 5].map(async () => Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') }))),
+    );
+    for (const id of done) await settle(t, engine, id);
+    const cwd = scratch('ae-settled-cwd-');
+    fs.writeFileSync(path.join(cwd, 'hold'), '');
+    const running = await Effect.runPromise(engine.file({ brief: 'b', cwd }));
+    await Effect.runPromise(engine.tick());
+    await runs(t, engine, running);
 
-  const before = calls(engine);
-  await Effect.runPromise(engine.tick());
-  for (const id of [...done, running]) await Effect.runPromise(engine.view(id));
-  assert.equal(calls(engine) - before, 2, 'the pass, and the one check in flight: none for the five settled');
+    const before = calls(engine);
+    await Effect.runPromise(engine.tick());
+    for (const id of [...done, running]) await Effect.runPromise(engine.view(id));
+    assert.equal(calls(engine) - before, 2, 'the pass, and the one check in flight: none for the five settled');
 
-  fs.rmSync(path.join(cwd, 'hold'));
-  await settle(engine, running);
-});
+    fs.rmSync(path.join(cwd, 'hold'));
+    await settle(t, engine, running);
+  },
+);

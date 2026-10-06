@@ -1,12 +1,24 @@
 /**
  * What a detached session's output says, as a spec's `readOutput` reads it: `claude -p`'s one result, and `claude -p`'s stream
  * of events — its closeout, what it consumed and cost, whether it spent its budget, what it was denied, and, off the stream,
- * the skills it loaded and the files it touched. Pure functions of the text. Codex's `exec --json` stream is read by `codexOutput`
+ * the skills it loaded and the files it touched. Pure functions of the lines `printedLinesOf` (`harness/claude/print.ts`) decodes:
+ * an output it refuses is thrown in its words, never read as saying nothing. Codex's `exec --json` stream is read by `codexOutput`
  * (`harness/codex/stream.ts`).
  */
 import path from 'node:path';
 import type { Denial, Usage } from '../../core/index.ts';
+import { printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
 import type { HarnessOutput } from './detached.ts';
+
+/** The lines of `kinds` in `output`, decoded; throws an `Error` whose message is `printedLinesOf`'s `wrong` when one does not decode. */
+const decoded = (output: string, kinds: readonly PrintedKind[]): PrintedLine[] => {
+  const read = printedLinesOf(output, kinds);
+  if ('wrong' in read) throw new Error(read.wrong);
+  return read.lines;
+};
+
+/** A denied call as a result's `permission_denials` or a `permission_denied` event names it. */
+type DeniedEntry = { tool_name: string; tool_use_id?: string; tool_input?: unknown };
 
 /**
  * What `claude -p --output-format json` says in its one `result` object. The last result line is taken and every other
@@ -34,61 +46,41 @@ import type { HarnessOutput } from './detached.ts';
  * Code refused without asking — in every permission mode: under `-p` nothing waits on a prompt, and the session carries
  * on past the refusal. A `--resume`'s result names only what the resume was denied, though its cost is its session's.
  * Read as `denialOf` words it, one per call, in the order given.
+ *
+ * Throws an `Error` naming the line, its field and the fix when a `result` line does not decode (`printedLinesOf`).
  */
-export const claudeResultOutput = (output: string): HarnessOutput => readClaude(output, [], new Map());
+export const claudeResultOutput = (output: string): HarnessOutput => {
+  const results = decoded(output, ['result']).flatMap((l) => (l.kind === 'result' ? [l.line] : []));
+  return readClaude(results.at(-1), [], new Map());
+};
+
+/** A result's token counts, in their classes, when it gives every class and its input sums to more than 0; else none. */
+const tokensOf = (usage: Printed<'result'>['usage']): Usage => {
+  const { input_tokens: uncachedTokens, cache_creation_input_tokens: cacheWriteTokens } = usage ?? {};
+  const { cache_read_input_tokens: cacheReadTokens, output_tokens: outputTokens } = usage ?? {};
+  if (uncachedTokens === undefined || cacheWriteTokens === undefined || cacheReadTokens === undefined || outputTokens === undefined)
+    return {};
+  const inputTokens = uncachedTokens + cacheWriteTokens + cacheReadTokens;
+  return inputTokens > 0 ? { inputTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens } : {};
+};
 
 /**
- * `claudeResultOutput`, with the denials a stream named before its result (`claudeStreamOutput`) joined ahead of the
- * result's own. Everything else is the result's alone, and a stream with no result says only what it denied. A line that
- * is not JSON is passed over, and the last `result` line is the one read.
+ * `claudeResultOutput`'s reading of `result`, with the denials a stream named before its result (`claudeStreamOutput`) joined
+ * ahead of the result's own. Everything else is the result's alone, and a stream with no result says only what it denied.
  */
-const readClaude = (output: string, denied: readonly unknown[], inputs: ReadonlyMap<string, unknown>): HarnessOutput => {
-  let result:
-    | {
-        type?: unknown;
-        subtype?: unknown;
-        structured_output?: unknown;
-        total_cost_usd?: unknown;
-        duration_api_ms?: unknown;
-        usage?: Record<string, unknown>;
-        permission_denials?: unknown;
-      }
-    | undefined;
-  for (const line of output.split('\n')) {
-    if (!line.includes('"result"')) continue;
-    try {
-      const parsed = JSON.parse(line) as typeof result;
-      if (parsed?.type === 'result') result = parsed;
-    } catch {}
-  }
-  if (!result) {
-    const denials = deniedCalls(denied, inputs);
-    return denials.length ? { denials } : {};
-  }
-  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
-  const [costUsd, apiMs] = [n(result.total_cost_usd), n(result.duration_api_ms)];
-  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = [
-    'input_tokens',
-    'cache_creation_input_tokens',
-    'cache_read_input_tokens',
-    'output_tokens',
-  ].map((key) => n(result.usage?.[key]));
-  const tokens =
-    uncachedTokens !== undefined &&
-    cacheWriteTokens !== undefined &&
-    cacheReadTokens !== undefined &&
-    outputTokens !== undefined &&
-    uncachedTokens + cacheWriteTokens + cacheReadTokens > 0
-      ? {
-          inputTokens: uncachedTokens + cacheWriteTokens + cacheReadTokens,
-          uncachedTokens,
-          cacheWriteTokens,
-          cacheReadTokens,
-          outputTokens,
-        }
-      : {};
-  const usage: Usage = { ...tokens, ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
-  const denials = deniedCalls([...denied, ...(Array.isArray(result.permission_denials) ? result.permission_denials : [])], inputs);
+const readClaude = (
+  result: Printed<'result'> | undefined,
+  denied: readonly DeniedEntry[],
+  inputs: ReadonlyMap<string, unknown>,
+): HarnessOutput => {
+  const denials = deniedCalls([...denied, ...(result?.permission_denials ?? [])], inputs);
+  if (!result) return denials.length ? { denials } : {};
+  const { total_cost_usd: costUsd, duration_api_ms: apiMs } = result;
+  const usage: Usage = {
+    ...tokensOf(result.usage),
+    ...(costUsd !== undefined ? { costUsd } : {}),
+    ...(apiMs !== undefined ? { apiMs } : {}),
+  };
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
     ...(Object.keys(usage).length ? { usage } : {}),
@@ -125,21 +117,67 @@ export const denialOf = (tool: string, input: unknown): Denial => {
  * Denied calls, each once by its `tool_use_id`, in the order first given: `{tool_name, tool_use_id, tool_input?}` as a
  * result's `permission_denials` and a `permission_denied` event write them. An entry with no input takes the one its
  * call was made with (`inputs`, by id), or else the one a later entry for the same call gives: a call named again keeps
- * the place of its first naming. One that names no tool is not a denial anyone can read, and is skipped.
+ * the place of its first naming. An entry with no id is a call of its own.
  */
-const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, unknown>): Denial[] => {
+const deniedCalls = (entries: readonly DeniedEntry[], inputs: ReadonlyMap<string, unknown>): Denial[] => {
   const seen = new Map<string, { denial: Denial; input: unknown }>();
   let unnamed = 0;
-  for (const entry of entries) {
-    const { tool_name: tool, tool_use_id: id, tool_input: given } = (entry ?? {}) as Record<string, unknown>;
-    if (typeof tool !== 'string' || !tool) continue;
-    const key = typeof id === 'string' && id ? id : `(no id ${++unnamed})`;
+  for (const { tool_name: tool, tool_use_id: id, tool_input: given } of entries) {
+    const key = id || `(no id ${++unnamed})`;
     const input = given ?? inputs.get(key);
     const first = seen.get(key);
     if (!first || (first.input === undefined && input !== undefined))
       seen.set(key, { denial: denialOf(first?.denial.tool ?? tool, input), input });
   }
   return [...seen.values()].map((d) => d.denial);
+};
+
+/** The kinds of line a stream is read for. */
+const STREAM_KINDS: readonly PrintedKind[] = ['result', 'system permission_denied', 'system init', 'assistant'];
+
+/** A call an assistant's line makes, as its `tool_use` block decodes. */
+type ToolUse = Extract<Exclude<Printed<'assistant'>['message']['content'], string>[number], { type: 'tool_use' }>;
+
+const isCall = (block: Exclude<Printed<'assistant'>['message']['content'], string>[number]): block is ToolUse => block.type === 'tool_use';
+
+/**
+ * What a stream says, gathered from its decoded lines in one pass: its last result; its `permission_denied` events, in order; the
+ * input each call was made with, by id; whether an `init` line started it and the first folder one names; its `Skill` calls and
+ * its file tools' calls, each once by id, first called first; and the ids of the calls an event or a result says were denied.
+ */
+type StreamFacts = {
+  result?: Printed<'result'>;
+  events: DeniedEntry[];
+  inputs: Map<string, unknown>;
+  started: boolean;
+  cwd?: string;
+  skills: Map<string, unknown>;
+  files: Map<string, [string, unknown]>;
+  denied: Set<string>;
+};
+
+/** What `facts` learn from the calls an assistant's line makes. */
+const gatherCalls = (facts: StreamFacts, line: Printed<'assistant'>): void => {
+  const { content } = line.message;
+  for (const { id, name, input } of typeof content === 'string' ? [] : content.filter(isCall)) {
+    facts.inputs.set(id, input);
+    if (name === 'Skill' && !facts.skills.has(id)) facts.skills.set(id, input);
+    if (Object.hasOwn(FILE_KEYS, name) && !facts.files.has(id)) facts.files.set(id, [name, input]);
+  }
+};
+
+/** What `facts` learn from one decoded line of a stream. */
+const gather = (facts: StreamFacts, printed: PrintedLine): void => {
+  if (printed.kind === 'result') {
+    facts.result = printed.line;
+    for (const { tool_use_id: id } of printed.line.permission_denials ?? []) if (id) facts.denied.add(id);
+  } else if (printed.kind === 'system permission_denied') {
+    facts.events.push(printed.line);
+    if (printed.line.tool_use_id) facts.denied.add(printed.line.tool_use_id);
+  } else if (printed.kind === 'system init') {
+    facts.started = true;
+    facts.cwd ??= printed.line.cwd;
+  } else gatherCalls(facts, printed.line);
 };
 
 /**
@@ -149,83 +187,19 @@ const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, un
  * What it was denied is read off the stream as well as the result, so a session killed before its result still says
  * it: each `{"type":"system","subtype":"permission_denied","tool_name","tool_use_id",…}` event, which names no input —
  * the input is the one the assistant's `tool_use` block of the same id was called with. Joined with the result's
- * `permission_denials`, one per call, in the order the stream first named each. A line that is not JSON is passed over.
+ * `permission_denials`, one per call, in the order the stream first named each.
  *
  * The skills it loaded are read off the stream alone (`loadedSkills`), and said only by a stream with its `init` line; the files
  * it read or wrote (`touchedFiles`), only by one whose `init` line names its folder.
+ *
+ * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
  */
 export const claudeStreamOutput = (output: string): HarnessOutput => {
-  const { events, inputs } = streamDenials(output);
-  const skills = loadedSkills(output);
-  const files = touchedFiles(output);
-  return { ...readClaude(output, events, inputs), ...(skills ? { skills } : {}), ...(files ? { files } : {}) };
-};
-
-/**
- * A stream's `permission_denied` events, in the order given, and the input each denied call was made with, by its id
- * (`callInputs`).
- */
-const streamDenials = (output: string): { events: unknown[]; inputs: Map<string, unknown> } => {
-  const events: unknown[] = [];
-  for (const line of output.split('\n')) {
-    if (!line.includes('"permission_denied"')) continue;
-    const e = parsedLine(line);
-    if (e?.type === 'system' && e.subtype === 'permission_denied') events.push(e);
-  }
-  const wanted = new Set(events.map((e) => (e as { tool_use_id?: unknown }).tool_use_id).filter((id) => typeof id === 'string'));
-  return { events, inputs: wanted.size ? callInputs(output, wanted) : new Map() };
-};
-
-/** The input each call of the ids `wanted` was made with: the input of the assistant's `tool_use` block of that id. */
-const callInputs = (output: string, wanted: ReadonlySet<string>): Map<string, unknown> => {
-  const inputs = new Map<string, unknown>();
-  for (const line of output.split('\n')) {
-    if (!line.includes('"tool_use"') || ![...wanted].some((id) => line.includes(id))) continue;
-    const e = parsedLine(line);
-    if (e?.type !== 'assistant' || !Array.isArray(e.message?.content)) continue;
-    for (const block of e.message.content as Array<Record<string, unknown> | null>) {
-      if (block?.type === 'tool_use' && typeof block.id === 'string' && wanted.has(block.id)) inputs.set(block.id, block.input);
-    }
-  }
-  return inputs;
-};
-
-/** A line of a stream, as far as its type, its folder, its denials and the calls it makes are read off it. */
-type StreamLine = {
-  type?: unknown;
-  subtype?: unknown;
-  cwd?: unknown;
-  tool_use_id?: unknown;
-  permission_denials?: unknown;
-  message?: { content?: unknown };
-};
-
-/** `line` parsed, when it is a JSON object: anything else is passed over. */
-const parsedLine = (line: string): StreamLine | undefined => {
-  try {
-    const e: unknown = JSON.parse(line);
-    return e && typeof e === 'object' ? e : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-/** The calls an assistant's line makes to the tools `named`, each as its `id`, its tool and its input. */
-const toolCalls = (e: StreamLine, named: (tool: string) => boolean): Array<[string, string, unknown]> =>
-  e.type === 'assistant' && Array.isArray(e.message?.content)
-    ? (e.message.content as Array<Record<string, unknown> | null>)
-        .filter((b) => b?.type === 'tool_use' && typeof b.name === 'string' && named(b.name) && typeof b.id === 'string')
-        .map((b) => [b?.id as string, b?.name as string, b?.input])
-    : [];
-
-/** The `Skill` calls an assistant's line makes, each as its `id` and its input. */
-const skillCalls = (e: StreamLine): Array<[string, unknown]> => toolCalls(e, (t) => t === 'Skill').map(([id, , input]) => [id, input]);
-
-/** The ids of the calls a line says were denied: a `permission_denied` event's one, or a result's `permission_denials`. */
-const deniedIds = (e: StreamLine): unknown[] => {
-  if (e.type === 'system' && e.subtype === 'permission_denied') return [e.tool_use_id];
-  if (e.type !== 'result' || !Array.isArray(e.permission_denials)) return [];
-  return e.permission_denials.map((d: unknown) => (d as { tool_use_id?: unknown } | null)?.tool_use_id);
+  const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
+  for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
+  const skills = facts.started ? loadedSkills(facts) : undefined;
+  const files = facts.cwd === undefined ? undefined : touchedFiles(facts.cwd, facts);
+  return { ...readClaude(facts.result, facts.events, facts.inputs), ...(skills ? { skills } : {}), ...(files ? { files } : {}) };
 };
 
 /** The skill a `Skill` call's input names, after its last `:` — a plugin's skill by its bare name — or none. */
@@ -238,24 +212,11 @@ const skillNamed = (input: unknown): string | undefined => {
 /**
  * Each skill a stream's session loaded, once per call by its `id`, in the order first called: the input of an assistant's
  * `Skill` `tool_use` block, a subagent's included, named by `skillNamed`. A call the session was denied, by its event or
- * its result, loaded nothing; a call naming no skill is skipped. Nothing where the stream has no `system` `init` line:
+ * its result, loaded nothing; a call naming no skill is skipped. Read only of a stream with a `system` `init` line: else
  * no session is known to have started.
  */
-const loadedSkills = (output: string): string[] | undefined => {
-  const calls = new Map<string, unknown>();
-  const denied = new Set<unknown>();
-  let started = false;
-  for (const line of output.split('\n')) {
-    if (!line.includes('"Skill"') && !line.includes('"init"')) continue;
-    const e = parsedLine(line);
-    if (!e) continue;
-    if (e.type === 'system' && e.subtype === 'init') started = true;
-    for (const [id, input] of skillCalls(e)) if (!calls.has(id)) calls.set(id, input);
-    for (const id of deniedIds(e)) denied.add(id);
-  }
-  if (!started) return undefined;
-  return [...calls].flatMap(([id, input]) => (denied.has(id) ? [] : (skillNamed(input) ?? [])));
-};
+const loadedSkills = ({ skills, denied }: StreamFacts): string[] =>
+  [...skills].flatMap(([id, input]) => (denied.has(id) ? [] : (skillNamed(input) ?? [])));
 
 /** The file a file tool's call names, as `FILE_KEYS` reads it, made relative to `cwd`: none when it names none, or one outside `cwd`. */
 const fileIn = (cwd: string, tool: string, input: unknown): string | undefined => {
@@ -265,32 +226,13 @@ const fileIn = (cwd: string, tool: string, input: unknown): string | undefined =
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : undefined;
 };
 
-/** A stream line that may say a session's folder, a file tool's call or a denial: the only lines `touchedFiles` parses. */
-const FILE_LINE = /"tool_use"|"init"|denied|"result"/;
-
-/** The folder a stream's `system` `init` line names, or none. */
-const initCwd = (e: StreamLine): string | undefined =>
-  e.type === 'system' && e.subtype === 'init' && typeof e.cwd === 'string' && e.cwd ? e.cwd : undefined;
-
 /**
  * Each file a stream's session read or wrote through its file tools (`FILE_KEYS`), a subagent's calls included, once, in the
  * order first touched, relative to the folder its `system` `init` line names (`cwd`). A call the session was denied, by its event
- * or its result, touched nothing; a file outside its folder is not counted. Nothing where no `init` line names a folder: no
- * session is known to have started, or no path can be read against it.
+ * or its result, touched nothing; a file outside its folder is not counted. Read only of a stream whose `init` line names a folder:
+ * else no session is known to have started, or no path can be read against it.
  */
-const touchedFiles = (output: string): string[] | undefined => {
-  const calls = new Map<string, [string, unknown]>();
-  const denied = new Set<unknown>();
-  let cwd: string | undefined;
-  for (const line of output.split('\n')) {
-    const e = FILE_LINE.test(line) ? parsedLine(line) : undefined;
-    if (!e) continue;
-    cwd ??= initCwd(e);
-    for (const [id, tool, input] of toolCalls(e, (t) => t in FILE_KEYS)) if (!calls.has(id)) calls.set(id, [tool, input]);
-    for (const id of deniedIds(e)) denied.add(id);
-  }
-  if (cwd === undefined) return undefined;
-  const at = cwd;
-  const files = [...calls].flatMap(([id, [tool, input]]) => (denied.has(id) ? [] : (fileIn(at, tool, input) ?? [])));
-  return [...new Set(files)];
+const touchedFiles = (cwd: string, { files, denied }: StreamFacts): string[] => {
+  const touched = [...files].flatMap(([id, [tool, input]]) => (denied.has(id) ? [] : (fileIn(cwd, tool, input) ?? [])));
+  return [...new Set(touched)];
 };

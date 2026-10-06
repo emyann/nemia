@@ -963,6 +963,117 @@ test('a Codex stream refused is refused once per change of its output: an unchan
   assert.equal(reads, 2, 'read again once its output changed');
 });
 
+/** The words `read` throws, or a failure of the test when it reads the output instead. */
+const refusedWith = (read: () => HarnessOutput): string => {
+  try {
+    assert.fail(`read as ${JSON.stringify(read())}, never refused`);
+  } catch (e) {
+    if (e instanceof assert.AssertionError) throw e;
+    return e instanceof Error ? e.message : String(e);
+  }
+};
+
+/** `claude -p`'s refusal of a line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
+const printedRefusal = (line: number, kind: string, field: string, found: string) =>
+  `line ${line} of the \`claude -p\` output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
+  ' as saying nothing: run a Claude Code whose `claude -p` output this runtime reads, or a runtime whose schema for the line in' +
+  ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
+
+/** A Claude Code job `name` written into `dir` as its worker leaves it, in `state`: its output a line of stderr, then `lines`. */
+const claudeRun = (dir: string, name: string, lines: string[], state: 'working' | 'done' = 'done') => {
+  const runs = path.join(dir, 'runs', 'claude');
+  fs.mkdirSync(runs, { recursive: true });
+  const base = path.join(runs, name.replace(/[^a-zA-Z0-9]+/g, '_'));
+  const ended = state === 'done' ? { exitCode: 0 } : {};
+  const run = { name, state, pid: 999999, ...ended, logFile: `${base}.log`, heartbeatAt: new Date().toISOString() };
+  fs.writeFileSync(`${base}.json`, JSON.stringify(run));
+  fs.writeFileSync(`${base}.log`, ['a warning on stderr', ...lines].join('\n'));
+  return `${base}.log`;
+};
+
+/**
+ * A Claude Code job whose output `lines` holds a line that does not decode, looked at while it works and once it has ended,
+ * beside a job that reads: through the composite, unread at work and failed once ended, with no closeout; and the warning, which
+ * is `outputRefusalOf`'s sentence over the refusal `words`.
+ */
+const refusedClaudeRun = async (lines: string[], words: string) => {
+  const { claudeJob } = await import('../src/harness/claude/code.ts');
+  const dir = root();
+  const log = claudeRun(dir, 'ae/j1/1', lines, 'working');
+  claudeRun(dir, 'ae/j0/1', [stream.init, resultLine({ structured_output: { outcome: 'done' } })]);
+  const other = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
+  const ops = composite({ claude: detachedOps(claudeJob, dir), alpha: testOps({ sessions: other }) }, 'alpha');
+  const expected = [
+    { name: 'ae/j1/1', harness: 'claude' },
+    { name: 'ae/j0/1', harness: 'claude' },
+    { name: 'ae/x/1', harness: 'alpha' },
+  ];
+  const working = await Effect.runPromise(ops.observeFor!(expected));
+  assert.deepEqual(working.unread, new Set(['ae/j1/1']), 'at work: neither there nor gone, never a job that said nothing');
+  assert.deepEqual([...working.seen.keys()].sort(), ['ae/j0/1', 'ae/x/1']);
+
+  claudeRun(dir, 'ae/j1/1', lines);
+  const { value, warnings } = await warned(detachedOps(claudeJob, dir).observe);
+  assert.deepEqual(
+    value.get('ae/j1/1'),
+    { sessionId: 'ae/j1/1', state: 'failed', nativeId: undefined, closeout: undefined, exitCode: 0 },
+    'ended, so failed: never completed, and nothing its output says',
+  );
+  assert.deepEqual(value.get('ae/j0/1')?.closeout?.payload, { outcome: 'done' }, 'the harness’s other run is read');
+  assert.deepEqual(warnings, [
+    `claude: \`ae/j1/1\`'s output, ${log}, cannot be read: ${words} It is unread while its process runs, and read as failed once it` +
+      ' has ended; the other sessions of claude are read. Once its task has settled, `ae forget` lets this session go.',
+  ]);
+  const ended = await Effect.runPromise(ops.observeFor!(expected));
+  assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
+  assert.equal(ended.seen.get('ae/j1/1')?.state, 'failed');
+};
+
+test('REFUSED: a claude job whose result line says a cost that is no number is unread at work and failed once ended, in words naming the line, the field and the fix', async () => {
+  await refusedClaudeRun(
+    [stream.init, resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 'a lot' })],
+    printedRefusal(3, 'a `result`', 'total_cost_usd', 'is "a lot", where Claude Code prints number'),
+  );
+});
+
+test('REFUSED: a claude job whose result line says its denials as no list is unread at work and failed once ended, never a job denied nothing', async () => {
+  await refusedClaudeRun(
+    [stream.init, resultLine({ structured_output: { outcome: 'done' }, permission_denials: 'Write' })],
+    printedRefusal(3, 'a `result`', 'permission_denials', 'is "Write", where Claude Code prints array'),
+  );
+});
+
+test('REFUSED: a claude job whose permission_denied event names its call by a number is unread at work and failed once ended', async () => {
+  const denied = { ...JSON.parse(stream.denied('toolu_w', 'Write')), tool_use_id: 7 };
+  await refusedClaudeRun(
+    [
+      stream.init,
+      stream.calls(['toolu_w', 'Write', { file_path: '/tmp/outside/x.txt', content: 'hi' }]),
+      JSON.stringify(denied),
+      resultLine({ structured_output: { outcome: 'done' } }),
+    ],
+    printedRefusal(4, 'a `system` `permission_denied`', 'tool_use_id', 'is 7, where Claude Code prints string'),
+  );
+});
+
+test('a claude job whose output has stderr before its result and a line torn mid-write after it still says what its result says', async () => {
+  const { claudeJob } = await import('../src/harness/claude/code.ts');
+  const dir = root();
+  const torn = stream.calls(['toolu_r', 'Read', { file_path: '/w/a.ts' }]).slice(0, -12);
+  const lines = [stream.init, resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.2 }), torn];
+  claudeRun(dir, 'ae/j2/1', lines);
+  assert.deepEqual(claudeStreamOutput(['a warning on stderr', ...lines].join('\n')), {
+    closeout: { payload: { outcome: 'done' } },
+    usage: { costUsd: 0.2 },
+    skills: [],
+  });
+  const { value, warnings } = await warned(detachedOps(claudeJob, dir).observe);
+  assert.deepEqual(warnings, [], 'nothing refused: stderr and a torn line are no lines Claude Code printed whole');
+  assert.equal(value.get('ae/j2/1')?.state, 'completed');
+  assert.deepEqual(value.get('ae/j2/1')?.closeout?.payload, { outcome: 'done' });
+  assert.deepEqual(value.get('ae/j2/1')?.usage, { costUsd: 0.2 });
+});
+
 test('a harness the composite cannot read leaves the names routed to it unread, and the others are read as ever', async () => {
   const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
   const failing = (verb: string) => Effect.fail(new RunnerError({ verb, message: 'claude agents: timed out' }));
@@ -1607,13 +1718,54 @@ test("what claude -p cost is its result's total_cost_usd, and its API time durat
     { closeout: { payload: { outcome: 'done' } }, usage: { costUsd: 0.2 } },
     'beside the answer, and a count it does not give is not given',
   );
-  assert.deepEqual(
-    claudeResultOutput(resultLine({ total_cost_usd: 'a lot', duration_api_ms: null })),
-    {},
-    'what is not a number is not a measurement',
-  );
-  assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: -1 })), {});
   assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
+});
+
+test('REFUSED: a cost or an API time that is not a number of 0 or more is no absence: the output is refused, naming the line, the field and the fix', () => {
+  assert.equal(
+    refusedWith(() => claudeResultOutput(resultLine({ total_cost_usd: 'a lot', duration_api_ms: null }))),
+    printedRefusal(1, 'a `result`', 'total_cost_usd', 'is "a lot", where Claude Code prints number'),
+    'what is not a number is not read as no measurement',
+  );
+  assert.match(
+    refusedWith(() => claudeResultOutput(resultLine({ total_cost_usd: -1 }))),
+    /^line 1 of the `claude -p` output is a `result` line whose `total_cost_usd` is -1, where /,
+  );
+  assert.match(
+    refusedWith(() => claudeStreamOutput(['a warning on stderr', resultLine({ duration_api_ms: null })].join('\n'))),
+    /^line 2 of the `claude -p` output is a `result` line whose `duration_api_ms` is null, where Claude Code prints number\. /,
+    'the stream reads the same result, and counts its lines from the first, stderr included',
+  );
+});
+
+test('REFUSED: a call or an init line a stream reads that does not decode refuses the stream, naming its line and field; a line of a kind it does not read passes', () => {
+  const block = (o: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'so' }, o] } });
+  assert.equal(
+    refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 5, name: 'Bash', input: {} })].join('\n'))),
+    printedRefusal(2, 'an `assistant`', 'message.content.1.id', 'is 5, where Claude Code prints string'),
+  );
+  assert.equal(
+    refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 'toolu_n', input: {} })].join('\n'))),
+    printedRefusal(2, 'an `assistant`', 'message.content.1.name', 'is missing'),
+  );
+  const badInit = JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 });
+  assert.equal(
+    refusedWith(() => claudeStreamOutput([badInit, resultLine({})].join('\n'))),
+    printedRefusal(1, 'a `system` `init`', 'cwd', 'is 5, where Claude Code prints string'),
+  );
+  assert.deepEqual(
+    claudeResultOutput([badInit, resultLine({ total_cost_usd: 0.2 })].join('\n')),
+    { usage: { costUsd: 0.2 } },
+    'json reads results alone',
+  );
+  const passing = [
+    stream.init,
+    JSON.stringify({ type: 'system', subtype: 'compact_boundary', cwd: 5, tool_use_id: 7, compact_metadata: { pre_tokens: 'x' } }),
+    JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_use', id: 5 }] }, total_cost_usd: 'a lot' }),
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'no call' }] } }),
+    resultLine({}),
+  ];
+  assert.deepEqual(claudeStreamOutput(passing.join('\n')), { skills: [] }, 'another subtype, another type, and a line with no call');
 });
 
 test("what claude -p was denied is its result's permission_denials, each by what a rule would name — and nothing when it was denied nothing", () => {
@@ -1624,7 +1776,6 @@ test("what claude -p was denied is its result's permission_denials, each by what
     { tool_name: 'Skill', tool_use_id: 'toolu_4', tool_input: { skill: 'look' } },
     { tool_name: 'NotebookEdit', tool_use_id: 'toolu_5', tool_input: { notebook_path: '/r/n.ipynb' } },
     { tool_name: 'Bash', tool_use_id: 'toolu_6', tool_input: { command: '' } },
-    { tool_use_id: 'toolu_7', tool_input: { command: 'ls' } },
     { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com' } },
   ];
   assert.deepEqual(
@@ -1637,10 +1788,35 @@ test("what claude -p was denied is its result's permission_denials, each by what
       { tool: 'NotebookEdit', what: '/r/n.ipynb' },
       { tool: 'Bash' },
     ],
-    'one per call, in order: a URL is not guessed at, an empty command is the tool alone, a call with no tool is skipped',
+    'one per call, in order: a URL is not guessed at, an empty command is the tool alone',
+  );
+  assert.deepEqual(
+    claudeResultOutput(
+      resultLine({ permission_denials: [...denials.slice(0, 1), { tool_name: 'Read', tool_input: { file_path: '/r/a' } }] }),
+    ).denials,
+    [
+      { tool: 'Write', what: '/tmp/outside/x.txt' },
+      { tool: 'Read', what: '/r/a' },
+    ],
+    'a denial with no id is a call of its own',
   );
   assert.equal('denials' in claudeResultOutput(resultLine({ permission_denials: [] })), false, 'none denied: no key');
-  assert.equal('denials' in claudeResultOutput(resultLine({ permission_denials: 'Write' })), false, 'not a list: not read');
+  assert.equal(
+    refusedWith(() =>
+      claudeResultOutput(
+        resultLine({
+          permission_denials: [...denials.slice(0, 6), { tool_use_id: 'toolu_7', tool_input: { command: 'ls' } }, ...denials.slice(6)],
+        }),
+      ),
+    ),
+    printedRefusal(1, 'a `result`', 'permission_denials.6.tool_name', 'is missing'),
+    'a denial that names no tool is refused, never skipped',
+  );
+  assert.equal(
+    refusedWith(() => claudeResultOutput(resultLine({ permission_denials: 'Write' }))),
+    printedRefusal(1, 'a `result`', 'permission_denials', 'is "Write", where Claude Code prints array'),
+    'not a list: refused, never read as no denial',
+  );
   assert.deepEqual(
     claudeStreamOutput(resultLine({ permission_denials: denials.slice(0, 1) })).denials,
     [{ tool: 'Write', what: '/tmp/outside/x.txt' }],

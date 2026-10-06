@@ -6,7 +6,7 @@
  *
  * The stream is refused as a whole at the first line of a type the runtime reads that does not decode: one Codex binary prints
  * every session's stream, so an event printed otherwise says its format moved under every session. A refused stream is no absence:
- * `observe` fails, and each Codex session stays unread.
+ * the runner reads that session alone as unread while its process runs, and as failed once it has ended (`detachedOps`).
  *
  * Its first line is its start, `thread.started`, whose `thread_id` the worker reads as the session's own id (`CODEX_START`).
  */
@@ -58,9 +58,9 @@ const DECODERS: Readonly<Record<string, (line: unknown) => Result.Result<CodexEv
   CodexEventSchema.members.map((m) => [m.fields.type.literal, Schema.decodeUnknownResult(m)]),
 );
 
-const UNREAD =
-  'Every Codex session stays unread, neither there nor gone, until its stream decodes: run a Codex whose `exec --json` stream' +
-  ' this runtime reads, or a runtime whose `CodexEventSchema` (`harness/codex/stream.ts`) reads this one.';
+const FIX =
+  'Run a Codex whose `exec --json` stream this runtime reads, or a runtime whose `CodexEventSchema` (`harness/codex/stream.ts`)' +
+  ' reads this one.';
 
 /** The object `line` holds when it is one whose `type` the runtime reads, or `undefined` for any other line. */
 const ours = (line: string): (Record<string, unknown> & { type: string }) | undefined => {
@@ -95,7 +95,7 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
     const { path, words } = firstRefusal(event, decoded.failure, 'Codex prints');
     const field = path.map(String).join('.');
     return {
-      wrong: `line ${at + 1} of the \`codex exec --json\` stream is a \`${event.type}\` event whose \`${field}\` ${words}. ${UNREAD}`,
+      wrong: `line ${at + 1} of the \`codex exec --json\` stream is a \`${event.type}\` event whose \`${field}\` ${words}. ${FIX}`,
     };
   }
   return { events };

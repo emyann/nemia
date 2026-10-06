@@ -1,0 +1,41 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { nemiaFence } from './fence.ts';
+import type { CommandClass } from '../admission/index.ts';
+
+/** A fixture table, one command of each class. */
+const TABLE: { name: string; nemia: CommandClass }[] = [
+  { name: 'ls', nemia: 'read' },
+  { name: 'hold', nemia: 'hers' },
+  { name: 'approve', nemia: 'answers' },
+  { name: 'cancel', nemia: 'prompts' },
+  { name: 'tick', nemia: 'out' },
+  { name: 'level', nemia: { bare: 'read', sets: 'prompts', setsBy: ['manual'] } },
+  { name: 'agents custom', nemia: { bare: 'read', sets: 'prompts', setsBy: ['--clear'], readsBy: ['--repo'] } },
+];
+
+test('her fence is derived from the classes: reads, her writes and answers run unasked, a prompt asks, out is denied, a setter asks set', () => {
+  assert.deepEqual(nemiaFence(TABLE), {
+    allow: [
+      'Bash(nemia ls)',
+      'Bash(nemia ls:*)',
+      'Bash(nemia hold)',
+      'Bash(nemia hold:*)',
+      'Bash(nemia approve)',
+      'Bash(nemia approve:*)',
+      'Bash(nemia level)',
+      'Bash(nemia level:*)',
+      'Bash(nemia agents custom)',
+      'Bash(nemia agents custom:*)',
+    ],
+    ask: ['Bash(nemia cancel:*)', 'Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)'],
+    deny: ['Bash(nemia tick:*)'],
+  });
+});
+
+test('REFUSED to run unasked: a command reclassed as a prompt asks, and one reclassed out is denied, by its class alone', () => {
+  const fence = nemiaFence(TABLE.map((c) => (c.name === 'hold' ? { ...c, nemia: 'prompts' as const } : c.name === 'ls' ? { ...c, nemia: 'out' as const } : c)));
+  assert.ok(fence.ask.includes('Bash(nemia hold:*)'));
+  assert.ok(fence.deny.includes('Bash(nemia ls:*)'));
+  assert.ok(!fence.allow.some((r) => r.startsWith('Bash(nemia hold') || r.startsWith('Bash(nemia ls')));
+});

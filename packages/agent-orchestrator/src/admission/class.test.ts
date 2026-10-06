@@ -6,7 +6,7 @@ import { classBreaks } from './class.ts';
 const flag = (name: string, side?: 'cli' | 'api') => ({ flag: name, ...(side ? { only: { side } } : {}) });
 
 test('REFUSED: a command with no class, said by name', () => {
-  assert.deepEqual(classBreaks([{ name: 'frob', writes: true, nemia: undefined as never }]), [
+  assert.deepEqual(classBreaks([{ name: 'frob', writes: true, nemia: undefined }]), [
     "frob has no class: say who answers for it when an agent calls it — 'read', 'hers', 'prompts', 'answers', 'out', or { bare: 'read', sets: 'prompts', setsBy }",
   ]);
 });

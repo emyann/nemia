@@ -1,7 +1,7 @@
 /**
  * Her definition and her bin, off the disk: `ownBin` finds the folder whose `nemia` is the package's own, in a workspace and under a
- * global prefix, and passes over another package's; `readNemia` refuses a file with no `askTools:`, as `test/agent-fences.test.ts`
- * refuses her a mode but `auto`. A store of its own, since `WF_ROOT` is read as the module loads.
+ * global prefix, and passes over another package's; `readNemia` refuses a hand list of her rules, which her fence derives, as
+ * `test/agent-fences.test.ts` refuses her a mode but `auto`. A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -53,25 +53,37 @@ test('the checkout gives this package its own bin', () => {
   assert.equal(fs.realpathSync(path.join(bin, 'nemia')), fs.realpathSync(path.join(import.meta.dirname, '..', '..', 'bin', 'nemia.ts')));
 });
 
-test('her shipped definition reads in auto, with her ask rules', () => {
+test('her shipped definition reads in auto, with no hand list of rules on nemia', () => {
   const her = readNemia();
   assert.equal(her.permissionMode, 'auto');
-  assert.ok(her.askTools.includes('Bash(nemia approve:*)'), her.askTools.join(', '));
+  assert.deepEqual(
+    (her.allowedTools ?? []).filter((rule) => rule.includes('nemia')),
+    [],
+  );
+  assert.ok(her.disallowedTools?.includes('Bash(wf:*)') && her.disallowedTools.includes('Bash(ae:*)'), 'wf and ae out of her reach');
 });
 
-test('REFUSED: a definition with no askTools, or one naming no rule, is refused her', () => {
+test('REFUSED: a definition with a hand list of her rules on nemia, an askTools: or an allow, is refused her', () => {
   const dir = scratch('wf-nemia-asks-');
   const text = fs.readFileSync(nemiaDefinition(), 'utf8');
-  for (const [name, cut] of [
-    ['none', text.replace(/^askTools:.*\n/m, '')],
-    ['empty', text.replace(/^askTools:.*$/m, 'askTools: ')],
+  const head = (line: string) => text.replace(/^permissionMode:/m, `${line}\npermissionMode:`);
+  for (const [name, cut, said] of [
+    ['asks', head('askTools: Bash(nemia approve:*)'), 'her askTools: is derived from the command table: take it out of nemia.md.'],
+    [
+      'allows',
+      head('allowedTools: Read, Bash(nemia show:*)'),
+      'her allowedTools: Bash(nemia show:*) is derived from the command table: take it out of nemia.md.',
+    ],
   ] as const) {
     const file = path.join(dir, `${name}.md`);
     fs.writeFileSync(file, cut);
     assert.throws(
       () => readNemia(file),
-      (err: Error) => err.message.startsWith(`${file}: her askTools: names no rule`),
+      (err: Error) => err.message === `${file}: ${said}`,
       name,
     );
   }
+  const file = path.join(dir, 'read.md');
+  fs.writeFileSync(file, head('allowedTools: Read'));
+  assert.deepEqual(readNemia(file).allowedTools, ['Read'], 'an allow on no nemia is hers to have');
 });

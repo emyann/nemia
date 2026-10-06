@@ -7,6 +7,7 @@
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import { Cause, Effect, Metric, type Duration } from 'effect';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ownOf } from '../tick/file.verb.ts';
@@ -16,7 +17,9 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
-import { composePrompt, memoryDir, nemiaDir, ownBin, readLevel, readNemia, SHIPPED_NEMIA, storeAsks } from './level.store.ts';
+import { composePrompt, memoryDir, nemiaDir, ownBin, readLevel, readNemia, SHIPPED_NEMIA, storeDenies } from './level.store.ts';
+import { nemiaFence } from './fence.ts';
+import { TABLE } from '../command/commands.verb.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
 import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, nemiaSettings, type HerTask, type NemiaAct } from './nemia.ts';
 
@@ -64,15 +67,18 @@ const factoryFolders = (): Mount[] => {
 };
 
 /**
- * Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition, with
- * her ask rules and the store's (`storeAsks`) and the daemon's own bin first on her path (`ownBin`), in the harness's settings.
+ * Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition; with
+ * her fence derived from the command table (`nemiaFence`), the store's denies (`storeDenies`) and the daemon's own bin first on her path
+ * (`ownBin`) in the harness's settings, and her admission (`nemia admit`) asked before each of her shell calls.
  */
 export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
   const prompt = composePrompt(step.body);
   const memory = `Edit(/${memoryDir()}/**)`;
   const quota = quotaUrl();
-  const settings = nemiaSettings([...step.askTools, ...storeAsks()], ownBin(), process.env.PATH ?? '');
+  const fence = nemiaFence(TABLE);
+  const bin = ownBin();
+  const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies()] }, bin, process.env.PATH ?? '');
   return {
     id,
     brief: nemiaBrief(quota),
@@ -84,7 +90,8 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
       ...(step.model === undefined ? {} : { model: step.model }),
       permissionMode: step.permissionMode,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
-      allowedTools: [...(step.allowedTools ?? []), memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
+      allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
+      admission: { command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit'], tools: ['Bash'] },
       background: true,
       mounts: factoryFolders(),
       ...ownOf(

@@ -38,13 +38,18 @@ export const NEMIA_DIGEST_EVERY = 1440;
 export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
 
 /**
- * The harness's settings her session is filed with, as JSON: her ask rules (`asks`), and the search path `searchPath` with the folder
- * `bin` first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined. Pure.
+ * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`), and the search path `searchPath` with the
+ * folder `bin` first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined.
+ * Pure.
  */
-export function nemiaSettings(asks: readonly string[], bin: string | undefined, searchPath: string): string {
+export function nemiaSettings(
+  rules: { readonly ask: readonly string[]; readonly deny: readonly string[] },
+  bin: string | undefined,
+  searchPath: string,
+): string {
   const rest = searchPath.split(path.delimiter).filter((entry) => entry !== '' && entry !== bin);
   return JSON.stringify({
-    permissions: { ask: [...asks] },
+    permissions: { ask: [...rules.ask], deny: [...rules.deny] },
     ...(bin === undefined ? {} : { env: { PATH: [bin, ...rest].join(path.delimiter) } }),
   });
 }

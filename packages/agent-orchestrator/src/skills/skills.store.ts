@@ -180,8 +180,8 @@ const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): vo
 
 /**
  * The refusals a copy and a write of a skill share, judged before either reads a byte of it: `at` is a `skills/` beside the workflows the
- * board lists — the store's, or a repository's — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and neither `at` nor the
- * folder it is in is a link, which a write would follow out of the store.
+ * board lists — the store's, or that of a repository a factory names — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and
+ * neither `at` nor the folder it is in is a link, which a write would follow out of the store.
  */
 function judgeSkillPlace(at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
   if (path.basename(at) !== SKILLS_FOLDER)
@@ -190,7 +190,7 @@ function judgeSkillPlace(at: string, name: string, anywhere: boolean, verb: stri
     );
   if (!anywhere && !isWorkflowsHolder(path.dirname(at))) {
     refuseSkill(
-      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's (<repo>/workflows/${SKILLS_FOLDER}, beside its .git). ${verb} to one of the two, or pass { anywhere: true } to write ${at} all the same.`,
+      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${SKILLS_FOLDER}, for a factory's repo). ${verb} to one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`,
     );
   }
   refuseSkill(skillNameRefusal(name));

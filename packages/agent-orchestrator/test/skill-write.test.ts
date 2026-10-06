@@ -15,7 +15,7 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-write-');
 process.env.WF_ROOT = ROOT;
-const { writeSkill, SkillWriteError } = await import('../src/runner.ts');
+const { addFactory, writeSkill, SkillWriteError } = await import('../src/runner.ts');
 
 const LIBRARY = path.join(ROOT, 'workflows', 'skills');
 const AGENTS = path.join(ROOT, 'workflows', 'agents');
@@ -235,6 +235,21 @@ test('a place that is not a skills folder beside the workflows is refused, and a
   fs.symlinkSync(outside, path.join(LIBRARY, 'linked'));
   refuses(() => writeSkill(LIBRARY, { ...DRAFT, name: 'linked' }, { version: null }), 'refused', /is a link/);
   assert.deepEqual(fs.readdirSync(outside), []);
+});
+
+test('REFUSED at shipped defaults: a skill written into the workflows/ of a checkout no factory names; written once one names it', () => {
+  const checkout = scratch('wf-skill-checkout-');
+  fs.mkdirSync(path.join(checkout, '.git'));
+  const library = path.join(checkout, 'workflows', 'skills');
+  refuses(
+    () => writeSkill(library, DRAFT, { version: null }),
+    'refused',
+    /skills is not the store's skills\/ .* nor a repository's the store knows .* give its repository to a factory \(nemia factory add <name> --repo <repo>\)/,
+  );
+  assert.equal(fs.existsSync(path.join(library, DRAFT.name)), false, 'a .git beside it makes no repository known');
+  addFactory({ name: 'skill-known', repos: [checkout] });
+  writeSkill(library, DRAFT, { version: null });
+  assert.ok(fs.existsSync(path.join(library, DRAFT.name, 'SKILL.md')), "a factory's repository");
 });
 
 test('a change is written at the version it was read at, and refused once the skill has moved (a file added beside SKILL.md moves it too) or gone', () => {

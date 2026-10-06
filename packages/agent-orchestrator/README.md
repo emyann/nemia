@@ -2775,6 +2775,19 @@ recommendation, recaps what moved, and carries their answer back as a `nemia` ve
   a "don't ask again" never widens what waits. The harness must trust her folder first, once, by hand: the
   refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
+- **`nemia level auto`**, or a factory set or raised to it (`--factory <name> auto`), is Semi-auto with one difference: an answer the
+  person's confirmed list allows in the run's current state is given unasked; anything else asks, as at Semi-auto. A rule names the
+  answer (`approve`, `retry`, `accept`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its
+  conditions over the run's state: `recommends` (the step signed `done`, and each question it asks carries a recommendation),
+  `checked` (its check exited 0: a step with no check does not meet it), `accepted` (no loop asks for another round, and none was
+  accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
+  closeout needs, and no other step waiting on a person). The rule that
+  ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
+  seeded with it, marked Default. **`nemia auto <agent>`** reads the list in force, the agent's proposal and the custom instruction;
+  **`nemia auto propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
+  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id>`** and
+  **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent calls them. A rule
+  nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that does not read allows nothing.
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
   her.
 

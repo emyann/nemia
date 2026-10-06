@@ -8,12 +8,13 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The custom instruction her rules come from, as a person wrote it. */
-const INSTRUCTION = 'Merge on your own when everyone agrees. Retry a failed implement up to three times. Write to me in French.';
+const INSTRUCTION =
+  'Merge on your own when everyone agrees. Retry implement on your own while a run has cost under $20. Write to me in French.';
 
 /** What she proposed from it: a rule the machinery holds, and the words it cannot, kept as guidance. */
 const PROPOSAL = {
   at: '2026-10-06T12:00:00.000Z',
-  rules: [{ id: 'retry-implement', answer: 'retry', steps: ['implement'], when: ['withinBudget'], under: 3 }],
+  rules: [{ id: 'retry-implement', answer: 'retry', steps: ['implement'], when: ['withinBudget'], under: 20 }],
   guidance: ['Write to me in French.'],
   digest: createHash('sha256').update(INSTRUCTION).digest('hex').slice(0, 16),
 };

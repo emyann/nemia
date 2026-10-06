@@ -538,6 +538,14 @@ test('the help prints no command the CLI does not serve', () => {
   );
 });
 
+test('REFUSED: an entry that ticks and writes nothing, since nothing it does waits on a pass', () => {
+  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'x', route, handler, writes: true, ticks: true }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'x', route, handler, writes: false, ticks: true }], []), [
+    'x ticks and writes nothing: a command whose work waits on the next pass files it, so give it writes: true, or take ticks out',
+  ]);
+});
+
 test('a table breaks its rules: a name twice, an entry served nowhere, a command that is also a verb of the CLI', () => {
   const route = { method: 'POST', path: '/api/x', status: 202 } as const;
   assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], ['b']), []);

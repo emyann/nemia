@@ -1275,8 +1275,8 @@ test('with no record, or one that does not read, a statement keeps its time for 
 });
 
 /**
- * The first attempt of a task resumed from a background session, run on Claude Code's background runner through an engine, in test `t`, until it
- * settles: `claude --bg` registers a finished session, and `said` is what its transcript says, given the session's start.
+ * The first attempt of a task resumed from a background session, run on Claude Code's background runner through an engine, in test
+ * `t`, until it settles: `claude --bg` registers a finished session, and `said` is what its transcript says, given the session's start.
  */
 const settledResumed = async (t: Waiter, said: (startedAt: number) => Statement) => {
   const f = fake();

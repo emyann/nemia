@@ -37,8 +37,7 @@ const PLACE_AND_NAME: readonly Positional[] = [
 ];
 
 /** Why the board's agent writes are served by the api's own routes. */
-const WRITE_HAND =
-  "the board guards the write, decodes the agent's form in its own words, answers the package's refusal with the steps that still name it, and reads the agent back";
+const WRITE_HAND = "the board guards the write, decodes the agent's form in its own words, and reads the agent back";
 
 /**
  * An agent of yours written from its form (`writeAgent`): `dir`, the agents folder the api resolved; `draft`, the agent as JSON text;
@@ -88,7 +87,7 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
     method: 'DELETE',
     path: '/api/agents/:from/:name',
     status: 200,
-    hand: "the board guards the removal, and answers the package's refusal with the steps that still name the agent",
+    hand: 'the board guards the removal, and reads the version the agent was read at before it is removed',
   },
   only: { side: 'api', why: "the board's library removes an agent; at the command line a person removes the agent's file" },
   handler: (args) =>

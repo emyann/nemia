@@ -23,6 +23,7 @@ import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, ty
 import { scratch } from './scratch.ts';
 import { stepClock } from './clock.ts';
 import { builtEngine } from './engine.ts';
+import { until as untilEvent, WAITED } from './waits.ts';
 
 const servers: RemoteServer[] = [];
 afterEach(async () => {
@@ -747,52 +748,59 @@ const timed = async <A>(f: () => Promise<A>): Promise<[number, A]> => {
   return [performance.now() - from, a];
 };
 
-test('a request the agent holds is given up after its bound: a card not read refuses, a send is in doubt, a GetTask reads as last seen', async () => {
-  const s = await serve({ script: HELD });
-  const root = scratch('ae-remote-');
-  const ops = remoteOps('remote', { url: s.url }, root, undefined, 300, { sendMs: 600, spawnWaitMs: 100 });
-  const spawnOf = (name: string) => Effect.runPromise(Effect.flip(ops.spawn({ name, brief: 'b', cwd: '/w' })));
+test(
+  'a request the agent holds is given up after its bound: a card not read refuses, a send is in doubt, a GetTask reads as last seen',
+  WAITED,
+  async (t) => {
+    const s = await serve({ script: HELD });
+    const root = scratch('ae-remote-');
+    const ops = remoteOps('remote', { url: s.url }, root, undefined, 300, { sendMs: 600, spawnWaitMs: 100 });
+    const spawnOf = (name: string) => Effect.runPromise(Effect.flip(ops.spawn({ name, brief: 'b', cwd: '/w' })));
 
-  s.hanging.card = true;
-  const [cardMs, card] = await timed(() => spawnOf('ae/card/1'));
-  assert.ok(cardMs < 3_000, `${cardMs} ms`);
-  assert.equal(card.refused, true);
-  assert.match(card.message, /could not be read at .*agent-card\.json \(.*did not answer within 0\.3 s\): the agent is not reachable/);
-  s.hanging.card = false;
+    s.hanging.card = true;
+    const [cardMs, card] = await timed(() => spawnOf('ae/card/1'));
+    assert.ok(cardMs < 3_000, `${cardMs} ms`);
+    assert.equal(card.refused, true);
+    assert.match(card.message, /could not be read at .*agent-card\.json \(.*did not answer within 0\.3 s\): the agent is not reachable/);
+    s.hanging.card = false;
 
-  s.hanging.a2a = true;
-  const [sendMs] = await timed(() => Effect.runPromise(ops.spawn({ name: 'ae/send/1', brief: 'b', cwd: '/w' })));
-  assert.ok(sendMs < 500, `${sendMs} ms: the spawn waited its 0.1 s and returned`);
-  const under = JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8'));
-  assert.equal(under.sending.pid, process.pid, 'a send held goes on to its own bound, `sendMs`, off the pass, in this process');
-  assert.equal((await Effect.runPromise(ops.observe)).get('ae/send/1')?.state, 'submitted', 'being sent: a Task submitted');
-  const t0 = Date.now();
-  while (JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).sending && Date.now() - t0 < 3_000)
-    await new Promise((r) => setTimeout(r, 25));
-  const gaveUp = JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8'));
-  assert.equal(gaveUp.taskId, undefined, 'the intent stays, with no Task');
-  assert.equal(gaveUp.sending, undefined);
-  assert.equal(
-    (await Effect.runPromise(ops.observe)).has('ae/send/1'),
-    false,
-    'given up: no session listed, which the grace window reads `lost`',
-  );
-  const send = await spawnOf('ae/send/1');
-  assert.notEqual(send.refused, true, 'held, the send may have been taken: in doubt, not refused');
-  assert.match(
-    send.message,
-    /since the agent did not answer the send of `ae\/send\/1` within 0\.6 s: whether the agent made a Task of it is not known, and it is not sent twice/,
-  );
-  s.hanging.a2a = false;
+    s.hanging.a2a = true;
+    const [sendMs] = await timed(() => Effect.runPromise(ops.spawn({ name: 'ae/send/1', brief: 'b', cwd: '/w' })));
+    assert.ok(sendMs < 500, `${sendMs} ms: the spawn waited its 0.1 s and returned`);
+    const under = JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8'));
+    assert.equal(under.sending.pid, process.pid, 'a send held goes on to its own bound, `sendMs`, off the pass, in this process');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/send/1')?.state, 'submitted', 'being sent: a Task submitted');
+    await untilEvent(
+      t,
+      () => JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).sending === undefined,
+      'the held send of ae/send/1 given up, its `sending` cleared',
+      { everyMs: 25 },
+    );
+    const gaveUp = JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8'));
+    assert.equal(gaveUp.taskId, undefined, 'the intent stays, with no Task');
+    assert.equal(gaveUp.sending, undefined);
+    assert.equal(
+      (await Effect.runPromise(ops.observe)).has('ae/send/1'),
+      false,
+      'given up: no session listed, which the grace window reads `lost`',
+    );
+    const send = await spawnOf('ae/send/1');
+    assert.notEqual(send.refused, true, 'held, the send may have been taken: in doubt, not refused');
+    assert.match(
+      send.message,
+      /since the agent did not answer the send of `ae\/send\/1` within 0\.6 s: whether the agent made a Task of it is not known, and it is not sent twice/,
+    );
+    s.hanging.a2a = false;
 
-  await Effect.runPromise(ops.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
-  const taskId = s.tasks()[0];
-  s.hanging.a2a = true;
-  const [observeMs, seen] = await timed(() => Effect.runPromise(ops.observe));
-  assert.ok(observeMs < 3_000, `${observeMs} ms`);
-  assert.equal(seen.get('ae/seen/1')?.sessionId, taskId);
-  assert.equal(seen.get('ae/seen/1')?.state, 'working', 'as last seen');
-});
+    await Effect.runPromise(ops.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
+    const taskId = s.tasks()[0];
+    s.hanging.a2a = true;
+    const [observeMs, seen] = await timed(() => Effect.runPromise(ops.observe));
+    assert.ok(observeMs < 3_000, `${observeMs} ms`);
+    assert.equal(seen.get('ae/seen/1')?.sessionId, taskId);
+    assert.equal(seen.get('ae/seen/1')?.state, 'working', 'as last seen');
+  },
+);
 
 test(`at shipped defaults an agent that holds every request holds a pass ${REQUEST_MS / 1000} s at most, and the task reads as last seen`, async () => {
   const s = await serve({ script: HELD });
@@ -805,31 +813,39 @@ test(`at shipped defaults an agent that holds every request holds a pass ${REQUE
   assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)');
 });
 
-test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is read submitted, then ends with its reply, sent once: the send leaves the pass`, async () => {
-  const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REQUEST_MS + 500 }] });
-  const { root, e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  const [ms] = await timed(async () => {
-    await Effect.runPromise(e.tick());
-    await Effect.runPromise(e.tick());
-  });
-  assert.ok(ms < SPAWN_WAIT_MS + 3_000, `${ms} ms: the pass waited ${SPAWN_WAIT_MS / 1000} s for the answer, and went on`);
-  const spawned = (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
-  assert.ok(spawned && spawned.error === undefined, 'spawned, with no doubt');
-  assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)', 'being sent: submitted, which runs as working');
-  const t0 = Date.now();
-  while (s.replies() === 0 && Date.now() - t0 < REQUEST_MS + 5_000) {
-    await Effect.runPromise(e.tick());
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  assert.equal(s.replies(), 1);
-  const done = await settled(e, id);
-  assert.equal(done.state.settled, 'succeeded');
-  assert.deepEqual(done.state.attempts[0].closeout, { verdict: 'fine' });
-  assert.equal(done.state.attempts.length, 1);
-  assert.equal(s.counts.sendMessage, 1, 'sent once');
-  assert.match(await Effect.runPromise(e.logs(id)), /agent: slow and sure/);
-});
+test(
+  `at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is read submitted, then ends with its reply, sent once: the send leaves the pass`,
+  WAITED,
+  async (t) => {
+    const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REQUEST_MS + 500 }] });
+    const { root, e } = engineOn(s);
+    const id = await Effect.runPromise(e.file(task()));
+    const [ms] = await timed(async () => {
+      await Effect.runPromise(e.tick());
+      await Effect.runPromise(e.tick());
+    });
+    assert.ok(ms < SPAWN_WAIT_MS + 3_000, `${ms} ms: the pass waited ${SPAWN_WAIT_MS / 1000} s for the answer, and went on`);
+    const spawned = (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
+    assert.ok(spawned && spawned.error === undefined, 'spawned, with no doubt');
+    assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)', 'being sent: submitted, which runs as working');
+    await untilEvent(
+      t,
+      async () => {
+        await Effect.runPromise(e.tick());
+        return s.replies() > 0;
+      },
+      () => `the slow reply, with ${s.replies()} replied`,
+      { everyMs: 100 },
+    );
+    assert.equal(s.replies(), 1);
+    const done = await settled(e, id);
+    assert.equal(done.state.settled, 'succeeded');
+    assert.deepEqual(done.state.attempts[0].closeout, { verdict: 'fine' });
+    assert.equal(done.state.attempts.length, 1);
+    assert.equal(s.counts.sendMessage, 1, 'sent once');
+    assert.match(await Effect.runPromise(e.logs(id)), /agent: slow and sure/);
+  },
+);
 
 /** A gate an agent's first step waits on, and its key. */
 const gate = () => {

@@ -187,6 +187,7 @@ function runWith(note: string | null): RunDetail {
         waitingFor: null,
         approve: null,
         denied: null,
+        sessionUnread: null,
         gate: null,
         accepted: null,
         lastLine: null,
@@ -542,7 +543,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * theme waiting at its gate, an ending, on you.
  */
 function summaryRun(): RunSummary {
-  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null };
+  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, sessionUnread: null };
   const step = (name: string, status: string, extra = {}) => ({
     name,
     taskId: `t-${name}`,
@@ -1537,7 +1538,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
 
 const { Artifacts, TryCloseouts } = await import('../src/components/Closeout.tsx');
 const facts = await import('../src/components/Facts.tsx');
-const { Facts, specRows, when } = facts;
+const { Facts, specRows, unreadRows, when } = facts;
 type StepTry = import('../src/lib/api.ts').StepTry;
 type StepCloseout = import('../src/lib/api.ts').StepCloseout;
 type StepSpec = import('../src/lib/api.ts').StepSpec;
@@ -1619,6 +1620,15 @@ const threeTries: StepTry[] = [
     answer: null,
   },
 ];
+
+test("REFUSED: a step's session alone unread draws an `unread` fact, the runtime's words whole, and a step read draws none", () => {
+  const words = '`ae/t-1/1`\'s transcript cannot be read: line 2 does not decode: Expected string, got "yesterday" at ["timestamp"]';
+  const html = renderToStaticMarkup(createElement(Facts, { rows: [['task', 't-1'], ...unreadRows(words)] }));
+  const row = /<div data-fact="unread"[^>]*>.*?<dd[^>]*><span data-unread="true"[^>]*>([^<]*)<\/span><\/dd><\/div>/.exec(html);
+  assert.ok(row, `an unread fact holds the words: ${html}`);
+  assert.equal(unescaped(row[1]), words, "the runtime's words, whole");
+  assert.deepEqual(unreadRows(null), [], 'a step whose session was read: no row');
+});
 
 test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, attempts and verdict, and a link that selects it", () => {
   const run = runWith('round 2 of 3');
@@ -2280,7 +2290,17 @@ function needing(
   return {
     ...run,
     steps: [
-      { ...run.steps[0], needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, denied: null, ...needs },
+      {
+        ...run.steps[0],
+        needs: null,
+        blockedByHarness: false,
+        waitingFor: null,
+        lastLine: null,
+        asked: null,
+        denied: null,
+        sessionUnread: null,
+        ...needs,
+      },
     ],
   };
 }

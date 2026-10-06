@@ -302,6 +302,22 @@ export function readRows(used: StepUsed | null | undefined): Array<[string, Reac
   return used?.read ? [['read', <Read key="read" said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];
 }
 
+/**
+ * The `unread` row of a step's facts: why the runtime could not read its session alone, whole and wrapping, in its words — a long sentence
+ * naming a file and a field. None for a step whose session was read.
+ */
+export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
+  words
+    ? [
+        [
+          'unread',
+          <span key="unread" data-unread className={cn('text-xs', WARN)}>
+            {words}
+          </span>,
+        ],
+      ]
+    : [];
+
 const WARN = 'text-amber-700 dark:text-amber-400';
 
 /**

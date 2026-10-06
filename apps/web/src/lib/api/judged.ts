@@ -197,7 +197,8 @@ export const RunHoldingSchema = Schema.Struct({
  * run's detail alone (`lastLine`): the list reads no conversation. `approve`: what the CLI's `ls` asks of you for a step waiting at its
  * gate, `approve plan`; null for any other step, and for one already sent back. `denied`: what the harness denied the step's current try,
  * `calls` each as a permission rule names it (`Skill(look)`) and `words` the line the CLI's `ls` says (`denied: Skill(look),
- * Bash(pytest)`); null for a step denied nothing, and for one whose harness cannot say.
+ * Bash(pytest)`); null for a step denied nothing, and for one whose harness cannot say. `sessionUnread`: why the runtime could not read
+ * the step's session alone, in its words; null for a step whose session was read, said afresh on every answer.
  */
 export type StepNeeds = {
   needs: string | null;
@@ -205,6 +206,7 @@ export type StepNeeds = {
   waitingFor: { words: string; advice: string } | null;
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
+  sessionUnread: string | null;
 };
 
 /** The fields of a `StepNeeds`, for the schema of a step that carries them to take in with its own (`RunSummarySchema` in runs.ts). */
@@ -214,4 +216,5 @@ export const StepNeedsFields = {
   waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })),
   approve: Schema.NullOr(Schema.String),
   denied: Schema.NullOr(Schema.Struct({ words: Schema.String, calls: StringsSchema })),
+  sessionUnread: Schema.NullOr(Schema.String),
 };

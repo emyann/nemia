@@ -29,6 +29,7 @@ import {
   composite,
   type ExpectedSession,
   type HarnessArgs,
+  type Observation,
   type HarnessQuota,
   type RunnerOps,
   type Transcript,
@@ -611,11 +612,11 @@ const make = (options: EngineOptions) =>
         const last = state.attempts.at(-1);
         const { find, observe, observeFor } = runners[harnessOf(state)];
         const look = observeFor
-          ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))).pipe(Effect.map((o) => o.seen))
-          : observe;
+          ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness })))
+          : observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
         const observed = look.pipe(
-          Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
-          Effect.map((o) => viewOfState(state, o)),
+          Effect.catchCause(() => Effect.succeed<Observation>({ seen: new Map<string, Sighting>(), unread: new Set() })),
+          Effect.map((o) => viewOfState(state, o.seen, o.unreadWhy)),
         );
         const recorded = Effect.sync(() => viewOfState(state, new Map()));
         if (!Object.hasOwn(runners, state.harness ?? fallback)) return yield* recorded;

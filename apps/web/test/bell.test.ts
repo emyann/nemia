@@ -40,6 +40,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
     waitingFor: null,
     approve: null,
     denied: null,
+    sessionUnread: null,
   })),
   graph: { roots: [], edges: [] },
   waitingOnYou: [],

@@ -106,6 +106,7 @@ function unstartedStep(name: string): RunDetail['steps'][number] {
     waitingFor: null,
     approve: null,
     denied: null,
+    sessionUnread: null,
     gate: null,
     accepted: null,
     lastLine: null,

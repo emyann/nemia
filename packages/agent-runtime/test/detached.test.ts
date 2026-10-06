@@ -938,12 +938,15 @@ test('a Codex stream that does not decode is never an absence: through the compo
   const working = await Effect.runPromise(ops.observeFor!(expected));
   assert.deepEqual([...working.seen.keys()], ['ae/x/1']);
   assert.deepEqual(working.unread, new Set(['ae/c2/1']), 'neither there nor gone');
+  assert.deepEqual([...(working.unreadWhy?.keys() ?? [])], ['ae/c2/1'], 'why, as its harness said it, through the composite');
+  assert.ok(working.unreadWhy?.get('ae/c2/1')?.includes(log), working.unreadWhy?.get('ae/c2/1'));
 
   codexRun(dir, 'ae/c2/1', bad);
   const ended = await Effect.runPromise(ops.observeFor!(expected));
   assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
   assert.equal(ended.seen.get('ae/c2/1')?.state, 'failed');
   assert.equal(ended.seen.get('ae/x/1')?.state, 'working');
+  assert.equal(ended.unreadWhy, undefined, 'read, so nothing said of why it is not');
 });
 
 test('a Codex stream refused is refused once per change of its output: an unchanged log is not decoded again on every pass', async () => {
@@ -1095,6 +1098,7 @@ test('a harness the composite cannot read leaves the names routed to it unread, 
     new Set(['ae/y/1', 'ae/z/1']),
     'each unread harness leaves its own names unread, by either verb; one that answered leaves none',
   );
+  assert.equal(o.unreadWhy, undefined, 'a harness whose look failed says why on `why`, of no session alone');
   assert.deepEqual(
     [...(await Effect.runPromise(ops.observe)).keys()],
     ['ae/x/1'],

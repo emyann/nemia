@@ -10,7 +10,7 @@ import { runReading } from '../list/list.verb.ts';
 import { type BranchReader, branchReader, branchStandings } from '../branches/branches.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
-import { closeoutOf, deniedOf } from '../views/views.verb.ts';
+import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
 import { wordOfView } from '../views/views-words.ts';
 import { holdAdvice, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
 import { merges, type ToDecide, toDecideWords } from '../ending/ending.ts';
@@ -141,6 +141,10 @@ export type RunHolding = {
  * `calls`, each as a permission rule names it (`Skill(look)`, `Bash(pytest)`), once each in the order first denied, and `words`, the line
  * `nemia ls` and `nemia decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the word
  * the board's chip compares. Null for a step denied nothing — and for one whose harness cannot say, as a `background: true` session cannot.
+ *
+ * `sessionUnread` is why the runtime could not read the step's session alone, in its words (`unreadOf`, off its view): the step is
+ * neither working nor gone, and its status says nothing of it. Null for a step whose session was read — on the first request whose look
+ * reads it, as nothing carries it.
  */
 export type StepNeeds = {
   needs: string | null;
@@ -148,6 +152,7 @@ export type StepNeeds = {
   waitingFor: { words: string; advice: string } | null;
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
+  sessionUnread: string | null;
 };
 
 /**
@@ -414,7 +419,8 @@ export const judge = Effect.fn('judge')(function* (
  * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
  * on you, what `nemia ls` asks of you, in its words (`onYouWords`). A wait is said only for a step the harness blocked, nothing else having
  * one for a person to answer: the words the reading put beside its status (`waits`), and the name its harness lists that session under
- * (`nameFor`). What its try was denied is the reading's words too (`denied`), with each call off the views (`deniedOf`).
+ * (`nameFor`). What its try was denied is the reading's words too (`denied`), with each call off the views (`deniedOf`), and why its
+ * session alone was unread the runtime's (`unreadOf`).
  */
 export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou' | 'beside'>): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
@@ -439,5 +445,6 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
       : null,
     approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0] : null,
     denied: denied && view ? { words: denied, calls: deniedOf(views)(run.steps[name].taskId!) } : null,
+    sessionUnread: unreadOf(view),
   };
 }

@@ -120,6 +120,13 @@ export type TaskView = {
    * not ask, and only then. Off the same observation as the phase, read afresh every pass: the status a Pod's spec asked for.
    */
   bridge?: Bridge;
+  /**
+   * Why the last attempt's session could not be read on this look, in its harness's words (`Observation.unreadWhy`), for a task not
+   * settled whose session the look left unread. Absent for a settled task, a session seen, and a look that said nothing of it — the
+   * full listing `view` and `everyView` read says nothing. Off the same look as the phase, rebuilt on every look and kept by none:
+   * the first look that reads the session drops it. Carried, never judged.
+   */
+  unreadWhy?: string;
 };
 
 /**
@@ -685,7 +692,7 @@ export const tick = Effect.fn('tick')(function* () {
     else folded.set(id, fold(id, read.events));
   }
   const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
-  const { seen: observed, unread, unobserved } = yield* lookAt(runner, expectedOf(lookedFor));
+  const { seen: observed, unread, unobserved, unreadWhy } = yield* lookAt(runner, expectedOf(lookedFor));
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -717,7 +724,7 @@ export const tick = Effect.fn('tick')(function* () {
       else memo.listed.delete(id);
     }
     if (after.settled) continue;
-    views.push(viewOfState(after, observed));
+    views.push(viewOfState(after, observed, unreadWhy));
     if (atWork(after, observed)) running[after.harness ?? 'default'] = (running[after.harness ?? 'default'] ?? 0) + 1;
   }
 
@@ -739,7 +746,7 @@ export const tick = Effect.fn('tick')(function* () {
   };
 });
 
-/** What a person wants to see. Derived, never stored. */
+/** What a person wants to see. Derived, never stored. Over a full listing (`observe`), which says no session's `unreadWhy`. */
 export const view = Effect.fn('view')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
   return viewOfState(fold(taskId, yield* journal.read(taskId)), observed);
@@ -775,7 +782,8 @@ const readEach = Effect.fn('readEach')(function* (taskIds: Iterable<string>) {
  * settled (`observeFor`), which is all a view reads of a sighting — so a look for Claude Code jobs alone lists their run files and asks no
  * `claude agents`, and a look for none is not made. Where a runner cannot be told, it observes everything once, as `list` does. What a
  * caller that shows some of the board reads in place of a `view` each (an observation each for tasks in flight) or of `list` (every
- * journal in the store). A registry that cannot be read this time is nothing observed, as `view` reads it.
+ * journal in the store). A registry that cannot be read this time is nothing observed, as `view` reads it. Why a session alone was
+ * unread (`TaskView.unreadWhy`) is carried off the look that said it.
  *
  * A task whose journal does not read is left out of `views` and named in `unreadable`, once, as the pass leaves it out: one entry no
  * runtime wrote in one journal costs the caller that task, never the others.
@@ -785,22 +793,20 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
   const { read, unreadable } = yield* readEach(new Set(taskIds));
   const states = read.map(({ taskId, events }) => fold(taskId, events));
   const open = states.filter((state) => !state.settled && state.attempts.length);
-  const observed = open.length
+  const { seen, unreadWhy } = open.length
     ? yield* (
         runner.observeFor
-          ? runner
-              .observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) }))))
-              .pipe(Effect.map((o) => o.seen))
-          : runner.observe
-      ).pipe(Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())))
-    : new Map<string, Sighting>();
-  return { views: states.map((state) => viewOfState(state, observed)), unreadable } satisfies TaskList;
+          ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) }))))
+          : runner.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: ALL_READ })))
+      ).pipe(Effect.catchCause(() => Effect.succeed<Observation>({ seen: new Map(), unread: ALL_READ })))
+    : { seen: new Map<string, Sighting>(), unreadWhy: undefined };
+  return { views: states.map((state) => viewOfState(state, seen, unreadWhy)), unreadable } satisfies TaskList;
 });
 
 /**
  * Every task on the board, each journal read, over one observation of every harness — what `list()` answers. A task whose journal does
  * not read is left out of `views` and named in `unreadable`, once, as `viewsOf` leaves it out; a store that cannot be listed, or a
- * harness that cannot be observed, fails the read.
+ * harness that cannot be observed, fails the read. A full listing says no session's `unreadWhy`.
  */
 export const everyView = Effect.fn('everyView')(function* () {
   const observed = yield* (yield* Runner).observe;
@@ -821,6 +827,12 @@ function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sigh
   if (last?.ended === null) return 'starting';
   return last ? 'between attempts' : 'pending';
 }
+
+/** Why the look left a task's last session unread, by its name in `unreadWhy`; none for a task never spawned. */
+const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | undefined): string | undefined => {
+  const last = state.attempts.at(-1);
+  return last ? unreadWhy?.get(nameFor(state.taskId, last.n)) : undefined;
+};
 
 /**
  * A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the
@@ -845,9 +857,10 @@ function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sigh
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
  * observation, and that id is what `logs` reads then. `waitingFor` is carried only where the phase is `needs-human`: the
  * word answers "waiting for what?", and there is no question to answer about a session nobody is waiting on. Carried, not
- * judged — `decide` never saw it. So is its `bridge`, which only a task that asked for one carries (`bridgeOfTask`).
+ * judged — `decide` never saw it. So is its `bridge`, which only a task that asked for one carries (`bridgeOfTask`), and why the
+ * look left its session unread (`unreadWhy`, the look's words by the last attempt's name), only for a session not seen.
  */
-export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>): TaskView {
+export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>, unreadWhy?: ReadonlyMap<string, string>): TaskView {
   const taskId = state.taskId;
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
@@ -855,6 +868,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   const admission = admissionOf(state);
   const bridge = bridgeOfTask(state.config, state.settled !== null, sighting?.bridge);
+  const unread = sighting ? undefined : unreadOfTask(state, unreadWhy);
   return {
     id: taskId,
     state,
@@ -864,5 +878,6 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     ...(waitingFor ? { waitingFor } : {}),
     ...(admission ? { admission } : {}),
     ...(bridge ? { bridge } : {}),
+    ...(unread ? { unreadWhy: unread } : {}),
   };
 }

@@ -86,6 +86,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   waitingFor: null,
   approve: 'approve implement',
   denied: { words: 'denied: Skill(look)', calls: ['Skill(look)'] },
+  sessionUnread: null,
   gate: { awaiting: false, approval: { try: 2, at: '2026-09-30T05:10:00.000Z', message: 'Go.' } },
   accepted: { try: 2, at: '2026-09-30T05:11:00.000Z', message: 'Good enough.' },
   lastLine: null,

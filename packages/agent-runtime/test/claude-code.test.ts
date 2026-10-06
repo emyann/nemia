@@ -1468,72 +1468,84 @@ test("a restarted long-lived task's earlier attempt keeps its start when a look 
   );
 });
 
-test("through the engine, a stopped long-lived attempt's spend is read from its journalled start though the task is viewed between the pass's look and its release", async () => {
-  const f = fake();
-  try {
-    const { Engine } = await import('../src/index.ts');
-    const { builtEngine } = await import('./engine.ts');
-    const root = tmp('root');
-    const asked: Array<[string, number]> = [];
-    let exited = false;
-    const ops = claudeOps({
-      root,
-      transcriptTime: async () => Date.now(),
-      closeoutFrom: async () => undefined,
-      usageFrom: async (sessionId: string, since: number) => {
-        asked.push([sessionId, since]);
-        return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
-      },
-    });
-    const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
-    let view = (): Effect.Effect<unknown, unknown> => Effect.void;
-    const viewed: typeof ops = {
-      ...ops,
-      observeFor: (expected) =>
-        ops.observeFor!(expected).pipe(
-          Effect.tap(() => (expected.some((x) => x.since !== undefined) ? Effect.ignore(view()) : Effect.void)),
-        ),
-      release: (session, task) => {
-        const from = asked.length;
-        exited = true;
-        return ops.release!(session, task).pipe(
-          Effect.tap((measured) => Effect.sync(() => released.push({ asked: asked.slice(from), measured }))),
-        );
-      },
-    };
-    const e = builtEngine(Engine.layer({ root, harnesses: { bg: viewed } }));
-    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: f.dir, harness: 'bg', restartPolicy: 'Always' }));
-    view = () => e.view(id);
-    const name = await until(async () => {
-      await Effect.runPromise(e.tick());
-      return f.read('bg-args')?.[2];
-    }, 'the session spawned');
-    const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0].startedAt);
-    const listing = (state: string) =>
-      fs.writeFileSync(
-        path.join(f.dir, 'agents.json'),
-        JSON.stringify([{ ...bgRow(name, state, 'idle', begun + 3_600_000), pid: process.pid }]),
+test(
+  "through the engine, a stopped long-lived attempt's spend is read from its journalled start though the task is viewed between the pass's look and its release",
+  WAITED,
+  async (t) => {
+    const f = fake();
+    try {
+      const { Engine } = await import('../src/index.ts');
+      const { builtEngine } = await import('./engine.ts');
+      const root = tmp('root');
+      const asked: Array<[string, number]> = [];
+      let exited = false;
+      const ops = claudeOps({
+        root,
+        transcriptTime: async () => Date.now(),
+        closeoutFrom: async () => undefined,
+        usageFrom: async (sessionId: string, since: number) => {
+          asked.push([sessionId, since]);
+          return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
+        },
+      });
+      const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
+      let view = (): Effect.Effect<unknown, unknown> => Effect.void;
+      const viewed: typeof ops = {
+        ...ops,
+        observeFor: (expected) =>
+          ops.observeFor!(expected).pipe(
+            Effect.tap(() => (expected.some((x) => x.since !== undefined) ? Effect.ignore(view()) : Effect.void)),
+          ),
+        release: (session, task) => {
+          const from = asked.length;
+          exited = true;
+          return ops.release!(session, task).pipe(
+            Effect.tap((measured) => Effect.sync(() => released.push({ asked: asked.slice(from), measured }))),
+          );
+        },
+      };
+      const e = builtEngine(Engine.layer({ root, harnesses: { bg: viewed } }));
+      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: f.dir, harness: 'bg', restartPolicy: 'Always' }));
+      view = () => e.view(id);
+      const name = await looked(
+        t,
+        async () => {
+          await Effect.runPromise(e.tick());
+          return f.read('bg-args')?.[2];
+        },
+        'the session spawned',
       );
-    listing('working');
-    await Effect.runPromise(e.tick());
-    await Effect.runPromise(e.stop(id));
-    await Effect.runPromise(e.tick());
-    listing('stopped');
-    const release = await until(async () => {
+      const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0].startedAt);
+      const listing = (state: string) =>
+        fs.writeFileSync(
+          path.join(f.dir, 'agents.json'),
+          JSON.stringify([{ ...bgRow(name, state, 'idle', begun + 3_600_000), pid: process.pid }]),
+        );
+      listing('working');
       await Effect.runPromise(e.tick());
-      return released[0];
-    }, 'the session released');
-    assert.deepEqual(release.asked, [[BG_ID, begun]], "the release reads the spend from the attempt's journalled start, not its row's");
-    const entries = (await Effect.runPromise(e.feed(0))).entries.filter((x) => x.taskId === id).map((x) => x.event);
-    assert.deepEqual(
-      entries.flatMap((x) => (x.kind === 'measured' ? [x.usage] : [])),
-      [release.measured],
-      'what the release read is journalled as the attempt measured',
-    );
-  } finally {
-    f.restore();
-  }
-});
+      await Effect.runPromise(e.stop(id));
+      await Effect.runPromise(e.tick());
+      listing('stopped');
+      const release = await looked(
+        t,
+        async () => {
+          await Effect.runPromise(e.tick());
+          return released[0];
+        },
+        'the session released',
+      );
+      assert.deepEqual(release.asked, [[BG_ID, begun]], "the release reads the spend from the attempt's journalled start, not its row's");
+      const entries = (await Effect.runPromise(e.feed(0))).entries.filter((x) => x.taskId === id).map((x) => x.event);
+      assert.deepEqual(
+        entries.flatMap((x) => (x.kind === 'measured' ? [x.usage] : [])),
+        [release.measured],
+        'what the release read is journalled as the attempt measured',
+      );
+    } finally {
+      f.restore();
+    }
+  },
+);
 
 test("a session expected with no start, or with one that is no number, is counted from its row's start — by its look and its release", async () => {
   const f = fake();

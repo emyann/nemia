@@ -603,9 +603,9 @@
     {
       "files": ["packages/agent-orchestrator/src/brief/brief.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 120, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 44 }],
-        "sonarjs/cognitive-complexity": ["error", 47]
+        "max-lines-per-function": ["error", { "max": 91, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 43 }],
+        "sonarjs/cognitive-complexity": ["error", 39]
       }
     },
     {

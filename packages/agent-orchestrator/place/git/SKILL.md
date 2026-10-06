@@ -1,6 +1,6 @@
 ---
 name: git
-description: The git place — a run's steps work in a git repository, each in a worktree on a branch of its own. How to keep your work in it, and the scripts Nemia runs to read and act on the repository for you. For a step whose workflow says it works in a git repository.
+description: The git place — a run's steps work in a git repository, each in a worktree on a branch of its own. How to keep your work in it, read what changed, merge its base when a person asks, and the scripts Nemia runs to read and act on the repository for you. For a step whose workflow says it works in a git repository.
 ---
 
 # Git
@@ -12,9 +12,33 @@ you start from it, and a person decides whether it ships.
 
 - Commit your work on your branch in small commits with plain messages, as you make it: a short imperative subject, and a body saying
   why when it is not plain.
-- Never push, never merge into the base branch, never delete a branch: a person does, or the run's ending step when they approve it.
 - What you leave uncommitted is committed for you when your step ends, in one commit under your step's name. That is a net, not a way to
   work: a reviewer reads your commits.
+
+## Read what changed
+
+Your brief names the commit the run started from, its base. When it does not give you the commands, read the work this way:
+
+- **In your workspace**, what the steps before you did: `git diff <base>` for the change against the base, committed or not, and
+  `git status` for what is not committed yet.
+- **On a result branch**, from the base's checkout: `git log --oneline <base>..<branch>` for its commits and `git diff <base>...<branch>`
+  for its change, as the branch made it, whatever the base did since.
+
+The run reads the same without you, from git's object store, through `scripts/report.ts`: what each result branch changed against the
+base, file by file.
+
+## Merge the base when a person asks
+
+A person can send a loop's work back to merge its base branch (`nemia merge <run>`), when the base moved and the work no longer lands.
+Your brief names the commit the person's trial merge read: merge that commit, never the base as it stands now, which may have moved again.
+
+- **A textual merge**: the work does not merge onto the base as text. `git merge <commit>`, resolve each conflict, keeping both meanings
+  (what this change does, and what the base changed), and commit the merge.
+- **A semantic merge**: it merges as text, but the landing's check refused the merged tree. `git merge --no-ff --no-commit <commit>`, fix
+  what broke inside the merge before you commit it, so `git show --remerge-diff` of the merge commit shows the fix.
+
+Where both meanings cannot hold, change nothing more, and sign off blocked naming the choice. The step that reads the merge after you
+finds it with `git log --merges -1`.
 
 ## Stage a landing
 
@@ -37,6 +61,8 @@ froze when it started; you need not run them. Each reads one JSON request on std
   there while a merge is staged in that checkout, which the run reads with no process.
 - `handoff` — commit what a step left uncommitted: `{ "workspace", "step", "why" }` answers `{ "commit" }`, null when the tree is clean.
 - `status` — the merge staged in a checkout: `{ "checkout", "tips" }` answers `{ "merging", "conflicted", "missing", "head" }`.
+- `report` — what each result branch changed against a run's base, from git's object store: `{ "repo", "baseRef", "onto", "branches",
+  "diffOf", "present", "atBase" }` answers `{ "at", "files", "diffs", "present", "atBase" }`.
 - `trial` — whether branches merge, by a merge made in git's object store alone, which touches no checkout, index or ref:
   `{ "repo", "trials": [{ "onto", "branch" }] }` answers `{ "at", "trials" }`, the commit each `onto` names now and each trial in the
   order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.

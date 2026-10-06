@@ -2926,9 +2926,7 @@ test('REFUSED: an ending whose place this nemia does not ship is not filed once 
   const out = await runWith(odd.e, advanceRun(readRun(odd.id)));
   assert.deepEqual(out.filed, [], 'its ending is not filed');
   assert.ok(
-    out.notes.some((n) =>
-      n.startsWith(`ship: not filed, for its place gives it no landing words: run ${odd.id} names the place skill svn`),
-    ),
+    out.notes.some((n) => n.startsWith(`ship: not filed, for its place gives it no words: run ${odd.id} names the place skill svn`)),
     out.notes.join('\n'),
   );
   assert.equal(readRun(odd.id).steps.ship.taskId, null);

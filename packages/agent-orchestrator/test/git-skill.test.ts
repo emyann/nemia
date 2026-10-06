@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
+import { SKILL_SECTIONS, unknownHoles } from '../src/place/place.ts';
 import { running } from './running.ts';
 import { steppingClock } from './clock.ts';
 import { scratch } from './scratch.ts';
@@ -126,6 +127,13 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     'trial',
   ]);
   assert.deepEqual(declared.denyWhileLanding, ['Bash(git commit:*)', 'Bash(git merge --continue:*)']);
+});
+
+test("SKILL.md holds the sections a brief told no command sends a step to, every template names only holes the code fills, and the skill forbids nothing a team's fence holds", () => {
+  const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
+  for (const section of Object.values(SKILL_SECTIONS)) assert.match(skill, new RegExp(`^## ${section}$`, 'm'), section);
+  assert.doesNotMatch(skill, /never push/i);
+  assert.deepEqual(unknownHoles(readPlaceJson(GIT_SKILL).say), []);
 });
 
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {

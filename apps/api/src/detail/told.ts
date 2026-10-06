@@ -1,7 +1,7 @@
 /** What a step was told, for the run page: the brief whole, and by layer from what the run froze (`toldLayers`). */
-import { composeBrief, handedParts, type HandedPart, type Run, type ToldLayers, toldLayers } from 'agent-orchestrator/run';
+import { handedParts, type HandedPart, type Run, type ToldLayers, toldLayers } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import { type Views } from 'agent-orchestrator';
+import { briefNow, type Views } from 'agent-orchestrator';
 
 /**
  * The brief a step was told, whole.
@@ -9,14 +9,14 @@ import { type Views } from 'agent-orchestrator';
  * For a filed step, the brief the engine holds: it is what the step was given. Recomposing it now
  * would not be — `composeBrief` points a step with no `after` at every step filed so far, so a
  * finished first step would read as told to look at work done after it, and an edited folder would
- * rewrite it. For a step not yet filed, what `composeBrief` would give it now, from `workflows` — the
- * workflow the run froze, as the tick composes it. For a filed task the engine has no record of, nobody can say.
+ * rewrite it. For a step not yet filed, what it would be told now (`briefNow`), from `workflows` — the
+ * workflow the run froze, as the tick composes it, with its place's words. For a filed task the engine has no record of, nobody can say.
  */
 function briefOf(run: Run, name: string, workflows: readonly Workflow[] | null, views: Views): string | null {
   const taskId = run.steps[name]?.taskId;
   if (taskId) return views.get(taskId)?.state.brief || null;
   const step = workflows?.find((s) => s.name === name);
-  return step && workflows ? composeBrief(step, run, workflows) : null;
+  return step && workflows ? briefNow(step, run, workflows) : null;
 }
 
 /**

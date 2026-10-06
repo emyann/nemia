@@ -309,6 +309,11 @@ const DECLARED = {
     commit: 'm',
     inspect: 'i',
     orphans: 'o',
+    results: ['git log {base}..{branch}'],
+    merge: 'git merge {sha}',
+    mergeUncommitted: 'mu',
+    showMerge: 'sm',
+    lastMerge: 'lm',
   },
 };
 
@@ -347,6 +352,19 @@ test('REFUSED: a place.json whose first wrong field does not read as contract v 
   const { unlock: _unlock, ...say } = DECLARED.say;
   assert.match(refusedWith(declaring({ ...DECLARED, say })), /`say\.unlock` is missing/);
   assert.match(refusedWith(declaring([])), /does not read as a place's declaration/);
+});
+
+test('REFUSED: a `say` template naming a hole the code does not fill for its key, naming the key, the hole and the holes it may name', () => {
+  const unknown = refusedWith(declaring({ ...DECLARED, say: { ...DECLARED.say, look: ['git diff {nope}', 'git status'] } }));
+  assert.match(unknown, /`say\.look` names \{nope\}, a hole the code does not fill: look may name \{baseRef\}/);
+  const another = refusedWith(declaring({ ...DECLARED, say: { ...DECLARED.say, ship: 'git -C {repo} merge {sha}' } }));
+  assert.match(another, /`say\.ship` names \{sha\}, a hole the code does not fill: ship may name \{repo\}, \{branch\}/);
+  const none = refusedWith(declaring({ ...DECLARED, say: { ...DECLARED.say, lastMerge: 'git log -1 {sha}' } }));
+  assert.match(none, /`say\.lastMerge` names \{sha\}, a hole the code does not fill: lastMerge may name no hole/);
+  const dir = declaring({ ...DECLARED, say: { ...DECLARED.say, look: ['git diff {nope}'] } });
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: git\n---\n');
+  assert.match(openRefused(dir), /`say\.look` names \{nope\}/, 'and so at start');
+  assert.deepEqual(readPlaceJson(declaring(DECLARED)).say.merge, 'git merge {sha}', 'a hole its key fills is read');
 });
 
 test('REFUSED: a verb declared with no script in scripts/', () => {

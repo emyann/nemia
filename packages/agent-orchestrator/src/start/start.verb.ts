@@ -17,7 +17,7 @@ import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
-import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { formerModesWritten, isShippedPlace, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
@@ -72,6 +72,7 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * before the first run is started. Refused:
  * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
  *   unfilled or fill twice (`stepsIn`);
+ * - a team that says `place: folder` whose agent is given the package's place skill (`placeSkillRefusal`);
  * - with `isolate: false` (`--no-worktree`): a team that says `place: folder`, which has no base branch to work on in place; one that
  *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
  *   does not have into the branch it stands on;
@@ -97,6 +98,8 @@ export function stepsToStart(
         `Start it without --no-worktree.`,
     });
   }
+  const placeSkill = placeSkillRefusal(steps, workflowDir, places);
+  if (placeSkill) throw new Invalid({ message: placeSkill });
   if (!isolate && fansOut(steps)) {
     throw new Invalid({
       message:
@@ -132,6 +135,27 @@ export function stepsToStart(
   const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
+}
+
+/**
+ * Why a team that says `place: folder` cannot start: a step whose session is given a skill its places resolve to a place skill the package
+ * ships (`isShippedPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is.
+ */
+function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, places: Places): string | undefined {
+  if (!isFolderTeam(steps)) return undefined;
+  const found = skillsFor(workflowDir, places).at;
+  for (const step of steps) {
+    const skill = step.agent?.skills?.find((name) => {
+      const at = found.get(name);
+      return typeof at === 'string' && isShippedPlace(at);
+    });
+    if (skill)
+      return (
+        `${step.name}: its agent is given the skill \`${skill}\`, the ${skill} place's, and this workflow's steps say \`place: folder\`: a folder run has no repository for it to act on.\n` +
+        `Take \`${skill}\` off the agent's \`skills:\`, or start a workflow whose steps work in a repository.`
+      );
+  }
+  return undefined;
 }
 
 /**

@@ -34,6 +34,7 @@ import {
 } from '../status/status.ts';
 import { landingSaidSection, type LandingSaid } from '../check/check.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 import type { Offer } from '../decide/decide.ts';
 
 /**
@@ -306,12 +307,14 @@ function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, read
  *
  * @param merge The base branch, the commit of it the person's trial merge read, and what the refusing check said, where one did.
  * @param loop The looping step, which reads the merge once the target signs off.
+ * @param say The run's place's words for a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
 export function mergeSection(
   step: Workflow,
   merge: { onto: string; sha: string; landing?: LandingSaid },
   loop: string,
   steps: readonly Workflow[],
+  say?: PlaceSay,
 ): string {
   const looping = steps.find((s) => s.name === loop);
   const between = looping ? loopSpan(steps, looping).filter((n) => n !== step.name && n !== loop) : [];
@@ -319,7 +322,7 @@ export function mergeSection(
     '',
     `## Merge ${merge.onto}`,
     '',
-    ...(merge.landing ? semanticMerge(merge, merge.landing) : textualMerge(merge)),
+    ...(merge.landing ? semanticMerge(merge, merge.landing, say) : textualMerge(merge, say)),
     `- Run the check${step.check ? ` (\`${step.check}\`)` : ''}, and fix what the merge broke — nothing else. Commit the merge.`,
     '- This is no review round: there are no findings to answer, and your `replies` are an empty list.',
     '',
@@ -328,38 +331,56 @@ export function mergeSection(
   ].join('\n');
 }
 
+/**
+ * The command that merges the base at `sha`, in the place's words (`template`), indented on its own line; or, with no words, where the
+ * place's skill says it, after `lead`.
+ */
+const mergeCommand = (lead: string, sha: string, template: string | undefined): string[] =>
+  template === undefined ? [`${lead}, ${skillSaid('merge')}.`, ''] : [`${lead}:`, '', `    ${sayFilled(template, { sha })}`, ''];
+
 /** How a merge that conflicts as text is made: at the commit the trial merge read, both meanings kept in each conflict. */
-const textualMerge = (merge: { onto: string; sha: string }): string[] => [
+const textualMerge = (merge: { onto: string; sha: string }, say?: PlaceSay): string[] => [
   `A person asked for this (\`nemia merge\`): the work no longer merges cleanly onto \`${merge.onto}\`, which moved since. Merge it in,`,
-  'at the commit their trial merge read:',
-  '',
-  `    git merge ${merge.sha}`,
-  '',
+  ...mergeCommand(`at the commit their trial merge read${say ? '' : `, \`${merge.sha}\``}`, merge.sha, say?.merge),
   `- In each conflict, keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off`,
   '  blocked and name the choice in `needs`.',
 ];
 
 /** How a merge that conflicts in meaning is made: without a commit, what broke fixed inside it, so the merge commit shows the fix. */
-const semanticMerge = (merge: { onto: string; sha: string }, said: LandingSaid): string[] => [
+const semanticMerge = (merge: { onto: string; sha: string }, said: LandingSaid, say?: PlaceSay): string[] => [
   `A person asked for this (\`nemia merge\`): the work merges cleanly onto \`${merge.onto}\` as text, but ${said.step}'s check refused the`,
   `merged tree at \`${merge.sha}\`${'verdict' in said ? ` (exit ${said.verdict})` : ''}, so the conflict is semantic: this change and what \`${merge.onto}\``,
-  'changed each hold alone, and break together. Merge it in at that commit, without committing:',
-  '',
-  `    git merge --no-ff --no-commit ${merge.sha}`,
-  '',
-  `- Fix what broke inside the merge, before you commit it, so \`git show --remerge-diff\` shows the fix to whoever reads the merge.`,
+  ...mergeCommand(
+    'changed each hold alone, and break together. Merge it in at that commit, without committing',
+    merge.sha,
+    say?.mergeUncommitted,
+  ),
+  `- Fix what broke inside the merge, before you commit it, so ${say ? `\`${say.showMerge}\`` : 'the merge commit'} shows the fix to whoever reads the merge.`,
   `  Keep both meanings: what this change does, and what \`${merge.onto}\` changed. Where both cannot hold, sign off blocked and name the`,
   '  choice in `needs`.',
 ];
 
 /**
+ * What a looping step reads of a merge: what it resolved, in the place's words (`say`) or where its skill says them, and what `onto`
+ * changed.
+ */
+const mergeRead = (onto: string, say: PlaceSay | undefined): string[] =>
+  say
+    ? [
+        `- What the merge resolved: \`${say.showMerge}\` of the merge commit (\`${say.lastMerge}\`), and what \`${onto}\` changed in the`,
+        '  files the change touches.',
+      ]
+    : [`- What the merge resolved, ${skillSaid('merge')}, and what \`${onto}\` changed in the files the change touches.`];
+
+/**
  * `## A merge of <base>`, on a looping step filed after its target merged the base: no new round — the merge is what to read, as
- * `git show --remerge-diff` shows it — and its own closeout before the merge, as data, to sign off with again unless the merge broke
+ * its place shows it (`mergeRead`) — and its own closeout before the merge, as data, to sign off with again unless the merge broke
  * something. A finding with `again: true` sends the target round again, and that round is counted.
  *
  * @param closeoutOf How each step signed off; the looping step's own is its closeout before the merge.
+ * @param say The run's place's words for reading a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
-export function mergeReviewSection(step: Workflow, run: Run, closeoutOf: (step: string) => Closeout | undefined): string {
+export function mergeReviewSection(step: Workflow, run: Run, closeoutOf: (step: string) => Closeout | undefined, say?: PlaceSay): string {
   const target = step.loop!;
   const round = roundOf(run, step.name);
   const cap = capOf(step);
@@ -372,8 +393,7 @@ export function mergeReviewSection(step: Workflow, run: Run, closeoutOf: (step: 
     `This step closes a loop (\`loop: ${target}\`), and this is no new round: ${target} merged \`${onto}\` into the change, on a person's`,
     `word (\`nemia merge\`), at ${run.baseRef ? `\`${run.baseRef}\`` : 'the commit their trial merge read'}. Read the merge, not the change again:`,
     '',
-    `- What the merge resolved: \`git show --remerge-diff\` of the merge commit (\`git log --merges -1\`), and what \`${onto}\` changed in the`,
-    '  files the change touches.',
+    ...mergeRead(onto, say),
     '- If both meanings are kept and the check still passes, sign off as you did before the merge, with the same `again`.',
     `- A finding about the merge with \`again: true\` sends ${target} round again, and that round is counted against \`rounds: ${cap}\`.`,
     '',

@@ -92,6 +92,7 @@ const GitRecordSchema = Schema.StructWithRest(
     baseRef: Schema.String,
     branch: Schema.String,
     isolate: Schema.Boolean,
+    placeSkill: Schema.optional(Schema.StructWithRest(Schema.Struct({ skill: Schema.String, version: Schema.String }), Rest)),
   }),
   Rest,
 );
@@ -104,6 +105,7 @@ const FolderRecordSchema = Schema.StructWithRest(
     baseRef: Schema.optional(Schema.Undefined),
     branch: Schema.optional(Schema.Undefined),
     isolate: Schema.optional(Schema.Undefined),
+    placeSkill: Schema.optional(Schema.Undefined),
   }),
   Rest,
 );

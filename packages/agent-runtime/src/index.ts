@@ -106,7 +106,7 @@ export { composite } from './harness/index.ts';
 export { admissionHook, sdkRunner } from './harness/index.ts';
 export { a2aRunner } from './a2a/index.ts';
 
-export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/index.ts';
+export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input, Bridge } from './core/index.ts';
 export type { SessionState, Ended, Outcome } from './core/index.ts';
 /**
  * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a board to

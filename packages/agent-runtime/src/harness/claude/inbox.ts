@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { readTextAsync } from '../../core/engine/tally.ts';
+import { quote, WORDS_QUOTE } from '../../core/quote.ts';
 
 /**
  * The longest line Claude Code's inbox reads, in characters. A longer one drops the connection and
@@ -129,29 +130,89 @@ export const processStart = (pid: number): string | undefined => {
   return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
 };
 
+/** A registration as Claude Code writes it for a session, `<sessions>/<pid>.json`: the fields the runtime reads, each as found. */
+export type Registration = {
+  pid?: unknown;
+  sessionId?: unknown;
+  name?: unknown;
+  kind?: unknown;
+  procStart?: unknown;
+  bridgeSessionId?: unknown;
+};
+
+/** Who `claudeRegistration` and `claudeRegistered` are told "this user" is, and when a process started: both passed only by a test. */
+export type RegisteredBy = { uid?: number; startOf?: (pid: number) => string | undefined };
+
+/** Whose a registration must be: the session of that id, or the one of that name. */
+type Whose = { sessionId: string } | { name: string };
+
+/** `value`, another party's, as a sentence quotes it (`quote`). */
+const quoted = (value: unknown): string => quote(JSON.stringify(value) ?? 'nothing');
+
+/** Why a registration read is not of `whose`, as a sentence — or `undefined`. */
+const notWhose = (file: string, r: Registration, whose: Whose): string | undefined => {
+  if ('name' in whose) return r.name === whose.name ? undefined : `${file} registers ${quoted(r.name)}, not ${quoted(whose.name)}`;
+  return r.sessionId === whose.sessionId
+    ? undefined
+    : `${file} registers session ${quoted(r.sessionId)} now, not ${whose.sessionId}: the process is another session's`;
+};
+
+/**
+ * The registration Claude Code wrote for the background session running under `pid`, `<sessionsDir>/<pid>.json`, when it is
+ * `whose`'s; or why it is not taken, as a sentence that names the file. A registration outlives its process, most of them by far,
+ * so one is taken only when:
+ *
+ * - it is a file this user owns, that reads as JSON;
+ * - of a `bg` session (an interactive one is never ours), named for the `pid` it holds;
+ * - of the session `whose` names, by its id or its name: a registration with an empty session id is no session's;
+ * - where the system says when a process started (`/proc`), the process under `pid` started when the registration says
+ *   (`procStart`): a pid another process has taken since is not the session. Without `/proc` (macOS) that check is not made.
+ */
+export const claudeRegistration = async (
+  sessionsDir: string,
+  pid: number,
+  whose: Whose,
+  { uid = process.getuid?.(), startOf = processStart }: RegisteredBy = {},
+): Promise<{ registration: Registration } | { refused: string }> => {
+  const file = path.join(sessionsDir, `${pid}.json`);
+  let r: Registration | null;
+  try {
+    const stat = await fs.promises.lstat(file);
+    if (!stat.isFile()) return { refused: `${file} is not a file` };
+    if (uid !== undefined && stat.uid !== uid) return { refused: `${file} is owned by uid ${stat.uid}, not by you` };
+    r = JSON.parse(await readTextAsync(file));
+  } catch (e) {
+    return { refused: `${file} cannot be read (${quote(e instanceof Error ? e.message : String(e), WORDS_QUOTE)})` };
+  }
+  if (typeof r !== 'object' || r === null) return { refused: `${file} holds no registration` };
+  if (r.kind !== 'bg') return { refused: `${file} registers a session of kind ${quoted(r.kind)}, not a background one` };
+  if (r.pid !== pid) return { refused: `${file} registers pid ${quoted(r.pid)}, not ${pid}` };
+  if (typeof r.sessionId !== 'string' || !r.sessionId) return { refused: `${file} registers no session id` };
+  const other = notWhose(file, r, whose);
+  if (other) return { refused: other };
+  const started = startOf(pid);
+  if (started !== undefined && String(r.procStart) !== started) {
+    return { refused: `${file} was written by an earlier process under pid ${pid}, which another process holds now` };
+  }
+  return { registration: r };
+};
+
 /**
  * The running background session Claude Code has registered under `name` — from `<sessionsDir>/<pid>.json`, which the
  * session writes for itself (`pid`, `sessionId`, `name`, `kind`) and `say` reads an inbox from — or `undefined`. A few
  * milliseconds, where `claude agents --json` takes a third of a second.
  *
  * Which session it is, and nothing of its state: the file does not say whether a session is working, idle or blocked,
- * and that stays the registry's. And a running session only, because a registration outlives its process, most of them
- * by far. So a file is taken only when:
- *
- * - it is a file this user owns, named for the `pid` it holds, of a `bg` session: an interactive one is never ours;
- * - a process this user may signal runs under that pid;
- * - where the system says when a process started (`/proc`), it started when the registration says (`procStart`): a pid
- *   another process has taken since is not the session. Without `/proc` (macOS) that check is not made.
+ * and that stays the registry's. And a running session only: a file is taken only when `claudeRegistration` takes it for
+ * `name`, and a process this user may signal runs under its pid.
  *
  * A file gone since the directory was read, or read mid-write, is not found this time; a directory that cannot be read
  * finds none.
- *
- * `uid` is who "this user" is, and `startOf` when a process started: both passed only by a test.
  */
 export const claudeRegistered = async (
   sessionsDir: string,
   name: string,
-  { uid = process.getuid?.(), startOf = processStart }: { uid?: number; startOf?: (pid: number) => string | undefined } = {},
+  by: RegisteredBy = {},
 ): Promise<{ sessionId: string; pid: number } | undefined> => {
   let files: string[];
   try {
@@ -162,20 +223,9 @@ export const claudeRegistered = async (
   for (const f of files) {
     const pid = Number(/^([1-9]\d*)\.json$/.exec(f)?.[1]);
     if (!pid) continue;
-    let r: { pid?: unknown; sessionId?: unknown; name?: unknown; kind?: unknown; procStart?: unknown } | null;
-    try {
-      const file = path.join(sessionsDir, f);
-      const stat = await fs.promises.lstat(file);
-      if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) continue;
-      r = JSON.parse(await readTextAsync(file));
-    } catch {
-      continue;
-    }
-    if (r?.name !== name || r.kind !== 'bg' || r.pid !== pid || typeof r.sessionId !== 'string' || !r.sessionId) continue;
-    if (!signalable(pid)) continue;
-    const started = startOf(pid);
-    if (started !== undefined && String(r.procStart) !== started) continue;
-    return { sessionId: r.sessionId, pid };
+    const read = await claudeRegistration(sessionsDir, pid, { name }, by);
+    if ('refused' in read || !signalable(pid)) continue;
+    return { sessionId: String(read.registration.sessionId), pid };
   }
   return undefined;
 };

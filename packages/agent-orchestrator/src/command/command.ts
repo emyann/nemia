@@ -102,7 +102,8 @@ export type Route =
  * answers for it when an agent calls it (`CommandClass`); its `route` on the
  * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
  * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
- * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one.
+ * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one; `ticks`, that what it files waits on
+ * the daemon's next pass, so the command line starts the daemon where none ticks the store (`ensureDaemon`).
  */
 export type CommandSpec = {
   readonly name: string;
@@ -116,6 +117,7 @@ export type CommandSpec = {
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
   readonly apiTakes?: readonly string[];
   readonly manual?: string;
+  readonly ticks?: true;
 };
 
 /** Every route the api serves a command on: none, its one, or each of its many. */
@@ -298,15 +300,23 @@ export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'hel
     .join('\n');
 
 /** An entry of a table as `commandBreaks` reads it: whether it has a handler, and its spec for what its route fixes. */
-type Entry = Pick<CommandSpec, 'name' | 'route' | 'only'> & { readonly spec?: Spec; readonly handler?: unknown };
+type Entry = Pick<CommandSpec, 'name' | 'route' | 'only' | 'ticks'> & {
+  readonly spec?: Spec;
+  readonly handler?: unknown;
+  readonly writes?: boolean;
+};
 
 /**
  * Where one entry breaks the rules of how it runs: an entry with no handler that is not served on the CLI alone, which the api could not
- * run; one served on the CLI alone with neither a handler nor a runner of the CLI (`runners`); and a key its route fixes that no flag of
- * its spec fills, which the command would never read.
+ * run; one served on the CLI alone with neither a handler nor a runner of the CLI (`runners`); a key its route fixes that no flag of
+ * its spec fills, which the command would never read; and one that ticks and writes nothing, whose next pass would have nothing to do.
  */
 function runBreaks(c: Entry, runners: readonly string[]): string[] {
   const breaks: string[] = [];
+  if (c.ticks === true && c.writes !== true)
+    breaks.push(
+      `${c.name} ticks and writes nothing: a command whose work waits on the next pass files it, so give it writes: true, or take ticks out`,
+    );
   const cliOnly = c.only?.side === 'cli';
   if (c.handler === undefined && !cliOnly)
     breaks.push(`${c.name} has no handler and is served on the api: give it a handler, or serve it on the CLI alone and run it there`);

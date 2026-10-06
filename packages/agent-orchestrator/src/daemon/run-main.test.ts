@@ -1,13 +1,19 @@
 /**
  * `runMain` in the process: what a program ends with reaches its caller as it was — its value, or the very error it failed or died with,
- * after what it held was let go — and the signal handlers it takes are handed back. A signal's exit code, which ends the process, is
- * daemon.store.test.ts's, on a real `nemia up`.
+ * after what it held was let go — and the signal handlers it takes are handed back; and a signal that comes while the program first runs
+ * without yielding, as a daemon taking the store does, lets go of what it held. A signal's exit code on a real `nemia up` is
+ * daemon.store.test.ts's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Effect } from 'effect';
 import { Conflict } from '../refusal/refusal.ts';
 import { runMain } from './up.verb.ts';
+import { nodeChild } from '../../test/child.ts';
+import { scratch } from '../../test/scratch.ts';
 
 const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 const listening = () => SIGNALS.map((s) => process.listenerCount(s));
@@ -71,4 +77,29 @@ test('while a program runs, it listens for SIGINT, SIGTERM and SIGHUP, one handl
     before.map((n) => n + 1),
   );
   assert.deepEqual(listening(), before);
+});
+
+test('a SIGTERM while the program first runs without yielding is heard once it yields: what it held is let go, and it exits 143', async () => {
+  const dir = scratch('wf-run-main-');
+  const [taken, signalled, released] = ['taken', 'signalled', 'released'].map((name) => path.join(dir, name));
+  const up = pathToFileURL(path.join(import.meta.dirname, 'up.verb.ts')).href;
+  const child = nodeChild(
+    [
+      "const fs = await import('node:fs');",
+      "const { Effect } = await import('effect');",
+      `const { runMain } = await import(${JSON.stringify(up)});`,
+      'const held = Effect.acquireRelease(',
+      `  Effect.sync(() => { fs.writeFileSync(${JSON.stringify(taken)}, ''); while (!fs.existsSync(${JSON.stringify(signalled)})) {} }),`,
+      `  () => Effect.sync(() => fs.writeFileSync(${JSON.stringify(released)}, '')),`,
+      ');',
+      "await runMain(held.pipe(Effect.andThen(Effect.sleep('1 hour')), Effect.scoped));",
+    ].join('\n'),
+    process.env,
+  );
+  await child.until(() => fs.existsSync(taken), 'the program took what it holds');
+  child.child.kill('SIGTERM');
+  fs.writeFileSync(signalled, '');
+  const ended = await child.closed;
+  assert.deepEqual([ended.code, ended.signal], [143, null], child.err());
+  assert.ok(fs.existsSync(released), 'what it held was let go');
 });

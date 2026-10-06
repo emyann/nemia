@@ -217,15 +217,15 @@ const SIGNALS = [
 /**
  * Runs `program` as the process's command. SIGINT, SIGTERM and SIGHUP interrupt it, and once its finalizers have run the process exits 130,
  * 143 or 129, by the signal that came. Otherwise the promise resolves with its value, or rejects with what it failed or died with, that
- * very value, so a refusal's `exitCode` reaches the caller. The handlers are its own, taken off as it ends: a second signal while the
- * finalizers run is Node's to handle.
+ * very value, so a refusal's `exitCode` reaches the caller. The handlers are its own, taken before the program starts, since its fiber
+ * runs at once as far as it can without yielding — the store taken, the first pass begun — and taken off as it ends: a second signal
+ * while the finalizers run is Node's to handle.
  *
  * Not the `runMain` of `@effect/platform-node`'s NodeRuntime: its teardown exits 130 on any interruption, whatever signal came, it
  * handles no SIGHUP, and it hands no failure back to the caller.
  */
 export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
   return new Promise<A>((resolve, reject) => {
-    const fiber = Effect.runFork(program);
     let stoppedWith: number | undefined;
     const stops = SIGNALS.map(([signal, code]) => {
       const stop = () => {
@@ -235,6 +235,7 @@ export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
       process.once(signal, stop);
       return [signal, stop] as const;
     });
+    const fiber = Effect.runFork(program);
     fiber.addObserver((exit) => {
       for (const [signal, stop] of stops) process.off(signal, stop);
       if (stoppedWith !== undefined) process.exit(stoppedWith);

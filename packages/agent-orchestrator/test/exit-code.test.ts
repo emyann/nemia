@@ -12,6 +12,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 
 import { exitCodeOf } from '../src/cli/exit.ts';
+import { offLine } from '../src/demand/demand.ts';
 
 const WF = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const BIN = scratch('wf-exit-code-bin-');
@@ -29,9 +30,14 @@ function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: n
 }
 
 test('a refusal exits 2 and prints its sentence: nemia approve of a run that does not exist', () => {
-  const { status, stderr } = wf(path.join(scratch('wf-exit-code-refused-'), 'store'), ['approve', 'r-nope', 'implement']);
+  const root = path.join(scratch('wf-exit-code-refused-'), 'store');
+  const { status, stderr } = wf(root, ['approve', 'r-nope', 'implement']);
   assert.equal(status, 2, `nemia approve of no run exits with the refusal's code; it said: ${stderr}`);
-  assert.equal(stderr, 'no such run: r-nope. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.\n');
+  assert.equal(
+    stderr,
+    `${offLine(root)}\n` +
+      'no such run: r-nope. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.\n',
+  );
 });
 
 test("REFUSED: nemia retry and nemia say of a run that does not exist exit 2, with the store's sentence naming nemia ls", () => {
@@ -39,9 +45,11 @@ test("REFUSED: nemia retry and nemia say of a run that does not exist exit 2, wi
     ['retry', 'r-nope', 'implement'],
     ['say', 'r-nope', 'implement', 'the words'],
   ]) {
-    const { status, stderr } = wf(path.join(scratch('wf-exit-code-no-run-'), 'store'), argv);
+    const root = path.join(scratch('wf-exit-code-no-run-'), 'store');
+    const { status, stderr } = wf(root, argv);
     assert.equal(status, 2, `nemia ${argv[0]} of no run exits with the refusal's code; it said: ${stderr}`);
-    assert.equal(stderr, "no such run: r-nope  (try 'nemia ls')\n", `nemia ${argv[0]}`);
+    const off = argv[0] === 'retry' ? `${offLine(root)}\n` : '';
+    assert.equal(stderr, `${off}no such run: r-nope  (try 'nemia ls')\n`, `nemia ${argv[0]}`);
   }
 });
 
@@ -60,7 +68,8 @@ test('a refusal of --no-worktree on a workflow that fans out exits 2, as its sib
   assert.equal(status, 2, `a fan-out refused --no-worktree exits with the refusal's code; it said: ${stderr}`);
   assert.equal(
     stderr,
-    'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\nEither drop --no-worktree, or make the steps a chain.\n',
+    `${offLine(root)}\n` +
+      'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\nEither drop --no-worktree, or make the steps a chain.\n',
   );
   assert.deepEqual(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : [], [], 'no run written');
 });

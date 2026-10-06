@@ -479,7 +479,7 @@ test('`nemia tick` on a store nobody holds never writes the file, and `nemia ls`
   const lastLine = async () => (await typed(t, ['ls'], engineOf())).printed.at(-1);
   assert.equal(
     await lastLine(),
-    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served',
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one',
   );
   holdBy(LIVE, { passedAt: minutesAgo(20) });
   const stalled = (await lastLine())!;
@@ -610,7 +610,7 @@ test("`nemia up --stats` reads the last pass's cost beside a daemon that holds t
   const none = await typed(t, ['up', '--stats'], engineOf());
   assert.equal(none.threw, undefined);
   assert.deepEqual(none.printed, [
-    `no pass has written what it cost to ${path.join(ROOT, 'tick-stats.json')} yet — no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up)`,
+    `no pass has written what it cost to ${path.join(ROOT, 'tick-stats.json')} yet — no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up; any nemia command that files work starts one too)`,
   ]);
 
   const byHand = await typed(

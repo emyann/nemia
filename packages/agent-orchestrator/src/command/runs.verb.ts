@@ -60,6 +60,7 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
     unknown: (arg) => `nemia cancel takes one run's id: not ${arg}.`,
   },
   writes: true,
+  ticks: true,
   nemia: 'prompts',
   only: { side: 'cli', why: 'the board offers no cancel: a person stops a run at the command line' },
   handler: Effect.fnUntraced(function* (args: Args) {
@@ -410,6 +411,7 @@ export const RESUME: Command<{ pause: Pause }> = {
     unknown: (arg) => `nemia resume takes no ${arg}: it resumes the store, whoever paused it.`,
   },
   writes: true,
+  ticks: true,
   nemia: 'hers',
   route: { method: 'DELETE', path: '/api/pause', status: 200 },
   handler: () => tried(() => ({ pause: resumePause() })),

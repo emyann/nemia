@@ -18,6 +18,7 @@ const { advanceRun, CLI, TABLE, startRun, runWith } = await import('../runner.ts
 const { readRun } = await import('../record/record.store.ts');
 const { aliased, main, VERBS } = await import('./main.ts');
 const { HELP, WF_HINT } = await import('./flags.ts');
+const { offLine } = await import('../demand/demand.ts');
 
 type Engine = NonNullable<Parameters<typeof main>[1]>;
 
@@ -178,19 +179,22 @@ test('nemia cancel: a run with a step in flight, the same run again, and a run a
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  cancelled`, `   asked to stop: implement  (the engine stops it on its next tick)`],
-    err: [],
+    err: [offLine(ROOT)],
   });
   const at = readRun(run.id).cancelledAt;
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  already cancelled at ${at}`, `   asked to stop: implement  (the engine stops it on its next tick)`],
-    err: [],
+    err: [offLine(ROOT)],
   });
 
   const done = await Effect.runPromise(startRun({ brief: 'done', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(done.id)));
   b.settle(`${done.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(done.id)));
-  assert.deepEqual(await typed(t, b.e, 'cancel', done.id), { out: [`${done.id}  already succeeded — nothing to stop`], err: [] });
+  assert.deepEqual(await typed(t, b.e, 'cancel', done.id), {
+    out: [`${done.id}  already succeeded — nothing to stop`],
+    err: [offLine(ROOT)],
+  });
 });
 
 test('nemia cancel of a run with nothing filed yet says so, a line more', async (t) => {
@@ -198,7 +202,7 @@ test('nemia cancel of a run with nothing filed yet says so, a line more', async 
   const run = await Effect.runPromise(startRun({ brief: 'not filed', repo: aRepo(), workflowDir: oneStep() }));
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  cancelled`, `   nothing was in flight — no further steps will be filed`],
-    err: [],
+    err: [offLine(ROOT)],
   });
 });
 
@@ -267,7 +271,7 @@ test('nemia accept of a loop out of rounds: what it accepted, and the file it wr
   b.settle(readRun(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
   await runWith(b.e, advanceRun(readRun(loop.id)));
   const { out, err } = await typed(t, b.e, 'accept', loop.id, '--message', 'as it stands');
-  assert.deepEqual(err, []);
+  assert.deepEqual(err, [offLine(ROOT)]);
   assert.equal(out.length, 2, out.join('\n'));
   assert.match(
     out[0],

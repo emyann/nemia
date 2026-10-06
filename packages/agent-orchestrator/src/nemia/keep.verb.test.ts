@@ -203,7 +203,10 @@ test('REFUSED: a factory write that names no factory, the default one, a raise w
   const check = (args: Record<string, string | boolean>) => LEVEL.check?.(args) ?? null;
   assert.match(check({ level: 'semi-auto', for: '2h' }) ?? '', /^--for and --end take the factory raised, --factory <name>/);
   assert.match(check({ factory: 'pipao', end: true, for: '2h' }) ?? '', /give one/);
-  assert.match(check({ factory: 'pipao', for: '2h' }) ?? '', /--for takes the level the factory is raised to: nemia level semi-auto --factory pipao/);
+  assert.match(
+    check({ factory: 'pipao', for: '2h' }) ?? '',
+    /--for takes the level the factory is raised to: nemia level semi-auto --factory pipao/,
+  );
   assert.match(check({ factory: 'pipao', level: 'manual', end: true }) ?? '', /--end takes no level/);
   assert.match(check({ factory: 'default', level: 'semi-auto' }) ?? '', /: nemia level semi-auto\.$/);
   for (const stretch of ['0h', '-1h', '2x', '8d'])
@@ -227,9 +230,10 @@ test("a factory raised for a stretch keeps her, the store at manual; once the ra
   assert.equal(raised.level, 'manual', "the store's own level is untouched");
   const pipao = raised.factories.find((row) => row.factory === 'pipao');
   assert.equal(pipao?.level, 'semi-auto');
-  assert.equal(pipao?.default, 'manual');
-  assert.ok(pipao?.raise !== null && Date.parse(pipao!.raise!.until) > Date.now() + 3_500_000, 'raised for an hour');
-  assert.ok(LEVEL.print(raised, {}).includes(`  pipao: semi-auto until ${pipao!.raise!.until}, then manual (the store's)`));
+  assert.equal(pipao.default, 'manual');
+  const until = pipao.raise?.until ?? '';
+  assert.ok(Date.parse(until) > Date.now() + 3_500_000, 'raised for an hour');
+  assert.ok(LEVEL.print(raised, {}).includes(`  pipao: semi-auto until ${until}, then manual (the store's)`));
   assert.deepEqual(await beat(), ['file']);
   assert.deepEqual(await beat(), ['subscribe']);
   assert.deepEqual(await beat(), []);

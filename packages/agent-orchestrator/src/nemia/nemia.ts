@@ -127,7 +127,7 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 /** Every state, in the order a session goes through them. */
 const STATES: NemiaState[] = ['off', 'due', 'filed', 'kept', 'stopped', 'leaving'];
 
-/** The keeper's moves, a stop or end from outside, which it never undoes, and the end of the last raise above `manual`, read as it passes. */
+/** The keeper's moves, a stop or end from outside, which it never undoes, and the end of the last raise above `manual` as it passes. */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },

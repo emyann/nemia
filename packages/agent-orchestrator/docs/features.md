@@ -2286,13 +2286,16 @@ stateDiagram-v2
   kept --> stopped: SETTLED_OUTSIDE / nothing
   stopped --> stopped: SUBSCRIBED / drop
   leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
-  off --> due: level semi-auto [trusted] (by person)
-  stopped --> due: level semi-auto [trusted] (by person)
-  leaving --> due: level semi-auto [trusted] (by person)
-  due --> leaving: level manual [always] (by person)
-  filed --> leaving: level manual [always] (by person)
-  kept --> leaving: level manual [always] (by person)
-  stopped --> leaving: level manual [always] (by person)
+  due --> off: RAISE_ENDED / nothing
+  filed --> leaving: RAISE_ENDED / nothing
+  kept --> leaving: RAISE_ENDED / nothing
+  off --> due: level (a factory above manual) [trusted] (by person)
+  stopped --> due: level (a factory above manual) [trusted] (by person)
+  leaving --> due: level (a factory above manual) [trusted] (by person)
+  due --> leaving: level (none above manual) [always] (by person)
+  filed --> leaving: level (none above manual) [always] (by person)
+  kept --> leaving: level (none above manual) [always] (by person)
+  stopped --> leaving: level (none above manual) [always] (by person)
 ```
 <!-- diagram:nemia:end -->
 
@@ -2337,6 +2340,37 @@ fence is derived from the class, with no hand list in `nemia/nemia.md`.
 - **Her admission** (`nemia admit`, `src/admission/`), the runtime's hook on her `Bash` calls: an approval, a round, an accept, any
   `--budget` and a retry of a step that waits on the person (`waitsOnPerson`, `src/retry/waits.ts`) are asked, whatever she types around
   them; a retry that waits on no one runs. A hook's ask prompts over every allow, so a "don't ask again" never widens what waits.
+
+## Shipped: a level per factory, and a raise for a stretch (Nemia platform slice 6a)
+
+A factory at Manual is left alone; one at Semi-auto is hers to work. The level is the person's, per factory, and naming no agent.
+
+- **A level per factory** (`src/level/`): each factory's default, `manual` or `semi-auto`, in its own file `factories/<name>/level.json`
+  (`level.store.ts`), written by `nemia level <level> --factory <name>` alone and removed with the factory. A factory with none follows
+  the store's level, `nemia/level.json`, read as before and never migrated, which is also the default factory's (runs started in none);
+  `nemia level <level>` sets it, and `--factory default` is refused, naming that command.
+- **A raise for a stretch**: `nemia level semi-auto --factory <name> --for <duration>` (`90m`, `2h`, `1d`, up to `7d`) raises it until a
+  moment written in the file, and `--end` ends it early. Level-triggered: a raise past its end reads as its default, with no write
+  (`raiseAt`, `levelOf`, `src/level/level.ts`). Refused: a raise to the default or below it (`Invalid`), an end with no raise in force
+  (`Conflict`), no such factory (`Missing`), and `--for`/`--end` given without a factory, together, or with the wrong level (`Invalid`).
+- **A factory at Manual is left alone**, by two generic primitives: a subscription's floor, `scope: {atLeast}` (`nemia subscribe
+  --at-least <level>`), whose deliverer passes a line of a run whose factory is below it, read as each line comes (`carries`,
+  `deliver.verb.ts`); and admission's floor, `nemia admit --at-least <level>`, which denies a call naming a run (`runId`) or a factory
+  (`factory`) below it, saying the raise is the person's, and asks a call whose run does not read or whose words do not parse
+  (`Scope`, `src/admission/admission.ts`). Nemia's keeper puts both at `semi-auto` (`NEMIA_FLOOR`).
+- **Her session follows the levels**: kept while any factory, the default included, is above `manual`, and stopped at the keeper's next
+  beat once none is (`Keeping`, `nemiaDue`); a subscription of hers without her floor is put again with it. The verb that puts a factory
+  above `manual` names a fresh task where none is open, asking first whether her folder is trusted.
+- **`nemia level`** says each factory's level, its default and whose it is, and a raise with its end; `GET /api/level` answers them as
+  `factories`, and `PUT /api/level` takes `factory`, `for` and `end`. The board's Settings page shows them, one row per factory, and sets
+  a default, raises a factory for a stretch and ends a raise.
+
+Turning her on again files her afresh, with the new admission and subscription: a session filed before this slice keeps the old ones.
+
+Tested in `src/level/level.test.ts` (a raise until its end, never at it; the stretches; what a write asks), `src/level/level.store.test.ts`,
+`src/nemia/keep.verb.test.ts` (a raise keeps her, its end passing stops her with no write; an end; the refusals),
+`src/admission/admission.test.ts` and `src/admission/admit.verb.test.ts` (denied below the floor, asked unread, no change above it),
+`src/subscription/deliver.verb.test.ts` (a floored subscription told nothing of a factory below it) and `src/admission/fence.test.ts`.
 
 ## Shipped: freeing the space — `wf prune`
 

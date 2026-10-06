@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { nemiaFence, widened } from './fence.ts';
 import type { CommandClass } from './class.ts';
+import { TABLE as COMMANDS } from '../command/commands.verb.ts';
 
 /** A fixture table, one command of each class. */
 const TABLE: { name: string; nemia: CommandClass }[] = [
@@ -47,4 +48,16 @@ test('REFUSED to widen what is not a prompt allowed by its own rule: an answer, 
   const allows = ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)', 'Bash(nemia tick:*)', 'Bash(nemia:*)', 'Bash(nemia level:*)'];
   assert.deepEqual(widened(fence, allows), { ...fence, ask: ['Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)'] });
   assert.deepEqual(widened(fence, ['Bash(nemia:*)', 'Bash(nemia level:*)']), fence);
+});
+
+test("REFUSED to run unasked: a factory's level set, raised or its raise ended, as the store's level is", () => {
+  const ask = nemiaFence(COMMANDS).ask;
+  for (const rule of [
+    'Bash(nemia level semi-auto:*)',
+    'Bash(nemia level manual:*)',
+    'Bash(nemia level *--factory*)',
+    'Bash(nemia level *--for*)',
+    'Bash(nemia level *--end*)',
+  ])
+    assert.ok(ask.includes(rule), rule);
 });

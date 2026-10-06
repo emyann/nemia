@@ -91,7 +91,8 @@ const factoryFolders = (): Mount[] => {
  * Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition; with
  * her fence derived from the command table (`nemiaFence`), less each prompt the person allowed in her folder (`widened`, `promptAllows`),
  * the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the harness's settings, and her admission
- * (`nemia admit`, with her floor) asked before each of her shell calls. A prompt allowed while she runs is widened the next time she is filed.
+ * (`nemia admit`, with her floor) asked before each of her shell calls. A prompt allowed while she runs is widened the next time she is
+ * filed.
  */
 export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
@@ -113,7 +114,10 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
       permissionMode: step.permissionMode,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
       allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
-      callAdmission: { command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit', '--at-least', NEMIA_FLOOR], tools: ['Bash'] },
+      callAdmission: {
+        command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit', '--at-least', NEMIA_FLOOR],
+        tools: ['Bash'],
+      },
       background: true,
       mounts: factoryFolders(),
       ...ownOf(

@@ -110,7 +110,12 @@ export const SUBSCRIBE: Command<Subscribed> = {
     flags: [
       { flag: '--wake', kind: 'text', key: 'wake', many: true, takes: `--wake takes a word that wakes the subscriber: ${SUBSCRIBE_FORM}.` },
       { flag: '--digest-every', kind: 'amount', key: 'digestEvery', takes: 'the minutes a digest waits for a wake', form: SUBSCRIBE_FORM },
-      { flag: '--at-least', kind: 'name', key: 'atLeast', takes: `--at-least takes a level, one of ${LEVELS.join(', ')}: ${SUBSCRIBE_FORM}.` },
+      {
+        flag: '--at-least',
+        kind: 'name',
+        key: 'atLeast',
+        takes: `--at-least takes a level, one of ${LEVELS.join(', ')}: ${SUBSCRIBE_FORM}.`,
+      },
     ],
     unknown: (arg) => `nemia subscribe does not take ${arg}: ${SUBSCRIBE_FORM}.`,
     missing: `nemia subscribe takes the subscription's name and the task it tells: ${SUBSCRIBE_FORM}.`,

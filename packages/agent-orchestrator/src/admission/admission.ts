@@ -118,10 +118,12 @@ const below = (line: string, what: string, factory: string, level: Level, floor:
 /** Scope's answer for one typed command: a denial where it names a run or factory below the floor, an ask where it cannot be read. */
 function scopedOf(typed: Typed & Named, scope: Scope): AdmissionAnswer | undefined {
   const line = ['nemia', typed.name, ...typed.args].join(' ');
-  if (typed.unread) return { decision: 'ask', reason: `${line} does not read as its command, so admission cannot read the runs it acts on.` };
+  if (typed.unread)
+    return { decision: 'ask', reason: `${line} does not read as its command, so admission cannot read the runs it acts on.` };
   for (const runId of typed.runs) {
     const run = scope.runOf(runId);
-    if (run === undefined) return { decision: 'ask', reason: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
+    if (run === undefined)
+      return { decision: 'ask', reason: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
     if (!atLeast(run.level, scope.floor)) return below(line, `${runId} of `, run.factory, run.level, scope.floor);
   }
   for (const factory of typed.factories) {

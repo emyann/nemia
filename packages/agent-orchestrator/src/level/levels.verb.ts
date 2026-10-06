@@ -18,7 +18,7 @@ import { factoryLevelOf, type FactoryLevel, type FactoryLevelFile, type Level } 
 /** Each factory level file that does not read said once a process: the deliverer and the keeper read the levels every beat. */
 const saidAlready = new Set<string>();
 
-/** The factory `name`'s file, or undefined where it does not read: said once on stderr, so the factory reads as manual and is left alone. */
+/** The factory `name`'s file; one that does not read is said once on stderr and read as `manual`, so the factory is left alone. */
 function fileOrManual(name: string): FactoryLevelFile | undefined {
   try {
     return readFactoryLevel(name);

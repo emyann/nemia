@@ -53,7 +53,13 @@ and its harness's pool, the highest priority first (`agent-runtime/src/core/admi
 **A call's admission** is split: running a command before a session's call and rendering it per harness is the runtime's
 (`config.callAdmission`, `agent-runtime/src/harness/admission.ts`; Claude Code's hook, `ae admission`), as a probe's `exec` is the
 kubelet's; what a call of the table means at a run's state is the orchestrator's, pure (`admissionOf`, `src/admission/admission.ts`),
-served by `nemia admit`. The static rules of an agent that runs `nemia` are derived from each command's class (`nemiaFence`).
+served by `nemia admit`. Given a floor (`nemia admit --at-least <level>`), it denies a call naming a run or a factory whose level is
+below it and asks one it cannot read (`Scope`), naming no agent. The static rules of an agent that runs `nemia` are derived from each
+command's class (`nemiaFence`).
+
+**Levels** are the person's and the orchestrator's (`src/level/`): each factory's default, `manual` or `semi-auto`, in its own file
+(`factories/<name>/level.json`, written by `nemia level --factory` alone), the store's level (`nemia/level.json`) under it and for the
+default factory, and a raise for a stretch that ends by itself, read as it passes with no write (`levelOf`).
 
 **The daemon and its lease** are the orchestrator's (`src/daemon/`, `up` in `src/daemon/up.verb.ts`): one store takes one daemon, which
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
@@ -85,11 +91,13 @@ publishes to. A reader in another process, `nemia watch`, watches the file (`wat
 one writer, stamped with the subscription it is for). A line holding a wake word is said to the task at once through the runtime's
 `say`, the routine lines before it riding it as a digest; with no wake, the digest is said after `digestEvery` minutes. The cursor moves
 only once `say` resolved, so a line is told at least once, to the harness's inbox: whether the session reads it is the runtime's
-(`agent-runtime/docs/open-issues.md`, #12, #14–#16).
+(`agent-runtime/docs/open-issues.md`, #12, #14–#16). A subscription given a floor (`--at-least`, its `scope`) is told only of the runs
+whose factory is at it or above, read as each line comes.
 
 **Nemia**, the store's own agent, is the orchestrator's: a long-lived task the daemon's keeper (`keep` in `src/nemia/keep.verb.ts`,
-forked by `up`) files at `semi-auto` and stops at `manual`, level-triggered off the person's switch (`$WF_ROOT/nemia/level.json`,
-`nemia level`) and her task's view, and subscribes to the feed under the name `nemia`, which no person gives or takes away. What she is
+forked by `up`) files while any factory is above `manual` and stops once none is, level-triggered off the levels (`nemia level`) and
+her task's view, and subscribes to the feed under the name `nemia`, which no person gives or takes away; her subscription and her
+admission carry her floor, `semi-auto`, so a factory at `manual` is left alone. What she is
 — her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
 repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control).
 
@@ -170,12 +178,12 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, no node:http, node:https,
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
-  check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, merge, meter, plan, prune, record, refusal,
+  check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, level, merge, meter, plan, prune, record, refusal,
   rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
   skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store, series.store,
-  subscription.store and a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
+  subscription.store, level.store and a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
   (the pass's meter) and config/config.store.ts, which import no store file. record/record.store.ts imports only those
   four; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
   imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.

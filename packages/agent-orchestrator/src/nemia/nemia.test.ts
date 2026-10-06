@@ -60,7 +60,10 @@ test('with no factory above manual, her open task is stopped and her subscriptio
 test('REFUSED: a word that is no level, and auto, named as to come; manual and semi-auto are levels', () => {
   assert.equal(levelRefusal('manual'), undefined);
   assert.equal(levelRefusal('semi-auto'), undefined);
-  assert.match(levelRefusal('auto') ?? '', /^auto is not built yet: .*slice 6.*nemia level \[manual\|semi-auto\] \[--factory <name> \[--for <duration> \| --end\]\]\.$/);
+  assert.match(
+    levelRefusal('auto') ?? '',
+    /^auto is not built yet: .*slice 6.*nemia level \[manual\|semi-auto\] \[--factory <name> \[--for <duration> \| --end\]\]\.$/,
+  );
   assert.equal(levelRefusal('on'), '"on" is no level: nemia level [manual|semi-auto] [--factory <name> [--for <duration> | --end]].');
 });
 

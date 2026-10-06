@@ -110,7 +110,9 @@ function storeAsked(level: Level, storeSet: boolean, above: boolean, now: NemiaL
 /** The factory's file a person's write asks for at `at`, or refused: no such factory (`Missing`), no raise to end, a raise of nothing. */
 function factoryFileAsked(ask: FactoryAsk, store: Level, at: Date): FactoryLevelFile {
   if (!factoryNames().includes(ask.factory))
-    throw new Missing({ message: `no factory is named ${ask.factory}: nemia factory ls lists the store's factories. Nothing was written.` });
+    throw new Missing({
+      message: `no factory is named ${ask.factory}: nemia factory ls lists the store's factories. Nothing was written.`,
+    });
   let current: FactoryLevelFile | undefined;
   try {
     current = readFactoryLevel(ask.factory);
@@ -163,7 +165,10 @@ const spendLine = ({ usd, measured, unmeasured }: Spend): string =>
 /** What `nemia level` prints of where she is. */
 function levelLines(data: NemiaLevel): string[] {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
-  const factories = ['factories (a raise ends by itself, read as it passes):', ...data.factories.map((row) => `  ${factoryLevelWords(row, DEFAULT_FACTORY)}`)];
+  const factories = [
+    'factories (a raise ends by itself, read as it passes):',
+    ...data.factories.map((row) => `  ${factoryLevelWords(row, DEFAULT_FACTORY)}`),
+  ];
   const session =
     data.task === null
       ? []
@@ -189,8 +194,10 @@ function factoryArgsRefusal(args: Args): string | null {
   if ((given || args.end === true) && typeof args.factory !== 'string')
     return `--for and --end take the factory raised, --factory <name>: ${LEVEL_FORM}.`;
   if (given && args.end === true) return `--for raises a factory and --end ends its raise: give one, ${LEVEL_FORM}.`;
-  if (given && !level) return `--for takes the level the factory is raised to: nemia level semi-auto --factory ${String(args.factory)} --for ${String(args.for)}.`;
-  if (args.end === true && level) return `--end takes no level, it ends the raise in force: nemia level --factory ${String(args.factory)} --end.`;
+  if (given && !level)
+    return `--for takes the level the factory is raised to: nemia level semi-auto --factory ${String(args.factory)} --for ${String(args.for)}.`;
+  if (args.end === true && level)
+    return `--end takes no level, it ends the raise in force: nemia level --factory ${String(args.factory)} --end.`;
   if (args.factory === DEFAULT_FACTORY)
     return `the default factory's level is the store's own, set with no --factory: nemia level ${level ? String(args.level) : '<level>'}.`;
   return given ? (durationRefusal(String(args.for)) ?? null) : null;
@@ -208,10 +215,10 @@ export const LEVEL: Command<NemiaLevel> = {
   usage: '[manual|semi-auto] [--factory <name> [--for <duration> | --end]]',
   help: [
     "Nemia, the store's own agent: bare, where she is, each factory's level and",
-    'how to reach her; a level sets the store\'s, which every factory follows',
-    'unless it has its own; --factory sets that factory\'s, --for raises it for',
+    "how to reach her; a level sets the store's, which every factory follows",
+    "unless it has its own; --factory sets that factory's, --for raises it for",
     'a stretch (90m, 2h, 1d; up to 7d) and --end ends the raise. semi-auto keeps',
-    'her session: what waits on you (a gate, a step\'s question, a loop out of',
+    "her session: what waits on you (a gate, a step's question, a loop out of",
     'rounds, a cap) is asked of you, and a write that cannot be undone or',
     'changes your settings or a factory; the rest is hers; a factory at manual',
     'is left alone, and her session stops once none is above manual',

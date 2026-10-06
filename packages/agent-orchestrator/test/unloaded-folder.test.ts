@@ -34,6 +34,8 @@ const { readFeed } = await import('../src/feed/feed.store.ts');
 const { REMOVED } = await import('../src/feed/feed.ts');
 const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
 const { judgedNow } = await import('../src/summary/summary.verb.ts');
+const { workflowsOf } = await import('../src/summary/reads.verb.ts');
+const { loadWorkflows } = await import('../src/folder/folder.store.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -236,6 +238,24 @@ test('`nemia up` over a store holding such a run ends no daemon: it passes again
   assert.equal(threw, STOP, `the daemon ended of what stopped it, after three passes: ${String(threw)}`);
   const said = [...out, ...err].filter((l) => l.includes(`left out: ${LEFT_OUT(bad.id)}`));
   assert.equal(said.length, 1, [...out, ...err].join('\n'));
+});
+
+test("REFUSED: an unfrozen run whose folder does not load is warned in the folder's words alone", () => {
+  const run = readRun(bad.id);
+  const loaded = (() => {
+    try {
+      loadWorkflows(UNPLACED, { repo: run.repo, home: ROOT });
+      return 'it loaded';
+    } catch (err) {
+      return (err as Error).message;
+    }
+  })();
+  assert.deepEqual(workflowsOf(run, ROOT), {
+    steps: null,
+    warning: `The workflow folder ${UNPLACED} no longer reads as a workflow: ${loaded}.`,
+  });
+  const gone = path.join(ROOT, 'no-such-folder');
+  assert.deepEqual(workflowsOf({ ...run, workflowDir: gone }, ROOT), { steps: null, warning: `The workflow folder ${gone} is gone.` });
 });
 
 test('the run goes on once its folder is mended, on the next pass, with nothing remembered', async () => {

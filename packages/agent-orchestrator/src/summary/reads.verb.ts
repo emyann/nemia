@@ -44,15 +44,15 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
   return taskId === undefined ? undefined : { taskId, why: unreadable.get(taskId)! };
 }
 
+/** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */
+export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
+
 /**
  * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): its unfrozen
  * workflow folder that does not load (`unloadedOf`), in the folder's words (`unloadedWords`); a task of its own the read left out
  * (`unreadableOf`); or one of a run it waits on, whose view fails in the runtime's words (`unreadableJournal`). As the tick leaves such a
  * run unjudged and counts it in flight. Any other failure fails the same.
  */
-/** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */
-export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
-
 export const judgedUnlessUnreadable = Effect.fn('judgedUnlessUnreadable')(function* <T, E, R>(
   run: Run,
   unreadable: Unreadable,
@@ -111,13 +111,13 @@ export const seenBy = (e: Engine, views: Views): Engine => ({
 });
 
 /**
- * The run's workflow folder, read now.
+ * The run's workflow folder, read now: its steps, or none and a warning in the folder's words — gone, or no longer read as a workflow.
  *
- * The run record is the truth about what ran; the folder is only where the prose came from, and it
- * can be edited or deleted after `nemia start`. So a folder that does not read is a warning on the
- * run, not a failure of the request — and on a run that froze its workflow, nothing the page draws
- * comes from it. Its agents and skills are looked for where the start looked: the run's repository's
- * own folder of them, then yours.
+ * The run record is the truth about what ran; the folder is only where the prose came from, and it can be edited or deleted after
+ * `nemia start`. So a folder that does not read is a warning, not a failure of the request. On a run that froze its workflow, the warning
+ * says nothing the page draws comes from the folder. On a run that froze none, it is the folder's words alone: such a run is not judged
+ * (`judgedUnlessUnreadable` answers `unloadedWords`), and its page says that instead. Its agents and skills are looked for where the start
+ * looked: the run's repository's own folder of them, then yours.
  */
 export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
   try {
@@ -130,8 +130,7 @@ export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warnin
       steps: null,
       warning: run.workflow
         ? `${why} Nothing here is read from it: the steps, their spec, prose and graph are the workflow the run froze at \`nemia start\`, which is what it is judged by.`
-        : `${why} The steps are listed from the run record, without their spec or prose, and the tick leaves the run where it is until ` +
-          `the folder loads again, or nemia rm ${run.id}.`,
+        : why,
     };
   }
 }

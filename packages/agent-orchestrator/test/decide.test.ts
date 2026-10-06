@@ -332,7 +332,7 @@ test('a place whose report is not heard: `nemia decide` says what the run change
   assert.ok(lines.includes(`  lesson  not known — ${branch} could not be read`), lines.join('\n'));
   assert.ok(!lines.some((l) => /touched nothing|^\s+\(root\)/.test(l)), 'nothing is said as changed or unchanged');
   const inFull = indexOf(lines, /^  ── in full: the check-affecting files/);
-  assert.ok(lines[inFull + 1]?.startsWith(unknown), `its files in full are not known either: ${lines[inFull + 1]}`);
+  assert.ok(lines[inFull + 1]?.startsWith(`  ${unknown}`), `its files in full are not known either: ${lines[inFull + 1]}`);
 });
 
 test("`nemia decide` and `nemia ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {

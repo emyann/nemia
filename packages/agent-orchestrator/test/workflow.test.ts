@@ -86,7 +86,7 @@ test('check and retries are read — the command verbatim, colons and all', () =
   assert.equal(bare.retries, undefined);
 });
 
-test('no frontmatter at all is a valid step', () => {
+test('a step with no key but its place is valid: no after, its body whole', () => {
   assert.deepEqual(parseWorkflow('only', '---\nplace: git\n---\nJust do it.').after, []);
   assert.equal(parseWorkflow('only', '---\nplace: git\n---\nJust do it.').body, 'Just do it.');
 });
@@ -2721,7 +2721,7 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
 });
 
 test("REFUSED by `renderStep`, in the parser's words where the parser has them: a key no step has, `guide`; and what a file cannot hold — a line break in a value, a comma in a step's name in a list", () => {
-  const step: StepDraft = { name: 'review', after: ['implement'], body: 'Review it.' };
+  const step: StepDraft = { name: 'review', after: ['implement'], place: 'git', body: 'Review it.' };
   const parsersWords = (lines: string): string => {
     try {
       fm('review', lines);
@@ -2774,18 +2774,26 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   );
   assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
 
-  for (const [draft, lines] of [
-    [{ ...step, tools: [] }, 'tools: '],
-    [{ ...step, model: '' }, 'model: '],
-    [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m'],
-    [{ ...step, gate: false }, 'gate: false'],
-    [{ ...step, harness: 'banana' }, 'harness: banana'],
-    [{ ...step, disallowedTools: ['Bash(git push, git reset)'] }, 'disallowedTools: Bash(git push, git reset)'],
-    [{ ...step, output: {} }, 'output: '],
+  for (const [draft, lines, rule] of [
+    [{ ...step, tools: [] }, 'tools: ', /^review: `tools` has no value, which reads as every tool/],
+    [{ ...step, model: '' }, 'model: ', /^review: `model` has no value\. Delete the line/],
+    [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m', /^review: `deadlineSeconds: 5m` is not a count\./],
+    [{ ...step, gate: false }, 'gate: false', /^review: `gate: false` is what a step without the line already is\./],
+    [{ ...step, harness: 'banana' }, 'harness: banana', /^review: `harness: banana` is not a harness a step can run on\./],
+    [
+      { ...step, disallowedTools: ['Bash(git push, git reset)'] },
+      'disallowedTools: Bash(git push, git reset)',
+      /^review: `disallowedTools: Bash\(git push, git reset\)` has a comma inside an entry/,
+    ],
+    [{ ...step, output: {} }, 'output: ', /^review: `output` has no value\. Delete the line/],
   ] as const) {
     const text = renderStep(draft as unknown as StepDraft);
     assert.ok(text.includes(`\n${lines}\n`), `what the parser judges, renderStep writes as given, for the parser to refuse:\n${text}`);
-    assert.throws(() => parseWorkflow('review', text), WorkflowError, lines);
+    assert.throws(
+      () => parseWorkflow('review', text),
+      (e: unknown) => e instanceof WorkflowError && rule.test(e.message),
+      `${lines}: refused on its own rule`,
+    );
   }
 });
 

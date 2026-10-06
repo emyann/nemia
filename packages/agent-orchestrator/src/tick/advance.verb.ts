@@ -50,8 +50,9 @@ import {
   type Parents,
 } from '../views/views.verb.ts';
 import { engineWord, waitsForWord } from '../views/views-words.ts';
-import { countSpawn, within } from '../meter/tally.store.ts';
-import { RunPlace, runPlaceVerb } from '../place/place.store.ts';
+import { countSpawn, withinEffect } from '../meter/tally.store.ts';
+import { RunPlace } from '../place/place.store.ts';
+import { runPlaceVerbAsync } from '../place/place-async.store.ts';
 import { roundsGranted, settledFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
@@ -324,7 +325,7 @@ export const advancePass = Effect.fn('advancePass')(
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
-    const handed = handOffAll(run, reads, yield* RunPlace);
+    const handed = yield* withinEffect('act', handOffAll(run, reads, yield* RunPlace));
     const memo = statusMemo();
     const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
     const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
@@ -435,25 +436,27 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassR
  * and with why a hand-off was not made, and whether a hand-off was marked on the record. A git run's step is handed off by its place's
  * `handoff`, from the place `dirOf` names, and marked only on its answer: one refused or not heard is asked again on the next pass.
  */
-function handOffAll(run: Run, r: PassReads, dirOf: (run: GitRun) => string): { collected: string[]; marked: boolean } {
+const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, dirOf: (run: GitRun) => string) {
   let marked = false;
-  const collected = within('act', () =>
-    handOffOwed(r.steps, run, r.phaseOf).flatMap((name) => {
-      if (!runStore.runs.exists(run.id)) return [];
-      const record = run.steps[name];
-      const unhanded = isGitRun(run) ? handedOffBy(run, dirOf, record.workspace!, name) : folderPlace(runsDir()).handOff(run, name);
-      if (unhanded === undefined) {
-        run.steps[name] = { ...record, handedOff: record.taskId! };
-        marked = true;
-      }
-      return [...(unhanded === undefined ? [] : [`${name}: ${unhanded}`]), ...collectArtifacts(run, name, r.signedOff(name))];
-    }),
-  );
+  const collected: string[] = [];
+  for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
+    if (!runStore.runs.exists(run.id)) continue;
+    const record = run.steps[name];
+    const unhanded = isGitRun(run) ? yield* handedOffBy(run, dirOf, record.workspace!, name) : folderPlace(runsDir()).handOff(run, name);
+    if (unhanded === undefined) {
+      run.steps[name] = { ...record, handedOff: record.taskId! };
+      marked = true;
+    }
+    collected.push(...(unhanded === undefined ? [] : [`${name}: ${unhanded}`]), ...collectArtifacts(run, name, r.signedOff(name)));
+  }
   return { collected, marked };
-}
+});
 
-/** What the place `dirOf` names did with `step`'s hand-off of `workspace`: undefined once it answered, else why not, in words. */
-function handedOffBy(run: GitRun, dirOf: (run: GitRun) => string, workspace: string, step: string): string | undefined {
+/**
+ * What the place `dirOf` names did with `step`'s hand-off of `workspace`, its `handoff` asked off the event loop, as a commit hook may
+ * take minutes: undefined once it answered, else why not, in words.
+ */
+const handedOffBy = Effect.fnUntraced(function* (run: GitRun, dirOf: (run: GitRun) => string, workspace: string, step: string) {
   let dir: string;
   try {
     dir = dirOf(run);
@@ -461,10 +464,10 @@ function handedOffBy(run: GitRun, dirOf: (run: GitRun) => string, workspace: str
     return `not handed off — ${(err as Error).message}`;
   }
   countSpawn();
-  const outcome = within('git', () => runPlaceVerb(dir, 'handoff', { workspace, step, why: '' }));
+  const outcome = yield* withinEffect('git', runPlaceVerbAsync(dir, 'handoff', { workspace, step, why: '' }));
   if ('answer' in outcome) return undefined;
   return `not handed off — ${'refused' in outcome ? `the place refused: ${outcome.refused}` : `the place's handoff was not heard: ${outcome.unread.said}`}; asked again on the next pass`;
-}
+});
 
 /**
  * Lift a person's hold once every run it names has shipped, each read through `parents`, and only the hold this pass read (`removeHold`):

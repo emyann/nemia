@@ -78,11 +78,11 @@ test('with no lease on the store, a ticking command spawns a daemon detached, an
   assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'spawn' });
   const lease = daemonStanding();
   assert.equal(lease.kind, 'ticking');
-  const pid = started[0]!;
+  const pid = started[0];
   assert.equal(lease.kind === 'ticking' && lease.file.pid, pid);
   const log = path.join(ROOT, 'daemon.log');
   assert.equal(said.length, 1, said.join('\n'));
-  for (const words of [`pid ${pid}`, log, `kill ${pid}`, FIXTURE]) assert.ok(said[0]!.includes(words), `${words}: ${said[0]}`);
+  for (const words of [`pid ${pid}`, log, `kill ${pid}`, FIXTURE]) assert.ok(said[0].includes(words), `${words}: ${said[0]}`);
   assert.ok(fs.existsSync(log));
   process.kill(pid, 'SIGTERM');
   await leaseUntil((kind) => kind === 'stopped');
@@ -189,6 +189,6 @@ test('NEMIA_DAEMON_START=off starts nothing and says so once', async () => {
   const { host, said, calls } = hostOf({ env: { ...ON, [DEMAND_OFF]: 'off' } });
   assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'off' });
   assert.equal(said.length, 1);
-  assert.match(said[0]!, /NEMIA_DAEMON_START=off here, so this command starts no daemon/);
+  assert.match(said[0], /NEMIA_DAEMON_START=off here, so this command starts no daemon/);
   assert.deepEqual(calls, []);
 });

@@ -38,7 +38,12 @@ import type { GitRun } from '../record/record.ts';
 const Strings = Schema.Array(Schema.String);
 const Count = Schema.NullOr(Schema.Int);
 
-const OpenedSchema = Schema.Struct({ repo: Schema.String, baseRef: Schema.String, branch: Schema.String }) satisfies Schema.Schema<Opened>;
+const OpenedSchema = Schema.Struct({
+  repo: Schema.String,
+  baseRef: Schema.String,
+  branch: Schema.String,
+  staged: Schema.optionalKey(Schema.String),
+}) satisfies Schema.Schema<Opened>;
 
 const MadeSchema = Schema.Struct({
   workspace: Schema.String,
@@ -159,6 +164,7 @@ const PlaceDeclaredSchema = Schema.Struct({
     drop: Schema.String,
     conflicts: Schema.String,
     unlock: Schema.String,
+    stage: Schema.String,
   }),
 }) satisfies Schema.Schema<PlaceDeclared>;
 

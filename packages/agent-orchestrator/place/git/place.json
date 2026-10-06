@@ -8,6 +8,7 @@
     "ship": "git -C {repo} merge --no-ff {branch}",
     "drop": "git -C {repo} branch -D {branches}",
     "conflicts": "`git status` shows them.",
-    "unlock": "git -C {repo} worktree unlock {path}"
+    "unlock": "git -C {repo} worktree unlock {path}",
+    "stage": "git -C {repo} merge --no-ff --no-commit {branches}"
   }
 }

@@ -290,7 +290,7 @@ const DECLARED = {
   v: 1,
   verbs: ['open', 'status'],
   denyWhileLanding: ['Bash(git commit:*)'],
-  say: { look: ['git status'], readResult: 'r', ship: 's', drop: 'd', conflicts: 'c', unlock: 'u' },
+  say: { look: ['git status'], readResult: 'r', ship: 's', drop: 'd', conflicts: 'c', unlock: 'u', stage: 'st' },
 };
 
 /** What `readPlaceJson` refuses the skill in `dir` with, its kind and exit code checked. */

@@ -160,6 +160,9 @@ import {
   type RetryMode,
 } from '../src/retry/retry-ask.ts';
 import { tryOf } from '../src/record/record.ts';
+import { admissionOf } from '../src/admission/index.ts';
+import { TABLE } from '../src/command/commands.verb.ts';
+import { waitsOnPerson } from '../src/retry/index.ts';
 import {
   firstFiledAt,
   runStartedAt,
@@ -10017,6 +10020,38 @@ test('REFUSED to be finished: a run waiting on a person in any status `nemia ls`
       cancelPlan(steps, r, p, readable, asked, () => undefined, [], [], spendOf),
       { kind: 'cancel', stop: [] },
       `${why}: cancelPlan reads the closeout as the run's reader hands it, only a well-formed one`,
+    );
+  }
+});
+
+test('a stopped step holds its run but waits on no one for admission: Nemia retries an unsigned step and a failed check unasked, and `nemia cancel` calls the run off', () => {
+  const cases: Array<[StepStatus, Workflow[], GitRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
+    ['unsigned', STEPS, signedOffOnce(blockedRun()) as GitRun, { t1: 'succeeded' }, () => undefined],
+    ['failed (check)', CHECKED, withCheck('c1'), { t1: 'succeeded', c1: 'failed' }, signedDone],
+  ];
+  for (const [status, steps, r, ended, closeoutOf] of cases) {
+    const p = phases(ended);
+    assert.equal(stepStatus(steps[0], r, p, closeoutOf, asked, steps), status);
+    const waitOf = (_: string, name: string) =>
+      waitsOnPerson(
+        retryable(
+          steps.find((s) => s.name === name)!,
+          r,
+          p,
+          closeoutOf,
+          asked,
+          steps,
+        ),
+      );
+    const admitted = (command: string) => admissionOf({ tool: 'Bash', input: { command }, cwd: '/' }, TABLE, waitOf);
+    assert.equal(admitted('nemia retry r implement'), undefined, `${status}: a try of a stopped step is Nemia's to give`);
+    assert.ok(admitted('nemia retry r implement --budget 5'), `${status}: a budget is the person's`);
+    assert.deepEqual(cancelPlan(steps, r, p, closeoutOf, asked), { kind: 'cancel', stop: [] }, `${status}: the run is not finished`);
+    const closeouts = (name: string) => (name === 'implement' ? closeoutOf(name) : undefined);
+    assert.deepEqual(
+      listing({ steps, run: r, phaseOf: shown(ended), closeoutOf: closeouts, askedCloseout: asked }).waitingOnYou,
+      ['implement'],
+      `${status}: nemia ls says it waits on you`,
     );
   }
 });

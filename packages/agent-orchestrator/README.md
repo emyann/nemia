@@ -2746,7 +2746,7 @@ recommendation, recaps what moved, and carries their answer back as a `nemia` ve
   web link her session shows, from a phone too), and what a person allowed her at a prompt beyond what ships.
 - **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
   (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve`, `round`, `accept`,
-  a `retry` of a step that waits on them (`WAITS_ON_PERSON`) but a `--recheck`, any `--budget` — is asked of the person by her
+  a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
   admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
   settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
   retry that waits on no one — is hers. Each command's class in the table decides (`nemia` on its entry, `src/admission/class.ts`), and
@@ -3086,7 +3086,7 @@ reconciles toward it — the same level-triggered rule the engine runs on one la
 Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
 normal things for a person to do, so none of them is an error and each says which it was. A run
 with a step waiting on a person is not finished — at its gate, blocked, unsigned, a refused check,
-out of rounds or budget, denied (`WAITS_ON_PERSON`, the rule `wf ls` says *waiting on you* by) — so
+out of rounds or budget, denied (`HOLDS_THE_RUN`, the rule `wf ls` says *waiting on you* by) — so
 it is called off: that is how a person sets it aside and keeps its record, and it stops being listed
 as waiting on them. A finished run, one that succeeded or failed with nothing waiting on anyone, is
 deliberately **not** relabelled — a run that succeeded succeeded, and stamping it

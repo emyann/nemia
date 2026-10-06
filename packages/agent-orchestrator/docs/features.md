@@ -2407,7 +2407,7 @@ fence is derived from the class, with no hand list in `nemia/nemia.md`.
   `nemia level` lists it: an ask outranks an allow wherever each is written, so the keeper takes the ask out.
 - **Her admission** (`nemia admit`, `src/admission/`), the runtime's hook on her `Bash` calls: an approval, a round, an accept, any
   `--budget` and a retry of a step that waits on the person (`waitsOnPerson`, `src/retry/waits.ts`) are asked, whatever she types around
-  them; a retry that waits on no one runs, and so does a `--recheck`, which files no session. A hook's ask prompts over every allow, so a "don't ask again" never widens what waits.
+  them; a retry that waits on no one runs. A hook's ask prompts over every allow, so a "don't ask again" never widens what waits.
 
 ## Shipped: a level per factory, and a raise for a stretch (Nemia platform slice 6a)
 

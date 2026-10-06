@@ -14,7 +14,7 @@ import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReade
 import type { Ran } from '../command/entry.verb.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
-import { admissionOf, namedIn, rechecks, typedIn, type Scope } from './admission.ts';
+import { admissionOf, namedIn, typedIn, type Scope } from './admission.ts';
 
 /** The usage the refusals of `nemia admit` end on. */
 const ADMIT_FORM = `nemia admit [--at-least ${LEVELS.join('|')}]`;
@@ -42,12 +42,8 @@ export const ADMIT: Ran = {
   only: { side: 'cli', why: "a session's hook asks it before each call, on its own machine" },
 };
 
-/**
- * Why a try of `step` of `runId` waits on the person, as `nemia retry` would judge it, or undefined where it waits on no one.
- *
- * @param recheck Whether the try is a `--recheck` (`waitsOnPerson`).
- */
-const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string, recheck: boolean) {
+/** Why `step` of `runId` waits on the person, as `nemia retry` would judge it, or undefined where it waits on no one. */
+const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string) {
   const run = yield* tried(() => runStore.runs.read(runId));
   const steps = yield* tried(() => stepsOf(run));
   const step = steps.find((s) => s.name === stepName);
@@ -65,7 +61,6 @@ const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string, r
       spendReader(views),
       exitVerdicts(views, run),
     ),
-    recheck,
   );
 });
 
@@ -112,10 +107,9 @@ export const admitted = Effect.fnUntraced(function* (given: string, table: Param
   for (const { args } of typedIn(line, table).filter((t) => t.name === 'retry')) {
     const [runId, step] = args.filter((a) => !a.startsWith('-'));
     if (runId === undefined || step === undefined) continue;
-    const recheck = rechecks(args);
-    const read = yield* Effect.result(waitRead(runId, step, recheck));
-    waits.set(`${runId} ${step} ${recheck}`, Result.isSuccess(read) ? read.success : `is not there: ${read.failure.message}`);
+    const read = yield* Effect.result(waitRead(runId, step));
+    waits.set(`${runId} ${step}`, Result.isSuccess(read) ? read.success : `is not there: ${read.failure.message}`);
   }
   const scope = atLeast === undefined ? undefined : yield* scopeRead(line, table, atLeast);
-  return admissionOf(call, table, (runId, step, recheck) => waits.get(`${runId} ${step} ${recheck}`), scope);
+  return admissionOf(call, table, (runId, step) => waits.get(`${runId} ${step}`), scope);
 });

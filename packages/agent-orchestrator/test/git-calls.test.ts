@@ -45,7 +45,6 @@ const GIT_SEGMENTS = ['.git', 'MERGE_HEAD'];
  * run and its row.
  */
 const CARDS: Readonly<Record<string, string>> = {
-  C2: 'workflow-build-repo-home-yrn-2b96, row C, its second half: `open` at `nemia start`, in place of `makeWorkspace`',
   E: 'git-out-card-e-nemia-rm-and-excf: `inventory` and `remove` for `nemia rm` and `nemia prune`',
   F: "git-out-card-f-a-step-s-work-84on: `make` and `handoff`, `workspaceFor`'s git half, `handOff`, `includeFiles`'s check-ignore",
   G: 'git-out-card-g-the-landing-r-5fbg: `status` and `land` for the landing, `mergeInProgress`, `mergeState`, `commitMerge`, `abortMerge`',
@@ -66,7 +65,7 @@ const GIT_SITES: Baseline = {
   'packages/agent-orchestrator/src/merge/merge.verb.ts': { count: 1, cards: ['H'] },
   'packages/agent-orchestrator/src/prune/prune.verb.ts': { count: 6, cards: ['E'] },
   'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 1, cards: ['I1', 'I2'] },
-  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 21, cards: ['C2', 'F', 'G', 'J'] },
+  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 19, cards: ['F', 'G', 'J'] },
 };
 
 /** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */

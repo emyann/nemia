@@ -1,7 +1,7 @@
 /**
- * `open`: the repository a run starts in, read at `wf start` — the commit HEAD is at and the branch it is on (`makeWorkspace` in
- * `src/workspace/worktree.store.ts` reads the same). Takes `{ root }`; answers `{ repo, baseRef, branch }`, `repo` as given. Refuses a
- * `root` that is no directory, no git repository, or a repository with no commit yet.
+ * `open`: the repository a run starts in, read at `nemia start` (`openPlace` in `src/place/place.store.ts`) — the commit HEAD is at and
+ * the branch it is on. Takes `{ root }`; answers `{ repo, baseRef, branch }`, `repo` as given. Refuses a `root` that is no directory, no
+ * git repository, or a repository with no commit yet.
  */
 import { git, gitSays, isDirectory, refused, serve, text } from './contract.ts';
 

@@ -1685,8 +1685,8 @@ which anything in this tool had ever shown anyone.
 
 `wf decide` is read-only. It reports facts and changes nothing. Whether a loop's work still merges onto its base, it asks the run's
 place (`trial`, for the merges it offers); where each result branch stands, and whether the run shipped, it still reads by running git
-itself (`branchReader`, `standingsOf` and `shippedOf` in `src/branches/branches.store.ts`), until card I1/I2 asks the place's `standing`
-for it. It ends with where each result branch stands
+itself (`branchReader`, `standingsOf` and `shippedOf` in `src/branches/branches.store.ts`), until card I2 reads what the tick's pass asked
+the place's `standing` (`standing.json`). It ends with where each result branch stands
 against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
 then with what is left to decide: a last step waiting at its gate, with the `wf approve` that answers it — in
 its own prose where that step is an ending that has not run, since approving is what runs it — or, where no
@@ -3062,8 +3062,8 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest/rest.ts`) — is
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the
   asks directory and its `done/`: `restStamps`, one `readdir` and a `stat` each), each of its tasks' journals (the runtime's feed, read
-  once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (one `git for-each-ref` a
-  repository). Its record is not read again either while its stamp holds: the memo keeps the run as it read it and hands it to the
+  once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (read off the heads
+  of the pass's one `standing` a repository, place and base branch, `passStanding`). Its record is not read again either while its stamp holds: the memo keeps the run as it read it and hands it to the
   listing (`keptOf`), so a pass reads only the records of runs in flight or whose files moved. The breakdown says how many (`, 200 runs at
   rest answered from memory`); on a store of 200 finished runs and a few in flight a pass reads 4 journals, the records of the runs in
   flight and starts 2 git processes, as it does with none (`src/tick/rest-store.test.ts`). On a store of 390 finished runs and 3 in flight,
@@ -3436,6 +3436,8 @@ holding a concurrency slot forever.
 | `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches/branches.store.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and the tips of a run's branches and a repository's heads (`resultTips`, `refsOf`, `headsOf`) |
+| `src/standing/standing.verb.ts` | where a pass's repositories stand, read once a pass (`passStanding`): one `standing` of the run's place for each repository, place and base branch, of the result branches of every run waited on there, within 15 s (`STANDING_DEADLINE_MS`); the reader the pass's `shippedBy`, `parentOf`, `runReady` and holds ask through (`standingReader`), and the heads its memo of runs at rest, its tips and a filed run's base are read from (`headsFor`). An unread `standing` reads as not shipped, and the waiting run says why |
+| `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`) and decoded by its schema (`readStanding`) |
 | `src/branches/changes.store.ts` | what a git run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
@@ -3496,6 +3498,7 @@ for the same reason, and so does the `wf` command.
 | `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
+| `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |
 | `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |

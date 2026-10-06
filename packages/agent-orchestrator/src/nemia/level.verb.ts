@@ -12,7 +12,7 @@ import { Conflict } from '../refusal/refusal.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { dollars, taskSpend, type Spend } from '../status/status.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
-import { LEVEL_FORM, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
+import { LEVEL_FORM, LEVELS, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
 /**
  * Where Nemia is, as `nemia level` answers: her `level` and since when; her task, its phase and its session where one is filed; how a
@@ -134,6 +134,7 @@ export const LEVEL: Command<NemiaLevel> = {
   },
   check: (args) => (typeof args.level === 'string' ? (levelRefusal(args.level) ?? null) : null),
   writes: true,
+  nemia: { bare: 'read', sets: 'prompts', setsBy: LEVELS },
   route: [
     {
       method: 'GET',

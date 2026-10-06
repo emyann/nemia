@@ -145,6 +145,7 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
   spec: INSTRUCTION_SPEC,
   check: instructionCheck,
   writes: true,
+  nemia: { bare: 'read', sets: 'prompts', setsBy: ['--path', '--store', '--clear'] },
   route: [
     {
       method: 'GET',
@@ -211,6 +212,7 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
     return leftOut(INSTRUCT_SPEC, args);
   },
   writes: true,
+  nemia: 'prompts',
   route: [
     { method: 'PUT', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: false } },
     { method: 'DELETE', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: true } },

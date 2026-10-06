@@ -57,6 +57,7 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
     ['dir', 'draft', 'schema', 'version', 'repo'],
   ),
   writes: true,
+  nemia: 'prompts',
   route: [
     { method: 'POST', path: '/api/agents/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/agents/:from/:name', status: 200, hand: WRITE_HAND },
@@ -82,6 +83,7 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
   help: ['an agent of yours removed'],
   spec: apiSpec(PLACE_AND_NAME, ['dir', 'version', 'repo']),
   writes: true,
+  nemia: 'prompts',
   route: {
     method: 'DELETE',
     path: '/api/agents/:from/:name',
@@ -109,6 +111,7 @@ export const AGENTS_TRY: Command<{ id: string }> = {
   help: ['an agent of yours tried on a short brief'],
   spec: apiSpec(PLACE_AND_NAME, ['dir', 'brief']),
   writes: true,
+  nemia: 'hers',
   route: {
     method: 'POST',
     path: '/api/agents/:from/:name/try',
@@ -133,6 +136,7 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
   help: ['one agent, read for its page'],
   spec: apiSpec(PLACE_AND_NAME, ['dir', 'repo']),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/agents/:from/:name', status: 200 },
   only: {
     side: 'api',

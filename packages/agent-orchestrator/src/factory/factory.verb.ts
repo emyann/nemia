@@ -111,6 +111,7 @@ export const FACTORY: Command<Listed> = {
       `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/factories', status: 200 },
   manual: FACTORY_HELP,
   handler: () => tried(() => ({ factories: readFactories() })),
@@ -128,6 +129,7 @@ const FACTORY_LS: Command<Listed> = {
     unknown: (arg) => `nemia factory ls takes nothing, and was given ${arg}: nemia factory ls lists every factory.`,
   },
   writes: false,
+  nemia: 'read',
   only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
   handler: () => tried(() => ({ factories: readFactories() })),
   print: listed,
@@ -163,6 +165,7 @@ const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: strin
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
+  nemia: 'prompts',
   only: WRITTEN_HERE,
   handler: (args) =>
     tried(() => {
@@ -195,6 +198,7 @@ const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
   help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
   spec: workflowSpec('attach'),
   writes: true,
+  nemia: 'prompts',
   only: WRITTEN_HERE,
   handler: (args) =>
     tried(() => {
@@ -214,6 +218,7 @@ const FACTORY_DETACH: Command<{ file: string }> = {
   help: ['take a workflow back, once no hire fills its steps'],
   spec: workflowSpec('detach'),
   writes: true,
+  nemia: 'prompts',
   only: WRITTEN_HERE,
   handler: (args) => tried(() => detachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') })),
   print: ({ file }, args) => [`${textOf(args, 'factory')}  detached ${textOf(args, 'workflow')}`, `detached: ${file}`],
@@ -262,6 +267,7 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   spec: HIRE_SPEC,
   check: stepCheck('hire', '<factory> <agent>', HIRE_SPEC),
   writes: true,
+  nemia: 'prompts',
   route: { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 },
   handler: (args, _env, home) =>
     tried(() => {
@@ -293,6 +299,7 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   spec: FIRE_SPEC,
   check: stepCheck('fire', '<factory>', FIRE_SPEC),
   writes: true,
+  nemia: 'prompts',
   route: { method: 'DELETE', path: '/api/factories/:factory/hires/:step', status: 200 },
   handler: (args) => tried(() => fireAgent({ factory: textOf(args, 'factory'), step: textOf(args, 'step') })),
   print: ({ file, fired }, args) => [`${textOf(args, 'factory')}  ${textOf(args, 'step')}  fired ${fired}`, `fired: ${file}`],
@@ -313,6 +320,7 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
     missing: 'nemia factory rm takes the name of the factory to remove, as nemia factory ls lists it: nemia factory rm <name>.',
   },
   writes: true,
+  nemia: 'prompts',
   only: WRITTEN_HERE,
   handler: (args) =>
     tried(() => {

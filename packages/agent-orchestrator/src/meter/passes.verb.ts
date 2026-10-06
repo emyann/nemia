@@ -58,6 +58,7 @@ export const PASSES: Command<PassesRead> = {
     apart: () => LAST_TAKES,
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/passes', status: 200 },
   handler: (args) => tried(() => passesOf(args)),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : passesLines(read)),

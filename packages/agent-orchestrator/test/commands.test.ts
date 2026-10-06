@@ -5,10 +5,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TABLE, commandBreaks, routeList, type Route } from '../src/runner.ts';
+import { classBreaks } from '../src/command/class.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
 test('the shipped table breaks none of its rules against the CLI’s verbs and runners', () => {
   assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
+});
+
+test('every shipped command is classed once, and no class breaks its rules', () => {
+  assert.deepEqual(classBreaks(TABLE), []);
 });
 
 /** A route as the pins say it: a route the api writes by hand (`hand`) marked so, its why left to the entry. */

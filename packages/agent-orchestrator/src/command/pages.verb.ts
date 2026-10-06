@@ -51,6 +51,7 @@ export const RUN: Command<{ run: Run | null }> = {
     unknown: (arg) => `the board's run page reads one run, and ${arg} is a second.`,
   },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs/:id', status: 200 },
   only: {
     side: 'api',
@@ -70,6 +71,7 @@ export const RUNS: Command<RunSummary[]> = {
   help: ["every run's summary, for the board's list"],
   spec: { positionals: [], flags: [], unknown: (arg) => `the board's list of runs takes no ${arg}.` },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs', status: 200 },
   only: {
     side: 'api',
@@ -93,6 +95,7 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
   help: ["one file of a step's files directory"],
   spec: stepSpec(NAME, []),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/artifacts/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a step's closeout named; at the command line a person opens the file" },
   handler: (args) =>
@@ -113,6 +116,7 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> 
   help: ["one file of a folder step's own folder"],
   spec: stepSpec(NAME, []),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/files/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a folder step's folder holds; at the command line a person opens the folder" },
   handler: (args) =>
@@ -134,6 +138,7 @@ export const STEP_PATH: Command<{ path: LifecycleStep[] }> = {
   help: ["the path of a step's task through the runtime's lifecycle"],
   spec: stepSpec([], ['task']),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 },
   only: { side: 'api', why: "the board draws each try of a step on the lifecycle's diagram; at the command line, nemia ls says its state" },
   handler: Effect.fnUntraced(function* (args: Args) {
@@ -156,6 +161,7 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
   help: ["a read of a step's conversation"],
   spec: stepSpec([], ['task', 'after']),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/transcript', status: 200 },
   only: {
     side: 'api',

@@ -60,6 +60,7 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
     unknown: (arg) => `nemia cancel takes one run's id: not ${arg}.`,
   },
   writes: true,
+  nemia: 'prompts',
   only: { side: 'cli', why: 'the board offers no cancel: a person stops a run at the command line' },
   handler: Effect.fnUntraced(function* (args: Args) {
     const { run, plan } = yield* cancelRun(textOf(args, 'runId') ?? '');
@@ -177,6 +178,7 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   },
   check: holdArgsRefusal,
   writes: true,
+  nemia: 'hers',
   route: { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
   handler: Effect.fnUntraced(function* (args: Args) {
     const runId = textOf(args, 'runId') ?? '';
@@ -242,6 +244,7 @@ export const RM: Command<{ id: string; removed: boolean; engine: EngineForgettin
   },
   check: rmRefusal,
   writes: true,
+  nemia: 'prompts',
   route: { method: 'DELETE', path: '/api/runs/:runId', status: 200 },
   handler: Effect.fnUntraced(function* (args: Args) {
     const forgot = yield* forgetRun(textOf(args, 'runId') ?? '', {
@@ -299,6 +302,7 @@ export const PRUNE: Command<{
       `nemia prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
   },
   writes: true,
+  nemia: 'prompts',
   route: { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } },
   handler: Effect.fnUntraced(function* (args: Args) {
     const p: Pruning = yield* prune(textOf(args, 'runId') ?? '', {
@@ -382,6 +386,7 @@ export const PAUSE: Command<PauseAnswer> = {
   },
   check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
   writes: true,
+  nemia: 'hers',
   route: { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } },
   handler: pauseBy,
   print: (answer) =>
@@ -405,6 +410,7 @@ export const RESUME: Command<{ pause: Pause }> = {
     unknown: (arg) => `nemia resume takes no ${arg}: it resumes the store, whoever paused it.`,
   },
   writes: true,
+  nemia: 'hers',
   route: { method: 'DELETE', path: '/api/pause', status: 200 },
   handler: () => tried(() => ({ pause: resumePause() })),
   print: () => [RESUMED],
@@ -417,6 +423,7 @@ export const PAUSED: Command<Paused> = {
   help: ["the store's pause, what finishes under it, and each check it holds, a landing with its merge staged among them"],
   spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/pause', status: 200 },
   only: {
     side: 'api',
@@ -433,6 +440,7 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   help: ['what a pause at once would stop, each task at work but a landing, and what that costs'],
   spec: { positionals: [], flags: [], unknown: (arg) => `what a pause at once would stop takes no ${arg}.` },
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/pause/now', status: 200 },
   only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, nemia pause --now says it' },
   handler: Effect.fnUntraced(function* () {
@@ -460,6 +468,7 @@ const TICK: Ran = {
     unknown: (arg) => `nemia tick takes no ${arg}: nemia tick runs one pass, and nemia tick --stats says after it what the pass cost.`,
   },
   writes: true,
+  nemia: 'out',
   only: { side: 'cli', why: 'a pass is run where the store is, by a person or by a daemon; the api serves none on a route' },
 };
 
@@ -503,6 +512,7 @@ const UP: Ran = {
   },
   check: upRefusal,
   writes: true,
+  nemia: 'out',
   only: { side: 'cli', why: 'nemia up holds the store as long as its process lives; the api holds none' },
 };
 
@@ -521,6 +531,7 @@ const WATCH: Ran = {
     return cursor === undefined || /^\d+$/.test(cursor) ? null : cursorTakes('watch');
   },
   writes: false,
+  nemia: 'read',
   only: { side: 'cli', why: 'it follows the feed on a terminal until ^C; the board reads what changed from the api' },
 };
 

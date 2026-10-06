@@ -43,6 +43,7 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
   help: ['the skill folders named, each read'],
   spec: apiSpec([{ key: 'skills', takes: 'many', kind: 'name' }], []),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/skills', status: 200 },
   only: { side: 'api', why: "the board's skill picker lists every skill by place; at the command line a person lists the folders" },
   handler: (args) =>
@@ -69,6 +70,7 @@ export const SKILLS_READ: Command<SkillPage> = {
     ['dir'],
   ),
   writes: false,
+  nemia: 'read',
   route: { method: 'GET', path: '/api/skills/:from/:name', status: 200 },
   only: {
     side: 'api',
@@ -103,6 +105,7 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
     ['library', 'change', 'version', 'copy', 'shipped'],
   ),
   writes: true,
+  nemia: 'prompts',
   route: [
     { method: 'POST', path: '/api/skills/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/skills/:from/:name', status: 200, hand: WRITE_HAND },

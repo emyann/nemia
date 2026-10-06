@@ -360,7 +360,10 @@ const semanticMerge = (merge: { onto: string; sha: string }, said: LandingSaid, 
   '  choice in `needs`.',
 ];
 
-/** What a looping step reads of a merge: what it resolved, in the place's words (`say`) or where its skill says them, and what `onto` changed. */
+/**
+ * What a looping step reads of a merge: what it resolved, in the place's words (`say`) or where its skill says them, and what `onto`
+ * changed.
+ */
 const mergeRead = (onto: string, say: PlaceSay | undefined): string[] =>
   say
     ? [

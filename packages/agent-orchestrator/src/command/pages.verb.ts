@@ -12,7 +12,7 @@ import type { Args, Flag, Positional, Spec } from './command.ts';
 import type { Command, Kept } from './entry.verb.ts';
 import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { restingMemo } from '../rest/resting.verb.ts';
 import { HOME } from '../record/record.store.ts';
@@ -122,7 +122,7 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> 
   handler: (args) =>
     tried(() => {
       const run = runOf(args);
-      const folder = run && !isGitRun(run) ? (run.steps[textOf(args, 'step') ?? '']?.workspace ?? null) : null;
+      const folder = run && !isRepositoryRun(run) ? (run.steps[textOf(args, 'step') ?? '']?.workspace ?? null) : null;
       return { folder, file: folder === null ? null : fileIn(folder, textOf(args, 'name') ?? '') };
     }),
   print: () => [],

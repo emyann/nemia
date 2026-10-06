@@ -29,7 +29,7 @@ const row = (extra: object = {}): RunSummary => ({
   id: 'r-1',
   repo: '/work/repo',
   factory: 'nemia',
-  place: 'git',
+  place: 'repository',
   work: null,
   brief: 'Decode the reads',
   workflowDir: '/work/workflows/build',
@@ -128,12 +128,20 @@ const unread = (at: string, found: string) => (err: unknown) => {
 };
 
 test('the Runs list decodes an answer the api gives, each union in its every shape', async (t) => {
-  const git = row({ toDecide: { kind: 'git', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } });
-  answering(t, [row(), git, row({ place: 'folder', waiting: null, holding: null, cost: null, toDecide: null, pruned: null })]);
+  const result = row({ toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } });
+  answering(t, [row(), result, row({ place: 'folder', waiting: null, holding: null, cost: null, toDecide: null, pruned: null })]);
   const runs = await readRuns();
   assert.equal(runs.length, 3);
   assert.deepEqual(runs[0], row());
-  assert.deepEqual(runs[1], git);
+  assert.deepEqual(runs[1], result);
+});
+
+test('REFUSED, a row an older daemon answers: a result to decide called git, and a run whose place is called git', async (t) => {
+  answering(t, [row({ toDecide: { kind: 'git', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } })]);
+  await assert.rejects(readRuns(), unread('[0].toDecide', '"git"'));
+
+  answering(t, [row({ place: 'git' })]);
+  await assert.rejects(readRuns(), unread('[0].place', '"git", where'));
 });
 
 test("a row keeps the factory its run was started in, null for the default factory's; REFUSED: a row without it", async (t) => {

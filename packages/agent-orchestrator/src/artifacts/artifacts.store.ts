@@ -13,7 +13,7 @@ import path from 'node:path';
 import type { Closeout } from '../closeout/closeout.ts';
 import { inside } from '../workspace/workspace.ts';
 import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
 
@@ -64,7 +64,7 @@ function branchOf(run: Run, stepName: string, files: readonly string[]): OnBranc
   const branch = run.steps[stepName]?.branch;
   let read: ReturnType<typeof presentOn> | undefined;
   return (rel) => {
-    if (!branch || !isGitRun(run)) return 'absent';
+    if (!branch || !isRepositoryRun(run)) return 'absent';
     read ??= presentOn(run, branch, [...new Set(files.map((file) => path.normalize(file)))]);
     return 'unknown' in read ? { unknown: read.unknown } : (read[rel] ?? 'absent');
   };

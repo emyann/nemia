@@ -1,7 +1,7 @@
 /** The merge check (`mergesOf`) and its entry in the command table (`MERGES`), served on the api alone. */
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { isGitRun } from '../record/record.ts';
+import { isRepositoryRun } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { placeDirOf, trialMerges } from '../place/place.store.ts';
 import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
@@ -13,7 +13,7 @@ import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
  */
 export function mergesOf(runId: string, branches: readonly string[]): Record<string, StandingMerge> {
   const run = runStore.runs.read(runId);
-  if (!isGitRun(run)) return {};
+  if (!isRepositoryRun(run)) return {};
   const { trials } = trialMerges(
     run.repo,
     branches.map((branch) => ({ onto: run.branch, branch })),

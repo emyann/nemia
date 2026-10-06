@@ -24,7 +24,7 @@ import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { finishingAmong, type Finishing, type PauseStanding } from '../pause/pause.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
@@ -488,7 +488,7 @@ const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: P
  * the pass did not read them, and the run is then judged in full.
  */
 const tipsHold = (run: Run, tipped: readonly string[], pass: PassRead): boolean => {
-  if (!tipped.length || !isGitRun(run)) return true;
+  if (!tipped.length || !isRepositoryRun(run)) return true;
   const heads = pass.standing && headsFor(pass.standing, run);
   return heads !== undefined && tipsSeen(run, tipped, heads) === undefined;
 };

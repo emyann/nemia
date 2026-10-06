@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
-import { isGitRun, namesInOrder, runTasks, type GitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, namesInOrder, runTasks, type RepositoryRun, type Run } from '../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import {
   branchFates,
@@ -101,14 +101,14 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const refusal = yield* tried(() => refusalOf(id, f, git));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
   const dirOf = yield* RunPlace;
-  const read = isGitRun(run) ? yield* tried(() => readRunPlace(run, dirOf(run), dir)) : undefined;
-  if (isGitRun(run) && read && !('inventory' in read))
+  const read = isRepositoryRun(run) ? yield* tried(() => readRunPlace(run, dirOf(run), dir)) : undefined;
+  if (isRepositoryRun(run) && read && !('inventory' in read))
     return { ...said, kind: 'refused', refusal: inventoryUnread('rm', id, run.repo, read), ...nothing() } satisfies Forgot;
   const place = read && 'inventory' in read ? read : undefined;
   const taskIds = forgottenIds(run);
   yield* tried(() => runStore.forgetting.write(id, taskIds));
   yield* closeWaitingTasks(e, run, f.views);
-  if (!isGitRun(run) || !place) {
+  if (!isRepositoryRun(run) || !place) {
     const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
     return { ...said, folder: true, kind: 'forgotten', ...nothing(), files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
   }
@@ -202,7 +202,7 @@ export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: rea
  * check, whose staged merge is read off its result tips.
  */
 const asksStanding = (run: Run, steps: readonly Workflow[] | undefined): boolean =>
-  isGitRun(run) && (steps ?? []).some((s) => (approvedFirst(s, run) && !run.steps[s.name]?.taskId) || landsOnCheck(s, run));
+  isRepositoryRun(run) && (steps ?? []).some((s) => (approvedFirst(s, run) && !run.steps[s.name]?.taskId) || landsOnCheck(s, run));
 
 /**
  * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
@@ -236,7 +236,7 @@ function refusalOf(id: string, f: Forgetting, git: BranchReader): string | null 
  * Remove a git run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and answer
  * what was removed, handed off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
  */
-function removeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
+function removeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
   const within = resolved(dir);
   const recorded = {
     ...run,
@@ -257,7 +257,7 @@ function removeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, di
  * pruned by the `remove`; one held (`heldWorktree`) is left with the place's command for it; one not clean is handed off first, and left
  * when its hand-off is refused, uncommitted, or does not answer.
  */
-function handWorktree(run: GitRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees): boolean {
+function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees): boolean {
   if (w.prunable && w.locked === undefined) {
     if (!lstatOf(w.path)) done.gone.push(w.path);
     return false;
@@ -280,7 +280,7 @@ function handWorktree(run: GitRun, place: RunPlaceRead, w: Held & { step: string
 }
 
 /** Remove `removing` through the place's `remove`, never forced, adding to `done` what went and what git would not remove, in its words. */
-function removeListed(run: GitRun, place: RunPlaceRead, removing: readonly Held[], done: Worktrees): void {
+function removeListed(run: RepositoryRun, place: RunPlaceRead, removing: readonly Held[], done: Worktrees): void {
   const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: removing.map((w) => w.path), branches: [] });
   if (!('answer' in outcome)) {
     for (const w of removing) done.left.push({ path: w.path, unread: { verb: 'remove', said: unansweredWords(outcome) } });
@@ -304,7 +304,7 @@ function strays(within: string): string[] {
  * branch as it read them — never one `handedOff` just committed onto, which the base has not — or forced, through the place's `remove`.
  * One git refuses to delete is kept, in git's words; all of them, when the `remove` does not answer.
  */
-function deleteBranches(run: GitRun, how: ForgetHow, place: RunPlaceRead, handedOff: Forgot['handedOff']): BranchFate[] {
+function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead, handedOff: Forgot['handedOff']): BranchFate[] {
   const read = place.inventory.branches;
   const handedOnto = new Set(handedOff.map((h) => h.branch));
   const merged = (branch: string): boolean => !handedOnto.has(branch) && read.some((b) => b.branch === branch && b.merged);

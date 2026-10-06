@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { unjudgedWord } from '../views/views.verb.ts';
-import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
+import { isRepositoryRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { prunedKept } from '../prune/prune.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
@@ -173,7 +173,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     repo: run.repo ?? null,
     factory: run.factory ?? null,
     place: placeOf(run),
-    work: isGitRun(run) ? null : run.workspace,
+    work: isRepositoryRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
     try: tryOf(run, home),
@@ -224,7 +224,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     repo: run.repo ?? null,
     factory: run.factory ?? null,
     place: placeOf(run),
-    work: isGitRun(run) ? null : run.workspace,
+    work: isRepositoryRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
     try: tryOf(run, home),

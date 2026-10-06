@@ -240,10 +240,13 @@ export type RunDetail = {
   brief: string;
   /** The line that prints what there is to decide on the run. */
   decide: string;
-  /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run (`place`), which has none. */
+  /**
+   * A repository run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run (`place`), which has
+   * none.
+   */
   repo: string | null;
   place: PlaceKind;
-  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run, whose work is on its branch. */
+  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a repository run, whose work is a branch. */
   work: string | null;
   workflowDir: string;
   /** The address of its workflow's page, and each step's under it: null where the board pages none, as for a folder given by path. */
@@ -313,7 +316,7 @@ export type RunDetail = {
     workspace: string | null;
     /**
      * For a step of a folder run, every file its folder holds now — the whole of what it made, not only what its closeout named.
-     * Empty for a step of a git run, whose work is a branch, and for one not filed yet.
+     * Empty for a step of a repository run, whose work is a branch, and for one not filed yet.
      */
     files: StepArtifact[];
     /** Why that list is empty when the folder is there and could not be read; null where the list is what the folder holds. */

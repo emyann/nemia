@@ -21,7 +21,7 @@ import { formerModesWritten, isShippedPlace, loadWorkflows, skillsFor, type Plac
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
-import { isGitRun, type Mount, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Mount, type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
@@ -330,7 +330,7 @@ export function leftOutMounts(run: Run): string[] {
     return [];
   }
   const mounted = new Set((run.mounts ?? []).map((m) => m.path));
-  return factoryMounts(factory, isGitRun(run) ? run.repo : undefined)
+  return factoryMounts(factory, isRepositoryRun(run) ? run.repo : undefined)
     .map((m) => m.path)
     .filter((at) => !mounted.has(at) && !isDirectory(at));
 }
@@ -391,7 +391,7 @@ export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gat
  * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on stand
  * read now (`standingLiveOf`).
  */
-const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
+const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const placeDir = yield* StartPlace;
   const needed = placeVerbsNeeded(told.workflow ?? [], told, isolate);
   const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed, isolate));
@@ -534,7 +534,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
-  const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
+  const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
   yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
   yield* tried(() => runStore.runs.create(run));

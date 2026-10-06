@@ -10,7 +10,7 @@ import type { MergeState } from '../ending/ending.ts';
 import type { LandingWords } from '../check/check.ts';
 import { resultBranches } from '../branches/branches.store.ts';
 import { resultTips } from '../branches/index.ts';
-import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
@@ -28,7 +28,7 @@ export type CheckoutRead = MergeState | { readonly unread: string };
  */
 export type StatusMemo = {
   readonly reads: Map<string, CheckoutRead>;
-  readonly heads: (run: GitRun) => Readonly<Record<string, string>> | undefined;
+  readonly heads: (run: RepositoryRun) => Readonly<Record<string, string>> | undefined;
   readonly placeDir?: string;
 };
 
@@ -43,7 +43,7 @@ export const statusMemo = (heads: StatusMemo['heads'], placeDir?: string): Statu
 });
 
 /** The directory `run`'s place runs from (`placeDirOf`), or why there is none, in its words: an odd record stops its own run alone. */
-function placeOf(run: GitRun, placeDir: string | undefined): { dir: string } | { unread: string } {
+function placeOf(run: RepositoryRun, placeDir: string | undefined): { dir: string } | { unread: string } {
   if (placeDir !== undefined) return { dir: placeDir };
   try {
     return { dir: placeDirOf(run) };
@@ -56,7 +56,7 @@ function placeOf(run: GitRun, placeDir: string | undefined): { dir: string } | {
  * Whether a merge is staged in `run`'s checkout, as a `stat` of the file the place named at `open` (`stagedFile`) says, with no process.
  * Undefined for a run whose record names no such file, started before its place named one: `status` says it there.
  */
-export function stagedHere(run: Pick<GitRun, 'stagedFile'>): boolean | undefined {
+export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | undefined {
   return run.stagedFile === undefined ? undefined : fs.existsSync(run.stagedFile);
 }
 
@@ -65,7 +65,7 @@ export function stagedHere(run: Pick<GitRun, 'stagedFile'>): boolean | undefined
  * checkout and run within one pass, of the place `memo` names. A refusal, an unread answer, and a place `placeDirOf` will not name are
  * `{ unread }`, in words.
  */
-export function checkoutStatus(run: GitRun, memo: StatusMemo): CheckoutRead {
+export function checkoutStatus(run: RepositoryRun, memo: StatusMemo): CheckoutRead {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return known;
@@ -91,7 +91,7 @@ function statusRead(dir: string, checkout: string, tips: Readonly<Record<string,
  * False for a folder run and for a run with no such ending.
  */
 export function mergeStaged(run: Run, steps: readonly Workflow[], memo: StatusMemo): boolean {
-  if (!isGitRun(run)) return false;
+  if (!isRepositoryRun(run)) return false;
   const landings = steps.filter((s) => landsOnCheck(s, run));
   if (!landings.length) return false;
   const marked = stagedHere(run);
@@ -114,7 +114,7 @@ export type LandedThrough =
  * path still unmerged), or why it was not heard (`unread`, a place `placeDirOf` will not name among them).
  */
 export function landThrough(
-  run: GitRun,
+  run: RepositoryRun,
   act: { readonly act: 'commit'; readonly message: string } | { readonly act: 'abort' },
   memo?: StatusMemo,
 ): LandedThrough {
@@ -132,7 +132,7 @@ export function landThrough(
  * Refuses (`Invalid`) a place `placeDirOf` will not name, and a `place.json` that does not read (`readPlaceJson`).
  */
 export function landingDenies(run: Run, placeDir?: string): readonly string[] {
-  if (!isGitRun(run)) return [];
+  if (!isRepositoryRun(run)) return [];
   return readPlaceJson(placeDir ?? placeDirOf(run)).denyWhileLanding;
 }
 
@@ -147,7 +147,7 @@ export function landingWords(
   placeDir?: string,
   heads?: Readonly<Record<string, string>>,
 ): LandingWords | undefined {
-  if (!isGitRun(run) || !landsOnCheck(step, run)) return undefined;
+  if (!isRepositoryRun(run) || !landsOnCheck(step, run)) return undefined;
   const declared = readPlaceJson(placeDir ?? placeDirOf(run));
   const branches = Object.keys(resultTips(run, resultBranches(run), heads)).join(' ') || '<result branch>';
   return { stage: declared.say.stage.replaceAll('{repo}', run.repo).replaceAll('{branches}', branches), denied: declared.denyWhileLanding };
@@ -158,5 +158,5 @@ export function landingWords(
  * Refuses as `landingDenies` does.
  */
 export function placeSay(run: Run, placeDir?: string): PlaceSay | undefined {
-  return isGitRun(run) ? readPlaceJson(placeDir ?? placeDirOf(run)).say : undefined;
+  return isRepositoryRun(run) ? readPlaceJson(placeDir ?? placeDirOf(run)).say : undefined;
 }

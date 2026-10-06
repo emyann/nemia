@@ -162,7 +162,7 @@ export default {
       'and does not name the same step above it: the decision is the whole of what it waits on you for',
     );
     await expectVisible(
-      deciding.locator(`li a[href="/runs/${UNMERGED.id}"] [data-to-decide="git"]`, { hasText: `to decide: ${UNMERGED.said}` }),
+      deciding.locator(`li a[href="/runs/${UNMERGED.id}"] [data-to-decide="result"]`, { hasText: `to decide: ${UNMERGED.said}` }),
       'the row of a finished run whose branch nobody merged says so, and names wf decide',
     );
     await expectCount(

@@ -11,10 +11,10 @@ import { POPOVER } from './CardGate';
 import { Refusal } from './Ask';
 
 /**
- * Prune, on a finished git run's page: the button opens a popover with a choice of what to give back — its worktrees; its files too; and,
- * for a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the second time in
- * words that say what goes. The api prunes through the package's `prune`, as the CLI's `prune <run> --yes` does, and refuses in its words,
- * shown here. Nothing is offered where the package would prune nothing (`prunable`).
+ * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files
+ * too; and, for a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the
+ * second time in words that say what goes. The api prunes through the package's `prune`, as the CLI's `prune <run> --yes` does, and
+ * refuses in its words, shown here. Nothing is offered where the package would prune nothing (`prunable`).
  */
 export function PruneRun({ run }: { run: RunDetail }) {
   if (!prunable(run)) return null;

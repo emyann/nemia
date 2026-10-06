@@ -18,7 +18,7 @@ import { merges, type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import { inFlight } from '../cap/cap.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
 import { bare, judgedSteps, type Views } from './reads.verb.ts';
@@ -47,7 +47,7 @@ export type RunStoppedOn = NonNullable<Assessment['stoppedOn']>;
  */
 export type RunToDecide = (
   | (Extract<ToDecide, { kind: 'approve' }> & { back: string[]; onto: string | null })
-  | Extract<ToDecide, { kind: 'git' }>
+  | Extract<ToDecide, { kind: 'result' }>
 ) & { said: string; command: string };
 
 /**
@@ -57,7 +57,7 @@ export type RunToDecide = (
 function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[]): RunToDecide | null {
   if (!t) return null;
   const said = toDecideWords(run, t);
-  if (t.kind === 'git') return { ...t, said, command: `nemia decide ${run.id}` };
+  if (t.kind === 'result') return { ...t, said, command: `nemia decide ${run.id}` };
   const step = steps.find((s) => s.name === t.step);
   return {
     ...t,
@@ -325,7 +325,7 @@ export function standingsOf(
   git: BranchReader,
   asked?: GitAsked,
 ): BranchStanding[] {
-  if (!isGitRun(run)) return [];
+  if (!isRepositoryRun(run)) return [];
   const filed = workFiled(run, steps);
   const branches = toDecideBranches(run, steps, status).filter((branch) => onTheBase.get(`${run.id}/${branch}`) !== filed);
   if (!branches.length) return [];

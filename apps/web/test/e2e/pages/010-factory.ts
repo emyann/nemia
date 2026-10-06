@@ -353,7 +353,7 @@ export default {
     const unmerged = cardOf(page, UNMERGED.id);
     await expectVisible(unmerged, `a finished run whose branch nobody merged keeps its card on the floor too (${UNMERGED.id})`);
     await expectVisible(
-      unmerged.locator('[data-to-decide="git"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
+      unmerged.locator('[data-to-decide="result"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
       'its card says the branch is ahead, a link to where it is decided',
     );
     await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");

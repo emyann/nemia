@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
-import { composeBrief, toldLayers, type GitRun } from '../src/run.ts';
+import { composeBrief, toldLayers, type RepositoryRun } from '../src/run.ts';
 import { briefBody, skillLayers, unrendered } from '../src/agents/agents.ts';
 
 const AGENTS: Agents = new Map([
@@ -21,7 +21,7 @@ const stepOf = (lines: string, note = 'Build it.', name = 'build'): Workflow =>
   parseWorkflow(name, `---\nplace: git\n${lines}\n---\n${note}\n`, undefined, AGENTS);
 
 /** A run of `steps`, none filed, asked for `brief`. */
-const runOf = (steps: readonly Workflow[], brief = 'add a flag'): GitRun => ({
+const runOf = (steps: readonly Workflow[], brief = 'add a flag'): RepositoryRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',

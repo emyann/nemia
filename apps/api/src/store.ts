@@ -23,7 +23,7 @@ import {
   workflowsOf,
 } from 'agent-orchestrator';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import { isGitRun, type Run } from 'agent-orchestrator/run';
+import { isRepositoryRun, type Run } from 'agent-orchestrator/run';
 
 /**
  * The engine the api reads through — `list`, `view` and `logs` — one for an app, built with its runtime (`live`: the package's
@@ -76,7 +76,7 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
  * The folder a step of a folder run works in, off the run's record (`folderPlace` made it): null for a step of a git run, which
  * works on a branch, and for one the run has not filed yet, which has no folder.
  */
-export const workFolderOf = (run: Run, step: string): string | null => (isGitRun(run) ? null : (run.steps[step]?.workspace ?? null));
+export const workFolderOf = (run: Run, step: string): string | null => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));
 
 /** Found among the runs the store has, not read by path, so no id can name a file outside it. */
 export const findRun = (id: string): Run | undefined => runStore.runs.list().find((r) => r.id === id);

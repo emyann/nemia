@@ -3,7 +3,7 @@
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
 import type { Workflow } from '../step/step.ts';
-import { fenced, isGitRun, placeOf, type GitRun, type Run } from '../record/record.ts';
+import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import { handedSection, type ParentCloseout } from './handed.ts';
@@ -214,9 +214,9 @@ export function composeBrief(
     if (inHere.length || given.from.length) {
       parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
     }
-  } else if (step.workspace === 'main' && isGitRun(run)) {
+  } else if (step.workspace === 'main' && isRepositoryRun(run)) {
     parts.push(...endingLook(step, run, steps, earlier, place.say));
-  } else if (earlier.length && isGitRun(run)) {
+  } else if (earlier.length && isRepositoryRun(run)) {
     parts.push(
       `This workspace has already been worked in by: ${earlier.join(', ')}.`,
       ...laterLook(run, place.say),
@@ -235,7 +235,7 @@ export function composeBrief(
  * How a step after others reads what they changed against the run's base: the place's own commands (`say.look`), or, with none, where
  * its place's skill says them.
  */
-function laterLook(run: GitRun, say: PlaceSay | undefined): string[] {
+function laterLook(run: RepositoryRun, say: PlaceSay | undefined): string[] {
   const lead = `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed`;
   if (!say) return [`${lead}, ${skillSaid('read')}.`];
   return [`${lead}:`, '', '```', ...say.look.map((line) => sayFilled(line, { baseRef: run.baseRef })), '```'];
@@ -248,7 +248,7 @@ function laterLook(run: GitRun, say: PlaceSay | undefined): string[] {
  */
 function endingLook(
   step: Workflow,
-  run: GitRun,
+  run: RepositoryRun,
   steps: readonly Workflow[],
   earlier: readonly string[],
   say: PlaceSay | undefined,

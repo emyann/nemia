@@ -238,7 +238,7 @@ test("a finished run is kept and a moving one is not, and a poll then reads the 
   await list();
   const first = await list();
   assert.equal(first.find((r) => r.id === 'r-rest')?.status, 'succeeded');
-  assert.equal(first.find((r) => r.id === 'r-rest')?.toDecide?.kind, 'git', 'a branch nobody merged: git was asked about it');
+  assert.equal(first.find((r) => r.id === 'r-rest')?.toDecide?.kind, 'result', 'a branch nobody merged: git was asked about it');
   assert.ok(resting.runs.has('r-rest'), 'kept');
   assert.ok(!resting.runs.has('r-moving'), 'not kept: its task is in flight');
 
@@ -317,9 +317,13 @@ test("a branch tip that moves is judged afresh once a pass reads it: the base br
   await aPass();
   await list();
   assert.ok(resting.runs.has('r-merged'));
-  assert.equal((await listed('r-merged'))?.toDecide?.kind, 'git');
+  assert.equal((await listed('r-merged'))?.toDecide?.kind, 'result');
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-merged/implement');
-  assert.equal((await unverified(() => listed('r-merged')))?.toDecide?.kind, 'git', 'no pass has read the merge: the list cannot know it');
+  assert.equal(
+    (await unverified(() => listed('r-merged')))?.toDecide?.kind,
+    'result',
+    'no pass has read the merge: the list cannot know it',
+  );
   assert.ok(resting.runs.has('r-merged'), 'and it is kept, against the tips the last pass read');
   await aPass();
   assert.equal(
@@ -335,7 +339,7 @@ test('REFUSED: a finished run whose branches no pass has read is not kept, and i
   assert.ok(!resting.runs.has('r-unread'), 'where its branch stands is unread: nothing to keep it against');
   assert.equal((await unverified(() => listed('r-unread')))?.toDecide ?? null, null, 'unread decides nothing');
   await aPass();
-  assert.equal((await unverified(() => listed('r-unread')))?.toDecide?.kind, 'git', 'read by the pass: ahead of the base');
+  assert.equal((await unverified(() => listed('r-unread')))?.toDecide?.kind, 'result', 'read by the pass: ahead of the base');
   assert.ok(resting.runs.has('r-unread'), 'and kept, against the tips the pass read');
 });
 

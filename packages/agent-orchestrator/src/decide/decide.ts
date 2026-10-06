@@ -3,7 +3,7 @@
  * prints (`costLine`, `runCostLines`). Pure.
  */
 import type { Workflow } from '../step/step.ts';
-import { isGitRun, refusedCheck, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, refusedCheck, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Verdict } from '../check/check.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -349,7 +349,7 @@ export function choicesOf(steps: readonly Workflow[], run: Run, d: Decision, off
     ...offers.map(({ step, command, said }): DecideCommand => ({ label: labelOf(command), command, said, step })),
     ...gateChoices(steps, run, d.awaitingApproval),
   ];
-  if (!isGitRun(run))
+  if (!isRepositoryRun(run))
     return [...once, { label: 'forget it', command: `nemia rm ${run.id}`, said: 'forgets the run with its folders and files', step: null }];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;

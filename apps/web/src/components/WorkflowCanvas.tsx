@@ -32,7 +32,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
     brief: '',
     decide: '',
     repo: '',
-    place: workflow.folderTeam ? 'folder' : 'git',
+    place: workflow.folderTeam ? 'folder' : 'repository',
     work: null,
     workflowDir: workflow.dir,
     workflowPage: null,

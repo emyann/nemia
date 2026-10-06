@@ -13,7 +13,7 @@
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
-import { isGitRun, tryOf, type Run } from '../record/record.ts';
+import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
@@ -174,7 +174,7 @@ export const keysOf = (run: Run): RunKeys => ({
 
 /** The deadline in ms a try's check was filed with, where its step lands the run on that check (`landsOnCheck`); else null. */
 function landingDeadlineOf(r: RunRead, step: Workflow, t: TimelineTry): number | null {
-  if (!t.check || !isGitRun(r.run) || !landsOnCheck(step, r.run)) return null;
+  if (!t.check || !isRepositoryRun(r.run) || !landsOnCheck(step, r.run)) return null;
   const seconds = r.deadlineOf(t.check.taskId);
   return seconds === null ? null : seconds * 1000;
 }

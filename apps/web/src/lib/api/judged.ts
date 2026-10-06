@@ -8,13 +8,13 @@ import { Schema } from 'effect';
 export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
 /**
- * Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — git's worktrees, or folders
- * the run makes.
+ * Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — a repository's worktrees, or
+ * folders the run makes.
  */
-export type PlaceKind = 'git' | 'folder';
+export type PlaceKind = 'repository' | 'folder';
 
 /** Decodes a `PlaceKind`. */
-export const PlaceKindSchema = Schema.Literals(['git', 'folder']) satisfies Schema.Schema<PlaceKind>;
+export const PlaceKindSchema = Schema.Literals(['repository', 'folder']) satisfies Schema.Schema<PlaceKind>;
 
 /** Mirrors `RunStatus` in apps/api/src/runs/judged.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -31,7 +31,7 @@ export const RunStoppedOnSchema = Schema.Literals(['awaiting approval', 'blocked
 /**
  * Mirrors `RunToDecide` in apps/api/src/runs/judged.ts: what a person has to decide about a run's result, the fifth reason a run waits on
  * one — `approve`, the gate on its last step, with `step`, `filed` whether it has run, and `says`, what it would do, the first line of the
- * step's own note (null where it has none, and for a gated step that has signed off, whose closeout is what to read); or `git`, result
+ * step's own note (null where it has none, and for a gated step that has signed off, whose closeout is what to read); or `result`, result
  * branches ahead of the base that nothing in the workflow merges.
  *
  * On `approve`, `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on
@@ -52,7 +52,7 @@ export type RunToDecide =
       said: string;
       command: string;
     }
-  | { kind: 'git'; branches: string[]; said: string; command: string };
+  | { kind: 'result'; branches: string[]; said: string; command: string };
 
 /** Decodes a `RunToDecide`, either kind. */
 export const RunToDecideSchema = Schema.Union([
@@ -66,7 +66,7 @@ export const RunToDecideSchema = Schema.Union([
     said: Schema.String,
     command: Schema.String,
   }),
-  Schema.Struct({ kind: Schema.Literal('git'), branches: StringsSchema, said: Schema.String, command: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('result'), branches: StringsSchema, said: Schema.String, command: Schema.String }),
 ]) satisfies Schema.Schema<RunToDecide>;
 
 /**

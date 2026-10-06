@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { collisionsDue, collisionsOf, othersInFlight, trialsOf } from './collide.ts';
-import type { GitRun, Run } from '../record/record.ts';
+import type { RepositoryRun, Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TrialMerge } from '../place/place.ts';
 
@@ -16,7 +16,7 @@ const STEPS: Workflow[] = [
 ];
 
 /** A git run `id` on /code/app's main, gated at its ship, with `more` over it. */
-const run = (id: string, more: Partial<GitRun> = {}): GitRun => ({
+const run = (id: string, more: Partial<RepositoryRun> = {}): RepositoryRun => ({
   id,
   workspace: '/code/app',
   brief: 'b',
@@ -35,7 +35,7 @@ const CLEAN: TrialMerge = { clean: true };
 const SHA = 'b'.repeat(40);
 
 /** `run` whose ship's landing was aborted, its check `t-check` having refused the merged tree on `refusedOn`. */
-const refused = (refusedOn: string | undefined, check = true): GitRun =>
+const refused = (refusedOn: string | undefined, check = true): RepositoryRun =>
   run('r-1', {
     steps: {
       implement: { taskId: 't-r-1', branch: 'wf/r-1/implement' },
@@ -49,7 +49,7 @@ const refused = (refusedOn: string | undefined, check = true): GitRun =>
 
 test('othersInFlight keeps each other run with worktrees on the same repository and base, a held one among them', () => {
   const ours = run('r-1');
-  const held = run('r-3', { hold: { until: ['r-9'] } } as Partial<GitRun>);
+  const held = run('r-3', { hold: { until: ['r-9'] } } as Partial<RepositoryRun>);
   assert.deepEqual(
     othersInFlight(ours, [ours, run('r-2'), held, run('r-4', { repo: '/code/app/' })]).map((r) => r.id),
     ['r-2', 'r-3', 'r-4'],
@@ -61,7 +61,7 @@ test('REFUSED: othersInFlight leaves out a run called off, pruned, on another ba
   const folder = { ...run('r-7'), place: { kind: 'folder' }, repo: undefined, branch: undefined } as unknown as Run;
   const others = [
     run('r-2', { cancelledAt: '2026-10-05T00:00:00.000Z' }),
-    run('r-3', { pruned: { at: '2026-10-05T00:00:00.000Z' } } as Partial<GitRun>),
+    run('r-3', { pruned: { at: '2026-10-05T00:00:00.000Z' } } as Partial<RepositoryRun>),
     run('r-4', { branch: 'release' }),
     run('r-5', { repo: '/code/other' }),
     run('r-6', { isolate: false }),
@@ -96,8 +96,8 @@ test('collisionsDue reads the ending waiting at its gate, or one whose landing a
   assert.equal(collisionsDue(STEPS, refused(SHA), undefined), 'ship');
 });
 
-test('REFUSED: collisionsDue for a branch left to git, an ending landed or untouched, a run called off or pruned', () => {
-  assert.equal(collisionsDue(STEPS, run('r-1'), { kind: 'git', branches: ['wf/r-1/implement'] }), undefined);
+test('REFUSED: collisionsDue for a result left to the person, an ending landed or untouched, a run called off or pruned', () => {
+  assert.equal(collisionsDue(STEPS, run('r-1'), { kind: 'result', branches: ['wf/r-1/implement'] }), undefined);
   assert.equal(collisionsDue(STEPS, run('r-1'), undefined), undefined);
   const landed = run('r-1', { steps: { ship: { taskId: 't-ship', landed: { commit: SHA } } } });
   assert.equal(collisionsDue(STEPS, landed, undefined), undefined);
@@ -156,7 +156,7 @@ test("collisionsOf says the semantic conflict: a clean merge onto the base whose
 });
 
 test('REFUSED: no semantic conflict on a base moved since, a refusal on no commit, a check not kept, or a base that conflicts', () => {
-  const asked = (r: GitRun, trial: TrialMerge, at: string | null = SHA) =>
+  const asked = (r: RepositoryRun, trial: TrialMerge, at: string | null = SHA) =>
     collisionsOf(r, 'ship', ['wf/r-1/implement'], [], { at: { main: at }, trials: [trial] }).semantic;
   assert.equal(asked(refused('c'.repeat(40)), CLEAN), null, 'the base moved since');
   assert.equal(asked(refused(undefined), CLEAN), null, 'no commit refused');

@@ -134,7 +134,7 @@ function runWith(note: string | null): RunDetail {
     brief: 'Go round again',
     decide: 'nemia decide r-1',
     repo: '/code/app',
-    place: 'git',
+    place: 'repository',
     work: null,
     workflowDir: '/code/app/workflow',
     workflowPage: null,
@@ -557,7 +557,7 @@ function summaryRun(): RunSummary {
   return {
     id: 'r-1',
     repo: '/code/app',
-    place: 'git',
+    place: 'repository',
     work: null,
     brief: 'Tile it',
     workflowDir: '/code/app/workflow',
@@ -3067,13 +3067,13 @@ test("the to-decide banner says what `wf ls` says after `→ to decide:`, and li
   assert.match(html, /<a href="#step-ship" data-approve="ship" class="underline underline-offset-2">/);
 
   const branch = {
-    kind: 'git' as const,
+    kind: 'result' as const,
     branches: ['wf/r-1/implement'],
     said: 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1',
     command: 'wf decide r-1',
   };
   const ahead = withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: branch } }));
-  assert.match(ahead, /data-to-decide="git"/);
+  assert.match(ahead, /data-to-decide="result"/);
   assert.deepEqual(textsOf(ahead), ['To decide:', branch.said], 'a branch nobody merged: the words, and the command in them');
   assert.doesNotMatch(ahead, /<a /, 'it names no step to link to');
 
@@ -6480,7 +6480,7 @@ test("the tick's pass on the Stats page: a column a bucket with its count, a bar
   assert.match(html, /title="&gt; 5000 ms: 1 pass"/, 'the open bucket names its end on hover');
   assert.deepEqual(
     [...html.matchAll(/data-part="([a-z]+)"/g)].map((m) => m[1]),
-    ['git', 'records'],
+    ['place', 'records'],
   );
   assert.match(html, /data-part="records"[^]*?1\.00 ms <span[^>]*>&lt; 1%</);
   assert.deepEqual(

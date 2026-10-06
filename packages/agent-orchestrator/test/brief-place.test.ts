@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
-import { composeBrief, type GitRun, type Run } from '../src/run.ts';
+import { composeBrief, type RepositoryRun, type Run } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { BriefPlace } from '../src/brief/brief.ts';
@@ -31,7 +31,7 @@ const stepNamed = (name: string): Workflow => {
 };
 
 /** A repository run of the tests' team, implement and review filed on one branch, with `steps` over its records. */
-const runOf = (steps: Partial<GitRun['steps']> = {}): GitRun => ({
+const runOf = (steps: Partial<RepositoryRun['steps']> = {}): RepositoryRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt/implement',

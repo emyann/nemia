@@ -12,7 +12,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   id,
   repo: '/code/app',
   factory: null,
-  place: 'git',
+  place: 'repository',
   work: null,
   brief: `# ${id}'s brief\n\nMore.`,
   workflowDir: '/code/app/workflows/dev',
@@ -104,7 +104,7 @@ test('REFUSED: a finished run whose branch nobody merged is the floor’s to dec
   const unmerged = run('done', {
     status: 'succeeded',
     moving: false,
-    toDecide: { kind: 'git', branches: ['wf/done/ship'], said: 'merge or drop wf/done/ship', command: 'git merge wf/done/ship' },
+    toDecide: { kind: 'result', branches: ['wf/done/ship'], said: 'merge or drop wf/done/ship', command: 'git merge wf/done/ship' },
   });
   assert.equal(bellRuns([unmerged]).length, 0);
 });

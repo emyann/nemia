@@ -8,7 +8,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { RunSlot } from '../cap/cap.ts';
 import { runSlots } from '../cap/cap.verb.ts';
-import { isGitRun, runTasks, unjudgedWords, unloadedWords, type Run, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, runTasks, unjudgedWords, unloadedWords, type Run, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { holdsOf, waitsOf, type ParentRun } from '../wait/wait.ts';
 import { listing, type Listing, type RunsListed, type Unjudged } from './list.ts';
@@ -204,7 +204,7 @@ const heldOf = ({ run, read, staged: merging }: Read): Pick<Paused, 'staged' | '
   const checks = 'assessed' in read ? (read.assessed.paused?.checks ?? []) : [];
   const landings = stepsOrNone(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
   const staged: PauseStaged[] =
-    landings.length && isGitRun(run) && merging() ? landings.map((s) => ({ run: run.id, step: s.name, repo: run.repo })) : [];
+    landings.length && isRepositoryRun(run) && merging() ? landings.map((s) => ({ run: run.id, step: s.name, repo: run.repo })) : [];
   const held: PauseHeld[] = checks.filter((step) => !staged.some((s) => s.step === step)).map((step) => ({ run: run.id, step }));
   return { staged, held };
 };

@@ -51,8 +51,8 @@ own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked 
 Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-out.md`, *Freezing* and open question 6): a team's own
 skill as a run's place, copied per run to `WF_ROOT/places/<skill>@<version>/`, a copy whose `skillVersion` drifted refusing the run's
 passes, `nemia prune` removing a copy no record names, and `nemia refreeze`. Card C2 records `placeSkill` and runs the package's own place,
-which ships as a release that never changes under a run; the card is filed once G and H have landed, so the first copy carries every verb
-and `say` key, and `placeSkill.version` becomes the copy's name then.
+which ships as a release that never changes under a run; the card is filed once G has landed (H has, below), so the first copy carries
+every verb and `say` key, and `placeSkill.version` becomes the copy's name then.
 
 Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer, and the hkb migration; and
 thin runtime stage 6 parts 3 (the gRPC binding) and 4 (streaming and subscribe). Each *Shipped* section names what it left, and those
@@ -5712,3 +5712,22 @@ Tested in `src/telemetry/telemetry.test.ts` (a scratch collector posted `pass.du
 a collector that does not answer costs no program), `src/meter/step.test.ts` (the facts, the five attributes, a run's id refused),
 `src/rest/rest.test.ts` and `src/rest/resting.test.ts` (each settle named by one read alone) and `test/step-metrics.test.ts` (a step
 settled with a cost recorded once over four passes of the real runtime, with no run's id).
+
+## Shipped: what a result changed, read from the place (git-out card H, 2026-10-06)
+
+Nothing in `src` asks git what a result branch changed: `nemia decide`, the api's decision and a declared file's branch ask the run's
+place, live, when a decision is read (`docs/design-2026-09-29-git-out.md`, open question 2):
+
+- **`report`** (`place/git/scripts/report.ts`) answers `Changes`: the base and each tip, each branch's files with their status and counts,
+  the diffs asked for and whether each path asked is on each branch, keyed by branch, and texts at the base. `changesOf` and `presentOn`
+  (`src/branches/changes.store.ts`) read it; `radius` is pure over its files, with the workspaces out of `atBase['package.json']`.
+- **Nothing is kept.** No snapshot, no `runs/<id>/place/report.json`: a run in flight meets nothing stored that changed, and its next
+  decision reads `report`. The trial merges stay on `trial`, and `nemia merge` takes the base's commit from the trial's `at`.
+- **Not known is said.** A report refused or not heard is "what this run changed is not known: <said>" on `nemia decide`, the api and the
+  board, never a branch that changed nothing; a declared file whose branch could not be read is "not known", never "not there".
+- **Counts in our words**: "3 files: +14 −1", and ", 1 binary" where there is one (`countsLine`); `diffStat`'s git sentence is gone, as
+  are `artifacts`, `readArtifact`, `touchedBy`, `workspacesOf` and `sensitiveDiff`. `.oxlintrc.json` is check-affecting.
+
+A decision read costs two node processes and a `git diff` per check-affecting path: 150 to 450 ms on this repository's branches, where
+the git calls it replaced took 20 to 120, the radii equal. Tested in `test/report.test.ts`, `test/radius.test.ts`, `test/decide.test.ts`
+and `test/store.test.ts` (a report not heard), `test/ship.test.ts` (a trial that read no base) and the api's `decide/decision.test.ts`.

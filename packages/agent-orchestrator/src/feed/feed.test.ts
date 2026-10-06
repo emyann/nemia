@@ -1111,6 +1111,51 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
   assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' }, 'and one that broke says failed');
 });
 
+test("the feed's word for a step waiting on a person is the word `nemia ls` prints, with what its harness waits for", () => {
+  const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
+  const run = {
+    id: 'r-1',
+    brief: 'b',
+    createdAt: '2026-09-22T10:00:00.000Z',
+    steps: { plan: { taskId: 't1' } },
+    repo: '/r',
+    branch: 'wf/r-1',
+    base: 'main',
+  } as unknown as Run;
+  const blockedWith = (waitingOf: (id: string) => string | undefined) =>
+    listing({
+      steps,
+      run,
+      phaseOf: (id) => (id === 't1' ? 'needs-human' : 'unknown'),
+      closeoutOf: () => undefined,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      waitingOf,
+    });
+  const waiting = blockedWith((id) => (id === 't1' ? 'permission prompt' : undefined));
+  assert.deepEqual(
+    [waiting.steps[0].status, waiting.steps[0].waits],
+    ['needs-human', 'waiting for a permission prompt'],
+    "the listing's status keeps the bare word, and the wait beside it",
+  );
+  assert.equal(
+    feedWords(waiting, run, { status: 'running' }).steps[0].word,
+    'needs-human: waiting for a permission prompt',
+    'the feed gives the word as `nemia ls` prints it, the wait included',
+  );
+  assert.equal(
+    feedWords(
+      blockedWith(() => undefined),
+      run,
+      { status: 'running' },
+    ).steps[0].word,
+    'needs-human',
+    'a step whose harness says nothing of its wait is the bare word',
+  );
+});
+
 test("a step's denied calls are its note's denied: part, each distinct ended call counted, a running one named, in the order first denied, the rest past five counted", () => {
   assert.equal(deniedNote([]), '', 'a step denied nothing says nothing of it');
   assert.equal(deniedNote(['Bash(git push)', 'WebFetch', 'Bash(git push)']), 'denied: Bash(git push) ×2, WebFetch ×1');

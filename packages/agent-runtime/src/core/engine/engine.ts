@@ -411,6 +411,12 @@ const settleOn = Effect.fn('settleOn')(function* (
 /** What a release the harness refused answers, in `releaseFinished`: told apart from every answer a release gives. */
 const REFUSED = Symbol('refused');
 
+/** A runner that can let a finished session go (`RunnerOps.release`). */
+type Releasing = RunnerOps & Required<Pick<RunnerOps, 'release'>>;
+
+/** Whether `runner` can let a finished session go: one without `release` keeps every session it lists. */
+const releases = (runner: RunnerOps): runner is Releasing => runner.release !== undefined;
+
 /**
  * Let the harness go of the sessions a task has finished with: every attempt whose end is on the
  * record and whose session the harness still lists. I/O applied to what the journal already says,
@@ -448,9 +454,9 @@ const releaseFinished = Effect.fnUntraced(function* (
   observed: ReadonlyMap<string, Sighting>,
   unread: ReadonlySet<string>,
 ) {
-  const { release } = yield* Runner;
+  const runner = yield* Runner;
   let listed = false;
-  if (!release) return { wrote: false, listed };
+  if (!releases(runner)) return { wrote: false, listed };
   const finished: Array<{ attempt: Releasable['attempts'][number]; session: Sighting }> = [];
   for (const attempt of state.attempts) {
     if (attempt.ended === null && (state.settled === null || attempt.nativeId === null)) continue;
@@ -460,26 +466,26 @@ const releaseFinished = Effect.fnUntraced(function* (
     else if (unread.has(name)) listed = true;
   }
   if (!finished.length) return { wrote: false, listed };
-  const released = yield* letGo(state, finished, release);
+  const released = yield* letGo(state, finished, runner);
   return { wrote: released.wrote, listed: listed || released.listed };
 });
 
 /**
- * Each of a task's finished sessions the harness still lists, `finished` in attempt order, let go by `release`, and what each
+ * Each of a task's finished sessions the harness still lists, `finished` in attempt order, let go by `runner`, and what each
  * consumed written down where it says more than the record (`releaseFinished`): traced, annotated with the task, since it asks
  * the harness. Says whether it wrote a `measured`, and whether a session can still move: its release refused, or listed at work.
  */
 const letGo = Effect.fn('releaseFinished')(function* (
   state: Releasable,
   finished: ReadonlyArray<{ attempt: Releasable['attempts'][number]; session: Sighting }>,
-  release: NonNullable<RunnerOps['release']>,
+  runner: Releasing,
 ) {
   yield* Effect.annotateCurrentSpan({ task: state.taskId });
   const journal = yield* Journal;
   let wrote = false;
   let listed = false;
   for (const { attempt, session } of finished) {
-    const released = yield* release(session, state.config ?? {}).pipe(Effect.catchTag('RunnerError', () => Effect.succeed(REFUSED)));
+    const released = yield* runner.release(session, state.config ?? {}).pipe(Effect.catchTag('RunnerError', () => Effect.succeed(REFUSED)));
     if (released === REFUSED || atWorkState(session.state)) listed = true;
     const measured = typeof released === 'object' ? released : session.usage;
     if (

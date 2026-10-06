@@ -95,6 +95,10 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A Codex `exec --json` line of a type the runtime reads is decoded by `CodexEventSchema` (`harness/codex/stream.ts`)**: one that
   does not decode leaves that session alone unread while its process runs and failed once it has ended (`lookOf`, `detached.ts`),
   never gone. A field the runtime starts reading is added to the schema; any other line passes undecoded.
+- **A Codex rollout record of a kind the runtime reads is decoded by `ROLLOUT` (`harness/codex/rollout.ts`)**: an `event_msg`
+  `task_complete` or `item_completed`. One that does not decode refuses the `transcript` verb, naming the line by its byte offset
+  and the rollout, never read as saying nothing. A field the runtime starts reading is added to the schema; any other record
+  passes undecoded.
 - **A `claude -p` line of a kind the runtime reads is decoded by `PRINTED` (`harness/claude/print.ts`)**: a `result`, a `system`
   `permission_denied` or `init`, an `assistant` line's `tool_use` blocks. One that does not decode refuses the output: that session alone
   is unread while its process runs and failed once it has ended (`lookOf`), never read with no answer. A field the runtime starts

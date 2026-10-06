@@ -820,13 +820,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/harness/codex/transcript.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 23 }],
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 164, "skipBlankLines": true, "skipComments": true }]

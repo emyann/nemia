@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-refusal-store-');
-const { Conflict, Invalid, Missing, AgentWriteError, SkillWriteError, isRefusal, maxRuns, unhold } = await import('../src/runner.ts');
+const { Conflict, Invalid, Missing, isRefusal, maxRuns, unhold } = await import('../src/runner.ts');
 const { WorkflowError } = await import('../src/workflow.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -50,19 +50,23 @@ test('isRefusal takes each kind, and a subclass of one; REFUSED: a plain Error c
   assert.equal(isRefusal(undefined), false);
 });
 
-test("a workflow's refusal, and an agent's and a skill's written, are Invalid, with the words given and exit code 2", () => {
-  for (const err of [
-    new WorkflowError('a step is wrong'),
-    new AgentWriteError('a step is wrong', 'stale'),
-    new SkillWriteError('a step is wrong'),
-  ]) {
-    assert.ok(err instanceof WorkflowError);
-    assert.ok(err instanceof Invalid);
-    assert.equal(err._tag, 'Invalid');
-    assert.equal(err.message, 'a step is wrong');
-    assert.equal(err.exitCode, 2);
-  }
-  assert.equal(new AgentWriteError('a step is wrong', 'stale').why, 'stale');
+test("a workflow's refusal is Invalid, with the words given and exit code 2", () => {
+  const err = new WorkflowError('a step is wrong');
+  assert.ok(err instanceof Invalid);
+  assert.equal(err._tag, 'Invalid');
+  assert.equal(err.message, 'a step is wrong');
+  assert.equal(err.exitCode, 2);
+});
+
+test('a Conflict carries the steps that hold what is asked of, when that is why, and none otherwise', () => {
+  const held = new Conflict({ message: 'agents/reviewer.md is named by a step beside it', users: ['dev/review'] });
+  assert.ok(isRefusal(held));
+  assert.equal(held._tag, 'Conflict');
+  assert.equal(held.exitCode, 2);
+  assert.deepEqual(held.users, ['dev/review']);
+  const bare = new Conflict({ message: 'the step is still running.' });
+  assert.equal(bare.users, undefined);
+  assert.equal(Object.hasOwn(bare, 'users'), false, 'no key for none, so its answer is `{ error }` alone');
 });
 
 test('REFUSED: a verb throws the kind of what it refuses, with its words', () => {

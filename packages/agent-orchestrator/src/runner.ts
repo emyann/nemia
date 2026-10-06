@@ -299,17 +299,8 @@ export {
 } from './branches/branches.store.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/rest.ts';
-export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';
-export {
-  copySkill,
-  givenSkills,
-  skillDirIn,
-  skillFolders,
-  skillRead,
-  skillText,
-  SkillWriteError,
-  writeSkill,
-} from './skills/skills.store.ts';
+export { removeAgent, writeAgent } from './agents/agents.store.ts';
+export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { readPlaceJson, runPlaceVerb } from './place/place.store.ts';
 export { briefNow } from './tick/told.verb.ts';
 export type {

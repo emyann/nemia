@@ -83,7 +83,8 @@ const DAEMON_WORDS: Record<Daemon['kind'], string> = {
 /**
  * The daemon's dot from what the api judged (`GET /api/daemon`, the api's own standing as the store's daemon), or from the read's `error`:
  * down then, and `unread`, never a daemon that ticks. Its title is the floor's whole sentence when nothing ticks (`daemonWords`), the api's
- * own line while one does, and why the read failed when it did.
+ * own line while one does, and why the read failed when it did. A daemon that ticks while its last pass could not read a harness
+ * (`unobserved`) warns, `ticking, harness unread`, its title the line and then each reason on a line of its own.
  */
 export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: Date): DaemonDot {
   if (error) {
@@ -91,6 +92,9 @@ export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: 
   }
   if (!daemon) return { kind: 'reading', tone: 'reading', word: 'reading', title: 'Reading whether a daemon ticks this store.' };
   const words = daemonWords(daemon, now);
+  if (daemon.ticking && daemon.unobserved.length > 0) {
+    return { kind: daemon.kind, tone: 'warn', word: 'ticking, harness unread', title: [daemon.line, ...daemon.unobserved].join('\n') };
+  }
   return {
     kind: daemon.kind,
     tone: TONES[daemon.kind],

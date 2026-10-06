@@ -150,6 +150,19 @@ test('the daemon’s dot: a ticking daemon’s title is the api’s own line', (
   assert.equal(daemonDot(daemon(), null, NOW).title, daemon().line);
 });
 
+test('the daemon’s dot: a ticking daemon whose last pass could not read a harness warns, each reason on its own line of the title', () => {
+  const unobserved = ['harness `claude`: claude agents: timed out', 'harness `codex`: its transcripts folder cannot be listed'];
+  assert.deepEqual(daemonDot(daemon({ unobserved }), null, NOW), {
+    kind: 'ticking',
+    tone: 'warn',
+    word: 'ticking, harness unread',
+    title: [daemon().line, ...unobserved].join(String.fromCharCode(10)),
+  });
+  const stalled = daemonDot(daemon({ kind: 'stalled', ticking: false, unobserved }), null, NOW);
+  assert.equal(stalled.word, 'stalled', 'REFUSED: a daemon that does not tick says why it does not, not what its pass read');
+  assert.doesNotMatch(stalled.title, /harness/);
+});
+
 test('the feed’s word: live while followed, polling while not', () => {
   assert.equal(feedWords('open').word, 'live');
   assert.equal(feedWords('connecting').word, 'connecting');

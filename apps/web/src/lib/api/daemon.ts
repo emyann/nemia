@@ -9,6 +9,7 @@ import { get } from './read.ts';
  * alone moves the runs; `none`, `unreadable`, `stopped`, `gone` and `stalled` (alive, silent past `staleAfterMs`) do not. `by` is the
  * holder's kind as the api names it, `url` where an api holder serves the board, and `start` how a person starts one. Times are ISO, null
  * where the file says none; `lastHeardAt` is the latest of its start, its last pass and its beat. `line` is the CLI `ls`'s own sentence.
+ * `unobserved` is why the ticking daemon's last pass could not read a harness, one sentence each, empty when it read them all.
  */
 export type Daemon = {
   kind: 'none' | 'unreadable' | 'stopped' | 'gone' | 'stalled' | 'ticking';
@@ -26,6 +27,7 @@ export type Daemon = {
   staleAfterMs: number | null;
   identity: 'same' | 'other' | 'unknown' | 'gone' | null;
   line: string;
+  unobserved: readonly string[];
 };
 
 /** Decodes a `Daemon`. */
@@ -45,6 +47,7 @@ const DaemonSchema = Schema.Struct({
   staleAfterMs: Schema.NullOr(Schema.Number),
   identity: Schema.NullOr(Schema.Literals(['same', 'other', 'unknown', 'gone'])),
   line: Schema.String,
+  unobserved: Schema.Array(Schema.String),
 }) satisfies Schema.Schema<Daemon>;
 
 /**

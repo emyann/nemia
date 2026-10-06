@@ -1,10 +1,10 @@
 /**
- * `inventory`: what a run left in a repository, read and touched not at all. Takes `{ repo, under, prefix, base }`; answers
- * `{ workspaces, branches }`: each worktree git lists inside `under` — never `under` itself — with its HEAD, its branch or that it is
- * detached, its lock and whether git could prune it; whether it is clean and the paths it holds uncommitted, `clean` null where it is locked,
- * prunable or its status does not read; and whether its HEAD's commit is on a branch. Then each branch under `refs/heads/<prefix>`, and
- * whether it is merged into `base` — false where `base` names nothing. A `repo` that is no directory left nothing there: it answers empty.
- * A repository git cannot list exits 1, which is no answer, never an empty one.
+ * `inventory`: what a run left in a repository, read and touched not at all. Takes `{ repo, under, prefix, base }`; answers `{ workspaces,
+ * branches }`: each worktree git lists inside `under` — never `under` itself — with its HEAD, its branch or that it is detached, its lock
+ * and whether git could prune it; whether it is clean and the paths it holds uncommitted, `clean` null where it is locked, prunable or its
+ * status does not read; and whether its HEAD's commit is on a branch. Then each branch under `refs/heads/<prefix>`, and whether it is
+ * merged into `base` — false where `base` names nothing. A `repo` that is no directory left nothing there: it answers empty. A repository
+ * git cannot list exits 1, which is no answer, never an empty one.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

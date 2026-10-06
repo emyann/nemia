@@ -585,8 +585,9 @@ export type Forgot = {
   /**
    * What is still there: locked (with git's reason); on no branch (`detached`, at its HEAD's commit); holding what `step` left uncommitted,
    * which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); left as it was because the place's
-   * `verb` did not answer (`unread`, with its refusal or why it was not heard); a directory git does not know as a worktree — or, for a run with no record, its worktrees' directory,
-   * which nothing says whose worktrees are in. `fix` is the place's command for it, from its `say`.
+   * `verb` did not answer (`unread`, with its refusal or why it was not heard); a directory git does not know as a worktree — or, for a run
+   * with no record, its worktrees' directory, which nothing says whose worktrees are in. `fix` is the place's command for it, from its
+   * `say`.
    */
   left: Array<{
     path: string;

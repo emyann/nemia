@@ -1,9 +1,9 @@
 /**
  * Forgetting a run that is over (`forgetRun`, `nemia rm`): it reads a run as `cancelRun` does, adopting what a pass filed and never wrote
- * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through the run's place (`runPlaceVerb`). A controller, reaching the runtime
- * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with `runWith`.
- * It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs nothing and is settled as it signed: no
- * pass reads the run again to close it.
+ * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through the run's place (`runPlaceVerb`). A
+ * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
+ * (`EngineService`), run with `runWith`. It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs
+ * nothing and is settled as it signed: no pass reads the run again to close it.
  */
 import fs from 'node:fs';
 import path from 'node:path';

@@ -60,12 +60,12 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
  *
  * Without `yes`, nothing is touched: each worktree and what removing it frees on disk (`diskBytes`: a worktree's `node_modules` is main's
  * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it,
- * the run is marked pruned first (`runStore.runs.prune`), its files counted as gone when they are to go, so that a pass or the api
- * reading it while its worktrees go reads it pruned and files nothing (`advance`); then the place's `remove` takes the worktrees — never
- * forced, so a file that turned up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under
+ * the run is marked pruned first (`runStore.runs.prune`), its files counted as gone when they are to go, so that a pass or the api reading
+ * it while its worktrees go reads it pruned and files nothing (`advance`); then the place's `remove` takes the worktrees — never forced, so
+ * a file that turned up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under
  * `artifacts`, removed and never followed, what would not go said and counted out of what was freed; and the marker is written again with
- * what was removed. The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a
- * run never pruned before, as it was on one that was. The tick never calls this.
+ * what was removed. The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a run
+ * never pruned before, as it was on one that was. The tick never calls this.
  */
 export const prune = (...args: Parameters<typeof pruning>) => pruning(...args).pipe(Effect.map((p): Pruning => p));
 

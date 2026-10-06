@@ -121,7 +121,9 @@ export function pruneRefusal(
   return said.length ? `${said.join('; ')}.` : null;
 }
 
-/** Why `nemia prune` waits on a run that finished and nobody has decided: its branch, or the repository it worked in, is what is read. Pure. */
+/**
+ * Why `nemia prune` waits on a run that finished and nobody has decided: its branch, or the repository it worked in, is what is read. Pure.
+ */
 function unmergedRefusal(run: GitRun, artifacts: boolean): string {
   const again = pruneAgain(run.id, { unmerged: true, artifacts });
   return run.isolate
@@ -129,7 +131,9 @@ function unmergedRefusal(run: GitRun, artifacts: boolean): string {
     : `it finished on ${run.branch} itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: ${again}`;
 }
 
-/** Why `nemia prune` keeps one worktree — locked, on no branch, or holding changes — with the place's command for it, or undefined. Pure. */
+/**
+ * Why `nemia prune` keeps one worktree — locked, on no branch, or holding changes — with the place's command for it, or undefined. Pure.
+ */
 function worktreeRefusal(w: PruneFacts['worktrees'][number], again: string): string | undefined {
   if (w.locked !== undefined) {
     return `${w.path} is locked${w.locked ? ` (${w.locked})` : ''}, and git will not remove it — unlock it if nothing needs it${w.fix ? `: ${w.fix}` : ''}`;

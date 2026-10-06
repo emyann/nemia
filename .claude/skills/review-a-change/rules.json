@@ -21,6 +21,15 @@
         "Bash(cd:*)",
         "Bash(for:*)"
       ]
+    },
+    {
+      "id": "read-within-reach",
+      "says": "Read, Grep and Glob reach the workspace and the folders the brief says you may read; never another run's folder, the store, ~/.claude, ~/.cache or a system path",
+      "breaks": [
+        "Glob",
+        "Grep",
+        "Read"
+      ]
     }
   ]
 }

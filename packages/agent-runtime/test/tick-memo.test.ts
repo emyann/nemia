@@ -99,15 +99,15 @@ test("a task filed again under a settled task's id is folded again on the next p
   );
 });
 
-test('a fresh engine on the same store folds every task on its first pass, and reads the whole feed once to learn where it ends', async () => {
+test('a fresh engine on the same store folds every task on its first pass, and reads none of the feed: its memo has nothing to forget', async () => {
   const { root } = await settledStore();
   const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
   const before = Effect.runSync(engine.io());
   await Effect.runPromise(engine.tick());
   const first = Effect.runSync(engine.io()).bytesRead - before.bytesRead;
   const journals = journalsOf(root);
-  const feed = sizeOf(path.join(root, 'feed.jsonl'));
-  assert.equal(first, feed + journals, `read ${first}: the feed's ${feed} bytes, and each journal once (${journals} bytes)`);
+  assert.ok(sizeOf(path.join(root, 'feed.jsonl')) > 0, 'the feed names every filing and settling');
+  assert.equal(first, journals, `read ${first}: each journal once (${journals} bytes), and no byte of the feed`);
   const second = Effect.runSync(engine.io());
   await Effect.runPromise(engine.tick());
   assert.equal(

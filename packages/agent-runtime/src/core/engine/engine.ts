@@ -561,9 +561,16 @@ const expectedOf = (
 /**
  * Read the feed on from the memo's cursor, and forget every task it names: each is folded again on this pass. An entry no runtime
  * wrote is past the cursor all the same, and the task it names, when it names one, is forgotten too; returns why each was skipped.
+ * A memo with no cursor yet keeps nothing to forget: its cursor is set to where the feed ends, and none of the feed is read or said.
  */
 const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
-  const { entries, cursor, refused = [] } = yield* (yield* Journal).feed(memo.cursor ?? 0);
+  const journal = yield* Journal;
+  if (memo.cursor === undefined) {
+    const { cursor } = yield* journal.feed(Number.MAX_SAFE_INTEGER);
+    memo.cursor = cursor >= Number.MAX_SAFE_INTEGER ? 0 : cursor;
+    return [];
+  }
+  const { entries, cursor, refused = [] } = yield* journal.feed(memo.cursor);
   for (const taskId of [...entries.map((e) => e.taskId), ...refused.flatMap((r) => r.taskId ?? [])]) {
     memo.settled.delete(taskId);
     memo.listed.delete(taskId);

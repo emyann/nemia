@@ -340,7 +340,7 @@ export const advancePass = Effect.fn('advancePass')(
     const feed = wordFeed(run, reads, assessed, admission, checkout);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
-    const heads = headsOf(run, pass);
+    const heads = headsOf(run, handed.marked ? undefined : pass);
     const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
@@ -596,7 +596,7 @@ function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[
 
 /**
  * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`headsFor`), undefined where it
- * did not, or asked of git where no pass read them (`advanceRun`).
+ * did not, or asked of git where no pass read them (`advanceRun`) or the run committed a hand-off since (`handOffAll`).
  */
 const headsOf = (run: Run, pass: PassRead | undefined): Heads => {
   let read: { heads: Readonly<Record<string, string>> | undefined } | undefined;

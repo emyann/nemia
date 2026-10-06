@@ -2780,6 +2780,24 @@ test("an agent's question is drawn as its markdown after `asks:`, in the banner 
   assert.doesNotMatch(blocked, /data-markdown/, "the harness's words and the session's last line are said as they are");
 });
 
+test("a result nobody decided is asked in the inspector, with the way to the run's Decide section; a run called off asks nothing", async () => {
+  const { Asked } = await import('../src/components/GateBrief.tsx');
+  const toDecide = {
+    kind: 'result' as const,
+    branches: ['wf/r-1/ship'],
+    said: 'merge or drop wf/r-1/ship',
+    command: 'git merge wf/r-1/ship',
+  };
+  const run = { ...needing('succeeded', {}, { waitingOnYou: [] }), toDecide };
+  const asked = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
+  assert.match(asked, /data-asked="result"/);
+  assert.ok(textContentOf(asked).includes("The run's result waits on you: merge or drop wf/r-1/ship."), asked);
+  assert.match(asked, /<a data-answer-link="true"[^>]*href="\/runs\/r-1#decide"/);
+
+  const called = { ...needing('succeeded', {}, { waitingOnYou: [], cancelledAt: at }), toDecide };
+  assert.equal(await routedWith(createElement(Asked, { run: called, step: called.steps[0] })), '');
+});
+
 test('a short string in a closeout is drawn as markdown; a number as it is', async () => {
   const { FieldView } = await import('../src/components/Outcome.tsx');
   const field = (value: unknown): string =>

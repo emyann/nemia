@@ -153,15 +153,15 @@ test("written where the board lists workflows from — the store's workflows/ an
   const repo = scratch('wf-write-repo-');
   addFactory({ name: 'write-known', repos: [repo] });
   assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'a repository a factory names is known with no .git read');
-  fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
+  fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
   fs.writeFileSync(
-    path.join(repo, 'workflows', 'agents', 'only-here.md'),
+    path.join(repo, '.claude', 'agents', 'only-here.md'),
     '---\nrole: Engineer\ndescription: Only in the repository.\n---\nYou are.\n',
   );
   assert.deepEqual(
     writeWorkflow(path.join(repo, 'workflows', 'dev'), [step('implement', { agent: 'only-here' })]).written,
     ['implement.md'],
-    "a factory's repository's, its agents found beside it",
+    "a factory's repository's, its agents found in its .claude/",
   );
   const named = scratch('wf-write-named-');
   assert.deepEqual(

@@ -5674,6 +5674,22 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
   );
 });
 
+test("REFUSED at shipped defaults: `nemia rm --delete-branches` never deletes a branch its hand-off just committed onto — the inventory read it merged, at its base, before the step's work was committed there — and says it kept it, not merged", async () => {
+  const repo = aRepo();
+  const b = board();
+  const p = await aParent(repo, b, { signed: true });
+  fs.writeFileSync(path.join(p.wt, 'left.txt'), 'left uncommitted\n');
+  const forgot = await runWith(b.e, forgetRun(p.run.id, { deleteBranches: true }));
+  assert.equal(forgot.kind, 'forgotten');
+  assert.deepEqual(
+    forgot.handedOff.map((h) => h.branch),
+    [p.branch],
+  );
+  assert.ok(hasBranch(repo, p.branch), 'the branch with the work the hand-off committed is kept');
+  assert.equal(gitIn(repo, 'show', '--name-only', '--format=', p.branch), 'left.txt');
+  assert.match(forgetLineOf(forgot), new RegExp(`kept ${escaped(p.branch)}: not merged into ${escaped(p.run.branch)}`));
+});
+
 test("`nemia rm --delete-branches` deletes a branch merged into its run's base and keeps one that is not, saying why; `--force-unmerged` beside it deletes that one too; the base branch a `--no-worktree` run worked on is never touched — and the CLI refuses `--force-unmerged` alone, a flag it does not take, and an id that is not a name, before anything is read", async (t) => {
   const repo = aRepo();
   const b = board();

@@ -169,7 +169,7 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`**;
   a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
-  `env` says; neither's Bash tool sees an `OTEL_*` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
+  `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
 - **Every child the runtime starts is spawned `withoutTelemetry`** (`harness/telemetry.ts`): a session exports only what its runner hands
   it, never as the engine's process; `test/telemetry.test.ts` sets the engine's own and reads what a stub `claude` and a command see.
 - **A Bash deny reaches each part of `&&`, `||`, `;`, `|`, `&`, a `$(…)`, and a part behind `timeout`, `nohup` or `VAR=`** (2.1.288),

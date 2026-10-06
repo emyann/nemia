@@ -2187,8 +2187,40 @@ Tested in `src/service/service.test.ts` (the unit and the plist against golden t
 refusal, WSL, the status lines, the landings waited for) and `src/service/service.verb.test.ts` (over a fake machine: install free,
 refused, beside a hand daemon and as its holder; a take-over's order with a landing, a person's pause standing, an interruption, a
 service that never ticks, a daemon that does not stop; uninstall, status and the fence). No test starts a service. Still to come:
-starting the daemon on demand when none holds the lease (no command does today: the only detached start is the git place's), and the
-service pointed at an installed release (slice 9).
+starting the daemon on demand when none holds the lease (no command does today: the only detached start is the git place's). The service
+pointed at an installed release is slice 9's, below.
+
+## Shipped: releases — `nemia upgrade` and `nemia version` (Nemia platform slice 9)
+
+A landing changed main, and the daemon ran the checkout, so the running system moved under it with every `git pull`, and nothing said
+which code served the board. What was built, in `src/release/`:
+
+- **`nemia upgrade <tag> [--repo <path>] [--name <name>]`** exports the tag through the git place's `export` (an empty `git init` holds
+  the tree, since the suite reads git), runs `npm ci`, `npm run build` and `npm run release:check` in it on a trial store under the build
+  folder (`WF_ROOT` and `AE_ROOT` there, `HKB_REPO` removed), seals the export's repository away (`seal`), writes `release.json` last and
+  renames the tree into `$WF_ROOT/releases/<tag>`, then switches `releases/current`, a relative link, by a rename. The repository is
+  `--repo`, else the running install's source, else the checkout.
+- **Restarted where the service runs the pointer**: the service holds the lease on a unit whose entry is under `releases/current`, and
+  the take-over restarts it paused (`restartPlan`, `takeOver`). A daemon started by hand is named and left running, with the line that
+  moves it; a service on the checkout gets the `service install` line that rewrites it; with no daemon, only the pointer moves.
+- **Refused, changing nothing**: a tag that climbs out of `releases/`, hides, holds a space or is `current` (`Invalid`); a tag the
+  repository lacks (`Missing`); a built tag that now names another commit (`Conflict`); no `release:check` script, or a command that
+  fails (`Invalid`, naming its log, which is kept). A tag built at the same commit is switched to without a rebuild, so a rollback is
+  an older tag. Class `prompts`, the CLI's alone.
+- **`nemia version [--json]`** says this `nemia`'s release (an install's tag and commit, or the checkout), the store's pointer and the
+  daemon's (`release` on its lease). Class `read`, the CLI's alone. `/api/version` adds the api's `release`, and the board's footer says
+  `v1.0.0 · <tag>` or `v1.0.0 · checkout`, the folder in its title.
+- **A checkout on an installed store is refused** (`trialRefusal`, exit 2), in the CLI's `main` and the api's, but for `version` and a
+  help, unless `NEMIA_ON_INSTALLED=1`: develop on a trial store (`WF_ROOT=<a scratch folder>`). An install's service and daemon entry are
+  named under `releases/current` (`pointedEntry`), so a restart after a switch runs the new release; an install's api reads its
+  `source` as the repository unless `HKB_REPO` names one.
+
+Measured on this repository: the export takes about 1 s and 20 MB, `npm ci` 7 s and 848 MB, the build 7 s, the typecheck 9 s and the
+suite about 2 min; a release is about 850 MB. With no `.git` the suite fails 21 tests, hence the empty `git init`. Tested in
+`src/release/release.test.ts`, `release.store.test.ts`, `upgrade.verb.test.ts` (over scratch repositories with a fixture package and a
+fake machine), `test/cli-trial.test.ts`, `src/daemon/daemon.store.test.ts` (the lease's `release`), `apps/api/test/main.test.ts` and
+`apps/web/test/footer.test.ts`. Still to come: a git-free export, a walk of the tag's tree for the six helpers that read `.git`, so a
+release holds no repository at all.
 
 ## Shipped: the daemon's log and traces (Nemia platform slice 5, part 1 of 3)
 

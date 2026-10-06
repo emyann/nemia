@@ -42,11 +42,13 @@ to the person as a gate.
 
 ## After a landing
 
-A landing that changed code under `packages/agent-runtime/src`, `packages/agent-orchestrator/src` or `apps/api/src` needs the daemon
-restarted before it runs; a doc, a skill, a test or the web alone does not. Recommend it to the person, paused: `nemia pause --why "…"`,
-the restart once no landing's check runs — a check the pause holds is listed `waiting on the pause`, and waits for `nemia resume`, not
-for the restart — then `nemia resume`. Several landings queued together share one restart, after the last. The restart is the
-person's: you run under the daemon.
+A landing changes `main`, not the running system: the daemon, the login service and the installed `nemia` run the release
+`releases/current` names in the store, built from a tag. Nothing upgrades on its own. When the person chooses, they tag a commit of `main`
+and run `nemia upgrade <tag>`: it builds the tag from a clean export, runs its `release:check`, switches the pointer, and restarts the
+service onto it, paused, once no landing's check runs; a build or check that fails changes nothing and names its log. `nemia upgrade`
+asks the person unless their confirmed list grants it. `nemia upgrade <older tag>` rolls back without a rebuild, and `nemia version`
+says which release this `nemia`, the pointer and the daemon run. A daemon started by hand is left running, with the line that moves it.
+A checkout's `nemia` and api are refused a store with an install: Nemia in development runs on a trial store (`WF_ROOT=<a scratch folder>`).
 
 ## Spend
 

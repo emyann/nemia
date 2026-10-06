@@ -60,7 +60,12 @@ holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. Th
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
 next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come. A person may run it as a login
-service (`nemia service install`, `src/service/`), which runs the same daemon from the checkout and hands the lease over only when told.
+service (`nemia service install`, `src/service/`), which runs the same daemon and hands the lease over only when told: from the checkout,
+or, run from an install, from `releases/current`. A release is a tag built and checked under the store (`src/release/`): `nemia upgrade
+<tag>` exports it clean, builds it into `$WF_ROOT/releases/<tag>` on a trial store, switches the pointer `releases/current` by a rename
+and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
+A checkout is refused a store whose pointer names an install, but for `version` and a help, unless `NEMIA_ON_INSTALLED=1`
+(`trialRefusal`, in the CLI's `main` and the api's).
 
 **A journal's bodies** are the runtime's storage: each long text of a line kept once, under the sha256 of its text, resolved on every
 read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's

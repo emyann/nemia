@@ -371,25 +371,6 @@ export const git = (repo: string, ...args: string[]) =>
   execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /**
- * Cut the run's starting workspace.
- *
- * The WORKFLOW owns this, not the engine and not the harness. Both harnesses can make a worktree
- * of their own, but each makes its *own* — and which worktree a step works in is a fact about the
- * workflow's shape, not about the harness. Owning it here also means neither harness needs a flag
- * the other one spells differently.
- *
- * No worktree is cut here: every step, the first included, gets its own from `workspaceFor`, so one code
- * path holds the pure plan and no special case overrides it.
- */
-export function makeWorkspace(repo: string): { workspace: string; baseRef: string; branch: string } {
-  return {
-    workspace: repo,
-    baseRef: git(repo, 'rev-parse', 'HEAD'),
-    branch: git(repo, 'rev-parse', '--abbrev-ref', 'HEAD'),
-  };
-}
-
-/**
  * The workspace a step runs in, made real.
  *
  * A folder run's steps work in folders the run makes, and nothing here is git's (`places.store.ts`). Without

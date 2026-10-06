@@ -703,29 +703,46 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
   assert.deepEqual(cards(), [`${card.name}.md`, 'broken.md', `${started.name}.md`].sort());
 });
 
-test("a card whose `repo:` is a folder a run cannot branch from — no git checkout, or no commit — fails without a refusal, as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
+test("REFUSED at shipped defaults: a card whose `repo:` is a folder a run cannot branch from — no git checkout, or no commit — is a 422 in the place's words, and nothing is written or removed", async () => {
   clear();
   const plain = scratch('nemia-api-inbox-plain-');
   const empty = scratch('nemia-api-inbox-empty-');
   execFileSync('git', ['init', '-q'], { cwd: empty });
-  const said = t.mock.method(console, 'error', () => {});
-  for (const about of [plain, empty]) {
+  for (const [about, words] of [
+    [plain, `${plain} is not a git repository: run git init there and commit once, or name a repository with --repo`],
+    [empty, `${empty} has no commit yet, so a run has nothing to start from: commit once there, then start again`],
+  ]) {
     const { card } = addToInbox({ text: 'Not a repository', repo: about });
-    let failure: (Error & { exitCode?: unknown }) | undefined;
-    try {
-      await runWith(engine(), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
-    } catch (err) {
-      failure = err as Error & { exitCode?: unknown };
-    }
-    assert.ok(failure && failure.exitCode !== 2 && failure.message.includes('git rev-parse HEAD'), `${about}: ${failure?.message}`);
     const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
-    assert.equal(res.status, 500, about);
-    assert.equal(((await res.json()) as Refused).error, failure.message);
+    assert.equal(res.status, 422, about);
+    assert.equal(((await res.json()) as Refused).error, words);
     assert.deepEqual(runFiles(), [], 'no run written');
     assert.deepEqual(cards(), [`${card.name}.md`], 'the card stays');
     clear();
   }
-  assert.equal(said.mock.calls.length, 2, 'each failure said once on stderr');
+});
+
+test("a card whose start fails without a refusal — its repository's `.worktreeinclude` a directory, say — fails as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
+  clear();
+  const odd = scratch('nemia-api-inbox-odd-');
+  execFileSync('git', ['init', '-q'], { cwd: odd });
+  execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: odd });
+  fs.mkdirSync(path.join(odd, '.worktreeinclude'));
+  const said = t.mock.method(console, 'error', () => {});
+  const { card } = addToInbox({ text: 'Its include file is a directory', repo: odd });
+  let failure: (Error & { exitCode?: unknown }) | undefined;
+  try {
+    await runWith(engine(), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
+  } catch (err) {
+    failure = err as Error & { exitCode?: unknown };
+  }
+  assert.ok(failure && failure.exitCode !== 2 && failure.message.startsWith('EISDIR'), failure?.message);
+  const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
+  assert.equal(res.status, 500);
+  assert.equal(((await res.json()) as Refused).error, failure.message);
+  assert.deepEqual(runFiles(), [], 'no run written');
+  assert.deepEqual(cards(), [`${card.name}.md`], 'the card stays');
+  assert.equal(said.mock.calls.length, 1, 'the failure said once on stderr');
 });
 
 test("REFUSED at shipped defaults: a `card` that is not a card's name is a 400 in the package's words, and one that is not text or with a brief that is not a 400 in the api's — before any workflow is looked for", async () => {

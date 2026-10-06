@@ -243,6 +243,21 @@ test('a key the tick does not name survives a read and a rewrite, and so does a 
   assert.equal((written.workflow as Array<Record<string, unknown>>)[0].aNewStepKey, 3);
 });
 
+test("a git record's `placeSkill` reads and survives a rewrite; one with none reads as before; one that is no skill is refused at it", () => {
+  const placeSkill = { skill: 'git', version: 'abc123def456' };
+  put('r-placed', { ...aRecord('r-placed'), placeSkill });
+  const run = readRun('r-placed');
+  assert.deepEqual(run.placeSkill, placeSkill);
+  assert.ok(rewriteRun(run));
+  assert.deepEqual((JSON.parse(fs.readFileSync(runFile('r-placed'), 'utf8')) as Record<string, unknown>).placeSkill, placeSkill);
+  put('r-unplaced', { ...aRecord('r-unplaced'), fromAnOlderWf: 1 });
+  const older = readRun('r-unplaced');
+  assert.equal('placeSkill' in older, false);
+  assert.equal((older as unknown as Record<string, unknown>).fromAnOlderWf, 1);
+  put('r-misplaced', { ...aRecord('r-misplaced'), placeSkill: 'git' });
+  assert.ok(refusalOf('r-misplaced').includes('its `placeSkill` is "git"'), refusalOf('r-misplaced'));
+});
+
 test("the oldest shapes on the owner's store read: no frozen workflow, `disallow:` on a frozen step, an earlier try, a landing and a slot", () => {
   const { workflow: _, ...unfrozen } = aRecord('r-old');
   put('r-old', {

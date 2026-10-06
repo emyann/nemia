@@ -4194,6 +4194,7 @@ test('REFUSED at `nemia start --after`, on either side, when a folder run is inv
     baseRef: undefined,
     branch: undefined,
     isolate: undefined,
+    placeSkill: undefined,
   };
   const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = {
     'a-1': { record: record('a-1') },

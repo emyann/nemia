@@ -13,7 +13,7 @@ import { type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteNameOf } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig } from '../filed/filed.ts';
-import { budgetUsdFor } from '../status/status.ts';
+import { budgetUsdFor, landsOnCheck } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/file.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
@@ -28,7 +28,9 @@ import { inputRefusal, type InputFile } from './inputs.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
-import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
+import { readInclude } from '../workspace/worktree.store.ts';
+import { SHIPPED_PLACE, openPlace } from '../place/place.store.ts';
+import type { PlaceVerb } from '../place/place.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
@@ -182,6 +184,9 @@ export type ConfigRefused = (
 
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
 export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });
+
+/** The place skill's directory a git run is opened with at start (`openPlace`): the package's own place, unless a layer gives another. */
+export const StartPlace = Context.Reference<string>('orchestrator/StartPlace', { defaultValue: () => SHIPPED_PLACE });
 
 /**
  * The first step whose `harness: a2a:<name>` names an agent the store's `a2a-agents.json` does not give the engine, refused with the fix,
@@ -343,19 +348,33 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
   return run;
 });
 
-/** A git run's record on `repo`, on the branch checked out there (`makeWorkspace`): fails with an `--after`'s refusal (`afterRefusal`). */
+/**
+ * The verbs a git run's place must declare for this build to run `steps` through it: `status` and `land` when an ending lands on its check
+ * (`landsOnCheck`), else none.
+ */
+export const placeVerbsNeeded = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): PlaceVerb[] =>
+  steps.some((step) => landsOnCheck(step, run)) ? ['status', 'land'] : [];
+
+/**
+ * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
+ * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`).
+ */
 const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
-  const { workspace, baseRef, branch } = yield* tried(() => makeWorkspace(repo));
+  const placeDir = yield* StartPlace;
+  const needed = placeVerbsNeeded(told.workflow ?? [], told);
+  const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed));
+  const { baseRef, branch } = opened;
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, parentRecord));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,
     repo,
-    workspace,
+    workspace: repo,
     baseRef,
     isolate,
     ...told,
     branch,
+    placeSkill,
     steps,
     createdAt: new Date().toISOString(),
   };

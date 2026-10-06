@@ -699,7 +699,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 534, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 522, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

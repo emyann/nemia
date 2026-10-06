@@ -48,6 +48,12 @@ own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked 
 3. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
    4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
 
+Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-out.md`, *Freezing* and open question 6): a team's own
+skill as a run's place, copied per run to `WF_ROOT/places/<skill>@<version>/`, a copy whose `skillVersion` drifted refusing the run's
+passes, `nemia prune` removing a copy no record names, and `nemia refreeze`. Card C2 records `placeSkill` and runs the package's own place,
+which ships as a release that never changes under a run; the card is filed once G and H have landed, so the first copy carries every verb
+and `say` key, and `placeSkill.version` becomes the copy's name then.
+
 Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer, and the hkb migration; and
 thin runtime stage 6 parts 3 (the gRPC binding) and 4 (streaming and subscribe). Each *Shipped* section names what it left, and those
 leftovers are open too.

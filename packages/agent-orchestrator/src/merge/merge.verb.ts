@@ -14,7 +14,7 @@ import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { roundsDue } from '../round/round.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { trialMerges } from '../place/place.store.ts';
+import { placeDirOf, trialMerges } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { gitSays } from '../workspace/worktree.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
@@ -47,7 +47,9 @@ function mergeReads(
 const trialOf =
   (run: Run) =>
   (branch: string): Trial =>
-    isGitRun(run) ? mergeWordOf(trialMerges(run.repo, [{ onto: run.branch, branch }]).trials[0]) : { error: 'no repository' };
+    isGitRun(run)
+      ? mergeWordOf(trialMerges(run.repo, [{ onto: run.branch, branch }], placeDirOf(run)).trials[0])
+      : { error: 'no repository' };
 
 /** The commit the run's base branch is at now, as git reads it in the run's repository, and when it was read; '' where git cannot. */
 const baseOf = (run: Run) => ({

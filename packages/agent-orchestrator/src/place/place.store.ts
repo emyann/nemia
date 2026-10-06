@@ -2,7 +2,7 @@
  * A place skill's verbs, run and heard (`place.ts` holds the contract): `runPlaceVerb` runs one verb's script from a skill's folder and
  * decodes what it prints into one of three outcomes, and `readPlaceJson` decodes the skill's `place.json`. What a script prints is read
  * by a schema per answer, each held to its type in `place.ts`: a field missing or of another type is no answer, and a field the contract
- * does not name is dropped.
+ * does not name is dropped. `openPlace` is a start's use of a place, and `placeDirOf` the one answer to where a run's place runs from.
  */
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from 'node:child_process';
 import fs from 'node:fs';
@@ -17,6 +17,7 @@ import {
   type Inventory,
   type Landed,
   type Made,
+  missingVerbsRefusal,
   type Opened,
   type PlaceAnswers,
   type PlaceDeclared,
@@ -31,6 +32,8 @@ import {
   type Trials,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { skillVersion } from '../folder/folder.store.ts';
+import type { GitRun } from '../record/record.ts';
 
 const Strings = Schema.Array(Schema.String);
 const Count = Schema.NullOr(Schema.Int);
@@ -336,16 +339,50 @@ export function readPlaceJson(skillDir: string): PlaceDeclared {
 /** The git place the package ships, run where a record names no place skill of its own. */
 export const SHIPPED_PLACE = path.join(import.meta.dirname, '..', '..', 'place', 'git');
 
+/** The name a record gives the package's place (`placeSkill.skill`): the one `place: git` resolves to. */
+export const SHIPPED_PLACE_SKILL = 'git';
+
+/**
+ * The directory a git run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one that
+ * names `SHIPPED_PLACE_SKILL`. Refuses (`Invalid`) a record that names another skill, which this nemia does not ship.
+ */
+export function placeDirOf(run: Pick<GitRun, 'id' | 'placeSkill'>): string {
+  const skill = run.placeSkill?.skill;
+  if (skill === undefined || skill === SHIPPED_PLACE_SKILL) return SHIPPED_PLACE;
+  throw new Invalid({
+    message: `run ${run.id} names the place skill ${skill}, and this nemia ships only ${SHIPPED_PLACE_SKILL}: read its store with the nemia that started it`,
+  });
+}
+
+/** What `openPlace` answers: the repository `open` read, and the place skill it ran, as a record names it. */
+export type OpenedPlace = { readonly opened: Opened; readonly placeSkill: { readonly skill: string; readonly version: string } };
+
+/**
+ * A git run's place, opened at `nemia start` on `root`: the skill in `skillDir` read (`readPlaceJson`), every verb of `needed` declared,
+ * its version taken (`skillVersion`), and its `open` verb run. Refuses (`Invalid`) a `place.json` that does not read or leaves out a verb
+ * of `needed` (`missingVerbsRefusal`), a folder with no SKILL.md, an `open` that refuses, in its own words, and one that is not heard,
+ * with why.
+ */
+export function openPlace(skillDir: string, root: string, needed: readonly PlaceVerb[]): OpenedPlace {
+  const declared = readPlaceJson(skillDir);
+  const missing = missingVerbsRefusal(path.join(skillDir, 'place.json'), declared, needed);
+  if (missing) throw new Invalid({ message: missing });
+  const version = skillVersion(skillDir);
+  if (version === null)
+    throw new Invalid({ message: `${skillDir} has no SKILL.md, so it is no skill to run a place from: write its SKILL.md there` });
+  const outcome = runPlaceVerb(skillDir, 'open', { root });
+  if ('refused' in outcome) throw new Invalid({ message: outcome.refused });
+  if ('unread' in outcome)
+    throw new Invalid({ message: `the place's open was not heard: ${outcome.unread.said}. Nothing was started: start it again` });
+  return { opened: outcome.answer, placeSkill: { skill: SHIPPED_PLACE_SKILL, version } };
+}
+
 /**
  * Whether each `{ onto, branch }` of `trials` merges in `repo`, as the place in `skillDir` answers its `trial` verb: each base's commit
  * now, and each trial in the order asked. Asks nothing for no trial. A refusal, an unread outcome, or an answer with another count of
  * trials than asked is never a verdict: every trial is then `{ unknown }` in words that say why, and every base's commit null.
  */
-export function trialMerges(
-  repo: string,
-  trials: readonly { readonly onto: string; readonly branch: string }[],
-  skillDir: string = SHIPPED_PLACE,
-): Trials {
+export function trialMerges(repo: string, trials: readonly { readonly onto: string; readonly branch: string }[], skillDir: string): Trials {
   if (!trials.length) return { at: {}, trials: [] };
   const outcome = runPlaceVerb(skillDir, 'trial', { repo, trials });
   if ('answer' in outcome && outcome.answer.trials.length === trials.length) return outcome.answer;

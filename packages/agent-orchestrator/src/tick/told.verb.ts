@@ -14,7 +14,7 @@ import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { PlaceSay } from '../place/place.ts';
-import { composeBrief } from '../brief/brief.ts';
+import { composeBrief } from '../brief/index.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where

@@ -224,8 +224,12 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }
 
-/** `nemia admit`'s runner: the call read on stdin, decided against the table (`admitted`), and the answer printed as JSON, or nothing. */
-export async function admitRun(_args: Args, e: Engine): Promise<void> {
-  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE));
+/**
+ * `nemia admit`'s runner: the call read on stdin, decided against the table (`admitted`) under the floor `--at-least` gives, and the answer
+ * printed as JSON, or nothing.
+ */
+export async function admitRun(args: Args, e: Engine): Promise<void> {
+  const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[2]) : undefined;
+  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor));
   if (answer !== undefined) console.log(JSON.stringify(answer));
 }

@@ -10,6 +10,10 @@
  * is read again from its start. Each beat the subscriptions are read again: one gone is stopped and its deliverer's file dropped, one new
  * or changed is started (`FiberMap`).
  *
+ * A scoped subscription carries only the lines of runs whose factory is at its floor or above (`atLeast`), read as each line comes: the
+ * run's factory once per run, frozen at its start, and the factory's level each time, so a raise counts from its start to its end. A
+ * line below the floor, or of a run that does not read, is passed: the cursor moves on, and nothing is said or folded.
+ *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) once it holds the store.
  */
 import { Cause, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
@@ -17,6 +21,8 @@ import { instantNow } from '../daemon/daemon.store.ts';
 import type { FeedLine } from '../feed/feed.ts';
 import { followFeed, type Followed } from '../feed/feed.verb.ts';
 import { EngineService } from '../runtime-client.ts';
+import { atLeast } from '../level/level.ts';
+import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { dropDelivery, listDeliveries, listSubscriptions, readDelivery, writeDelivery } from './subscription.store.ts';
 import { digestDue, digestOf, messageOf, resumedAt, sortLine, type Delivery, type Subscription } from './subscription.ts';
 
@@ -80,8 +86,18 @@ const told = (name: string, sub: Subscription, text: string, o: DeliverOptions):
     );
   });
 
-/** One subscription's delivery: where its deliverer is (`state`), written through after each change, and its lock, one change at a time. */
-type Delivering = { name: string; sub: Subscription; o: DeliverOptions; state: Ref.Ref<Delivery>; lock: Semaphore.Semaphore };
+/**
+ * One subscription's delivery: where its deliverer is (`state`), written through after each change, its lock, one change at a time, and
+ * the factory of each run it has read (`factories`), frozen on the run's record.
+ */
+type Delivering = {
+  name: string;
+  sub: Subscription;
+  o: DeliverOptions;
+  state: Ref.Ref<Delivery>;
+  lock: Semaphore.Semaphore;
+  factories: Map<string, string>;
+};
 
 /** `next` kept: in memory, and on disk stamped with the subscription it is for. */
 const keep = (d: Delivering, next: Delivery): Effect.Effect<void> =>
@@ -89,10 +105,25 @@ const keep = (d: Delivering, next: Delivery): Effect.Effect<void> =>
     Effect.andThen(Effect.sync(() => writeDelivery(d.name, { ...next, of: { task: d.sub.task, from: d.sub.from } }))),
   );
 
-/** A line of the feed, ending at `cursor`: a wake said with the digest it carries, then the cursor kept; else folded into the digest. */
+/** Whether the subscription carries a line of the run `run`: unscoped, always; scoped, where the run's factory is at its floor now. */
+const carries = (d: Delivering, run: string): Effect.Effect<boolean> => {
+  const floor = d.sub.scope?.atLeast;
+  if (floor === undefined) return Effect.succeed(true);
+  return Effect.gen(function* () {
+    const factory = d.factories.get(run) ?? (yield* runFactory(run));
+    d.factories.set(run, factory);
+    return atLeast(yield* levelOfFactory(factory), floor);
+  }).pipe(Effect.catchCause(() => Effect.succeed(false)));
+};
+
+/**
+ * A line of the feed, ending at `cursor`: one the subscription does not carry passed; a wake said with the digest it carries, then the
+ * cursor kept; else folded into the digest.
+ */
 const onLine = (d: Delivering, line: FeedLine, cursor: number): Effect.Effect<void, never, EngineService> =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
+    if (!(yield* carries(d, line.run))) return yield* keep(d, { ...at, cursor });
     if (sortLine(line, d.sub.wake) === 'routine')
       return yield* keep(d, { cursor, digest: [...at.digest, line], since: at.since ?? instantNow() });
     yield* told(d.name, d.sub, messageOf(line, at.digest), d.o);
@@ -139,7 +170,7 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
 const delivering = (name: string, sub: Subscription, o: DeliverOptions): Effect.Effect<never, never, EngineService> =>
   Effect.gen(function* () {
     const state = yield* Ref.make<Delivery>(resumedAt(readDelivery(name), sub));
-    const d: Delivering = { name, sub, o, state, lock: yield* Semaphore.make(1) };
+    const d: Delivering = { name, sub, o, state, lock: yield* Semaphore.make(1), factories: new Map() };
     const check = d.lock.withPermit(digestPass(d)).pipe(Effect.andThen(Metric.update(SUBSCRIPTION_DIGEST_CHECKS, 1)));
     yield* Effect.forkChild(Effect.forever(check.pipe(Effect.andThen(Effect.sleep(o.digestCheck)))));
     return yield* reading(d);

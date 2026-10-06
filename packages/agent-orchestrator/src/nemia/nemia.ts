@@ -9,21 +9,19 @@
  */
 import path from 'node:path';
 import { DEFAULT_WAKE } from '../subscription/subscription.ts';
+import { FACTORY_LEVEL_FORM, LEVELS, type Level } from '../level/level.ts';
+
+export { LEVELS, type Level } from '../level/level.ts';
 
 /**
- * The levels a person sets: `manual`, her session stopped; `semi-auto`, her session kept, what waits on the person asked of them, and a
- * write that cannot be undone or changes their settings or a factory.
- */
-export const LEVELS = ['manual', 'semi-auto'] as const;
-
-/** A level a person sets. */
-export type Level = (typeof LEVELS)[number];
-
-/**
- * What `nemia level` writes: the `level` asked, when (`since`), and the task her session is filed under (`task`), named when she was put
- * at `semi-auto` and kept at `manual`, so the keeper stops the session it kept.
+ * What `nemia level` writes of the store: its `level`, the default factory's and that of every factory that names none, when (`since`),
+ * and the task her session is filed under (`task`), named when some factory was put above `manual` and kept once none is, so the keeper
+ * stops the session it kept.
  */
 export type LevelFile = { level: Level; since: string; task?: string };
+
+/** The level a factory is worked on by her from: below it, her subscription carries none of its lines and admission denies her its runs. */
+export const NEMIA_FLOOR: Level = 'semi-auto';
 
 /** The name of her subscription to the feed, which the keeper alone puts and drops: refused to `nemia subscribe` and `unsubscribe`. */
 export const NEMIA_SUBSCRIPTION = 'nemia';
@@ -37,7 +35,7 @@ export const NEMIA_WAKE: readonly string[] = [...DEFAULT_WAKE, 'denied:'];
  */
 export const NEMIA_DIGEST_EVERY = 1440;
 
-/** The task her session is filed under when she is put at `semi-auto` at `since`: `nemia-` and the time's digits. */
+/** The task her session is filed under when some factory is put above `manual` at `since`: `nemia-` and the time's digits. */
 export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
 
 /**
@@ -58,7 +56,7 @@ export function nemiaSettings(
 }
 
 /** The usage the refusals of `nemia level` end on. */
-export const LEVEL_FORM = `nemia level [${LEVELS.join('|')}]`;
+export const LEVEL_FORM = FACTORY_LEVEL_FORM;
 
 /** Why `word` is no level `nemia level` sets, or undefined where it is one. `auto` is a level to come, said so. Pure. */
 export function levelRefusal(word: string): string | undefined {
@@ -72,39 +70,48 @@ export function levelRefusal(word: string): string | undefined {
 export type HerTask = { settled: boolean; stopRequested: boolean };
 
 /**
- * Where she is: `off`, at `manual` with nothing to stop; `due`, at `semi-auto` with no task filed; `filed`, her task open and not yet
- * subscribed; `kept`, open and subscribed; `stopped`, her task stopped or ended from outside at `semi-auto`, never filed again until the
- * person sets the level again; `leaving`, at `manual` with her task open or her subscription still there.
+ * Where she is: `off`, no factory above `manual` and nothing to stop; `due`, some factory above it and no task filed; `filed`, her task
+ * open and not yet subscribed with her floor; `kept`, open and subscribed with it; `stopped`, her task stopped or ended from outside while
+ * some factory is above `manual`, never filed again until the person sets a level again; `leaving`, none above `manual` with her task
+ * open or her subscription still there.
  */
 export type NemiaState = 'off' | 'due' | 'filed' | 'kept' | 'stopped' | 'leaving';
 
 /** What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription. */
 export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop';
 
+/** What the keeper reads of the levels: whether any factory, the default one included, is above `manual` now, and her task's id. */
+export type Keeping = { above: boolean; task?: string };
+
+/** What the keeper reads of her subscription: the task it tells, and whether it carries her floor (`NEMIA_FLOOR`). */
+export type HerSubscription = { task: string; scoped: boolean };
+
+/** Whether her task is open: filed, not settled, and no stop asked. */
+const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !task.settled && !task.stopRequested;
+
 /**
- * Where she is (`NemiaState`), off the person's file (`level`, none read as `manual`), her task's record (`task`, absent where none is
- * filed under the file's id) and the task her subscription names (`subscribedTo`). Pure.
+ * Where she is (`NemiaState`), off the levels (`keeping`), her task's record (`task`, absent where none is filed under her id) and her
+ * subscription (`subscribed`): kept only once it tells her task and carries her floor, so one put before the floor is put again. Pure.
  */
-export function nemiaState(level: LevelFile | undefined, task: HerTask | undefined, subscribedTo: string | undefined): NemiaState {
-  const open = task !== undefined && !task.settled && !task.stopRequested;
-  if (level?.level !== 'semi-auto') return open || subscribedTo !== undefined ? 'leaving' : 'off';
+export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaState {
+  if (!keeping.above) return isOpen(task) || subscribed !== undefined ? 'leaving' : 'off';
   if (task === undefined) return 'due';
-  if (!open) return 'stopped';
-  return subscribedTo === level.task ? 'kept' : 'filed';
+  if (!isOpen(task)) return 'stopped';
+  return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped ? 'kept' : 'filed';
 }
 
 /**
- * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task;
- * at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing. A task settled from
- * outside is never filed again: the person said so by stopping it. Pure.
+ * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
+ * without her floor; at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing. A
+ * task settled from outside is never filed again: the person said so by stopping it. Pure.
  */
-export function nemiaDue(level: LevelFile | undefined, task: HerTask | undefined, subscribedTo: string | undefined): NemiaAct[] {
-  const state = nemiaState(level, task, subscribedTo);
-  const dropped: NemiaAct[] = subscribedTo === undefined ? [] : ['drop'];
+export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
+  const state = nemiaState(keeping, task, subscribed);
+  const dropped: NemiaAct[] = subscribed === undefined ? [] : ['drop'];
   if (state === 'due') return ['file'];
   if (state === 'filed') return [...dropped, 'subscribe'];
   if (state === 'stopped') return dropped;
-  if (state === 'leaving') return [...(task !== undefined && !task.settled && !task.stopRequested ? (['stop'] as const) : []), ...dropped];
+  if (state === 'leaving') return [...(isOpen(task) ? (['stop'] as const) : []), ...dropped];
   return [];
 }
 
@@ -120,7 +127,7 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 /** Every state, in the order a session goes through them. */
 const STATES: NemiaState[] = ['off', 'due', 'filed', 'kept', 'stopped', 'leaving'];
 
-/** The keeper's moves, and a stop or end from outside, which it never undoes. */
+/** The keeper's moves, a stop or end from outside, which it never undoes, and the end of the last raise above `manual`, read as it passes. */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
@@ -128,12 +135,18 @@ const EDGES: NemiaEdge[] = [
   { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
   { from: 'stopped', to: 'stopped', event: 'SUBSCRIBED', action: 'drop' },
   { from: 'leaving', to: 'off', event: 'OPEN_OR_SUBSCRIBED', action: 'stop, drop' },
+  { from: 'due', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
+  { from: 'filed', to: 'leaving', event: 'RAISE_ENDED', action: 'nothing' },
+  { from: 'kept', to: 'leaving', event: 'RAISE_ENDED', action: 'nothing' },
 ];
 
-/** The person's verbs: `nemia level semi-auto`, asked first whether her folder is trusted, and `nemia level manual`. */
+/**
+ * The person's verbs: `nemia level` putting some factory above `manual` (the store's level, a factory's default or a raise), asked first
+ * whether her folder is trusted, and putting none above it (a level set, or a raise ended early).
+ */
 export const NEMIA_VERBS: NemiaVerb[] = [
-  { verb: 'level semi-auto', from: ['off', 'stopped', 'leaving'], to: 'due', guard: 'trusted', by: 'person' },
-  { verb: 'level manual', from: ['due', 'filed', 'kept', 'stopped'], to: 'leaving', guard: 'always', by: 'person' },
+  { verb: 'level (a factory above manual)', from: ['off', 'stopped', 'leaving'], to: 'due', guard: 'trusted', by: 'person' },
+  { verb: 'level (none above manual)', from: ['due', 'filed', 'kept', 'stopped'], to: 'leaving', guard: 'always', by: 'person' },
 ];
 
 /** Her machine as plain data, a fresh copy each call. */

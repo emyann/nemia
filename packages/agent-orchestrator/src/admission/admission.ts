@@ -1,12 +1,21 @@
 /**
- * A call's admission, decided off the command table and the runs' state: whether a shell line an agent is about to run answers what waits
- * on the person (`admissionOf`), and the table's commands it types (`typedIn`). Pure: the caller reads the state (`admit.verb.ts`).
+ * A call's admission, decided off the command table and the runs' state: whether a shell line an agent is about to run acts on a run or a
+ * factory below the agent's floor (`Scope`), or answers what waits on the person (`admissionOf`); the table's commands it types
+ * (`typedIn`), and the runs and factories they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
  */
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
+import { parseArgv, type Spec } from '../command/command.ts';
+import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { atLeast, type Level } from '../level/level.ts';
 import type { CommandClass } from './class.ts';
 
-/** An entry of the table as admission reads it: its name, its class, and the side it is served on. */
-type Entry = { readonly name: string; readonly nemia: CommandClass; readonly only?: { readonly side: 'cli' | 'api' } };
+/** An entry of the table as admission reads it: its name, its class, the side it is served on, and how its words are spelt. */
+type Entry = {
+  readonly name: string;
+  readonly nemia: CommandClass;
+  readonly only?: { readonly side: 'cli' | 'api' };
+  readonly spec?: Spec;
+};
 
 /** A command of the table typed on a shell line: its name, its class, and the words after its name. */
 export type Typed = { name: string; nemia: CommandClass; args: string[] };
@@ -41,6 +50,96 @@ export function typedIn(line: string, table: readonly Entry[]): Typed[] {
   return typed;
 }
 
+/** The keys a command's spec files a run and a factory under, whose values admission scopes. */
+const RUN_KEY = 'runId';
+const FACTORY_KEY = 'factory';
+
+/**
+ * What a typed command names: its runs and its factories, each value of its spec's `runId` and `factory` keys; `unread` where its words do
+ * not parse by its spec, though the spec takes one of them.
+ */
+export type Named = { runs: string[]; factories: string[]; unread: boolean };
+
+/** A shell redirection (`>`, `2>&1`, `<in`), which is no word of the command; a bare operator takes the word after it. */
+const REDIRECT = /^\d*[<>]/;
+
+/** The words of a command, its redirections and their targets left out. */
+const unredirected = (args: readonly string[]): string[] =>
+  args.filter((a, i) => !REDIRECT.test(a) && !(i > 0 && /^\d*[<>]+&?$/.test(args[i - 1])));
+
+/** The values `args` holds under `key`, one or many. */
+const valuesAt = (args: Readonly<Record<string, unknown>>, key: string): string[] => {
+  const value = args[key];
+  return typeof value === 'string' ? [value] : Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+};
+
+/** Whether `spec` files a run or a factory under one of the keys admission scopes. */
+const scoped = (spec: Spec): boolean =>
+  [...spec.positionals.map((p) => p.key), ...spec.flags.map((f) => f.key)].some((k) => k === RUN_KEY || k === FACTORY_KEY);
+
+/** What the command `typed`, of `table`, names, read by its entry's spec. */
+function namedBy(typed: Typed, table: readonly Entry[]): Named {
+  const spec = table.find((e) => e.name === typed.name)?.spec;
+  if (spec === undefined || !scoped(spec)) return { runs: [], factories: [], unread: false };
+  let args: Readonly<Record<string, unknown>> | undefined;
+  try {
+    args = parseArgv(spec, unredirected(typed.args));
+  } catch {
+    args = undefined;
+  }
+  if (args === undefined) return { runs: [], factories: [], unread: true };
+  return { runs: valuesAt(args, RUN_KEY), factories: valuesAt(args, FACTORY_KEY), unread: false };
+}
+
+/** The runs and factories each command of `table` typed on the shell line `line` names, in order (`typedIn`, `namedBy`). */
+export const namedIn = (line: string, table: readonly Entry[]): Array<Typed & Named> =>
+  typedIn(line, table).map((typed) => ({ ...typed, ...namedBy(typed, table) }));
+
+/**
+ * The floor an agent's calls are scoped by, as a namespace scopes a binding: the level a factory is at least at for a call to act on it
+ * (`floor`); the factory and level of a run, undefined where the run does not read (`runOf`); and a factory's level (`factoryOf`).
+ */
+export type Scope = {
+  floor: Level;
+  runOf: (runId: string) => { factory: string; level: Level } | undefined;
+  factoryOf: (factory: string) => Level;
+};
+
+/** How a factory's level is raised, as the refusal says it: the store's for the default factory, else the factory's own. */
+const raiseWords = (factory: string, floor: Level): string =>
+  factory === DEFAULT_FACTORY ? `nemia level ${floor}` : `nemia level ${floor} --factory ${factory} [--for <duration>]`;
+
+/** The denial of `line`, which acts on the factory `factory` at `level`, below `floor`, through `what`. */
+const below = (line: string, what: string, factory: string, level: Level, floor: Level): AdmissionAnswer => ({
+  decision: 'deny',
+  reason: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${floor}, it is left alone. Raising it is the person's: ${raiseWords(factory, floor)}.`,
+});
+
+/** Scope's answer for one typed command: a denial where it names a run or factory below the floor, an ask where it cannot be read. */
+function scopedOf(typed: Typed & Named, scope: Scope): AdmissionAnswer | undefined {
+  const line = ['nemia', typed.name, ...typed.args].join(' ');
+  if (typed.unread) return { decision: 'ask', reason: `${line} does not read as its command, so admission cannot read the runs it acts on.` };
+  for (const runId of typed.runs) {
+    const run = scope.runOf(runId);
+    if (run === undefined) return { decision: 'ask', reason: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
+    if (!atLeast(run.level, scope.floor)) return below(line, `${runId} of `, run.factory, run.level, scope.floor);
+  }
+  for (const factory of typed.factories) {
+    const level = scope.factoryOf(factory);
+    if (!atLeast(level, scope.floor)) return below(line, '', factory, level, scope.floor);
+  }
+  return undefined;
+}
+
+/**
+ * Scope's answer for the shell line `line`: a denial where any command on it acts on a run or a factory below the floor, first; else an ask
+ * where one cannot be read; else none.
+ */
+function scopeOf(line: string, table: readonly Entry[], scope: Scope): AdmissionAnswer | undefined {
+  const answers = namedIn(line, table).flatMap((typed) => scopedOf(typed, scope) ?? []);
+  return answers.find((a) => a.decision === 'deny') ?? answers[0];
+}
+
 /** Whether a command's words raise a step's cap. */
 const raises = (args: readonly string[]): boolean => args.some((a) => a === '--budget' || a.startsWith('--budget='));
 
@@ -59,17 +158,22 @@ function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) =>
 }
 
 /**
- * Admission's answer for a call: `ask`, saying why in the person's words, where the call is a shell line that types an `answers` command
- * of `table` that waits on the person (`askedOf`); else none, and the call meets the session's own rules. `waitOf` says why a step waits
- * on the person — at its gate, on its question, out of rounds, at its cap, or not there to read — or undefined where it waits on no one.
+ * Admission's answer for a call: where `scope` is given, `deny` for a shell line acting on a run or a factory below its floor, and `ask`
+ * for one whose runs it cannot read (`scopeOf`); then `ask`, saying why in the person's words, where the call is a shell line that types
+ * an `answers` command of `table` that waits on the person (`askedOf`); else none, and the call meets the session's own rules. `waitOf`
+ * says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there to read — or undefined where
+ * it waits on no one.
  */
 export function admissionOf(
   call: AdmissionCall,
   table: readonly Entry[],
   waitOf: (runId: string, step: string) => string | undefined,
+  scope?: Scope,
 ): AdmissionAnswer | undefined {
   const line = call.input.command;
   if (call.tool !== 'Bash' || typeof line !== 'string') return undefined;
+  const inScope = scope === undefined ? undefined : scopeOf(line, table, scope);
+  if (inScope !== undefined) return inScope;
   for (const typed of typedIn(line, table).filter((t) => t.nemia === 'answers')) {
     const why = askedOf(typed, waitOf);
     if (why !== undefined) return { decision: 'ask', reason: why };

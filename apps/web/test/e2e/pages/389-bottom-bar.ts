@@ -1,7 +1,8 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { atWork, atWorkWords } from '../../../src/lib/footer.ts';
+import { atWork, atWorkWords, versionWords } from '../../../src/lib/footer.ts';
 import type { RunSummary } from '../../../src/lib/api/runs.ts';
+import type { Version } from '../../../src/lib/api/version.ts';
 import { photograph, railOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
@@ -56,8 +57,14 @@ async function groups(page: Page): Promise<void> {
   if ((await bar.locator('[data-at-work]').getAttribute('title')) !== work.title)
     throw new Refused(`its hover says it whole, ${JSON.stringify(work.title)}`);
   await expectVisible(bar.locator('[data-quota-short][data-marked]'), 'the quota, marked: the week is past the mark');
-  const { version } = await answer<{ version: string }>(page, '/api/version');
-  await expectTexts(bar.locator(`[data-version="${version}"]`), [`v${version}`], 'the version the api answers');
+  const served = await answer<Version>(page, '/api/version');
+  if (served.release?.kind !== 'checkout')
+    throw new Refused(`the e2e's api runs this checkout and says so — it answers ${JSON.stringify(served.release)}`);
+  const words = versionWords(served);
+  const version = bar.locator(`[data-version="${served.version}"][data-release="checkout"]`);
+  await expectTexts(version, [`v${served.version} · checkout`], 'the version the api answers, and that it runs a checkout');
+  if ((await version.getAttribute('title')) !== words.title || !words.title.endsWith(served.release.root))
+    throw new Refused(`its hover names the folder the api runs from, ${JSON.stringify(words.title)}`);
   const order = await bar
     .locator('[data-daemon-dot], [data-feed-word], [data-at-work], [data-quota-short], [data-version]')
     .evaluateAll((all) => all.map((el) => Object.keys((el as HTMLElement).dataset)[0]));

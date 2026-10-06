@@ -11,6 +11,7 @@ import { routePath } from 'hono/route';
 import {
   freshStatsMemo,
   seriesMemo,
+  type Running,
   type SeriesMemo,
   type Factory,
   type StatsMemo,
@@ -28,10 +29,14 @@ import { Engine, StoreRoot } from './store.ts';
 /**
  * The environment the api reads its settings from, on each request, as it read `process.env` before: `HKB_REPO` (`repoOf`), `WF_MAX_RUNS`
  * (`maxRuns`), `WF_VERIFY_REST` (`verifiesRest`) and `HKB_QUOTA_*` (`makeQuota`), each refused, or defaulted, in its reader's words. The
- * live layer holds `process.env` itself, not a copy.
+ * live layer holds `process.env` itself, not a copy. Beside it, the code the api runs (`running`), where its repository is an install's
+ * source (`repoOf`); none where a test gives no release.
  */
-export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS.ProcessEnv }>()('api/ApiConfig') {
-  static readonly layer = (env: NodeJS.ProcessEnv): Layer.Layer<ApiConfig> => Layer.succeed(ApiConfig)({ env });
+export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS.ProcessEnv; readonly running?: Running }>()(
+  'api/ApiConfig',
+) {
+  static readonly layer = (env: NodeJS.ProcessEnv, running?: Running): Layer.Layer<ApiConfig> =>
+    Layer.succeed(ApiConfig)(running === undefined ? { env } : { env, running });
 }
 
 /**
@@ -75,6 +80,7 @@ export type ApiEnv = { Variables: { runtime: ApiRuntime } };
  */
 export type Served = {
   env: NodeJS.ProcessEnv;
+  running: Running | undefined;
   repo: string;
   factory: Factory | undefined;
   e: Engine['Service'];
@@ -113,9 +119,10 @@ const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
 export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>): Promise<A> =>
   c.var.runtime.runPromise(
     Effect.gen(function* () {
-      const { env } = yield* ApiConfig;
+      const { env, running } = yield* ApiConfig;
       const services = {
         env,
+        running,
         e: yield* Engine,
         home: yield* StoreRoot,
         mcp: yield* McpAsker,
@@ -124,7 +131,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
       };
       const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>
-        handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env) }),
+        handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env, running) }),
       ).pipe(
         Effect.ensuring(
           Effect.flatMap(readsOf(services.e), (after) =>

@@ -181,11 +181,11 @@ test('health answers', async () => {
   assert.deepEqual(await res.json(), { ok: true });
 });
 
-test("the version answers: the orchestrator's package version, a non-empty string", async () => {
+test("the version answers: the orchestrator's package version, a non-empty string, and the code the api runs, this checkout", async () => {
   const res = await app.request('/api/version');
   assert.equal(res.status, 200);
-  const body = (await res.json()) as { version: string };
-  assert.deepEqual(body, { version: VERSION });
+  const body = (await res.json()) as { version: string; release: unknown };
+  assert.deepEqual(body, { version: VERSION, release: { kind: 'checkout', root: path.resolve(import.meta.dirname, '..', '..', '..') } });
   assert.ok(body.version.length > 0, 'the version is a word, not empty');
 });
 

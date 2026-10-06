@@ -107,12 +107,12 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     .filter((f) => f !== 'contract.ts')
     .map((f) => f.replace(/\.ts$/, ''));
   assert.deepEqual([...declared.verbs].sort(), scripts.sort());
-  assert.deepEqual([...declared.verbs].sort(), ['handoff', 'land', 'open', 'status', 'trial']);
+  assert.deepEqual([...declared.verbs].sort(), ['export', 'handoff', 'land', 'open', 'seal', 'status', 'trial']);
   assert.deepEqual(declared.denyWhileLanding, LANDING_DENIED);
 });
 
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
-  for (const script of ['open', 'handoff', 'status', 'land', 'trial']) {
+  for (const script of ['open', 'handoff', 'status', 'land', 'trial', 'export', 'seal']) {
     const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
       input: JSON.stringify({ v: 2, root: '/' }),
       encoding: 'utf8',
@@ -437,4 +437,62 @@ test('REFUSED: trial in a repository that is not there; unread for a request wit
     unreadOf(run('trial', { repo: '/', trials: [{ onto: 'main' }] })),
     'the request\'s `trials` is [{"onto":"main"}], where a list of { onto, branch } is asked',
   );
+});
+
+test("export writes the tag's tree, not the working tree, into an empty repository of its own, and answers the tag's commit", () => {
+  const dir = repository();
+  git(dir, 'tag', 'v1');
+  const tagged = git(dir, 'rev-parse', 'HEAD');
+  fs.writeFileSync(path.join(dir, 'f'), 'after the tag\n');
+  fs.writeFileSync(path.join(dir, 'loose'), 'never committed\n');
+  const into = path.join(scratch('wf-git-skill-export-'), 'v1');
+  assert.deepEqual(answerOf(run('export', { repo: dir, tag: 'v1', into })), { commit: tagged });
+  assert.deepEqual(fs.readdirSync(into).sort(), ['.git', 'f', 'g']);
+  assert.equal(fs.readFileSync(path.join(into, 'f'), 'utf8'), 'base\n');
+  assert.equal(gitOk(into, 'rev-parse', '--verify', '--quiet', 'HEAD'), false, 'its repository holds no commit');
+  assert.deepEqual(git(into, 'ls-files', '-co', '--exclude-standard').split('\n').sort(), ['f', 'g']);
+  assert.equal(fs.existsSync(`${into}.tar`), false, 'the archive is gone');
+});
+
+test('REFUSED: export of a tag the repository lacks, from no directory, and into a folder that holds anything', () => {
+  const dir = repository();
+  git(dir, 'tag', 'v1');
+  const root = scratch('wf-git-skill-export-');
+  const into = path.join(root, 'v2');
+  assert.equal(
+    refusalOf(run('export', { repo: dir, tag: 'v2', into })),
+    `${dir} has no tag v2: tag the commit to release (git -C ${dir} tag v2 <commit>)`,
+  );
+  assert.equal(fs.existsSync(into), false, 'nothing written');
+  const gone = path.join(root, 'gone');
+  assert.equal(refusalOf(run('export', { repo: gone, tag: 'v1', into })), `${gone} is not a directory, so no tag in it can be exported`);
+  fs.mkdirSync(into);
+  fs.writeFileSync(path.join(into, 'kept'), "a person's\n");
+  assert.equal(
+    refusalOf(run('export', { repo: dir, tag: 'v1', into })),
+    `${into} is not empty, and a tag is exported into an empty folder`,
+  );
+  assert.deepEqual(fs.readdirSync(into), ['kept']);
+  assert.equal(unreadOf(run('export', { repo: dir, into })), "the request's `tag` is missing, where a string is asked");
+});
+
+test("seal takes away an export's empty repository, and answers false for a tree that has none", () => {
+  const dir = repository();
+  git(dir, 'tag', 'v1');
+  const into = path.join(scratch('wf-git-skill-seal-'), 'v1');
+  answerOf(run('export', { repo: dir, tag: 'v1', into }));
+  assert.deepEqual(answerOf(run('seal', { tree: into })), { removed: true });
+  assert.deepEqual(fs.readdirSync(into).sort(), ['f', 'g']);
+  assert.deepEqual(answerOf(run('seal', { tree: into })), { removed: false });
+});
+
+test('REFUSED: seal of a repository that holds a commit, which it leaves, and of a tree that is not there', () => {
+  const dir = repository();
+  assert.equal(
+    refusalOf(run('seal', { tree: dir })),
+    `${path.join(dir, '.git')} holds a commit, so it is not the empty repository an export gives a tree: it is left as it is`,
+  );
+  assert.equal(gitOk(dir, 'rev-parse', '--verify', '--quiet', 'HEAD'), true, 'the repository is still there');
+  const gone = path.join(scratch('wf-git-skill-seal-'), 'gone');
+  assert.equal(refusalOf(run('seal', { tree: gone })), `${gone} is not a directory, so there is no exported tree to seal`);
 });

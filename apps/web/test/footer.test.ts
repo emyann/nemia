@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
-import { atWork, atWorkWords, daemonDot, feedWords, footerParts, quotaShort, staleFrameHeights } from '../src/lib/footer.ts';
+import { atWork, atWorkWords, daemonDot, feedWords, footerParts, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
 const NOW = new Date('2026-09-30T05:10:00.000Z');
@@ -221,4 +221,17 @@ test('the frame height: no page under the bottom bar is the screen less the head
   const app = path.join(import.meta.dirname, '..');
   const stale = sources(path.join(app, 'src')).filter((file) => staleFrameHeights(fs.readFileSync(file, 'utf8')).length > 0);
   assert.equal(stale.length, 0, `less the header and the bottom bar, 100svh-5rem: ${stale.map((f) => path.relative(app, f)).join(', ')}`);
+});
+
+test("the version says the code serving the board: an install's tag, or checkout, and the folder in its hover; the version alone without", () => {
+  const install = { kind: 'install', root: '/home/me/.nemia/v1.2.0', tag: 'v1.2.0', commit: 'abcdef1234567890' } as const;
+  assert.deepEqual(versionWords({ version: '1.0.0', release: install }), {
+    text: 'v1.0.0 · v1.2.0',
+    title: "Nemia's orchestrator, version 1.0.0, the installed release v1.2.0 (abcdef1) at /home/me/.nemia/v1.2.0",
+  });
+  assert.deepEqual(versionWords({ version: '1.0.0', release: { kind: 'checkout', root: '/home/me/nemia' } }), {
+    text: 'v1.0.0 · checkout',
+    title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/me/nemia",
+  });
+  assert.deepEqual(versionWords({ version: '1.0.0' }), { text: 'v1.0.0', title: "Nemia's orchestrator, version 1.0.0" });
 });

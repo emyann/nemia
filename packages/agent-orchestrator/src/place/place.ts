@@ -8,7 +8,20 @@
  */
 
 /** The verbs a place may answer, in the order a run meets them. */
-export const PLACE_VERBS = ['open', 'make', 'handoff', 'report', 'standing', 'trial', 'status', 'land', 'inventory', 'remove'] as const;
+export const PLACE_VERBS = [
+  'open',
+  'make',
+  'handoff',
+  'report',
+  'standing',
+  'trial',
+  'status',
+  'land',
+  'inventory',
+  'remove',
+  'export',
+  'seal',
+] as const;
 
 /** A verb a place may answer. */
 export type PlaceVerb = (typeof PLACE_VERBS)[number];
@@ -28,6 +41,8 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   land: 120_000,
   inventory: 120_000,
   remove: 120_000,
+  export: 120_000,
+  seal: 120_000,
 };
 
 /** What `open` answers at `nemia start`: the repository, the commit a run starts from, and the line of work it is on. */
@@ -135,6 +150,12 @@ export type Removed = {
   readonly kept: readonly { readonly branch: string; readonly said: string }[];
 };
 
+/** What `export` answers: the commit the tag names, whose tree it wrote. */
+export type Exported = { readonly commit: string };
+
+/** What `seal` answers: whether an exported tree held the empty repository `export` gave it, now removed. */
+export type Sealed = { readonly removed: boolean };
+
 /** Each verb's answer. */
 export type PlaceAnswers = {
   readonly open: Opened;
@@ -147,6 +168,8 @@ export type PlaceAnswers = {
   readonly land: Landed;
   readonly inventory: Inventory;
   readonly remove: Removed;
+  readonly export: Exported;
+  readonly seal: Sealed;
 };
 
 /** Each verb's request, as the code hands it: `v` is added by the runner. */
@@ -181,6 +204,8 @@ export type PlaceRequests = {
     | { readonly checkout: string; readonly act: 'abort' };
   readonly inventory: { readonly repo: string; readonly under: string; readonly prefix: string };
   readonly remove: { readonly repo: string; readonly workspaces: readonly string[]; readonly branches: readonly string[] };
+  readonly export: { readonly repo: string; readonly tag: string; readonly into: string };
+  readonly seal: { readonly tree: string };
 };
 
 /** A verb that gave no answer: which, the last words its script said or why it was not heard, and when, as an ISO time. */

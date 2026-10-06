@@ -24,6 +24,8 @@ import {
   type PlaceRequests,
   type PlaceVerb,
   type Removed,
+  type Exported,
+  type Sealed,
   type Standing,
   type Status,
   type Trials,
@@ -121,6 +123,10 @@ const RemovedSchema = Schema.Struct({
   kept: Schema.Array(Schema.Struct({ branch: Schema.String, said: Schema.String })),
 }) satisfies Schema.Schema<Removed>;
 
+const ExportedSchema = Schema.Struct({ commit: Schema.String }) satisfies Schema.Schema<Exported>;
+
+const SealedSchema = Schema.Struct({ removed: Schema.Boolean }) satisfies Schema.Schema<Sealed>;
+
 /** Each verb's answer, as its schema decodes it. */
 const ANSWERS: { readonly [V in PlaceVerb]: Schema.Codec<PlaceAnswers[V], unknown> } = {
   open: OpenedSchema,
@@ -133,6 +139,8 @@ const ANSWERS: { readonly [V in PlaceVerb]: Schema.Codec<PlaceAnswers[V], unknow
   land: LandedSchema,
   inventory: InventorySchema,
   remove: RemovedSchema,
+  export: ExportedSchema,
+  seal: SealedSchema,
 };
 
 const RefusedSchema = Schema.Struct({ refused: Schema.String });

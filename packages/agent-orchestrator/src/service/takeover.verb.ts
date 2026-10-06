@@ -24,17 +24,24 @@ export type TakeoverHost = {
   readonly waitMs: number;
 };
 
+/** The command a take-over runs under unless it is named: the install that hands the store to the service. */
+export const INSTALL_BY = 'nemia service install';
+
+/** How a take-over's lines open: the install with the pid it was given, or the command that runs it. */
+const opening = (pid: number, by: string): string => (by === INSTALL_BY ? `${by} --take-over ${pid}` : by);
+
 /**
  * Why `pid` is not the daemon to stop, or null: the lease must name it ticking, and the process table must say it is the process that
- * wrote the lease (`same`), so a pid reused by another process is never signalled.
+ * wrote the lease (`same`), so a pid reused by another process is never signalled. Its words open on `by`, the command asking.
  */
-export function takeOverRefusal(pid: number, lease: DaemonStanding): string | null {
+export function takeOverRefusal(pid: number, lease: DaemonStanding, by: string = INSTALL_BY): string | null {
+  const said = opening(pid, by);
   if (lease.kind !== 'ticking')
-    return `nemia service install --take-over ${pid}: no daemon ticks the store (${lease.kind}): install without --take-over starts the service.`;
+    return `${said}: no daemon ticks the store (${lease.kind}): install without --take-over starts the service.`;
   if (lease.file.pid !== pid)
-    return `nemia service install --take-over ${pid}: the store is held by pid ${lease.file.pid}, not ${pid}: name the holder's pid, as nemia service status says it.`;
+    return `${said}: the store is held by pid ${lease.file.pid}, not ${pid}: name the holder's pid, as nemia service status says it.`;
   if (lease.identity !== 'same')
-    return `nemia service install --take-over ${pid}: pid ${pid} could not be confirmed as the daemon that holds the store (${lease.identity}): stop it by hand once checked, then install.`;
+    return `${said}: pid ${pid} could not be confirmed as the daemon that holds the store (${lease.identity}): stop it by hand once checked, then install.`;
   return null;
 }
 
@@ -42,17 +49,17 @@ export function takeOverRefusal(pid: number, lease: DaemonStanding): string | nu
  * Refuses (`Conflict`) a pid that is not the confirmed holder (`takeOverRefusal`): asked before anything is written, and again before the
  * signal.
  */
-export const takeOverConfirmed = (pid: number, host: TakeoverHost) =>
+export const takeOverConfirmed = (pid: number, host: TakeoverHost, by: string = INSTALL_BY) =>
   tried(() => {
-    const refusal = takeOverRefusal(pid, host.lease());
+    const refusal = takeOverRefusal(pid, host.lease(), by);
     if (refusal !== null) throw new Conflict({ message: refusal });
   });
 
 /** The pause the take-over puts, or false where one already stands, which it leaves as it is. */
-const pauseFor = (pid: number, host: TakeoverHost) =>
+const pauseFor = (pid: number, host: TakeoverHost, by: string) =>
   tried(() => {
     try {
-      host.pause({ by: 'nemia service install', why: `taking over the daemon at pid ${pid}` });
+      host.pause({ by, why: `${by === INSTALL_BY ? 'taking over' : 'restarting'} the daemon at pid ${pid}` });
       return true;
     } catch (err) {
       if (err instanceof Conflict) return false;
@@ -85,29 +92,29 @@ const leaseUntil = (host: TakeoverHost, done: (lease: DaemonStanding) => boolean
  * Hands the store from the daemon of `pid` to the service `start` starts, and answers the pid that ticks it then. Refused (`Conflict`):
  * a pid that is not the confirmed holder, before anything is done; a daemon that does not stop, or a service that does not take the
  * store, within the host's `waitMs` — the store left paused, since no work starts without a daemon to judge it, and `nemia resume` said.
- * Interrupted before the signal, it lifts the pause it put.
+ * Interrupted before the signal, it lifts the pause it put. Its pause and its lines name `by`, the command that runs it.
  */
-export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: TakeoverHost, start: () => void) {
-  yield* takeOverConfirmed(pid, host);
+export const takeOver = Effect.fn('takeOver')(function* (pid: number, host: TakeoverHost, start: () => void, by: string = INSTALL_BY) {
+  yield* takeOverConfirmed(pid, host, by);
   let signalled = false;
-  const own = yield* Effect.acquireRelease(pauseFor(pid, host), (put, exit) =>
+  const own = yield* Effect.acquireRelease(pauseFor(pid, host, by), (put, exit) =>
     put && (exit._tag === 'Success' || !signalled) ? tried(() => host.resume()).pipe(Effect.ignore) : Effect.void,
   );
   yield* landed(host);
-  yield* takeOverConfirmed(pid, host);
+  yield* takeOverConfirmed(pid, host, by);
   signalled = true;
   yield* tried(() => host.signal(pid));
   const left = own ? 'the store stays paused: nemia resume once a daemon ticks it' : 'the pause that stood is left as it was';
   yield* leaseUntil(
     host,
     (lease) => lease.kind === 'stopped' || lease.kind === 'gone' || (lease.kind === 'ticking' && lease.file.pid !== pid),
-    `nemia service install: pid ${pid} was sent SIGTERM and still holds the store: check it with ps -p ${pid}, stop it, and install again; ${left}.`,
+    `${by}: pid ${pid} was sent SIGTERM and still holds the store: check it with ps -p ${pid}, stop it, and ${by === INSTALL_BY ? 'install' : 'run it'} again; ${left}.`,
   );
   yield* tried(start);
   const ticking = yield* leaseUntil(
     host,
     (lease) => lease.kind === 'ticking' && lease.file.pid !== pid,
-    `nemia service install: the service was started and does not tick the store yet: nemia service status says why; ${left}.`,
+    `${by}: the service was started and does not tick the store yet: nemia service status says why; ${left}.`,
   );
   return { pid: ticking.kind === 'ticking' ? ticking.file.pid : null, paused: !own };
 }, Effect.scoped);

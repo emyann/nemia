@@ -48,18 +48,20 @@ test('the api ticks with no argument, and not with --no-tick; any other is refus
 
 /**
  * `node src/main.ts` with `PORT` and `args`, in the store `root` (one of its own unless given), exporting no telemetry unless `otel`
- * names a collector: what it printed, and how it ended if it did. It is killed when the test is done, if it still runs, and in any case
- * within a minute.
+ * names a collector, with `more` over that environment: what it printed, and how it ended if it did. It is killed when the test is
+ * done, if it still runs, and in any case within a minute.
  */
-function startApi(port: string, args: string[] = [], root = scratch('nemia-api-main-'), otel = '') {
+function startApi(port: string, args: string[] = [], root = scratch('nemia-api-main-'), otel = '', more: NodeJS.ProcessEnv = {}) {
+  const { NEMIA_ON_INSTALLED: _set, ...ambient } = process.env;
   const env = {
-    ...process.env,
+    ...ambient,
     PORT: port,
     WF_ROOT: root,
     HKB_REPO: root,
     WF_MAX_CONCURRENT: '2',
     WF_MAX_RUNS: '2',
     OTEL_EXPORTER_OTLP_ENDPOINT: otel,
+    ...more,
   };
   const child = spawn(process.execPath, ['src/main.ts', ...args], { cwd: API, env, timeout: 60_000 });
   let output = '';
@@ -118,6 +120,34 @@ test('the api refuses a PORT that is not a port: exit 2, the fix on stderr, noth
   assert.doesNotMatch(api.output(), /listening/);
 });
 
+/** A store whose `releases/current` names a built release `v1`: a store that runs an install. */
+function installedStore(): string {
+  const root = scratch('nemia-api-installed-');
+  const release = path.join(root, 'releases', 'v1');
+  fs.mkdirSync(release, { recursive: true });
+  const file = { tag: 'v1', commit: 'abcdef1234567890', source: '/src', builtAt: '2026-10-06T07:00:00.000Z' };
+  fs.writeFileSync(path.join(release, 'release.json'), JSON.stringify(file));
+  fs.symlinkSync('v1', path.join(root, 'releases', 'current'));
+  return root;
+}
+
+test("REFUSED at shipped defaults: the checkout's api on a store that runs an install exits 2, naming the setting; no lease, no port", async () => {
+  for (const args of [[], ['--no-tick']]) {
+    const api = startApi('0', args, installedStore());
+    assert.equal(await api.ended, 2, api.output());
+    assert.match(api.output(), /this is the checkout .* runs the installed release v1 \(releases\/current\)/);
+    assert.match(api.output(), /NEMIA_ON_INSTALLED=1/);
+    assert.doesNotMatch(api.output(), /listening/);
+    assert.equal(fs.existsSync(path.join(api.root, 'daemon.json')), false, 'no lease taken');
+  }
+});
+
+test("the checkout's api serves that store told NEMIA_ON_INSTALLED=1", async (t) => {
+  const api = startApi('0', ['--no-tick'], installedStore(), '', { NEMIA_ON_INSTALLED: '1' });
+  t.after(() => api.child.kill());
+  await api.said(/api listening on http:\/\/127\.0\.0\.1:\d+/);
+});
+
 /** The lease of the store at `root`, as the daemon wrote it. */
 const leaseOf = (root: string) => JSON.parse(fs.readFileSync(path.join(root, 'daemon.json'), 'utf8')) as Record<string, unknown>;
 
@@ -133,6 +163,7 @@ test("(a) the api is the store's daemon: it holds the lease as the api, at its u
   const [url] = await api.said(/http:\/\/127\.0\.0\.1:\d+/);
   const lease = await leaseSays(api.root, (l) => l.url === url);
   assert.deepEqual([lease.pid, lease.by], [api.child.pid, 'api']);
+  assert.deepEqual(lease.release, { kind: 'checkout', root: path.resolve(API, '..', '..') }, 'the lease says the api runs this checkout');
   const daemon = (await (await fetch(`${url}/api/daemon`)).json()) as Record<string, unknown>;
   assert.deepEqual([daemon.by, daemon.url, daemon.pid], ['api', url, api.child.pid]);
 });

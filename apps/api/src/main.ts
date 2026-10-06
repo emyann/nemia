@@ -7,10 +7,24 @@
  * says them, through the telemetry its environment asks for (`telemetryLayer`): OTLP too when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The
  * feed's lines it writes are published to the hub its layer built (`FeedHub`), which the app's streams of the feed read.
  * With `--no-tick` it serves alone, holding nothing. It prints the port the server got: the one asked for, or a free one for `PORT=0`.
+ * Refused first (`Conflict`), binding nothing: a checkout's api on a store that runs an install (`trialRefusal`), unless
+ * `NEMIA_ON_INSTALLED=1`; and an install's repository is the one it was built from (`repoOf`).
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import { DEFAULT_EVERY_MS, FeedHub, holdUrl, runMain, telemetryLayer, up } from 'agent-orchestrator';
+import {
+  Conflict,
+  currentRelease,
+  DEFAULT_EVERY_MS,
+  FeedHub,
+  HOME,
+  holdUrl,
+  runMain,
+  runningRelease,
+  telemetryLayer,
+  trialRefusal,
+  up,
+} from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
 import { repoOf } from './capabilities/capabilities.ts';
 import { HOST, portOf, ticksOf } from './port.ts';
@@ -26,7 +40,10 @@ let port: number;
 let ticks: boolean;
 let e: Engine['Service'];
 let hub: (typeof FeedHub)['Service'];
+const running = runningRelease();
 try {
+  const trial = trialRefusal(running, currentRelease(), HOME, process.env);
+  if (trial !== null) throw new Conflict({ message: trial });
   ticks = ticksOf(process.argv.slice(2));
   port = portOf(process.env.PORT, ticks);
   const services = await runtime.context();
@@ -70,7 +87,7 @@ else
   await runMain(
     up(e!, {
       every: DEFAULT_EVERY_MS,
-      repo: repoOf(process.env),
+      repo: repoOf(process.env, running),
       holder: 'api',
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
     }).pipe(Effect.scoped, Effect.provideService(FeedHub, hub), Effect.provide(telemetryLayer(process.env))),

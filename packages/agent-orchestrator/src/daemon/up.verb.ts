@@ -14,6 +14,8 @@ import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenSt
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
+import { leaseRelease } from '../release/release.ts';
+import { runningRelease } from '../release/version.verb.ts';
 
 /**
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
@@ -170,7 +172,7 @@ export const logPass = Effect.fn('logPass')(function* (pass: Pass, was: UpSaid) 
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope> =>
   Effect.gen(function* () {
     const taken = yield* Effect.acquireRelease(
-      Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder }), catch: (err) => err }),
+      Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),
       ({ held }) => Effect.sync(() => releaseStore(held)),
     );
     yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(taken.held))))));

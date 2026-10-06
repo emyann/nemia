@@ -13,6 +13,8 @@ import { pausedRead } from '../list/list.verb.ts';
 import { putPause, resumePause } from '../pause/pause.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
+import { pointedEntry } from '../release/release.ts';
+import { runningRelease } from '../release/version.verb.ts';
 import {
   envPairs,
   envRefusal,
@@ -70,12 +72,15 @@ export type ServiceHost = TakeoverHost & {
   readonly linger: (user: string) => boolean | undefined;
 };
 
-/** The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. */
+/**
+ * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
+ * runs is under `releases/current` (`pointedEntry`), so the service follows the pointer.
+ */
 export const liveHost = (): ServiceHost => ({
   machine: machineOf,
   dirs: serviceDirs,
   roots: storeRoots,
-  daemon: () => daemonEntry(),
+  daemon: () => pointedEntry(daemonEntry(), runningRelease()),
   node: process.execPath,
   path: process.env.PATH ?? '',
   user: userOf,
@@ -298,6 +303,22 @@ const installedRead = (at: Placed): ServiceRead['unit'] => {
   return { ...read, ...(checkout !== undefined ? { checkout } : {}) };
 };
 
+/** What an upgrade asks of the store's service: the system's word on it, the entry its file runs, and its start. */
+export type ServiceForUpgrade = { readonly state: UnitState | null; readonly entry: string | undefined; readonly start: () => void };
+
+/** The service `--name` names on this machine, as installed, or null where the machine, the store or the name has none to ask. */
+export function serviceForUpgrade(args: Args, host: ServiceHost): ServiceForUpgrade | null {
+  let at: Placed;
+  try {
+    at = placed(args, host);
+  } catch {
+    return null;
+  }
+  const unit = installedRead(at);
+  if (unit === null) return null;
+  return { state: stateOf(at, host), entry: unit.entry, start: () => ops(at, host).start() };
+}
+
 /** Reads the service and the lease, and names both: whether the service is installed and runs, what it runs, and who holds the store. */
 export const serviceStatus = Effect.fn('serviceStatus')(function* (args: Args, host: ServiceHost = liveHost()) {
   return yield* tried(() => {
@@ -313,8 +334,13 @@ export const serviceStatus = Effect.fn('serviceStatus')(function* (args: Args, h
 /** Why a service command is the CLI's alone. */
 const CLI_ONLY = { side: 'cli', why: "it writes or reads the person's login services, on the machine the command runs on" } as const;
 
-/** `--name`, which every service command takes. */
-const NAME_FLAG: Flag = { flag: '--name', kind: 'name', key: 'name', takes: '--name takes the service name, like --name nemia-trial.' };
+/** `--name`, which every service command takes, and `nemia upgrade`. */
+export const NAME_FLAG: Flag = {
+  flag: '--name',
+  kind: 'name',
+  key: 'name',
+  takes: '--name takes the service name, like --name nemia-trial.',
+};
 
 /** How each service command is typed, as its refusals end on it. */
 const SHAPES = {

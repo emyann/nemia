@@ -169,6 +169,17 @@ test('REFUSED: a wait that never comes fails its test at the timeout, and the ru
   assert.match(ran.stdout, /^# never came: the bell that never rings$/m, ran.stdout);
 });
 
+test('REFUSED: a wait that cannot read its test fails at once, and its process ends on its own, holding no timer open', () => {
+  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const ran = spawnSync(
+    'timeout',
+    ['-k', '5', '120', process.execPath, '--test', '--test-reporter=tap', path.join('test', 'fixtures', 'waits', 'unread.ts')],
+    { cwd: PACKAGE, env, encoding: 'utf8' },
+  );
+  assert.equal(ran.status, 0, `ended by itself, not by \`timeout\` (124): ${ran.stdout}${ran.stderr}`);
+  assert.match(ran.stdout, /^# pass 1$/m, ran.stdout);
+});
+
 test("the helper is the runtime's, byte for byte", () => {
   assert.equal(
     fs.readFileSync(path.join(TEST, 'waits.ts'), 'utf8'),

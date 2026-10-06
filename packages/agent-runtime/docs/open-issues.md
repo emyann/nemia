@@ -746,7 +746,7 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
 - **A stop of a send another process makes** does nothing here: that process's send is its own. The stop is asked again on
   later passes, and a Task the send brings back is then cancelled; the deadline bounds the rest.
 
-### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day; per session for a transcript or an output 2026-10-06, six gaps left)
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day; per session for a transcript or an output 2026-10-06, eight gaps left)
 
 The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
 pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
@@ -775,7 +775,9 @@ What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
   harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
-  is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before.
+  is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before. A `--bg` session whose transcript cannot
+  be read, while it has not ended, is left out of that `observe` too (it answers only what the look `seen`), so `ae ls` and a view
+  show its task as if its session were not listed, with the warning beside it, until it reads as ended or readable again.
 - **A harness never read again holds its tasks in flight until their deadline.** `UNREAD` ends nothing, by design, so a task with
   no deadline on a harness that is gone for good waits for ever, where before it failed `lost` 30 s after its spawn. A person's
   stop on such a task without a deadline waits too. The board shows it working; `wf up --stats` shows the harness's unread count.
@@ -788,14 +790,23 @@ What is left:
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
   to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
   gap above already leaves too wide. Found in review of the run that made a failed observe say so.
-- **A long-lived session whose transcript stays unreadable fails and is restarted, on and on.** Nemia's own long-lived session
-  (`restartPolicy: 'Always'`) is the one at risk: once its transcript has been cold for the floor it reads as `failed`, and
-  `restartOf` (`core/domain.ts`) restarts it after the backoff, continuing the same session. If the restarted session's transcript
-  cannot be read either — a lasting `EACCES` on the folder, or a line that does not decode carried into the conversation it
-  continues — each attempt ends `failed` and is restarted again, the backoff capped at 5 minutes (`RESTART_BACKOFF`), with the
-  warning on every look and nothing that settles the task. Before this, the same session held every background session unread
-  instead. A bound needs a decision: settle a long-lived task whose attempts all end on an unreadable transcript, or restart it
-  cold.
+- **A busy or blocked `--bg` session whose transcript cannot be read never ends.** `endedOf` (`harness/claude/bg.ts`) ends only a
+  session listed finished, or `working` and not busy; one listed `blocked` (waiting on a prompt, or idle under `--remote-control`,
+  which lists `blocked`, `idle`, with no `waitingFor`) or busy is unread on every pass while its transcript stays unreadable. Its
+  deadline still ends it; with none, its task waits for ever, as on a harness never read again (above).
+- **A stop asked while a `--bg` session is unread sends no `claude stop`.** In `stopping`, `UNREAD` does nothing until the deadline
+  (`decide`), so the stop waits until the session reads as ended — then `failed`, and released (`claude stop`, `claude rm`) — or
+  until the deadline cuts it. A blocked or busy session that stays unread (the gap above) is never stopped, with no deadline.
+- **A long-lived session whose transcript stays unreadable is either restarted on and on, or unread for ever.** Nemia's own
+  long-lived session (`restartPolicy: 'Always'`) is the one at risk, and which of the two it meets depends on how it lists. Listed
+  finished, or `working` and idle, once its transcript has been cold for the floor it reads as `failed`, and `restartOf`
+  (`core/domain.ts`) restarts it after the backoff, continuing the same session; if the restarted session's transcript cannot be
+  read either — a lasting `EACCES` on the folder, or a line that does not decode carried into the conversation it continues — each
+  attempt ends `failed` and is restarted again, the backoff capped at 5 minutes (`RESTART_BACKOFF`), with the warning on every look
+  and nothing that settles the task. Idle under `--remote-control` it lists `blocked`, so it never ends (the gap above): unread on
+  every pass, never restarted, never settled, and a stop never sent, with no deadline. Before this, either session held every
+  background session unread instead. A bound needs a decision: settle a long-lived task whose attempts all end on an unreadable
+  transcript, or restart it cold; and whether an unreadable session idle under `--remote-control` counts as ended.
 - **A detached capture found and not read is read as nothing said.** `saidAt` (`harness/detached/said.ts`) answers nothing when
   the log stats and its read then fails (`EACCES`, `EIO`), so the run reads as having said nothing rather than unread, as a `--bg`
   transcript now does (`TranscriptUnread`). The end is read off the run file, so this never makes an attempt `LOST`, but its usage

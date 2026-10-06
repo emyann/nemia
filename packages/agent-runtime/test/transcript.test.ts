@@ -760,6 +760,128 @@ test("a Codex record: a failed task's end is its error; a command that exited 0 
   );
 });
 
+/** A record of the kind `payload.type` names, at `at(0)`, carrying `payload`. */
+const eventMsg = (payload: object): object => ({ timestamp: at(0), type: 'event_msg', payload });
+
+/** The words `codexRolloutEvents` refuses `record` with, read alone as the line at byte 9 of `/r.jsonl`. */
+const refusedWith = (record: object): string => {
+  try {
+    codexRolloutEvents(record, 9, '/r.jsonl');
+  } catch (e) {
+    return (e as Error).message;
+  }
+  return 'not refused';
+};
+
+test("REFUSED: a Codex rollout's record of a kind the runtime reads with a field that is there in another shape refuses the read by its file, its offset, its field and the fix", async () => {
+  const fix = '`ROLLOUT` (`harness/codex/rollout.ts`)';
+  const thread = randomUUID();
+  const lines = rolloutLines(thread);
+  lines.splice(2, 0, eventMsg({ type: 'task_complete', turn_id: 't' }));
+  (lines[2] as { timestamp: string }).timestamp = 'yesterday';
+  const text = jsonl(lines);
+  writeRollout(thread, text);
+  const offset = Buffer.byteLength(text.split('\n').slice(0, 2).join('\n')) + 1;
+  await assert.rejects(readTranscript(rolloutFile(thread), undefined, codexRolloutEvents), (e: Error) => {
+    assert.ok(
+      e.message.startsWith(
+        `the line at byte ${offset} of the rollout \`${rolloutFile(thread)}\` is an \`event_msg\` \`task_complete\` record whose \`timestamp\` is "yesterday"`,
+      ),
+      e.message,
+    );
+    assert.ok(e.message.includes(fix), e.message);
+    return true;
+  });
+
+  const content = refusedWith(eventMsg({ type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: 'hello' } }));
+  assert.ok(
+    content.startsWith(
+      'the line at byte 9 of the rollout `/r.jsonl` is an `event_msg` `item_completed` record whose `payload.item.content` is "hello"',
+    ),
+    content,
+  );
+  assert.ok(content.includes(fix), content);
+
+  const error = refusedWith(eventMsg({ type: 'task_complete', turn_id: 't', error: { message: 7 } }));
+  assert.ok(
+    error.startsWith(
+      'the line at byte 9 of the rollout `/r.jsonl` is an `event_msg` `task_complete` record whose `payload.error.message` is 7',
+    ),
+    error,
+  );
+  assert.ok(error.includes(fix), error);
+});
+
+test('REFUSED: a Codex command whose exit code is no number refuses the `transcript` verb, never reads as a failed command', async () => {
+  const root = tmp('root');
+  const thread = randomUUID();
+  const lines = rolloutLines(thread);
+  const bad = eventMsg({
+    type: 'item_completed',
+    item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: '0', aggregated_output: 'a' },
+  });
+  const text = jsonl(lines) + jsonl([bad]);
+  writeRollout(thread, text);
+  runFile(root, 'codex', 'ae/c4/1', { nativeId: thread });
+  const offset = Buffer.byteLength(jsonl(lines));
+  await assert.rejects(detachedRead(detachedOps(codex, root), 'ae/c4/1'), (e: unknown) => {
+    assert.ok(e instanceof RunnerError, String(e));
+    assert.equal(e.verb, 'transcript');
+    assert.ok(
+      e.message.startsWith(
+        `codex: the line at byte ${offset} of the rollout \`${rolloutFile(thread)}\` is an \`event_msg\` \`item_completed\` record whose \`payload.item.exit_code\` is "0"`,
+      ),
+      e.message,
+    );
+    assert.ok(e.message.includes('`harness/codex/rollout.ts`'), e.message);
+    return true;
+  });
+});
+
+test('a Codex record of a kind the runtime reads with a field left out reads as it always has; a record of any other kind passes undecoded', () => {
+  const system = (id: string, text: string) => [{ id, at: at(0), role: 'system', kind: 'system', text }];
+  const item = (fields: object) => codexRolloutEvents(eventMsg({ type: 'item_completed', item: fields }), 9);
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete' }), 9), system('@9', 'task_complete'));
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: null }), 9), system('@9', 'task_complete'));
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: {} }), 9), system('@9', 'task_complete'));
+  assert.deepEqual(codexRolloutEvents({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't' } }, 9), [], 'no time');
+  assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'item_completed' }), 9), []);
+  assert.deepEqual(item({ type: 'AgentMessage' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'text', text: '' }]);
+  assert.deepEqual(item({ type: 'UserMessage', id: '' }), [{ id: '@9', at: at(0), role: 'user', kind: 'text', text: '' }]);
+  assert.deepEqual(item({ type: 'Reasoning' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'thinking' }]);
+  assert.deepEqual(item({ type: 'CommandExecution' }), [
+    {
+      id: '@9',
+      at: at(0),
+      role: 'assistant',
+      kind: 'tool_use',
+      tool: { name: 'CommandExecution', input: { command: undefined, cwd: undefined } },
+    },
+    { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
+  ]);
+  assert.deepEqual(item({ type: 'CommandExecution', exit_code: null, aggregated_output: null, status: 'completed' })[1]?.result, {
+    text: '',
+    isError: true,
+  });
+  assert.deepEqual(item({ type: 'FileChange' }), [
+    { id: '@9', at: at(0), role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: undefined } } },
+    { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
+  ]);
+  assert.deepEqual(item({ type: 'WebSearch', id: 'w', query: 7 }), system('w', '[WebSearch]'));
+  assert.deepEqual(item({ id: 'n' }), system('n', '[undefined]'));
+  for (const other of [
+    { timestamp: at(0), type: 'response_item', payload: 7 },
+    { timestamp: 'yesterday', type: 'session_meta', payload: { id: 7 } },
+    eventMsg({ type: 'token_count', info: 'x' }),
+    { timestamp: at(0), type: 'event_msg', payload: 'task_complete' },
+    { timestamp: at(0), type: 'turn_context', payload: { type: 'task_complete', error: 7 } },
+    'event_msg',
+    null,
+  ]) {
+    assert.deepEqual(codexRolloutEvents(other, 9, '/r.jsonl'), [], JSON.stringify(other));
+  }
+});
+
 test("claude-detached reads the transcript `claude --bg` would, once its run has the session's id; a spec that keeps no record has no transcript", async () => {
   const root = tmp('root');
   const sessionId = randomUUID();

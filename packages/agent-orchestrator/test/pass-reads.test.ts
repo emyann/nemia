@@ -272,8 +272,8 @@ test('a pass spends no git process more for more runs waiting on runs of the sam
   await waitingOn(b, repo, second.id);
   const added = runs() - was;
   const { tallies: after } = await onePass(b);
-  assert.ok(before.kinds.git.spawned > 0, 'the pass asked git');
-  assert.equal(after.kinds.git.spawned, before.kinds.git.spawned, 'over one listing of branches per repository');
+  assert.ok(before.kinds.place.spawned > 0, 'the pass asked the place');
+  assert.equal(after.kinds.place.spawned, before.kinds.place.spawned, 'over one listing of branches per repository');
   assert.equal(
     after.records - before.records,
     added + 1,
@@ -428,7 +428,7 @@ test('a pass asks one standing for each repository, place and base branch: a run
       .sort(),
     ['main', 'other'],
   );
-  assert.equal(after.kinds.git.spawned, before.kinds.git.spawned + 1, 'one process more, for the second base');
+  assert.equal(after.kinds.place.spawned, before.kinds.place.spawned + 1, 'one process more, for the second base');
 });
 
 test('REFUSED: a run waits on one whose standing is unread, though it has shipped, says why, and is filed once standing answers', async () => {

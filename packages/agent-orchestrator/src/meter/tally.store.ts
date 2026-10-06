@@ -4,9 +4,10 @@
  * Open only during a pass (`metered`, or `meteredPass` for an Effect program), and empty outside one: a reader called by a verb, the api
  * or a test between passes runs as it would unmetered, at the price of one comparison. Inside a pass, `within(kind, f)` charges the time
  * until `f` settles to `kind`, and the time of a `within` nested in it to the inner kind instead — so a run record's approvals are asks,
- * and a git call made to file a step is git — and the time in no `within` at all to `assess`, the judgement and whatever else is not
- * counted. The counting itself is the overhead, and the reading that closes one interval opens the next, so the kinds and the overhead add
- * up to the pass's time exactly, and the pass's time is measured apart from them, so a test can hold the one against the other.
+ * and a place verb run to file a step is the place's — and the time in no `within` at all to `assess`, the judgement and whatever else
+ * is not counted. The counting itself is the overhead, and the reading that closes one interval opens the next, so the kinds and the
+ * overhead add up to the pass's time exactly, and the pass's time is measured apart from them, so a test can hold the one against the
+ * other.
  *
  * A pass is sequential — `tick` awaits each run before the next — which is what makes a stack right here. The meter is the pass's own,
  * carried by its async context (`AsyncLocalStorage`): what else in the process reads through these readers while a pass is open (the api's

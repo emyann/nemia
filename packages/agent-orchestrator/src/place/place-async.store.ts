@@ -7,6 +7,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { Effect, Exit, Schedule } from 'effect';
 import { STOP_GRACE_MS, STOP_POLL_MS, outcomeOf, placeAsk, signalGroup, type PlaceAsk, type PlaceRan } from './place.store.ts';
 import type { PlaceOutcome, PlaceRequests, PlaceVerb } from './place.ts';
+import { countSpawn, withinEffect } from '../meter/tally.store.ts';
 
 /** Whether the group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. */
 const emptied = (pgid: number): Effect.Effect<boolean> =>
@@ -68,7 +69,8 @@ const ended = (child: ChildProcessWithoutNullStreams): Effect.Effect<Ended> =>
  * Run `verb` of the place skill in `skillDir` as `runPlaceVerb` runs it — its script, request, deadline, environment and outcome — with
  * the event loop free while it runs. The script is taken in the ask's scope and let go as it closes: one that came to its end is left as
  * it is, and one that did not — past its deadline, or the ask interrupted — is stopped with what it started (`stopScript`) before the ask
- * ends. Never fails.
+ * ends. A script started is counted in the pass's `place` phase, its process and its time; a verb with no script starts nothing. Never
+ * fails.
  */
 export const runPlaceVerbAsync = <V extends PlaceVerb>(
   skillDir: string,
@@ -80,8 +82,11 @@ export const runPlaceVerbAsync = <V extends PlaceVerb>(
     const asked = placeAsk(skillDir, verb, request, options);
     if ('unread' in asked) return Effect.succeed(asked);
     const printed: Printed = { stdout: [], stderr: [], killed: false };
-    return Effect.acquireRelease(
-      Effect.sync(() => started(skillDir, asked, printed)),
+    const run = Effect.acquireRelease(
+      Effect.sync(() => {
+        countSpawn();
+        return started(skillDir, asked, printed);
+      }),
       (child, exit) => (Exit.isSuccess(exit) ? Effect.void : Effect.map(stopScript(child), (killed) => void (printed.killed = killed))),
     ).pipe(
       Effect.flatMap(ended),
@@ -103,4 +108,5 @@ export const runPlaceVerbAsync = <V extends PlaceVerb>(
         ),
       ),
     );
+    return withinEffect('place', run);
   });

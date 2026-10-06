@@ -36,7 +36,8 @@ import {
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { PLACE_SKILLS, skillVersion } from '../folder/folder.store.ts';
-import type { GitRun } from '../record/record.ts';
+import type { RepositoryRun } from '../record/record.ts';
+import { countSpawn, within } from '../meter/tally.store.ts';
 
 const Strings = Schema.Array(Schema.String);
 const Count = Schema.NullOr(Schema.Int);
@@ -346,7 +347,7 @@ export function outcomeOf<V extends PlaceVerb>(verb: V, ran: PlaceRan, deadlineM
  * reason, for anything else — no script, a non-zero exit, a signal, the deadline passed, or a stdout that does not decode. Never throws for
  * what the script did. The script leads a process group of its own; past its deadline it is killed, and what it started (git, git's hooks
  * and filters) is sent SIGTERM, so git takes its locks away, then SIGKILL after `STOP_GRACE_MS`. A process that leaves the group is not
- * stopped.
+ * stopped. A script started is counted in the pass's `place` phase, its process and its time; a verb with no script starts nothing.
  */
 export function runPlaceVerb<V extends PlaceVerb>(
   skillDir: string,
@@ -367,9 +368,12 @@ export function runPlaceVerb<V extends PlaceVerb>(
     env: asked.env,
     detached: true,
   };
-  const ran = spawnSync(process.execPath, [asked.script], spawned);
-  const timedOut = ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT';
-  const killed = timedOut && ran.pid > 0 && stopGroup(ran.pid);
+  const { ran, timedOut, killed } = within('place', () => {
+    countSpawn();
+    const ran = spawnSync(process.execPath, [asked.script], spawned);
+    const timedOut = ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT';
+    return { ran, timedOut, killed: timedOut && ran.pid > 0 && stopGroup(ran.pid) };
+  });
   return outcomeOf(
     verb,
     { status: ran.status, signal: ran.signal, stdout: ran.stdout ?? '', stderr: ran.stderr ?? '', error: ran.error, timedOut, killed },
@@ -415,7 +419,7 @@ export const SHIPPED_PLACE = path.join(PLACE_SKILLS, SHIPPED_PLACE_SKILL);
  * The directory a git run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one that
  * names `SHIPPED_PLACE_SKILL`. Refuses (`Invalid`) a record that names another skill, which this nemia does not ship.
  */
-export function placeDirOf(run: Pick<GitRun, 'id' | 'placeSkill'>): string {
+export function placeDirOf(run: Pick<RepositoryRun, 'id' | 'placeSkill'>): string {
   const skill = run.placeSkill?.skill;
   if (skill === undefined || skill === SHIPPED_PLACE_SKILL) return SHIPPED_PLACE;
   throw new Invalid({
@@ -424,7 +428,7 @@ export function placeDirOf(run: Pick<GitRun, 'id' | 'placeSkill'>): string {
 }
 
 /** Where a run's place verbs run from once it is started (`nemia rm`, `nemia prune`): `placeDirOf`, unless a layer gives another. */
-export const RunPlace = Context.Reference<(run: Pick<GitRun, 'id' | 'placeSkill'>) => string>('orchestrator/RunPlace', {
+export const RunPlace = Context.Reference<(run: Pick<RepositoryRun, 'id' | 'placeSkill'>) => string>('orchestrator/RunPlace', {
   defaultValue: () => placeDirOf,
 });
 
@@ -437,7 +441,7 @@ export type RunPlaceRead = { readonly dir: string; readonly say: PlaceDeclared['
  * that is no answer: refused, or not heard. Never an empty inventory in its place.
  */
 export function readRunPlace(
-  run: Pick<GitRun, 'id' | 'repo' | 'branch'>,
+  run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
   placeDir: string,
   under: string,
 ): RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }> {

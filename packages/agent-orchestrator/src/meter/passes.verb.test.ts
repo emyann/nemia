@@ -24,7 +24,7 @@ const cost = (k: number, ms: number, runs: number) =>
   passCost({
     at: new Date(Date.UTC(2026, 9, 5, 10, 0, k)).toISOString(),
     ms,
-    phases: Object.fromEntries(PHASES.map((p) => [p, { ms: p === 'git' ? ms : 0, calls: 1, bytes: 0, reads: 0, spawned: 0 }])) as never,
+    phases: Object.fromEntries(PHASES.map((p) => [p, { ms: p === 'place' ? ms : 0, calls: 1, bytes: 0, reads: 0, spawned: 0 }])) as never,
     harnesses: {},
     records: runs,
     overheadMs: 0,

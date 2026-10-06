@@ -247,6 +247,12 @@ function logNames(query: string): string[] {
 /** Every panel of `panels`, a row's own among them. */
 const allPanels = (panels: Panel[]): Panel[] => panels.flatMap((p) => [p, ...allPanels(p.panels ?? [])]);
 
+/** The text a variable's query names: a PromQL query as written, a Tempo tag-values query as the `span.` key whose values it reads. */
+const variableText = (query: unknown): string => {
+  const label = (query as { label?: unknown } | undefined)?.label;
+  return typeof query === 'string' ? query : typeof label === 'string' ? `span.${label}` : JSON.stringify(query);
+};
+
 /** Every query `dashboard` sends: each panel's targets, and each query variable's. */
 function queriesOf(dashboard: Dashboard): Query[] {
   const targets = allPanels(dashboard.panels).flatMap((p) =>
@@ -254,7 +260,7 @@ function queriesOf(dashboard: Dashboard): Query[] {
   );
   const variables = (dashboard.templating?.list ?? [])
     .filter((v) => v.type === 'query')
-    .map((v) => ({ datasource: v.datasource?.uid ?? '', text: typeof v.query === 'string' ? v.query : JSON.stringify(v.query) }));
+    .map((v) => ({ datasource: v.datasource?.uid ?? '', text: variableText(v.query) }));
   return [...targets, ...variables];
 }
 
@@ -407,6 +413,11 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, and a lo
   ];
   for (const [title, datasource, from, to, named] of cases)
     assert.deepEqual(unknownNames(withQuery(dashboardTitled(title), datasource, from, to), KNOWN), [named], `${title}: ${to}`);
+  const run = dashboardTitled('A run');
+  const variable = run.templating?.list.find((v) => v.name === 'run');
+  assert.ok(variable, 'A run picks its run');
+  variable.query = { ...(variable.query as object), label: 'runid' };
+  assert.deepEqual(unknownNames(run, KNOWN), ['runid'], 'A run: a variable reading the tag runid');
 });
 
 test('System charts every metric the code exports', () => {

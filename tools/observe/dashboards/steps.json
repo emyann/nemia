@@ -11,7 +11,7 @@
   "graphTooltip": 1,
   "refresh": "30s",
   "time": {
-    "from": "now-6h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
@@ -213,7 +213,14 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -266,7 +273,14 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -368,6 +382,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 0,
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
@@ -380,7 +395,14 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
         "reduceOptions": {
           "calcs": [
             "lastNotNull"

@@ -11,7 +11,7 @@
   "graphTooltip": 1,
   "refresh": "30s",
   "time": {
-    "from": "now-6h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
@@ -47,7 +47,7 @@
         },
         "query": {
           "type": 1,
-          "label": "span.run",
+          "label": "run",
           "refId": "TempoDatasourceVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -64,7 +64,7 @@
         },
         "query": {
           "type": 1,
-          "label": "span.step",
+          "label": "step",
           "refId": "TempoDatasourceVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -99,7 +99,7 @@
       "id": 1,
       "type": "table",
       "title": "Filings",
-      "description": "The orchestrator's filings of the run's steps.",
+      "description": "The runtime's filings of the run's steps: a span for each session a step filed.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -107,8 +107,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 10
+        "w": 24,
+        "h": 9
       },
       "targets": [
         {
@@ -118,10 +118,23 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.service.name=\"$service\" && span.run=\"$run\" && span.step=~\"$step\" && name=~\"fileReady|fileTries|fileRounds|fileChecks\"} | select(span.step)",
+          "query": "{resource.service.name=\"$service\" && span.run=\"$run\" && span.step=~\"$step\" && name=\"file\"} | select(span.step)",
           "limit": 50,
           "spss": 20,
           "tableType": "spans"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Trace Service": true,
+              "Trace Name": true,
+              "service.name": true,
+              "run": true
+            }
+          }
         }
       ],
       "fieldConfig": {
@@ -143,9 +156,9 @@
         "uid": "tempo"
       },
       "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
+        "x": 0,
+        "y": 9,
+        "w": 24,
         "h": 10
       },
       "targets": [
@@ -160,6 +173,20 @@
           "limit": 50,
           "spss": 20,
           "tableType": "spans"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Trace Service": true,
+              "Trace Name": true,
+              "service.name": true,
+              "run": true,
+              "Name": true
+            }
+          }
         }
       ],
       "fieldConfig": {
@@ -182,7 +209,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 10,
+        "y": 19,
         "w": 12,
         "h": 8
       },
@@ -237,7 +264,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 10,
+        "y": 19,
         "w": 12,
         "h": 8
       },
@@ -291,7 +318,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 27,
         "w": 24,
         "h": 12
       },

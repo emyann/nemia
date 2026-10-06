@@ -131,6 +131,8 @@ export type ArtifactFile = { path: string; bytes: number };
  * A declared artifact the run does not have, and why (`missingArtifacts` in artifacts.store.ts):
  *
  *   not there      a path from the workspace root with nothing at it, nor on the branch
+ *   not known      a path from the workspace root the run has not collected, and whose branch's tip the place did not say: `said` is
+ *                  what it said instead
  *   directory      a path from the workspace root that is a directory: not collected, since a step names each file
  *   not collected  a file in the workspace that is not in the step's files directory, and whose copy something in that directory refused
  *                  — or that is on no branch either: git ignores it, and its step has not handed off
@@ -141,7 +143,8 @@ export type ArtifactFile = { path: string; bytes: number };
  */
 export type MissingArtifact = {
   path: string;
-  why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' | 'configuration';
+  why: 'not there' | 'not known' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' | 'configuration';
+  said?: string;
 };
 
 /**
@@ -167,6 +170,11 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
             ? `!! declared and not collected: ${names}  — on no branch, and its worktree was removed by nemia prune at ${pruned.at}`
             : `!! declared but not in the workspace: ${names}  — nothing to collect`,
         )),
+    ...line(
+      'not known',
+      (names) =>
+        `!! declared and not collected, and whether its branch has it is not known: ${names}  — ${missing.find((m) => m.said)?.said ?? ''}`,
+    ),
     ...line('directory', (names) => `!! declared a directory, not collected: ${names}  — a step names each file`),
     ...line('not collected', (names) => `!! declared and not collected: ${names}  — in the workspace, and not in ${dir}`),
     ...(filesGone ? [] : line('missing', (names) => `!! declared but not in ${dir}: ${names}`)),

@@ -1357,9 +1357,15 @@ test('the agent-facing chips are amber and the check-affecting ones outlined red
     "on a branch with neither, the branch's rows are drawn and no chip is",
   );
   const unread = renderToStaticMarkup(
-    createElement(TouchedBranch, { touched: { branch: 'wf/gone', radius: { error: 'git could not diff abc...wf/gone' } } }),
+    createElement(TouchedBranch, {
+      touched: { branch: 'wf/gone', radius: { error: 'what this run changed is not known: the place has no branch wf/gone in /r' } },
+    }),
   );
-  assert.match(unread, />not read: git could not diff abc\.\.\.wf\/gone</, 'a branch git could not read says so');
+  assert.match(
+    unread,
+    />what this run changed is not known: the place has no branch wf\/gone in \/r</,
+    'a branch the place did not say says so, in the sentence the api gave',
+  );
   assert.doesNotMatch(unread, /data-bar|data-group/, 'and draws no row');
 });
 
@@ -3047,21 +3053,21 @@ test('the step that ends the run in the checkout is known by its `workspace`, an
   );
 });
 
-test("what an ending step would act on, beside its gate: the branch's standing and diff stat, and each work step's closeout with its files", () => {
+test("what an ending step would act on, beside its gate: the branch's standing and counts, and each work step's closeout with its files", () => {
   const run = endingRun();
   const standing = {
     branch: 'wf/r-1/implement',
     where: 'ahead',
     commits: 3,
     said: 'wf/r-1/implement is ahead of main by 3 commits',
-    stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
+    stat: '4 files: +456 −2',
   };
   const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
   assert.match(html, /^<section aria-label="What ship would act on"/);
   assert.match(html, /data-standing="ahead"/);
   const texts = textsOf(html);
   assert.ok(texts.includes(standing.said), html);
-  assert.ok(texts.includes(standing.stat), "git's own --shortstat, as `wf decide` prints it");
+  assert.ok(texts.includes(standing.stat), 'how much it changed, as `wf decide` prints it');
   assert.ok(texts.includes('implement'), `the work it waits on, off the graph\n${html}`);
   assert.match(html, /<h4[^>]*>What changed<\/h4>/, 'its closeout rendered as the markdown it is');
   assert.ok(texts.includes('the cap on runs in flight'), html);

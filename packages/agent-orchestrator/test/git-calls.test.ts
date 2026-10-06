@@ -59,7 +59,6 @@ type Baseline = Readonly<Record<string, Entry>>;
 
 /** Each file that calls git today, with its count and the cards that remove its calls. */
 const GIT_SITES: Baseline = {
-  'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 1, cards: ['H'] },
   'packages/agent-orchestrator/src/branches/branches.store.ts': { count: 7, cards: ['I1', 'I2'] },
   'packages/agent-orchestrator/src/forget/forget.verb.ts': { count: 8, cards: ['E'] },
   'packages/agent-orchestrator/src/merge/merge.verb.ts': { count: 1, cards: ['H'] },

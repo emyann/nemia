@@ -501,7 +501,8 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
 }
 
 /**
- * What one branch touched: a row per group with its +/− bar, then the agent-facing and check-affecting files, each only when there are any.
+ * What one branch touched: a row per group with its +/− bar, then the agent-facing and check-affecting files, each only when there are any
+ * — or, where the run's place did not say, the api's sentence saying what the run changed is not known, as it is given.
  */
 export function TouchedBranch({ touched: { branch, radius } }: { touched: Touched }) {
   return (
@@ -511,7 +512,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
         <span className="break-all font-mono text-xs">{branch}</span>
       </p>
       {'error' in radius ? (
-        <p className="text-sm text-red-700 dark:text-red-400">not read: {radius.error}</p>
+        <p className="text-sm text-red-700 dark:text-red-400">{radius.error}</p>
       ) : radius.changes.length ? (
         <>
           <GroupRows groups={radius.groups} />

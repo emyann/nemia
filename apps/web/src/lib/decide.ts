@@ -44,7 +44,7 @@ export const decisionStamp = (
 
 /**
  * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads touched, counted
- * once; the lines of every file, each file counted once; and how many branches git could not read.
+ * once; the lines of every file, each file counted once; and how many branches' changes are not known, never counted as none.
  *
  * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from its
  * parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on
@@ -56,7 +56,7 @@ export function touchedSummary(touched: readonly Touched[]): string {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));
   const unread = touched.length - read.length;
   if (!touched.length) return 'touched nothing — no branch to read';
-  if (!read.length) return `touched not known — ${unread === 1 ? 'its branch' : `${unread} branches`} could not be read`;
+  if (!read.length) return `touched not known — what ${unread === 1 ? 'its branch' : `its ${unread} branches`} changed was not said`;
   const groups = new Set(read.flatMap((r) => r.groups.map((g) => g.name))).size;
   const files = new Map<string, { added: number; removed: number }>();
   for (const c of read.flatMap((r) => r.changes)) {
@@ -70,7 +70,7 @@ export function touchedSummary(touched: readonly Touched[]): string {
     added += lines.added;
     removed += lines.removed;
   }
-  return `touched ${groups} package${groups === 1 ? '' : 's'} · +${added} −${removed}${unread ? ` · ${unread} not read` : ''}`;
+  return `touched ${groups} package${groups === 1 ? '' : 's'} · +${added} −${removed}${unread ? ` · ${unread} not known` : ''}`;
 }
 
 /**

@@ -6,7 +6,7 @@ import type { PageSpec } from '../visit.ts';
 export default {
   /**
    * A run whose review loop is out of rounds, waiting on you. Its record names a repository that is not on this machine, so the Decide
-   * section says its branch could not be read, and the page renders. The graph the run froze: implement → review, the edge back beneath
+   * section says what its branch changed is not known, and the page renders. The graph the run froze: implement → review, the edge back beneath
    * the row, and review drawn as a human gate. Each step's note is on hover on the canvas and under its chip on the run's page, read before
    * a click opens the inspector, which has a heading of its own. The timeline has a row a try and a total a round; implement's Details
    * list its three rounds, each a task of its own, and round 2 selected shows its closeout with the other two folded beneath.
@@ -26,8 +26,8 @@ export default {
     );
     const decide = page.locator('section[aria-label="Decide"]');
     await expectVisible(
-      decide.getByText(/^not read: git could not diff /).first(),
-      `the Decide section says ${LOOPING.id}'s branch could not be read: its record names a repository not on this machine`,
+      decide.getByText(/^what this run changed is not known: /).first(),
+      `the Decide section says what ${LOOPING.id}'s branch changed is not known: its record names a repository not on this machine`,
     );
     await expectVisible(decide.locator('[data-lesson="unknown"]'), 'the lesson chip says nobody can know, not that nothing was written');
     await expectVisible(

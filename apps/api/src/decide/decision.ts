@@ -44,8 +44,8 @@ export type Touched = { branch: string; radius: BranchChanges['radius'] };
 /**
  * Where one result branch stands against the base branch, as git says it now (`BranchStanding`) — on it, ahead of it by N commits, or gone
  * — with the fact in the package's words (`branchWord`) and how much it changed, as `nemia decide` prints beside the branch
- * (`countsLine`): `3 files: +14 −1`, with `, 1 binary` where one is, or the sentence saying what it changed is not known. `stat` is null for
- * a branch with nothing on it past the run's base.
+ * (`countsLine`): `3 files: +14 −1`, with `, 1 binary` where one is, or the sentence saying what it changed is not known. `stat` is null
+ * for a branch with nothing on it past the run's base.
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 

@@ -333,7 +333,10 @@ function changesRead(
   return { toRead: toRead.map(of), results: branches.map(of) };
 }
 
-/** What each branch to read touched, the lesson line, and each branch's files `sensitive` names — the check-affecting ones by default — in full. */
+/**
+ * What each branch to read touched, the lesson line, and each branch's files `sensitive` names — the check-affecting ones by default — in
+ * full.
+ */
 function printTouched(touched: BranchChanges[], sensitive: string[] | undefined): void {
   if (!touched.length) return;
   console.log();

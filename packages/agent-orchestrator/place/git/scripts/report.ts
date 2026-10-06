@@ -1,10 +1,10 @@
 /**
  * `report`: what each result branch changed against a run's base, read in git's object store alone, which touches no checkout. Takes
- * `{ repo, baseRef, onto, branches, diffOf, present, atBase }`, the last three lists of paths from the repository's root; answers `Changes`:
- * `at`, the base, the commit `onto` names now (null where git has none) and each branch's tip; `files`, each branch's changed files against
- * the base, renames found, with null counts for a binary file; `diffs`, for each branch, the whole diff of each path of `diffOf` it changed,
- * a rename's two ends as one; `present`, for each branch, whether each path of `present` is a file, a directory or absent at its tip; and
- * `atBase`, the text of each path of `atBase` at the base, null where none is.
+ * `{ repo, baseRef, onto, branches, diffOf, present, atBase }`, the last three lists of paths from the repository's root; answers
+ * `Changes`: `at`, the base, the commit `onto` names now (null where git has none) and each branch's tip; `files`, each branch's changed
+ * files against the base, renames found, with null counts for a binary file; `diffs`, for each branch, the whole diff of each path of
+ * `diffOf` it changed, a rename's two ends as one; `present`, for each branch, whether each path of `present` is a file, a directory or
+ * absent at its tip; and `atBase`, the text of each path of `atBase` at the base, null where none is.
  *
  * A branch git does not have is left out of every answer, never answered as one that changed nothing. Refuses a repository that is no
  * directory, a base git cannot read, and a git command that fails, in git's words. Exits 1 when git cannot be started at all.

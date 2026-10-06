@@ -49,7 +49,7 @@ export default {
       acts.locator('[data-standing="ahead"]', { hasText: ENDING.standing }),
       `the panel says where the branch stands (${ENDING.standing})`,
     );
-    await expectVisible(acts.locator('[data-stat]', { hasText: ENDING.stat }), `and git's own diff stat of it (${ENDING.stat})`);
+    await expectVisible(acts.locator('[data-stat]', { hasText: ENDING.stat }), `and how much it changed (${ENDING.stat})`);
     await expectRendered(acts.locator('[data-markdown]'), ENDING.review);
     await expectVisible(
       acts.locator(`[aria-label="Artifacts of ${back}"] a`, { hasText: ENDING.artifact }),

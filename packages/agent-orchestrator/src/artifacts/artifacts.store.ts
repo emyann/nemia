@@ -15,14 +15,18 @@ import { inside } from '../workspace/workspace.ts';
 import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf } from '../record/record.store.ts';
-import { gitSays } from '../workspace/worktree.store.ts';
+import { presentOn } from '../branches/changes.store.ts';
+
+/** What is at a path at the tip of a step's branch, as its run's place says (`presentOn`), or what the place said instead. */
+type OnBranch = (rel: string) => 'file' | 'directory' | 'absent' | { readonly unknown: string };
 
 /**
  * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`): a declared file written and never handed over is a
  * mismatch a person can see, where the merge alone would be clean and empty.
  *
  * A path from the workspace root is read where the tick collected it (`collectArtifacts`), and the workspace says why when it is not
- * there (`workspaceArtifact`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
+ * there (`workspaceArtifact`), and the step's branch, as the run's place says what is at each such path, asked once and only when one
+ * is needed (`branchOf`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
  * on disk: present when it is a file inside the directory once every link on the way is followed, so a link that leads out is as missing
  * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
  * at (`artifactPlace`), as is a path through a folder a harness reads as its own configuration, which is never collected.
@@ -30,41 +34,70 @@ import { gitSays } from '../workspace/worktree.store.ts';
 export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): MissingArtifact[] {
   if (!closeout || 'error' in closeout) return [];
   const dir = artifactsDir(run, stepName);
+  const onBranch = branchOf(
+    run,
+    stepName,
+    closeout.artifacts.filter((file) => artifactPlace(file, dir) === 'workspace'),
+  );
   const missing: MissingArtifact[] = [];
   for (const file of closeout.artifacts) {
     const place = artifactPlace(file, dir);
     const why =
       place === 'outside' || place === 'escapes' || place === 'configuration'
-        ? place
+        ? { why: place }
         : place === 'files'
           ? isFileIn(file, dir)
             ? undefined
-            : 'missing'
-          : workspaceArtifact(run, stepName, file, dir);
-    if (why) missing.push({ path: file, why });
+            : { why: 'missing' as const }
+          : workspaceArtifact(run, stepName, file, dir, onBranch);
+    if (why) missing.push({ path: file, ...why });
   }
   return missing;
+}
+
+/**
+ * What is at each of `files`, named from the workspace root, at the tip of the step's branch: one question to the run's place for all of
+ * them, asked the first time one is needed, and then read from its answer. Absent everywhere for a step with no branch or a run with no
+ * repository.
+ */
+function branchOf(run: Run, stepName: string, files: readonly string[]): OnBranch {
+  const branch = run.steps[stepName]?.branch;
+  let read: ReturnType<typeof presentOn> | undefined;
+  return (rel) => {
+    if (!branch || !isGitRun(run)) return 'absent';
+    read ??= presentOn(run, branch, [...new Set(files.map((file) => path.normalize(file)))]);
+    return 'unknown' in read ? { unknown: read.unknown } : (read[rel] ?? 'absent');
+  };
 }
 
 /**
  * Why a file named from the workspace root is not one the run has — or undefined when it is: collected into `dir`, which answers first,
  * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, or a
  * directory. A file in the workspace whose copy something a step made in `dir` refuses (`copyBlocked`) is `not collected`, even when it is
- * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer, so a step handed off without
- * its files collected still has what its branch holds, and one on no branch either, a file git ignores that its step has not handed off
- * yet, is `not collected`. With nothing in the workspace, the branch answers too.
+ * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer (`onBranch`), so a step handed
+ * off without its files collected still has what its branch holds, and one on no branch either, a file git ignores that its step has not
+ * handed off yet, is `not collected`. With nothing in the workspace, the branch answers too. Where the place did not say what the branch
+ * holds, the file is `not known`, with what it said — never `not there`.
  */
-function workspaceArtifact(run: Run, stepName: string, file: string, dir: string): MissingArtifact['why'] | undefined {
+function workspaceArtifact(
+  run: Run,
+  stepName: string,
+  file: string,
+  dir: string,
+  onBranch: OnBranch,
+): Omit<MissingArtifact, 'path'> | undefined {
   const rel = path.normalize(file);
   if (isFileIn(path.join(dir, rel), dir)) return undefined;
-  const { workspace, branch } = run.steps[stepName] ?? {};
+  const { workspace } = run.steps[stepName] ?? {};
   const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
-  if (at.kind === 'outside') return 'escapes';
-  if (at.kind === 'directory') return 'directory';
-  if (at.kind === 'file' && copyBlocked(dir, rel)) return 'not collected';
-  const onBranch = branch && isGitRun(run) ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
-  if (at.kind === 'file') return onBranch === 'blob' ? undefined : 'not collected';
-  return onBranch === 'blob' ? undefined : onBranch === 'tree' ? 'directory' : 'not there';
+  if (at.kind === 'outside') return { why: 'escapes' };
+  if (at.kind === 'directory') return { why: 'directory' };
+  if (at.kind === 'file' && copyBlocked(dir, rel)) return { why: 'not collected' };
+  const there = onBranch(rel);
+  if (typeof there !== 'string') return { why: 'not known', said: there.unknown };
+  if (there === 'file') return undefined;
+  if (at.kind === 'file') return { why: 'not collected' };
+  return { why: there === 'directory' ? 'directory' : 'not there' };
 }
 
 /**

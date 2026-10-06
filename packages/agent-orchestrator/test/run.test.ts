@@ -5637,8 +5637,8 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
   );
   assert.equal(
     refusal({ mode: 'nudge', budget: 3 }, [], spends({ t0: 1, t1: 1 })),
-    '--budget 3 is not above $3, the $3 cap in force on implement, whose tries have cost $2.00: --budget only ever raises the cap. Give more than $3: nemia retry r-1 implement --budget <amount>.',
-    'not above the cap in force, refused before what the run would do itself',
+    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
+    'what the run does itself is said first, so the fix is never a --budget it would refuse next',
   );
   const spentOut: Workflow[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
   const outOfRetries = (how: RetryHow) =>

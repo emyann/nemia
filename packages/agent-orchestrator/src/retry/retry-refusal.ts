@@ -90,7 +90,8 @@ type Judged = Asked &
  * floor (`raiseOf`: what its tries have cost, and the cap in force) — each by name; and an ask already waiting that no tick will honour,
  * for want of a `--budget` or for one the step cannot take. A `--budget` above the floor is taken on any step a person may try, blocked
  * or failed as much as over its budget. A step over its budget whose check did not finish is offered the recheck first, which costs nothing
- * and needs no `--budget`.
+ * and needs no `--budget`. A step the run tries again itself is told so before any of these, so no refusal's fix is a `--budget` that
+ * would be refused next.
  *
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
  *   running, and refused.
@@ -131,8 +132,8 @@ export function retryRefusal(
     (c.modes.length ? undefined : nothingToTry(c)) ??
     modeRefusal(c) ??
     wordlessRefusal(c) ??
-    budgetAskRefusal(c) ??
     runTriesItself(c) ??
+    budgetAskRefusal(c) ??
     null
   );
 }

@@ -41,7 +41,10 @@ const {
   WHY_CAP,
   runWith,
 } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { passStanding } = await import('../src/standing/standing.verb.ts');
+/** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
+const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
 const { main } = await import('../src/cli/main.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -399,6 +402,7 @@ test('a held run files nothing — the next step, nor on a hold written between 
   const quiet = await runWith(b.e, advanceRun(readRun(run.id)));
   assert.ok(!b.filings.includes(`${run.id}-implement`), 'nothing filed while held');
   assert.equal(quiet.feed.run.note, `held until ${target.id} ships`, 'the feed says the hold, and not that the run waits on you');
+  await aPass(b.e);
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
   assert.match(ls, new RegExp(`→ held until ${target.id} ships  —  nemia hold ${run.id} --off lifts it`));
   const screen = (await typed(t, b.e, 'decide', run.id)).printed;
@@ -517,6 +521,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
     runWith(b.e, retryRun(atGate.id, 'implement', { mode: 'nudge', message: 'change it' })),
     (err: Error) => err.message.startsWith(held) && err.message.includes('a retry would release'),
   );
+  await aPass(b.e);
   const ls = (await typed(t, b.e, 'ls', atGate.id)).printed;
   assert.doesNotMatch(ls, /waiting on you/, ls);
   assert.doesNotMatch(ls, VERBS, ls);
@@ -1190,6 +1195,7 @@ test("nemia ls, nemia decide and the feed say a hold's why and who put it beside
   assert.equal((await typed(t, b.e, 'hold', olderGate.id, '--until', target.id)).error, undefined);
   asOlder(olderGate.id);
 
+  await aPass(b.e);
   const ls = (await typed(t, b.e, 'ls', atGate.id)).printed;
   assert.match(ls, new RegExp(`→ ${literal(words)}  —  nemia hold ${atGate.id} --off lifts it`), ls);
   assert.match(ls, new RegExp(`${literal(words)}; its approval is asked once the hold lifts`), ls);

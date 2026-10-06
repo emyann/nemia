@@ -50,6 +50,7 @@ import {
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
@@ -189,7 +190,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
-  const landing = placeTold(run, step, notes);
+  const landing = placeTold(run, step, notes, undefined, f.heads?.());
   if (!landing) return;
   const answers = answersHeld(f, r, step, record);
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
@@ -366,7 +367,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
-  const landing = placeTold(run, target, notes);
+  const landing = placeTold(run, target, notes, undefined, f.heads?.());
   if (!landing) return;
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
@@ -520,18 +521,19 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
 /**
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
  * that waited on runs, on the pass that files its roots, moves its base to its branch as the pass read it (`Filing.heads`), and keeps it
- * where the pass did not; and a run that waited on runs or was handed runs as context reads what they concluded (`handedOf`).
+ * where the pass did not; and a run that waited on runs or was handed runs as context reads what they concluded, where their branches
+ * stand read through `git` (`handedOf`).
  */
-export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean) {
+export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean, git: BranchReader) {
   const { e, run } = f;
   if (ready.length && starting && run.after?.length && isGitRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
-  const parents = ready.length && starting ? yield* handedOf(e, run) : undefined;
+  const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
   const filed: string[] = [];
   const dirOf = yield* RunPlace;
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
-    const landing = placeTold(run, step, f.notes);
+    const landing = placeTold(run, step, f.notes, undefined, f.heads?.());
     if (!landing) continue;
     const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, dirOf));
     f.notes.push(...cutNotes(name, made));

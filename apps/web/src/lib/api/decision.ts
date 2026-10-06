@@ -101,13 +101,15 @@ const DecideCommandSchema = Schema.Struct({
 
 /**
  * Mirrors `Standing` in apps/api/src/decide/decision.ts: where one result branch stands against the base branch as git says it now — on it,
- * ahead of it by N commits, or gone — with the fact in the package's words and how much it changed, as the CLI's `decide` prints beside the
- * branch (`3 files: +14 −1`, or the sentence saying what it changed is not known); `stat` is null for a branch with nothing past the base.
+ * ahead of it by N commits, gone, or unread, `why` saying its place did not say — with the fact in the package's words and how much it
+ * changed, as the CLI's `decide` prints beside the branch (`3 files: +14 −1`, or the sentence saying what it changed is not known); `stat`
+ * is null for a branch with nothing past the base.
  */
 export type Standing = (
   | { branch: string; where: 'on' }
   | { branch: string; where: 'ahead'; commits: number }
   | { branch: string; where: 'gone' }
+  | { branch: string; where: 'unread'; why: string }
 ) & { said: string; stat: string | null; merge: StandingMerge | null };
 
 /**
@@ -189,6 +191,7 @@ const StandingSchema = Schema.Union([
   Schema.Struct({ branch: Schema.String, where: Schema.Literal('on'), ...StandingFields }),
   Schema.Struct({ branch: Schema.String, where: Schema.Literal('ahead'), commits: Schema.Number, ...StandingFields }),
   Schema.Struct({ branch: Schema.String, where: Schema.Literal('gone'), ...StandingFields }),
+  Schema.Struct({ branch: Schema.String, where: Schema.Literal('unread'), why: Schema.String, ...StandingFields }),
 ]) satisfies Schema.Schema<Standing>;
 
 /** Mirrors `Decidable` in apps/api/src/decide/decision.ts. */

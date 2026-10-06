@@ -1,7 +1,6 @@
 /**
  * A git run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read back
- * only where it was asked for, the `node_modules` it is given (`workspace.ts` decides, this applies), and `gitSays`, the quiet git read
- * `branches.store.ts` and the tick still make.
+ * only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
@@ -29,7 +28,7 @@ import { folderPlace } from '../record/places.store.ts';
 import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
-import { countSpawn, execCounted, withinEffect } from '../meter/tally.store.ts';
+import { countSpawn, withinEffect } from '../meter/tally.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
 import { readPlaceJson } from '../place/place.store.ts';
 import type { PlaceRequests } from '../place/place.ts';
@@ -423,15 +422,3 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
     notes: [...made.notes, ...depsNotes(deps)],
   });
 });
-
-/**
- * Git's output, or undefined when it cannot answer — quietly, as a person reads the screen this
- * feeds, and untrimmed, as a name may end in a space. A lockfile's diff is large, so is the buffer.
- */
-export const gitSays = (repo: string, ...args: string[]): string | undefined => {
-  try {
-    return execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
-  } catch {
-    return undefined;
-  }
-};

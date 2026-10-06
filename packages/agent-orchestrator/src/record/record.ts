@@ -156,7 +156,7 @@ type RunBase = {
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (`isShipped` in branches.store.ts) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
+   * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
    * finished.
    */
   tips?: Record<string, string>;

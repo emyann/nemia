@@ -20,7 +20,6 @@
  */
 import fs from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { Effect, Fiber, Context, References } from 'effect';
 import { NOTHING_SEEN, PHASES, type CheckLabels, type Phase, type PhaseCost, type Seen } from './meter.ts';
 
@@ -280,14 +279,3 @@ export const readText = (file: string): string => {
   countRead(buf.length);
   return buf.toString('utf8');
 };
-
-/** `execFileSync`, counted as a process started, and as `git` when the command is git: throws as it does. */
-export function execCounted(cmd: string, args: readonly string[], options: ExecFileSyncOptions & { encoding: BufferEncoding }): string;
-export function execCounted(cmd: string, args: readonly string[], options?: ExecFileSyncOptions): string | Buffer;
-export function execCounted(cmd: string, args: readonly string[], options?: ExecFileSyncOptions): string | Buffer {
-  const run = () => {
-    countSpawn();
-    return execFileSync(cmd, args, options);
-  };
-  return cmd === 'git' ? within('git', run) : run();
-}

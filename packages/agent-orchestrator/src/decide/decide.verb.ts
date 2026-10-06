@@ -12,7 +12,7 @@ import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
 import type { BranchStanding, Round, SpendOf } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
-import { hasStarted, holdsOf, waitsOf, type Wait } from '../wait/wait.ts';
+import { hasStarted, holdsOf, waitedOn, waitsOf, type Wait } from '../wait/wait.ts';
 import { roundOffers, roundsDue } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
 import { choicesOf, costLine, decision, runCostLines, type DecideCommand, type Decision } from './decide.ts';
@@ -23,7 +23,8 @@ import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Re
 import { timeline, type Timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { branchReader, shippedOf, standingsOf } from '../branches/branches.store.ts';
+import { shippedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
 import {
   checkReportsRead,
   closeoutAsked,
@@ -34,6 +35,7 @@ import {
   everyTryOf,
   harnessBlocked,
   parentsRead,
+  passParents,
   saidIn,
   spendReader,
   taskPhasesRead,
@@ -47,7 +49,7 @@ import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { collisionsDue, type Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
-import { landingDenies } from '../place/landing.store.ts';
+import { landingDenies, statusMemo } from '../place/landing.store.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -235,19 +237,23 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 
 /**
  * What is left for a person to do — the pure call, with git asked the one question it owns. Each task is viewed once (`viewedOnce`), the
- * current tries and every try before them, and git asked of each branch once (`branchReader`), for the decision and the standings both
- * — and not at all for a run still running or called off, whose standings are none: nothing of it is decided on them.
+ * current tries and every try before them, and where the branches stand asked of their places at most once, now (`standingNow`: this
+ * run's, and those of every run the tick's pass would ask of), only where something read depends on it (`standingWhen`): the decision of
+ * a run neither running nor called off, its standings and collisions, the checkout's claims of an ending asked for, the runs it waits on,
+ * and the cap's parents where a run waits on another. A run still running or called off has no standings: nothing of it is decided on them.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
  * The cap on runs in flight, whose `WF_MAX_RUNS` before any pass is `env`'s, is read for both facts it bears on: whether a run nothing of
  * which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`).
+ * Where the branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time.
  * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
-export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env) {
+export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env, standing?: StandingAsker) {
   const e = viewedOnce(yield* EngineService);
-  const git = yield* tried(() => branchReader());
   const run = yield* tried(() => runStore.runs.read(id));
+  const runs = yield* tried(() => runStore.runs.list());
+  const live = standing ?? (yield* standingWhen(runs, id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
@@ -260,9 +266,13 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const checkout = yield* checkoutHold(e, run, steps, undefined, env);
-  const shipped = yield* tried(() => shippedOf(run, git));
-  const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
+  const memo = statusMemo((r) => headsOver(live.read())(r));
+  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, env, memo);
+  const decided = (git: BranchReader) =>
+    decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
+  const unasked = decided(standingReader(NOTHING_READ));
+  const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
+  const d = yield* tried(() => decided(git));
   const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   const ending = collisionsDue(steps, run, decide);
@@ -275,14 +285,15 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const costs = costsOf(steps, run, used, spendOf);
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, undefined, env)).held.get(id) : undefined;
+  const parents = passParents(yield* live.when(runs.some((r) => waitedOn(r).length > 0)));
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, runs, env, parents)).held.get(id) : undefined;
   const ended = Boolean(run.cancelledAt || run.pruned || run.hold);
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(steps, run, d, rounds, phaseOf, reader, asked, spendOf),
     ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run)),
   ];
-  const parent = yield* parentsRead(run, git).pipe(over(e));
+  const parent = yield* parentsRead(run, yield* live.when(waitedOn(run).length > 0)).pipe(over(e));
   const answer: Decided = {
     run,
     decision: d,

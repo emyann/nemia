@@ -24,8 +24,7 @@ import {
   spendReader,
   type Parents,
 } from '../views/views.verb.ts';
-import { oneByOne } from '../branches/branches.store.ts';
-import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
+import { standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
@@ -84,13 +83,13 @@ const needOf = Effect.fnUntraced(function* (
  *
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
  * any pass has written it, `WF_MAX_RUNS` of `env` (`maxRuns`, refused by name when it is not a count). The runs the runs wait on are read
- * through `parents`, a pass's (`passParents`), and each once per call with none given.
+ * through `parents` (`passParents`): a pass's, or the caller's, over the reader it read where the branches stand through.
  */
 export const slotsOf = Effect.fn('slotsOf')(function* (
   e: Engine,
   runs: readonly Run[] = runStore.runs.list(),
   env: NodeJS.ProcessEnv = process.env,
-  parents: Parents = { git: oneByOne, read: new Map() },
+  parents: Parents,
 ) {
   const cap = lastCeilings()?.runs ?? maxRuns(env);
   if (cap <= 0) return { cap: 0, inFlight: null, held: new Map() } satisfies Slots;
@@ -118,9 +117,13 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
   return { cap, inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id), held: heldRuns(needs, cap) } satisfies Slots;
 });
 
-/** The run slots (`slotsOf`) of every run in the store, read through the engine in the context: the cap and what holds it. */
+/**
+ * The run slots (`slotsOf`) of every run in the store, read through the engine in the context, the runs they wait on off the tick's last
+ * reading of where the branches stand (`standingSnapshot`), with no git process: the cap and what holds it, as the board says it.
+ */
 export const slotsRead = Effect.fn('slotsRead')(function* (env: NodeJS.ProcessEnv = process.env) {
-  return yield* slotsOf(yield* EngineService, undefined, env);
+  const parents = passParents(standingReader(yield* standingSnapshot()));
+  return yield* slotsOf(yield* EngineService, undefined, env, parents);
 });
 
 /**
@@ -128,12 +131,7 @@ export const slotsRead = Effect.fn('slotsRead')(function* (env: NodeJS.ProcessEn
  * cap or no run that has nothing filed. The cap before any pass has written one is `env`'s `WF_MAX_RUNS`, as `slotsOf` reads it; the runs
  * the runs wait on are read through `parents`, as `slotsOf` reads them.
  */
-export const runSlots = Effect.fn('runSlots')(function* (
-  e: Engine,
-  runs: readonly Run[] = runStore.runs.list(),
-  env: NodeJS.ProcessEnv = process.env,
-  parents?: Parents,
-) {
+export const runSlots = Effect.fn('runSlots')(function* (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv, parents: Parents) {
   const cap = lastCeilings()?.runs ?? maxRuns(env);
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map<string, RunSlot>();
   return (yield* slotsOf(e, runs, env, parents)).held;
@@ -144,20 +142,23 @@ export const runSlots = Effect.fn('runSlots')(function* (
  * (`runSlots`), read on the first claim on a checkout that asks for them and kept for the rest of the pass, a read that failed asked again;
  * and the runs others wait on (`Parents`); and the tasks the engine's feed said settled since the pass before (`settled`, `followedFeed`),
  * which the metrics record once (`settledFacts`), absent where the pass read no feed; and where the pass read its repositories stand
- * (`passStanding`), which its parents are read off, absent outside the tick's pass. Made by the pass and dropped with it: the next reads
- * the world again.
+ * (`passStanding`), which its parents are read off — or, outside the tick's pass, where its caller read them (`standingNow`,
+ * `standingSnapshot`). Made by the pass and dropped with it: the next reads the world again.
  */
 export type PassRead = {
   runs: readonly Run[];
   slots: Effect.Effect<Map<string, RunSlot>, Refusal>;
   parents: Parents;
   settled?: ReadonlySet<string>;
-  standing?: PassStanding;
+  standing: PassStanding;
 };
 
-/** What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it. */
-export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv = process.env, standing?: PassStanding): PassRead => {
-  const parents = passParents(standing && standingReader(standing));
+/**
+ * What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it, and the
+ * runs others wait on read off `standing`.
+ */
+export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv, standing: PassStanding): PassRead => {
+  const parents = passParents(standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
   const slots = Effect.suspend(() => {
@@ -171,5 +172,5 @@ export const passRead = (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv
       }),
     );
   });
-  return { runs, slots, parents, ...(standing ? { standing } : {}) };
+  return { runs, slots, parents, standing };
 };

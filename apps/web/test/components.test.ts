@@ -3152,6 +3152,22 @@ test("what an ending step would act on, beside its gate: the branch's standing a
   );
 });
 
+test("a result branch whose place was not heard reads unread beside an ending's gate, in the package's words — never on the base, nor ahead", () => {
+  const run = endingRun();
+  const why = 'the place was not heard: timed out';
+  const standing = {
+    branch: 'wf/r-1/implement',
+    where: 'unread',
+    why,
+    said: `wf/r-1/implement: where it stands is not read (${why})`,
+    stat: null,
+  };
+  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  assert.match(html, /data-standing="unread"/);
+  assert.ok(textsOf(html).includes(standing.said), html);
+  assert.doesNotMatch(html, /data-standing="(on|ahead|gone)"|data-stat/, 'no standing of its own, and no counts');
+});
+
 test('the gate of an ending step says approving is what files it, and its send-back goes to the work — never to the step at the gate, which `wf retry` refuses', () => {
   const html = withClient(
     createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['implement'], acts: true }),

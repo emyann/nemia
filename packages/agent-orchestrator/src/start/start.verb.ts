@@ -32,6 +32,7 @@ import { writeAgentFiles } from '../agents/agents.store.ts';
 import { SHIPPED_PLACE, openPlace, readPlaceJson } from '../place/place.store.ts';
 import type { PlaceVerb } from '../place/place.ts';
 import { parentRecord } from '../branches/branches.store.ts';
+import { standingLiveOf } from '../standing/standing.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   DEFAULT_FACTORY,
@@ -356,9 +357,13 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
   };
 }
 
-/** A folder run's record, its workspace its own directory in the store: fails with an `--after`'s refusal (`afterRefusal`). */
+/**
+ * A folder run's record, its workspace its own directory in the store: fails with an `--after`'s refusal (`afterRefusal`), where the runs
+ * it waits on stand read now (`standingLiveOf`).
+ */
 const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, steps: Run['steps']) {
-  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { place: { kind: 'folder' } }, parentRecord));
+  const git = yield* standingLiveOf(told.after ?? []);
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { place: { kind: 'folder' } }, (id) => parentRecord(id, git)));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,
@@ -383,14 +388,16 @@ export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gat
 
 /**
  * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
- * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`).
+ * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on stand
+ * read now (`standingLiveOf`).
  */
 const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const placeDir = yield* StartPlace;
   const needed = placeVerbsNeeded(told.workflow ?? [], told, isolate);
   const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed, isolate));
   const { baseRef, branch, staged } = opened;
-  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, parentRecord));
+  const git = yield* standingLiveOf(told.after ?? []);
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, (id) => parentRecord(id, git)));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
   const run: Run = {
     id,

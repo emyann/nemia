@@ -9,6 +9,7 @@ export {
   lessonLine,
   parseGlobs,
   resultSteps,
+  resultTips,
   shippedOver,
   tipBranches,
   tipsSeen,

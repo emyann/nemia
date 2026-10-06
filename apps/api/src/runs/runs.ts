@@ -37,8 +37,8 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  *   (`seenBy`): its record and git, and its tasks as they were listed. The feed's filing times are read once, on from where the last read
  *   stopped (`filedTimes`): when each run started. A run at rest is answered from the list's memo (`restingRead`) while nothing it was
  *   judged on has moved, so a poll reads the journals of the runs still moving and of none other; the rest are read through the request's
- *   own engine and git (`viewsFor`, `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails
- *   the request.
+ *   own engine and the tick's last standing (`viewsFor`, `standingSnapshot`). With `WF_VERIFY_REST` a kept answer is judged afresh
+ *   too, and one that differs fails the request.
  * - `GET /api/runs/:id` — a run in full (`detail`) with the address of its workflow's page (`RunPage`), found by the package's entry
  *   (`run`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the list says it with
  *   (`RunSummary.unreadable`).

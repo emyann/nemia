@@ -3,10 +3,10 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, unreadName } from '../world.ts';
 
 export default {
   /**
@@ -21,7 +21,7 @@ export default {
     const { id, gated } = GATED;
     const until = HELD.id;
     const hold = path.join(store!, 'runs', `${id}.hold`);
-    const word = `held until ${until} ships`;
+    const word = `held until ${unreadName(until)} ships`;
     const holdIt = () => {
       if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
       fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });
@@ -40,7 +40,7 @@ export default {
 
     try {
       holdIt();
-      await expectVisible(card.locator('[data-holding]', { hasText: new RegExp(`^${word}$`) }), `the card says ${word}`);
+      await expectVisible(card.locator('[data-holding]', { hasText: new RegExp(`^${literal(word)}$`) }), `the card says ${word}`);
       const button = card.locator(`[data-lift="${id}"]`);
       await expectVisible(button, 'and offers Lift… beside its held chip');
       await expectCount(page.locator('[data-lift]'), 1, 'on the held card alone');
@@ -65,7 +65,7 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const section = page.locator('section[aria-label="Held"]');
-      await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${word}$`) }), `the run's page says ${word}`);
+      await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the run's page says ${word}`);
       await section.getByRole('button', { name: 'Lift…', exact: true }).click();
       await expectVisible(section.getByText(`Lift the hold on ${id}?`), 'the first press asks');
       if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');

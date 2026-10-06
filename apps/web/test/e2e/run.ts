@@ -53,7 +53,7 @@ import {
 import { QUOTA_ASKS_MS } from './board.ts';
 import { loadPages, planOf } from './pages.ts';
 import { exitOn, launch, visitAll } from './visit.ts';
-import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './world.ts';
+import { API, apiEnv, heard, OUT, setApiEnv, setStore, standingPass, store, WEB } from './world.ts';
 
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
@@ -155,7 +155,7 @@ function fromNodeModules(file: string): string {
  * it; builds the app; seeds the store; starts
  * the api and `vite preview`; and visits every page. The seed writes the diamond after the checkout's files, which its base commits; then
  * the run with no repository anywhere in it, newest of them all; then the feed, over every journal the seed wrote, where the api reads
- * when each task was filed.
+ * when each task was filed. Before the api starts, a pass reads where the runs' branches stand (`standingPass`), as the tick would.
  *
  * First on the api's PATH is a `claude` that lists the store's sessions (REGISTRY), HELD's blocked: the engine observes claude agents on
  * every list, and the pages are about the store, not about the sessions on this machine. It answers the api's get_usage request too
@@ -236,6 +236,7 @@ async function main(): Promise<void> {
     HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   });
+  standingPass();
   const apiPort = await startServer(
     'the api',
     [path.join(API, 'src', 'main.ts'), '--no-tick'],

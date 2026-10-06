@@ -9,10 +9,9 @@
  *
  * A word that runs nothing passes: `'git'` in a list, a comparison or another function's argument, `MERGE_HEAD` in a sentence or a comment.
  *
- * Each file that holds such a call today is a known exception, counted file by file (`GIT_SITES`), and the count only shrinks. Each entry
- * names the cards that remove its calls (`CARDS`). `ratchetBreaks` refuses a file no entry holds, a count above the measure or below it,
- * an entry for a file gone or clean, and an entry with no card or an unknown card. A change that takes a call out of a file lowers its
- * count in the same commit; the baseline is empty once card J lands.
+ * A file that held such a call was a known exception, counted file by file (`GIT_SITES`), and the count only shrank. Each entry named the
+ * cards that removed its calls (`CARDS`). `ratchetBreaks` refuses a file no entry holds, a count above the measure or below it, an entry
+ * for a file gone or clean, and an entry with no card or an unknown card. The baseline is empty, and stays so.
  *
  * The test reads files outside this package: `turbo.json` makes the apps' sources and the runtime inputs of this package's tests.
  */
@@ -55,11 +54,8 @@ const CARDS: Readonly<Record<string, string>> = {
 type Entry = { count: number; cards: readonly string[] };
 type Baseline = Readonly<Record<string, Entry>>;
 
-/** Each file that calls git today, with its count and the cards that remove its calls. */
-const GIT_SITES: Baseline = {
-  'packages/agent-orchestrator/src/branches/branches.store.ts': { count: 7, cards: ['I2'] },
-  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 1, cards: ['J'] },
-};
+/** Each file that calls git, with its count and the cards that remove its calls: none. */
+const GIT_SITES: Baseline = {};
 
 /** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */
 type FileFacts = { consts: ReadonlyMap<string, string>; pathNames: ReadonlySet<string> };
@@ -350,11 +346,19 @@ test('REFUSED: a new file with a git call, in each layer, and a count raised by 
     ['apps/web/src/lib/x.ts', PLANTS.path[1]],
   ] as const)
     assert.deepEqual(planted(file, plant), [`${file} holds 1 git calls: ${fix}`]);
-  const [file] = Object.keys(GIT_SITES);
-  const raised = new Map([...texts, [file, `${texts.get(file)}\n${PLANTS.wrapper[0]}`]]);
-  assert.deepEqual(ratchetBreaks(measured(raised), GIT_SITES, onDisk), [
-    `${file} holds ${GIT_SITES[file].count + 1} git calls, more than the ${GIT_SITES[file].count} the baseline allows: never add them here`,
-  ]);
+  const file = 'packages/agent-orchestrator/src/x/held.store.ts';
+  const baseline: Baseline = { [file]: { count: 1, cards: ['J'] } };
+  const held = new Map([...texts, [file, PLANTS.wrapper[0]]]);
+  assert.deepEqual(
+    ratchetBreaks(measured(held), baseline, () => true),
+    [],
+    'the count the fixture baseline holds is let through',
+  );
+  const raised = new Map([...texts, [file, `${PLANTS.wrapper[0]}\n${PLANTS.wrapper[0]}`]]);
+  assert.deepEqual(
+    ratchetBreaks(measured(raised), baseline, () => true),
+    [`${file} holds 2 git calls, more than the 1 the baseline allows: never add them here`],
+  );
 });
 
 test('REFUSED: a count above or below the baseline, an entry gone or clean, one with no card, an unknown card', () => {

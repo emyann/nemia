@@ -61,12 +61,18 @@ export type Told = ReturnType<typeof toldOf> & PlaceTold;
 
 /**
  * What `step` of `run` is told and denied by its place (`landingWords`, `placeSay`), read from `placeDir` or the run's own place
- * (`placeDirOf`); or undefined, with a note for `step` on `notes` saying why its place gives none (`placeDirOf` or `readPlaceJson`
- * refusing): the step is then not filed, and the pass goes on.
+ * (`placeDirOf`), its branches named off `heads` where given; or undefined, with a note for `step` on `notes` saying why its place gives
+ * none (`placeDirOf` or `readPlaceJson` refusing): the step is then not filed, and the pass goes on.
  */
-export function placeTold(run: Run, step: Workflow, notes: string[], placeDir?: string): PlaceTold | undefined {
+export function placeTold(
+  run: Run,
+  step: Workflow,
+  notes: string[],
+  placeDir?: string,
+  heads?: Readonly<Record<string, string>>,
+): PlaceTold | undefined {
   try {
-    return { words: landingWords(run, step, placeDir), say: placeSay(run, placeDir) };
+    return { words: landingWords(run, step, placeDir, heads), say: placeSay(run, placeDir) };
   } catch (err) {
     notes.push(`${step.name}: not filed, for its place gives it no words: ${(err as Error).message}`);
     return undefined;

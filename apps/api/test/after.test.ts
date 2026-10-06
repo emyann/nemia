@@ -9,7 +9,8 @@
  * unmerged before any tick recorded its tip. Their children, none filed: `d-waits`, `e-cancelled-parent`, `f-no-such-parent`,
  * `g-parents-shipped`, `h-gone-parent`; and `i-started`, a child that started, whose parents are never read again. On the engine's feed,
  * `b-running` and `i-started` were filed an hour and more after they were created, as a run started `--after` runs is once they ship;
- * `a-shipped`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them.
+ * `a-shipped`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them. A pass has read where their branches
+ * stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { observations, root } from './harness.ts';
 import { test } from 'node:test';
@@ -20,7 +21,7 @@ import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { decideRun, engine, list, runStore, runWith, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
+import { decideRun, engine, list, passStanding, runStore, runWith, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -124,6 +125,7 @@ writeRun('g-parents-shipped', { after: ['a-shipped'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i');
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
+await runWith(engine(), passStanding(runStore.runs.list()));
 
 const filedB = '2026-09-14T01:10:00.000Z';
 const filedI = '2026-09-14T01:40:30.000Z';

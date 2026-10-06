@@ -19,7 +19,8 @@ import { leftOutMounts, startRun } from './start.verb.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
 import { parentRead } from '../views/views.verb.ts';
-import { EngineService } from '../runtime-client.ts';
+import { EngineService, tried } from '../runtime-client.ts';
+import { standingLive } from '../standing/standing.verb.ts';
 import { contextLines } from './context.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../brief/handed.verb.ts';
@@ -315,7 +316,9 @@ export const START: Command<Started> = {
     const started = yield* startOf(args);
     const paused = yield* pausedRead();
     const shipped: string[] = [];
-    for (const id of started.run.context ?? []) if ((yield* parentRead(id)).shipped) shipped.push(id);
+    const context = started.run.context ?? [];
+    const git = context.length ? yield* standingLive([started.run]) : undefined;
+    for (const id of context) if (git && (yield* parentRead(id, git)).shipped) shipped.push(id);
     return { ...started, ...(paused.pause ? { paused } : {}), ...(started.run.context?.length ? { shipped } : {}) };
   }),
   print: startedLines,
@@ -349,7 +352,8 @@ export const CONCLUDED: Command<Concluded> = {
     if (notId) throw new Invalid({ message: notId });
     if (!runStore.runs.exists(id))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
-    const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read');
+    const git = yield* standingLive([yield* tried(() => runStore.runs.read(id))]);
+    const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);
     return { run: id, shipped: parent.shipped, section: contextSection(parent) };
   }),
   print: ({ section }) => [section.replace(/^\n+/, '')],

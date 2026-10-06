@@ -1680,16 +1680,15 @@ Git's yes needs one more question. A result branch is cut at the run's base, so 
 committed to is on the base branch from the start. Such a branch ships only a run whose steps all
 succeeded, with nothing to merge. A run whose step failed, signed off blocked or ended unsigned with
 nothing committed is decided, not shipped. Work past the base that is on the base branch ships whatever
-the steps said, since a person merged it (`isShipped` says which: `true`, or `'unchanged'`).
+the steps said, since a person merged it (the place's `standing` says which: `true`, or `'unchanged'`).
 
 A failed run is decided too. The first run this was pointed at had been sitting for hours marked
 `failed`, and its branch held a real fix plus a design question addressed to a person — none of
 which anything in this tool had ever shown anyone.
 
 `wf decide` is read-only. It reports facts and changes nothing. Whether a loop's work still merges onto its base, it asks the run's
-place (`trial`, for the merges it offers); where each result branch stands, and whether the run shipped, it still reads by running git
-itself (`branchReader`, `standingsOf` and `shippedOf` in `src/branches/branches.store.ts`), until card I2 reads what the tick's pass asked
-the place's `standing` (`standing.json`). It ends with where each result branch stands
+place (`trial`, for the merges it offers); where each result branch stands, and whether the run shipped, it asks the place's
+`standing` once, live (`standingNow`), never the tick's last snapshot. It ends with where each result branch stands
 against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
 then with what is left to decide: a last step waiting at its gate, with the `wf approve` that answers it — in
 its own prose where that step is an ending that has not run, since approving is what runs it — or, where no
@@ -3440,7 +3439,7 @@ holding a concurrency slot forever.
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`place: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
-| `src/branches/branches.store.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and the tips of a run's branches and a repository's heads (`resultTips`, `refsOf`, `headsOf`) |
+| `src/branches/branches.store.ts` | where a run's result branches stand, read off a `BranchReader` over the place's `standing`: whether each landed and where it stands (`standingsOf`, `shippedOf`, `branchStandings`, `resultBranches`), a parent run as its record and the standing say it (`parentRecord`), and the tips of a run's branches (`resultTips`) |
 | `src/standing/standing.verb.ts` | where a pass's repositories stand, read once a pass (`passStanding`): one `standing` of the run's place for each repository, place and base branch, of the result branches of every run waited on there, within 15 s (`STANDING_DEADLINE_MS`); the reader the pass's `shippedBy`, `parentOf`, `runReady` and holds ask through (`standingReader`), and the heads its memo of runs at rest, its tips and a filed run's base are read from (`headsFor`), read afresh for a run that handed off on the pass. An unread `standing` reads as not shipped, and the waiting run says why |
 | `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`), and decoded by its schema, a file that does not decode refused (`Invalid`) naming it (`readStanding`) |
 | `src/branches/changes.store.ts` | what a git run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |

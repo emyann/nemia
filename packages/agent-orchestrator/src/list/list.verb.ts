@@ -17,7 +17,8 @@ import { runSpend, type BranchStanding, type Spend, type SpendOf } from '../stat
 import type { RetryAsk } from '../retry/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf, stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
-import { branchReader, resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import {
   closeoutAsked,
@@ -27,6 +28,7 @@ import {
   exitVerdicts,
   harnessBlocked,
   parentsRead,
+  passParents,
   saidCount,
   spendReader,
   taskPhasesRead,
@@ -37,7 +39,7 @@ import {
 import { engineWord, phaseOfView } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
-import { mergeStaged, statusMemo, type StatusMemo } from '../place/landing.store.ts';
+import { mergeStaged, statusMemo } from '../place/landing.store.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
 
@@ -49,10 +51,11 @@ import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, 
  * @param steps The steps the run is judged by; left out, its frozen workflow (`stepsOf`).
  * @param shown The steps listed, a line each; left out, `steps`.
  * @param standings Where each result branch stands against the base branch, asked once the run's status is known; left out, every result
- *   branch of the run, asked of git (`standingsOf`).
+ *   branch of the run, as `git` reads it (`standingsOf`).
  * @param slot The cap on runs in flight holding this run (`runSlots`), said where `waiting` would be; left out, none.
- * @param checkout Whether to read the run whose `workspace: main` step holds the repository's own checkout (`checkoutHold`); off, none.
- * @param git The call's branch reader (`branchReader`): one listing of a repository's branches for every run of it.
+ * @param checkout Where the branches stand, as `git` was read off it, to read the run whose `workspace: main` step holds the repository's
+ *   own checkout over (`checkoutHold`); left out, none is read.
+ * @param git The call's branch reader (`standingReader`): what was read of where the result branches stand, never git asked as it goes.
  * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
  */
 export type ReadingHow = {
@@ -61,8 +64,8 @@ export type ReadingHow = {
   shown?: readonly Workflow[];
   standings?: (status: Assessment['status'], steps: readonly Workflow[]) => readonly BranchStanding[];
   slot?: RunSlot;
-  checkout?: boolean;
-  git?: BranchReader;
+  checkout?: PassStanding;
+  git: BranchReader;
   parent?: (id: string) => ParentRun;
 };
 
@@ -89,8 +92,8 @@ export type RunReading = Listing & {
  * check would cost every poll of the list. The runs it waits on and is held until are each read once (`parentsRead`), and where its result
  * branches stand is asked once its status is known.
  */
-export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run, how: ReadingHow = {}) {
-  const git = how.git ?? branchReader();
+export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run, how: ReadingHow) {
+  const { git } = how;
   const steps = how.steps ?? stepsOf(run);
   const views = how.views ?? (yield* taskPhasesRead(run).pipe(over(e))).views;
   const phaseOf = (taskId: string): TaskPhase => phaseOfView(views.get(taskId));
@@ -103,7 +106,10 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
     assess(steps, on, phaseOf, closeoutReader(views, run), closeoutsAsked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
   const assessed = assessOf(run);
   const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, git);
-  const checkout = how.checkout ? yield* checkoutHold(e, run, steps) : undefined;
+  const memo = statusMemo(headsOver(git));
+  const checkout = how.checkout
+    ? yield* checkoutHold(e, run, steps, { standing: Effect.succeed(how.checkout) }, process.env, memo)
+    : undefined;
   const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
   const listed = listing({
     steps: how.shown ?? steps,
@@ -129,53 +135,58 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
 });
 
 /**
- * What `nemia ls` shows for one run (`runReading`): every result branch asked of git, and the run holding the checkout read.
+ * What `nemia ls` shows for one run (`runReading`): where every result branch stands as the tick's last pass read it (`standing`; left
+ * out, `standingSnapshot`), with no process, and the run holding the checkout read.
  *
  * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the narrowed `TaskPhase` the DAG decides on: a
- * person reading the list wants the detail. Where the run's result stands against the base branch is read off git on this call: it is what
- * says a finished run is one nobody has decided.
+ * person reading the list wants the detail. Where the run's result stands against the base branch is what says a finished run is one
+ * nobody has decided; one no pass read is said unread.
  */
-export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = branchReader()) =>
-  runReading(e, run, { slot, git, checkout: true });
+export const list = Effect.fn('list')(function* (e: Engine, run: Run, slot?: RunSlot, standing?: PassStanding) {
+  const read = standing ?? (yield* standingSnapshot());
+  return yield* runReading(e, run, { slot, git: standingReader(read), checkout: read });
+});
 
 /**
  * What `list` reads of `run`, or why it is left unjudged (`unjudgedOf`): a run a task journal of which does not read, or whose unfrozen
  * folder does not load; any other failure of the read is the program's.
  */
-const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined, git: BranchReader) {
-  const exit = yield* Effect.exit(list(e, run, slot, git));
+const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined, standing: PassStanding) {
+  const exit = yield* Effect.exit(list(e, run, slot, standing));
   if (Exit.isSuccess(exit)) return exit.value;
   const unjudged = yield* unjudgedOf(e, run, Cause.squash(exit.cause), 'nemia ls');
   return unjudged ?? (yield* Effect.failCause(exit.cause));
 });
 
 /**
- * `nemia ls`'s answer: every run, or the one named, each as `list` reads it, and which daemon ticks the store (`daemonStanding`). The cap
- * on runs in flight is judged over the whole store even for one run; each task is viewed once and each repository's branches listed once
- * (`viewedOnce`, `branchReader`). A run a task journal of which does not read, or whose unfrozen folder does not load, is answered
- * unjudged (`unjudgedOf`), the second with no result branch (`resultOf`); any other failure rejects. Refuses a run named that is not in
- * the store, as `runStore.runs.read` does.
+ * `nemia ls`'s answer: every run, or the one named, each as `list` reads it, which daemon ticks the store (`daemonStanding`), and when the
+ * tick's last pass read where the branches stand (`standingSnapshot`), or that none has. The cap on runs in flight is judged over the
+ * whole store even for one run; each task is viewed once (`viewedOnce`), and where the branches stand is read off `standing.json`, with
+ * no process. A run a task journal of which does not read, or whose unfrozen folder does not load, is answered unjudged (`unjudgedOf`),
+ * the second with no result branch (`resultOf`); any other failure rejects. Refuses a run named that is not in the store, as
+ * `runStore.runs.read` does.
  */
 export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const e = yield* EngineService;
   const runs = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
   const listed: RunsListed['runs'] = [];
   const reads: Read[] = [];
-  const memo = statusMemo();
+  const standing = yield* standingSnapshot();
+  const git = standingReader(standing);
+  const memo = statusMemo(headsOver(git));
   if (runs.length) {
     const viewed = viewedOnce(e);
-    const git = branchReader();
-    git.prime(runs);
-    const held = yield* runSlots(viewed, runId ? runStore.runs.list() : runs);
+    const held = yield* runSlots(viewed, runId ? runStore.runs.list() : runs, process.env, passParents(git));
     for (const run of runs) {
-      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), git);
+      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing);
       listed.push({ run, listed: read, result: resultOf(run) });
       reads.push({ run, read, staged: () => mergeStaged(run, stepsOrNone(run), memo) });
     }
   }
   const pause = readPause();
   const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
-  return { runs: listed, daemon: daemonStanding(), ...paused } satisfies RunsListed;
+  const read = standing.at === undefined ? { none: true as const } : { at: standing.at };
+  return { runs: listed, daemon: daemonStanding(), standing: read, ...paused } satisfies RunsListed;
 });
 
 /** The run's result branches (`resultBranches`); none for a run whose unfrozen folder does not load, which cannot say its result steps. */
@@ -235,7 +246,7 @@ export const pausedRead = Effect.fn('pausedRead')(function* () {
   if (!pause) return { pause: null, finishing: [], staged: [], held: [] } satisfies Paused;
   const runs = runStore.runs.list();
   const viewed = viewedOnce(e);
-  return yield* pausedOf(viewed, pause, runs, yield* holdingReads(viewed, runs));
+  return yield* pausedOf(viewed, pause, runs, yield* holdingReads(viewed, runs, standingReader(yield* standingSnapshot())));
 });
 
 /** Whether `run` has a step with a `check:` whose session was filed and whose check was not: one the pause can hold. */
@@ -246,13 +257,14 @@ const checkDue = (run: Run): boolean =>
  * The readings of those of `runs` the pause can hold a check of (`heldOf`): each whose ending lands on its check while a merge is staged
  * in its checkout (`mergeStaged`, asked once a run), read as `nemia ls` reads it, and each other with a check due (`checkDue`), read
  * without asking git where its branches stand. A run a task journal of which does not read (`unreadableJournal`), or whose unfrozen
- * folder does not load (`stepsOrNone`), is left out, as the tick leaves it unjudged; any other failure throws. `memo` is the read's
- * reading of its places (`StatusMemo`).
+ * folder does not load (`stepsOrNone`), is left out, as the tick leaves it unjudged; any other failure throws. Where the branches stand
+ * is read through `git`, and the checkouts asked of `placeDir` where it is given, else of each run's own place.
  */
-const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[], memo: StatusMemo = statusMemo()) {
+const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[], git: BranchReader, placeDir?: string) {
+  const memo = statusMemo(headsOver(git), placeDir);
   const holding = runs.flatMap((run) => {
-    if (mergeStaged(run, stepsOrNone(run), memo)) return [{ run, how: {}, staged: () => true }];
-    return checkDue(run) ? [{ run, how: { standings: () => [] } satisfies ReadingHow, staged: () => false }] : [];
+    if (mergeStaged(run, stepsOrNone(run), memo)) return [{ run, how: { git } satisfies ReadingHow, staged: () => true }];
+    return checkDue(run) ? [{ run, how: { git, standings: () => [] } satisfies ReadingHow, staged: () => false }] : [];
   });
   const reads = yield* Effect.all(
     holding.map(({ run, how, staged }) =>
@@ -269,10 +281,11 @@ const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[
 });
 
 /**
- * Each check among `runs` the pause holds (`heldOf`), a landing with its merge staged among them, as the tick's pass says it, reading
- * its places through `memo` (`StatusMemo`).
+ * Each check among `runs` the pause holds (`heldOf`), a landing with its merge staged among them, as the tick's pass says it, where the
+ * branches stand read through `git`, asking `placeDir` where it is given, else each run's own place.
  */
-export const heldRead = (e: Engine, runs: readonly Run[], memo?: StatusMemo) => Effect.map(holdingReads(e, runs, memo), heldAmong);
+export const heldRead = (e: Engine, runs: readonly Run[], git: BranchReader, placeDir?: string) =>
+  Effect.map(holdingReads(e, runs, git, placeDir), heldAmong);
 
 /**
  * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`)

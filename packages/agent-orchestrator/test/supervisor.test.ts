@@ -23,6 +23,10 @@ process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, list, retryRun, runSlots, startRun, runWith } = await import('../src/runner.ts');
+const { passParents } = await import('../src/views/views.verb.ts');
+const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
+/** The runs waited on as a read with no standing reads them: none of their branches asked. */
+const noParents = () => passParents(standingReader(NOTHING_READ));
 const { readRun } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -225,7 +229,7 @@ test("`slot: none` on disk: a watcher's run files its step at a full cap, counts
 
   process.env.WF_MAX_RUNS = '1';
   assert.deepEqual(
-    [...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)])))],
+    [...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)], process.env, noParents())))],
     [],
     'nothing held: with the supervisor running, one slot is still free for the work',
   );
@@ -240,7 +244,7 @@ test("`slot: none` on disk: a watcher's run files its step at a full cap, counts
       false,
       `pass ${pass}: its own filing is not counted while its session runs`,
     );
-  assert.deepEqual([...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)])))], []);
+  assert.deepEqual([...(await runWith(e, runSlots(e, [readRun(watcher.id), readRun(work.id)], process.env, noParents())))], []);
   delete process.env.WF_MAX_RUNS;
   assert.ok(filings.includes(`${watcher.id}-supervise`) && filings.includes(`${work.id}-implement`));
 });

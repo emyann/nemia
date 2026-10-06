@@ -11,6 +11,7 @@ import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
+import { standingLiveOf } from '../standing/standing.verb.ts';
 import {
   closeoutAsked,
   closeoutReader,
@@ -32,8 +33,8 @@ export type Holding = { run: Run; hold: Hold };
  *
  * Refused before anything is written, exit 2, with what to do instead: an id that is not a run's (`idRefusal`), and one named after
  * `--until`, whose fix keeps the run to hold; a run not there, and what `holdRefusal` refuses — nothing named, a run cancelled, pruned,
- * shipped (as `--after` reads it) or succeeded with nothing left but a person's merge, asked of the engine only for a run nothing else
- * refuses, a run already held, a folder run; and of each run
+ * shipped (as `--after` reads it, where the branches stand now: `standingLiveOf`) or succeeded with nothing left but a person's merge,
+ * asked of the engine only for a run nothing else refuses, a run already held, a folder run; and of each run
  * named: twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a result branch
  * gone, already shipped — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`, exclusively: a hold
  * two people put at once is the first one's, and the second is refused as already held.
@@ -53,15 +54,16 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
       message: `no such run: ${id}. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --until <runId>.`,
     });
   const run = yield* tried(() => runStore.runs.read(id));
+  const git = yield* standingLiveOf([id, ...until]);
   const read = new Map(
     yield* Effect.all(
-      [...new Set(until)].filter((u) => u !== id).map((u) => Effect.map(parentRead(u), (parent) => [u, parent] as const)),
+      [...new Set(until)].filter((u) => u !== id).map((u) => Effect.map(parentRead(u, git), (parent) => [u, parent] as const)),
       { concurrency: 'unbounded' },
     ),
   );
   let finished: 'shipped' | 'succeeded' | undefined;
   if (until.length && !run.cancelledAt && !run.pruned && !run.hold) {
-    if ((yield* parentRead(id)).shipped) finished = 'shipped';
+    if ((yield* parentRead(id, git)).shipped) finished = 'shipped';
     else {
       const steps = yield* tried(() => stepsOf(run));
       const { views, phaseOf } = yield* taskPhasesRead(run);

@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { MergeState } from '../ending/ending.ts';
 import type { LandingWords } from '../check/check.ts';
-import { resultTips } from '../branches/branches.store.ts';
+import { resultBranches } from '../branches/branches.store.ts';
+import { resultTips } from '../branches/index.ts';
 import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import type { PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
@@ -20,14 +21,26 @@ export type CheckoutRead = MergeState | { readonly unread: string };
 
 /**
  * One pass's reading of its places: the answers of `status` it has had (`reads`), by checkout and the run that asked, whose tips it was
- * asked with, so a pass that asks twice of one checkout for one run starts one process; and the place it asks (`placeDir`), where one is
- * given in place of each run's own (`placeDirOf`). Owned by the pass and dropped with it; a `land` clears its reads, since the checkout
+ * asked with, so a pass that asks twice of one checkout for one run starts one process; every branch of a run's repository and its commit
+ * as its caller read them (`heads`), which a run's result tips are read off (`resultTips`); and the place it asks (`placeDir`), where one
+ * is given in place of each run's own (`placeDirOf`). Owned by the pass and dropped with it; a `land` clears its reads, since the checkout
  * has changed.
  */
-export type StatusMemo = { readonly reads: Map<string, CheckoutRead>; readonly placeDir?: string };
+export type StatusMemo = {
+  readonly reads: Map<string, CheckoutRead>;
+  readonly heads: (run: GitRun) => Readonly<Record<string, string>> | undefined;
+  readonly placeDir?: string;
+};
 
-/** A new `StatusMemo` for one pass, with no answer yet, asking `placeDir` where it is given, else each run's own place. */
-export const statusMemo = (placeDir?: string): StatusMemo => ({ reads: new Map(), ...(placeDir === undefined ? {} : { placeDir }) });
+/**
+ * A new `StatusMemo` for one pass, with no answer yet, reading a run's heads through `heads`, asking `placeDir` where it is given, else
+ * each run's own place.
+ */
+export const statusMemo = (heads: StatusMemo['heads'], placeDir?: string): StatusMemo => ({
+  reads: new Map(),
+  heads,
+  ...(placeDir === undefined ? {} : { placeDir }),
+});
 
 /** The directory `run`'s place runs from (`placeDirOf`), or why there is none, in its words: an odd record stops its own run alone. */
 function placeOf(run: GitRun, placeDir: string | undefined): { dir: string } | { unread: string } {
@@ -48,17 +61,18 @@ export function stagedHere(run: Pick<GitRun, 'stagedFile'>): boolean | undefined
 }
 
 /**
- * `run`'s checkout as its place's `status` answers it, with the run's result tips (`resultTips`), asked once per checkout and run within
- * one pass where `memo` is given, of the place it names. A refusal, an unread answer, and a place `placeDirOf` will not name are
+ * `run`'s checkout as its place's `status` answers it, with the run's result tips off the heads `memo` reads (`resultTips`), asked once per
+ * checkout and run within one pass, of the place `memo` names. A refusal, an unread answer, and a place `placeDirOf` will not name are
  * `{ unread }`, in words.
  */
-export function checkoutStatus(run: GitRun, memo?: StatusMemo): CheckoutRead {
+export function checkoutStatus(run: GitRun, memo: StatusMemo): CheckoutRead {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
-  const known = memo?.reads.get(key);
+  const known = memo.reads.get(key);
   if (known) return known;
-  const place = placeOf(run, memo?.placeDir);
-  const read: CheckoutRead = 'unread' in place ? place : statusRead(place.dir, run.repo, resultTips(run));
-  memo?.reads.set(key, read);
+  const place = placeOf(run, memo.placeDir);
+  const read: CheckoutRead =
+    'unread' in place ? place : statusRead(place.dir, run.repo, resultTips(run, resultBranches(run), memo.heads(run)));
+  memo.reads.set(key, read);
   return read;
 }
 
@@ -76,7 +90,7 @@ function statusRead(dir: string, checkout: string, tips: Readonly<Record<string,
  * landing among `steps` is filed and not landed, and true where it gives no answer — a merge nobody can read is held, never let go.
  * False for a folder run and for a run with no such ending.
  */
-export function mergeStaged(run: Run, steps: readonly Workflow[], memo?: StatusMemo): boolean {
+export function mergeStaged(run: Run, steps: readonly Workflow[], memo: StatusMemo): boolean {
   if (!isGitRun(run)) return false;
   const landings = steps.filter((s) => landsOnCheck(s, run));
   if (!landings.length) return false;
@@ -124,13 +138,18 @@ export function landingDenies(run: Run, placeDir?: string): readonly string[] {
 
 /**
  * What `step`, an ending of `run` that lands on its check, is told and denied by its place (`landingContract`): its `say.stage` with
- * `{repo}` and `{branches}` filled from the run's checkout and its result branches, and its denies. Undefined for any other step, whose
- * place is not read. Refuses as `landingDenies` does.
+ * `{repo}` and `{branches}` filled from the run's checkout and its result branches with a tip, recorded or among `heads` (`resultTips`),
+ * and its denies. Undefined for any other step, whose place is not read. Refuses as `landingDenies` does.
  */
-export function landingWords(run: Run, step: Workflow, placeDir?: string): LandingWords | undefined {
+export function landingWords(
+  run: Run,
+  step: Workflow,
+  placeDir?: string,
+  heads?: Readonly<Record<string, string>>,
+): LandingWords | undefined {
   if (!isGitRun(run) || !landsOnCheck(step, run)) return undefined;
   const declared = readPlaceJson(placeDir ?? placeDirOf(run));
-  const branches = Object.keys(resultTips(run)).join(' ') || '<result branch>';
+  const branches = Object.keys(resultTips(run, resultBranches(run), heads)).join(' ') || '<result branch>';
   return { stage: declared.say.stage.replaceAll('{repo}', run.repo).replaceAll('{branches}', branches), denied: declared.denyWhileLanding };
 }
 

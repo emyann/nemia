@@ -14,7 +14,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { listWorkflows, versionOf as versionIn } from './workflows.ts';
-import { engine, hireRefusalOf, loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
+import { engine, hireRefusalOf, loadWorkflows, parentRecord, passStanding, runStore, runWith, standingLiveOf } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
@@ -680,6 +680,12 @@ test('POST /api/runs takes `after` and passes it to `startRun`, which freezes it
   assert.deepEqual(runStore.runs.read(id).after, ['p-running']);
   assert.deepEqual(filedTasks(), [], 'nothing filed');
 
+  const unread = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+  assert.ok(
+    unread.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
+    `no pass has read where p-running stands since it was written: ${unread.waiting?.word}`,
+  );
+  await runWith(engine(), passStanding(runStore.runs.list()));
   const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
   assert.deepEqual([detail.after, detail.waiting?.word], [['p-running'], 'waiting on p-running']);
 
@@ -720,7 +726,12 @@ test("REFUSED at shipped defaults: a run `nemia start --after` will not wait on 
     const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
     assert.equal(res.status, 422, JSON.stringify(after));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, afterRefusal(after, { repo, branch: 'main' }, parentRecord), JSON.stringify(after));
+    const git = await runWith(engine(), standingLiveOf(after));
+    assert.equal(
+      error,
+      afterRefusal(after, { repo, branch: 'main' }, (id) => parentRecord(id, git)),
+      JSON.stringify(after),
+    );
     return error;
   };
   assert.equal(

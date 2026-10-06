@@ -5,19 +5,19 @@
  * A cache of a pure function, never a source of truth, keyed by the facts the tick's own memo of runs at rest watches (`RestMemo` in
  * tick.verb.ts): the run's files in the store — its record, the markers and asks a person writes beside it (its stamp in `runStore`) —
  * and its record as read; nothing of its tasks on the engine's feed since (`followedFeed`), every journal append being a line there; and
- * the tips of the branches git was asked about for it, with its base branch's, read in one `for-each-ref` a repository (`headsOf`).
+ * the tips of the branches git was asked about for it, with its base branch's, as the read's `git` gives them (`BranchReader.heads`).
  * Anything else takes the run out, and the next read judges it afresh. In memory alone: nothing is written for it, and a process started
  * again starts with none.
  *
  * `WF_VERIFY_REST=1` judges each run the memo answers in full too, and a read whose answer differs is refused (`answered`): a change the
  * memo missed is a bug in what it watches. Off in normal runs, since it spends all that the memo saves. A controller: it reads the feed
- * through the client, the store's stamps and git's tips, and writes nothing.
+ * through the client, the store's stamps and the tips its reader gives, and writes nothing.
  */
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import { headsOf } from '../branches/branches.store.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 import { followedFeed } from './rest.verb.ts';
@@ -72,16 +72,17 @@ const tipsOf = (
  * The memo brought up to the engine's feed (`followedFeed`) and the store stamped: made before the read takes a record, so what changes
  * between the two is read as changed on the next read, never missed. A read made while the feed cannot be read keeps nothing. The read
  * keeps where it read the feed to: a line past it is read by the next read, unless another read takes it first, and then its `keep` keeps
- * nothing. The feed is read through `e`, and `verify` is `WF_VERIFY_REST` as the caller's environment gives it (`verifiesRest`).
+ * nothing. The feed is read through `e`, `verify` is `WF_VERIFY_REST` as the caller's environment gives it (`verifiesRest`), and the
+ * tips a kept answer is checked against are what `git` read, with no process.
  */
-export const restingRead = Effect.fn('restingRead')(function* <T>(e: Engine, memo: RestingMemo<T>, verify: boolean) {
+export const restingRead = Effect.fn('restingRead')(function* <T>(e: Engine, memo: RestingMemo<T>, verify: boolean, git: BranchReader) {
   const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;
   const stamps = runStore.runs.stamps();
   const heads = new Map<string, ReadonlyMap<string, string>>();
   const now = (repo: string) => {
     const at = path.resolve(repo);
-    if (!heads.has(at)) heads.set(at, new Map(Object.entries(headsOf(at))));
+    if (!heads.has(at)) heads.set(at, git.heads(at));
     return heads.get(at)!;
   };
   const given = new Map<string, T>();

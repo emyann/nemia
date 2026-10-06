@@ -4,6 +4,9 @@
  */
 import type { Locator, Page, Request } from 'playwright';
 
+/** `text` as a regular expression that matches it and nothing else. */
+export const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** How long an element has to appear. The pages read an api on this machine; slower than this is a finding. */
 export const WAIT_MS = 10_000;
 

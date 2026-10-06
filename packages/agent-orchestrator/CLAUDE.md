@@ -16,8 +16,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   (`src/place/place-async.store.ts`) for a verb that may take long, `make` and `handoff`; a verb declared in `place.json` has its script
   (`readPlaceJson`).
 - **A git call belongs to the place (`runPlaceVerb`, `runPlaceVerbAsync`), never to `src`**: `test/git-calls.test.ts` refuses a `'git'`
-  spawn, a call of `git` or `gitSays`, and a `.git` or `MERGE_HEAD` path in `packages/*/src` and `apps/*/src`, holding today's per file
-  (`GIT_SITES`, each naming its cards): lower a count in the commit that removes one, and add none.
+  spawn, a call of `git` or `gitSays`, and a `.git` or `MERGE_HEAD` path in `packages/*/src` and `apps/*/src`; `GIT_SITES` is empty, and
+  stays so.
 - **A harness's word or a team name in `src` or `bin` is refused by `test/words.test.ts`**, which holds today's per file
   (`HARNESS_WORDS`, `TEAM_NAMES`, each naming its card or move): lower a count in the commit that removes one, and add none.
 - **The command is `nemia` in every printed word; a `wf` said in `src` or `bin` is refused by `test/cli-name.test.ts`**, but a value
@@ -119,10 +119,13 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   decides on is never on `Date`: the daemon's silence is `elapsedMs` over `instantNow()`, a place verb's grace on `performance.now()`.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
-- **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` and the place's `standing` list again without it
-  (pinned against `oneByOne`).
+- **Git refuses a whole `for-each-ref` for one base it cannot read**: the place's `standing` lists again without it (pinned in
+  `test/standing.test.ts` against git asked one branch at a time).
 - **The tick reads git through one `standing` a repository, place and base a pass** (`passStanding`, `standingReader`): a question it
-  did not ask goes to `oneByOne`, so a new git read in the pass belongs in the ask (`asksOf`), held by `test/pass-reads.test.ts`.
+  did not ask is `unread`, never asked again, so a new git read in the pass belongs in the ask (`asksOf`), held by
+  `test/pass-reads.test.ts`.
+- **Only the tick writes `standing.json`**: a reader off the tick (`nemia ls`, the board's list) reads it (`standingSnapshot`), and a
+  person's one-off verb asks the place live (`standingNow`, `standingLive`); neither runs git through a reader of its own.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).
 - **What `engine()` reads, it reads without throwing** (`readRemote`): a bad file is left out and said on stderr.
 - **A task journal that does not read, or an unfrozen run's folder that does not load (`UnloadedFolder`, `record/steps.store.ts`), stops

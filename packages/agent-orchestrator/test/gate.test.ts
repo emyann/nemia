@@ -24,9 +24,26 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, cancelRun, forgetRun, inboxDir, list, parentRead, retryRun, startRun, startFromInbox, runWith } =
-  await import('../src/runner.ts');
-const { markCancelled, readRun } = await import('../src/record/record.store.ts');
+const {
+  advanceRun,
+  approveRun,
+  cancelRun,
+  forgetRun,
+  inboxDir,
+  list,
+  parentRead,
+  retryRun,
+  startRun,
+  startFromInbox,
+  runWith,
+  standingLiveOf,
+} = await import('../src/runner.ts');
+/** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
+const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
+const { listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
+const { passStanding } = await import('../src/standing/standing.verb.ts');
+/** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
+const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
 const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 
@@ -307,12 +324,13 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   gitIn(repo, 'merge', '-q', '--no-ff', `wf/${parent.id}/implement`, '-m', 'merge the parent');
 
   const child = await Effect.runPromise(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] }));
-  assert.equal((await runWith(b.e, parentRead(parent.id))).shipped, false, 'merged, and at its gate');
+  assert.equal((await runWith(b.e, parentNow(parent.id))).shipped, false, 'merged, and at its gate');
   for (let pass = 1; pass <= 2; pass++) assert.deepEqual((await runWith(b.e, advanceRun(readRun(child.id)))).filed, [], `pass ${pass}`);
+  await aPass(b.e);
   assert.deepEqual((await runWith(b.e, list(b.e, readRun(child.id)))).steps[0].status, `waiting on ${parent.id}`);
 
   approveByHand(parent.id, 'implement', 1);
-  assert.equal((await runWith(b.e, parentRead(parent.id))).shipped, true);
+  assert.equal((await runWith(b.e, parentNow(parent.id))).shipped, true);
   assert.deepEqual((await runWith(b.e, advanceRun(readRun(child.id)))).filed, ['plan']);
 
   await assert.rejects(
@@ -325,7 +343,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
     (await runWith(b.e, advanceRun(readRun(parent.id)))).filed.concat((await runWith(b.e, advanceRun(readRun(parent.id)))).tried),
     [],
   );
-  assert.equal((await runWith(b.e, parentRead(parent.id))).shipped, true, 'still shipped');
+  assert.equal((await runWith(b.e, parentNow(parent.id))).shipped, true, 'still shipped');
 });
 
 /**

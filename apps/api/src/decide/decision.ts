@@ -7,11 +7,13 @@ import {
   type BranchStanding,
   branchStandings,
   type BranchChanges,
+  type BranchReader,
   branchWord,
   changesOf,
   COMMANDS,
   type Collisions,
   type Decided,
+  decideRun,
   type StandingMerge,
   countsLine,
   type DecideCommand,
@@ -28,8 +30,10 @@ import {
   type RunWaiting,
   runWaitingOf,
   runWith,
+  runStore,
+  standingWhen,
 } from 'agent-orchestrator';
-import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitsOf } from 'agent-orchestrator/run';
+import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitedOn, waitsOf } from 'agent-orchestrator/run';
 import { type Engine } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
@@ -185,23 +189,22 @@ function lessonOf(touched: readonly Touched[]): Lesson {
   return { said, state: touched.some((t) => !('error' in t.radius) && t.radius.lessons.length) ? 'written' : 'nothing' };
 }
 
-/** The package's own `nemia decide` of a run (`decideRun`), through its entry of the command table, served on the api alone. */
-const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
-
 /** The merge check, the table's entry served on the api alone. */
 const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
 
 /**
- * What `nemia decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
+ * What `nemia decide` shows a person about a run, decided by the package (`decideRun`, the handler of the command table's `decide`): its
  * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
  *
- * First, as `nemia decide` asks it first, off the runs it waits on and is held until, each read once (`parentsRead`): a run whose roots
- * wait on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`, and none is read
- * either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A run still
- * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its `WF_MAX_RUNS` before
- * any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is not asked a thing: the page asks while a run is
- * decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called off, or already shipped, is
- * `nothing`.
+ * Where the branches stand is asked of their places at most once, live, as a person's verb asks it (`standingWhen`), the same ask handed to
+ * the package's decision, and only where it is read: for the runs it waits on, and for a run judged neither running nor called off without
+ * it, then judged over it. First, as the CLI asks it first, off the runs it waits on and is held until, each read once (`parentsRead`): a
+ * run whose roots wait on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`,
+ * and none is read either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A
+ * run still running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its
+ * `WF_MAX_RUNS` before any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is asked nothing more: the
+ * page asks while a run is decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called off, or
+ * already shipped, is `nothing`.
  *
  * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
  * never the base branch of a run that cut worktrees, whose work is not on it — and the result branches' counts, each read from the run's
@@ -212,23 +215,25 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
 export async function decisionOf(run: Run, e: Engine['Service'], home: string, env: NodeJS.ProcessEnv): Promise<RunDecision> {
-  const parent = await runWith(e, parentsRead(run));
+  const live = await runWith(e, standingWhen(runStore.runs.list(), run.id));
+  const parent = await runWith(e, parentsRead(run, await runWith(e, live.when(waitedOn(run).length > 0))));
   const waiting = runWaitingOf(run, waitsOf(run, parent));
   const holding = holdingOf(run, holdsOf(run, parent));
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };
   const folder = workflowsOf(run, home).steps;
   const views = await runWith(e, viewsOf(run, e));
-  const judged = await runWith(e, judge(run, stepNames(run, folder), folder, views, { reader: e, parent }));
+  const judgedOver = (git: BranchReader) => runWith(e, judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent }));
+  const { judged, git } = await judgedLive(judgedOver, (need) => runWith(e, live.when(need)));
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
-  const decided = (await runWith(e, DECIDE.handler({ runId: run.id }, env))) as Decided;
+  const decided = await runWith(e, decideRun(run.id, env, live));
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };
   const d = decided.decision;
   const nothing = nothingOf(run, d);
   if (nothing) return { nothing };
   const steps = judgedSteps(run, folder);
   const collisions = decided.collisions ?? null;
-  const { read, standings } = await branchesOf(e, run, steps, d.kind === 'awaiting' ? d.branches : undefined, collisions);
+  const { read, standings } = await branchesOf(e, run, git, steps, d.kind === 'awaiting' ? d.branches : undefined, collisions);
   const touched = read.map(({ branch, radius }) => ({ branch, radius }));
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   return {
@@ -250,6 +255,20 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   };
 }
 
+/**
+ * A run judged first over nothing asked of git (`judgedOver`), then again over where its branches stand, asked then (`when`), unless it
+ * is called off or running with nobody waited on, which reads none of it: the judgement, and the reader it was judged over.
+ */
+async function judgedLive<J extends { status: string; waitingOnYou: readonly unknown[] }>(
+  judgedOver: (git: BranchReader) => Promise<J>,
+  when: (need: boolean) => Promise<BranchReader>,
+): Promise<{ judged: J; git: BranchReader }> {
+  const unasked = await judgedOver(await when(false));
+  const settled = unasked.status === 'cancelled' || (unasked.status === 'running' && !unasked.waitingOnYou.length);
+  const git = await when(!settled);
+  return { judged: settled ? unasked : await judgedOver(git), git };
+}
+
 /** What `nemia decide` says of a run with nothing to decide: called off, or its branches already on the base; undefined for any other. */
 function nothingOf(run: Run, d: Decided['decision']): string | undefined {
   if (d.kind === 'cancelled') return `cancelled at ${d.at} — nothing to decide`;
@@ -266,6 +285,7 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
 async function branchesOf(
   e: Engine['Service'],
   run: Run,
+  git: BranchReader,
   steps: Parameters<typeof resultSteps>[0],
   awaiting: string[] | undefined,
   collisions: Collisions | null,
@@ -286,7 +306,7 @@ async function branchesOf(
   const changes = changesOf(run, [...toRead, ...(run.isolate ? results : [])]);
   const read = toRead.map((branch) => changes.find((c) => c.branch === branch)!);
   if (!run.isolate) return { read, standings: [] };
-  const stands = branchStandings(run, results);
+  const stands = branchStandings(run, results, git);
   const merges = collisions
     ? Object.fromEntries(collisions.base.map(({ branch, ...merge }) => [branch, merge]))
     : await mergesOf(e, run, stands);

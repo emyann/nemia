@@ -11,7 +11,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import { isGitRun, namesInOrder, runTasks, type GitRun, type Run } from '../record/record.ts';
-import { approvedFirst } from '../status/status.ts';
+import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import {
   branchFates,
   checkLogsOf,
@@ -30,7 +30,9 @@ import { UnloadedFolder } from '../record/steps.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { readPlaceJson, readRunPlace, runPlaceVerb, RunPlace, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
-import { standingsOf } from '../branches/branches.store.ts';
+import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standing/standing.verb.ts';
+import { statusMemo } from '../place/landing.store.ts';
 import { merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
@@ -95,7 +97,8 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const f = yield* readForgetting(e, id);
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
-  const refusal = yield* tried(() => refusalOf(id, f));
+  const git = asksStanding(f.run, f.steps) ? yield* standingLive([f.run]) : standingReader(NOTHING_READ);
+  const refusal = yield* tried(() => refusalOf(id, f, git));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
   const dirOf = yield* RunPlace;
   const read = isGitRun(run) ? yield* tried(() => readRunPlace(run, dirOf(run), dir)) : undefined;
@@ -195,14 +198,21 @@ export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: rea
 });
 
 /**
- * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
- * stands for an ending that has not run, and a merge the ending staged.
+ * Whether `nemia rm` reads where `run`'s result stands: for an ending gated before it runs that has not run, or one that lands on its
+ * check, whose staged merge is read off its result tips.
  */
-function refusalOf(id: string, f: Forgetting): string | null {
+const asksStanding = (run: Run, steps: readonly Workflow[] | undefined): boolean =>
+  isGitRun(run) && (steps ?? []).some((s) => (approvedFirst(s, run) && !run.steps[s.name]?.taskId) || landsOnCheck(s, run));
+
+/**
+ * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
+ * stands for an ending that has not run, and a merge the ending staged, as `git` reads them.
+ */
+function refusalOf(id: string, f: Forgetting, git: BranchReader): string | null {
   const { run, steps } = f;
   const askAt = (a: AskName) => runStore.asks.where(id, a);
   const others = runStore.runs.list().filter((o) => o.id !== id);
-  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
+  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, git) : [];
   const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
     steps,
@@ -218,7 +228,7 @@ function refusalOf(id: string, f: Forgetting): string | null {
     askAt,
     standings,
     'rm',
-    merging(run, steps),
+    merging(run, steps, statusMemo(headsOver(git))),
   );
 }
 

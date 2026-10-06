@@ -7,9 +7,12 @@ import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
+import { Effect } from 'effect';
+import { engine, runStore, runWith, standingWhen } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 
@@ -309,6 +312,38 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
     body.used,
     "the run's page carries the same words on each step, off the views it already reads",
   );
+});
+
+const childProcess = createRequire(import.meta.url)('node:child_process') as typeof import('node:child_process');
+
+/** How many times `f` started the place's `standing` (`node <place>/scripts/standing.ts`), counted at `node:child_process`'s `spawn`. */
+async function standingAsks(f: () => Promise<unknown>): Promise<number> {
+  const real = childProcess.spawn;
+  let asks = 0;
+  const counted = (...args: Parameters<typeof real>) => {
+    if (Array.isArray(args[1]) && path.basename(String(args[1][0])) === 'standing.ts') asks += 1;
+    return (real as (...a: unknown[]) => ReturnType<typeof real>)(...args);
+  };
+  Object.assign(childProcess, { spawn: counted });
+  syncBuiltinESMExports();
+  try {
+    await f();
+  } finally {
+    Object.assign(childProcess, { spawn: real });
+    syncBuiltinESMExports();
+  }
+  return asks;
+}
+
+test("a decidable run's decision asks where the branches stand once: the package's decision reads the api's own ask", async () => {
+  const once = await standingAsks(() =>
+    runWith(
+      engine(),
+      Effect.flatMap(standingWhen(runStore.runs.list(), 'r-d1'), (asker) => asker.standing),
+    ),
+  );
+  assert.ok(once > 0, "one ask starts the place's standing, which the count sees");
+  assert.equal(await standingAsks(() => decidable('r-d1')), once, 'the decision asks as one ask does, never twice');
 });
 
 test("the run's total reads its peak against the cap of the step that reached it: two steps' caps are not one cap", async () => {

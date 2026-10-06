@@ -351,7 +351,7 @@ gone, not moved.
 | F. `make` and `handoff` | 6 | `workspaceFor`'s git half and `handOff` (`workspace/worktree.store.ts`, `tick/`); `includeFiles` and `check-ignore` into `make`; `provisionDeps` stays and runs on `Made.workspace`; the realpath guard. |
 | G. The landing | 6 | `status` and `land` in `landEnding` and `mainClaim` (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. As built: the reads and acts in `place/landing.store.ts` (`checkoutStatus`, `landThrough`, `mergeStaged`, `landingWords`); `open` answers `staged`, which `nemia start` records as `stagedFile`; the pause and the tick (`mergeStaged`), `mainClaim`, and `nemia rm` and `nemia prune` (`merging` in `prune/prune.verb.ts`) `stat` it (`stagedHere`), and for a record without one ask `status`, only while a landing is filed and not landed (`mainClaim`: while `landingOpen` holds); the brief's git words come from `say.stage`. |
 | H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, read live through `report` (no snapshot); `nemia merge`'s base off the trial's `at`; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
-| I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. |
+| I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. Split in two: I1, the tick's pass asks one `standing` (`passStanding`) and writes the snapshot; I2, every reader but the tick: `nemia ls` and the board's list read the snapshot (`standingSnapshot`), printing its age when stale and "not read" with none, and a person's one-off verb — `decide`, `approve`, `rm`, `prune`, `start --after`, `hold`, the api's decision — asks `standing` live (`standingNow`, `standingLive`). `branchReader`, `oneByOne`, `isShipped`, `headsOf`, `refsOf` and `gitSays` left `src`, and `GIT_SITES` is empty. |
 | J. The api and the web | H, I | The api reads the snapshot `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`) through the package, and reads `report` live as card H left it, with no snapshot; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
 | K. The guard | now | Landed first, as a baseline that only shrinks (`GIT_SITES` in `test/git-calls.test.ts`), each later card lowering its own entries. A test over `packages/*/src` and `apps/*/src` that refuses a `'git'` command handed to a spawn, and a `.git` or `MERGE_HEAD` path, with a plant that makes it refuse. The `.git` probe in `authoring.ts` is settled first (open question 5). |
 
@@ -380,8 +380,8 @@ absorbs. The `say` templates are what make the words match.
   due, and one `status` per ending holding a checkout; `report` runs at a decision's read, never in a pass (open question 2). Measured by card A1 on the owner's machine
   (12 cores, WSL), `runPlaceVerb` on a scratch repository, ten runs each, a floor: `open`, `status`, `handoff` and `land` take 50 to 60
   ms at the median, against 1 ms for one `git rev-parse`; node's start is most of it. Card J compares the pass's `place` phase with
-  today's `git` phase in `tick-stats.json`. The board's list and memo of runs at rest spawn nothing, where today they run git on each
-  request (`branchReader`, `headsOf`); its decision page runs the place's `report` and `trial`, live.
+  today's `git` phase in `tick-stats.json`. The board's list and memo of runs at rest spawn nothing, reading `standing.json` (card I2);
+  its decision page runs the place's `standing`, `report` and `trial`, live.
 - **Code.** The git code does not disappear; it moves into the skill's scripts. The package loses `worktree.ts`'s git half, most of
   `branches.ts`, the git calls of `forget.ts`, and the api's `merge.ts`. It gains `place/` and the decoders.
 
@@ -400,6 +400,10 @@ absorbs. The `say` templates are what make the words match.
    api's decision and a declared file's branch — and nothing of it is kept: no `report.json`, no refresh. It costs a decision read two
    node processes and a `git diff` per check-affecting path, 150 to 450 ms where today's git calls took 20 to 120 (card H's measure).
    Card J reads the `standing.json` snapshot, and no snapshot of `report`.
+   *Departed from, for a person's verbs, on 2026-10-06 (card I2)*: `nemia ls` and the board's list read the snapshot, but a verb a
+   person runs once — `decide`, `approve`, `rm`, `prune`, `start --after`, `hold`, the api's decision — asks `standing` live
+   (`standingNow`), since what it refuses or prints must not be a pass old. A run that finished since the last pass shows "not read"
+   on a list until the next one.
 3. **Codex trust: a task field, or leave `repositoryOf` in the runtime?** *Recommend* `config.codex.trustFrom` (cards B1, B2). The runtime
    is finished, but this is a harness's own flag, the shape `config.claude` already has. batch/v1 has no field for it, and neither does
    it for `config.claude`.

@@ -12,7 +12,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
-import { isShipped } from '../src/branches/branches.store.ts';
 import { shippedOver } from '../src/branches/branches.ts';
 import { scratch } from './scratch.ts';
 
@@ -193,15 +192,42 @@ test('standing asked of no branch answers the heads alone, whatever the base', (
   assert.equal(answer.heads['wf/r/b'], git(repo.dir, 'rev-parse', 'wf/r/b'));
 });
 
-/** A run in `dir` on `main`, cut at `baseRef`, which recorded `tip` of `branch` when one is given. */
-const runOn = (dir: string, { branch, tip, baseRef }: { branch: string; tip?: string; baseRef: string }) =>
-  ({ repo: dir, branch: 'main', baseRef, ...(tip ? { tips: { [branch]: tip } } : {}) }) as never;
+/** Whether `commit` is within `base` in `dir`, as git's `merge-base --is-ancestor` says: `yes`, `no` (its exit 1), or `unknown`. */
+function within(dir: string, commit: string, base: string): 'yes' | 'no' | 'unknown' {
+  try {
+    git(dir, 'merge-base', '--is-ancestor', commit, base);
+    return 'yes';
+  } catch (err) {
+    return (err as { status?: number }).status === 1 ? 'no' : 'unknown';
+  }
+}
 
-test('a branch is shipped by its standing exactly when isShipped says so, asked of the same repository', () => {
+/**
+ * Whether `branch`, cut at `baseRef`, is shipped onto `main`, asked of git one question at a time: on `main` by its name, or gone and its
+ * recorded `tip` on `main`; `true` with work past `baseRef`, `unchanged` with none.
+ */
+function shippedByGit(dir: string, { branch, tip, baseRef }: { branch: string; tip?: string; baseRef: string }) {
+  const landed = (commit: string) => (within(dir, commit, baseRef) === 'no' ? true : 'unchanged');
+  const onBase = within(dir, branch, 'main');
+  if (onBase === 'yes') return landed(branch);
+  if (onBase === 'no' || !tip) return false;
+  return within(dir, tip, 'main') === 'yes' ? landed(tip) : false;
+}
+
+test('a branch is shipped by its standing exactly when git asked one question at a time says so, a gone one never merged included', () => {
   const repo = repository();
-  const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) }));
-  for (const [i, a] of asked(repo).entries())
-    assert.equal(shippedOver(answer.branches[i]), isShipped(runOn(repo.dir, a), a.branch), a.branch);
+  git(repo.dir, 'switch', '-q', '-c', 'wf/r/u', repo.cut);
+  const unmerged = commit(repo.dir, 'u.txt', 'u\n');
+  git(repo.dir, 'switch', '-q', 'main');
+  git(repo.dir, 'branch', '-q', '-D', 'wf/r/u');
+  const branches = [...asked(repo), { branch: 'wf/r/u', tip: unmerged, baseRef: repo.cut }];
+  const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches }));
+  const said = branches.map((_, i) => shippedOver(answer.branches[i]));
+  assert.deepEqual(said, [true, false, 'unchanged', true, false, false, false]);
+  assert.deepEqual(
+    said,
+    branches.map((a) => shippedByGit(repo.dir, a)),
+  );
 });
 
 test('REFUSED: standing of no repository, and against a base git cannot read; unread for a request with no list of branches', () => {

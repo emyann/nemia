@@ -2,7 +2,8 @@
  * Each run's summary, as the board's list gives it (`RunSummary`): its record, its steps judged in `nemia ls`'s words (`judge`), its graph,
  * what it cost and how long it has been at work; a run whose task's journal does not read answered off its record alone (`unjudged`). A
  * run at rest is answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of
- * the runs still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and git.
+ * the runs still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and where
+ * branches stand off `standing.json` (`standingSnapshot`).
  */
 import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
@@ -11,7 +12,8 @@ import { unjudgedWord } from '../views/views.verb.ts';
 import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { prunedKept } from '../prune/prune.ts';
-import { type BranchReader, branchReader } from '../branches/branches.store.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
+import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import {
@@ -284,7 +286,7 @@ const judgedOrNot = Effect.fnUntraced(function* (
  */
 export const judgedNow = Effect.fn('judgedNow')(function* (e: Engine, home: string, some: readonly Run[]) {
   const { views, reader, unreadable } = yield* viewsFor(e, some);
-  const git = branchReader();
+  const git = standingReader(yield* standingSnapshot());
   const out: Array<Omit<RunSummary, 'startedAt'>> = [];
   for (const run of some) {
     const one = yield* judgedOrNot(run, views, unreadable, reader, git, home);
@@ -323,7 +325,8 @@ export type SummaryHow = {
  * `how.verify` says. Dies where a verified answer differs from the memo's (`answered`).
  */
 export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify }: SummaryHow) {
-  const read = yield* restingRead(e, memo, verify);
+  const git = standingReader(yield* standingSnapshot());
+  const read = yield* restingRead(e, memo, verify, git);
   const runs = runStore.runs.list();
   read.only(runs.map((run) => run.id));
   const filed = yield* filedTimes(e, filings);
@@ -335,8 +338,6 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
     if (!answer || read.verify) toJudge.push(run);
   }
   const { views, reader, unreadable } = yield* viewsFor(e, toJudge, () => runs);
-  const git = branchReader();
-  git.prime(toJudge);
   const judged = new Map<string, Judged>();
   const notJudged = new Map<string, Omit<RunSummary, 'startedAt'>>();
   for (const run of toJudge) {

@@ -8,7 +8,7 @@
  *
  * The runs held on: `p-live`, still working, its branch not merged, which may ship yet; `p-shipped`, signed off and its branch merged into
  * main; `p-cancelled`, called off before anything of it was filed; `p-gone`, signed off on a branch deleted unmerged before any tick
- * recorded its tip.
+ * recorded its tip. A pass has read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -28,6 +28,7 @@ import {
   holdAdvice,
   holdWord,
   list,
+  passStanding,
   retryRun,
   roundRun,
   runStore,
@@ -230,6 +231,7 @@ holdOn(CANCELLED, ['p-live']);
 const AFTER = 'h-after';
 writeRun(AFTER, [implement], { implement: { taskId: null } }, { after: ['p-live'] });
 holdOn(AFTER, ['p-shipped', 'p-live']);
+await runWith(engine(), passStanding(runStore.runs.list()));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {

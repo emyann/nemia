@@ -116,6 +116,7 @@ export {
   holdWord,
   runReady,
   waitAdvice,
+  waitedOn,
   waitingOn,
   waitsOf,
   waitWord,

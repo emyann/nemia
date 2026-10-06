@@ -19,7 +19,7 @@ import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { checkoutStatus, landThrough, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
+import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import {
   closeoutAsked,
@@ -33,6 +33,7 @@ import {
 } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
+import type { PassStanding } from '../standing/standing.verb.ts';
 
 /**
  * Which run's `workspace: main` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
@@ -46,27 +47,27 @@ import { passRead, type PassRead } from '../cap/cap.verb.ts';
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
  * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
  *
- * @param pass The pass that asks (`PassRead`), and the slot it gave this run (`advanceRun`'s): the runs whose claims are read are the
+ * @param from The pass that asks (`PassRead`), and the slot it gave this run (`advanceRun`'s): the runs whose claims are read are the
  *   pass's own listing, the very runs it advances, so a step it filed is read on the run it filed it on; the runs the cap holds are read
  *   once for the pass, and only where another run's claim waits on a slot, since this run's own claim reads the slot the pass gave it; and
- *   each run another waits on is read once for the pass. With none given, the store is listed only past the run's own asks, and the cap
- *   read only where a claim waits on a slot.
+ *   each run another waits on is read once for the pass. Else where the branches stand, as the caller reads it (`PassStanding`): the store
+ *   is listed, and that read, only past the run's own asks, and the cap read only where a claim waits on a slot.
  * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
- * @param memo The pass's reading of its places (`StatusMemo`), shared with its `landEnding`, so a checkout is read once a run.
+ * @param memo The reading of the places (`StatusMemo`), shared with the pass's `landEnding`, so a checkout is read once a run.
  */
 export const checkoutHold = Effect.fn('checkoutHold')(function* (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
-  pass?: { read: PassRead; slot: RunSlot | undefined },
-  env: NodeJS.ProcessEnv = process.env,
-  memo: StatusMemo = statusMemo(),
+  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
+  env: NodeJS.ProcessEnv,
+  memo: StatusMemo,
 ) {
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
-  const read = pass?.read ?? passRead(e, runStore.runs.list(), env);
+  const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing);
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
-  const mine = yield* mainClaim(e, run, pass ? Effect.succeed(pass.slot) : slotOf(run.id), read.parents, memo);
+  const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
   for (const other of read.runs) {
@@ -180,7 +181,7 @@ export function landEnding(
   asked: (taskId: string) => CloseoutAsked,
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
-  memo?: StatusMemo,
+  memo: StatusMemo,
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];

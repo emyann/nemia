@@ -3,10 +3,10 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, unreadName } from '../world.ts';
 
 export default {
   /**
@@ -16,7 +16,8 @@ export default {
    * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and
    * offers no answer. The hold is written as `wf hold` writes it, then taken back as `wf hold --off` does and said on the feed, so every
    * page after reads the store as seeded — and the card, read again, offers its gate as it did. That hold is one older code wrote, with
-   * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`).
+   * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`). HELD's repository is one no machine
+   * has: the hold names it unread, in its place's words (`unreadName`).
    */
   name: 'hold',
   route: '/factories/default',
@@ -24,7 +25,7 @@ export default {
     const { id, gated } = GATED;
     const until = HELD.id;
     const hold = path.join(store!, 'runs', `${id}.hold`);
-    const word = `held until ${until} ships`;
+    const word = `held until ${unreadName(until)} ships`;
     const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has shipped; to go on before then: nemia hold ${id} --off`;
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
@@ -39,7 +40,7 @@ export default {
       fed(id, 'held');
 
       const said = card.locator('[data-holding="on-runs"]');
-      await expectVisible(said.filter({ hasText: new RegExp(`^${word}$`) }), `the card says ${word}`);
+      await expectVisible(said.filter({ hasText: new RegExp(`^${literal(word)}$`) }), `the card says ${word}`);
       const title = await said.getAttribute('title');
       if (title !== `${word}\n${advice}`)
         throw new Refused(`the card's hold says itself whole and how to lift it on hover — it says ${JSON.stringify(title)}`);
@@ -67,7 +68,7 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const section = page.locator('section[aria-label="Held"]');
-      await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${word}$`) }), `the run's page says ${word}`);
+      await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the run's page says ${word}`);
       await expectVisible(section.locator('[data-advice]', { hasText: new RegExp(`^${literal(advice)}$`) }), 'and how to lift it');
       await expectVisible(section.getByRole('link', { name: until, exact: true }), `and links ${until}`);
       const step = page.locator(`article > section#step-${gated}`);
@@ -96,19 +97,17 @@ export default {
   },
 } satisfies PageSpec;
 
-/** `text` as a regular expression that matches it and nothing else. */
-const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /**
  * GATED held until HELD as `wf hold --why … --by operator` writes it: its card on the Factory, its row on Runs, its page and its gate's
  * note each say the hold's why and who put it beside `held until`, in the package's words, the card clamped to its two lines and whole
- * on hover. The hold is then taken back, and the run's page says no hold.
+ * on hover; the note names HELD off the hold alone, where it stands unread. The hold is then taken back, and the run's page says no hold.
  */
 async function heldWithWords(page: Page): Promise<void> {
   const { id, gated } = GATED;
   const hold = path.join(store!, 'runs', `${id}.hold`);
   const why = `merge conflicts in five files with ${HELD.id}'s branch: rebase on it once it lands, then go on`;
-  const word = `held until ${HELD.id} ships (why: ${why}; by operator)`;
+  const word = `held until ${unreadName(HELD.id)} ships (why: ${why}; by operator)`;
+  const noted = `held until ${HELD.id} ships (why: ${why}; by operator); its approval is asked once the hold lifts`;
   const whole = new RegExp(`^${literal(word)}$`);
   try {
     if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one with words — ${hold} is there`);
@@ -140,7 +139,7 @@ async function heldWithWords(page: Page): Promise<void> {
     await expectVisible(page.locator('section[aria-label="Held"] p.font-mono', { hasText: whole }), `the run's page says ${word}`);
     await expectVisible(
       page.locator(`article > section#step-${gated} [data-note]`, {
-        hasText: new RegExp(`^${literal(`${word}; its approval is asked once the hold lifts`)}$`),
+        hasText: new RegExp(`^${literal(noted)}$`),
       }),
       `and ${gated}'s note, at the gate the hold keeps back, says it too`,
     );

@@ -42,7 +42,10 @@ const {
   touchedLines,
   runWith,
 } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { passStanding } = await import('../src/standing/standing.verb.ts');
+/** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
+const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
 const { metered } = await import('../src/meter/tally.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -858,6 +861,7 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
     [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
     "review, a terminal gated step, approved: the run is over, and the branch nobody has merged is still a person's, with the commands, since no step of this folder merges",
   );
+  await aPass(e);
   indexOf(await listed(t, e, run.id), `   → to decide: ${branch} is ahead of main, and nothing has merged it — nemia decide ${run.id}`);
 });
 

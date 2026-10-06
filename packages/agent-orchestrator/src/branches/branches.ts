@@ -76,7 +76,22 @@ export function tipsSeen(
 }
 
 /**
- * Whether a branch has landed on its base, read off where the place's `standing` says it stands: the yes `isShipped` says when it is on
+ * The commit each of a run's result `branches` is at, as `heads` has it — or, for one `heads` does not have, the tip the run last saw
+ * (`tipsSeen`): what a merge in the repository's checkout is read as this run's by (`checkoutStatus`). Pure: `heads` is every branch of
+ * the repository and its commit as its caller read them, none where it read nothing.
+ */
+export function resultTips(
+  run: Pick<Run, 'tips'>,
+  branches: readonly string[],
+  heads: Readonly<Record<string, string>> | undefined,
+): Record<string, string> {
+  const tips: Record<string, string> = Object.fromEntries(Object.entries(run.tips ?? {}).filter(([b]) => branches.includes(b)));
+  for (const branch of branches) if (heads && Object.hasOwn(heads, branch)) tips[branch] = heads[branch];
+  return tips;
+}
+
+/**
+ * Whether a branch has landed on its base, read off where the place's `standing` says it stands: yes when it is on
  * its base — `true` with work past its run's base, `'unchanged'` with none or where git could not tell — and false otherwise, or where
  * nothing was read. Pure.
  */

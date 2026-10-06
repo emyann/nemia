@@ -12,7 +12,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, runWith, slotWord } from 'agent-orchestrator';
+import {
+  addToInbox,
+  engine,
+  inboxNameRefusal,
+  noCardLine,
+  queueInInbox,
+  readInbox,
+  runSlots,
+  runStore,
+  runWith,
+  slotWord,
+  standingReader,
+  standingSnapshot,
+} from 'agent-orchestrator';
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('nemia-api-queue-repo-');
 process.env.HKB_REPO = repo;
@@ -405,9 +418,12 @@ const ceilings = async (): Promise<Ceilings> => {
   return (await res.json()) as Ceilings;
 };
 
-/** The runs the package's own `runSlots` holds, on the same store, as the api answers them. */
-const packageHeld = async (): Promise<Ceilings['held']> =>
-  [...(await runWith(engine(), runSlots(engine())))].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
+/** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
+const packageHeld = async (): Promise<Ceilings['held']> => {
+  const git = standingReader(await runWith(engine(), standingSnapshot()));
+  const held = await runWith(engine(), runSlots(engine(), runStore.runs.list(), process.env, { git, read: new Map() }));
+  return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
+};
 
 /** One run in flight, two wanting a slot, one waiting on the run in flight, one called off. */
 function seedRuns(): void {

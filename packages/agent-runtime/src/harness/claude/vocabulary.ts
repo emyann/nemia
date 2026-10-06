@@ -206,7 +206,7 @@ export const claudeAllowArgs = (config: SpawnRequest['config']): string[] => {
  * sibling the glob matches be read, and one named with a backslash before a letter let the sibling without the backslash be read, and
  * not itself. An escape is read: a rule naming `\*` let the folder named with the `*` be read, and not its sibling.
  */
-export const CLAUDE_UNRULED = /[()*?[\]\\\t\n\v\f\r]/;
+export const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
 
 /**
  * Why a task's mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule that denies an
@@ -218,7 +218,7 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
   const how = mount.readOnly
     ? 'read-only, and Claude Code holds a folder read-only'
     : 'writable, and Claude Code lets a session write a folder beside its own';
-  return `\`mounts\` gives the session ${JSON.stringify(mount.path)} ${how} by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a tab or line break. Mount a folder whose path has none of them, or leave the mount off.`;
+  return `\`mounts\` gives the session ${JSON.stringify(mount.path)} ${how} by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a whitespace other than a space. Mount a folder whose path has none of them, or leave the mount off.`;
 };
 
 /**

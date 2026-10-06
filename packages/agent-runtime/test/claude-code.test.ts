@@ -777,7 +777,19 @@ test('a task with no mounts is given the argv it was given before mounts existed
 });
 
 /** Paths a permission rule cannot carry, one per character `CLAUDE_UNRULED` holds: each ends, misses or widens the rule. */
-const UNRULED_MOUNTS = ['/srv/(x)', '/srv/a)', '/srv/*', '/srv/a?', '/srv/[a]', '/srv/a]', '/srv/a\\b', '/srv/a\tb', '/srv/a\nb'];
+const UNRULED_MOUNTS = [
+  '/srv/(x)',
+  '/srv/a)',
+  '/srv/*',
+  '/srv/a?',
+  '/srv/[a]',
+  '/srv/a]',
+  '/srv/a\\b',
+  '/srv/a\tb',
+  '/srv/a\nb',
+  `/srv/a${String.fromCharCode(0xa0)}b`,
+  `/srv/a${String.fromCharCode(0x2028)}b`,
+];
 
 /** Paths a permission rule carries, as measured on Claude Code 2.1.291: a space, a comma and braces inside its parentheses. */
 const RULED_MOUNTS = ['/srv/my notes', '/srv/a,b', '/srv/{a,b}', '/srv/plain'];
@@ -799,7 +811,7 @@ test('REFUSED at shipped defaults: a mount whose path a permission rule cannot n
       );
       assert.equal(
         says,
-        `\`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a tab or line break. Mount a folder whose path has none of them, or leave the mount off.`,
+        `\`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a whitespace other than a space. Mount a folder whose path has none of them, or leave the mount off.`,
         `${harness}${background ? ' --bg' : ''}: ${at}`,
       );
     }
@@ -807,7 +819,7 @@ test('REFUSED at shipped defaults: a mount whose path a permission rule cannot n
   for (const at of UNRULED_MOUNTS) {
     assert.equal(
       claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: at, readOnly: false }] } }),
-      `\`mounts\` gives the session ${JSON.stringify(at)} writable, and Claude Code lets a session write a folder beside its own by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a tab or line break. Mount a folder whose path has none of them, or leave the mount off.`,
+      `\`mounts\` gives the session ${JSON.stringify(at)} writable, and Claude Code lets a session write a folder beside its own by a permission rule, which cannot name a path with a parenthesis, a glob's character (*, ? or a bracket), a backslash, or a whitespace other than a space. Mount a folder whose path has none of them, or leave the mount off.`,
       at,
     );
   }

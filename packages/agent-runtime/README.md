@@ -71,7 +71,7 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/h
   is also `Edit(//<path>/**)` in the one `--disallowedTools` list (`claudeMountArgs`, `claudeDenies`). `--add-dir` grants writes
   as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
   and `bypassPermissions`, a Bash redirection into it included. A path a permission rule cannot carry — a parenthesis, a
-  glob's `*`, `?` or bracket, a backslash, a tab or a line break (`CLAUDE_UNRULED`) — is refused; a space, a comma and braces
+  glob's `*`, `?` or bracket, a backslash, a whitespace other than a space (`CLAUDE_UNRULED`) — is refused; a space, a comma and braces
   are carried. The vocabulary door answers the same characters (`unruledIn`), for a caller that builds a rule from a path.
   `--add-dir` also lists the folder's own `.claude/skills` in the session; its `CLAUDE.md` is not read. The vocabulary door
   names the folders a harness reads so as its own configuration (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts

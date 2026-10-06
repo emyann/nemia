@@ -79,11 +79,12 @@ test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
   for (const harness of ['command', 'a2a:x', 'nope', '']) assert.equal(fenceReach(harness), undefined, harness);
 });
 
-test('the first character of a path a permission rule cannot carry is answered on Claude Code, and nothing on a clean path', () => {
+test('the first character of a path a permission rule cannot carry is answered on Claude Code, a whitespace but the space among them, and nothing on a clean path', () => {
   for (const harness of CLAUDES) {
     assert.equal(unruledIn(harness, '/srv/my wf(1)/runs'), '(', harness);
     assert.equal(unruledIn(harness, '/srv/wf*'), '*', harness);
     assert.equal(unruledIn(harness, '/srv/a\\b'), '\\', harness);
+    assert.equal(unruledIn(harness, `/srv/my${String.fromCharCode(0xa0)}wf`), String.fromCharCode(0xa0), harness);
     assert.equal(unruledIn(harness, '/srv/my wf,{a}'), undefined, harness);
   }
 });

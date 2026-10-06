@@ -3,8 +3,7 @@
  * `release:check` that are node one-liners and a lockfile with no dependency, so `npm ci` installs nothing and needs no network. Each tag
  * is upgraded to, rolled back to and refused as the command does it, and the daemon restarted through a fake machine: a host whose lease,
  * unit, signal and start are the test's, as `service.verb.test.ts`'s are, so no test starts a service or signals a process. `WF_ROOT` is
- * set before the import, since the pause's store reads it as it loads; repository runs with no configuration of the machine's and one
- * identity.
+ * set before the import, since the pause's store reads it as it loads; git runs with no configuration of the machine's and one identity.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

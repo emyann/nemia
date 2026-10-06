@@ -1,8 +1,8 @@
 /**
  * The git place's `report` (`place/git/scripts/report.ts`), run through `runPlaceVerb` against scratch repositories: the files each branch
  * changed — added, modified, renamed, binary, a name git would quote — the diff of each path asked of, whether a path is on a branch, the
- * text of a path at the base, a branch git does not have left out of every answer, and its refusals, never an empty list. Repository runs
- * with no user or system configuration and a fixed identity.
+ * text of a path at the base, a branch git does not have left out of every answer, and its refusals, never an empty list. Git runs with no
+ * user or system configuration and a fixed identity.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

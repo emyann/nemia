@@ -2,8 +2,8 @@
  * The git place's `inventory` and `remove` (`place/git/scripts/`), run through `runPlaceVerb` against scratch repositories: what a run
  * left, read — each worktree inside `under` with its lock, its detached HEAD, whether git could prune it, what it holds uncommitted and
  * whether its HEAD is on a branch, and each branch under the prefix with whether it is merged — and taken away, never forced. Each with an
- * answer, a refusal or an empty answer, and an unread outcome, which is never an empty one. Repository runs with no user or system
- * configuration and a fixed identity, so a machine's hooks, default branch or signing change nothing here.
+ * answer, a refusal or an empty answer, and an unread outcome, which is never an empty one. Git runs with no user or system configuration
+ * and a fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

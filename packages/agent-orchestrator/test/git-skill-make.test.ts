@@ -1,8 +1,8 @@
 /**
  * The git place's `make` (`place/git/scripts/make.ts`), run through `runPlaceVerb` against scratch repositories: a worktree cut, one
  * already there taken up, a fan-in's merges clean and conflicting, and what `.worktreeinclude` copies and refuses — with the one parse of
- * that file, which `open` and `make` share (`worktreeInclude` in `scripts/contract.ts`). Repository runs with no user or system
- * configuration and a fixed identity, so a machine's hooks, default branch or signing change nothing here.
+ * that file, which `open` and `make` share (`worktreeInclude` in `scripts/contract.ts`). Git runs with no user or system configuration and
+ * a fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

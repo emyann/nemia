@@ -2,8 +2,8 @@
  * The git place's `standing` (`place/git/scripts/standing.ts`), run through `runPlaceVerb` against scratch repositories: every head of the
  * repository, and for each branch asked of whether it is on its base, whether it holds work past its run's base, how far ahead it is,
  * a gone branch judged by the tip its run recorded, and its refusals. Its two fallbacks are made to answer by a `git` planted on `PATH`:
- * one that refuses `%(ahead-behind:…)` as a git older than 2.41 does, and a `baseRef` git cannot read. Repository runs with no user or
- * system configuration and a fixed identity.
+ * one that refuses `%(ahead-behind:…)` as a git older than 2.41 does, and a `baseRef` git cannot read. Git runs with no user or system
+ * configuration and a fixed identity.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

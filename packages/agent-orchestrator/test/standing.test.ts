@@ -381,3 +381,20 @@ test('REFUSED: a branch is told what was last read of it only where it was read 
   assert.deepEqual(toldOf([{ branch: 'wf/r/b', baseRef: NOWHERE }], kept), [{ branch: 'wf/r/b', baseRef: NOWHERE }]);
   assert.deepEqual(toldOf([{ branch: 'wf/r/a', baseRef: NOWHERE }], undefined), [{ branch: 'wf/r/a', baseRef: NOWHERE }]);
 });
+
+test('a branch read off its base and landed since, its tip unchanged, is asked of git whether it holds work past its baseRef', () => {
+  const repo = repository();
+  const first = answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) }));
+  const told = knownFrom(asked(repo), first);
+  const tip = git(repo.dir, 'rev-parse', 'wf/r/b');
+  assert.deepEqual(told[1], { branch: 'wf/r/b', baseRef: repo.cut, known: { tip, pastBase: null } }, 'read off its base');
+  git(repo.dir, 'merge', '-q', '--no-ff', '-m', 'land b', 'wf/r/b');
+  const planted = plantedGit(ENV);
+  const again = answerOf(standing({ repo: repo.dir, base: 'main', branches: told }, planted.env));
+  assert.deepEqual(again, answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) })));
+  assert.deepEqual([again.branches[1].onBase, again.branches[1].pastBase, shippedOver(again.branches[1])], ['yes', true, true]);
+  assert.deepEqual(
+    planted.said().filter((line) => line === `merge-base --is-ancestor ${tip} ${repo.cut}`),
+    [`merge-base --is-ancestor ${tip} ${repo.cut}`],
+  );
+});

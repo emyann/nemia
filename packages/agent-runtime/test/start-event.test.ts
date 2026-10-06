@@ -75,6 +75,11 @@ test('the id of an item that comes before the start is not the thread’s: the t
   assert.equal(run.nativeId, THREAD);
 });
 
+test('a second start event, with another id, is not read: the first one’s id is kept', async () => {
+  const { run } = await ran(sh(printed(threadStarted(THREAD), threadStarted(OTHER)), CODEX_START));
+  assert.equal(run.nativeId, THREAD);
+});
+
 test('a session_id on a hook line before init is not the session’s: init’s is taken', async () => {
   const hook = JSON.stringify({ type: 'system', subtype: 'hook_started', session_id: OTHER });
   const { run } = await ran(sh(printed(hook, stream.init), CLAUDE_INIT_START));

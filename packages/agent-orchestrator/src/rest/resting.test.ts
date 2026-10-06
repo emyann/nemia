@@ -18,9 +18,10 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { restingMemo, restingRead } = await import('./resting.verb.ts');
 const { runWith } = await import('../runtime-client.ts');
+const { followedFeed } = await import('./rest.verb.ts');
 
-/** The engine's feed, in memory: one line a task's append; `broken` makes it unreadable. */
-const feed: Array<{ taskId: string }> = [];
+/** The engine's feed, in memory: one line a task's append, of the kind its event names; `broken` makes it unreadable. */
+const feed: Array<{ taskId: string; event?: { kind: string } }> = [];
 let broken = false;
 const e = promised({
   feed: async (after: number) => {
@@ -119,4 +120,25 @@ test('REFUSED: a verified read refuses a run judged afresh otherwise than the me
   assert.ok(refused instanceof Error, 'an answer the memo gave otherwise is refused');
   assert.match(refused.message, /answered verified differently from a fresh read \(WF_VERIFY_REST\)/);
   read.answered(stored('unkept'), { said: 'anything' });
+});
+
+test('followedFeed names each task settled since its last read, once; REFUSED: none on its first read, nor on one that failed', async () => {
+  const memo: { cursor?: number; runs: Map<string, unknown>; settled?: ReadonlySet<string> } = { runs: new Map() };
+  feed.push({ taskId: 'before-work-1', event: { kind: 'settled' } });
+  await runWith(e, followedFeed(e, memo));
+  assert.deepEqual([...memo.settled!], [], 'a first read starts at the end of the feed');
+  feed.push({ taskId: 'now-work-1', event: { kind: 'ended' } }, { taskId: 'now-work-1', event: { kind: 'settled' } });
+  feed.push({ taskId: 'now-review-1', event: { kind: 'ended' } });
+  await runWith(e, followedFeed(e, memo));
+  assert.deepEqual([...memo.settled!], ['now-work-1']);
+  await runWith(e, followedFeed(e, memo));
+  assert.deepEqual([...memo.settled!], [], 'a settle is named by one read alone');
+  feed.push({ taskId: 'now-review-1', event: { kind: 'settled' } });
+  broken = true;
+  try {
+    assert.equal(await runWith(e, followedFeed(e, memo)), false);
+    assert.deepEqual([...memo.settled!], [], 'a read that failed names none');
+  } finally {
+    broken = false;
+  }
 });

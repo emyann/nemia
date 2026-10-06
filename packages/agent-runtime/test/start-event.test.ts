@@ -22,6 +22,7 @@ import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { resultLine, SESSION, stream } from './reader-streams.ts';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
@@ -51,25 +52,27 @@ const runFileOr = (root: string, name: string): Record<string, unknown> => {
   }
 };
 
-/** Spawns `spec`'s run under `name` and waits for its worker to write an end, then gives back its run file. */
-const ran = async (spec: HarnessSpec, name = 'ae/t/1', root = scratch('ae-start-')) => {
+/**
+ * Spawns `spec`'s run under `name` and waits for its worker to write an end, then gives back its run file; `t`'s test fails if none
+ * comes.
+ */
+const ran = async (t: Waiter, spec: HarnessSpec, name = 'ae/t/1', root = scratch('ae-start-')) => {
   const ops = detachedOps(spec, root);
   await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd: root }));
-  const until = performance.now() + 15_000;
-  while (performance.now() < until) {
-    try {
-      const run = runFile(root, name);
-      if (run.state !== 'working') return { ops, root, run };
-    } catch {}
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  assert.fail(`${name} never ended: ${JSON.stringify(runFile(root, name))}`);
+  await until(
+    t,
+    () => ![undefined, 'working'].includes(runFileOr(root, name).state as string | undefined),
+    () => `${name} ended: its run file is ${JSON.stringify(runFileOr(root, name))}`,
+    { everyMs: 100 },
+  );
+  return { ops, root, run: runFile(root, name) };
 };
 
 const threadStarted = (thread_id: unknown) => JSON.stringify({ type: 'thread.started', thread_id });
 
-test('the id of an item that comes before the start is not the thread’s: the thread’s is taken', async () => {
+test('the id of an item that comes before the start is not the thread’s: the thread’s is taken', WAITED, async (t) => {
   const { run } = await ran(
+    t,
     sh(
       printed(JSON.stringify({ type: 'item.started', item: { id: 'aaaaaaaaaaaaaaaaaaaa', type: 'x' } }), threadStarted(THREAD)),
       CODEX_START,
@@ -78,25 +81,25 @@ test('the id of an item that comes before the start is not the thread’s: the t
   assert.equal(run.nativeId, THREAD);
 });
 
-test('a second start event, with another id, is not read: the first one’s id is kept', async () => {
-  const { run } = await ran(sh(printed(threadStarted(THREAD), threadStarted(OTHER)), CODEX_START));
+test('a second start event, with another id, is not read: the first one’s id is kept', WAITED, async (t) => {
+  const { run } = await ran(t, sh(printed(threadStarted(THREAD), threadStarted(OTHER)), CODEX_START));
   assert.equal(run.nativeId, THREAD);
 });
 
-test('a session_id on a hook line before init is not the session’s: init’s is taken', async () => {
+test('a session_id on a hook line before init is not the session’s: init’s is taken', WAITED, async (t) => {
   const hook = JSON.stringify({ type: 'system', subtype: 'hook_started', session_id: OTHER });
-  const { run } = await ran(sh(printed(hook, stream.init), CLAUDE_INIT_START));
+  const { run } = await ran(t, sh(printed(hook, stream.init), CLAUDE_INIT_START));
   assert.equal(run.nativeId, SESSION);
 });
 
-test('an id split across two writes is read whole', async () => {
+test('an id split across two writes is read whole', WAITED, async (t) => {
   const [head, tail] = [threadStarted(THREAD).slice(0, 40), threadStarted(THREAD).slice(40)];
-  const { run } = await ran(sh(`printf '%s' '${head}'; sleep 0.3; printf '%s\\n' '${tail}'`, CODEX_START));
+  const { run } = await ran(t, sh(`printf '%s' '${head}'; sleep 0.3; printf '%s\\n' '${tail}'`, CODEX_START));
   assert.equal(run.nativeId, THREAD);
 });
 
-test('a start line with no newline after it is read at the end of the stream', async () => {
-  const { run } = await ran(sh(`printf '%s' '${resultLine({})}'`, CLAUDE_RESULT_START));
+test('a start line with no newline after it is read at the end of the stream', WAITED, async (t) => {
+  const { run } = await ran(t, sh(`printf '%s' '${resultLine({})}'`, CLAUDE_RESULT_START));
   assert.equal(run.state, 'done');
   assert.equal(run.nativeId, SESSION);
 });
@@ -113,112 +116,129 @@ const REFUSAL_WORDS = [
   /`ae forget`/,
 ];
 
-test('REFUSED: a start whose id is a number leaves that session unread while its process runs, and the next one of the harness read', async () => {
-  const root = scratch('ae-start-');
-  const bad = detachedOps(sh(`${printed(threadStarted(12345))}; sleep 30`, CODEX_START), root);
-  await Effect.runPromise(bad.spawn({ name: 'ae/bad/1', brief: 'x', cwd: root }));
-  const until = performance.now() + 15_000;
-  while (runFileOr(root, 'ae/bad/1').startRefused === undefined) {
-    assert.ok(performance.now() < until, `ae/bad/1 never refused its start: ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`);
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  try {
-    const good = await ran(sh(printed(threadStarted(THREAD)), CODEX_START), 'ae/good/1', root);
-    assert.equal(runFile(root, 'ae/bad/1').state, 'working');
+test(
+  'REFUSED: a start whose id is a number leaves that session unread while its process runs, and the next one of the harness read',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-start-');
+    const bad = detachedOps(sh(`${printed(threadStarted(12345))}; sleep 30`, CODEX_START), root);
+    await Effect.runPromise(bad.spawn({ name: 'ae/bad/1', brief: 'x', cwd: root }));
+    await until(
+      t,
+      () => runFileOr(root, 'ae/bad/1').startRefused !== undefined,
+      () => `ae/bad/1 refused its start: its run file is ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`,
+      { everyMs: 100 },
+    );
+    try {
+      const good = await ran(t, sh(printed(threadStarted(THREAD)), CODEX_START), 'ae/good/1', root);
+      assert.equal(runFile(root, 'ae/bad/1').state, 'working');
 
-    const listed = await warned(good.ops.observe);
-    assert.deepEqual([...listed.value.keys()], ['ae/good/1'], 'the refused session is left out while it runs, the other read');
+      const listed = await warned(good.ops.observe);
+      assert.deepEqual([...listed.value.keys()], ['ae/good/1'], 'the refused session is left out while it runs, the other read');
+      assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
+      assert.equal(listed.warnings.length, 1);
+      for (const w of REFUSAL_WORDS) assert.match(listed.warnings[0], w);
+
+      const asked = await warned(good.ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
+      assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'unread while it runs, never read as a live session with no id');
+      assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
+      assert.equal(asked.warnings.length, 1);
+      for (const w of REFUSAL_WORDS) assert.match(asked.warnings[0], w);
+    } finally {
+      await Effect.runPromise(bad.stop('ae/bad/1'));
+    }
+  },
+);
+
+test(
+  'REFUSED: a start whose id is a number, once its process has ended, reads as failed with no id, and its task settles and is forgotten',
+  WAITED,
+  async (t) => {
+    const spec = sh(printed(threadStarted(12345)), CODEX_START);
+    const { ops, run } = await ran(t, spec, 'ae/bad/1');
+    assert.equal(run.state, 'done', 'the harness itself exited 0');
+    const asked = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
+    assert.deepEqual([...asked.value.unread], []);
+    assert.equal(asked.value.seen.get('ae/bad/1')?.state, 'failed');
+    assert.equal(asked.value.seen.get('ae/bad/1')?.nativeId, undefined);
+    for (const w of REFUSAL_WORDS) assert.match(asked.warnings[0] ?? '', w);
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/bad/1')?.state, 'failed', 'listed, as failed');
+
+    const root = scratch('ae-start-root-');
+    const engine = builtEngine(Engine.layer({ root, harnesses: { sh: spec }, defaultHarness: 'sh' }));
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-start-cwd-') }));
+    await until(
+      t,
+      async () => {
+        if ((await Effect.runPromise(engine.view(id))).state.settled) return true;
+        await Effect.runPromise(engine.tick());
+        return false;
+      },
+      `${id} settled`,
+      { everyMs: 50 },
+    );
+    const { state } = await Effect.runPromise(engine.view(id));
+    assert.equal(state.settled, 'failed');
+    assert.equal(state.attempts[0]?.nativeId ?? null, null, 'recorded with no session id');
+    const forgot = await Effect.runPromise(engine.forget([id], { yes: true }));
+    assert.equal(forgot.forgotten, true);
+    assert.deepEqual(fs.readdirSync(path.join(root, 'runs', 'sh')), [], 'its run files went with it');
+  },
+);
+
+test(
+  'REFUSED: a Codex start whose thread_id is a number, once ended, reads as failed beside a Codex session read: its output’s refusal is its own',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-start-');
+    const codexLike = (line: string) => sh(printed(line), CODEX_START, { readOutput: codexOutput });
+    await ran(t, codexLike(threadStarted(12345)), 'ae/bad/1', root);
+    const { ops } = await ran(t, codexLike(threadStarted(THREAD)), 'ae/good/1', root);
+    const listed = await warned(ops.observe);
+    assert.equal(listed.value.get('ae/bad/1')?.state, 'failed');
+    assert.equal(listed.value.get('ae/bad/1')?.nativeId, undefined);
     assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
-    assert.equal(listed.warnings.length, 1);
-    for (const w of REFUSAL_WORDS) assert.match(listed.warnings[0], w);
+    for (const w of REFUSAL_WORDS) assert.match(listed.warnings[0] ?? '', w);
+    const asked = await Effect.runPromise(ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
+    assert.deepEqual([...asked.unread], []);
+    assert.equal(asked.seen.get('ae/bad/1')?.state, 'failed');
+    assert.equal(asked.seen.get('ae/good/1')?.nativeId, THREAD);
+  },
+);
 
-    const asked = await warned(good.ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
-    assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'unread while it runs, never read as a live session with no id');
-    assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
-    assert.equal(asked.warnings.length, 1);
-    for (const w of REFUSAL_WORDS) assert.match(asked.warnings[0], w);
-  } finally {
-    await Effect.runPromise(bad.stop('ae/bad/1'));
-  }
-});
-
-test('REFUSED: a start whose id is a number, once its process has ended, reads as failed with no id, and its task settles and is forgotten', async () => {
-  const spec = sh(printed(threadStarted(12345)), CODEX_START);
-  const { ops, run } = await ran(spec, 'ae/bad/1');
-  assert.equal(run.state, 'done', 'the harness itself exited 0');
-  const asked = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
-  assert.deepEqual([...asked.value.unread], []);
-  assert.equal(asked.value.seen.get('ae/bad/1')?.state, 'failed');
-  assert.equal(asked.value.seen.get('ae/bad/1')?.nativeId, undefined);
-  for (const w of REFUSAL_WORDS) assert.match(asked.warnings[0] ?? '', w);
-  assert.equal((await Effect.runPromise(ops.observe)).get('ae/bad/1')?.state, 'failed', 'listed, as failed');
-
-  const root = scratch('ae-start-root-');
-  const engine = builtEngine(Engine.layer({ root, harnesses: { sh: spec }, defaultHarness: 'sh' }));
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-start-cwd-') }));
-  const until = performance.now() + 20_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled) {
-    assert.ok(performance.now() < until, `${id} never settled`);
-    await Effect.runPromise(engine.tick());
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  const { state } = await Effect.runPromise(engine.view(id));
-  assert.equal(state.settled, 'failed');
-  assert.equal(state.attempts[0]?.nativeId ?? null, null, 'recorded with no session id');
-  const forgot = await Effect.runPromise(engine.forget([id], { yes: true }));
-  assert.equal(forgot.forgotten, true);
-  assert.deepEqual(fs.readdirSync(path.join(root, 'runs', 'sh')), [], 'its run files went with it');
-});
-
-test('REFUSED: a Codex start whose thread_id is a number, once ended, reads as failed beside a Codex session read: its output’s refusal is its own', async () => {
-  const root = scratch('ae-start-');
-  const codexLike = (line: string) => sh(printed(line), CODEX_START, { readOutput: codexOutput });
-  await ran(codexLike(threadStarted(12345)), 'ae/bad/1', root);
-  const { ops } = await ran(codexLike(threadStarted(THREAD)), 'ae/good/1', root);
-  const listed = await warned(ops.observe);
-  assert.equal(listed.value.get('ae/bad/1')?.state, 'failed');
-  assert.equal(listed.value.get('ae/bad/1')?.nativeId, undefined);
-  assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
-  for (const w of REFUSAL_WORDS) assert.match(listed.warnings[0] ?? '', w);
-  const asked = await Effect.runPromise(ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
-  assert.deepEqual([...asked.unread], []);
-  assert.equal(asked.seen.get('ae/bad/1')?.state, 'failed');
-  assert.equal(asked.seen.get('ae/good/1')?.nativeId, THREAD);
-});
-
-test('REFUSED: a start whose id is a string of no id’s shape', async () => {
-  const { run } = await ran(sh(printed(threadStarted('../../etc/passwd')), CODEX_START));
+test('REFUSED: a start whose id is a string of no id’s shape', WAITED, async (t) => {
+  const { run } = await ran(t, sh(printed(threadStarted('../../etc/passwd')), CODEX_START));
   assert.deepEqual(run.startRefused, { line: 1, field: 'thread_id', found: '"../../etc/passwd"' });
   assert.equal(run.nativeId, undefined);
 });
 
-test('REFUSED: a start event with no id, on the line it is printed at', async () => {
-  const { ops, run } = await ran(sh(printed('not json', JSON.stringify({ type: 'thread.started' })), CODEX_START));
+test('REFUSED: a start event with no id, on the line it is printed at', WAITED, async (t) => {
+  const { ops, run } = await ran(t, sh(printed('not json', JSON.stringify({ type: 'thread.started' })), CODEX_START));
   assert.deepEqual(run.startRefused, { line: 2, field: 'thread_id', found: 'nothing' });
   const { warnings } = await warned(ops.observe);
   assert.match(warnings[0] ?? '', /line\s+2\s+of\s+its\s+stdout[\s\S]*nothing/);
 });
 
-test('a stream that never prints its start keeps no id, and is not refused', async () => {
-  const { ops, run } = await ran(sh(`echo 'auth failed' >&2; exit 1`, CODEX_START));
+test('a stream that never prints its start keeps no id, and is not refused', WAITED, async (t) => {
+  const { ops, run } = await ran(t, sh(`echo 'auth failed' >&2; exit 1`, CODEX_START));
   assert.equal(run.state, 'failed');
   assert.equal(run.nativeId, undefined);
   assert.equal(run.startRefused, undefined);
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t/1')?.state, 'failed', 'read, as a harness that never started');
 });
 
-test('only stdout is read for the start: one printed on stderr gives no id', async () => {
-  const { run } = await ran(sh(`printf '%s\\n' '${threadStarted(THREAD)}' >&2`, CODEX_START));
+test('only stdout is read for the start: one printed on stderr gives no id', WAITED, async (t) => {
+  const { run } = await ran(t, sh(`printf '%s\\n' '${threadStarted(THREAD)}' >&2`, CODEX_START));
   assert.equal(run.nativeId, undefined);
 });
 
-test('a result split across two writes, a character cut in two at the split, still closes the input', async () => {
+test('a result split across two writes, a character cut in two at the split, still closes the input', WAITED, async (t) => {
   const result = resultLine({ result: 'été' });
   const at = Buffer.from(result).indexOf(Buffer.from('é')) + 1;
   const octal = (b: Buffer) => [...b].map((byte) => `\\${byte.toString(8).padStart(3, '0')}`).join('');
   const script = `read first; printf '%s\\n' '${stream.init}'; printf '${octal(Buffer.from(result).subarray(0, at))}'; sleep 0.3; printf '${octal(Buffer.from(result).subarray(at))}\\n'; cat > /dev/null`;
   const spec = sh(script, CLAUDE_INIT_START, { input: claudeJob.input });
-  const { run } = await ran(spec);
+  const { run } = await ran(t, spec);
   assert.equal(run.inputClosed, true, 'stdin was ended at the result, so the job exited');
   assert.equal(run.state, 'done');
   assert.equal(run.nativeId, SESSION);

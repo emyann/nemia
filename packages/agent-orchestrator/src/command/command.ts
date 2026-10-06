@@ -287,6 +287,18 @@ export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: A
   return [CLI, command.name, ...words, ...flagged].join(' ');
 }
 
+/**
+ * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
+ * help prints them; who answers for one is its table entry's of the same name, served on the api alone.
+ */
+export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help'>[] = [
+  {
+    name: 'decide',
+    usage: '<runId> [--sensitive <globs>]',
+    help: ['what the run produced, and the choice it leaves you (nemia decide --help)'],
+  },
+];
+
 /** The column the help's lines under a command start at. */
 const HELP_INDENT = ' '.repeat(31);
 

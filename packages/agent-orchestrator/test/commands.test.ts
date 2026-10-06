@@ -145,6 +145,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['service install', 'cli'],
       ['service uninstall', 'cli'],
       ['service status', 'cli'],
+      ['upgrade', 'cli'],
+      ['version', 'cli'],
       [
         'workflows write',
         [
@@ -197,6 +199,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'pause now',
       'memory',
       'service status',
+      'version',
       'workflows list',
       'workflows step',
       'watch',

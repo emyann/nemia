@@ -35,6 +35,9 @@ import {
   type Args,
   type Command,
   type Ran,
+  currentRelease,
+  runningRelease,
+  trialRefusal,
 } from '../runner.ts';
 import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
@@ -220,12 +223,17 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 }
 
 /**
- * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `e` is the
- * engine they talk to: the board under `WF_ROOT`, unless a test hands it one of its own.
+ * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `given` is
+ * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. Refused (`Conflict`) before
+ * any command but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
  */
-export async function main(argv: string[], e: Engine = engine()): Promise<void> {
+export async function main(argv: string[], given?: Engine): Promise<void> {
   const named = namedIn(argv);
   if (named === undefined) return console.log(HELP);
+  const exempt = named.name === 'version' || named.rest.includes('--help');
+  const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(), HOME, process.env);
+  if (trial !== null) throw new Conflict({ message: trial });
+  const e = given ?? engine();
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(command, named.rest, e);
   return VERBS.get(named.name)!(named.rest, e);

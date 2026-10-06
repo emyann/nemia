@@ -2731,8 +2731,8 @@ it reads.
 
 ## Nemia, the store's own agent: `nemia level` and `nemia memory`
 
-Nemia watches every factory of the store for the person: a long-lived session, woken by the feed, that brings each gate to them with a
-recommendation, recaps what moved, and carries their answer back as a `nemia` verb. She is the person's switch, never a run:
+Nemia watches every factory of the store for the person: a long-lived session, woken by the feed, that brings what waits on them with a
+recommendation, recaps what moved, carries their answer back as a `nemia` verb, and does the rest on her own judgement. She is the person's switch, never a run:
 
 - **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, or the
   web link her session shows, from a phone too), and what a person allowed her at a prompt beyond what ships.

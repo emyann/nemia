@@ -2262,16 +2262,18 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
   never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
   `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: auto`, with every factory's folders mounted
-  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one. Her
-  settings ask the person each write: her `askTools:` (every verb that writes, `wf` and `ae`), and an `Edit` on each folder of the store
-  but hers, read at filing (`storeAsks`); and they put the daemon's own `nemia` first on her `PATH` (`ownBin`).
+  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one. At 5b
+  her settings asked the person each write, through an askTools: list in her instruction and an Edit asked on each folder of the store
+  but hers; card A replaced both (*at Semi-auto, only what waits on the person prompts*, below): her fence is derived from the command
+  classes (`nemiaFence`), the store outside her folder is denied her edits (`storeDenies`), and `readNemia` refuses an askTools: line.
+  Her settings put the daemon's own `nemia` first on her `PATH` (`ownBin`).
 - **Her subscription is `nemia`**, with the default wake words and `denied:`, and a digest once a day; `nemia subscribe nemia` and `nemia
   unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
 - **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in
   `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
 - **What she is ships in `packages/agent-orchestrator/nemia/`**: `nemia.md` (her instruction, her allow list of read verbs and her deny
   list: push, a forced branch delete, a merge, a kill by name, a pull request or release by `gh`, `browser_run_code_unsafe`), and her
-  skills `recap`, `bring-a-gate`, `grant-access` and `commission-a-workflow`. A factory's own rules are its instruction (`NEMIA.md`), which she reads
+  skills: at 5b `recap`, bring-a-gate, `grant-access` and `commission-a-workflow`; card B's (below) are today's. A factory's own rules are its instruction (`NEMIA.md`), which she reads
   before acting there; this repository's is `NEMIA.md` at its root.
 
 Her machine, drawn by its code:
@@ -2337,6 +2339,30 @@ fence is derived from the class, with no hand list in `nemia/nemia.md`.
 - **Her admission** (`nemia admit`, `src/admission/`), the runtime's hook on her `Bash` calls: an approval, a round, an accept, any
   `--budget` and a retry of a step that waits on the person (`waitsOnPerson`, `src/retry/waits.ts`) are asked, whatever she types around
   them; a retry that waits on no one runs. A hook's ask prompts over every allow, so a "don't ask again" never widens what waits.
+
+## Shipped: her skills — her verbs generated, what waits, a factory, a card
+
+Card B of the third Nemia amendment: what ships with her (`nemia/`) teaches her card A's model. What waits on the person she brings in
+chat with a recommendation, then runs the verb they choose with their words as `--message`, so its prompt is their decision, asked once;
+what prompts, prompts; the rest is hers, on her judgement, and said.
+
+- **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
+  class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
+  *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
+  make it prompt; `out` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
+  (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
+  table, naming the command that regenerates it:
+  `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
+- **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for a step at its gate, a step's question and a loop out of
+  rounds, each naming its read and its answering verbs; `commission-a-workflow` brings a proposal as a card to start, fold or drop;
+  `create-a-factory` makes a whole factory short of a run, drafting its workflows, agents and skills in her own folder for the person to
+  place; `write-a-card` writes a card with the person's words, today's facts, done-when, proof, a first measure, a size from measured
+  costs and where it goes. Her instruction's *Where you stand* says what waits, what prompts and what is hers.
+- **Held**: `test/nemia-shipped.test.ts` refuses "gate" in what ships but for a step's gate, and reads each of her skills as Claude Code
+  would; `test/skills-rendered.test.ts` parses each frontmatter as YAML.
+- **Left to platform phase 7**: the writers of workflows, agents and skills and an agent's try on the CLI (`agents write`, `workflows
+  write`, `skills write`, `agents try`, served on the api alone). When they are served, the verbs skill lists them by itself, and
+  `create-a-factory` is rewritten to use them.
 
 ## Shipped: freeing the space — `wf prune`
 

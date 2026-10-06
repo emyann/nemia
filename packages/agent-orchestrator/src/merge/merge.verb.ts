@@ -16,13 +16,12 @@ import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { placeDirOf, trialMerges } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
-import { gitSays } from '../workspace/worktree.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Command } from '../command/entry.verb.ts';
 import type { Workflow } from '../step/step.ts';
-import { mergeAsk, mergeAskedLine, mergeOffer, type MergeAsk, type MergeReads, type Trial } from './merge.ts';
+import { mergeAsk, mergeAskedLine, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 
 export type MergeAsked = { run: Run; ask: MergeAsk; file: string };
@@ -43,23 +42,22 @@ function mergeReads(
   };
 }
 
-/** A trial merge of a branch onto the run's base branch, by the place's trial merge (`trialMerges`), which touches no checkout. */
+/**
+ * A trial merge of a branch onto the run's base branch, by the place's trial merge (`trialMerges`), which touches no checkout, and the
+ * commit the base branch was at as the place tried it.
+ */
 const trialOf =
   (run: Run) =>
-  (branch: string): Trial =>
-    isGitRun(run)
-      ? mergeWordOf(trialMerges(run.repo, [{ onto: run.branch, branch }], placeDirOf(run)).trials[0])
-      : { error: 'no repository' };
-
-/** The commit the run's base branch is at now, as git reads it in the run's repository, and when it was read; '' where git cannot. */
-const baseOf = (run: Run) => ({
-  sha: isGitRun(run) ? (gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() ?? '') : '',
-  at: new Date().toISOString(),
-});
+  (branch: string): Tried => {
+    if (!isGitRun(run)) return { trial: { error: 'no repository' }, base: null };
+    const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], placeDirOf(run));
+    return { trial: mergeWordOf(trials[0]), base: at[run.branch] ?? null };
+  };
 
 /**
  * The merges `nemia decide` offers on a run awaiting a person (`Decision`): one for each loop whose merge the verb would take now
- * (`mergeAsk`, which asks git last, once nothing else refuses it), on the commit the base is at (`baseOf`), in the words of `mergeOffer`.
+ * (`mergeAsk`, which asks the place last, once nothing else refuses it), on the commit its trial read the base at, in the words of
+ * `mergeOffer`.
  * None on any other run.
  */
 export function mergeOffers(
@@ -76,11 +74,11 @@ export function mergeOffers(
 ): Offer[] {
   if (d.kind !== 'awaiting' || !isGitRun(run)) return [];
   const reads = mergeReads(steps, run, ...read);
-  const base = baseOf(run);
+  const at = new Date().toISOString();
   return steps
     .filter((s) => s.loop)
     .flatMap((looping) => {
-      const answer = mergeAsk(steps, run, looping.name, reads, rounds, trialOf(run), base);
+      const answer = mergeAsk(steps, run, looping.name, reads, rounds, trialOf(run), at);
       return 'ask' in answer ? [mergeOffer(run, answer.ask)] : [];
     });
 }
@@ -90,10 +88,10 @@ export function mergeOffers(
  * The next tick honours it once, and moves the run's base to the commit merged.
  *
  * Refused before anything is written, with what to do instead (`mergeAsk`): among them a run whose result step closes no loop, pointed to
- * `nemia retry`, and work whose trial merge onto the base is clean, pointed to the landing's approval. The trial is the place's
- * (`trialMerges`), which touches no checkout. An ask written by someone else between the look and the write is refused as the look would
- * have refused it, and a file at the ask's name that does not read as one is named (`strayAsk`). Fails with a refusal, the verb's or one a
- * read threw (`Missing` for no such run); dies of anything else (`tried`).
+ * `nemia retry`, work whose trial merge onto the base is clean, pointed to the landing's approval, and a base whose commit the trial
+ * did not read. The trial is the place's (`trialMerges`), which touches no checkout. An ask written by someone else between the look and
+ * the write is refused as the look would have refused it, and a file at the ask's name that does not read as one is named (`strayAsk`).
+ * Fails with a refusal, the verb's or one a read threw (`Missing` for no such run); dies of anything else (`tried`).
  */
 export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: string) {
   if (!(yield* tried(() => runStore.runs.exists(id))))
@@ -106,16 +104,11 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const reads = mergeReads(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views));
-  const base = baseOf(run);
-  const { sha } = base;
-  const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run), base);
+  const at = new Date().toISOString();
+  const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run), at);
 
   const first = answer((yield* tried(() => runStore.asks.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
-  if (!sha)
-    return yield* Effect.fail(
-      new Conflict({ message: `git cannot read ${run.branch} in ${run.repo}. Check the repository, then: nemia merge ${id}.` }),
-    );
   const { ask } = first;
   const written = yield* tried(() => runStore.asks.write(id, { kind: 'merge', ask }));
   if (!written.written) {

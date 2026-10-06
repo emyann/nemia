@@ -512,7 +512,8 @@ const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a =
 
 /**
  * The stats of a store's facts for a query (`Stats`), as of `now`. The marks are found over every run that froze (`marksOf`), so a run
- * before `from` or of another factory is still compared with; the facts and marks are then filtered by each key the query gives a value,
+ * before `from`, or one another key's filter leaves out, is still compared with, though never a run of another factory; the facts and
+ * marks are then filtered by each key the query gives a value,
  * then kept between its days: `from` defaults to the first fact's or mark's day, `to` to `now`'s. With `by`, one group per value of that
  * key, sorted by key (`byKey`); a step with no agent, and a run with no repository, are a group of their own (`key` null), last. The tiles
  * are always the last 14 days to `now`'s day and the 14 before. `healthOver` reads the system's health over the days answered: none

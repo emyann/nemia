@@ -1,7 +1,7 @@
 {
   "uid": "nemia-passes",
   "title": "Passes",
-  "description": "A tick pass: its time from the daemon's spans, its phases from Prometheus, and the slowest traces.",
+  "description": "A tick pass, read from its pass span: its time from the spans, its phases from Prometheus, and the slowest pass and advancePass spans by their own duration.",
   "tags": [
     "nemia"
   ],
@@ -166,7 +166,7 @@
       "id": 3,
       "type": "table",
       "title": "Slowest passes",
-      "description": "The latest 500 pass spans in the range, slowest first; each links to its trace.",
+      "description": "The latest 500 pass spans in the range, slowest first. A row's Duration is the pass span's own, not its trace's, which lasts as long as a session the pass filed; each row links to its trace.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -227,7 +227,7 @@
       "id": 4,
       "type": "table",
       "title": "Slowest runs in a pass",
-      "description": "The latest 500 advancePass spans, a run's share of a pass, slowest first, with its run.",
+      "description": "The latest 500 advancePass spans, a run's share of a pass, slowest first, with its run. A row's Duration is the span's own, not its trace's; each row links to its trace.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"

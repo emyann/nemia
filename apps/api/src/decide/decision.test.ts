@@ -197,12 +197,12 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
         where: 'ahead',
         commits: 1,
         said: `${branch} is ahead of main by 1 commit`,
-        stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
+        stat: '4 files: +456 −2',
         /** Whether it still merges onto the base as the base is now: git's `merge-tree`, a merge in the object store alone. */
         merge: { clean: true, said: 'merges cleanly onto main' },
       },
     ],
-    "where the result stands against the base branch, and how much it changed, as `nemia decide` prints them under the run: git's own `--shortstat`, trimmed",
+    'where the result stands against the base branch, and how much it changed, as `nemia decide` prints them under the run: its counts, in its words',
   );
 
   assert.equal(body.touched.length, 1);
@@ -598,13 +598,13 @@ test('a step `denials: fail` stopped is offered the bare `nemia retry <run> <ste
   assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
 });
 
-test('a branch git cannot read is an `error` on its entry — the lesson not known, its diff not read — and the request still answers', async () => {
+test('a branch the place has not is an `error` on its entry — the lesson not known, its diff not known — and the request still answers', async () => {
   settledTask('t-d3-implement', blocked);
   const gone = 'wf/r-d3/gone';
   writeRun({ id: 'r-d3', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } } });
 
   const body = await decidable('r-d3');
-  const unread = `git could not diff ${base.slice(0, 12)}...${gone}`;
+  const unread = `what this run changed is not known: the place has no branch ${gone} in ${repo}`;
   assert.deepEqual(
     body.touched,
     [{ branch: gone, radius: { error: unread } }],
@@ -629,8 +629,30 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
     steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
   });
   const nowhere = await decidable('r-d3b');
-  assert.deepEqual(nowhere.touched, [{ branch: gone, radius: { error: unread } }], 'a repository that is not there at all');
+  const refused = `what this run changed is not known: ${path.join(root, 'no-such-repo')} is not a directory, so nothing a branch in it changed can be read`;
+  assert.deepEqual(
+    nowhere.touched,
+    [{ branch: gone, radius: { error: refused } }],
+    'a repository that is not there at all: the place refuses',
+  );
   assert.equal(nowhere.lesson.state, 'unknown');
+});
+
+test('a place whose report is not heard says what the run changed is not known, never that it changed nothing', async () => {
+  const before = process.env.PATH;
+  process.env.PATH = scratch('nemia-api-decision-no-git-');
+  try {
+    const body = await decidable('r-d1');
+    const [touched] = body.touched;
+    const unknown = /^what this run changed is not known: the place's report was not heard: /;
+    assert.ok('error' in touched.radius, `with no git to run, the place's report exits 1: ${JSON.stringify(touched.radius)}`);
+    assert.match(touched.radius.error, unknown);
+    assert.match(body.sensitive[0]?.error ?? '', unknown, 'its check-affecting diff is not known either');
+    assert.equal(body.lesson.state, 'unknown');
+    for (const s of body.standings) assert.match(s.stat ?? '', unknown, `${s.branch}'s counts are not known, never none`);
+  } finally {
+    process.env.PATH = before;
+  }
 });
 
 test('REFUSED once pruned: a run whose worktrees `nemia prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {

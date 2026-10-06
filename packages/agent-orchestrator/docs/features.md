@@ -40,20 +40,18 @@ check run by the run, which lands the merge or aborts it; `denials: fail` (§10)
 own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
 own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
 
-**What remains, in order.** Of the numbered items, three are open:
+**What remains, in order.** Of the numbered items, two are open:
 
 1. §1, a run that grows steps from a plan.
-2. §2's board half of Remote Control: the run page's word that a step's session is reachable from a phone, and whether a session was
-   in fact bridged, which nothing reads (runtime open issue 23).
-3. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
+2. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
    4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
 
 Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-out.md`, *Freezing* and open question 6): a team's own
 skill as a run's place, copied per run to `WF_ROOT/places/<skill>@<version>/`, a copy whose `skillVersion` drifted refusing the run's
 passes, `nemia prune` removing a copy no record names, and `nemia refreeze`. Card C2 records `placeSkill` and runs the package's own place,
-which ships as a release that never changes under a run; the card is filed once G and H have landed, so the first copy carries every verb
-and `say` key, and `placeSkill.version` becomes the copy's name then. Card E has landed: `nemia rm` and `nemia prune` read, hand off and remove a run's
-worktrees and branches through its place (`inventory`, `handoff`, `remove`), and call no git of their own.
+which ships as a release that never changes under a run; the card is filed once G has landed (H has, below), so the first copy carries
+every verb and `say` key, and `placeSkill.version` becomes the copy's name then. Card E has landed: `nemia rm` and `nemia prune` read,
+hand off and remove a run's worktrees and branches through its place (`inventory`, `handoff`, `remove`), and call no git of their own.
 
 Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer, and the hkb migration; and
 thin runtime stage 6 parts 3 (the gRPC binding) and 4 (streaming and subscribe). Each *Shipped* section names what it left, and those
@@ -2408,8 +2406,9 @@ stateDiagram-v2
   /api/level`, a refusal in the api's words), her session's state judged from the orchestrator's facts alone (`sessionOf`,
   `apps/web/src/lib/nemia.ts`: off, leaving, not filed, starting, up, stopped from outside with a way to a fresh one), how to reach it
   as the api answers it (its first line a command to copy), her spend and allows, and her memory read-only, with words saying a fact is
-  pruned by asking her. Still to build: the runtime reads her bridge's web link, and `reachOf` answers it, so the board shows the link
-  itself rather than the sentence about it.
+  pruned by asking her. Her web link is read off her task's view (`TaskView.bridge`, through `bridgeOf`): `reach` answers it after
+  the attach line, or why it is not up, and `nemia level` and `GET /api/level` answer it as `bridge` too, which the page draws as a
+  link.
 
 `commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory
 instruction` is not on her allow list, since its write flags share its prefix.
@@ -5391,9 +5390,9 @@ Next: 2c, a workflow that marks a mount writable on purpose.
   start, and the runtime client (`runtime-client.ts`) holds the engine's harness map.
 - **Nothing new on a screen.** `wf ls` and `wf decide` print the same lines whether the engine's record carries `remoteControl` or not,
   and a test holds them so. `wf --help`'s sentence on the keys names `remote` among the rest.
-- **Left**: the board's word for it on the run page; the supervisor; and whether a session was in fact bridged, which nothing reads
-  (engine open issue 23). *Since: the supervisor shipped as §9 (2026-09-17); the board's word and the bridge are what is left
-  (noted 2026-09-28).*
+- **Left**: nothing. *Since: the supervisor shipped as §9 (2026-09-17); whether a session was in fact bridged is read off its
+  registration onto its task's view (`TaskView.bridge`, runtime open issue 23), and a step's detail answers it (`StepFiled.bridge`),
+  drawn as a *Reach* row in the step's facts on the run page and its inspector (2026-10-06).*
 
 **Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
 whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
@@ -5416,7 +5415,7 @@ auto-registration with Remote Control fits.
 - agent-orchestrator: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
   supervisor: a session of its own, not a step of any run, that watches the store and acts, with Remote Control on. What it
   is told and what it may do is its own design; nothing here decides it.
-- Board: the run page says a step's session is reachable from the phone when it is.
+- Board: the run page says a step's session is reachable from the phone when it is, with its link. *Done 2026-10-06.*
 
 ## 3. The queue: a cap on runs in flight, and cards that start themselves
 
@@ -5741,3 +5740,22 @@ Tested in `src/telemetry/telemetry.test.ts` (a scratch collector posted `pass.du
 a collector that does not answer costs no program), `src/meter/step.test.ts` (the facts, the five attributes, a run's id refused),
 `src/rest/rest.test.ts` and `src/rest/resting.test.ts` (each settle named by one read alone) and `test/step-metrics.test.ts` (a step
 settled with a cost recorded once over four passes of the real runtime, with no run's id).
+
+## Shipped: what a result changed, read from the place (git-out card H, 2026-10-06)
+
+Nothing in `src` asks git what a result branch changed: `nemia decide`, the api's decision and a declared file's branch ask the run's
+place, live, when a decision is read (`docs/design-2026-09-29-git-out.md`, open question 2):
+
+- **`report`** (`place/git/scripts/report.ts`) answers `Changes`: the base and each tip, each branch's files with their status and counts,
+  the diffs asked for and whether each path asked is on each branch, keyed by branch, and texts at the base. `changesOf` and `presentOn`
+  (`src/branches/changes.store.ts`) read it; `radius` is pure over its files, with the workspaces out of `atBase['package.json']`.
+- **Nothing is kept.** No snapshot, no `runs/<id>/place/report.json`: a run in flight meets nothing stored that changed, and its next
+  decision reads `report`. The trial merges stay on `trial`, and `nemia merge` takes the base's commit from the trial's `at`.
+- **Not known is said.** A report refused or not heard is "what this run changed is not known: <said>" on `nemia decide`, the api and the
+  board, never a branch that changed nothing; a declared file whose branch could not be read is "not known", never "not there".
+- **Counts in our words**: "3 files: +14 −1", and ", 1 binary" where there is one (`countsLine`); `diffStat`'s git sentence is gone, as
+  are `artifacts`, `readArtifact`, `touchedBy`, `workspacesOf` and `sensitiveDiff`. `.oxlintrc.json` is check-affecting.
+
+A decision read costs two node processes and a `git diff` per check-affecting path: 150 to 450 ms on this repository's branches, where
+the git calls it replaced took 20 to 120, the radii equal. Tested in `test/report.test.ts`, `test/radius.test.ts`, `test/decide.test.ts`
+and `test/store.test.ts` (a report not heard), `test/ship.test.ts` (a trial that read no base) and the api's `decide/decision.test.ts`.

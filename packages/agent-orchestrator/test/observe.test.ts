@@ -19,7 +19,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import yaml from 'js-yaml';
 import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
-import { Effect, Logger, References, Tracer } from 'effect';
+import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 
@@ -83,8 +83,21 @@ type Known = {
 /** A dashboard's query, as the checker reads it: the datasource it is sent to, its text, and the profile type a Pyroscope query reads. */
 type Query = { datasource: string; text: string; profileType?: string };
 
-/** A panel's query, as far as the checker reads it: PromQL in `expr`, TraceQL or LogQL in `query`, Pyroscope's in the last two. */
-type Target = { datasource?: { uid?: string }; expr?: string; query?: string; labelSelector?: string; profileTypeId?: string };
+/**
+ * A panel's query, as far as the checker reads it: PromQL in `expr`, TraceQL or LogQL in `query`, Pyroscope's in `labelSelector` and
+ * `profileTypeId`, and the rows a Tempo table shows in `tableType`: a row per span, or per trace when it is `traces` or missing.
+ */
+type Target = {
+  datasource?: { uid?: string };
+  expr?: string;
+  query?: string;
+  labelSelector?: string;
+  profileTypeId?: string;
+  tableType?: string;
+};
+
+/** A panel's transformation, as far as the checker reads it: a `sortBy`'s fields among its options. */
+type Transformation = { id: string; options?: { sort?: { field?: string }[] } };
 
 /** A panel of a dashboard, as far as the checker reads it. */
 type Panel = {
@@ -94,6 +107,7 @@ type Panel = {
   targets?: Target[];
   panels?: Panel[];
   options?: { content?: string };
+  transformations?: Transformation[];
 };
 
 /** A dashboard, as far as the checker reads it. */
@@ -170,8 +184,15 @@ const runner: AsyncRunner = {
   },
 };
 
-/** The span names, span attribute keys and log annotation keys of one traced pass that files a run's first step. */
-async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<string>; annotations: Set<string> }> {
+/** The spans `span` sits under, its parent first. */
+const ancestorsOf = (span: Tracer.AnySpan): Tracer.AnySpan[] =>
+  span._tag === 'Span' && Option.isSome(span.parent) ? [span.parent.value, ...ancestorsOf(span.parent.value)] : [];
+
+/**
+ * The span names, span attribute keys and log annotation keys of one traced pass that files a run's first step, and the names it gives a
+ * span under another of the same name: one name two layers both use, a query on which mixes them.
+ */
+async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<string>; annotations: Set<string>; shared: Set<string> }> {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo });
   git('init', '-q');
@@ -207,7 +228,13 @@ async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<strin
       Effect.withTracer(tracer),
     ),
   );
-  return { spans: new Set(spans.map((s) => s.name)), attributes: new Set(spans.flatMap((s) => [...s.attributes.keys()])), annotations };
+  const shared = spans.filter((s) => ancestorsOf(s).some((a) => a._tag === 'Span' && a.name === s.name)).map((s) => s.name);
+  return {
+    spans: new Set(spans.map((s) => s.name)),
+    attributes: new Set(spans.flatMap((s) => [...s.attributes.keys()])),
+    annotations,
+    shared: new Set(shared),
+  };
 }
 
 const TRACED = await tracedPass();
@@ -324,6 +351,30 @@ function unknownNames(dashboard: Dashboard, known: Known): string[] {
   return [...unknown];
 }
 
+/** Each span name in `shared` that `dashboard`'s Tempo queries name, each once. */
+const sharedSpansOf = (dashboard: Dashboard, shared: Set<string>): string[] => [
+  ...new Set(queriesOf(dashboard).flatMap((q) => (q.datasource === 'tempo' ? traceNames(q.text).spans.filter((n) => shared.has(n)) : []))),
+];
+
+/**
+ * What would show a trace's length where `dashboard` means a span's, each said in a line: a Tempo table naming a span whose target is
+ * not `tableType: "spans"` (Grafana's default, a missing one, is a row per trace, its Duration the trace's), or that sorts on any
+ * field but its span's `Duration`.
+ */
+function spanTableFaults(dashboard: Dashboard): string[] {
+  const faults: string[] = [];
+  for (const p of allPanels(dashboard.panels).filter((p) => p.type === 'table')) {
+    const targets = (p.targets ?? []).filter(
+      (t) => (t.datasource?.uid ?? p.datasource?.uid) === 'tempo' && traceNames(t.query ?? '').spans.length > 0,
+    );
+    if (targets.length === 0) continue;
+    for (const t of targets) if (t.tableType !== 'spans') faults.push(`${p.title}: a table of ${t.tableType ?? 'traces'}, not spans`);
+    const sorts = (p.transformations ?? []).filter((x) => x.id === 'sortBy').flatMap((x) => x.options?.sort ?? []);
+    for (const { field } of sorts) if (field !== 'Duration') faults.push(`${p.title}: sorted on ${field}, not its span's Duration`);
+  }
+  return faults;
+}
+
 /** Each metric `METRICS` holds that none of `dashboard`'s queries names in any of its forms, by its id. */
 const unchartedMetrics = (dashboard: Dashboard): string[] => {
   const named = promMetricsOf(dashboard);
@@ -417,6 +468,7 @@ test("the scan reads the code's metrics, and the traced pass the spans the dashb
   assert.deepEqual(METRICS.get('machine.load'), ['machine_load_ratio']);
   assert.deepEqual(METRICS.get('subscription.wakes'), ['subscription_wakes'], 'a counter that is not incremental is a gauge, no suffix');
   for (const span of ['tick', 'pass', 'advancePass', 'fileReady', 'file', 'append']) assert.ok(TRACED.spans.has(span), span);
+  assert.deepEqual([...TRACED.shared], ['tick'], "the orchestrator's tick, and the runtime engine's inside it");
   for (const key of ['run', 'step', 'task', 'kind']) assert.ok(TRACED.attributes.has(key), key);
   for (const key of ['run', 'step']) assert.ok(TRACED.annotations.has(key), key);
   assert.deepEqual([...KNOWN.labels].filter((l) => ['phase', 'route'].includes(l)).sort(), ['phase', 'route']);
@@ -468,6 +520,37 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
   assert.ok(variable, 'A run picks its run');
   variable.query = { ...(variable.query as object), label: 'runid' };
   assert.deepEqual(unknownNames(run, KNOWN), ['runid'], 'A run: a variable reading the tag runid');
+});
+
+test("a table of spans shows each span's own duration, and no query names a span two layers emit", () => {
+  for (const [file, d] of DASHBOARDS) {
+    assert.deepEqual(spanTableFaults(d), [], file);
+    assert.deepEqual(sharedSpansOf(d, TRACED.shared), [], file);
+  }
+});
+
+test("REFUSED: a table of a span's traces, a table left to Grafana's default, one sorted off the span, and a query on tick", () => {
+  const passes = () => dashboardTitled('Passes');
+  const target = (d: Dashboard, title: string): Target => {
+    const found = allPanels(d.panels).find((p) => p.title === title)?.targets?.[0];
+    assert.ok(found, `Passes has no ${title}`);
+    return found;
+  };
+  const traces = passes();
+  target(traces, 'Slowest passes').tableType = 'traces';
+  assert.deepEqual(spanTableFaults(traces), ['Slowest passes: a table of traces, not spans']);
+  const bare = passes();
+  delete target(bare, 'Slowest passes').tableType;
+  assert.deepEqual(spanTableFaults(bare), ['Slowest passes: a table of traces, not spans']);
+  const sorted = passes();
+  const runs = allPanels(sorted.panels).find((p) => p.title === 'Slowest runs in a pass');
+  const sort = runs?.transformations?.find((x) => x.id === 'sortBy')?.options?.sort?.[0];
+  assert.ok(sort, 'Slowest runs in a pass sorts');
+  sort.field = 'Start time';
+  assert.deepEqual(spanTableFaults(sorted), ["Slowest runs in a pass: sorted on Start time, not its span's Duration"]);
+  const tick = withQuery(passes(), 'tempo', 'name="pass"', 'name="tick"');
+  assert.deepEqual(unknownNames(tick, KNOWN), [], 'tick is a name the code emits');
+  assert.deepEqual(sharedSpansOf(tick, TRACED.shared), ['tick']);
 });
 
 test('System charts every metric the code exports', () => {

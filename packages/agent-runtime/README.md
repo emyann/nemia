@@ -1875,6 +1875,15 @@ enum of the engine's — `decide` never reads it, and a harness that says nothin
 harnesses say nothing and cannot: `ae-worker.ts` writes `working | stopped | done | failed` and never `blocked`,
 so a codex or `claude-detached` session never reaches `needs-human` at all.
 
+Where a session can be reached from a browser or a phone is the view's `bridge`, carried the same way. Claude Code opens a bridge
+to claude.ai for a `--bg` session filed with `claude.remoteControl`, and writes its id, `bridgeSessionId`, in the registration it
+keeps for the process (`<sessions>/<pid>.json`), which `claude agents --json` does not list; `observe` reads that file for each
+session it lists with a process, under the same guards as `find` (`claudeRegistration`), and puts `{ url }` or `{ url: null, why }`
+on the sighting (`claudeBridge`, `harness/claude/bridge.ts`). The view tells three cases apart (`bridgeOfTask`): a task that
+asked and is up carries `{ url }`; one that asked and is not up carries `{ url: null, why }` — no `bridgeSessionId` yet, a
+registration not taken, an id not of the form `session_…`, no process seen, or a session ended; one that did not ask carries none.
+An absent link is never read as not bridged.
+
 A view of a task with no attempt in flight carries no `usage`: an ended attempt's is on `state.attempts`. Measured on
 a loop of twenty reads each against that machine's board (236 tasks), before and after:
 
@@ -2065,7 +2074,8 @@ of pure code sits beside it.
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
-| `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
+| `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration, read under its guards (`claudeRegistration`) and found by name |
+| `src/harness/claude/bridge.ts` | a `--bg` session's Remote Control link, off its registration's `bridgeSessionId` (`claudeBridge`), or why there is none |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`, `admissionHook`), which `bin/ae.ts` loads alone, before any engine |
 | `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, in a job's environment (`claudeTelemetryEnv`) and in a background session's `--settings` (`telemeteredFlags`) |

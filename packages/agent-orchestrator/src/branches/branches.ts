@@ -3,8 +3,8 @@
  * branch tips a pass records (`tipBranches`, `tipsSeen`), and the decider screen's reading of what a branch touched, told by where it is
  * and by what reads it (`radius`, `radiusLines`, `touchedLines`, `inFullLines`, `lessonLine`).
  *
- * Data in, lines out. `branches.store.ts` asks git (`numstat`, `sensitiveDiff`), `cli/main.ts` prints, and nothing here reads a disk or
- * spawns a thing — so every line the screen shows a person can be tested as a string.
+ * Data in, lines out. `changes.store.ts` asks the place's `report` what each branch changed, `cli/main.ts` prints, and nothing here reads
+ * a disk or spawns a thing — so every line the screen shows a person can be tested as a string.
  *
  * The lists are written once, here, and `nemia decide --help` prints them. A glob is a path from the
  * repository root: `*` and `?` stay within a directory, `**` crosses any number of them — a leading
@@ -74,8 +74,8 @@ export function tipsSeen(
 }
 
 /**
- * One file a branch changed, as `git diff --numstat` counts it. A rename keeps where it came `from`.
- * A binary file has no line counts: `null`, never 0, because git counted nothing.
+ * One file a branch changed, as the place's `report` counts it (`ChangedFile`). A rename keeps where it came `from`.
+ * A binary file has no line counts: `null`, never 0, because nothing was counted.
  */
 export type Change = { path: string; from?: string; added: number | null; removed: number | null };
 
@@ -96,8 +96,11 @@ export type Radius = {
   deepWorkspaces?: string[];
 };
 
-/** A branch the screen read, and what it touched — or why that could not be read. */
+/** A branch the screen read, and what it touched — or the sentence saying it is not known (`notKnown`). */
 export type Touched = { branch: string; radius: Radius | { error: string } };
+
+/** The sentence for a branch whose changes could not be read, with what the place said: never read as a branch that changed nothing. */
+export const notKnown = (said: string): string => `what this run changed is not known: ${said}`;
 
 /** Files an agent reads as instructions before it reads the brief. A change to one changes every step after it. */
 export const AGENT_FACING: readonly string[] = [
@@ -110,7 +113,7 @@ export const AGENT_FACING: readonly string[] = [
 ];
 
 /**
- * Files that decide what a check means: its scripts, its dependencies, its compiler, and its tests. A
+ * Files that decide what a check means: its scripts, its dependencies, its compiler, its lint, and its tests. A
  * change could edit one of these to make its check pass, so they are the default `--sensitive` list,
  * and their whole diff is on the screen.
  */
@@ -119,6 +122,8 @@ export const CHECK_AFFECTING: readonly string[] = [
   '**/package-lock.json',
   '**/tsconfig*.json',
   '**/turbo.json',
+  '**/.oxlintrc.json',
+  '**/.oxfmtrc.json',
   '**/*.test.*',
   '**/test/',
   '**/.e2e/',
@@ -184,60 +189,6 @@ const pathsOf = (c: Change): string[] => (c.from ? [c.from, c.path] : [c.path]);
 const nameOf = (c: Change): string => (c.from ? `${c.from} → ${c.path}` : c.path);
 const linesOf = (c: Change): string => (c.added === null || c.removed === null ? 'binary' : `+${c.added} −${c.removed}`);
 
-/** A path git had to quote — a tab, a quote, a backslash in it — as the name it is: each `\ooo` is one byte of it, in octal. */
-function unquote(s: string): string {
-  if (s.length < 2 || !s.startsWith('"') || !s.endsWith('"')) return s;
-  const ESCAPED: Record<string, string> = { n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', f: '\f', v: '\v' };
-  const body = s.slice(1, -1);
-  const bytes: number[] = [];
-  const utf8 = new TextEncoder();
-  for (let i = 0; i < body.length; i++) {
-    if (body[i] !== '\\') {
-      const ch = String.fromCodePoint(body.codePointAt(i)!);
-      i += ch.length - 1;
-      bytes.push(...utf8.encode(ch));
-      continue;
-    }
-    const octal = /^[0-3][0-7]{2}/.exec(body.slice(i + 1));
-    if (octal) {
-      bytes.push(parseInt(octal[0], 8));
-      i += 3;
-      continue;
-    }
-    const next = body[++i] ?? '';
-    bytes.push(...utf8.encode(ESCAPED[next] ?? next));
-  }
-  return new TextDecoder().decode(new Uint8Array(bytes));
-}
-
-/** `old => new`, or `dir/{old => new}/rest` when the two share a prefix or a suffix. */
-function renamed(spec: string): { path: string; from?: string } {
-  const tidy = (p: string) => unquote(p.replace(/\/{2,}/g, '/'));
-  const brace = /^(.*)\{(.*) => (.*)\}(.*)$/.exec(spec);
-  if (brace) {
-    const [, before, from, to, after] = brace as unknown as [string, string, string, string, string];
-    return { from: tidy(`${before}${from}${after}`), path: tidy(`${before}${to}${after}`) };
-  }
-  const [from, to, ...more] = spec.split(' => ');
-  return to !== undefined && !more.length ? { from: unquote(from), path: unquote(to) } : { path: unquote(spec) };
-}
-
-/**
- * `git diff --numstat` read into changes. A line it cannot read is refused rather than skipped: a
- * radius that drops a file it did not understand under-reports exactly what it exists to report.
- */
-export function parseNumstat(numstat: string): Change[] {
-  return numstat
-    .split('\n')
-    .filter((line) => line.trim())
-    .map((line) => {
-      const m = /^(-|\d+)\t(-|\d+)\t(.+)$/.exec(line);
-      if (!m) throw new Error(`not a line of git diff --numstat: ${JSON.stringify(line)}`);
-      const count = (n: string) => (n === '-' ? null : Number(n));
-      return { ...renamed(m[3]), added: count(m[1]), removed: count(m[2]) };
-    });
-}
-
 /**
  * The workspace package a file is in: the outermost directory on its way that a `workspaces` glob names (`packages/agent-orchestrator`),
  * or undefined when none does. Outermost, so a glob with `**`, which names every directory below `packages/`, puts a file in one package.
@@ -273,11 +224,25 @@ export function isLesson(file: string, workspaces: readonly string[] = []): bool
 }
 
 /**
- * What a branch touched, grouped by blast radius. A file counts in every group it touched — a move
- * from one package to another is a change to both — and a binary file counts as a file, with no lines.
+ * The npm `workspaces` of a repository's root `package.json` text, as written — its list, or its `packages` — and none when there is no
+ * file or it does not read: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` (`workspaceGlob`, `deepWorkspaces`).
  */
-export function radius(numstat: string, workspaces: readonly string[] = []): Radius {
-  const changes = parseNumstat(numstat);
+export function workspacesIn(packageJson: string | null | undefined): string[] {
+  try {
+    const { workspaces } = JSON.parse(packageJson ?? '{}') as { workspaces?: unknown };
+    const globs: unknown = Array.isArray(workspaces) ? workspaces : (workspaces as { packages?: unknown } | undefined)?.packages;
+    return Array.isArray(globs) ? globs.filter((g): g is string => typeof g === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * What a branch touched, grouped by blast radius, from the files the place's `report` says it changed. A file counts in every group it
+ * touched — a move from one package to another is a change to both — and a binary file counts as a file, with no lines.
+ */
+export function radius(files: readonly Change[], workspaces: readonly string[] = []): Radius {
+  const changes = [...files];
   const groups = new Map<string, Group>();
   for (const c of changes) {
     for (const name of new Set(pathsOf(c).map((p) => groupOf(p, workspaces)))) {
@@ -345,9 +310,9 @@ export function radiusLines(r: Radius): string[] {
 export const branchesToRead = (result: readonly string[], worked: ReadonlyArray<string | undefined>, base?: string): string[] =>
   result.length ? [...result] : [...new Set(worked.filter((b): b is string => Boolean(b) && b !== base))];
 
-/** The paths whose whole diff the screen prints: every end of every change a glob names. */
+/** The paths whose whole diff the screen asks for: each change a glob names at either end, by its path; the place diffs a rename as one. */
 export const sensitivePaths = (changes: readonly Change[], globs: readonly string[]): string[] =>
-  changes.filter((c) => pathsOf(c).some((p) => matches(p, globs))).flatMap(pathsOf);
+  changes.filter((c) => pathsOf(c).some((p) => matches(p, globs))).map((c) => c.path);
 
 /** `--sensitive a,b` read into globs; empty entries dropped. */
 export const parseGlobs = (arg: string): string[] =>
@@ -362,24 +327,37 @@ export const sensitiveHeading = (globs: readonly string[] | undefined): string =
     ? `in full: the files --sensitive names (${globs.join(', ')}), in place of what decides a check`
     : 'in full: the check-affecting files — what a change could edit to make its check pass';
 
-/** What each branch touched, for a person: the branch, then its radius beneath it. */
+/**
+ * How much a branch changed, in one line: `3 files: +14 −1`, and `, 1 binary` where a file has no line counts; null for a branch that
+ * changed no file, which the screen beside it leaves unsaid.
+ */
+export function countsLine(r: Radius): string | null {
+  if (!r.changes.length) return null;
+  const binary = r.changes.filter((c) => c.added === null || c.removed === null).length;
+  const sum = (n: (c: Change) => number | null) => r.changes.reduce((total, c) => total + (n(c) ?? 0), 0);
+  const counted = r.changes.length > binary ? ` +${sum((c) => c.added)} −${sum((c) => c.removed)}` : '';
+  const files = `${r.changes.length} file${r.changes.length === 1 ? '' : 's'}:`;
+  return `${files}${counted}${binary ? `${counted ? ',' : ''} ${binary} binary` : ''}`;
+}
+
+/** What each branch touched, for a person: the branch, then its radius beneath it — or the sentence saying it is not known. */
 export const touchedLines = (touched: readonly Touched[]): string[] =>
   touched.flatMap(({ branch, radius: r }) =>
-    'error' in r ? [`touched  ${branch}  —  not read: ${r.error}`] : [`touched  ${branch}`, ...radiusLines(r).map((line) => `  ${line}`)],
+    'error' in r ? [`touched  ${branch}  —  ${r.error}`] : [`touched  ${branch}`, ...radiusLines(r).map((line) => `  ${line}`)],
   );
 
 /**
- * The files printed in full on one branch, under a heading that says why: the diff git gave, `none`
+ * The files printed in full on one branch, under a heading that says why: the diff the place gave, `none`
  * when no changed file is on the list — said, so an empty section is not mistaken for one never
- * looked at — or why it could not be read.
+ * looked at — or the sentence saying it is not known.
  */
-export function inFullLines(t: Touched, globs: readonly string[] | undefined, diff: string | undefined, many = false): string[] {
+export function inFullLines(t: Touched, globs: readonly string[] | undefined, diff: string | { error: string }, many = false): string[] {
   const heading = `${sensitiveHeading(globs)}${many ? `, on ${t.branch}` : ''}`;
   const body =
     'error' in t.radius
-      ? [`not read: ${t.radius.error}`]
-      : diff === undefined
-        ? [`not read: git could not diff ${t.branch}`]
+      ? [t.radius.error]
+      : typeof diff !== 'string'
+        ? [diff.error]
         : diff.trim()
           ? diff.replace(/\n+$/, '').split('\n')
           : ['none'];

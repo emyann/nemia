@@ -17,26 +17,39 @@ import {
   lessonGlobs,
   lessonLine,
   matches,
+  countsLine,
+  notKnown,
   parseGlobs,
-  parseNumstat,
   radius,
   radiusLines,
   sensitiveHeading,
   sensitivePaths,
   touchedLines,
+  workspacesIn,
+  type Change,
 } from '../src/branches/branches.ts';
 import { count, sumUsage, usedLines, budgetWord, dollars, peakMark, readWords, rebuiltCache } from '../src/status/status.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
-const numstat = (...lines: string[]) => `${lines.join('\n')}\n`;
+/**
+ * The files a branch changed, as the place's `report` lists them, each written `added<TAB>removed<TAB>path`: `-` for a binary file's
+ * count, and a rename's path `from => to`.
+ */
+const numstat = (...lines: string[]): Change[] =>
+  lines.map((line) => {
+    const [added, removed, named] = line.split('\t');
+    const [from, to] = named.split(' => ');
+    const count = (n: string) => (n === '-' ? null : Number(n));
+    return { ...(to === undefined ? { path: from } : { from, path: to }), added: count(added), removed: count(removed) };
+  });
 
 test('radius reads a rename at both ends, a binary file with no counts, and a file in no directory', () => {
   const r = radius(
     numstat(
       '12\t3\tpackages/agent-orchestrator/src/radius.ts',
-      '0\t0\tpackages/agent-orchestrator/{test => spec}/old.test.ts',
-      '5\t1\tapps/web/src/{a.ts => b.ts}',
-      '1\t0\tapps/web/src/{ => nested}/x.ts',
+      '0\t0\tpackages/agent-orchestrator/test/old.test.ts => packages/agent-orchestrator/spec/old.test.ts',
+      '5\t1\tapps/web/src/a.ts => apps/web/src/b.ts',
+      '1\t0\tapps/web/src/x.ts => apps/web/src/nested/x.ts',
       '-\t-\tapps/web/public/logo.png',
       '2\t0\tCLAUDE.md',
       '1\t1\tdocs/old.md => notes/new.md',
@@ -108,25 +121,22 @@ test('the agent-facing and check-affecting lines are absent when nothing qualifi
 });
 
 test('a branch that changed nothing says so, rather than printing an empty radius', () => {
-  assert.deepEqual(radiusLines(radius('')), ['nothing — the branch changed no file against the base']);
+  assert.deepEqual(radiusLines(radius([])), ['nothing — the branch changed no file against the base']);
 });
 
-test('a numstat line the parser cannot read is refused, not skipped', () => {
-  assert.throws(
-    () => parseNumstat('12\t3\tsrc/a.ts\n 6 files changed, 2 insertions(+)\n'),
-    (e: Error) => e.message.startsWith('not a line of git diff --numstat: " 6 files changed'),
-  );
-  assert.throws(
-    () => parseNumstat('x\t3\tsrc/a.ts'),
-    (e: Error) => e.message.startsWith('not a line of git diff --numstat'),
-  );
+test("how much a branch changed is said in our words: files, lines, and the binary files beside them, never git's sentence", () => {
+  assert.equal(countsLine(radius(numstat('12\t1\tsrc/a.ts', '2\t0\tdocs/b.md', '0\t0\tsrc/c.ts => src/d.ts'))), '3 files: +14 −1');
+  assert.equal(countsLine(radius(numstat('1\t0\tsrc/a.ts', '-\t-\tshot.png'))), '2 files: +1 −0, 1 binary');
+  assert.equal(countsLine(radius(numstat('-\t-\tshot.png'))), '1 file: 1 binary', 'no line was counted, so none is said');
+  assert.equal(countsLine(radius([])), null, 'a branch that changed no file has no counts to say');
 });
 
-test('a path git quoted is read as the name it is', () => {
-  assert.deepEqual(
-    parseNumstat(numstat('1\t0\t"src/a\\"b.ts"', '2\t0\t"docs/caf\\303\\251\\tx.md"')).map((c) => c.path),
-    ['src/a"b.ts', 'docs/café\tx.md'],
-  );
+test("the base's workspaces are read from its package.json text: a list, or its packages, and none from no file or one that does not read", () => {
+  assert.deepEqual(workspacesIn('{"workspaces":["packages/*","apps/*"]}'), ['packages/*', 'apps/*']);
+  assert.deepEqual(workspacesIn('{"workspaces":{"packages":["./packages/*",3]}}'), ['./packages/*']);
+  assert.deepEqual(workspacesIn('{"name":"x"}'), []);
+  assert.deepEqual(workspacesIn(null), []);
+  assert.deepEqual(workspacesIn('{not json'), []);
 });
 
 test('the shipped lists name what the brief names, and refuse what they do not', () => {
@@ -143,6 +153,8 @@ test('the shipped lists name what the brief names, and refuse what they do not',
     'apps/web/test/e2e/run.ts',
     '.e2e/shot.png',
     'apps/web/.e2e/a/b.png',
+    '.oxlintrc.json',
+    'packages/x/.oxfmtrc.json',
   ];
   const notInCheck = [
     'src/index.ts',
@@ -153,6 +165,7 @@ test('the shipped lists name what the brief names, and refuse what they do not',
     'latest/a.ts',
     'docs/test.md',
     'README.md',
+    'oxlintrc.json',
   ];
   for (const f of inCheck) assert.ok(matches(f, CHECK_AFFECTING), `check-affecting: ${f}`);
   for (const f of notInCheck) assert.ok(!matches(f, CHECK_AFFECTING), `not check-affecting: ${f}`);
@@ -197,12 +210,12 @@ test('the shipped lists name what the brief names, and refuse what they do not',
 });
 
 test('--sensitive with a glob that matches nothing names no path, and the heading says whose list it is', () => {
-  const { changes } = radius(numstat('3\t1\tsrc/index.ts', '4\t0\tsrc/index.test.ts', '0\t0\t{test => spec}/a.ts'));
+  const { changes } = radius(numstat('3\t1\tsrc/index.ts', '4\t0\tsrc/index.test.ts', '0\t0\ttest/a.ts => spec/a.ts'));
   assert.deepEqual(sensitivePaths(changes, parseGlobs('nothing/**, *.nope')), []);
   assert.deepEqual(
     sensitivePaths(changes, CHECK_AFFECTING),
-    ['src/index.test.ts', 'test/a.ts', 'spec/a.ts'],
-    'the default takes both ends of a rename, so the diff git prints reads as one',
+    ['src/index.test.ts', 'spec/a.ts'],
+    'a rename the default names at either end is asked by its path, and the place diffs both ends as one',
   );
   assert.match(sensitiveHeading(parseGlobs('nothing/**, *.nope')), /--sensitive names \(nothing\/\*\*, \*\.nope\)/);
   assert.match(sensitiveHeading(undefined), /check-affecting .* make its check pass/);
@@ -210,7 +223,7 @@ test('--sensitive with a glob that matches nothing names no path, and the headin
 });
 
 const on = (branch: string, ...lines: string[]) => ({ branch, radius: radius(numstat(...lines), WORKSPACES) });
-const gone = (branch: string) => ({ branch, radius: { error: `git could not diff abc123...${branch}` } });
+const gone = (branch: string) => ({ branch, radius: { error: notKnown(`the place has no branch ${branch} in /r`) } });
 
 test("the lesson line: a branch that touched only a package's docs says so, and one that touched nothing agent-facing says nothing was written", () => {
   assert.equal(lessonLine([on('wf/a', '3\t1\tpackages/x/docs/features.md')]), 'lesson  packages/x/docs/features.md +3 −1');
@@ -247,7 +260,7 @@ test('what each branch touched is said under the branch, and a branch that could
     '  packages/x  1 file   +2 −2',
     '  src         1 file   +1 −0',
     '  check-affecting  packages/x/test/a.ts',
-    'touched  wf/gone  —  not read: git could not diff abc123...wf/gone',
+    'touched  wf/gone  —  what this run changed is not known: the place has no branch wf/gone in /r',
   ]);
 });
 
@@ -265,8 +278,13 @@ test('the files in full: the heading says why, then the diff — or none, said �
     '-assert.equal(1, 1);',
     '+assert.ok(true);',
   ]);
-  assert.deepEqual(inFullLines(t, undefined, undefined).slice(1), ['not read: git could not diff wf/a']);
-  assert.deepEqual(inFullLines(gone('wf/gone'), undefined, undefined).slice(1), ['not read: git could not diff abc123...wf/gone']);
+  const unread = { error: notKnown("the place's report was not heard: spawn git ENOENT") };
+  assert.deepEqual(inFullLines(t, undefined, unread).slice(1), [
+    "what this run changed is not known: the place's report was not heard: spawn git ENOENT",
+  ]);
+  assert.deepEqual(inFullLines(gone('wf/gone'), undefined, '').slice(1), [
+    'what this run changed is not known: the place has no branch wf/gone in /r',
+  ]);
   assert.match(inFullLines(t, undefined, '', true)[0], /, on wf\/a /);
 });
 

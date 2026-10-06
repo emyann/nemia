@@ -10,6 +10,7 @@ import {
   nemiaFactQuery,
   nemiaMemoryQuery,
   putLevel,
+  type Bridge,
   type FactoryLevel,
   type Level,
   type LevelAsk,
@@ -20,6 +21,7 @@ import { factoryWords, levelWord, offeredLevel, PRUNE_WORDS, RAISE_STRETCHES, se
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { CopyButton } from './CopyButton';
+import { BridgeWords } from './Facts';
 
 /**
  * Nemia, the store's own agent, on the Settings page: the store's level with its switch, each factory's level with its default and a
@@ -63,7 +65,7 @@ export function NemiaSettings() {
             </div>
           )}
           <SessionPart nemia={data} pending={write.isPending} onAsk={askLevel} />
-          <ReachPart reach={data.reach} />
+          <ReachPart reach={data.reach} bridge={data.bridge} />
           <SpendPart nemia={data} />
         </>
       ) : (
@@ -259,10 +261,14 @@ function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bo
   );
 }
 
-/** How a person reaches her session, as the api says it: its first line a command to copy, the rest sentences. None while none runs. */
-function ReachPart({ reach }: { reach: readonly string[] }) {
+/**
+ * How a person reaches her session, as the api says it: its first line a command to copy, the rest sentences, but for the line her bridge
+ * says, drawn from `bridge` itself: her web link to open, or why it is not up. None while none runs.
+ */
+function ReachPart({ reach, bridge }: { reach: readonly string[]; bridge: Bridge | null }) {
   if (!reach.length) return null;
-  const [command, ...rest] = reach;
+  const [command, ...lines] = reach;
+  const rest = bridge === null ? lines : lines.slice(0, -1);
   return (
     <Part heading="Reach her" data-nemia-reach>
       <div className="flex max-w-full items-center gap-1 self-start rounded-md border bg-muted/40 px-2 py-1">
@@ -276,6 +282,11 @@ function ReachPart({ reach }: { reach: readonly string[] }) {
           {line}
         </p>
       ))}
+      {bridge && (
+        <p className="text-xs text-muted-foreground">
+          <BridgeWords bridge={bridge} data-nemia-bridge />
+        </p>
+      )}
     </Part>
   );
 }

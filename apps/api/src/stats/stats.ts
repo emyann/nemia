@@ -34,11 +34,11 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   a row per step and field the step's frozen `tally:` names, each a `sum` and the `tries` it was measured on, over the range
  *   (`total`) and on each of its `days`: an array's items, a number's value, or the items whose boolean flag is true; `sum` is null,
  *   never 0, on a day no closeout of the step measured it. Each group carries its `marks`: the days a run froze a step, an agent or a
- *   rendered skill that differs from the run of the same workflow folder before it; and its `slowLandings`: each landing check that
- *   passed in more than half the deadline its task was filed with, its `checkMs`, that `deadlineMs` and the `share`. A query the package
- *   refuses (`statsQueryOf`) is a 422 naming the key and what it takes. A run is read again only when its files in the store or its tasks'
- *   journals changed: each finished run's facts are answered from the app's memo (`ReadMemo`) while they stand, and read afresh too under
- *   `WF_VERIFY_REST=1`.
+ *   rendered skill that differs from the run of the same factory and workflow folder before it; and its `slowLandings`: each landing check
+ *   that passed in more than half the deadline its task was filed with, its `checkMs`, that `deadlineMs` and the `share`. A query the
+ *   package refuses (`statsQueryOf`) is a 422 naming the key and what it takes. A run is read again only when its files in the store or its
+ *   tasks' journals changed: each finished run's facts are answered from the app's memo (`ReadMemo`) while they stand, and read afresh too
+ *   under `WF_VERIFY_REST=1`.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
   served(c, async ({ e, env, home, memo }) => {

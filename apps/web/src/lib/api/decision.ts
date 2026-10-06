@@ -46,7 +46,7 @@ const RadiusSchema = Schema.Struct({
   lessons: Schema.mutable(Schema.Array(ChangeSchema)),
 }) satisfies Schema.Schema<Radius>;
 
-/** Mirrors `Touched` in apps/api/src/decide/decision.ts: a branch, and its radius or why git could not read it. */
+/** Mirrors `Touched` in apps/api/src/decide/decision.ts: a branch, and its radius or the sentence saying what it changed is not known. */
 export type Touched = { branch: string; radius: Radius | { error: string } };
 
 /** Decodes a `Touched`. */
@@ -102,7 +102,7 @@ const DecideCommandSchema = Schema.Struct({
 /**
  * Mirrors `Standing` in apps/api/src/decide/decision.ts: where one result branch stands against the base branch as git says it now — on it,
  * ahead of it by N commits, or gone — with the fact in the package's words and how much it changed, as the CLI's `decide` prints beside the
- * branch (git's `--shortstat`); `stat` is null where git said nothing of it.
+ * branch (`3 files: +14 −1`, or the sentence saying what it changed is not known); `stat` is null for a branch with nothing past the base.
  */
 export type Standing = (
   | { branch: string; where: 'on' }

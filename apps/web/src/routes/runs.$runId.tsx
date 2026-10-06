@@ -253,7 +253,7 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  * At its gate — waiting on you as the CLI's `ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`)
  * — the step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a
  * person approves, beside Approve and Send back. An ending step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing
- * on, and shows instead the work it would act on (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its
+ * on, and shows instead the work it would act on (`ActsOn`), the branch's standing and counts and each work step's closeout with its
  * files, since approving is what runs it. An ending that has already run — filed, aborted, retried — is at its gate for its own closeout,
  * as any gated step is. A send-back names the steps the package names (`sendBackTo`): the step itself once it has run, or the steps it
  * waits on. Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,

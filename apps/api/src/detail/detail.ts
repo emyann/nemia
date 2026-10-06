@@ -6,6 +6,8 @@ import {
   atWork,
   artifactsDir,
   budgetWord,
+  type Bridge,
+  bridgeOf,
   closeoutAsked,
   closeoutReader,
   consumption,
@@ -205,6 +207,11 @@ export type StepFiled = {
    * file does not declare it or cannot be read. Null for a local harness, whose mode is `runsIn`.
    */
   remote: { name: string; address: string | null } | null;
+  /**
+   * The session's web link, for a step whose sessions are bridged (`remote: true`), off its task's view (`bridgeOf`): its `url` where the
+   * bridge is up, else `why` it is not. Null for a step not bridged, an A2A remote step among them.
+   */
+  bridge: Bridge | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
 };
@@ -738,6 +745,7 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
     permissionMode: permissionMode ?? null,
     runsIn: runsInOf(view.state),
     remote: remoteOf(view.state.harness),
+    bridge: bridgeOf(views)(view.id),
     tools: tools ?? null,
     deadlineSeconds: deadlineSeconds ?? null,
   };

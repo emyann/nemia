@@ -16,8 +16,9 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionState, Sighting, Usage } from '../../core/index.ts';
+import type { Bridge, SessionState, Sighting, Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
+import { claudeBridge } from './bridge.ts';
 import {
   claudeTranscriptEvents,
   lastStructuredOutput,
@@ -134,6 +135,8 @@ export type ClaudeOptions = {
    * cannot tell. Injectable for the same reason.
    */
   parentCallFrom?: (sessionId: string) => Promise<ParentCall | undefined>;
+  /** The bridge of the session `sessionId` its process `pid` holds (`claudeBridge`, by default). Injectable for the same reason. */
+  bridgeOf?: (pid: number, sessionId: string) => Promise<Bridge>;
   /**
    * Where the runner writes what it hands the CLI by path — a task's MCP config — what it records at spawn — a resumed session's
    * parent's last call — and what it records as it looks — when it first saw a working session's transcript as it stands
@@ -141,7 +144,8 @@ export type ClaudeOptions = {
    */
   root?: string;
   /**
-   * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, and `say` its inbox. Default
+   * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, `say` its inbox, and
+   * `observe` the bridge of each session it holds a process for (`claudeBridge`). Default
    * `sessions` under `$CLAUDE_CONFIG_DIR`, or under `~/.claude`, read when the runner is made.
    */
   sessionsDir?: string;
@@ -256,6 +260,7 @@ type Reading = {
   mono: () => Monotonic | undefined;
   transcriptTime: (sessionId: string) => Promise<number | undefined>;
   kept: ReturnType<typeof keptReads>;
+  bridgeOf: (pid: number, sessionId: string) => Promise<Bridge>;
 };
 
 /**
@@ -372,6 +377,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     mono: options.mono ?? monoNow,
     transcriptTime: options.transcriptTime ?? sdkTranscriptTime,
     kept: keptReads(now, options.closeoutFrom ?? transcriptCloseout, usageFrom),
+    bridgeOf: options.bridgeOf ?? ((pid, sessionId) => claudeBridge(sessionsDir, pid, sessionId)),
   };
   const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map(), countsFrom: new Map() };
   return {
@@ -605,11 +611,19 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
 /**
  * `reportOf`, failing with a `RunnerError` for `observe` when a read of the session's transcript throws — its lines do not decode
  * (`lines.ts`), or it was found and not read (`TranscriptUnread`): a statement or usage the transcript holds and the runtime cannot
- * read is no absence, so the whole listing fails and each background session is unread.
+ * read is no absence, so the whole listing fails and each background session is unread. A session listed with a process carries its
+ * bridge too (`claudeBridge`), a link or why there is none, which fails nothing.
  */
 const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt?: number; countFrom?: number }) =>
   Effect.tryPromise({
-    try: () => reportOf(x, name, l.sighting, l.startedAt, l.countFrom),
+    try: async (): Promise<readonly [string, Sighting]> => {
+      const { pid, sessionId } = l.sighting;
+      const [[, reported], bridge] = await Promise.all([
+        reportOf(x, name, l.sighting, l.startedAt, l.countFrom),
+        pid === undefined ? undefined : x.bridgeOf(pid, sessionId),
+      ]);
+      return [name, bridge ? { ...reported, bridge } : reported];
+    },
     catch: (cause) =>
       new RunnerError({
         verb: 'observe',

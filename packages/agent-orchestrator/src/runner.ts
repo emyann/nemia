@@ -39,6 +39,7 @@ export {
   CHECK_AFFECTING,
   LESSON,
   branchesToRead,
+  countsLine,
   inFullLines,
   lessonLine,
   parseGlobs,
@@ -288,19 +289,15 @@ export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export {
-  artifacts,
   branchReader,
   branchStandings,
-  diffStat,
   headsOf,
   isShipped,
   parentRecord,
-  readArtifact,
   resultBranches,
-  sensitiveDiff,
-  touchedBy,
   type BranchReader,
 } from './branches/branches.store.ts';
+export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';
 export {
@@ -365,6 +362,7 @@ export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from '
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
+  bridgeOf,
   closeoutAsked,
   closeoutOf,
   closeoutReader,
@@ -383,7 +381,7 @@ export {
   waitingOf,
 } from './views/views.verb.ts';
 export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
-export type { CheckReport } from './views/views.verb.ts';
+export type { Bridge, CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
 export { leftOutMounts, repoFor, startRun } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';

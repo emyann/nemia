@@ -6,19 +6,18 @@ import {
   branchesToRead,
   type BranchStanding,
   branchStandings,
+  type BranchChanges,
   branchWord,
-  CHECK_AFFECTING,
+  changesOf,
   COMMANDS,
   type Collisions,
   type Decided,
   type StandingMerge,
+  countsLine,
   type DecideCommand,
-  diffStat,
   lessonLine,
   parentsRead,
   resultSteps,
-  sensitiveDiff,
-  touchedBy,
   judgedSteps,
   stepNames,
   viewsOf,
@@ -36,14 +35,17 @@ import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
 export type { DecideCommand };
 
-/** What a branch touched, as `nemia decide` reads it (`touchedBy`): its radius, or why git could not say. */
-export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
+/**
+ * What a branch touched, as `nemia decide` reads it from the run's place (`changesOf`): its radius, or the sentence saying what it changed
+ * is not known.
+ */
+export type Touched = { branch: string; radius: BranchChanges['radius'] };
 
 /**
  * Where one result branch stands against the base branch, as git says it now (`BranchStanding`) — on it, ahead of it by N commits, or gone
- * — with the fact in the package's words (`branchWord`) and how much it changed, as `nemia decide` prints beside the branch (`diffStat`,
- * git's `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch
- * it does not have, or one with nothing on it past the run's base.
+ * — with the fact in the package's words (`branchWord`) and how much it changed, as `nemia decide` prints beside the branch
+ * (`countsLine`): `3 files: +14 −1`, with `, 1 binary` where one is, or the sentence saying what it changed is not known. `stat` is null
+ * for a branch with nothing on it past the run's base.
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 
@@ -52,7 +54,10 @@ export type { Collisions, StandingMerge };
 /** One file of a branch's check-affecting diff: its unified diff, at most `DIFF_LINES` lines, and how many more it had. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
 
-/** The check-affecting files' diff on one branch, a file each; none when no changed file is on the list; `error` when git could not say. */
+/**
+ * The check-affecting files' diff on one branch, a file each; none when no changed file is on the list; `error`, the sentence saying it is
+ * not known, when the place did not say.
+ */
 export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string | null };
 
 /**
@@ -167,12 +172,10 @@ function diffPath(lines: readonly string[]): string {
   return Number.isInteger(half) && both.slice(2, half) === both.slice(half + 3) ? both.slice(2, half) : both;
 }
 
-/** A branch's check-affecting diff, as `inFullLines` reads what `sensitiveDiff` gave: an error, none, or the files. */
-function sensitiveOf(run: GitRun, t: Touched): SensitiveDiff {
-  if ('error' in t.radius) return { branch: t.branch, files: [], error: t.radius.error };
-  const diff = sensitiveDiff(run, t, CHECK_AFFECTING);
-  if (diff === undefined) return { branch: t.branch, files: [], error: `git could not diff ${t.branch}` };
-  return { branch: t.branch, files: diff.trim() ? diffFiles(diff) : [], error: null };
+/** A branch's check-affecting diff, as `inFullLines` reads what the place gave (`BranchChanges.inFull`): an error, none, or the files. */
+function sensitiveOf({ branch, inFull }: BranchChanges): SensitiveDiff {
+  if (typeof inFull !== 'string') return { branch, files: [], error: inFull.error };
+  return { branch, files: inFull.trim() ? diffFiles(inFull) : [], error: null };
 }
 
 /** The line `lessonLine` prints, and which of its three it is. */
@@ -201,9 +204,10 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  * `nothing`.
  *
  * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
- * never the base branch of a run that cut worktrees, whose work is not on it — each read with `touchedBy`, and with `sensitiveDiff` over
- * the default check-affecting list. A branch git cannot read is an `error` on its entry, never a failed request. A few `git` calls a
- * branch, so read once, never on a poll. For a run still running with a step waiting on you, the branches read are the result steps'
+ * never the base branch of a run that cut worktrees, whose work is not on it — and the result branches' counts, each read from the run's
+ * place on this request (`changesOf`), with the default check-affecting files' diffs. What the place could not say is an `error` on its
+ * entry, the sentence saying it is not known, never a failed request nor a branch that changed nothing. Two of the place's reports a
+ * request, so read once, never on a poll. For a run still running with a step waiting on you, the branches read are the result steps'
  * (`resultSteps`), as the decision reads them once it is not. A folder run has no repository to ask, so none of git is read for it.
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
@@ -224,14 +228,14 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   if (nothing) return { nothing };
   const steps = judgedSteps(run, folder);
   const collisions = decided.collisions ?? null;
-  const { touched, standings } = await branchesOf(e, run, steps, d.kind === 'awaiting' ? d.branches : undefined, collisions);
+  const { read, standings } = await branchesOf(e, run, steps, d.kind === 'awaiting' ? d.branches : undefined, collisions);
+  const touched = read.map(({ branch, radius }) => ({ branch, radius }));
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
-  const git = isGitRun(run) ? run : undefined;
   return {
     standings,
     touched,
     lesson: lessonOf(touched),
-    sensitive: git ? touched.map((t) => sensitiveOf(git, t)) : [],
+    sensitive: read.map(sensitiveOf),
     used: Object.fromEntries(filed.map((name) => [name, usedOf(decided.used[name], steps.find((s) => s.name === name)?.context)])),
     total: totalOf(
       steps,
@@ -254,7 +258,7 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
 }
 
 /**
- * What each branch the CLI reads touched (`branchesToRead`, `touchedBy`), and where each result branch stands against the base
+ * What each branch the CLI reads changed (`branchesToRead`, `changesOf`), and where each result branch stands against the base
  * (`Standing`): the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a
  * run that worked on its base branch itself. Whether each branch ahead merges onto the base is the decision's own trial at an ending
  * (`collisions`), and the table's merge check (`MERGES`) at any other.
@@ -273,25 +277,30 @@ async function branchesOf(
         .filter((b): b is string => Boolean(b)),
     ),
   ];
-  if (!isGitRun(run)) return { touched: [], standings: [] };
-  const touched: Touched[] = branchesToRead(
+  if (!isGitRun(run)) return { read: [], standings: [] };
+  const toRead = branchesToRead(
     awaiting ?? results,
     Object.values(run.steps).map((s) => s.branch),
     run.isolate ? run.branch : undefined,
-  ).map((branch) => ({ branch, radius: touchedBy(run, branch) }));
-  if (!run.isolate) return { touched, standings: [] };
-  const read = branchStandings(run, results);
+  );
+  const changes = changesOf(run, [...toRead, ...(run.isolate ? results : [])]);
+  const read = toRead.map((branch) => changes.find((c) => c.branch === branch)!);
+  if (!run.isolate) return { read, standings: [] };
+  const stands = branchStandings(run, results);
   const merges = collisions
     ? Object.fromEntries(collisions.base.map(({ branch, ...merge }) => [branch, merge]))
-    : await mergesOf(e, run, read);
-  const standings: Standing[] = read.map((s) => ({
+    : await mergesOf(e, run, stands);
+  const standings: Standing[] = stands.map((s) => ({
     ...s,
     said: branchWord(run, s),
-    stat: diffStat(run, s.branch).trim() || null,
+    stat: statOf(changes.find((c) => c.branch === s.branch)!.radius),
     merge: s.where === 'ahead' ? (merges[s.branch] ?? null) : null,
   }));
-  return { touched, standings };
+  return { read, standings };
 }
+
+/** How much a branch changed, in `nemia decide`'s words (`countsLine`), or the sentence saying it is not known; null for nothing. */
+const statOf = (radius: BranchChanges['radius']): string | null => ('error' in radius ? radius.error : countsLine(radius));
 
 /**
  * Whether each branch ahead of the base still merges onto it (`StandingMerge`), keyed by branch, as the table's merge check answers it

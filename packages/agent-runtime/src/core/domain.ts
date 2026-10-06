@@ -141,7 +141,17 @@ export type Sighting = {
   held?: boolean;
   /** The id of the process the harness holds the session in, when it says. Journalled for a long-lived task as it changes. */
   pid?: number;
+  /**
+   * The link that opens the session in a browser or on a phone, where its harness bridged it there, or why there is none as a
+   * sentence: Claude Code's Remote Control, read off the registration it writes for the process. Absent from a harness that cannot
+   * say, and from a session it holds no process for. **Carried, never judged**: `decide` does not read it, and the view says
+   * whether it was asked for (`TaskView.bridge`).
+   */
+  bridge?: Bridge;
 };
+
+/** A session's bridge: the link that opens it, or no link and why, in words that say what to do. */
+export type Bridge = { url: string } | { url: null; why: string };
 
 /**
  * One tool call a harness denied: the tool, and what it was asked for — a command's first word, a skill's name, a

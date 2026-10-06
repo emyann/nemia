@@ -6,7 +6,7 @@
 import { Effect, Layer, Logger, LogLevel } from 'effect';
 import { FetchHttpClient } from 'effect/http';
 import { OtlpLogger, OtlpSerialization, OtlpTracer, type OtlpExporter } from 'effect/observability';
-import { lineOf, logsUrl, otlpOf, tracesUrl } from './telemetry.ts';
+import { lineOf, logsUrl, otlpOf, stepLabels, tracesUrl } from './telemetry.ts';
 
 /** Prints each log as its line (`lineOf`), its annotations unprinted: Info and below on stdout, Warn and above on stderr. */
 export const lineLogger = Logger.make<unknown, void>(({ message, logLevel, date }) => {
@@ -39,4 +39,4 @@ export function telemetryLayer(env: Readonly<Record<string, string | undefined>>
 export const forStep =
   (run: string, step: string) =>
   <A, E, R>(filing: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-    filing.pipe(Effect.annotateLogs({ run, step }), Effect.annotateSpans({ run, step }));
+    filing.pipe(Effect.annotateLogs(stepLabels(run, step)), Effect.annotateSpans(stepLabels(run, step)));

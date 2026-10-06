@@ -23,6 +23,9 @@
  *
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
+import { isGitRun, type Run } from '../record/record.ts';
+import type { Workflow } from '../step/step.ts';
+
 /**
  * The seconds a step's check may run before the engine stops it, where the check does not land the run. A hung suite must not hold a run
  * for ever.
@@ -74,6 +77,24 @@ export type CheckEnv = {
   /** The judged step's closeout, flat, as a JSON file: absent where the step signed off none. */
   WF_CLOSEOUT?: string;
 };
+
+/**
+ * What a step's check is told (`CheckEnv`): its run, its step, the workspace it judges and the step's artifacts folder (`t.files`), the
+ * run's base commit where the step works on a branch of a repository run, and the file of the step's closeout (`t.closeout`) where it
+ * signed off one.
+ */
+export const checkEnvOf = (
+  run: Run,
+  step: Pick<Workflow, 'name' | 'workspace'>,
+  t: { workspace: string; files: string; closeout: string | undefined },
+): CheckEnv => ({
+  WF_RUN: run.id,
+  WF_STEP: step.name,
+  ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
+  WF_WORKSPACE: t.workspace,
+  WF_ARTIFACTS: t.files,
+  ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),
+});
 
 /**
  * The install an ending's check runs first where the merge asks for packages the checkout lacks. `npm install` rather than `npm ci`,

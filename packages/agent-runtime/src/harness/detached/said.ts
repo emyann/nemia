@@ -121,7 +121,8 @@ const saidAt = (
 /**
  * What the run `name`'s capture says, as `reader` reads it — or why the reader refused it, or nothing where there is no
  * capture yet. Read again only when the capture has changed since `memo` read it, and then from the file it is kept in when
- * that has its key. A refusal is kept in `memo` alone: it fails `observe`, and is read again by the next process.
+ * that has its key. A refusal is kept in `memo` alone: it leaves that run unread, or failed once ended, and is read again by the
+ * next process.
  *
  * @param over the run is no longer working, so its capture no longer grows: only then is what was read kept on disk.
  */

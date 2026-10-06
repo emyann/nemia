@@ -746,7 +746,7 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
 - **A stop of a send another process makes** does nothing here: that process's send is its own. The stop is asked again on
   later passes, and a Task the send brings back is then cancelled; the deadline bounds the rest.
 
-### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, five gaps left)
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day; per session for a transcript or an output 2026-10-06, six gaps left)
 
 The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
 pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
@@ -760,11 +760,17 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
 `src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`.
 
-A `--bg` transcript is read the same way (2026-10-06). One that does not decode (`lines.ts`), and one found and then not read, fails
-the `--bg` `observe`: every background session is unread on that pass, never read as no statement and never `LOST`. A failed read is
-any error the OS gives once the file was found (`EACCES`, `EIO`, or `ENOENT` for a file gone since). A refused decode is kept while
-the transcript is unchanged. A failed read is never kept, so the next pass reads the file again (`TranscriptUnread`,
-`harness/claude/transcript.ts`). A session with no transcript at all still reads as none. The tests are in `test/transcript.test.ts`.
+A `--bg` transcript, and a detached run's output, are read per session (2026-10-06). A transcript line that does not decode
+(`lines.ts`), a transcript found and then not read, and a `codex exec --json` line that does not decode (`stream.ts`) leave that
+session alone unread while it may still run, its harness's other sessions read beside it, never read as no statement and never
+`LOST`; once it has ended, it reads as `failed`, as a refused start does, so its task settles and `stop`, `release` and `forget`
+reach it. Why is said as a warning on every look. A `--bg` session has ended when it is listed finished, or working and idle, and
+its transcript has been unwritten for the quiet floor (`QUIESCENT_AFTER_MS`), or it is listed finished with no transcript time
+(`endedOf`, `harness/claude/bg.ts`); a detached run, once its process is no longer at work (`lookOf`,
+`harness/detached/detached.ts`). A failed read is any error the OS gives once the file was found (`EACCES`, `EIO`, or `ENOENT` for
+a file gone since), never kept, so the next pass reads the file again (`TranscriptUnread`, `harness/claude/transcript.ts`); a
+refused decode is kept while the transcript is unchanged. A session with no transcript at all still reads as none. The tests are
+in `test/transcript.test.ts`, `test/completion.test.ts`, `test/claude-code.test.ts` and `test/unread-session.test.ts`.
 What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
@@ -782,16 +788,24 @@ What is left:
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
   to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
   gap above already leaves too wide. Found in review of the run that made a failed observe say so.
-- **One transcript that cannot be read holds every `--bg` session unread.** A transcript whose decode is refused or whose read
-  keeps failing (a lasting `EACCES`) fails the whole `--bg` listing, so every background session waits unread until its deadline,
-  and one with no deadline waits for ever (the gap above). Reading unread per session needs the runner's `observe` to answer an
-  `Observation`, which it does not.
+- **A long-lived session whose transcript stays unreadable fails and is restarted, on and on.** Nemia's own long-lived session
+  (`restartPolicy: 'Always'`) is the one at risk: once its transcript has been cold for the floor it reads as `failed`, and
+  `restartOf` (`core/domain.ts`) restarts it after the backoff, continuing the same session. If the restarted session's transcript
+  cannot be read either — a lasting `EACCES` on the folder, or a line that does not decode carried into the conversation it
+  continues — each attempt ends `failed` and is restarted again, the backoff capped at 5 minutes (`RESTART_BACKOFF`), with the
+  warning on every look and nothing that settles the task. Before this, the same session held every background session unread
+  instead. A bound needs a decision: settle a long-lived task whose attempts all end on an unreadable transcript, or restart it
+  cold.
+- **A detached capture found and not read is read as nothing said.** `saidAt` (`harness/detached/said.ts`) answers nothing when
+  the log stats and its read then fails (`EACCES`, `EIO`), so the run reads as having said nothing rather than unread, as a `--bg`
+  transcript now does (`TranscriptUnread`). The end is read off the run file, so this never makes an attempt `LOST`, but its usage
+  and statement are missing.
 - **`release` still reads a transcript that cannot be read as no usage.** `releaseFrom` (`harness/claude/bg.ts`) reads what a
   session consumed after `claude stop` and answers nothing for any failure, a refused decode or a failed read. The end is on record
   by then, so this never makes a statement absent or an attempt `LOST`, but the end's cost is missing. Retrying the read means
   deciding whether a release whose stop is already done runs again.
 
-### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06)
+### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06, fixed the same day)
 
 A line of `codex exec --json` of a type the runtime reads that `CodexEventSchema` (`harness/codex/stream.ts`) does not decode fails
 the Codex harness's whole look, so every Codex session is unread, by design (issue 35), until the run file whose output it is goes.
@@ -799,10 +813,10 @@ Nothing makes it go: `ae forget` takes only a settled task, refuses a session it
 `service/forget.ts`), and a task with no deadline on that harness never settles — the gap issue 35 names. The one way out today is a
 hand removal of the run, which the repository's rules forbid. The same trap was found, and closed, for a session whose start event
 does not decode, under every detached harness: unread only while its process runs, then read as failed with no id
-(`refusedAtWork`, `harness/detached/detached.ts`), and under Codex its output's refusal of the same line is its alone, read as
-nothing said (`outputFor`), so its harness's other sessions stay read (`test/start-event.test.ts`). Any other refused output is
-not closed here: it is read off a run whose process may have ended, so the same answer — read the run that refused as failed
-once it has ended, and its harness's others as read — is the candidate fix.
+(`lookOf`, `harness/detached/detached.ts`), so its harness's other sessions stay read (`test/start-event.test.ts`). **Fixed
+2026-10-06:** any other refused output is read the same way — the run that refused unread while its process is at work, failed
+once it has ended, its harness's others read, and why said on every look (`lookOf`, `test/unread-session.test.ts`); see the
+*Fixed* table.
 
 ## Verified live, once
 
@@ -1218,6 +1232,7 @@ harness's cancel and still left a direct caller to ask again.
 | a continuation (`resumeFrom`) whose first spawn the harness refused, `unstartable`, started its next attempt cold, without the session it was filed to continue — with `maxAttempts` above 1 (issue 5) | `resumeTarget` continues the task's `resumeFrom` while every attempt so far ended `unstartable`; an attempt that ran — spawned, or adopted after a crash with no spawn on the record — is judged by the `resume` policy as before (the first version keyed on `spawnedAt`, and an adoption has none; found in review) | engine, 2026-09-22 |
 | with one attempt per start, the runtime continues no attempt, so issue 5's case — an `unstartable` continuation — would start its next try cold | the orchestrator's `continuesFrom` hands a `--nudge` try, a round or a `resume:` step the last attempt's session, or, where the harness never named that one — it could not start, or was lost — the `resumeFrom` it was started with; for a held task's later turn, the session that signed the turn before (`test/run.test.ts`, `test/store.test.ts`, `test/held.test.ts`) | orchestrator, 2026-09-23 (stage 4a part 2) |
 | a check that exited 0 at 607 s of a 600 s deadline settled `failed`, `deadline exceeded`: the pass that recorded its `done` end read it again past the deadline, and the deadline settled first | an end on record is judged by that end; past the deadline, `decide` still stops a live session, cuts an open attempt, settles one the deadline cut, and starts no other attempt | engine, 2026-09-24 |
+| a Codex line that does not decode left every Codex session unread until its run went, and none could be forgotten (issue 36); a `--bg` transcript that could not be read did the same to every background session (issue 35) | the session whose output or transcript cannot be read is unread alone while it may still run, its harness's others read; once ended it reads `failed`, as a refused start does, why said on every look, so its task settles and `stop`, `release` and `forget` reach it | runtime, 2026-10-06 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

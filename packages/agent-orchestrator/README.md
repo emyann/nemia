@@ -2946,6 +2946,11 @@ with its `run`, and one about a step with its `step` too; the runtime's journal 
   (`Effect.fn`): `tick` > `pass` > `advancePass` > a filing (`fileReady`) > the runtime's `file` > its journal's `append`, each annotated
   with the run, the step and the task it was for. The metrics are every one in the process's registry (the pass's and the steps', below),
   cumulative, posted every 10 s and once more as the process ends. A collector that does not answer costs a failed post, never a pass.
+- **Each step's session exports too, to the same endpoint.** `engine()` hands the runtime the collector (`telemetry: { endpoint }`), and
+  a ready step, a try and a round are filed with their run and step as labels (`stepLabels`): the runtime starts each session exporting
+  its metrics, logs and traces with `run`, `step` and its `task` on every signal, in the trace of the filing that started it where its
+  harness takes one. A check is filed with no labels, and the runtime hands a check's command no telemetry at all; without an endpoint, no
+  child is handed any. How each harness is told is the runtime's (`packages/agent-runtime/README.md`, *What a session exports*).
 - **`OTEL_SERVICE_NAME`** — the service the export is under, `nemia` unless set. Without an endpoint it does nothing.
 
 ```sh

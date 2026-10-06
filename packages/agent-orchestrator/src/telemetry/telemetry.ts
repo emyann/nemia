@@ -1,6 +1,7 @@
 /**
  * What a daemon's process says and where it sends it, as data: whether its environment asks for an OTLP export, and to where
- * (`otlpOf`), and a log as the line `nemia up` prints (`lineOf`). The layer that acts on them is `telemetry.store.ts`'s.
+ * (`otlpOf`), what a step's task says it is for (`stepLabels`), and a log as the line `nemia up` prints (`lineOf`). The layer that acts
+ * on them is `telemetry.store.ts`'s.
  */
 
 /** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
@@ -18,6 +19,12 @@ export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp 
   if (!url) return undefined;
   return { url, serviceName: env.OTEL_SERVICE_NAME?.trim() || DEFAULT_SERVICE_NAME };
 }
+
+/**
+ * The labels a step's task is filed with and its spans and logs say: the run `run` and the step `step`, which its sessions' telemetry
+ * says beside the runtime's own task.
+ */
+export const stepLabels = (run: string, step: string): { run: string; step: string } => ({ run, step });
 
 /** Where an OTLP collector at `otlp` takes traces. */
 export const tracesUrl = (otlp: Otlp): string => `${otlp.url}/v1/traces`;

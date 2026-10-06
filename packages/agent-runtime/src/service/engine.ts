@@ -87,6 +87,7 @@ import {
   type TickReport,
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
+import { traceparentOf } from '../harness/telemetry.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -415,6 +416,9 @@ const openAttemptOf = (taskId: string, state: State, resume: string): { last: At
   return { last };
 };
 
+/** The W3C trace context of the span this runs in (`traceparentOf`): the filing's, for its sessions to join; undefined where none is. */
+const filingSpan = Effect.currentSpan.pipe(Effect.match({ onFailure: () => undefined, onSuccess: traceparentOf }));
+
 /** An observe count with nothing counted: a harness this engine has not observed yet. */
 const NONE: ObserveCount = { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
 
@@ -551,10 +555,9 @@ const make = (options: EngineOptions) =>
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
     const runners = Object.fromEntries(
-      Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential)).map(([name, ops]): [string, SeamOps] => [
-        name,
-        counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
-      ]),
+      Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential, options.telemetry)).map(
+        ([name, ops]): [string, SeamOps] => [name, counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events))],
+      ),
     );
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
@@ -590,7 +593,7 @@ const make = (options: EngineOptions) =>
       });
 
     const fileVerb = Effect.fn('Engine.file')(function* (spec: TaskSpec) {
-      const task = { ...spec, harness: spec.harness ?? fallback };
+      const task = { ...spec, harness: spec.harness ?? fallback, traceparent: options.telemetry ? yield* filingSpan : undefined };
       const refused = refusalOf(task) ?? argsRefusalOf(task) ?? harnessRefusalOf(task, harnesses);
       if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
       return yield* go(file(task));

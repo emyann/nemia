@@ -197,3 +197,22 @@ test('`ae admission -- <command>` runs the command on the call and prints the ho
   });
   assert.equal(decisionOf(none.trim()), 'ask');
 });
+
+test("REFUSED: `ae admission`'s command inherits none of the telemetry its session was handed; the rest of its environment still reaches it", () => {
+  const ae = path.join(import.meta.dirname, '..', '..', 'bin', 'ae.ts');
+  const handed = {
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+    OTEL_RESOURCE_ATTRIBUTES: 'run=r,step=s,task=t',
+    TRACEPARENT: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
+    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
+  };
+  const seen = `const seen = ${JSON.stringify(['ADMISSION_OWN', ...Object.keys(handed)])}.filter((k) => k in process.env).join(' ');
+process.stdin.on('data', () => process.stdout.write(JSON.stringify({ decision: 'ask', reason: seen })))`;
+  const out = execFileSync(process.execPath, [ae, 'admission', '--', process.execPath, '-e', seen], {
+    input: HOOK_INPUT,
+    encoding: 'utf8',
+    env: { ...process.env, ...handed, ADMISSION_OWN: 'mine' },
+  });
+  assert.equal(JSON.parse(out).hookSpecificOutput.permissionDecisionReason, 'ADMISSION_OWN');
+});

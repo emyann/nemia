@@ -199,6 +199,8 @@ const request: SpawnRequest = {
   },
   resumeFrom: 'native-1',
   closeoutSchema: { type: 'object', required: ['outcome'] },
+  resource: { team: 'a', task: 't-1' },
+  traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
 };
 
 test('a spawn is a user Message: the name its task, the brief its one text part, the session it continues its context, the rest its metadata', () => {
@@ -216,6 +218,8 @@ test('a spawn is a user Message: the name its task, the brief its one text part,
       harness: 'fake',
       config: request.config,
       closeoutSchema: request.closeoutSchema,
+      resource: request.resource,
+      traceparent: request.traceparent,
     },
     extensions: [RUNTIME_EXTENSION],
     referenceTaskIds: [],
@@ -260,6 +264,8 @@ test('a spawn with its optional keys unset comes back with every key, as the eng
     config: undefined,
     closeoutSchema: undefined,
     resumeFrom: undefined,
+    resource: undefined,
+    traceparent: undefined,
   });
 });
 
@@ -421,6 +427,8 @@ test('a spawn through the client reaches the driver as the engine asked for it, 
     config: undefined,
     closeoutSchema: undefined,
     resumeFrom: undefined,
+    resource: undefined,
+    traceparent: undefined,
   };
   await Effect.runPromise(d.runner.spawn(bare));
   assert.deepEqual(d.acted()[1], ['spawn', bare]);

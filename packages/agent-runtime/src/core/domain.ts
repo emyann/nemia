@@ -357,6 +357,13 @@ export type Event =
        * listing or silence is not its end, and that only a stop from outside ends. Absent on a job, which runs to its end.
        */
       restartPolicy?: 'Always';
+      /**
+       * The layer above's labels, a Pod's `metadata.labels`: names to texts its sessions' telemetry says beside the task's id.
+       * Carried for the runner, never read by `decide`. Absent when none were given.
+       */
+      labels?: Record<string, string>;
+      /** The W3C trace context of the span that filed the task, when its engine exports. Carried for the runner, never read by `decide`. */
+      traceparent?: string;
     }
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string; mono?: Monotonic }
   | { kind: 'spawned'; at: string; attempt: number; error?: string; mono?: Monotonic }
@@ -486,6 +493,10 @@ export type State = {
   holdOpen?: true;
   /** Filed long-lived: only a stop from outside ends its session. See the `filed` event. */
   restartPolicy?: 'Always';
+  /** The layer above's labels, as filed. See the `filed` event. `decide` never reads them. */
+  labels?: Record<string, string>;
+  /** The trace context of the span that filed the task. See the `filed` event. `decide` never reads it. */
+  traceparent?: string;
   /** Filed to wait for the layer above's word: absent on a journal an older runtime wrote, which reads as queued. See the `filed` event. */
   queued?: boolean;
   /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
@@ -566,6 +577,8 @@ function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
   if (e.restartPolicy === 'Always') s.restartPolicy = 'Always';
   if (e.queued !== undefined) s.queued = e.queued;
   if (e.priority !== undefined) s.priority = e.priority;
+  if (e.labels !== undefined) s.labels = e.labels;
+  if (e.traceparent !== undefined) s.traceparent = e.traceparent;
 }
 
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */

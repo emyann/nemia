@@ -147,7 +147,7 @@ test('REFUSED (b, c): a second api, and a nemia up, on a store the api holds —
   assert.match(second.output(), new RegExp(`^api: \\S+ is held by the api of pid ${first.child.pid} at ${url}, `));
   assert.doesNotMatch(second.output(), /listening/);
   const wf = spawn(process.execPath, [path.join(API, '../../packages/agent-orchestrator/bin/nemia.ts'), 'up'], {
-    env: { ...process.env, WF_ROOT: first.root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2' },
+    env: { ...process.env, WF_ROOT: first.root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2', OTEL_EXPORTER_OTLP_ENDPOINT: '' },
     timeout: 60_000,
   });
   let said = '';
@@ -163,7 +163,7 @@ test('REFUSED (b, c): a second api, and a nemia up, on a store the api holds —
 test('REFUSED (d): with a nemia up holding the store, the api exits 2 naming its pid, and binds no port', async (t) => {
   const root = scratch('nemia-api-main-');
   const wf = spawn(process.execPath, [path.join(API, '../../packages/agent-orchestrator/bin/nemia.ts'), 'up', '200'], {
-    env: { ...process.env, WF_ROOT: root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2' },
+    env: { ...process.env, WF_ROOT: root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2', OTEL_EXPORTER_OTLP_ENDPOINT: '' },
     cwd: root,
     timeout: 60_000,
   });

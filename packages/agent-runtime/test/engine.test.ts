@@ -962,7 +962,7 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
   assert.equal(plain.spawned[0].config?.claude, undefined, 'no Remote Control unless asked');
 });
 
-test("decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, what a person said, or an end time but for a long-lived task's backoff — carried on the record, never judged", () => {
+test("decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, labels, a trace context, usage, a cost, an exit code, what a person said, or an end time but for a long-lived task's backoff — carried on the record, never judged", () => {
   const source = fs.readFileSync(new URL('../src/core/domain.ts', import.meta.url), 'utf8');
   const from = source.indexOf('export function decide(');
   assert.ok(from >= 0, 'found decide');
@@ -982,7 +982,7 @@ test("decide never reads tools, effort, MCP servers, a budget, a context window,
   for (const read of [body.replace(endTime, ''), machine])
     assert.doesNotMatch(
       read,
-      /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.claude\b|\.priority|\.filedAt/,
+      /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.claude\b|\.priority|\.filedAt|\.labels|\.traceparent/,
     );
 });
 

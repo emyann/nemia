@@ -73,7 +73,10 @@ asks `forget` of every task its record names, and the tick asks again for one th
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set — its traces, its logs and every metric in its registry, the pass's and the steps' (`STEP_METRICS`,
-recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone).
+recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone). A session exports to the same
+collector: the orchestrator hands the runtime the endpoint (`engine()`) and files a step's task with its run and step as labels
+(`stepLabels`); the runtime, which alone knows how a harness is told, hands each session it starts the collector, those labels and its
+`task`, and the filing's trace context, and a command none (`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`).
 
 **The feed** is the orchestrator's, written once: `emitFeed` (`src/feed/feed.verb.ts`) appends each line to `feed.jsonl`, the record,
 logs it at Info with its run, step and word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,

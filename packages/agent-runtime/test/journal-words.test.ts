@@ -90,6 +90,8 @@ const spawnAsked = {
   config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] },
   closeoutSchema: { type: 'object' },
   resumeFrom: undefined,
+  resource: { task: 't-words' },
+  traceparent: undefined,
 };
 
 const filed = {

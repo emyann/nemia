@@ -8,6 +8,7 @@ import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
 import { Admission, type IoCounts, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
 import { claudeOps, claudeCodeOps } from '../harness/claude/index.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
+import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
 import { remoteConfigRefusal, remoteOps, type Credentials, type MissingCredential, type RemoteAgent } from '../a2a/index.ts';
 
 /**
@@ -64,6 +65,12 @@ export type EngineOptions = {
    * set, say. Absent, the refusal says to give `Engine.layer` a `credentials` that answers for the scheme.
    */
   missingCredential?: MissingCredential;
+  /**
+   * Where the sessions this engine starts export their telemetry: an OTLP/HTTP collector the process chose, handed to every spawn
+   * (`telemetered`), tagged with the task's id and labels, and with the trace context of the span that filed the task. A harness that
+   * exports says it in its own variables; one that does not ignores it. Absent: no session exports, whatever the process's environment.
+   */
+  telemetry?: Telemetry;
 };
 
 /** A task to file (`Engine.file`). */
@@ -126,6 +133,12 @@ export type TaskSpec = {
    * tasks of one priority go in the order they were filed. Read by the pass's admission alone (`maxConcurrent`).
    */
   priority?: number;
+  /**
+   * The caller's labels, a Pod's `metadata.labels`: names to texts, said on each of the task's sessions' telemetry beside `task`, its
+   * id. Carried, never judged. Refused unless at most 16 entries, each named by a lowercase word other than `task`, with a text of 1
+   * to 256 characters and no control character.
+   */
+  labels?: Record<string, string>;
 };
 
 /**
@@ -187,27 +200,41 @@ export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'ob
 /** Claude Code as the engine runs it itself, in either of the two ways it is brought. */
 export const isClaude = (h: HarnessConfig): h is 'claude' | 'claude-bg' => h === 'claude' || h === 'claude-bg';
 
-/** Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. */
+/**
+ * Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. With
+ * `telemetry`, each spawn is told where to export (`telemetered`).
+ */
 export const runnersOf = (
   harnesses: Record<string, HarnessConfig>,
   root: string,
   credentials?: Credentials,
   missingCredential?: MissingCredential,
+  telemetry?: Telemetry,
 ): Record<string, RunnerOps> =>
   Object.fromEntries(
-    Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => [
-      name,
-      h === 'claude'
-        ? claudeCodeOps({ root })
-        : h === 'claude-bg'
-          ? claudeOps({ root })
-          : isSpec(h)
-            ? detachedOps(h, root)
-            : isRemote(h)
-              ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
-              : h,
-    ]),
+    Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
+      const ops = runnerOf(name, h, root, credentials, missingCredential);
+      return [name, telemetry ? telemetered(ops, telemetry) : ops];
+    }),
   );
+
+/** The harness `h`, configured under `name`, as the seam's value. */
+const runnerOf = (
+  name: string,
+  h: HarnessConfig,
+  root: string,
+  credentials?: Credentials,
+  missingCredential?: MissingCredential,
+): RunnerOps =>
+  h === 'claude'
+    ? claudeCodeOps({ root })
+    : h === 'claude-bg'
+      ? claudeOps({ root })
+      : isSpec(h)
+        ? detachedOps(h, root)
+        : isRemote(h)
+          ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
+          : h;
 
 /** Why `maxConcurrent` is not a ceiling, or `undefined`: anything but a whole number from 1. */
 const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
@@ -228,8 +255,8 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
  * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` that is not a whole number from 1; a harness
- * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; and an
- * `unschedulable`, a `credentials` or a `missingCredential` that is not a function.
+ * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; an
+ * `unschedulable`, a `credentials` or a `missingCredential` that is not a function; and a `telemetry` that names no collector.
  */
 export const optionsRefusalOf = (options: EngineOptions): string | undefined => {
   const ceiling = ceilingRefusalOf(options.maxConcurrent);
@@ -247,7 +274,7 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
   if (options.missingCredential !== undefined && typeof options.missingCredential !== 'function') {
     return '`missingCredential` is a function, `(scheme, agentUrl, harness) => words`: give one, or leave it out.';
   }
-  return undefined;
+  return telemetryRefusalOf(options.telemetry);
 };
 
 /**

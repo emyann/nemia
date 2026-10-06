@@ -13,6 +13,7 @@ import {
   COMMANDS,
   type Collisions,
   type Decided,
+  decideRun,
   type StandingMerge,
   countsLine,
   type DecideCommand,
@@ -188,24 +189,22 @@ function lessonOf(touched: readonly Touched[]): Lesson {
   return { said, state: touched.some((t) => !('error' in t.radius) && t.radius.lessons.length) ? 'written' : 'nothing' };
 }
 
-/** The package's own `nemia decide` of a run (`decideRun`), through its entry of the command table, served on the api alone. */
-const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
-
 /** The merge check, the table's entry served on the api alone. */
 const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
 
 /**
- * What `nemia decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
+ * What `nemia decide` shows a person about a run, decided by the package (`decideRun`, the handler of the command table's `decide`): its
  * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
  *
- * Where the branches stand is asked of their places at most once, live, as a person's verb asks it (`standingWhen`), and only where it is
- * read: for the runs it waits on, and for a run judged neither running nor called off without it, then judged over it. First, as the CLI
- * asks it first, off the runs it waits on and is held until, each read once (`parentsRead`): a run whose roots wait on runs that have not
- * shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`, and none is read either: what is in flight
- * is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A run still running with nobody waited on
- * (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its `WF_MAX_RUNS` before any pass is `env`'s, the app's
- * environment, as `GET /api/ceilings` reads it — and git is asked nothing more: the page asks while a run is decidable, and the Factory's
- * card only for a run waiting on you, but a request is a request. Called off, or already shipped, is `nothing`.
+ * Where the branches stand is asked of their places at most once, live, as a person's verb asks it (`standingWhen`), the same ask handed to
+ * the package's decision, and only where it is read: for the runs it waits on, and for a run judged neither running nor called off without
+ * it, then judged over it. First, as the CLI asks it first, off the runs it waits on and is held until, each read once (`parentsRead`): a
+ * run whose roots wait on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`,
+ * and none is read either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A
+ * run still running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its
+ * `WF_MAX_RUNS` before any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is asked nothing more: the
+ * page asks while a run is decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called off, or
+ * already shipped, is `nothing`.
  *
  * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
  * never the base branch of a run that cut worktrees, whose work is not on it — and the result branches' counts, each read from the run's
@@ -227,7 +226,7 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   const judgedOver = (git: BranchReader) => runWith(e, judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent }));
   const { judged, git } = await judgedLive(judgedOver, (need) => runWith(e, live.when(need)));
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
-  const decided = (await runWith(e, DECIDE.handler({ runId: run.id }, env))) as Decided;
+  const decided = await runWith(e, decideRun(run.id, env, live));
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };
   const d = decided.decision;
   const nothing = nothingOf(run, d);

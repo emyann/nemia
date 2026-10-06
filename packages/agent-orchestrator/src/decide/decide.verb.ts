@@ -24,7 +24,7 @@ import { timeline, type Timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { shippedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
-import { headsOver, NOTHING_READ, standingReader, standingWhen } from '../standing/standing.verb.ts';
+import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
 import {
   checkReportsRead,
   closeoutAsked,
@@ -246,13 +246,14 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
  * The cap on runs in flight, whose `WF_MAX_RUNS` before any pass is `env`'s, is read for both facts it bears on: whether a run nothing of
  * which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`).
+ * Where the branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time.
  * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
-export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env) {
+export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env, standing?: StandingAsker) {
   const e = viewedOnce(yield* EngineService);
   const run = yield* tried(() => runStore.runs.read(id));
   const runs = yield* tried(() => runStore.runs.list());
-  const live = yield* standingWhen(runs, id);
+  const live = standing ?? (yield* standingWhen(runs, id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));

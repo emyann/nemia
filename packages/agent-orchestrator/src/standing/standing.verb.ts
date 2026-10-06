@@ -221,6 +221,9 @@ export const standingWhen = Effect.fn('standingWhen')(function* (runs: readonly 
   };
 });
 
+/** Where branches stand, asked at most once for a person's verb (`standingWhen`), to hand on to another read of the same request. */
+export type StandingAsker = Effect.Success<ReturnType<typeof standingWhen>>;
+
 /** What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of. */
 export const asksOwnOr = (ids: readonly string[]): ((run: GitRun) => boolean) => {
   const asked = new Set(ids);

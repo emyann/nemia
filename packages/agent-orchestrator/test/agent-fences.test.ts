@@ -781,7 +781,7 @@ test('REFUSED: a call that breaks a shipped rule, allowed to the step given the 
 });
 
 test('the shipped read-within-reach rule is broken by a denied Glob, Grep or Read, as nemia stats counts it, and kept by a denied npm', () => {
-  const outside = 'Read(/home/x/.agent-workflows/runs/r/artifacts/a.md)';
+  const outside = 'Read(/srv/.agent-workflows/runs/r/artifacts/a.md)';
   for (const skill of ['write-a-spec', 'review-a-change']) {
     const [shipped] = SHIPPED_RULES.filter((rules) => rules.skill === skill);
     assert.ok(shipped, `${skill} declares its rules`);

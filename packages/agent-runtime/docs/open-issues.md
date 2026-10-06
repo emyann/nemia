@@ -806,12 +806,16 @@ once it has ended, and its harness's others as read — is the candidate fix.
 The feed is never rotated but by a forget (`rotateFeed`), so it grows by every line of every task ever filed: 72 MB on this
 machine on 2026-10-06, with no sealed file, beside 76 MB of journals over 3,935 tasks. A pass reads none of it but what was
 appended since the last (`forgetNamed`, and the orchestrator's `followedFeed`; `agent-orchestrator/src/tick/feed-reads.test.ts`
-holds a restarted tick's passes to the same reads over a feed 20,000 lines longer). What still reads it whole, each once a call
-and never on a pass:
+holds a restarted tick's passes to the same reads over a feed 20,000 lines longer). What still reads it whole, each once a call,
+and one of them on a pass:
 
 - **`forget` decodes the whole feed to count each task's lines** (`service/forget.ts`, `feed(0)`), every body resolved, for a
-  `feedLines` per task; then the files store rotates it, which reads it once more (`rotateFeed`). A count off the raw lines, or a
-  rotation that answers the count, would read it once and decode none.
+  `feedLines` per task; then the files store rotates it, which reads it once more (`rotateFeed`). It runs on a pass: the
+  orchestrator's `finishForgetting` (`tick/tick.verb.ts`) forgets with `yes` the tasks of a run a person removed (`nemia rm`) once
+  they settled, so the pass that finishes a removal reads the feed whole twice — measured on a fixture, a forget of one task over an
+  89 MB feed read 178 MB in 591 ms, over a 22 MB one 44 MB in 170 ms; about 144 MB on this machine's 72 MB. One pass a removal,
+  not every pass. A count off the raw lines, or a rotation that answers the count, would read it once and decode none; the
+  rotation still reads and rewrites it whole, so only a feed bounded in size bounds that pass.
 - **`sweep` reads the whole feed for the bodies it names** (`feedNaming` in `core/engine/sweep.ts`), as it must before removing one.
 - **`ae feed` from the start** (`src/cli/main.ts`), as asked.
 - **An engine's first pass folds every journal** (76 MB here): what the memo is made of, paid once per engine, and O(tasks).

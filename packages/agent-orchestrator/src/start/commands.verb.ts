@@ -303,6 +303,7 @@ export const START: Command<Started> = {
   spec: START_SPEC,
   check: (args) => leftOut(START_SPEC, args),
   writes: true,
+  ticks: true,
   nemia: 'hers',
   route: {
     method: 'POST',
@@ -431,6 +432,7 @@ export const PLAN: Ran = {
   spec: PLAN_SPEC,
   check: (args) => leftOut(PLAN_SPEC, args),
   writes: true,
+  ticks: true,
   nemia: 'hers',
   only: {
     side: 'cli',

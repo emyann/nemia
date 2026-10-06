@@ -90,8 +90,12 @@ export const holderName = (kind: HolderKind): string => (kind === 'wf up' ? 'nem
 export const holderWords = (file: Pick<DaemonFile, 'by' | 'pid' | 'url'>): string =>
   holderOf(file) === 'api' ? `the api of pid ${file.pid}${file.url ? ` at ${file.url}` : ''}` : `the nemia up of pid ${file.pid}`;
 
-/** How a daemon is started, said wherever none ticks: the api, which serves the board too, or a `nemia up` where none is served. */
-export const START_WORDS = 'start one with npm start in apps/api, or nemia up where no board is served';
+/**
+ * How a daemon is started, said wherever none ticks: the api, which serves the board too, a `nemia up` where none is served, or a command
+ * that ticks (`ensureDaemon`).
+ */
+export const START_WORDS =
+  'start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one';
 
 /** The file's name under `WF_ROOT`. */
 export const DAEMON_FILE = 'daemon.json';

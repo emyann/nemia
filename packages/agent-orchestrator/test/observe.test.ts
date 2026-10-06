@@ -51,7 +51,22 @@ const LOKI_FIELDS = ['service_name', 'trace_id', 'span_id', 'severity_text', 'de
 const RESOURCE_ATTRIBUTES = ['service.name'];
 
 /** The datasources the image provisions, by uid. */
-const DATASOURCES = ['prometheus', 'tempo', 'loki'];
+const DATASOURCES = ['prometheus', 'tempo', 'loki', 'pyroscope'];
+
+/** The label Pyroscope files a profile under, as measured: the service, the profiler's `appName`. */
+const PROFILE_LABELS = ['service_name'];
+
+/**
+ * The profile types the preload's profiler sends (`tools/observe/profile/`), as measured: wall time and its samples, the CPU time it
+ * collects beside them, and the heap's objects and bytes in use.
+ */
+const PROFILE_TYPES = [
+  'wall:wall:nanoseconds:wall:nanoseconds',
+  'wall:samples:count:wall:nanoseconds',
+  'wall:cpu:nanoseconds:wall:nanoseconds',
+  'memory:inuse_objects:count:inuse_space:bytes',
+  'memory:inuse_space:bytes:inuse_space:bytes',
+];
 
 /** Every name a dashboard may use, each kind its own set. */
 type Known = {
@@ -61,17 +76,22 @@ type Known = {
   attributes: Set<string>;
   resources: Set<string>;
   logFields: Set<string>;
+  profileLabels: Set<string>;
+  profileTypes: Set<string>;
 };
 
-/** A dashboard's query, as the checker reads it: the datasource it is sent to, and its text. */
-type Query = { datasource: string; text: string };
+/** A dashboard's query, as the checker reads it: the datasource it is sent to, its text, and the profile type a Pyroscope query reads. */
+type Query = { datasource: string; text: string; profileType?: string };
+
+/** A panel's query, as far as the checker reads it: PromQL in `expr`, TraceQL or LogQL in `query`, Pyroscope's in the last two. */
+type Target = { datasource?: { uid?: string }; expr?: string; query?: string; labelSelector?: string; profileTypeId?: string };
 
 /** A panel of a dashboard, as far as the checker reads it. */
 type Panel = {
   type: string;
   title?: string;
   datasource?: { uid?: string };
-  targets?: { datasource?: { uid?: string }; expr?: string; query?: string }[];
+  targets?: Target[];
   panels?: Panel[];
   options?: { content?: string };
 };
@@ -199,6 +219,8 @@ const KNOWN: Known = {
   attributes: TRACED.attributes,
   resources: new Set(RESOURCE_ATTRIBUTES),
   logFields: new Set([...TRACED.annotations, ...LOKI_FIELDS]),
+  profileLabels: new Set(PROFILE_LABELS),
+  profileTypes: new Set(PROFILE_TYPES),
 };
 
 /** PromQL's own words, which are not metrics: its functions, aggregations and keywords as the dashboards use them. */
@@ -244,6 +266,10 @@ function logNames(query: string): string[] {
   return [...labels, ...fields.map(([, f]) => f)];
 }
 
+/** The labels a Pyroscope label selector names, each with the value it asks for. */
+const profileLabelsOf = (selector: string): [string, string][] =>
+  [...selector.matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].map(([, label, value]) => [label, value]);
+
 /** Every panel of `panels`, a row's own among them. */
 const allPanels = (panels: Panel[]): Panel[] => panels.flatMap((p) => [p, ...allPanels(p.panels ?? [])]);
 
@@ -256,7 +282,11 @@ const variableText = (query: unknown): string => {
 /** Every query `dashboard` sends: each panel's targets, and each query variable's. */
 function queriesOf(dashboard: Dashboard): Query[] {
   const targets = allPanels(dashboard.panels).flatMap((p) =>
-    (p.targets ?? []).map((t) => ({ datasource: t.datasource?.uid ?? p.datasource?.uid ?? '', text: t.expr ?? t.query ?? '' })),
+    (p.targets ?? []).map((t) => ({
+      datasource: t.datasource?.uid ?? p.datasource?.uid ?? '',
+      text: t.expr ?? t.query ?? t.labelSelector ?? '',
+      ...(t.profileTypeId === undefined ? {} : { profileType: t.profileTypeId }),
+    })),
   );
   const variables = (dashboard.templating?.list ?? [])
     .filter((v) => v.type === 'query')
@@ -283,6 +313,13 @@ function unknownNames(dashboard: Dashboard, known: Known): string[] {
       check(attributes, known.attributes);
       check(resources, known.resources);
     } else if (q.datasource === 'loki') check(logNames(q.text), known.logFields);
+    else if (q.datasource === 'pyroscope') {
+      check(
+        profileLabelsOf(q.text).map(([label]) => label),
+        known.profileLabels,
+      );
+      check([q.profileType ?? ''], known.profileTypes);
+    }
   }
   return [...unknown];
 }
@@ -312,7 +349,7 @@ const dashboardTitled = (title: string): Dashboard => {
 type Service = { image?: string; container_name?: string; ports?: string[]; volumes?: string[]; environment?: Record<string, string> };
 
 /** The ports the daemon's collector and Grafana are reached on, each published on the same host port. */
-const PORTS = [3000, 4317, 4318];
+const PORTS = [3000, 4317, 4318, 4040];
 
 /** What is wrong with `compose`'s one service, each said in a line. */
 function composeFaults(compose: { services?: Record<string, Service> }): string[] {
@@ -352,6 +389,7 @@ test('REFUSED: an image by tag, a short digest, and a port the daemon exports to
     'image grafana/otel-lgtm@sha256:2de1094c is not pinned by a digest',
   ]);
   assert.deepEqual(changed({ ports: (service.ports ?? []).filter((p) => !p.endsWith(':4318')) }), ['port 4318 is not published']);
+  assert.deepEqual(changed({ ports: (service.ports ?? []).filter((p) => !p.endsWith(':4040')) }), ['port 4040 is not published']);
 });
 
 test("each dashboard parses, has its own uid, and points at the image's datasources", () => {
@@ -390,26 +428,38 @@ test('the dashboards name only what the code emits', () => {
     const service = d.templating?.list.find((v) => v.name === 'service');
     if (service) assert.equal(service.query, DEFAULT_SERVICE_NAME, `${d.title}: the service a daemon files under by default`);
   }
+  const profiles = queriesOf(dashboardTitled('System')).filter((q) => q.datasource === 'pyroscope');
+  assert.deepEqual(
+    new Set(profiles.map((q) => q.profileType)),
+    new Set(PROFILE_TYPES.filter((t) => t.startsWith('wall:cpu') || t.startsWith('memory:inuse_space'))),
+    'System draws the CPU and the heap in use',
+  );
+  for (const q of profiles) assert.deepEqual(profileLabelsOf(q.text), [['service_name', '$service']], q.text);
 });
+
+/** The fields of a target that hold what it asks for. */
+const TARGET_FIELDS = ['expr', 'query', 'labelSelector', 'profileTypeId'] as const;
 
 /** `dashboard` with the first query sent to `datasource` holding `from` holding `to` in its place. */
 function withQuery(dashboard: Dashboard, datasource: string, from: string, to: string): Dashboard {
-  const target = allPanels(dashboard.panels)
+  const found = allPanels(dashboard.panels)
     .flatMap((p) => (p.targets ?? []).map((t) => ({ t, uid: t.datasource?.uid ?? p.datasource?.uid })))
-    .find(({ t, uid }) => uid === datasource && (t.expr ?? t.query ?? '').includes(from));
-  assert.ok(target, `no ${datasource} query of ${dashboard.title} holds ${from}`);
-  if (target.t.expr !== undefined) target.t.expr = target.t.expr.replace(from, to);
-  else target.t.query = target.t.query!.replace(from, to);
+    .flatMap(({ t, uid }) => (uid === datasource ? TARGET_FIELDS.map((field) => ({ t, field })) : []))
+    .find(({ t, field }) => (t[field] ?? '').includes(from));
+  assert.ok(found, `no ${datasource} query of ${dashboard.title} holds ${from}`);
+  found.t[found.field] = found.t[found.field]!.replace(from, to);
   return dashboard;
 }
 
-test('REFUSED: a renamed metric, span or attribute, an unbounded label, and a log field the code does not annotate', () => {
+test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log field the code does not annotate, and a profile not sent', () => {
   const cases: [string, string, string, string, string][] = [
     ['System', 'prometheus', 'pass_duration_bucket', 'pass_durations_bucket', 'pass_durations_bucket'],
     ['Passes', 'tempo', 'name="pass"', 'name="passes"', 'passes'],
     ['A run', 'tempo', 'span.run', 'span.runid', 'runid'],
     ['System', 'prometheus', 'by (factory, workflow, step, agent)', 'by (run)', 'run'],
     ['A run', 'loki', '| run=', '| runid=', 'runid'],
+    ['System', 'pyroscope', 'wall:cpu:nanoseconds', 'process_cpu:cpu:nanoseconds', 'process_cpu:cpu:nanoseconds:wall:nanoseconds'],
+    ['System', 'pyroscope', 'service_name=', 'service=', 'service'],
   ];
   for (const [title, datasource, from, to, named] of cases)
     assert.deepEqual(unknownNames(withQuery(dashboardTitled(title), datasource, from, to), KNOWN), [named], `${title}: ${to}`);

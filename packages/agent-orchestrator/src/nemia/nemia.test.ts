@@ -1,16 +1,18 @@
 /**
  * Nemia's machine, pure: what the keeper owes at each state, a task stopped from outside never filed again, a level that is none refused
- * and `auto` named as to come, and her diagram drawing each edge and each verb.
+ * and `auto` named as to come, her diagram drawing each edge and each verb, and her settings turning the daemon's start off.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
+import { DEMAND_OFF } from '../demand/demand.ts';
 import {
   NEMIA_WAKE,
   levelRefusal,
   nemiaDiagram,
   nemiaDue,
   nemiaGraph,
+  nemiaSettings,
   nemiaState,
   nemiaTaskId,
   type HerSubscription,
@@ -88,4 +90,13 @@ test("a step's denied calls wake her, and only her: the default wake words leave
   const line = { at: '2026-10-05T16:00:00.000Z', run: 'r-1', step: 'build', word: 'running', note: 'denied: Bash(git push) ×1 · try 2' };
   assert.equal(sortLine(line, NEMIA_WAKE), 'wake');
   assert.equal(sortLine(line, DEFAULT_WAKE), 'routine');
+});
+
+test('a nemia she types starts no daemon beside the one that keeps her, with a bin of its own or none', () => {
+  const rules = { ask: ['Bash(nemia cancel:*)'], deny: [] };
+  assert.deepEqual(JSON.parse(nemiaSettings(rules, undefined, '/usr/bin')).env, { [DEMAND_OFF]: 'off' });
+  assert.deepEqual(JSON.parse(nemiaSettings(rules, '/srv/nemia/bin', '/usr/bin:/srv/nemia/bin')).env, {
+    [DEMAND_OFF]: 'off',
+    PATH: '/srv/nemia/bin:/usr/bin',
+  });
 });

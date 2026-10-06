@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from '../scratch.ts';
-import { photograph } from './board.ts';
+import { photograph, TALLEST_WINDOW } from './board.ts';
 
 let browser: Browser;
 before(async () => {
@@ -79,16 +79,18 @@ async function wrongIn(file: string, rows: number): Promise<string[]> {
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0);
         const { data } = ctx.getImageData(0, 0, img.width, img.height);
-        const is = (x: number, y: number, [r, g, b]: number[]) => {
+        const is = (x: number, y: number, [r, g, b]: Rgb) => {
           const at = (y * img.width + x) * 4;
-          return Math.abs(data[at]! - r!) <= 2 && Math.abs(data[at + 1]! - g!) <= 2 && Math.abs(data[at + 2]! - b!) <= 2;
+          return Math.abs(data[at] - r) <= 2 && Math.abs(data[at + 1] - g) <= 2 && Math.abs(data[at + 2] - b) <= 2;
         };
         const wrong: string[] = [];
-        const page = Math.max(WINDOW, HEADER + rows * ROW + FOOTER);
-        if (img.height !== page) wrong.push(`the picture is ${img.height} px tall, the page ${page}`);
+        const tall = Math.max(WINDOW, HEADER + rows * ROW + FOOTER);
+        if (img.height !== tall) wrong.push(`the picture is ${img.height} px tall, the page ${tall}`);
         const footerTop = img.height - FOOTER;
-        const once = (what: string, colour: number[], inBand: (y: number) => boolean) => {
-          const out = [10, 640, 1200].flatMap((x) => Array.from({ length: img.height }, (_, y) => y).filter((y) => is(x, y, colour) && !inBand(y)));
+        const once = (what: string, colour: Rgb, inBand: (y: number) => boolean) => {
+          const out = [10, 640, 1200].flatMap((x) =>
+            Array.from({ length: img.height }, (_, y) => y).filter((y) => is(x, y, colour) && !inBand(y)),
+          );
           if (out.length) wrong.push(`the ${what} is drawn outside its band, from y ${Math.min(...out)} to ${Math.max(...out)}`);
         };
         once('header', H, (y) => y < HEADER);
@@ -97,7 +99,7 @@ async function wrongIn(file: string, rows: number): Promise<string[]> {
         if (bare.length) wrong.push(`the sidebar is missing beside the content from y ${Math.min(...bare)} to ${Math.max(...bare)}`);
         for (let i = 0; i < rows; i++) {
           const top = HEADER + i * ROW;
-          const hidden = Array.from({ length: ROW }, (_, k) => top + k).filter((y) => !is(640, y, colours[i]!));
+          const hidden = Array.from({ length: ROW }, (_, k) => top + k).filter((y) => !is(640, y, colours[i]));
           if (hidden.length) wrong.push(`content row ${i + 1} is covered from y ${Math.min(...hidden)} to ${Math.max(...hidden)}`);
         }
         return wrong;
@@ -163,5 +165,34 @@ test('a page that fits the window is pictured as it is, with no resize', async (
   await photograph(page, file, { fullPage: true, always: true });
   assert.deepEqual(await wrongIn(file, 5), [], 'the picture of the page that fits');
   assert.deepEqual(await stateOf(page), { window: WINDOW, scrollY: 0, resized: 0 });
+  await page.context().close();
+});
+
+test('a tall page whose picture is refused is put back all the same, its window and its scroll', async () => {
+  const out = scratch('nemia-photograph-refused-');
+  const page = await framedPage(20, 900);
+  await assert.rejects(photograph(page, out, { fullPage: true, always: true }), 'a folder is no file to write a picture to');
+  const { window, scrollY } = await stateOf(page);
+  assert.deepEqual({ window, scrollY }, { window: WINDOW, scrollY: 900 });
+  await page.context().close();
+});
+
+test('a page taller than the tallest window is taken in its own window, and the log says so', async (t) => {
+  const out = scratch('nemia-photograph-tallest-');
+  const rows = Math.ceil(TALLEST_WINDOW / ROW);
+  const page = await framedPage(rows);
+  const said = t.mock.method(console, 'log', () => {});
+  await photograph(page, path.join(out, 'tallest.png'), { fullPage: true, always: true });
+  const lines = said.mock.calls.map((call) => String(call.arguments[0]));
+  assert.deepEqual(lines, [
+    `e2e: tallest.png is taken in its own window: its page is ${HEADER + rows * ROW + FOOTER} px tall, over the ${TALLEST_WINDOW} px a window can be`,
+  ]);
+  const { window, scrollY } = await stateOf(page);
+  assert.deepEqual({ window, scrollY }, { window: WINDOW, scrollY: 0 });
+  const wrong = await wrongIn(path.join(out, 'tallest.png'), rows);
+  assert.ok(
+    wrong.some((s) => s.startsWith('the footer is drawn outside its band')),
+    `taken as Playwright takes it, the footer where the window's bottom was: ${wrong.join('; ')}`,
+  );
   await page.context().close();
 });

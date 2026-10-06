@@ -23,8 +23,9 @@
  *
  * Exits non-zero on the first failure, naming the page, the theme and the assertion, with a screenshot
  * of what the page looked like. Both servers are stopped on the way out: on success, on failure, and on a
- * signal. The assertions are made to refuse in checks.test.ts, and the visiting and the exit (visit.ts) in
- * visit.test.ts, both of which `npm run e2e` runs first.
+ * signal. The assertions are made to refuse in checks.test.ts, the visiting and the exit (visit.ts) in
+ * visit.test.ts, and a full-page picture of a tall page with its frame where the window was in photograph.test.ts, all of which
+ * `npm run e2e` runs first.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';

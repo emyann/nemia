@@ -188,7 +188,10 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
   'test/transcript.test.ts': { count: 5, not: "a mocked clock's shift, wall and monotonic; three to convert" },
   'test/remote-agent.test.ts': { count: 2, not: "a send's `until` a minute ahead, written into a run file" },
-  'test/detached.test.ts': { count: 12, not: 'a synchronous hold inside a patched `writeFileSync`; eleven to convert' },
+  'test/detached.test.ts': {
+    count: 1,
+    not: 'a synchronous hold inside a patched `writeFileSync`, where no promise waits and no timeout fires',
+  },
   'test/live.test.ts': { count: 15, not: "AE_LIVE only: a real harness's turns, which spend money" },
   'test/budget.test.ts': { count: 1, not: 'to convert' },
   'test/claude-code.test.ts': { count: 3, not: 'to convert' },

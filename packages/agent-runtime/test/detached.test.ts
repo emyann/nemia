@@ -53,23 +53,40 @@ import { FILES_STREAM, resultLine, SESSION, SKILLS_STREAM, stream } from './read
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { monoNow } from '../src/core/engine/now.ts';
 import { builtEngine } from './engine.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 
-const settle = async (ops: ReturnType<typeof detachedOps>, name: string, want: SessionState, ms = 15_000) => {
-  const deadline = performance.now() + ms;
-  while (performance.now() < deadline) {
-    const seen = (await Effect.runPromise(ops.observe)).get(name);
-    if (seen?.state === want) return seen;
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  const seen = (await Effect.runPromise(ops.observe)).get(name);
-  assert.fail(`never reached ${want}; last was ${seen?.state ?? 'nothing'}`);
+/** Looks at `name` in test `t`, every 150ms, until it is `want`; answers its sighting then. */
+const settle = (t: Waiter, ops: ReturnType<typeof detachedOps>, name: string, want: SessionState) => {
+  let last: Sighting | undefined;
+  return until(
+    t,
+    async () => {
+      last = (await Effect.runPromise(ops.observe)).get(name);
+      return last?.state === want && last;
+    },
+    () => `${name} ${want}; last was ${last?.state ?? 'nothing'}`,
+    { everyMs: 150 },
+  );
 };
 
-test('a detached session runs, is observable while running, and reports success', async () => {
+/** Ticks `engine` in test `t`, every 100ms, until task `id` has settled. */
+const ticked = (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) =>
+  until(
+    t,
+    async () => {
+      if ((await Effect.runPromise(engine.view(id))).state.settled) return true;
+      await Effect.runPromise(engine.tick());
+      return false;
+    },
+    `${id} settled`,
+    { everyMs: 100 },
+  );
+
+test('a detached session runs, is observable while running, and reports success', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('sleep 1; echo done > out.txt; exit 0'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t1/1', dir)));
@@ -77,18 +94,18 @@ test('a detached session runs, is observable while running, and reports success'
   const running = (await Effect.runPromise(ops.observe)).get('ae/t1/1');
   assert.equal(running?.state, 'working', 'visible immediately, before it finishes');
 
-  await settle(ops, 'ae/t1/1', 'completed');
+  await settle(t, ops, 'ae/t1/1', 'completed');
   assert.equal(fs.readFileSync(path.join(dir, 'out.txt'), 'utf8').trim(), 'done');
 });
 
-test('a non-zero exit is a failure — the only signal a generic harness has to give', async () => {
+test('a non-zero exit is a failure — the only signal a generic harness has to give', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('exit 3'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t2/1', dir)));
-  await settle(ops, 'ae/t2/1', 'failed');
+  await settle(t, ops, 'ae/t2/1', 'failed');
 });
 
-test('the worker outlives the process that spawned it', async () => {
+test('the worker outlives the process that spawned it', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('sleep 2; exit 0'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t3/1', dir)));
@@ -99,21 +116,24 @@ test('the worker outlives the process that spawned it', async () => {
     'working',
     "`spawn` returns as soon as the child is unref'd: a worker tied to this process could not still be working",
   );
-  await settle(ops, 'ae/t3/1', 'completed');
+  await settle(t, ops, 'ae/t3/1', 'completed');
 });
 
-test('stop reaches the detached worker, which kills the harness and says so', async () => {
+test('stop reaches the detached worker, which kills the harness and says so', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('sleep 30'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
-  await settle(ops, 'ae/t4/1', 'working');
+  await settle(t, ops, 'ae/t4/1', 'working');
 
-  const deadline = performance.now() + 15_000;
-  while (performance.now() < deadline) {
-    await Effect.runPromise(ops.stop('ae/t4/1'));
-    if ((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'canceled') break;
-    await new Promise((r) => setTimeout(r, 200));
-  }
+  await until(
+    t,
+    async () => {
+      await Effect.runPromise(ops.stop('ae/t4/1'));
+      return (await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'canceled';
+    },
+    'ae/t4/1 canceled, its stop re-issued',
+    { everyMs: 200 },
+  );
   assert.equal(
     (await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state,
     'canceled',
@@ -121,7 +141,7 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   );
 });
 
-test('a stop that lands the moment the worker has published its pid is heard, not taken for a kill', async () => {
+test('a stop that lands the moment the worker has published its pid is heard, not taken for a kill', WAITED, async (t) => {
   const dir = root();
   const hook = path.join(dir, 'freeze-after-publish.mjs');
   fs.writeFileSync(
@@ -161,20 +181,14 @@ test('a stop that lands the moment the worker has published its pid is heard, no
       return false;
     }
   };
-  const until = async (ok: () => boolean, what: string) => {
-    for (const bound = performance.now() + 10_000; !ok();) {
-      if (performance.now() > bound) assert.fail(`${what}, in 10s`);
-      await new Promise((r) => setTimeout(r, 20));
-    }
-  };
   let pid = 0;
   let heard = false;
   try {
-    await until(() => (pid = pidOf()) > 0, 'the worker publishes its pid');
-    await until(() => frozen(pid), 'the worker freezes after its first write');
+    await until(t, () => (pid = pidOf()) > 0, 'the worker publishes its pid', { everyMs: 20 });
+    await until(t, () => frozen(pid), 'the worker freezes after its first write', { everyMs: 20 });
     await Effect.runPromise(ops.stop('ae/t4/2'));
     process.kill(pid, 'SIGCONT');
-    await settle(ops, 'ae/t4/2', 'canceled');
+    await settle(t, ops, 'ae/t4/2', 'canceled');
     heard = true;
   } finally {
     if (pid > 0 && !heard)
@@ -195,73 +209,80 @@ const alive = (pid: number) => {
     return false;
   }
 };
-/** Until `ok` holds, under a bound of seconds: past one heartbeat of the worker, and its drain. */
-const within = async (ok: () => boolean, what: string, ms = 15_000) => {
-  for (const bound = performance.now() + ms; !ok();) {
-    if (performance.now() > bound) assert.fail(`${what}, in ${ms / 1000}s`);
-    await new Promise((r) => setTimeout(r, 50));
-  }
-};
+/** Until `ok` holds, in test `t`, looked at every 50ms. */
+const within = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 50 });
 
 for (const [what, takeAway] of [
   ['its run file', (_dir: string, file: string) => fs.rmSync(file)],
   ['the whole store', (dir: string) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 })],
 ] as const) {
-  test(`a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`, async () => {
-    const dir = root();
-    const cwd = scratch('ae-harness-');
-    const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir);
-    await Effect.runPromise(ops.spawn(req('ae/g1/1', cwd)));
-    const file = path.join(dir, 'runs', 'sh', 'ae_g1_1.json');
-    let worker = 0;
-    let harness = 0;
-    await within(() => {
-      try {
-        worker = (JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number }).pid;
-      } catch {}
-      try {
-        harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8'));
-      } catch {}
-      return worker > 0 && harness > 0;
-    }, 'the worker and its harness started');
+  test(
+    `a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`,
+    WAITED,
+    async (t) => {
+      const dir = root();
+      const cwd = scratch('ae-harness-');
+      const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir);
+      await Effect.runPromise(ops.spawn(req('ae/g1/1', cwd)));
+      const file = path.join(dir, 'runs', 'sh', 'ae_g1_1.json');
+      let worker = 0;
+      let harness = 0;
+      await within(
+        t,
+        () => {
+          try {
+            worker = (JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number }).pid;
+          } catch {}
+          try {
+            harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8'));
+          } catch {}
+          return worker > 0 && harness > 0;
+        },
+        'the worker and its harness started',
+      );
 
-    takeAway(dir, file);
-    await within(() => !alive(worker) && !alive(harness), 'the worker and its harness ended');
-    assert.equal(fs.existsSync(file), false, 'the run file is not made again');
-  });
+      takeAway(dir, file);
+      await within(t, () => !alive(worker) && !alive(harness), 'the worker and its harness ended');
+      assert.equal(fs.existsSync(file), false, 'the run file is not made again');
+    },
+  );
 }
 
-test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits, holding its output or not', async () => {
-  const dir = root();
-  const cwd = scratch('ae-harness-');
-  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
-  await Effect.runPromise(ops.spawn(req('ae/g3/1', cwd)));
-  await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
-  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
-  fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));
-  await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 25_000);
-});
+test(
+  'a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits, holding its output or not',
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const cwd = scratch('ae-harness-');
+    const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+    await Effect.runPromise(ops.spawn(req('ae/g3/1', cwd)));
+    await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+    const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+    fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));
+    await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended');
+  },
+);
 
-test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', async () => {
+test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', WAITED, async (t) => {
   const dir = root();
   const cwd = scratch('ae-harness-');
   const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
   await Effect.runPromise(ops.spawn(req('ae/g3/2', cwd)));
-  await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+  await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
   const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
   await Effect.runPromise(ops.stop('ae/g3/2'));
-  await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 20_000);
-  await settle(ops, 'ae/g3/2', 'canceled');
+  await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended');
+  await settle(t, ops, 'ae/g3/2', 'canceled');
 });
 
-test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async () => {
+test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(listener(dir), dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/g2/1', brief: 'b', cwd: dir }));
-  await within(() => heardIn(dir).length === 1, 'the brief read');
+  await within(t, () => heardIn(dir).length === 1, 'the brief read');
   assert.equal(runningIn([dir]).length, 2, 'the worker and the listener');
   fs.rmSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json'));
-  await within(() => runningIn([dir]).length === 0, 'the worker and the listener ended');
+  await within(t, () => runningIn([dir]).length === 0, 'the worker and the listener ended');
   assert.equal(fs.existsSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json')), false, 'the run file is not made again');
 });
 
@@ -270,7 +291,7 @@ test('a worker whose run file is taken away while it writes words on ends its ha
  * file's `.tmp`, and the run file still says `pid: 0`. Answers the worker's pid, read off that `.tmp`, once it is seen frozen:
  * continued before it has frozen, it would freeze for good.
  */
-const spawnFrozenBeforePublish = async (ops: ReturnType<typeof detachedOps>, dir: string, name: string) => {
+const spawnFrozenBeforePublish = async (t: Waiter, ops: ReturnType<typeof detachedOps>, dir: string, name: string) => {
   const hook = path.join(dir, 'freeze-before-publish.mjs');
   fs.writeFileSync(
     hook,
@@ -299,8 +320,8 @@ const spawnFrozenBeforePublish = async (ops: ReturnType<typeof detachedOps>, dir
     }
   };
   let pid = 0;
-  await until(() => (pid = read(`${runFile}.tmp`)) > 0, 'the worker writes its status');
-  await until(() => isFrozen(pid), 'the worker freezes before it publishes its pid');
+  await until(t, () => (pid = read(`${runFile}.tmp`)) > 0, 'the worker writes its status', { everyMs: 25 });
+  await until(t, () => isFrozen(pid), 'the worker freezes before it publishes its pid', { everyMs: 25 });
   assert.equal(read(runFile), 0, 'the run file has no pid while the worker is frozen');
   return pid;
 };
@@ -322,17 +343,17 @@ const isAlive = (pid: number) => {
   }
 };
 
-test('a stop that lands before the worker has published its pid is heard: the harness never starts', async () => {
+test('a stop that lands before the worker has published its pid is heard: the harness never starts', WAITED, async (t) => {
   const dir = root();
   const ran = path.join(dir, 'ran');
   const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
-  const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/3');
+  const pid = await spawnFrozenBeforePublish(t, ops, dir, 'ae/t4/3');
   let heard = false;
   try {
     await Effect.runPromise(ops.stop('ae/t4/3'));
     process.kill(pid, 'SIGCONT');
-    await settle(ops, 'ae/t4/3', 'canceled');
-    await until(() => !isAlive(pid), 'the worker exits');
+    await settle(t, ops, 'ae/t4/3', 'canceled');
+    await until(t, () => !isAlive(pid), 'the worker exits', { everyMs: 25 });
     heard = true;
   } finally {
     if (!heard) {
@@ -348,15 +369,15 @@ test('a stop that lands before the worker has published its pid is heard: the ha
   assert.equal(seen.exitCode, undefined, 'a harness never started has no exit code');
   const again = detachedOps(sh(`touch ${ran}; exit 0`), dir);
   await Effect.runPromise(again.spawn(req('ae/t4/3', dir)));
-  await settle(again, 'ae/t4/3', 'completed');
+  await settle(t, again, 'ae/t4/3', 'completed');
   assert.equal(fs.existsSync(ran), true, 'a run spawned again after a stop starts its harness');
 });
 
-test('a stop whose marker lands after the worker looked for it finds the pid it published, and is heard', async () => {
+test('a stop whose marker lands after the worker looked for it finds the pid it published, and is heard', WAITED, async (t) => {
   const dir = root();
   const ran = path.join(dir, 'ran');
   const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
-  const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/4');
+  const pid = await spawnFrozenBeforePublish(t, ops, dir, 'ae/t4/4');
   const write = fs.writeFileSync;
   let held = false;
   (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = (f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
@@ -380,7 +401,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
     }
     assert.equal(held, true, 'the stop wrote its marker');
     assert.equal(fs.existsSync(ran), true, 'the harness started before the marker was written');
-    await settle(ops, 'ae/t4/4', 'canceled');
+    await settle(t, ops, 'ae/t4/4', 'canceled');
     heard = true;
   } finally {
     if (!heard) {
@@ -418,15 +439,15 @@ test('THE LEASE: a run file whose heartbeat stopped is reported dead, not runnin
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t5/1')?.state, 'failed', 'a stopped beat is dead');
 });
 
-test('THE LEASE runs on the monotonic clock: a live worker is working whatever the wall clock stepped', async (t) => {
+test('THE LEASE runs on the monotonic clock: a live worker is working whatever the wall clock stepped', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('sleep 30'), dir);
   await Effect.runPromise(ops.spawn(req('ae/m1/1', dir)));
-  await settle(ops, 'ae/m1/1', 'working');
+  await settle(t, ops, 'ae/m1/1', 'working');
   stepClock(t, STALE_MS + 30_000);
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/m1/1')?.state, 'working', 'a wall clock stepped forward ends no lease');
   await Effect.runPromise(ops.stop('ae/m1/1'));
-  await settle(ops, 'ae/m1/1', 'canceled');
+  await settle(t, ops, 'ae/m1/1', 'canceled');
 });
 
 test('THE LEASE refused on the monotonic clock: a beat 31s old in this boot is dead under a fresh heartbeatAt; one of another boot is read off heartbeatAt', async () => {
@@ -460,44 +481,57 @@ test('THE LEASE refused on the monotonic clock: a beat 31s old in this boot is d
   assert.equal(await seen(), 'working', 'a beat of another boot is not compared: its heartbeatAt answers, and it is fresh');
 });
 
-test('the spawn and the worker each beat on the monotonic clock of this boot, and every write of the worker beats again', async () => {
-  const dir = root();
-  const ops = detachedOps(sh('sleep 30'), dir);
-  await Effect.runPromise(ops.spawn(req('ae/m3/1', dir)));
-  const file = path.join(dir, 'runs', 'sh', 'ae_m3_1.json');
-  const read = () => JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; heartbeatAt: string; beat?: { boot: string; ms: number } };
-  const spawned = read();
-  assert.equal(spawned.pid, 0, 'read as the spawn wrote it, before the worker');
-  assert.equal(spawned.beat?.boot, monoNow()?.boot, 'the spawn beats in this boot');
-  await settle(ops, 'ae/m3/1', 'working');
-  let worker = read();
-  const deadline = performance.now() + 15_000;
-  while (worker.pid === 0 && performance.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 50));
-    try {
-      worker = read();
-    } catch {}
-  }
-  assert.equal(worker.beat?.boot, monoNow()?.boot, 'the worker beats in this boot');
-  assert.ok(worker.beat!.ms > spawned.beat!.ms, 'the worker writes a beat of its own, not the one the spawn left');
-  let later = worker;
-  while (later.heartbeatAt === worker.heartbeatAt && performance.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 100));
-    try {
-      later = read();
-    } catch {}
-  }
-  assert.notEqual(later.heartbeatAt, worker.heartbeatAt, 'the worker wrote its run file again');
-  assert.ok(later.beat!.ms > worker.beat!.ms, 'a later write beats again, not only the first');
-  await Effect.runPromise(ops.stop('ae/m3/1'));
-  await settle(ops, 'ae/m3/1', 'canceled');
-});
+test(
+  'the spawn and the worker each beat on the monotonic clock of this boot, and every write of the worker beats again',
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const ops = detachedOps(sh('sleep 30'), dir);
+    await Effect.runPromise(ops.spawn(req('ae/m3/1', dir)));
+    const file = path.join(dir, 'runs', 'sh', 'ae_m3_1.json');
+    const read = () =>
+      JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; heartbeatAt: string; beat?: { boot: string; ms: number } };
+    const spawned = read();
+    assert.equal(spawned.pid, 0, 'read as the spawn wrote it, before the worker');
+    assert.equal(spawned.beat?.boot, monoNow()?.boot, 'the spawn beats in this boot');
+    await settle(t, ops, 'ae/m3/1', 'working');
+    let worker = read();
+    await until(
+      t,
+      () => {
+        try {
+          worker = read();
+        } catch {}
+        return worker.pid !== 0;
+      },
+      'the worker publishes its pid',
+      { everyMs: 50 },
+    );
+    assert.equal(worker.beat?.boot, monoNow()?.boot, 'the worker beats in this boot');
+    assert.ok(worker.beat!.ms > spawned.beat!.ms, 'the worker writes a beat of its own, not the one the spawn left');
+    let later = worker;
+    await until(
+      t,
+      () => {
+        try {
+          later = read();
+        } catch {}
+        return later.heartbeatAt !== worker.heartbeatAt;
+      },
+      'the worker writes its run file again',
+      { everyMs: 100 },
+    );
+    assert.ok(later.beat!.ms > worker.beat!.ms, 'a later write beats again, not only the first');
+    await Effect.runPromise(ops.stop('ae/m3/1'));
+    await settle(t, ops, 'ae/m3/1', 'canceled');
+  },
+);
 
-test('logs come back from the worker capture', async () => {
+test('logs come back from the worker capture', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('echo hello-from-the-harness; exit 0'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t6/1', dir)));
-  await settle(ops, 'ae/t6/1', 'completed');
+  await settle(t, ops, 'ae/t6/1', 'completed');
   assert.match(await Effect.runPromise(ops.logs('ae/t6/1')), /hello-from-the-harness/);
 });
 
@@ -550,13 +584,8 @@ const heardIn = (cwd: string) => {
     return [];
   }
 };
-/** Until `ok` holds, under a bound of seconds. */
-const until = async (ok: () => boolean, what: string) => {
-  for (const bound = performance.now() + 15_000; !ok();) {
-    if (performance.now() > bound) assert.fail(`never ${what}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-};
+/** Until `ok` holds, in test `t`, looked at every 25ms. */
+const listened = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 25 });
 const runOf = (dir: string, name: string) =>
   JSON.parse(fs.readFileSync(path.join(dir, 'runs', 'in', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`), 'utf8')) as {
     state: string;
@@ -572,88 +601,100 @@ const sayRefused = async (ops: ReturnType<typeof detachedOps>, name: string, tex
   const e = await Effect.runPromise(Effect.flip(ops.say!({ name, sessionId: name }, text)));
   assert.match(e.message, pattern, why);
 };
-const stopped = async (ops: ReturnType<typeof detachedOps>, name: string) => {
+const stopped = async (t: Waiter, ops: ReturnType<typeof detachedOps>, name: string) => {
   await Effect.runPromise(ops.stop(name));
-  await settle(ops, name, 'canceled');
+  await settle(t, ops, name, 'canceled');
 };
 
-test("a harness that reads its stdin is given its brief's line first, then each word said, in order — and a line half appended waits for its end", async () => {
-  const dir = root();
-  const ops = detachedOps(listener(dir), dir);
-  await Effect.runPromise(ops.spawn({ name: 'ae/i1/1', brief: 'the brief', cwd: dir }));
-  await until(() => heardIn(dir).length === 1, 'the brief read');
-  await say(ops, 'ae/i1/1', 'first');
-  await say(ops, 'ae/i1/1', 'second');
-  await until(() => heardIn(dir).length === 3, 'the words read');
-  assert.deepEqual(heardIn(dir), ['the brief', 'first', 'second']);
-  assert.equal(runOf(dir, 'ae/i1/1').inputAt, fs.statSync(inboxOf(dir, 'ae/i1/1')).size, 'how far it has written on, on the run file');
+test(
+  "a harness that reads its stdin is given its brief's line first, then each word said, in order — and a line half appended waits for its end",
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const ops = detachedOps(listener(dir), dir);
+    await Effect.runPromise(ops.spawn({ name: 'ae/i1/1', brief: 'the brief', cwd: dir }));
+    await listened(t, () => heardIn(dir).length === 1, 'the brief read');
+    await say(ops, 'ae/i1/1', 'first');
+    await say(ops, 'ae/i1/1', 'second');
+    await listened(t, () => heardIn(dir).length === 3, 'the words read');
+    assert.deepEqual(heardIn(dir), ['the brief', 'first', 'second']);
+    assert.equal(runOf(dir, 'ae/i1/1').inputAt, fs.statSync(inboxOf(dir, 'ae/i1/1')).size, 'how far it has written on, on the run file');
 
-  fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"par');
-  await new Promise((r) => setTimeout(r, 1_200));
-  fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), 'ted"}\n');
-  await until(() => heardIn(dir).length === 4, 'the line once whole');
-  assert.equal(heardIn(dir)[3], 'parted', 'written on whole, once');
-  await stopped(ops, 'ae/i1/1');
-});
+    fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"par');
+    await new Promise((r) => setTimeout(r, 1_200));
+    fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), 'ted"}\n');
+    await listened(t, () => heardIn(dir).length === 4, 'the line once whole');
+    assert.equal(heardIn(dir)[3], 'parted', 'written on whole, once');
+    await stopped(t, ops, 'ae/i1/1');
+  },
+);
 
-test('the closing line closes its input: said on the run file, its stdin ended, and nothing appended after it written on — nor taken by say', async () => {
-  const dir = root();
-  const ops = detachedOps(listener(dir), dir);
-  await Effect.runPromise(ops.spawn({ name: 'ae/i2/1', brief: 'b', cwd: dir }));
-  await until(() => heardIn(dir).length === 1, 'the brief read');
-  await say(ops, 'ae/i2/1', 'end and linger');
-  await until(() => heardIn(dir).includes('EOF'), 'its stdin ended at its closing line');
-  const run = runOf(dir, 'ae/i2/1');
-  assert.equal(run.inputClosed, true);
-  assert.equal(run.state, 'working', 'still running: it ends when it likes');
+test(
+  'the closing line closes its input: said on the run file, its stdin ended, and nothing appended after it written on — nor taken by say',
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const ops = detachedOps(listener(dir), dir);
+    await Effect.runPromise(ops.spawn({ name: 'ae/i2/1', brief: 'b', cwd: dir }));
+    await listened(t, () => heardIn(dir).length === 1, 'the brief read');
+    await say(ops, 'ae/i2/1', 'end and linger');
+    await listened(t, () => heardIn(dir).includes('EOF'), 'its stdin ended at its closing line');
+    const run = runOf(dir, 'ae/i2/1');
+    assert.equal(run.inputClosed, true);
+    assert.equal(run.state, 'working', 'still running: it ends when it likes');
 
-  await sayRefused(ops, 'ae/i2/1', 'more', /^in: `ae\/i2\/1` has given its result and reads no more words/);
-  const size = fs.statSync(inboxOf(dir, 'ae/i2/1')).size;
-  fs.appendFileSync(inboxOf(dir, 'ae/i2/1'), '{"said":"behind its back"}\n');
-  await new Promise((r) => setTimeout(r, 1_200));
-  assert.deepEqual(heardIn(dir), ['b', 'end and linger', 'EOF'], 'nothing written on after the close');
-  assert.equal(runOf(dir, 'ae/i2/1').inputAt, size, 'nor counted as written');
-  await stopped(ops, 'ae/i2/1');
-});
+    await sayRefused(ops, 'ae/i2/1', 'more', /^in: `ae\/i2\/1` has given its result and reads no more words/);
+    const size = fs.statSync(inboxOf(dir, 'ae/i2/1')).size;
+    fs.appendFileSync(inboxOf(dir, 'ae/i2/1'), '{"said":"behind its back"}\n');
+    await new Promise((r) => setTimeout(r, 1_200));
+    assert.deepEqual(heardIn(dir), ['b', 'end and linger', 'EOF'], 'nothing written on after the close');
+    assert.equal(runOf(dir, 'ae/i2/1').inputAt, size, 'nor counted as written');
+    await stopped(t, ops, 'ae/i2/1');
+  },
+);
 
-test('a harness closing its input on its own words ends its run: done, its stdin ended by the worker', async () => {
+test('a harness closing its input on its own words ends its run: done, its stdin ended by the worker', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(listener(dir), dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/i3/1', brief: 'end', cwd: dir }));
-  await settle(ops, 'ae/i3/1', 'completed');
+  await settle(t, ops, 'ae/i3/1', 'completed');
   assert.deepEqual(heardIn(dir), ['end', 'EOF']);
   await sayRefused(ops, 'ae/i3/1', 'late', /has given its result and reads no more words/);
 });
 
-test('a worker started again on its run file writes no word twice: it goes on from where the one before had written on', async () => {
-  const dir = root();
-  const first = path.join(dir, 'first');
-  const again = path.join(dir, 'again');
-  fs.mkdirSync(first);
-  fs.mkdirSync(again);
-  const ops = detachedOps(listener(dir), dir);
-  await Effect.runPromise(ops.spawn({ name: 'ae/i4/1', brief: 'b', cwd: first }));
-  await until(() => heardIn(first).length === 1, 'the brief read');
-  await say(ops, 'ae/i4/1', 'one');
-  await until(() => heardIn(first).length === 2, 'one read');
-  await stopped(ops, 'ae/i4/1');
+test(
+  'a worker started again on its run file writes no word twice: it goes on from where the one before had written on',
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const first = path.join(dir, 'first');
+    const again = path.join(dir, 'again');
+    fs.mkdirSync(first);
+    fs.mkdirSync(again);
+    const ops = detachedOps(listener(dir), dir);
+    await Effect.runPromise(ops.spawn({ name: 'ae/i4/1', brief: 'b', cwd: first }));
+    await listened(t, () => heardIn(first).length === 1, 'the brief read');
+    await say(ops, 'ae/i4/1', 'one');
+    await listened(t, () => heardIn(first).length === 2, 'one read');
+    await stopped(t, ops, 'ae/i4/1');
 
-  const file = path.join(dir, 'runs', 'in', 'ae_i4_1.json');
-  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), cwd: again }));
-  const worker = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'bin', 'ae-worker.ts');
-  execFileSync(process.execPath, [
-    '-e',
-    `require('node:child_process').spawn(process.execPath, [${JSON.stringify(worker)}, ${JSON.stringify(file)}], { detached: true, stdio: 'ignore' }).unref()`,
-  ]);
-  await until(() => heardIn(again).length === 1, 'the brief read again');
-  assert.equal(runOf(dir, 'ae/i4/1').inputClosed, undefined, 'its worker started again by hand on the same run file: its input open');
-  await say(ops, 'ae/i4/1', 'two');
-  await until(() => heardIn(again).length === 2, 'two read');
-  assert.deepEqual(heardIn(again), ['b', 'two'], 'the words the one before wrote on are not written again');
-  await stopped(ops, 'ae/i4/1');
-});
+    const file = path.join(dir, 'runs', 'in', 'ae_i4_1.json');
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), cwd: again }));
+    const worker = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'bin', 'ae-worker.ts');
+    execFileSync(process.execPath, [
+      '-e',
+      `require('node:child_process').spawn(process.execPath, [${JSON.stringify(worker)}, ${JSON.stringify(file)}], { detached: true, stdio: 'ignore' }).unref()`,
+    ]);
+    await listened(t, () => heardIn(again).length === 1, 'the brief read again');
+    assert.equal(runOf(dir, 'ae/i4/1').inputClosed, undefined, 'its worker started again by hand on the same run file: its input open');
+    await say(ops, 'ae/i4/1', 'two');
+    await listened(t, () => heardIn(again).length === 2, 'two read');
+    assert.deepEqual(heardIn(again), ['b', 'two'], 'the words the one before wrote on are not written again');
+    await stopped(t, ops, 'ae/i4/1');
+  },
+);
 
-test('a run spawned again under the name starts past what was said to the one before it', async () => {
+test('a run spawned again under the name starts past what was said to the one before it', WAITED, async (t) => {
   const dir = root();
   const first = path.join(dir, 'first');
   const again = path.join(dir, 'again');
@@ -661,10 +702,10 @@ test('a run spawned again under the name starts past what was said to the one be
   fs.mkdirSync(again);
   const ops = detachedOps(listener(dir), dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/i5/1', brief: 'b', cwd: first }));
-  await until(() => heardIn(first).length === 1, 'the brief read');
+  await listened(t, () => heardIn(first).length === 1, 'the brief read');
   await say(ops, 'ae/i5/1', 'one');
-  await until(() => heardIn(first).length === 2, 'one read');
-  await stopped(ops, 'ae/i5/1');
+  await listened(t, () => heardIn(first).length === 2, 'one read');
+  await stopped(t, ops, 'ae/i5/1');
   await sayRefused(
     ops,
     'ae/i5/1',
@@ -675,11 +716,11 @@ test('a run spawned again under the name starts past what was said to the one be
 
   await Effect.runPromise(ops.spawn({ name: 'ae/i5/1', brief: 'b2', cwd: again }));
   assert.equal(runOf(dir, 'ae/i5/1').input?.from, fs.statSync(inboxOf(dir, 'ae/i5/1')).size, 'from the end of the inbox as it was');
-  await until(() => heardIn(again).length === 1, 'the brief read');
+  await listened(t, () => heardIn(again).length === 1, 'the brief read');
   await say(ops, 'ae/i5/1', 'two');
-  await until(() => heardIn(again).length === 2, 'two read');
+  await listened(t, () => heardIn(again).length === 2, 'two read');
   assert.deepEqual(heardIn(again), ['b2', 'two']);
-  await stopped(ops, 'ae/i5/1');
+  await stopped(t, ops, 'ae/i5/1');
 });
 
 test('say is refused, with nothing appended, where no worker would write the words on', async () => {
@@ -1063,7 +1104,7 @@ test('codex is given the schema and an output file, and the prompt still comes l
   assert.ok(!codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args.includes('--output-schema'), 'no schema, no flag');
 });
 
-test("a detached harness's final answer is its closing statement — and nothing lands in the workspace", async () => {
+test("a detached harness's final answer is its closing statement — and nothing lands in the workspace", WAITED, async (t) => {
   const dir = root();
   const workspace = scratch('ae-ws-');
   const answers: HarnessSpec = {
@@ -1073,7 +1114,7 @@ test("a detached harness's final answer is its closing statement — and nothing
   const ops = detachedOps(answers, dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/t9/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
 
-  const seen = await settle(ops, 'ae/t9/1', 'completed');
+  const seen = await settle(t, ops, 'ae/t9/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
   assert.equal(
     seen.closeout && 'at' in seen.closeout,
@@ -1308,11 +1349,11 @@ test('an effort a harness does not have is refused by that harness, in its own w
   assert.equal(claudeDetached.refuses!(task('xhigh')), undefined);
 });
 
-test("a detached session's exit code is on its sighting, and no usage is invented beside it", async () => {
+test("a detached session's exit code is on its sighting, and no usage is invented beside it", WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('exit 3'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t14/1', dir)));
-  const seen = await settle(ops, 'ae/t14/1', 'failed');
+  const seen = await settle(t, ops, 'ae/t14/1', 'failed');
   assert.equal(seen?.exitCode, 3);
   assert.equal(seen?.usage, undefined, 'a generic harness measures no usage, and reports none rather than 0');
 });
@@ -1372,7 +1413,7 @@ test('a detached worker aimed at a directory that is not there is refused, and c
   await new Promise((r) => setTimeout(r, 300));
 });
 
-test('a relative cwd is resolved where the worker is launched — the harness runs in repo, not repo/repo', async () => {
+test('a relative cwd is resolved where the worker is launched — the harness runs in repo, not repo/repo', WAITED, async (t) => {
   const was = process.cwd();
   const parent = root();
   fs.mkdirSync(path.join(parent, 'repo'));
@@ -1392,7 +1433,7 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
     process.chdir(was);
   }
 
-  await settle(ops, 'ae/t19/1', 'completed');
+  await settle(t, ops, 'ae/t19/1', 'completed');
   const repo = fs.realpathSync(path.join(parent, 'repo'));
   assert.equal(given && fs.realpathSync(given), repo, 'the spec is handed the resolved directory, so a `-C` names it too');
   assert.equal(
@@ -1725,80 +1766,95 @@ test('a stream says the files its session touched only when its init line names 
   assert.equal('files' in claudeResultOutput(FILES_STREAM), false, '--output-format json has no events: it cannot say');
 });
 
-test("a spec that reads its harness's output reports the answer found there, with no time — nothing in the workspace", async () => {
-  const dir = root();
-  const workspace = scratch('ae-ws-');
-  const prints: HarnessSpec = {
-    name: 'sh',
-    readOutput: claudeResultOutput,
-    command: () => ({
-      cmd: 'sh',
-      args: ['-c', `echo noise >&2; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`],
-    }),
-  };
-  const ops = detachedOps(prints, dir);
-  await Effect.runPromise(ops.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
+test(
+  "a spec that reads its harness's output reports the answer found there, with no time — nothing in the workspace",
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const workspace = scratch('ae-ws-');
+    const prints: HarnessSpec = {
+      name: 'sh',
+      readOutput: claudeResultOutput,
+      command: () => ({
+        cmd: 'sh',
+        args: ['-c', `echo noise >&2; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`],
+      }),
+    };
+    const ops = detachedOps(prints, dir);
+    await Effect.runPromise(ops.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
 
-  const seen = await settle(ops, 'ae/t20/1', 'completed');
-  assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-  assert.equal(
-    'at' in seen.closeout,
-    false,
-    'no time: its own process wrote the log, after the spawn cleared the last one, whatever the clock says',
-  );
-  assert.deepEqual(fs.readdirSync(workspace), []);
-});
+    const seen = await settle(t, ops, 'ae/t20/1', 'completed');
+    assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+    assert.equal(
+      'at' in seen.closeout,
+      false,
+      'no time: its own process wrote the log, after the spawn cleared the last one, whatever the clock says',
+    );
+    assert.deepEqual(fs.readdirSync(workspace), []);
+  },
+);
 
-test("what a harness's output says it denied the session is on the session's sighting, as the spec read it — and nothing when it denied nothing", async () => {
-  const dir = root();
-  const denials = [{ tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
-  const says = (read: HarnessOutput): HarnessSpec => ({
-    name: 'sh',
-    readOutput: () => read,
-    command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }),
-  });
-  const denied = detachedOps(says({ denials }), dir);
-  await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
-  assert.deepEqual((await settle(denied, 'ae/t23/1', 'completed')).denials, denials);
-  const none = detachedOps(says({ denials: [] }), dir);
-  await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
-  assert.equal('denials' in (await settle(none, 'ae/t24/1', 'completed')), false, 'an empty list is no key');
-});
+test(
+  "what a harness's output says it denied the session is on the session's sighting, as the spec read it — and nothing when it denied nothing",
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const denials = [{ tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
+    const says = (read: HarnessOutput): HarnessSpec => ({
+      name: 'sh',
+      readOutput: () => read,
+      command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }),
+    });
+    const denied = detachedOps(says({ denials }), dir);
+    await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
+    assert.deepEqual((await settle(t, denied, 'ae/t23/1', 'completed')).denials, denials);
+    const none = detachedOps(says({ denials: [] }), dir);
+    await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
+    assert.equal('denials' in (await settle(t, none, 'ae/t24/1', 'completed')), false, 'an empty list is no key');
+  },
+);
 
-test("a run is not called over before the harness's last output is in its log — the answer read from it would be lost", async () => {
-  const dir = root();
-  const late: HarnessSpec = {
-    name: 'sh',
-    readOutput: claudeResultOutput,
-    command: () => ({
-      cmd: 'sh',
-      args: ['-c', `(sleep 0.4; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}') & exit 0`],
-    }),
-  };
-  const ops = detachedOps(late, dir);
-  await Effect.runPromise(ops.spawn({ name: 'ae/t21/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
+test(
+  "a run is not called over before the harness's last output is in its log — the answer read from it would be lost",
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const late: HarnessSpec = {
+      name: 'sh',
+      readOutput: claudeResultOutput,
+      command: () => ({
+        cmd: 'sh',
+        args: ['-c', `(sleep 0.4; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}') & exit 0`],
+      }),
+    };
+    const ops = detachedOps(late, dir);
+    await Effect.runPromise(ops.spawn({ name: 'ae/t21/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
 
-  const until = performance.now() + 15_000;
-  let seen: Sighting | undefined;
-  while (performance.now() < until) {
-    seen = (await Effect.runPromise(ops.observe)).get('ae/t21/1');
-    if (seen && seen.state !== 'working') break;
-    await new Promise((r) => setTimeout(r, 20));
-  }
-  assert.equal(
-    seen?.state,
-    'completed',
-    'a child still prints when the harness exits: `exit` comes before the pipes drain, and the engine records the end on the first pass that sees done',
-  );
-  assert.deepEqual(seen?.closeout?.payload, { outcome: 'done' }, 'the first sighting that says done already has the answer');
-});
+    let seen: Sighting | undefined;
+    await until(
+      t,
+      async () => {
+        seen = (await Effect.runPromise(ops.observe)).get('ae/t21/1');
+        return seen && seen.state !== 'working';
+      },
+      () => `ae/t21/1 past working; last was ${seen?.state ?? 'nothing'}`,
+      { everyMs: 20 },
+    );
+    assert.equal(
+      seen?.state,
+      'completed',
+      'a child still prints when the harness exits: `exit` comes before the pipes drain, and the engine records the end on the first pass that sees done',
+    );
+    assert.deepEqual(seen?.closeout?.payload, { outcome: 'done' }, 'the first sighting that says done already has the answer');
+  },
+);
 
-test('...and a child that holds a pipe open for good does not keep the run working', async () => {
+test('...and a child that holds a pipe open for good does not keep the run working', WAITED, async (t) => {
   const dir = root();
   const ops = detachedOps(sh('(sleep 30) & exit 0'), dir);
   const started = performance.now();
   await Effect.runPromise(ops.spawn(req('ae/t22/1', dir)));
-  await settle(ops, 'ae/t22/1', 'completed', 10_000);
+  await settle(t, ops, 'ae/t22/1', 'completed');
   assert.ok(performance.now() - started < 10_000, 'ended within the drain bound, not when the child let go');
 });
 
@@ -1814,86 +1870,90 @@ test('a re-spawn of the same attempt does not find the last answer in the output
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t23/1')?.closeout, undefined);
 });
 
-test('claude-detached at shipped defaults: a task that asked for a closeout gets the one it printed, and its session id', async () => {
-  const bin = scratch('ae-fake-claude-');
-  fs.writeFileSync(
-    path.join(bin, 'claude'),
-    [
-      '#!/bin/sh',
-      `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
-      `printf '%s\\n' "$@" > '${bin}/argv'`,
-      'echo "a warning" >&2',
-      `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.0123, duration_api_ms: 850 })}'`,
-    ].join('\n'),
-    { mode: 0o755 },
-  );
-  const prev = process.env.PATH;
-  process.env.PATH = `${bin}:${prev}`;
-  try {
-    const cwd = root();
-    const engine = builtEngine(Engine.layer({ root: root() }));
-    const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
-    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema }));
-    const until = performance.now() + 15_000;
-    while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
-      await Effect.runPromise(engine.tick());
-      await new Promise((r) => setTimeout(r, 100));
+test(
+  'claude-detached at shipped defaults: a task that asked for a closeout gets the one it printed, and its session id',
+  WAITED,
+  async (t) => {
+    const bin = scratch('ae-fake-claude-');
+    fs.writeFileSync(
+      path.join(bin, 'claude'),
+      [
+        '#!/bin/sh',
+        `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
+        `printf '%s\\n' "$@" > '${bin}/argv'`,
+        'echo "a warning" >&2',
+        `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.0123, duration_api_ms: 850 })}'`,
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const prev = process.env.PATH;
+    process.env.PATH = `${bin}:${prev}`;
+    try {
+      const cwd = root();
+      const engine = builtEngine(Engine.layer({ root: root() }));
+      const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
+      const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema }));
+      await ticked(t, engine, id);
+      const { state } = await Effect.runPromise(engine.view(id));
+      assert.equal(state.settled, 'succeeded');
+      assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
+      assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
+      assert.deepEqual(state.attempts[0]?.usage, { costUsd: 0.0123, apiMs: 850 }, 'and what it cost, from the same JSON');
+      const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
+      assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]), schema);
+      assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
+      assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
+    } finally {
+      process.env.PATH = prev;
     }
-    const { state } = await Effect.runPromise(engine.view(id));
-    assert.equal(state.settled, 'succeeded');
-    assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
-    assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
-    assert.deepEqual(state.attempts[0]?.usage, { costUsd: 0.0123, apiMs: 850 }, 'and what it cost, from the same JSON');
-    const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
-    assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]), schema);
-    assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
-    assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
-  } finally {
-    process.env.PATH = prev;
-  }
-});
+  },
+);
 
 /** File a task on `spec` through an engine, tick it until it settles, and give back its state. */
-const settledOn = async (spec: HarnessSpec, task: { resumeFrom?: string } = {}) => {
+const settledOn = async (t: Waiter, spec: HarnessSpec, task: { resumeFrom?: string } = {}) => {
   const engine = builtEngine(Engine.layer({ root: root(), harnesses: { sh: spec } }));
   const id = await Effect.runPromise(engine.file({ brief: 'x', cwd: root(), harness: 'sh', closeoutSchema: { type: 'object' }, ...task }));
-  const until = performance.now() + 15_000;
-  while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
-    await Effect.runPromise(engine.tick());
-    await new Promise((r) => setTimeout(r, 100));
-  }
+  await ticked(t, engine, id);
   return (await Effect.runPromise(engine.view(id))).state;
 };
 
 /** This process's clock 10 s ahead of the files': the attempt is journalled after the moment its statement's file was written. */
 const AHEAD_MS = 10_000;
 
-test("a detached statement it printed is on the record when this process's clock runs ahead of its files'", async (t: TestContext) => {
-  stepClock(t, AHEAD_MS);
-  const prints: HarnessSpec = {
-    name: 'sh',
-    readOutput: claudeResultOutput,
-    command: () => ({ cmd: 'sh', args: ['-c', `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`] }),
-  };
-  const state = await settledOn(prints);
-  assert.equal(state.settled, 'succeeded');
-  assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
-  assert.notEqual(state.attempts[0]?.stated, false);
-});
+test(
+  "a detached statement it printed is on the record when this process's clock runs ahead of its files'",
+  WAITED,
+  async (t: TestContext) => {
+    stepClock(t, AHEAD_MS);
+    const prints: HarnessSpec = {
+      name: 'sh',
+      readOutput: claudeResultOutput,
+      command: () => ({ cmd: 'sh', args: ['-c', `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`] }),
+    };
+    const state = await settledOn(t, prints);
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
+    assert.notEqual(state.attempts[0]?.stated, false);
+  },
+);
 
-test("a detached statement written to its closeout file is on the record when this process's clock runs ahead of its files'", async (t: TestContext) => {
-  stepClock(t, AHEAD_MS);
-  const answers: HarnessSpec = {
-    name: 'sh',
-    command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
-  };
-  const state = await settledOn(answers);
-  assert.equal(state.settled, 'succeeded');
-  assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it wrote, on the record');
-  assert.notEqual(state.attempts[0]?.stated, false);
-});
+test(
+  "a detached statement written to its closeout file is on the record when this process's clock runs ahead of its files'",
+  WAITED,
+  async (t: TestContext) => {
+    stepClock(t, AHEAD_MS);
+    const answers: HarnessSpec = {
+      name: 'sh',
+      command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
+    };
+    const state = await settledOn(t, answers);
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it wrote, on the record');
+    assert.notEqual(state.attempts[0]?.stated, false);
+  },
+);
 
-test("a resumed detached run that says nothing is not handed its parent's statement, from its file or its output", async () => {
+test("a resumed detached run that says nothing is not handed its parent's statement, from its file or its output", WAITED, async (t) => {
   const line = (o: object) => `printf '%s\\n' '${resultLine(o)}'`;
   const spec: HarnessSpec = {
     name: 'sh',
@@ -1908,63 +1968,63 @@ test("a resumed detached run that says nothing is not handed its parent's statem
       ],
     }),
   };
-  const parent = await settledOn(spec);
+  const parent = await settledOn(t, spec);
   assert.deepEqual(parent.attempts[0]?.closeout, { outcome: 'parent' }, 'the parent stated');
-  const child = await settledOn(spec, { resumeFrom: SESSION });
+  const child = await settledOn(t, spec, { resumeFrom: SESSION });
   assert.equal(child.attempts[0]?.closeout, undefined, "the parent's statement is not the child's");
   assert.equal(child.attempts[0]?.stated, false, 'and the child is on the record as not having stated');
 });
 
-test('claude-detached, filed through the engine with disallowedTools, spawns claude with --disallowedTools and the rules', async () => {
-  const bin = scratch('ae-fake-claude-');
-  fs.writeFileSync(
-    path.join(bin, 'claude'),
-    [
-      '#!/bin/sh',
-      `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
-      `printf '%s\\n' "$@" > '${bin}/argv'`,
-      `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`,
-    ].join('\n'),
-    { mode: 0o755 },
-  );
-  const prev = process.env.PATH;
-  process.env.PATH = `${bin}:${prev}`;
-  try {
-    const engine = builtEngine(Engine.layer({ root: root() }));
-    const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
-    const allow = ['Write(**)'];
-    const id = await Effect.runPromise(
-      engine.file({
-        brief: 'the prompt',
-        cwd: root(),
-        harness: 'claude-detached',
-        config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
-      }),
+test(
+  'claude-detached, filed through the engine with disallowedTools, spawns claude with --disallowedTools and the rules',
+  WAITED,
+  async (t) => {
+    const bin = scratch('ae-fake-claude-');
+    fs.writeFileSync(
+      path.join(bin, 'claude'),
+      [
+        '#!/bin/sh',
+        `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
+        `printf '%s\\n' "$@" > '${bin}/argv'`,
+        `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`,
+      ].join('\n'),
+      { mode: 0o755 },
     );
-    const until = performance.now() + 15_000;
-    while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
-      await Effect.runPromise(engine.tick());
-      await new Promise((r) => setTimeout(r, 100));
+    const prev = process.env.PATH;
+    process.env.PATH = `${bin}:${prev}`;
+    try {
+      const engine = builtEngine(Engine.layer({ root: root() }));
+      const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
+      const allow = ['Write(**)'];
+      const id = await Effect.runPromise(
+        engine.file({
+          brief: 'the prompt',
+          cwd: root(),
+          harness: 'claude-detached',
+          config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
+        }),
+      );
+      await ticked(t, engine, id);
+      assert.deepEqual((await Effect.runPromise(engine.view(id))).state.config?.disallowedTools, rules, 'on the record');
+      const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
+      const i = argv.indexOf('--disallowedTools');
+      assert.notEqual(i, -1, argv.join(' '));
+      assert.equal(argv[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
+      assert.match(argv[i + 2], /^--/, 'a flag ends the variadic list');
+      assert.deepEqual(
+        (await Effect.runPromise(engine.view(id))).state.config?.allowedTools,
+        allow,
+        'and the allow list beside it, on the record',
+      );
+      const a = argv.indexOf('--allowedTools');
+      assert.notEqual(a, -1, argv.join(' '));
+      assert.equal(argv[a + 1], 'Write(**)');
+      assert.equal(argv[a + 2], '--permission-mode', 'a flag ends this variadic list too');
+    } finally {
+      process.env.PATH = prev;
     }
-    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.config?.disallowedTools, rules, 'on the record');
-    const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
-    const i = argv.indexOf('--disallowedTools');
-    assert.notEqual(i, -1, argv.join(' '));
-    assert.equal(argv[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
-    assert.match(argv[i + 2], /^--/, 'a flag ends the variadic list');
-    assert.deepEqual(
-      (await Effect.runPromise(engine.view(id))).state.config?.allowedTools,
-      allow,
-      'and the allow list beside it, on the record',
-    );
-    const a = argv.indexOf('--allowedTools');
-    assert.notEqual(a, -1, argv.join(' '));
-    assert.equal(argv[a + 1], 'Write(**)');
-    assert.equal(argv[a + 2], '--permission-mode', 'a flag ends this variadic list too');
-  } finally {
-    process.env.PATH = prev;
-  }
-});
+  },
+);
 
 test('REFUSED: a deny list on codex, which has no tool list to take from — in its own words, naming the sandbox', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
@@ -1996,7 +2056,7 @@ test('REFUSED: an allow list on codex, for the same reason and in the same shape
   );
 });
 
-test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', async () => {
+test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', WAITED, async (t) => {
   const bin = scratch('ae-fake-codex-');
   const stream = [
     { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
@@ -2022,11 +2082,7 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
   try {
     const engine = builtEngine(Engine.layer({ root: root() }));
     const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
-    const until = performance.now() + 15_000;
-    while (!(await Effect.runPromise(engine.view(id))).state.settled && performance.now() < until) {
-      await Effect.runPromise(engine.tick());
-      await new Promise((r) => setTimeout(r, 100));
-    }
+    await ticked(t, engine, id);
     const { state } = await Effect.runPromise(engine.view(id));
     assert.equal(state.settled, 'succeeded');
     assert.deepEqual(
@@ -2248,49 +2304,53 @@ test('REFUSED: a run asked for whose output the spec refuses is unread at work a
   assert.deepEqual([...told.seen.keys()], ['ae/o/1']);
 });
 
-test("a resumed run's spawn carries its parent's totals on its run file, and a look by name takes them off reading no parent", async () => {
-  const dir = root();
-  const OTHER = '11111111-2222-3333-4444-555555555555';
-  const t0 = Date.parse('2026-09-23T12:00:00Z');
-  const parent = (name: string, at: number, result: object, nativeId = SESSION) =>
-    doneRun(dir, name, { nativeId, startedAt: new Date(at).toISOString() }, resultLine(result));
-  parent('ae/r/1', t0, { total_cost_usd: 0.0209649, duration_api_ms: 6069 });
-  parent('ae/r/3', t0 + 2_000, { total_cost_usd: 0.0284121, duration_api_ms: 8132 });
-  parent('ae/r/2', t0 + 1_000, { total_cost_usd: 0.0257381, duration_api_ms: 7142 });
-  parent('ae/v/1', t0, { usage: { input_tokens: 1, output_tokens: 1 } }, OTHER);
-  const printing = (result: object): HarnessSpec => ({
-    ...sh(`echo '${resultLine(result)}'`),
-    readOutput: claudeResultOutput,
-    resumeCostCarried: true,
-  });
-  const runOn = (name: string) => JSON.parse(fs.readFileSync(path.join(dir, 'runs', 'sh', `${name.replace(/\//g, '_')}.json`), 'utf8'));
-  const spec = printing({ total_cost_usd: 0.031, duration_api_ms: 9000 });
-  await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/r/4', dir), resumeFrom: SESSION }));
-  assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'the latest run before it under the id');
-  await settle(detachedOps(spec, dir), 'ae/r/4', 'completed');
-  assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'kept by its worker');
+test(
+  "a resumed run's spawn carries its parent's totals on its run file, and a look by name takes them off reading no parent",
+  WAITED,
+  async (t) => {
+    const dir = root();
+    const OTHER = '11111111-2222-3333-4444-555555555555';
+    const t0 = Date.parse('2026-09-23T12:00:00Z');
+    const parent = (name: string, at: number, result: object, nativeId = SESSION) =>
+      doneRun(dir, name, { nativeId, startedAt: new Date(at).toISOString() }, resultLine(result));
+    parent('ae/r/1', t0, { total_cost_usd: 0.0209649, duration_api_ms: 6069 });
+    parent('ae/r/3', t0 + 2_000, { total_cost_usd: 0.0284121, duration_api_ms: 8132 });
+    parent('ae/r/2', t0 + 1_000, { total_cost_usd: 0.0257381, duration_api_ms: 7142 });
+    parent('ae/v/1', t0, { usage: { input_tokens: 1, output_tokens: 1 } }, OTHER);
+    const printing = (result: object): HarnessSpec => ({
+      ...sh(`echo '${resultLine(result)}'`),
+      readOutput: claudeResultOutput,
+      resumeCostCarried: true,
+    });
+    const runOn = (name: string) => JSON.parse(fs.readFileSync(path.join(dir, 'runs', 'sh', `${name.replace(/\//g, '_')}.json`), 'utf8'));
+    const spec = printing({ total_cost_usd: 0.031, duration_api_ms: 9000 });
+    await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/r/4', dir), resumeFrom: SESSION }));
+    assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'the latest run before it under the id');
+    await settle(t, detachedOps(spec, dir), 'ae/r/4', 'completed');
+    assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'kept by its worker');
 
-  for (const n of [1, 2, 3]) fs.rmSync(path.join(dir, 'runs', 'sh', `ae_r_${n}.json`));
-  const ops = detachedOps(spec, dir);
-  let told: Observation | undefined;
-  const reads = await readsOf(async () => {
-    told = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/4' }]));
-  });
-  assert.ok(reads <= 3, `read ${reads} files, none of its parent's`);
-  const usage = told!.seen.get('ae/r/4')?.usage;
-  assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 0.0025879) < 1e-9, `cost ${usage?.costUsd}`);
-  assert.equal(usage?.apiMs, 868, 'its own API time, its parent gone from the folder');
+    for (const n of [1, 2, 3]) fs.rmSync(path.join(dir, 'runs', 'sh', `ae_r_${n}.json`));
+    const ops = detachedOps(spec, dir);
+    let told: Observation | undefined;
+    const reads = await readsOf(async () => {
+      told = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/4' }]));
+    });
+    assert.ok(reads <= 3, `read ${reads} files, none of its parent's`);
+    const usage = told!.seen.get('ae/r/4')?.usage;
+    assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 0.0025879) < 1e-9, `cost ${usage?.costUsd}`);
+    assert.equal(usage?.apiMs, 868, 'its own API time, its parent gone from the folder');
 
-  await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/u/1', dir), resumeFrom: '00000000-0000-4000-8000-000000000000' }));
-  assert.deepEqual(runOn('ae/u/1').carried, {}, 'no parent: nothing carried');
-  await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/v/2', dir), resumeFrom: OTHER }));
-  assert.deepEqual(runOn('ae/v/2').carried, {}, 'a parent that printed no total: nothing carried');
-  await Effect.runPromise(
-    detachedOps({ ...spec, resumeCostCarried: undefined }, dir).spawn({ ...req('ae/n/1', dir), resumeFrom: SESSION }),
-  );
-  assert.equal('carried' in runOn('ae/n/1'), false, 'a spec whose harness prints its own totals carries none');
-  for (const name of ['ae/r/4', 'ae/u/1', 'ae/v/2', 'ae/n/1']) await settle(detachedOps(spec, dir), name, 'completed');
-});
+    await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/u/1', dir), resumeFrom: '00000000-0000-4000-8000-000000000000' }));
+    assert.deepEqual(runOn('ae/u/1').carried, {}, 'no parent: nothing carried');
+    await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/v/2', dir), resumeFrom: OTHER }));
+    assert.deepEqual(runOn('ae/v/2').carried, {}, 'a parent that printed no total: nothing carried');
+    await Effect.runPromise(
+      detachedOps({ ...spec, resumeCostCarried: undefined }, dir).spawn({ ...req('ae/n/1', dir), resumeFrom: SESSION }),
+    );
+    assert.equal('carried' in runOn('ae/n/1'), false, 'a spec whose harness prints its own totals carries none');
+    for (const name of ['ae/r/4', 'ae/u/1', 'ae/v/2', 'ae/n/1']) await settle(t, detachedOps(spec, dir), name, 'completed');
+  },
+);
 
 test('find and stop read the one run file of the session they are given, among many', async () => {
   const dir = root();

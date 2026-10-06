@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOf, type Scope } from './admission.ts';
+import { admissionOf, type Auto, type Scope } from './admission.ts';
 import { TABLE } from '../command/commands.verb.ts';
+import { DEFAULT_AUTO, listInForce, type AutoRule, type Facts } from '../auto/index.ts';
+import type { Level } from '../level/level.ts';
 
 /** The state the fixtures read: `r`'s step `gate` awaits approval, `check` failed its check, and no other run is there. */
 const waitOf = (runId: string, step: string): string | undefined =>
@@ -114,4 +116,62 @@ test('REFUSED to pass unread: a run that does not read, and a scoped command who
   assert.match(scopedAnswer('nemia show gone')?.reason ?? '', /names gone, which does not read/);
   assert.equal(scopedAnswer('nemia show gone')?.decision, 'ask');
   assert.equal(scopedAnswer('nemia show t --frob')?.decision, 'ask');
+});
+
+/** A run where all agree: every condition holds, and it has cost $3. */
+const ALL_AGREE: Facts = { recommends: true, checked: true, accepted: true, withinBudget: true, nothingOpen: true, spend: 3 };
+
+/** What admission reads at auto: `list` in force, `r`'s factory at `level`, its facts `facts` or none (`unread`), and no other run. */
+const atAuto = (list: readonly AutoRule[], level: Level = 'auto', facts: Facts | 'unread' = ALL_AGREE): Auto => ({
+  list,
+  levelOf: (runId) => (runId === 'r' ? level : undefined),
+  factsOf: (runId) => (runId === 'r' && facts !== 'unread' ? facts : undefined),
+});
+
+/** Admission's decision for a shell line at auto, or undefined for none. */
+const decidedAt = (command: string, auto: Auto | undefined) =>
+  admissionOf({ tool: 'Bash', input: { command }, cwd: '/w' }, TABLE, waitOf, undefined, auto)?.decision;
+
+/** A rule the person confirmed: a try of any step, unasked, where all agree. */
+const TRIES: AutoRule = { id: 'tries', answer: 'retry', when: ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'] };
+
+test("at auto, an answer the confirmed list allows in the run's state is given unasked", () => {
+  assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce(undefined))), undefined);
+  assert.equal(decidedAt('nemia retry r gate', atAuto([DEFAULT_AUTO, TRIES])), undefined);
+  assert.equal(decidedAt('nemia approve r gate && nemia retry r gate', atAuto([DEFAULT_AUTO, TRIES])), undefined, 'each allowed');
+});
+
+test('REFUSED at semi-auto: the same state asks, and so does a session handed no list, at auto', () => {
+  assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce(undefined), 'semi-auto')), 'ask');
+  assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce(undefined), 'manual')), 'ask');
+  assert.equal(decidedAt('nemia approve r gate', undefined), 'ask');
+});
+
+test('REFUSED: a rule nobody confirmed allows nothing; a list with the default dropped allows no approval', () => {
+  assert.equal(decidedAt('nemia retry r gate', atAuto(listInForce(undefined))), 'ask', 'only the default is in force');
+  assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce([TRIES]))), 'ask');
+  assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce([]))), 'ask');
+});
+
+test('REFUSED at auto: a state where one condition fails, a run whose facts or level do not read, and an answer naming no step', () => {
+  assert.equal(decidedAt('nemia approve r gate', atAuto([DEFAULT_AUTO], 'auto', { ...ALL_AGREE, checked: false })), 'ask');
+  assert.equal(decidedAt('nemia approve r gate', atAuto([DEFAULT_AUTO], 'auto', 'unread')), 'ask');
+  assert.equal(decidedAt('nemia approve q gate', atAuto([DEFAULT_AUTO])), 'ask');
+  assert.equal(decidedAt('nemia round r', atAuto([DEFAULT_AUTO])), 'ask', 'a round is no answer a rule gives');
+  assert.equal(decidedAt('nemia accept r gate', atAuto([DEFAULT_AUTO])), 'ask', 'nor an accept');
+});
+
+test("REFUSED at auto: a try that raises a step's cap, whatever the rules allow", () => {
+  assert.equal(decidedAt('nemia retry r gate --budget 5', atAuto([DEFAULT_AUTO, TRIES])), 'ask');
+  assert.equal(decidedAt('nemia retry r gate --budget=5', atAuto([DEFAULT_AUTO, TRIES])), 'ask');
+});
+
+test('REFUSED: a confirm or a drop of a rule is asked every time, at auto and with no list, alone or behind another command', () => {
+  for (const line of ['nemia auto confirm nemia tries', 'nemia auto drop nemia default', 'nemia show r && nemia auto confirm nemia tries'])
+    for (const auto of [undefined, atAuto([DEFAULT_AUTO, TRIES])]) assert.equal(decidedAt(line, auto), 'ask', line);
+  assert.equal(decidedAt('nemia auto nemia', atAuto([DEFAULT_AUTO])), undefined, 'the read is no ask');
+  assert.match(
+    admissionOf({ tool: 'Bash', input: { command: 'nemia auto confirm nemia tries' }, cwd: '/w' }, TABLE, waitOf)?.reason ?? '',
+    /^nemia auto confirm nemia tries is yours, asked every time/,
+  );
 });

@@ -1,18 +1,24 @@
 /**
  * A call's admission, decided off the command table and the runs' state: whether a shell line an agent is about to run acts on a run or a
- * factory below the agent's floor (`Scope`), or answers what waits on the person (`admissionOf`); the table's commands it types
- * (`typedIn`), and the runs and factories they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
+ * factory below the agent's floor (`Scope`), answers what waits on the person (`admissionOf`), which a rule the person confirmed may let
+ * through at `auto` (`Auto`), or is asked every time (`asksAlways`); the table's commands it types (`typedIn`), and the runs and factories
+ * they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
  */
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
 import { parseArgv, type Spec } from '../command/command.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
+import { allowedBy, AUTO_ANSWERS, NO_FACTS, type AutoRule, type Facts } from '../auto/index.ts';
 import type { CommandClass } from './class.ts';
 
-/** An entry of the table as admission reads it: its name, its class, the side it is served on, and how its words are spelt. */
+/**
+ * An entry of the table as admission reads it: its name, its class, whether it is asked every time, the side it is served on, and how its
+ * words are spelt.
+ */
 type Entry = {
   readonly name: string;
   readonly nemia: CommandClass;
+  readonly asksAlways?: true;
   readonly only?: { readonly side: 'cli' | 'api' };
   readonly spec?: Spec;
 };
@@ -160,25 +166,77 @@ function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) =>
 }
 
 /**
+ * What admission reads at `auto`, for the agent it is handed: the person's list in force for it (`list`); the level of a run's factory,
+ * undefined where the run does not read (`levelOf`); and the facts of a run at the call, for a step, undefined where they do not read
+ * (`factsOf`). Read at the call, and carried to no other.
+ */
+export type Auto = {
+  list: readonly AutoRule[];
+  levelOf: (runId: string) => Level | undefined;
+  factsOf: (runId: string, step: string) => Facts | undefined;
+};
+
+/** The run and step a typed answer names, read by its entry's spec, or undefined where its words do not parse or name none. */
+export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string; step: string } | undefined {
+  const spec = table.find((e) => e.name === typed.name)?.spec;
+  if (spec === undefined) return undefined;
+  let args: Readonly<Record<string, unknown>> | undefined;
+  try {
+    args = parseArgv(spec, unredirected(typed.args));
+  } catch {
+    return undefined;
+  }
+  if (args === undefined) return undefined;
+  const [runId] = valuesAt(args, RUN_KEY);
+  const [step] = valuesAt(args, 'step');
+  return runId === undefined || step === undefined ? undefined : { runId, step };
+}
+
+/**
+ * Whether a rule of the person's list lets the typed answer through unasked: an answer a rule may give (`AUTO_ANSWERS`), raising no cap,
+ * naming a run and a step, the run's factory at `auto`, and a rule that allows it in the run's facts at the call (`allowedBy`).
+ */
+function autoAllows(typed: Typed, table: readonly Entry[], auto: Auto | undefined): boolean {
+  if (auto === undefined || !(AUTO_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args)) return false;
+  const answer = answerOf(typed, table);
+  if (answer === undefined) return false;
+  const level = auto.levelOf(answer.runId);
+  if (level === undefined || !atLeast(level, 'auto')) return false;
+  const facts = auto.factsOf(answer.runId, answer.step) ?? NO_FACTS;
+  return allowedBy(auto.list, { answer: typed.name, step: answer.step }, facts) !== undefined;
+}
+
+/** The ask of a command of `table` the person is asked every time (`asksAlways`) typed on the shell line `line`, or undefined for none. */
+function alwaysAsked(line: string, table: readonly Entry[]): AdmissionAnswer | undefined {
+  const typed = typedIn(line, table).find((t) => table.find((e) => e.name === t.name)?.asksAlways);
+  if (typed === undefined) return undefined;
+  return { decision: 'ask', reason: `${['nemia', typed.name, ...typed.args].join(' ')} is yours, asked every time: no allow reaches it.` };
+}
+
+/**
  * Admission's answer for a call: where `scope` is given, `deny` for a shell line acting on a run or a factory below its floor, and `ask`
- * for one whose runs it cannot read (`scopeOf`); then `ask`, saying why in the person's words, where the call is a shell line that types
- * an `answers` command of `table` that waits on the person (`askedOf`); else none, and the call meets the session's own rules. `waitOf`
- * says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there to read — or undefined where
- * it waits on no one.
+ * for one whose runs it cannot read (`scopeOf`); then `ask` where the line types a command asked every time (`asksAlways`), whatever the
+ * session was allowed; then `ask`, saying why in the person's words, where the call is a shell line that types an `answers` command of
+ * `table` that waits on the person (`askedOf`) and no rule of `auto` lets through (`autoAllows`); else none, and the call meets the
+ * session's own rules. `waitOf` says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there
+ * to read — or undefined where it waits on no one.
  */
 export function admissionOf(
   call: AdmissionCall,
   table: readonly Entry[],
   waitOf: (runId: string, step: string) => string | undefined,
   scope?: Scope,
+  auto?: Auto,
 ): AdmissionAnswer | undefined {
   const line = call.input.command;
   if (call.tool !== 'Bash' || typeof line !== 'string') return undefined;
   const inScope = scope === undefined ? undefined : scopeOf(line, table, scope);
   if (inScope !== undefined) return inScope;
+  const always = alwaysAsked(line, table);
+  if (always !== undefined) return always;
   for (const typed of typedIn(line, table).filter((t) => t.nemia === 'answers')) {
     const why = askedOf(typed, waitOf);
-    if (why !== undefined) return { decision: 'ask', reason: why };
+    if (why !== undefined && !autoAllows(typed, table, auto)) return { decision: 'ask', reason: why };
   }
   return undefined;
 }

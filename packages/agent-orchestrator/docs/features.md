@@ -5593,3 +5593,20 @@ Not agent-orchestrator features, listed so nothing is lost:
   (Kubernetes: a pod's `priorityClassName`). Tests: two pending tasks, the later-filed one alphabetically first, the
   earlier admitted; a higher priority admitted before an older lower one. agent-orchestrator then: `priority` on every
   filing after a run's first step, and the run cap (§3) unchanged.
+
+## Shipped: the daemon exports its metrics over OTLP (2026-10-06)
+
+The side Grafana charts what the daemon keeps of its passes and what the tick knows of each step:
+
+- **`OtlpMetrics` beside the tracer and the logger** in `telemetryLayer`, under the same service and resource, to
+  `<endpoint>/v1/metrics` (`metricsUrl`), only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set: every metric in the process's registry,
+  cumulative, every 10 s and once more as the process ends.
+- **The steps' metrics** (`STEP_METRICS`, `src/meter/step.verb.ts`), recorded by the tick after its pass off what each run's full pass
+  read of the tasks the feed said settled (`settledIn`, `settledFacts`): a session's cost, tokens and time, the tries by outcome, the
+  checks by verdict, the rounds granted and exhausted, the calls denied — by factory, workflow, step, agent and outcome alone
+  (`boundedAttributes`). The README lists them with their Prometheus names, measured.
+
+Tested in `src/telemetry/telemetry.test.ts` (a scratch collector posted `pass.duration` at `/v1/metrics`; none posted without an endpoint;
+a collector that does not answer costs no program), `src/meter/step.test.ts` (the facts, the five attributes, a run's id refused),
+`src/rest/rest.test.ts` and `src/rest/resting.test.ts` (each settle named by one read alone) and `test/step-metrics.test.ts` (a step
+settled with a cost recorded once over four passes of the real runtime, with no run's id).

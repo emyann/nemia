@@ -26,7 +26,7 @@
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Logger } from 'effect';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -47,6 +47,7 @@ import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
+import { warned } from './warned.ts';
 import { stepClock } from './clock.ts';
 import { FILES_STREAM, resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
@@ -846,16 +847,6 @@ const codexRun = (dir: string, name: string, lines: object[]) => {
   return `${base}.log`;
 };
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
-
-/** Runs `look`, keeping every line logged as a warning. */
-const warned = async <A>(look: Effect.Effect<A, unknown>): Promise<{ value: A; warnings: string[] }> => {
-  const warnings: string[] = [];
-  const keeper = Logger.make(({ message, logLevel }) => {
-    if (logLevel === 'Warn') warnings.push((Array.isArray(message) ? message : [message]).join(' '));
-  });
-  const value = await Effect.runPromise(look.pipe(Effect.provide(Logger.layer([keeper]))));
-  return { value, warnings };
-};
 
 test('REFUSED: a Codex run whose stream does not decode is read as failed alone, and why is said in words naming the session, the line, the event, the field and the fix', async () => {
   const dir = root();

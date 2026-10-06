@@ -43,7 +43,7 @@ import { registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
 import { claudeQuota } from './quota.ts';
-import type { ExpectedSession, RunnerOps, SpawnRequest } from '../seam.ts';
+import type { ExpectedSession, Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 
 /**
  * How long a `working` session must write nothing before this harness reports it quiet — stopped, rather than
@@ -382,9 +382,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map(), countsFrom: new Map() };
   return {
     spawn: spawnUnder(root, options.parentCallFrom ?? transcriptLastCall),
-    observe: observeInto(reading, registry, undefined),
-    observeFor: (expected) =>
-      observeInto(reading, registry, countsFromOf(expected)).pipe(Effect.map((seen) => ({ seen, unread: new Set<string>() }))),
+    observe: observeInto(reading, registry, undefined).pipe(Effect.map((o) => o.seen)),
+    observeFor: (expected) => observeInto(reading, registry, countsFromOf(expected)),
     find: findIn(sessionsDir),
     stop: stopSession,
     release: releaseFrom(registry, usageFrom),
@@ -542,8 +541,15 @@ const countsFromOf = (expected: readonly ExpectedSession[]): Map<string, number>
  * 1. The registry's rows (`listedIn`).
  * 2. This harness's own definition of finished, applied to what is still `working` (`reportOf`). What was kept for an
  *    attempt no longer listed goes with it, so a released session is not read again.
+ *
+ * Seen, each session read; unread, each whose transcript cannot be read while it runs (`reportedOf`), why said as a warning on
+ * every look. Fails only when the listing itself cannot be read: it is every session's.
  */
-const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<string, number> | undefined): RunnerOps['observe'] =>
+const observeInto = (
+  x: Reading,
+  registry: Registry,
+  countsFrom: ReadonlyMap<string, number> | undefined,
+): Effect.Effect<Observation, RunnerError> =>
   sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
     Effect.flatMap((out) => {
       const read = registryOf(out);
@@ -553,10 +559,13 @@ const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<str
     }),
     Effect.flatMap((m) => {
       x.kept.prune(new Set([...m].map(([name, l]) => attemptOf(name, l.sighting, l.startedAt, l.countFrom))));
-      return Effect.forEach([...m], ([name, l]) => reportedOf(x, name, l), {
-        concurrency: 'unbounded',
-      }).pipe(Effect.map((entries) => new Map(entries)));
+      return Effect.forEach([...m], ([name, l]) => reportedOf(x, name, l), { concurrency: 'unbounded' });
     }),
+    Effect.tap((reports) => Effect.forEach(reports, (r) => (r.warning ? Effect.logWarning(r.warning) : Effect.void), { discard: true })),
+    Effect.map((reports) => ({
+      seen: new Map(reports.flatMap((r) => (r.sighting ? [[r.name, r.sighting] as const] : []))),
+      unread: new Set(reports.flatMap((r) => (r.sighting ? [] : [r.name]))),
+    })),
   );
 
 /**
@@ -566,7 +575,7 @@ const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<str
  * keeps what the last one said. Called only on a listing that decoded, so a refused one leaves the registry as the last one read.
  */
 const listedIn = (rows: RegistryRow[], registry: Registry, countsFrom: ReadonlyMap<string, number> | undefined) => {
-  const m = new Map<string, { sighting: Sighting; startedAt?: number; countFrom?: number }>();
+  const m = new Map<string, Listed>();
   const kept = countsFrom ? new Map<string, number>() : new Map(registry.countsFrom);
   for (const map of [registry.listed, registry.pids, registry.starts, registry.countsFrom]) map.clear();
   for (const row of rows) {
@@ -608,30 +617,90 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
   };
 };
 
+/** A session as the registry lists it: its sighting, its start, and when its usage is counted from. */
+type Listed = { sighting: Sighting; startedAt?: number; countFrom?: number };
+
+/** One listed session as a look reads it: its sighting, or none when it is unread, and why it was read so (`warning`). */
+type Reported = { name: string; sighting?: Sighting; warning?: string };
+
 /**
- * `reportOf`, failing with a `RunnerError` for `observe` when a read of the session's transcript throws — its lines do not decode
- * (`lines.ts`), or it was found and not read (`TranscriptUnread`): a statement or usage the transcript holds and the runtime cannot
- * read is no absence, so the whole listing fails and each background session is unread. A session listed with a process carries its
- * bridge too (`claudeBridge`), a link or why there is none, which fails nothing.
+ * `reportOf`, the session's own when a read of its transcript throws — its lines do not decode (`lines.ts`), or it was found and
+ * not read (`TranscriptUnread`): a statement or usage the transcript holds and the runtime cannot read is no absence, so the session
+ * is unread while it runs and read as failed once it has ended (`unreadableOf`), and every other session is read. A session listed
+ * with a process carries its bridge too (`claudeBridge`), a link or why there is none, which fails nothing.
  */
-const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt?: number; countFrom?: number }) =>
+const reportedOf = (x: Reading, name: string, l: Listed): Effect.Effect<Reported, RunnerError> =>
   Effect.tryPromise({
-    try: async (): Promise<readonly [string, Sighting]> => {
+    try: async (): Promise<Reported> => {
+      const look = lookOf(x, name, l);
       const { pid, sessionId } = l.sighting;
-      const [[, reported], bridge] = await Promise.all([
-        reportOf(x, name, l.sighting, l.startedAt, l.countFrom),
+      const [read, bridge] = await Promise.all([
+        reportOf(x, look).then(
+          (sighting): Reported => ({ name, sighting }),
+          (cause: unknown) => unreadableOf(x, look, cause),
+        ),
         pid === undefined ? undefined : x.bridgeOf(pid, sessionId),
       ]);
-      return [name, bridge ? { ...reported, bridge } : reported];
+      return read.sighting && bridge ? { ...read, sighting: { ...read.sighting, bridge } } : read;
     },
     catch: (cause) =>
       new RunnerError({
         verb: 'observe',
-        message:
-          `claude --bg: \`${name}\`'s transcript cannot be read, so every background session of ours stays unread, neither there` +
-          ` nor gone: ${cause instanceof Error ? cause.message : String(cause)}`,
+        message: `claude --bg: \`${name}\` cannot be read: ${cause instanceof Error ? cause.message : String(cause)}`,
       }),
   });
+
+/**
+ * A session whose transcript cannot be read, for `cause`: once it has ended (`endedOf`), its row's sighting read as `failed`, its
+ * process and bridge kept for `release` and nothing it said, consumed or was quiet for; before, unread. Either way with why, said
+ * in words naming the session, the cause — which names the transcript — and how it is read.
+ */
+const unreadableOf = async (x: Reading, l: Look, cause: unknown): Promise<Reported> => {
+  const ended = await endedOf(x, l);
+  const why = cause instanceof Error ? cause.message : String(cause);
+  const warning =
+    `claude --bg: \`${l.name}\`'s transcript cannot be read: ${why.replace(/\.?\s*$/, '.')} ` +
+    (ended
+      ? 'It has ended, so it reads as failed'
+      : 'It is unread until it has ended — listed finished, or working and idle, its transcript unwritten for the quiet floor —' +
+        ' and reads as failed then') +
+    `; the other background sessions are read. Once its task has settled, \`ae forget\` lets this session go.`;
+  return ended ? { name: l.name, sighting: { ...l.sighting, state: 'failed' }, warning } : { name: l.name, warning };
+};
+
+/**
+ * Whether a listed session has ended, by this harness's own definition of finished: listed final (`FINAL`), or `working` and not
+ * busy, with its transcript unwritten for the floor (`quietFor`) — or, listed final, with no transcript time at all. A busy or
+ * blocked session has not.
+ */
+const endedOf = async (x: Reading, l: Look): Promise<boolean> => {
+  const { state, busy } = l.sighting;
+  const final = FINAL.has(state);
+  if (!final && !(state === 'working' && !busy)) return false;
+  const quiet = await l.quietFor();
+  return quiet === undefined ? final : quiet >= x.quiescentAfterMs;
+};
+
+/**
+ * One listed session's look (`Look`): its attempt, and its transcript's mtime and quiet asked of the world once a pass at most and
+ * only when needed. Quiet is counted from the transcript's last write or the session's own start, whichever is later, and bounded by
+ * the monotonic time since that write was first seen (`quiet.ts`); a session with no transcript time has none.
+ */
+const lookOf = (x: Reading, name: string, l: Listed): Look => {
+  const { sighting, startedAt } = l;
+  const countFrom = l.countFrom ?? startedAt;
+  let written: Promise<number | undefined> | undefined;
+  const writtenAt = () => (written ??= x.transcriptTime(sighting.sessionId));
+  const quietFor = async () => {
+    const lastWrite = await writtenAt();
+    if (lastWrite === undefined) return undefined;
+    const aged = x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
+    const mono = x.mono();
+    const sighted = sightingOf(quietFileOf(x.root, name), lastWrite, mono);
+    return sighted && mono ? Math.min(aged, mono.ms - sighted.ms) : aged;
+  };
+  return { name, sighting, startedAt, countFrom, attempt: attemptOf(name, sighting, startedAt, countFrom), writtenAt, quietFor };
+};
 
 /**
  * One listed session as `observe` reports it, by this harness's own definition of finished. The clock is the transcript's
@@ -648,35 +717,19 @@ const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt
  * `working` and quiet for the floor reports `quietMs` too, statement or not, because an inherited statement the runner could
  * not tell is discarded upstream; what quiet means is `decide`'s.
  */
-const reportOf = async (
-  x: Reading,
-  name: string,
-  sighting: Sighting,
-  startedAt: number | undefined,
-  countFrom = startedAt,
-): Promise<readonly [string, Sighting]> => {
-  const attempt = attemptOf(name, sighting, startedAt, countFrom);
-  let written: Promise<number | undefined> | undefined;
-  const writtenAt = () => (written ??= x.transcriptTime(sighting.sessionId));
-  const quietFor = async () => {
-    const lastWrite = await writtenAt();
-    if (lastWrite === undefined) return undefined;
-    const aged = x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
-    const mono = x.mono();
-    const sighted = sightingOf(quietFileOf(x.root, name), lastWrite, mono);
-    return sighted && mono ? Math.min(aged, mono.ms - sighted.ms) : aged;
-  };
-  if (sighting.busy) return busyReportOf(x, { name, sighting, startedAt, countFrom, attempt, writtenAt, quietFor });
-  const told = toldOf(x, name, await x.kept.statementOf(attempt, sighting, writtenAt));
-  const used = await x.kept.usageOf(attempt, sighting, countFrom, writtenAt);
+const reportOf = async (x: Reading, l: Look): Promise<Sighting> => {
+  const { sighting } = l;
+  if (sighting.busy) return busyReportOf(x, l);
+  const told = toldOf(x, l.name, await x.kept.statementOf(l.attempt, sighting, l.writtenAt));
+  const used = await x.kept.usageOf(l.attempt, sighting, l.countFrom, l.writtenAt);
   const reported: Sighting = {
     ...sighting,
     ...(told ? { closeout: told } : {}),
     ...(used ? { usage: used } : {}),
   };
-  if (reported.state !== 'working') return [name, reported];
-  const quiet = await quietFor();
-  return quiet !== undefined && quiet >= x.quiescentAfterMs ? [name, { ...reported, quietMs: quiet }] : [name, reported];
+  if (reported.state !== 'working') return reported;
+  const quiet = await l.quietFor();
+  return quiet !== undefined && quiet >= x.quiescentAfterMs ? { ...reported, quietMs: quiet } : reported;
 };
 
 /**
@@ -700,15 +753,15 @@ const toldOf = (x: Reading, name: string, said: Statement | undefined): { payloa
  * Both reads are kept (`Kept`) while the transcript stays as they found it, since this branch is reached only over a transcript
  * cold for the floor.
  */
-const busyReportOf = async (x: Reading, l: Look): Promise<readonly [string, Sighting]> => {
+const busyReportOf = async (x: Reading, l: Look): Promise<Sighting> => {
   const { name, sighting, startedAt } = l;
   const quiet = sighting.state === 'working' ? await l.quietFor() : undefined;
-  if (quiet === undefined || quiet < x.quiescentAfterMs || startedAt === undefined) return [name, sighting];
+  if (quiet === undefined || quiet < x.quiescentAfterMs || startedAt === undefined) return sighting;
   const said = await x.kept.statementOf(l.attempt, sighting, l.writtenAt, true);
   const told = said?.lastWord ? toldOf(x, name, said) : undefined;
-  if (!told || (told.at !== undefined && told.at < startedAt)) return [name, sighting];
+  if (!told || (told.at !== undefined && told.at < startedAt)) return sighting;
   const used = await x.kept.usageOf(l.attempt, sighting, l.countFrom, l.writtenAt, true);
-  return [name, { ...sighting, closeout: told, ...(used ? { usage: used } : {}), quietMs: quiet }];
+  return { ...sighting, closeout: told, ...(used ? { usage: used } : {}), quietMs: quiet };
 };
 
 /**

@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Logger } from 'effect';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessSpec } from '../src/harness/detached/detached.ts';
@@ -20,17 +20,8 @@ import { codexOutput } from '../src/harness/codex/stream.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
-
-/** Runs `look`, keeping every line logged as a warning. */
-const warned = async <A>(look: Effect.Effect<A, unknown>): Promise<{ value: A; warnings: string[] }> => {
-  const warnings: string[] = [];
-  const keeper = Logger.make(({ message, logLevel }) => {
-    if (logLevel === 'Warn') warnings.push((Array.isArray(message) ? message : [message]).join(' '));
-  });
-  const value = await Effect.runPromise(look.pipe(Effect.provide(Logger.layer([keeper]))));
-  return { value, warnings };
-};
 
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
 const USED = { toolCalls: 0, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 };

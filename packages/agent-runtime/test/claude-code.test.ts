@@ -273,6 +273,36 @@ test("observeFor says which names it could not read: a background session's, and
   }
 });
 
+test('REFUSED: observeFor keeps the name of a background session the registry lists and whose transcript it cannot read as unread, never absent, and reads the other beside it', async () => {
+  const f = fake();
+  try {
+    const bad = '5e551011-0000-4000-8000-0000000000bd';
+    const rows = [
+      { name: 'ae/b/1', sessionId: bad, state: 'done', status: 'idle', kind: 'background' },
+      { name: 'ae/g/1', sessionId: BG_ID, state: 'done', status: 'idle', kind: 'background' },
+    ];
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify(rows));
+    const ops = claudeCodeOps({
+      ...opsOptions(tmp('root')),
+      closeoutFrom: async (sessionId: string) => {
+        if (sessionId === bad) throw new Error('line 2 of the transcript is a `user` line whose `timestamp` is "yesterday"');
+        return { payload: { outcome: 'done' }, at: 5 };
+      },
+    });
+    const o = await Effect.runPromise(
+      ops.observeFor!([
+        { name: 'ae/b/1', harness: 'claude' },
+        { name: 'ae/g/1', harness: 'claude' },
+      ]),
+    );
+    assert.deepEqual(o.unread, new Set(['ae/b/1']), 'the registry answered, and left it unread');
+    assert.deepEqual([...o.seen.keys()], ['ae/g/1']);
+    assert.deepEqual(o.seen.get('ae/g/1')?.closeout, { payload: { outcome: 'done' }, at: 5 });
+  } finally {
+    f.restore();
+  }
+});
+
 test('a pass over many ended jobs reads the run file and output of the job it expects, and no other', async () => {
   const f = fake();
   try {

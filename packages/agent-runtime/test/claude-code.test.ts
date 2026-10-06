@@ -1441,7 +1441,7 @@ test("through the engine, a stopped long-lived attempt's spend is read from its 
       await Effect.runPromise(e.tick());
       return f.read('bg-args')?.[2];
     }, 'the session spawned');
-    const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0]!.startedAt);
+    const begun = Date.parse((await Effect.runPromise(e.view(id))).state.attempts[0].startedAt);
     const listing = (state: string) =>
       fs.writeFileSync(
         path.join(f.dir, 'agents.json'),

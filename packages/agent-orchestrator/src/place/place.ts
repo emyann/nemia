@@ -205,3 +205,14 @@ export type PlaceDeclared = {
   readonly denyWhileLanding: readonly string[];
   readonly say: { readonly look: readonly string[] } & { readonly [K in Exclude<(typeof PLACE_SAYS)[number], 'look'>]: string };
 };
+
+/**
+ * Why the place declared in `file` cannot serve a run: the verbs of `needed` its `declared` verbs leave out, each named, with the fix.
+ * Undefined when it declares every one. Pure.
+ */
+export function missingVerbsRefusal(file: string, declared: PlaceDeclared, needed: readonly PlaceVerb[]): string | undefined {
+  const missing = needed.filter((verb) => !declared.verbs.includes(verb));
+  if (!missing.length) return undefined;
+  const which = missing.join(', ');
+  return `${file} does not declare ${which}, which this workflow's run asks of its place: add ${missing.length === 1 ? 'the verb' : 'each verb'} to \`verbs\` with its script in scripts/, or start a workflow that asks no ${which} of it`;
+}

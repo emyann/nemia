@@ -3,7 +3,7 @@ import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { isGitRun } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
-import { trialMerges } from '../place/place.store.ts';
+import { placeDirOf, trialMerges } from '../place/place.store.ts';
 import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
 
 /**
@@ -17,6 +17,7 @@ export function mergesOf(runId: string, branches: readonly string[]): Record<str
   const { trials } = trialMerges(
     run.repo,
     branches.map((branch) => ({ onto: run.branch, branch })),
+    placeDirOf(run),
   );
   return Object.fromEntries(
     branches.map((branch, i) => {

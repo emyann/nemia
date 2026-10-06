@@ -95,6 +95,7 @@ const PINNED: Record<string, string[]> = {
     'branchWord',
     'branchesToRead',
     'breakdownLines',
+    'bridgeOf',
     'budgetRefusal',
     'budgetWord',
     'cardSkills',

@@ -749,7 +749,8 @@ Refused at load: any word but `true` or `false` — `remote: yes` is refused by 
 `wf start`, with nothing written, on a harness the runtime refuses `claude.remoteControl` for, in the runtime's words after the
 `remote: true` line (`configRefused`): `codex` and `claude-detached` run a prompt and exit, and only a Claude Code background session,
 `claude` with `background: true`, is bridged; and on a `claude` step without `background: true`, since a job opens no bridge. `wf ls`
-and `wf decide` say nothing of it yet.
+and `wf decide` say nothing of it yet; the board's facts of the step draw its web link, or why it is not up, read off its task's view
+(`bridgeOf`).
 
 ### What a step may spend: `budget:`
 
@@ -2734,8 +2735,8 @@ it reads.
 Nemia watches every factory of the store for the person: a long-lived session, woken by the feed, that brings each gate to them with a
 recommendation, recaps what moved, and carries their answer back as a `nemia` verb. She is the person's switch, never a run:
 
-- **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, or the
-  web link her session shows, from a phone too), and what a person allowed her at a prompt beyond what ships.
+- **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, then
+  her web link once its bridge is up, from a phone too, or why it is not), and what a person allowed her at a prompt beyond what ships.
 - **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
   (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve`, `round`, `accept`,
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her

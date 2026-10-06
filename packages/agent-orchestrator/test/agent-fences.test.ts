@@ -34,6 +34,8 @@
  *
  * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
  * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
+ * A dontAsk job given a skill whose SKILL.md grants tools is told to read that file with Read, since its fence refuses the Skill tool's
+ * load (`grantingSkillsUnread`). Each call a shipped skill's rule says it breaks is one the stats count against it (`rulesOfTry`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

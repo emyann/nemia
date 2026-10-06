@@ -22,7 +22,7 @@ import {
 } from '../event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
 import { countRead, countWrite } from './tally.ts';
-import { readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
+import { feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
 import { removeBody, sweep } from './sweep.ts';
 
@@ -93,6 +93,12 @@ export type PlainJournalOps = {
    * store keeps it in bytes. The caller asks first that each task is settled (`Engine.forget`): the store asks nothing.
    */
   readonly forget?: (taskIds: readonly string[]) => Effect.Effect<ForgottenFeed | undefined, JournalError>;
+  /**
+   * Optional: how many of the feed's lines name each task of `taskIds`, read once and resolving no body; a line forgotten is not
+   * counted, and a task with none counts 0. A store that offers it answers from `forget` the lines it forgot of each task
+   * (`ForgottenFeed.linesByTask`), so a count before a removal and the removal read the feed once between them.
+   */
+  readonly feedLines?: (taskIds: readonly string[]) => Effect.Effect<Readonly<Record<string, number>>, JournalError>;
   /**
    * Optional: call `onChange` when something has been appended, so a watcher can read instead of
    * poll. A store that cannot signal simply omits this and watchers fall back to a timer — the
@@ -404,6 +410,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
         list: ops.list,
         ...(ops.subscribe ? { subscribe: ops.subscribe } : {}),
         ...(ops.forget ? { forget: ops.forget } : {}),
+        ...(ops.feedLines ? { feedLines: ops.feedLines } : {}),
         append: appendSaid((taskId, event, briefParts) =>
           bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event),
         ),
@@ -489,7 +496,9 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
        * advances past what was read, and a rotation moves no cursor.
        */
       feed: (after) => Effect.try({ try: () => readFeed(root, after), catch: fail('*') }),
-      /** The tasks' lines out of the feed (`rotateFeed`), then, under the feed's lock still, their journals. */
+      /** Each task's lines in the feed, counted off one read of it (`feedLinesOf`). */
+      feedLines: (taskIds) => Effect.try({ try: () => feedLinesOf(root, taskIds), catch: fail('*') }),
+      /** The tasks' lines out of the feed (`rotateFeed`), each task's counted, then, under the feed's lock still, their journals. */
       forget: (taskIds) =>
         Effect.try({
           try: () =>

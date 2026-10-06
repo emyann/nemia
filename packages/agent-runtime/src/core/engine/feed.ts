@@ -31,8 +31,16 @@ export const FEED_LOCK_WAIT_MS = 2_000;
 /** The bytes of a header, `{"feedBase":B}` or `{"sealedTo":S}` padded with spaces, and its line break. */
 export const HEADER_BYTES = 34;
 
-/** What a rotation forgot, and the feed's bytes, both files, before and after it. */
-export type ForgottenFeed = { linesForgotten: number; bytesBefore: number; bytesAfter: number };
+/**
+ * What a rotation forgot, and the feed's bytes, both files, before and after it; and, where the store counts them, the lines it
+ * forgot of each task (`linesByTask`), a task with none left out.
+ */
+export type ForgottenFeed = {
+  linesForgotten: number;
+  bytesBefore: number;
+  bytesAfter: number;
+  linesByTask?: Readonly<Record<string, number>>;
+};
 
 /**
  * A read of the feed: the entries after the cursor asked with, still kept, where to resume, and how many lines after it were
@@ -329,8 +337,25 @@ export const withFeedLock = <A>(root: string, fn: () => A): A => {
 /** The id of the task a feed line names, or `undefined`. */
 const taskIdOf = (entry: unknown): unknown => (typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined);
 
-/** Where a sealed file being written stands: its descriptor, the run of lines forgotten not yet written, the last cursor, the count. */
-type Writing = { fd: number; at: number; prev: number; run: number[]; forgotten: number };
+/**
+ * How many of the feed's lines under `root` name each task of `taskIds`, the feed read once (`readFeed`), each line parsed and no
+ * body resolved: a line a rotation forgot is not counted, and a task with none counts 0.
+ */
+export const feedLinesOf = (root: string, taskIds: readonly string[]): Record<string, number> => {
+  const counts = new Map(taskIds.map((id) => [id, 0]));
+  for (const entry of readFeed(root, 0).entries) {
+    const id = taskIdOf(entry);
+    const n = typeof id === 'string' ? counts.get(id) : undefined;
+    if (n !== undefined) counts.set(id as string, n + 1);
+  }
+  return Object.fromEntries(counts);
+};
+
+/**
+ * Where a sealed file being written stands: its descriptor, the run of lines forgotten not yet written, the last cursor, the count,
+ * and the count by task (`byTask`).
+ */
+type Writing = { fd: number; at: number; prev: number; run: number[]; forgotten: number; byTask: Map<string, number> };
 
 /** Write `text` at the end of what `w` has written. */
 const put = (w: Writing, text: string): void => {
@@ -352,6 +377,7 @@ const sealLine = (w: Writing, entry: unknown, c: number, forget: ReadonlySet<str
   if (typeof id === 'string' && forget.has(id)) {
     w.run.push(c - w.prev);
     w.forgotten++;
+    w.byTask.set(id, (w.byTask.get(id) ?? 0) + 1);
   } else {
     flushRun(w);
     put(w, `${JSON.stringify({ c, entry })}\n`);
@@ -421,7 +447,7 @@ const replaceWith = (file: string, write: (fd: number) => void): void => {
  */
 const sealUpTo = (root: string, seen: Seen, forget: ReadonlySet<string>): Built => {
   const tmp = `${feedFiles(root).sealed}.${randomUUID()}.tmp`;
-  const w: Writing = { fd: fs.openSync(tmp, 'w'), at: 0, prev: 0, run: [], forgotten: 0 };
+  const w: Writing = { fd: fs.openSync(tmp, 'w'), at: 0, prev: 0, run: [], forgotten: 0, byTask: new Map() };
   put(w, headerLine('sealedTo', 0));
   if (seen.sealed) {
     for (const record of sealedRecords(seen.sealed)) {
@@ -493,7 +519,7 @@ const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void)
         const after = seeFeed(root);
         const bytesAfter = sizeOf(after);
         closeSeen(after);
-        return { linesForgotten, bytesBefore, bytesAfter };
+        return { linesForgotten, bytesBefore, bytesAfter, linesByTask: Object.fromEntries(b.w.byTask) };
       } finally {
         closeSeen(now);
       }

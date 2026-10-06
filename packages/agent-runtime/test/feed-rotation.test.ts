@@ -353,3 +353,35 @@ test('one append writes twice, the journal and the feed, and takes the lock once
   assert.deepEqual([after.writes - before.writes, after.locks - before.locks], [2, 1]);
   assert.ok(after.lockWaitMs >= before.lockWaitMs);
 });
+
+/** A store whose feed holds, in turn, `counts[id]` lines of each task, its first one filed. */
+const storeOf = async (counts: Record<string, number>) => {
+  const ops = Journal.filesOps(scratch('ae-feed-counts-'));
+  let n = 0;
+  for (const [id, lines] of Object.entries(counts))
+    for (let i = 0; i < lines; i++) await Effect.runPromise(ops.append(id, (i === 0 ? filed(++n) : said(++n)) as never));
+  return ops;
+};
+
+test('a rotation answers the lines it forgot of each task, and leaves out a task given that had none', async () => {
+  const ops = await storeOf({ a: 3, c: 2, b: 5 });
+  const rotated = await forget(ops, ['a', 'b', 'z']);
+  assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5 });
+  assert.equal(rotated?.linesForgotten, 8);
+});
+
+test("the store's count of each task's feed lines is what a rotation then forgets of it, skips a line forgotten before, and is no prefix match", async () => {
+  const ops = await storeOf({ a: 3, ab: 4, b: 5, c: 2 });
+  const counted = (ids: string[]) => Effect.runPromise(ops.feedLines!(ids));
+  assert.deepEqual(await counted(['a', 'b', 'z']), { a: 3, b: 5, z: 0 });
+  assert.deepEqual(await counted(['ab']), { ab: 4 }, "an id another task's begins with counts its own lines alone");
+  await forget(ops, ['c']);
+  await Effect.runPromise(ops.append('d', filed(40) as never));
+  assert.deepEqual(
+    await counted(['a', 'c', 'd']),
+    { a: 3, c: 0, d: 1 },
+    'the lines a rotation forgot are not counted; those it sealed and those after it are',
+  );
+  const rotated = await forget(ops, ['a', 'b', 'c', 'd']);
+  assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5, d: 1 });
+});

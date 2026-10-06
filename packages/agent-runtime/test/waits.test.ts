@@ -193,9 +193,6 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
     not: 'a synchronous hold inside a patched `writeFileSync`, where no promise waits and no timeout fires',
   },
   'test/live.test.ts': { count: 15, not: "AE_LIVE only: a real harness's turns, which spend money" },
-  'test/fixtures/leak-failing.ts': { count: 1, not: 'to convert' },
-  'test/fixtures/leak-unguarded.ts': { count: 1, not: 'to convert' },
-  'test/leaks.test.ts': { count: 1, not: 'to convert' },
 };
 
 /** A `now()` of `Date` or `performance` with a number added, across line breaks; built in parts, so this file says none. */

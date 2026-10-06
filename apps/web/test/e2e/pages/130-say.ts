@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, sidebar, themeOf } from '../board.ts';
-import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectNone, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { apiEnv, heard, OUT, REPO, store } from '../world.ts';
@@ -60,8 +60,10 @@ export default {
         throw new Refused(`the api answers with the engine's entry, { at, attempt, text } — it answered ${JSON.stringify(entry)}`);
       }
       const inbox = JSON.stringify({ type: 'user', session_id: SAYING.sessionId, message: { role: 'user', content: SAYING.words } });
-      for (const until = performance.now() + WAIT_MS; heard.length === before && performance.now() < until;)
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      await expectNone(
+        async () => (heard.length === before ? `it heard ${JSON.stringify(heard.slice(before))}` : null),
+        "the words reached the session's inbox once, as given",
+      );
       if (heard.length !== before + 1 || JSON.stringify(heard.at(-1)) !== inbox) {
         throw new Refused(`the words reached the session's inbox once, as given — it heard ${JSON.stringify(heard.slice(before))}`);
       }

@@ -149,18 +149,19 @@ export async function expectDrawn(image: Locator, assertion: string, timeout = W
 
 /** As many elements match as `count`, within `timeout`. */
 export async function expectCount(locator: Locator, count: number, assertion: string, timeout = WAIT_MS): Promise<void> {
-  const until = performance.now() + timeout;
-  let found = await locator.count();
-  while (found !== count && performance.now() < until) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    found = await locator.count();
-  }
-  if (found !== count) throw new Refused(`${assertion} — expected ${count}, found ${found}`);
+  await expectNone(
+    async () => {
+      const found = await locator.count();
+      return found === count ? null : `expected ${count}, found ${found}`;
+    },
+    assertion,
+    timeout,
+  );
 }
 
 /** The elements matched read `texts`, one each and in that order, within `timeout`: a menu's places, the first one first. */
 export async function expectTexts(locator: Locator, texts: readonly string[], assertion: string, timeout = WAIT_MS): Promise<void> {
-  await until(
+  await expectNone(
     async () => {
       const found = (await locator.allTextContents()).map((text) => text.trim());
       if (found.length === texts.length && found.every((text, i) => text === texts[i])) return null;
@@ -266,13 +267,7 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
     );
     return over.length ? `${over.join(', ')} overlap` : null;
   };
-  const until = performance.now() + timeout;
-  let found = await problem();
-  while (found && performance.now() < until) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    found = await problem();
-  }
-  if (found) throw new Refused(`${assertion} — ${found}`);
+  await expectNone(problem, assertion, timeout);
 }
 
 /**
@@ -280,7 +275,7 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
  * Nothing matched is refused too.
  */
 export async function expectUncut(elements: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
-  await until(
+  await expectNone(
     async () => {
       const cut = await elements.evaluateAll((all) =>
         all.flatMap((element, i) =>
@@ -299,10 +294,15 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
 }
 
 /**
- * Polls `problem` until it says none or `timeout` passes, and refuses with what it said last: for a floor laid out a render after what
- * moved it.
+ * Polls `problem` every 100 ms until it says none, and refuses with what it said last once `timeout` passes: for a floor laid out a render
+ * after what moved it, and any state a page waits for: a page polls through this, never a loop of its own.
+ *
+ * @param problem what is wrong now, or null once the state is there
+ * @param assertion what the page must show, said first in the refusal
+ * @param timeout how long the state has to come; slower than `WAIT_MS` is a finding
+ * @throws `Refused`, `<assertion> — <what problem said last>`
  */
-async function until(problem: () => Promise<string | null>, assertion: string, timeout: number): Promise<void> {
+export async function expectNone(problem: () => Promise<string | null>, assertion: string, timeout = WAIT_MS): Promise<void> {
   const end = performance.now() + timeout;
   let found = await problem();
   while (found && performance.now() < end) {
@@ -317,7 +317,7 @@ async function until(problem: () => Promise<string | null>, assertion: string, t
  * Both boxes are relative to the viewport.
  */
 export async function expectInView(element: Locator, frame: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
-  await until(
+  await expectNone(
     async () => {
       const [box, view] = await Promise.all([element.boundingBox(), frame.boundingBox()]);
       if (!box || !view) return 'not drawn';
@@ -335,7 +335,7 @@ export async function expectInView(element: Locator, frame: Locator, assertion: 
  * it. Nothing matched on either side is refused too.
  */
 export async function expectLeftOf(left: Locator, right: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
-  await until(
+  await expectNone(
     async () => {
       const [a, b] = await Promise.all([boxesOf(left), boxesOf(right)]);
       if (!a.length || !b.length) return `nothing to compare: ${a.length} and ${b.length} found`;
@@ -357,7 +357,7 @@ export async function expectLeftOf(left: Locator, right: Locator, assertion: str
  * `boundingBox` is relative to the viewport.
  */
 export async function expectOnScreen(element: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
-  await until(
+  await expectNone(
     async () => {
       const [box, height] = await Promise.all([element.boundingBox(), element.page().evaluate(() => window.innerHeight)]);
       if (!box) return 'not drawn';
@@ -376,7 +376,7 @@ export async function expectOnScreen(element: Locator, assertion: string, timeou
  */
 export async function expectBetween(middle: Locator, one: Locator, other: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
   const centre = (b: Boxed) => (b.box ? b.box.y + b.box.height / 2 : Number.NaN);
-  await until(
+  await expectNone(
     async () => {
       const [m, [o], [p]] = await Promise.all([boxesOf(middle), boxesOf(one), boxesOf(other)]);
       const counts = [m.length, o ? 1 : 0, p ? 1 : 0];

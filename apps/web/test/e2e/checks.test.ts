@@ -31,6 +31,7 @@ import {
   WAIT_MS,
   watch,
 } from './checks.ts';
+import { until, WAITED } from '../waits.ts';
 
 let browser: Browser;
 /**
@@ -107,12 +108,7 @@ async function pageWith(html: string, { theme = 'light', api = 200 }: { theme?: 
   return { page, problems };
 }
 
-async function eventually(done: () => boolean, ms = 3_000): Promise<void> {
-  const until = performance.now() + ms;
-  while (!done() && performance.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
-}
-
-test('a console error, an uncaught exception, a failed request and a 500 are each a problem', async () => {
+test('a console error, an uncaught exception, a failed request and a 500 are each a problem', WAITED, async (t) => {
   const { problems } = await pageWith(
     `<p>ok</p><script>
     console.error('the graph did not draw');
@@ -128,7 +124,12 @@ test('a console error, an uncaught exception, a failed request and a 500 are eac
     /^request failed: GET http:\/\/e2e\.test\/api\/gone/,
     /^request answered 500: GET http:\/\/e2e\.test\/api\/runs$/,
   ];
-  await eventually(() => want.every((pattern) => problems().some((p) => pattern.test(p))));
+  await until(
+    t,
+    () => want.every((pattern) => problems().some((p) => pattern.test(p))),
+    () => `every one of ${want.join(', ')}; problems: ${problems().join(' | ')}`,
+    { everyMs: 50 },
+  );
   for (const pattern of want)
     assert.ok(
       problems().some((p) => pattern.test(p)),
@@ -458,34 +459,43 @@ test("idle waits for any other request: one answered late, and a stream that is 
   );
 });
 
-test("the board closing the feed's stream while it stays on the page is a failed request the watch counts", async () => {
+test("the board closing the feed's stream while it stays on the page is a failed request the watch counts", WAITED, async (t) => {
   const { page, problems } = await servedPage('<p>ok</p>');
   await opened(page, FEED_STREAM);
   await page.evaluate(() => (window as unknown as { es: EventSource }).es.close());
   const want = `request failed: GET ${origin}${FEED_STREAM} — net::ERR_ABORTED`;
-  await eventually(() => problems().includes(want));
-  assert.deepEqual(problems(), [want]);
-});
-
-test("the feed's stream left by the page's own reload is not counted — and one opened after that reload, then closed by the page, is", async () => {
-  const opens = `<p>ok</p><script>window.es = new EventSource('${FEED_STREAM}')</script>`;
-  const { page, problems } = await servedPage(opens);
-  const isStream = (r: { url: () => string }) => new URL(r.url()).pathname === FEED_STREAM;
-  await page.waitForFunction(() => (window as unknown as { es: EventSource }).es.readyState === EventSource.OPEN);
-  const [reopened] = await Promise.all([page.waitForResponse(isStream, { timeout: 5_000 }), page.reload({ waitUntil: 'load' })]);
-  assert.ok(reopened.ok());
-  await idle(page, 3_000);
-  assert.deepEqual(
-    problems(),
-    [],
-    "the stream the reload left is not counted — which Playwright 1.62, reporting nothing of a request its page left, passes with or without the watch's rule; the next test is where the rule allows and refuses",
+  await until(
+    t,
+    () => problems().includes(want),
+    () => `${want}; problems: ${problems().join(' | ')}`,
+    { everyMs: 50 },
   );
-
-  await page.evaluate(() => (window as unknown as { es: EventSource }).es.close());
-  const want = `request failed: GET ${origin}${FEED_STREAM} — net::ERR_ABORTED`;
-  await eventually(() => problems().length > 0);
   assert.deepEqual(problems(), [want]);
 });
+
+test(
+  "the feed's stream left by the page's own reload is not counted — and one opened after that reload, then closed by the page, is",
+  WAITED,
+  async (t) => {
+    const opens = `<p>ok</p><script>window.es = new EventSource('${FEED_STREAM}')</script>`;
+    const { page, problems } = await servedPage(opens);
+    const isStream = (r: { url: () => string }) => new URL(r.url()).pathname === FEED_STREAM;
+    await page.waitForFunction(() => (window as unknown as { es: EventSource }).es.readyState === EventSource.OPEN);
+    const [reopened] = await Promise.all([page.waitForResponse(isStream, { timeout: 5_000 }), page.reload({ waitUntil: 'load' })]);
+    assert.ok(reopened.ok());
+    await idle(page, 3_000);
+    assert.deepEqual(
+      problems(),
+      [],
+      "the stream the reload left is not counted — which Playwright 1.62, reporting nothing of a request its page left, passes with or without the watch's rule; the next test is where the rule allows and refuses",
+    );
+
+    await page.evaluate(() => (window as unknown as { es: EventSource }).es.close());
+    const want = `request failed: GET ${origin}${FEED_STREAM} — net::ERR_ABORTED`;
+    await until(t, () => problems().length > 0, 'a problem, once the page closes its stream', { everyMs: 50 });
+    assert.deepEqual(problems(), [want]);
+  },
+);
 
 test("the watch lets the feed's stream be aborted by a navigation of the page committed after it opened, and counts every other failure", () => {
   const main = {};

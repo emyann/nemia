@@ -27,3 +27,4 @@ export {
   tryNote,
 } from './retry.ts';
 export { retryRefusal } from './retry-refusal.ts';
+export { WAITS_ON_PERSON, waitsOnPerson } from './waits.ts';

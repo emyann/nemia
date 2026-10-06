@@ -1,11 +1,12 @@
 /**
  * The runners of `nemia agents custom` and `nemia factory instruct`, which read the words a file holds; and the runners of `nemia rm` and
  * `nemia prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally
- * what was not done into the exit code.
+ * what was not done into the exit code; and the runner of `nemia admit`, which reads the call on stdin.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  admitted,
   AGENTS_CUSTOM,
   FACTORY_INSTRUCT,
   HOME,
@@ -17,6 +18,7 @@ import {
   runsForgetting,
   runWith,
   sizeOf,
+  TABLE,
   type Args,
   type Pruning,
 } from '../runner.ts';
@@ -220,4 +222,10 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
   const data = await runWith(e, FACTORY_INSTRUCT.handler(asked, undefined, HOME));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
+}
+
+/** `nemia admit`'s runner: the call read on stdin, decided against the table (`admitted`), and the answer printed as JSON, or nothing. */
+export async function admitRun(_args: Args, e: Engine): Promise<void> {
+  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE));
+  if (answer !== undefined) console.log(JSON.stringify(answer));
 }

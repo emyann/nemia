@@ -52,6 +52,7 @@ import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 import { LEVEL } from '../nemia/level.verb.ts';
 import { MEMORY } from '../nemia/memory.verb.ts';
+import { ADMIT } from '../admission/admit.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -547,4 +548,4 @@ export const COMMANDS: readonly Command[] = [
  * The whole table, in the order `nemia`'s help lists them: `nemia start` and `nemia plan`, then every other command with a handler, then
  * those the CLI runs itself (`RAN`).
  */
-export const TABLE: readonly (Command | Ran)[] = [COMMANDS[0], PLAN, ...COMMANDS.slice(1), ...RAN];
+export const TABLE: readonly (Command | Ran)[] = [COMMANDS[0], PLAN, ...COMMANDS.slice(1), ...RAN, ADMIT];

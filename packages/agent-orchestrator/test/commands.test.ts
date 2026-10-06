@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TABLE, commandBreaks, routeList, type Route } from '../src/runner.ts';
-import { classBreaks } from '../src/command/class.ts';
+import { classBreaks } from '../src/admission/index.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
 test('the shipped table breaks none of its rules against the CLI’s verbs and runners', () => {
@@ -155,6 +155,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['tick', 'cli'],
       ['up', 'cli'],
       ['watch', 'cli'],
+      ['admit', 'cli'],
     ],
   );
 });
@@ -195,6 +196,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'workflows list',
       'workflows step',
       'watch',
+      'admit',
     ],
   );
   assert.deepEqual(

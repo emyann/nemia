@@ -539,7 +539,7 @@
     {
       "files": ["apps/web/src/routes/runs.$runId.tsx"],
       "rules": {
-        "complexity": ["error", { "max": 23 }]
+        "complexity": ["error", { "max": 22 }]
       }
     },
     {

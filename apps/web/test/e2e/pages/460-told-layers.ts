@@ -21,6 +21,10 @@ const LAYERED = {
   addedSkill: 'cite-sources',
   deny: 'WebFetch',
   review: 'Read the note, and say whether it holds up.',
+  /** The run the page writes beside it, which froze no workflow, so its steps are read from the folder and have no layers. */
+  unfrozen: 'told-unfrozen-e2e46',
+  /** What the folder's `write` step says, its body on a record that froze no layers. */
+  folderSays: 'Write a short note on what was asked.',
   brief: `Told by layer\n\nA run written by the told-layers page: a step whose agent, person and policy each told it something.\n\n\`\`\`\nconst line = '${'a line that is longer than any panel, '.repeat(8)}';\n\`\`\``,
 } as const;
 
@@ -80,6 +84,29 @@ function written(): string {
   return record;
 }
 
+/** Writes a record that froze no workflow, as one written before runs froze theirs: its key absent, so the api reads the folder's steps. */
+function unfrozen(): string {
+  const record = path.join(store!, 'runs', `${LAYERED.unfrozen}.json`);
+  const work = path.join(store!, 'runs', LAYERED.unfrozen, 'work');
+  fs.mkdirSync(work, { recursive: true });
+  const run = {
+    id: LAYERED.unfrozen,
+    place: { kind: 'folder' },
+    workspace: work,
+    brief: 'Told whole\n\nA run written by the told-layers page, which froze no workflow.',
+    workflowDir: path.join(store!, FOLDER.workflow),
+    createdAt: new Date().toISOString(),
+    steps: { write: { taskId: null }, review: { taskId: null } },
+  };
+  fs.writeFileSync(record, JSON.stringify(run, null, 2));
+  return record;
+}
+
+/** Refuses unless the step section `write` says each of `words` once, fold and all. */
+async function expectOnce(section: Locator, words: Array<[string, string]>): Promise<void> {
+  for (const [what, said] of words) await expectCount(section.getByText(said), 1, `${what} once in the section, only in its fold`);
+}
+
 /** The section of the run page for `step`, under its heading. */
 const sectionOf = (page: Page, step: string) =>
   page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: step, exact: true }) });
@@ -128,18 +155,23 @@ export default {
   /**
    * What a step was told, by layer, from what its run froze. `write`'s fold, opened, draws the agent's instructions with its skill, the
    * person's custom instructions, the step's policy with the skill and the deny its line adds, and the task, in that order, each once, and
-   * says the first two went into the session's system prompt; `review`, with no agent, says its own words are all it was told. The page
-   * writes its run and takes it back, so each visit reads the store as seeded.
+   * says the first two went into the session's system prompt; `review`, with no agent, says its own words are all it was told. Each
+   * section, fold and all, says each layer's words once: no body above the fold says them again. A run that froze no layers still draws
+   * its step's body above the fold, which is all it has of the step's words. The page writes its runs and takes them back, so each visit
+   * reads the store as seeded.
    */
   name: 'told-layers',
   route: `/runs/${FOLDER.id}`,
   expect: async (page) => {
-    const record = written();
+    const records: string[] = [];
     try {
+      records.push(written(), unfrozen());
       await goto(page, `/runs/${LAYERED.id}`);
       const write = sectionOf(page, 'write');
       const fold = write.locator('details[data-told]');
       await expectVisible(fold.locator('summary', { hasText: 'What it would be told now' }), "write's fold: a step not filed yet");
+      await settled(page);
+      await photograph(write, path.join(OUT, `told-layers-closed-${await themeOf(page)}.png`));
       await fold.locator('summary').click();
       const layers = ['instructions', 'custom', 'policy', 'task'];
       await expectCount(fold.locator('[data-layer]'), layers.length, 'four layers');
@@ -172,18 +204,34 @@ export default {
       await expectCount(fold.locator('[data-fence]'), 1, 'and under no other layer');
       await expectCount(fold.getByText(LAYERED.policySays), 1, 'the policy once: the brief is not drawn whole beside the layers');
       await expectVisible(fold.getByText("in the session's system prompt", { exact: false }), 'where the first two went');
+      await expectOnce(write, [
+        ["the agent's instructions", LAYERED.instructions],
+        ['the custom instructions', LAYERED.custom],
+        ['the policy', LAYERED.policySays],
+      ]);
 
       const review = sectionOf(page, 'review').locator('details[data-told]');
       await review.locator('summary').click();
       await expectVisible(review.getByText('No agent: its own words are all it was told', { exact: false }), 'review has no agent');
       await expectCount(review.locator('[data-layer="instructions"], [data-layer="custom"]'), 0, "and so no agent's layer");
+      await expectOnce(sectionOf(page, 'review'), [["review's own words", LAYERED.review]]);
       await settled(page);
       await photograph(write, path.join(OUT, `told-layers-open-${await themeOf(page)}.png`));
       await onPhone(page, write);
+
+      await goto(page, `/runs/${LAYERED.unfrozen}`);
+      const whole = sectionOf(page, 'write');
+      await expectVisible(
+        whole.locator(':scope > [data-markdown]', { hasText: LAYERED.folderSays }),
+        'a record that froze no layers still draws its body',
+      );
+      await expectCount(whole.locator('[data-layer]'), 0, 'and no layer, since none was frozen');
+      await settled(page);
+      await photograph(whole, path.join(OUT, `told-layers-unfrozen-${await themeOf(page)}.png`));
       await goto(page, `/runs/${FOLDER.id}`);
     } finally {
-      fs.rmSync(record, { force: true });
-      fs.rmSync(path.join(store!, 'runs', LAYERED.id), { recursive: true, force: true });
+      for (const record of records) fs.rmSync(record, { force: true });
+      for (const id of [LAYERED.id, LAYERED.unfrozen]) fs.rmSync(path.join(store!, 'runs', id), { recursive: true, force: true });
     }
   },
 } satisfies PageSpec;

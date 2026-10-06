@@ -20,8 +20,8 @@ export const holdable = (run: Holdable): boolean =>
 
 /**
  * The runs a hold of `run` may wait on, as the form offers them: every other git run of its repository not called off or pruned, that has
- * not finished with nothing left to decide — a run succeeded and merged has shipped, and one succeeded with branches nothing merges has not.
- * In the order `runs` gives them.
+ * not finished with nothing left to decide — a run succeeded and merged has shipped, and one succeeded with branches nothing merges has
+ * not. In the order `runs` gives them.
  */
 export const holdCandidates = <R extends Candidate>(run: Pick<RunSummary, 'id' | 'repo'>, runs: readonly R[]): R[] =>
   runs.filter(

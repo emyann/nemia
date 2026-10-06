@@ -215,6 +215,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'agents try POST',
       'skills write POST',
       'skills write PUT',
+      'hold POST',
       'hold DELETE',
       'rm DELETE',
       'prune POST',

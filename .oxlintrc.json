@@ -571,14 +571,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/prune/prune.verb.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 154, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 51 }],
-        "sonarjs/cognitive-complexity": ["error", 47]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/inbox/inbox.store.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 22]
@@ -641,8 +633,8 @@
     {
       "files": ["packages/agent-orchestrator/src/list/list.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 167, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 46 }],
+        "max-lines-per-function": ["error", { "max": 159, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 39 }],
         "sonarjs/cognitive-complexity": ["error", 41]
       }
     },
@@ -673,13 +665,6 @@
       "rules": {
         "complexity": ["error", { "max": 36 }],
         "sonarjs/cognitive-complexity": ["error", 36]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/prune/prune.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 31]
       }
     },
     {

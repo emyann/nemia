@@ -12,6 +12,19 @@ test('the shipped table breaks none of its rules against the CLI’s verbs and r
   assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
 });
 
+test('the commands whose work waits on the next pass tick, and no read, nor up, tick or watch, does', () => {
+  assert.deepEqual(
+    TABLE.filter((c) => c.ticks === true)
+      .map((c) => c.name)
+      .sort(),
+    ['accept', 'approve', 'cancel', 'inbox queue', 'merge', 'plan', 'resume', 'retry', 'round', 'start'],
+  );
+  assert.deepEqual(
+    TABLE.filter((c) => c.ticks === true && (!c.writes || ['up', 'tick', 'watch'].includes(c.name))).map((c) => c.name),
+    [],
+  );
+});
+
 test('every shipped command is classed once, and no class breaks its rules', () => {
   assert.deepEqual(classBreaks(TABLE), []);
 });

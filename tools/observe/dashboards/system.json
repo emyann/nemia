@@ -1453,6 +1453,92 @@
           "sort": "desc"
         }
       }
+    },
+    {
+      "id": 27,
+      "type": "row",
+      "title": "Profiles",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "panels": []
+    },
+    {
+      "id": 28,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "From Pyroscope, over the dashboard's range: only a daemon started with the preload `tools/observe/profile/preload.ts` and `PYROSCOPE_SERVER_ADDRESS` sends profiles (`tools/observe/README.md`, *Profile the daemon*). Read a pass's share beside **Passes** over the same range."
+      }
+    },
+    {
+      "id": 29,
+      "type": "flamegraph",
+      "title": "CPU, over the range",
+      "description": "wall:cpu: the CPU time the profiler collects beside its wall samples, by stack, summed over every pass in the range.",
+      "datasource": {
+        "type": "grafana-pyroscope-datasource",
+        "uid": "pyroscope"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "pyroscope"
+          },
+          "refId": "A",
+          "queryType": "profile",
+          "profileTypeId": "wall:cpu:nanoseconds:wall:nanoseconds",
+          "labelSelector": "{service_name=\"$service\"}",
+          "groupBy": []
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "flamegraph",
+      "title": "Heap in use, over the range",
+      "description": "memory:inuse_space: the bytes the heap holds, by the stack that allocated them, as sampled.",
+      "datasource": {
+        "type": "grafana-pyroscope-datasource",
+        "uid": "pyroscope"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 12,
+        "h": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "pyroscope"
+          },
+          "refId": "A",
+          "queryType": "profile",
+          "profileTypeId": "memory:inuse_space:bytes:inuse_space:bytes",
+          "labelSelector": "{service_name=\"$service\"}",
+          "groupBy": []
+        }
+      ]
     }
   ]
 }

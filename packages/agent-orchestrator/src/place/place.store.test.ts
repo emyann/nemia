@@ -9,7 +9,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PLACE_DEADLINE_MS, PLACE_VERBS, type PlaceAnswers, type PlaceOutcome, type PlaceRequests, type PlaceVerb } from './place.ts';
+import {
+  PLACE_DEADLINE_MS,
+  PLACE_VERBS,
+  sayFilled,
+  type PlaceAnswers,
+  type PlaceOutcome,
+  type PlaceRequests,
+  type PlaceVerb,
+} from './place.ts';
 import { SHIPPED_PLACE, openPlace, placeDirOf, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
 import { skillVersion } from '../folder/folder.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -43,7 +51,7 @@ const REQUESTS: PlaceRequests = {
   },
   status: { checkout: '/r', tips: {} },
   land: { checkout: '/r', act: 'abort' },
-  inventory: { repo: '/r', under: '/w', prefix: 'wf/x/' },
+  inventory: { repo: '/r', under: '/w', prefix: 'wf/x/', base: 'main' },
   remove: { repo: '/r', workspaces: [], branches: [] },
   export: { repo: '/r', tag: 'v1', into: '/i' },
   seal: { tree: '/i' },
@@ -289,7 +297,18 @@ const DECLARED = {
   v: 1,
   verbs: ['open', 'status'],
   denyWhileLanding: ['Bash(git commit:*)'],
-  say: { look: ['git status'], readResult: 'r', ship: 's', drop: 'd', conflicts: 'c', unlock: 'u' },
+  say: {
+    look: ['git status'],
+    readResult: 'r',
+    ship: 's',
+    drop: 'd',
+    conflicts: 'c',
+    unlock: 'u',
+    attach: 'a',
+    commit: 'm',
+    inspect: 'i',
+    orphans: 'o',
+  },
 };
 
 /** What `readPlaceJson` refuses the skill in `dir` with, its kind and exit code checked. */
@@ -401,4 +420,15 @@ test('REFUSED: openPlace of a folder with no SKILL.md, or no place.json', () => 
   assert.equal(openRefused(dir), `${dir} has no SKILL.md, so it is no skill to run a place from: write its SKILL.md there`);
   fs.rmSync(path.join(dir, 'place.json'));
   assert.match(openRefused(dir), /place\.json is not there/);
+});
+
+test("sayFilled fills each hole it is handed, and leaves a hole it is not, and a person's `<branch>`, as written", () => {
+  assert.equal(
+    sayFilled('git -C {repo} worktree unlock {path}', { repo: '/r', path: '/w/{repo}' }),
+    'git -C /r worktree unlock /w/{repo}',
+    'a value is put in once, never read again for holes',
+  );
+  assert.equal(sayFilled('git -C {path} switch -c <branch>', { path: '/w' }), 'git -C /w switch -c <branch>');
+  assert.equal(sayFilled('git -C {repo} status', { path: '/w' }), 'git -C {repo} status');
+  assert.equal(sayFilled('{toString} {path}', { path: '/w' }), '{toString} /w', 'a name the holes only inherit is no hole they name');
 });

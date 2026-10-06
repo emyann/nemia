@@ -178,17 +178,8 @@ export {
 } from './round/round.ts';
 export { cancelPlan } from './cancel/cancel.ts';
 export type { CancelPlan } from './cancel/cancel.ts';
-export {
-  branchFates,
-  checkLogsOf,
-  forgetLine,
-  forgetRefusal,
-  heldWorktree,
-  idRefusal,
-  parseWorktrees,
-  runWorktrees,
-} from './forget/forget.ts';
-export type { AskName, BranchFate, ForgetHow, Forgot, GitWorktree } from './forget/forget.ts';
+export { branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees } from './forget/forget.ts';
+export type { AskName, BranchFate, ForgetHow, Forgot } from './forget/forget.ts';
 export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/index.ts';
 export type { InputFile } from './start/index.ts';
 export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts';

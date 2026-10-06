@@ -273,7 +273,7 @@ test("nemia ls's line: whether a daemon ticks the store, and when its last pass 
   const line = (file: DaemonFile | undefined, how = live) => daemonLine(judged(file && text(file), how), NOW);
   assert.equal(
     line(undefined),
-    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served',
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one',
   );
   assert.equal(
     daemonLine(judged('nope', live), NOW),
@@ -296,11 +296,11 @@ test("nemia ls's line: whether a daemon ticks the store, and when its last pass 
   );
   assert.equal(
     line(holder(), dead),
-    'nemia up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or nemia up where no board is served',
+    'nemia up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one',
   );
   assert.equal(
     line(holder(), as('other')),
-    "nemia up: none ticking — the nemia up of pid 4242 is gone, that pid another process's now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or nemia up where no board is served",
+    "nemia up: none ticking — the nemia up of pid 4242 is gone, that pid another process's now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one",
   );
   assert.equal(
     line(holder(), as('unknown')),
@@ -309,7 +309,7 @@ test("nemia ls's line: whether a daemon ticks the store, and when its last pass 
   assert.doesNotMatch(line(holder({ passedAt: ago(20) }), as('unknown')), /kill 4242 stops it/);
   assert.equal(
     line(holder({ passedAt: ago(6), stoppedAt: ago(5) })),
-    'nemia up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with npm start in apps/api, or nemia up where no board is served',
+    'nemia up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one',
   );
 });
 

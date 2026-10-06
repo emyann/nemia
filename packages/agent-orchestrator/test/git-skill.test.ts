@@ -107,12 +107,23 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     .filter((f) => f !== 'contract.ts')
     .map((f) => f.replace(/\.ts$/, ''));
   assert.deepEqual([...declared.verbs].sort(), scripts.sort());
-  assert.deepEqual([...declared.verbs].sort(), ['export', 'handoff', 'land', 'open', 'report', 'seal', 'status', 'trial']);
+  assert.deepEqual([...declared.verbs].sort(), [
+    'export',
+    'handoff',
+    'inventory',
+    'land',
+    'open',
+    'remove',
+    'report',
+    'seal',
+    'status',
+    'trial',
+  ]);
   assert.deepEqual(declared.denyWhileLanding, LANDING_DENIED);
 });
 
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
-  for (const script of ['open', 'handoff', 'status', 'land', 'trial', 'report', 'export', 'seal']) {
+  for (const script of ['open', 'handoff', 'status', 'land', 'trial', 'report', 'export', 'seal', 'inventory', 'remove']) {
     const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
       input: JSON.stringify({ v: 2, root: '/' }),
       encoding: 'utf8',

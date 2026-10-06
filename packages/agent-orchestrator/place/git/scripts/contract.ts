@@ -39,6 +39,14 @@ export function strings(request: Request, key: string): Readonly<Record<string, 
   return value as Record<string, string>;
 }
 
+/** The list of strings `key` of `request`, or `Malformed` naming it. */
+export function texts(request: Request, key: string): readonly string[] {
+  const value = request[key];
+  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string'))
+    throw new Malformed(`the request's \`${key}\` is ${JSON.stringify(value) ?? 'missing'}, where a list of strings is asked`);
+  return value as string[];
+}
+
 /**
  * Read the one request on stdin, hand it to `verb`, and print what it replies: exit 0 with its JSON, exit 2 with the reason when the
  * request is not JSON, is not an object, carries another `v`, or `verb` throws `Malformed`, and exit 1 with the error when `verb` throws
@@ -64,7 +72,7 @@ export function failedWords(err: unknown, lines = 4): string {
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  return said.length ? said.slice(-lines).join(' / ') : `git exited ${status ?? 'on a signal'}`;
+  return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
 }
 
 /** Git run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws with git's words when git fails. */

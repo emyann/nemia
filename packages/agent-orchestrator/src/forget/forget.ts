@@ -1,7 +1,7 @@
 /**
  * `nemia rm`, from the run's side: whether a run may be forgotten (`idRefusal`, `forgetRefusal`), what becomes of its worktrees, branches
  * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
- * what git lists is handed in.
+ * what the run's place reads of its repository is handed in.
  */
 import type { Workflow } from '../step/step.ts';
 import { andList, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
@@ -25,6 +25,7 @@ import { assess, type Assessment } from '../tick/assess.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
+import type { Held } from '../place/place.ts';
 import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 
 /**
@@ -438,34 +439,21 @@ function holdersFix(c: Facts): string | undefined {
 const FIXES = [cancelFix, unheardFix, unlandedFix, strandedFix, holdersFix];
 
 /**
- * A worktree as `git worktree list --porcelain` lists it: where, its HEAD's commit, the branch checked out in it — or `detached`, on none —
- * whether git holds it locked (the reason, or ''), and whether its directory is gone (`prunable`).
+ * Why `nemia <verb>` touches nothing of the run `id`: its place did not read what the run left in `repo` — it refused, in its words, or
+ * was not heard. Never read as nothing left to remove. Pure.
  */
-export type GitWorktree = { path: string; head?: string; branch?: string; detached?: true; locked?: string; prunable?: boolean };
-
-/**
- * `git worktree list --porcelain`, read. Pure. Each record starts at `worktree <path>`; its `HEAD`, `branch`, `detached`, `locked` and
- * `prunable` lines are kept.
- */
-export function parseWorktrees(porcelain: string): GitWorktree[] {
-  const listed: GitWorktree[] = [];
-  for (const line of porcelain.split('\n')) {
-    const [word, ...more] = line.split(' ');
-    const rest = more.join(' ');
-    if (word === 'worktree') listed.push({ path: rest });
-    const at = listed.at(-1);
-    if (!at || word === 'worktree') continue;
-    if (word === 'HEAD') at.head = rest;
-    else if (word === 'detached') at.detached = true;
-    else if (word === 'branch') at.branch = rest.replace(/^refs\/heads\//, '');
-    else if (word === 'locked') at.locked = rest;
-    else if (word === 'prunable') at.prunable = true;
-  }
-  return listed;
+export function inventoryUnread(
+  verb: 'rm' | 'prune',
+  id: string,
+  repo: string,
+  outcome: { readonly refused: string } | { readonly unread: { readonly said: string } },
+): string {
+  const why = 'refused' in outcome ? `refused to read it — ${outcome.refused}` : `was not heard — ${outcome.unread.said}`;
+  return `its place's inventory of what it left in ${repo} ${why}; nothing was touched, as nothing says what is there: nemia ${verb} ${id} again once the place reads it`;
 }
 
 /**
- * The run's worktrees, and the paths its record names that git does not list. Pure.
+ * The run's worktrees, and the paths its record names that its place's inventory does not list. Pure.
  *
  * Only what is inside `dir`, the run's own directory (`worktrees/<id>`): never the repository itself, where a `--no-worktree` run worked,
  * and never another run's, whose id may start with this one's. Git's list decides, so a worktree a pass cut and died before filing is found
@@ -477,8 +465,8 @@ export function runWorktrees(
   run: Run,
   names: readonly string[],
   dir: string,
-  listed: readonly GitWorktree[],
-): { worktrees: Array<GitWorktree & { step: string }>; unlisted: string[] } {
+  listed: readonly Held[],
+): { worktrees: Array<Held & { step: string }>; unlisted: string[] } {
   const ours = (p: string) => Boolean(inside(path.resolve(dir), path.resolve(p)));
   const worktrees = listed
     .filter((w) => ours(w.path))
@@ -499,25 +487,26 @@ export function runWorktrees(
 }
 
 /**
- * Why `nemia rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one
- * on no branch, what git says of it. Locked: git refuses, and so does `nemia rm`. Detached — a rebase, a bisect or a checkout of a commit
- * left its HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is
- * on a branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
+ * Why `nemia rm` leaves a worktree as it is — or null, when its place may be asked to remove it. Pure: handed what the place's inventory
+ * read of it. Locked: git refuses, and so does `nemia rm`. Detached — a rebase, a bisect or a checkout of a commit left its HEAD on no
+ * branch, as a session stopped in the middle of one does — unless it is clean and its HEAD's commit is on a branch already: a hand-off
+ * there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
  */
-export function heldWorktree(
-  w: GitWorktree,
-  onNoBranch: { clean: boolean; onBranch: boolean } = { clean: false, onBranch: false },
-): { locked: string } | { detached: string } | null {
+export function heldWorktree(w: Held): { locked: string } | { detached: string } | null {
   if (w.locked !== undefined) return { locked: w.locked };
-  if (w.detached && !(onNoBranch.clean && onNoBranch.onBranch)) return { detached: w.head ?? '' };
+  if (w.detached && !(w.clean === true && w.onBranch)) return { detached: w.head ?? '' };
   return null;
 }
 
 /**
  * What `nemia rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's
- * words, when it would not.
+ * words, when it would not, or why the place's `remove` did not answer.
  */
-export type BranchFate = { branch: string; deleted: boolean; why: 'merged' | 'forced' | 'default' | 'unmerged' | { git: string } };
+export type BranchFate = {
+  branch: string;
+  deleted: boolean;
+  why: 'merged' | 'forced' | 'default' | 'unmerged' | { git: string } | { unread: string };
+};
 
 /**
  * What becomes of each branch git has under the run's name, `wf/<id>/`. Pure. Only those: never the base branch a `--no-worktree` run
@@ -595,8 +584,10 @@ export type Forgot = {
   gone: string[];
   /**
    * What is still there: locked (with git's reason); on no branch (`detached`, at its HEAD's commit); holding what `step` left uncommitted,
-   * which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); a directory git does not know as a
-   * worktree — or, for a run with no record, its worktrees' directory, which nothing says whose worktrees are in.
+   * which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); left as it was because the place's
+   * `verb` did not answer (`unread`, with its refusal or why it was not heard); a directory git does not know as a worktree — or, for a run
+   * with no record, its worktrees' directory, which nothing says whose worktrees are in. `fix` is the place's command for it, from its
+   * `say`.
    */
   left: Array<{
     path: string;
@@ -605,8 +596,10 @@ export type Forgot = {
     uncommitted?: string;
     step?: string;
     git?: string;
+    unread?: { verb: string; said: string };
     unknown?: true;
     orphaned?: true;
+    fix?: string;
   }>;
   branches: BranchFate[];
   /** What was removed besides the worktrees, from `WF_ROOT`: the record first. */
@@ -662,9 +655,13 @@ function storeLine(f: Forgot): string {
     kept('unmerged').length
       ? `kept ${kept('unmerged').join(', ')}: not merged into ${base} — --force-unmerged deletes ${them(kept('unmerged').length)}, and the work on ${them(kept('unmerged').length)}`
       : '',
-    ...f.branches
-      .filter((b) => typeof b.why === 'object')
-      .map((b) => `kept ${b.branch}: git would not delete it — ${(b.why as { git: string }).git}`),
+    ...f.branches.map((b) =>
+      typeof b.why !== 'object'
+        ? ''
+        : 'git' in b.why
+          ? `kept ${b.branch}: git would not delete it — ${b.why.git}`
+          : `kept ${b.branch}: the place's remove did not answer — ${b.why.unread}; nemia rm ${f.id} again deletes it once it does`,
+    ),
   ].filter(Boolean);
   return [
     `${f.id}  forgotten: ${worktrees.length ? worktrees.join(', ') : f.isolate === false ? `no worktrees, it worked in ${f.repo} itself` : 'no worktrees'}`,
@@ -676,21 +673,24 @@ function storeLine(f: Forgot): string {
     .join('; ');
 }
 
-/** What is still there after `nemia rm`, each with what to do about it. */
+/** What is still there after `nemia rm`, each with what to do about it, in its place's command (`fix`). */
 function leftWords(f: Forgot): string {
-  return f.left
-    .map((l) =>
-      l.locked !== undefined
-        ? ` ${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${f.repo} worktree unlock ${l.path}`
-        : l.detached !== undefined
-          ? ` ${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${l.path} switch -c <branch>, or finish or abort what left it there), then nemia rm ${f.id} again`
-          : l.uncommitted !== undefined
-            ? ` ${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${l.path} commit), then nemia rm ${f.id} again`
-            : l.git !== undefined
-              ? ` git would not remove ${l.path} — ${l.git}; what is uncommitted there is on no branch, so look in it before anything is forced: git -C ${l.path} status`
-              : l.orphaned
-                ? ` ${l.path} is still there, and with no record nemia rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each`
-                : ` ${l.path} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`,
-    )
-    .join(';');
+  return f.left.map((l) => ` ${leftWord(f.id, l)}`).join(';');
+}
+
+/** What one thing still there after `nemia rm` is, why it is there, and what to do: `fix`, the place's command, where it has one. */
+function leftWord(id: string, l: Forgot['left'][number]): string {
+  const fix = (lead: string) => (l.fix ? `${lead}${l.fix}` : '');
+  if (l.locked !== undefined)
+    return `${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it${fix(': ')}`;
+  if (l.detached !== undefined)
+    return `${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (${fix('')}${l.fix ? ', or ' : ''}finish or abort what left it there), then nemia rm ${id} again`;
+  if (l.uncommitted !== undefined)
+    return `${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged${fix(': ')}), then nemia rm ${id} again`;
+  if (l.unread)
+    return `${l.path} is left as it is: the place's ${l.unread.verb} did not answer — ${l.unread.said}. nemia rm ${id} again once it does`;
+  if (l.git !== undefined)
+    return `git would not remove ${l.path} — ${l.git}; what is uncommitted there is on no branch, so look in it before anything is forced${fix(': ')}`;
+  if (l.orphaned) return `${l.path} is still there, and with no record nemia rm cannot say whose worktrees are in it${fix(' — ')}`;
+  return `${l.path} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`;
 }

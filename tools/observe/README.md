@@ -1,21 +1,21 @@
 # tools/observe — the side Grafana
 
 A Grafana to watch how Nemia runs while we build it: one `grafana/otel-lgtm` container holding the OpenTelemetry collector, Tempo, Loki,
-Prometheus and Grafana, with four dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no package,
-`bin` or workflow refers to it. The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this machine
-alone (`127.0.0.1`).
+Prometheus, Pyroscope and Grafana, with four dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
+package, `bin` or workflow refers to it. The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this
+machine alone (`127.0.0.1`).
 
 ## Up and down
 
 From the repository's root:
 
 ```sh
-docker compose -f tools/observe/compose.yaml up -d      # up, on 3000 (Grafana), 4317 (OTLP gRPC) and 4318 (OTLP HTTP)
+docker compose -f tools/observe/compose.yaml up -d      # up, on 3000 (Grafana), 4317 (OTLP gRPC), 4318 (OTLP HTTP), 4040 (Pyroscope)
 docker compose -f tools/observe/compose.yaml down       # down, keeping what it stored
 docker compose -f tools/observe/compose.yaml down -v    # down, and drop what it stored
 ```
 
-What it stores (traces, logs, metrics, Grafana's own database) lives in the volume `nemia-observe_data`, mounted on `/data`.
+What it stores (traces, logs, metrics, profiles, Grafana's own database) lives in the volume `nemia-observe_data`, mounted on `/data`.
 
 Open Grafana at <http://localhost:3000>: it lets anyone on this machine in as an admin, with no login. It lands on **System**.
 
@@ -31,6 +31,45 @@ It then exports its spans, its logs and its metrics there, filed under the servi
 dashboards' `Service` variable picks it. The packages' README says what the daemon exports (`packages/agent-orchestrator/README.md`,
 *What the daemon says*).
 
+## Profile the daemon
+
+The daemon sends no profiles by itself. A preload in `profile/` profiles it into the stack's Pyroscope, its CPU and its heap, when it is
+named on the daemon's command line and `PYROSCOPE_SERVER_ADDRESS` is set. The profiler (`@pyroscope/nodejs`, a native addon) is installed
+in that folder alone, outside the workspaces: no package or app depends on it, and the root lockfile does not name it. Once, from the
+repository's root:
+
+```sh
+npm ci --prefix tools/observe/profile
+```
+
+Then start the daemon from `apps/api` with the preload before its entry:
+
+```sh
+PYROSCOPE_SERVER_ADDRESS=http://localhost:4040 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+  node --import ../../tools/observe/profile/preload.ts src/main.ts
+```
+
+It sends a profile every 15 seconds, filed under the service its traces use (`OTEL_SERVICE_NAME`, else `nemia`): wall time with the CPU
+time beside it, and the heap in use. Without `PYROSCOPE_SERVER_ADDRESS`, or with it blank, the preload loads nothing and opens nothing. It
+takes the endpoint out of the daemon's environment once read, so no check or session the daemon starts inherits it, and a `--import` on
+the command line reaches the daemon alone: never give it through `NODE_OPTIONS`, which every node child of the daemon would load (the
+checks' `npm test`, a harness). A profiler that is not installed is said once on stderr, and the daemon runs unprofiled.
+
+The login service (`nemia service install`) writes `node <entry>` and nothing between them, so it cannot be profiled yet. Doing so is a
+follow-up: an option of `nemia service install` that writes node's own arguments between the node and the entry, in the unit's
+`ExecStart=` and the plist's `ProgramArguments` (`unitText`, `plistText` in `packages/agent-orchestrator/src/service/service.ts`), read
+back by `unitRead` and `plistRead`, with `PYROSCOPE_SERVER_ADDRESS` given as `--env`.
+
+A stack started before Pyroscope's port was published must be made again to publish it: `docker compose -f tools/observe/compose.yaml up
+-d` recreates the container and keeps the volume.
+
+What it costs, measured on a scratch daemon over a scratch store of 24 runs with 7 sessions working (2026-10-06), in rounds of two
+minutes, profiled and not, in the order B A A B B A, 90 passes each way: a pass's median went from 47.4 to 49.6 ms (+4.6%), its mean
+from 49.4 to 52.3 ms (+5.9%), and the daemon's CPU from 12.2 to 19.4 ms a second (0.7% of one core more). The passes' own phases did not
+move (`assess` 7.75 ms both ways); the difference is in `git` (30.1 to 32.6 ms), the phase that waits on git's processes, and two rounds
+of the same kind differed by up to 10%. A loop of pure JavaScript ran no slower profiled. The live daemon's passes are heavier (200 to 300
+ms), so read the share again there before keeping it on.
+
 ## The dashboards
 
 They sit in the folder `Nemia`, linked to each other at the top of each page. They are provisioned from the files: an edit made in
@@ -39,7 +78,9 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 - **System** — every metric the daemon and the api export, from Prometheus: a pass's time, its phases and its journal reads; the runs in
   the store, the sessions queued and admitted, the oldest one's wait and the machine's load; the api's reads by route; each step's cost,
   tokens, time, tries, checks, rounds and denied calls over the range, by factory, workflow, step and agent; the feed's readers, the
-  subscriptions and Nemia's keeper.
+  subscriptions and Nemia's keeper. Below them, **Profiles**: the CPU and the heap in use from Pyroscope, by stack, over the dashboard's
+  range and its `Service`, for a daemon started with the preload. A flame graph sums every pass in its range: read it beside **Passes**
+  over the same range, which the links at the top keep.
 - **Passes** — a pass's time from the `pass` spans (TraceQL metrics), its phases from `pass.phase.duration` (the phases are not spans),
   and the slowest of the latest 500 `pass` and `advancePass` spans, each linked to its trace.
 - **A run** — pick a run: its filings (the runtime's `file` spans, one for each session a step filed), the runtime's appends to its
@@ -49,7 +90,8 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   telemetry (`a-step-s-session-exports-its-1tan`).
 
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log
-field the code does not emit fails it, and so does a metric the code defines that System does not chart.
+field the code does not emit fails it, and so does a metric the code defines that System does not chart, or a profile type the profiler
+does not send. `agent-orchestrator/test/profile.test.ts` holds the preload: with no endpoint, nothing loaded and nothing opened.
 
 ## The names, as measured
 
@@ -65,6 +107,9 @@ Read off a daemon exporting to this stack (2026-10-06):
 - **Loki**: one stream label, `service_name`; the logs' annotations (`run`, `step`, `word`) and the collector's fields (`trace_id`,
   `span_id`, `severity_text`, `detected_level`) are structured metadata, filtered as `| run="…"`. The daemon exports what it logs at
   `Info`.
+- **Pyroscope**: one label of ours, `service_name`, the profiler's `appName`. The profile types: `wall:wall:nanoseconds:wall:nanoseconds`,
+  `wall:samples:count:wall:nanoseconds`, `wall:cpu:nanoseconds:wall:nanoseconds` (the CPU time collected beside the wall samples),
+  `memory:inuse_objects:count:inuse_space:bytes` and `memory:inuse_space:bytes:inuse_space:bytes`.
 
 ## Replacing a hand-run container
 

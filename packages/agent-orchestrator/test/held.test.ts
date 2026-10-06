@@ -521,6 +521,29 @@ test('`nemia cancel` closes a task that waits for a word — nothing runs, so no
   );
 });
 
+test('`nemia cancel` calls off a run whose step signed off blocked, with no gate: it writes the mark, closes the task without stopping it, and nothing waits on you', async () => {
+  const { run, e } = await signedPlan({}, BLOCKED);
+  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['plan']);
+  const before = readRun(run.id).steps;
+  const { plan } = await runWith(e, cancelRun(run.id));
+  assert.deepEqual(plan, { kind: 'cancel', stop: [] }, 'a blocked run is not finished: a person is asked of it');
+  const view = await stateOf(e, `${run.id}-plan`);
+  assert.deepEqual([view.state.closed, view.state.stopRequested], [true, false]);
+  assert.ok(readRun(run.id).cancelledAt);
+  assert.deepEqual(readRun(run.id).steps, before, "the record's steps stand as they were");
+  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, []);
+  assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'cancelled');
+});
+
+test('`nemia cancel` reads a closeout that does not read as the run does: an unsigned step waiting on you, so the run is called off', async () => {
+  const { run, e } = await signedPlan({}, ['not a closeout']);
+  assert.deepEqual(await statuses(e, run.id), { plan: 'unsigned · closeout unreadable', implement: 'waiting' });
+  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['plan']);
+  const { plan } = await runWith(e, cancelRun(run.id));
+  assert.deepEqual(plan, { kind: 'cancel', stop: [] });
+  assert.ok(readRun(run.id).cancelledAt);
+});
+
 test('`nemia rm` of a run whose step waits for a word closes its task: no pass reads the run again to close it', async () => {
   const { run, e } = await signedPlan({}, BLOCKED);
   const forgot = await runWith(e, forgetRun(run.id));

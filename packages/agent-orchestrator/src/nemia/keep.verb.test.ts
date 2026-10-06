@@ -135,8 +135,9 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);
   const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; settings: string };
   assert.equal(own.remoteControl, true);
-  const settings = JSON.parse(own.settings) as { permissions: { ask: string[]; deny: string[] }; env: { PATH: string } };
+  const settings = JSON.parse(own.settings) as { permissions: { ask: string[]; deny: string[] }; env: Record<string, string> };
   assert.equal(settings.env.PATH, [bin, '/usr/local/bin', '/usr/bin'].join(path.delimiter), "the daemon's own bin first, and once");
+  assert.equal(settings.env.NEMIA_DAEMON_START, 'off', 'a nemia she types starts no daemon beside the one that keeps her');
   const fence = nemiaFence(TABLE);
   assert.deepEqual(
     settings.permissions.ask,

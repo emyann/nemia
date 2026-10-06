@@ -256,10 +256,10 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * its config saying so, and a job whose run file is not there is looked for in the registry too — once its grace is
      * past, the pass reads it lost either way. A job read that failed, or left a name unread, asks the registry.
      *
-     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its
-     * run file there and unreadable, or the registry once asked, or it left the name unread: listed, its transcript unreadable. A job's name the registry was asked for and does not list,
-     * with its run file not there, is absent. The registry is told what it is told (`observeFor`), so a long-lived attempt's
-     * usage is counted from when the journal says it began.
+     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its run file
+     * there and unreadable, or the registry once asked, or it left the name unread: listed, its transcript unreadable. A job's name the
+     * registry was asked for and does not list, with its run file not there, is absent. The registry is told what it is told
+     * (`observeFor`), so a long-lived attempt's usage is counted from when the journal says it began.
      */
     observeFor: (expected) =>
       job.observeFor!(expected).pipe(

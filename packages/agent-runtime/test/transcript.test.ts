@@ -785,9 +785,9 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 };
 
 /**
- * A fake `claude`: `agents` prints its rows, `--bg --name <n>` adds one, working and idle, under a new
- * session id, and `rm <id>` drops the row of the session whose id starts so; anything else succeeds and does nothing. While `<bin>/agents-fails` exists, `agents` fails,
- * as a registry under contention does. Every call is written down.
+ * A fake `claude`: `agents` prints its rows, `--bg --name <n>` adds one, working and idle, under a new session id, and `rm <id>` drops
+ * the row of the session whose id starts so; anything else succeeds and does nothing. While `<bin>/agents-fails` exists, `agents`
+ * fails, as a registry under contention does. Every call is written down.
  */
 const fakeClaude = () => {
   const bin = tmp('bin');

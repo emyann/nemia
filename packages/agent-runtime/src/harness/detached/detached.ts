@@ -356,10 +356,11 @@ const firstRunFile = (plan: object): string => {
 export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
 /**
- * A run's sighting, field for field: its state, `failed` where it is read as failed (`lookOf`); its closeout the file its harness wrote (`statement`), else what its output says, with no
- * time: the spawn cleared both before it launched the run, so either was written by the run's own process, and the engine keeps
- * it whatever the clock says; its exit code once it has one, never the worker's -1; and what its output says it used, reached
- * and was denied, and the skills it loaded and the files it touched: an empty list kept, since it says they were counted.
+ * A run's sighting, field for field: its state, `failed` where it is read as failed (`lookOf`); its closeout the file its harness wrote
+ * (`statement`), else what its output says, with no time: the spawn cleared both before it launched the run, so either was written by
+ * the run's own process, and the engine keeps it whatever the clock says; its exit code once it has one, never the worker's -1; and
+ * what its output says it used, reached and was denied, and the skills it loaded and the files it touched: an empty list kept, since it
+ * says they were counted.
  */
 const sightingOf = (
   name: string,

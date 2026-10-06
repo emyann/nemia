@@ -2186,9 +2186,9 @@ in `src/service/`:
 Tested in `src/service/service.test.ts` (the unit and the plist against golden text, `KillMode=process`, escaping read back, every
 refusal, WSL, the status lines, the landings waited for) and `src/service/service.verb.test.ts` (over a fake machine: install free,
 refused, beside a hand daemon and as its holder; a take-over's order with a landing, a person's pause standing, an interruption, a
-service that never ticks, a daemon that does not stop; uninstall, status and the fence). No test starts a service. Still to come:
-starting the daemon on demand when none holds the lease (no command does today: the only detached start is the git place's). The service
-pointed at an installed release is slice 9's, below.
+service that never ticks, a daemon that does not stop; uninstall, status and the fence). No test starts a service. Starting the
+daemon on demand when none holds the lease is shipped below (*the daemon started on demand*). The service pointed at an installed release
+is slice 9's, below.
 
 ## Shipped: releases — `nemia upgrade` and `nemia version` (Nemia platform slice 9)
 
@@ -2221,6 +2221,34 @@ suite about 2 min; a release is about 850 MB. With no `.git` the suite fails 21 
 fake machine), `test/cli-trial.test.ts`, `src/daemon/daemon.store.test.ts` (the lease's `release`), `apps/api/test/main.test.ts` and
 `apps/web/test/footer.test.ts`. Still to come: a git-free export, a walk of the tag's tree for the six helpers that read `.git`, so a
 release holds no repository at all.
+
+## Shipped: the daemon started on demand (card 4e, from the command line)
+
+A person typed `nemia start` on a store nothing ticked, and the run waited, said only by a line of `nemia ls`. What was built, in
+`src/service/demand.ts` (pure) and `src/service/demand.verb.ts`:
+
+- **The ten commands whose work waits on the next pass declare `ticks`** in the command table — `start`, `plan`, `inbox queue`, `retry`,
+  `approve`, `round`, `accept`, `merge`, `resume`, `cancel` — and `runBreaks` refuses `ticks` on one that writes nothing. The CLI's `main`
+  runs `ensureDaemon` after a command's parse and check, before its work; the api calls the handlers directly and starts nothing.
+- **Where no live daemon holds the lease** (`daemonStanding`: none, unreadable, stalled, gone or stopped), it starts the store's login
+  service where one is installed (the unit or agent whose `WF_ROOT` is the store), else spawns, in a session of its own, the daemon that
+  service would run (`ServiceHost.daemon()`, an install's `releases/current` or the checkout's api), printing into `$WF_ROOT/daemon.log`,
+  with the service's environment: `WF_ROOT`, its `PATH` and the login's own keys, nothing else of the shell. It waits for the lease up to
+  60 s, read every 200 ms, and ends early if the child exits. A daemon that holds the lease is left alone, and nothing is said.
+- **One line says what it did**: the pid, what it runs, where it logs, `kill <pid>` and `nemia service install --take-over <pid>`, and
+  that `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` or `OTEL_EXPORTER_OTLP_ENDPOINT` come from `nemia service install --env`, since the shell's are
+  not passed on; or the service's journal and its stop; or, where nothing came up, why, and that the command went on. Nothing is thrown.
+- **`NEMIA_DAEMON_START=off` starts nothing and says so**: set in Nemia's settings (`nemiaSettings`), so a `nemia` she types never starts
+  a second kind of daemon beside the one that keeps her, and in every test process (`test/ambient.ts`, the api's `test/harness.ts`).
+- **A SIGTERM in the daemon's first moments lets go of the store**: `runMain` takes its signals before it forks the program, whose fiber
+  runs at once as far as it can; before, a signal there was node's default and left the lease `gone`.
+
+Tested in `src/service/demand.test.ts` (each lease's plan, the switch, the service before a spawn, the environment, the lines),
+`src/service/demand.verb.test.ts` (a daemon spawned for real on a scratch store and found by its lease; none beside a live lease, a second
+start failing the test; the store's systemd unit and launchd agent started, another store's left alone; a child that ends, one that
+cannot spawn, another daemon taking the store, the switch), `test/demand-cli.test.ts` (each of the ten through `main` over a host that
+starts nothing, no read asking, and no `daemon.log` or lease in the store), `test/ambient.test.ts`, `src/command/command.test.ts`,
+`src/nemia/nemia.test.ts` and `src/daemon/run-main.test.ts`. Starting the daemon from the board is still to come.
 
 ## Shipped: the daemon's log and traces (Nemia platform slice 5, part 1 of 3)
 

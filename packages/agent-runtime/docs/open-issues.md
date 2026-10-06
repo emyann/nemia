@@ -1069,7 +1069,8 @@ every pool, and `priority` carried again, a whole number in int32, which the orc
 `tick()` reports `running`, the sessions at work per harness, and a `blocked` one is not among them. The rule moved to
 agent-orchestrator in part 1: `holdsSlot` in its `src/cap/cap.ts` counts a session at work, one starting and one
 admitted and not yet started, and not one blocked on a person (`needs-human`) or held for an answer. Its
-`src/cap/cap.test.ts` makes each case happen, a blocked session working again counted again included.
+`src/cap/cap.test.ts` (now this package's `test/admission.test.ts`) makes each case happen, a blocked session working
+again counted again included.
 
 **What is left, unchanged and now the orchestrator's.** It is reasoning, not a measurement: a session on a permission
 prompt makes no API calls, so it costs nothing against the subscription's rate limit, but no blocked session's API
@@ -1101,7 +1102,8 @@ task it is given and admits a queued one on its word.
 **Where it is now** (2026-09-25). The runtime chooses no order since stage 4c part 2: a pass walks the board in the order
 the store lists it and starts every task not queued, and `State` carries `filedAt` for the layer above to read. The rule
 moved to agent-orchestrator in part 1: `toAdmit` in its `src/cap/cap.ts` admits momentum first, then the earlier filing,
-then the lower id, and its `src/cap/cap.test.ts` gives the fixtures in the opposite order so the tiebreak is proven.
+then the lower id, and its `src/cap/cap.test.ts` (now this package's `test/admission.test.ts`) gives the fixtures in
+the opposite order so the tiebreak is proven.
 
 **What is left, now the orchestrator's.** The time is the filer's clock: `file()` stamps `new Date()` in the process that
 files, so two processes with skewed clocks filing onto one board are ordered by their clocks — one machine, one clock,
@@ -1372,11 +1374,11 @@ own allowance stays `maxAttempts`, which agent-orchestrator leaves at 1.
 **The judgement, moved up (stage 4a, 2026-09-23).** Both doors now end the attempt as its harness ended it — `done`,
 reason `harness` — with `stated: false` beside it, written on every end read off a sighting of a task that asked for a
 statement (`true` when one came). The engine settles such a task `succeeded`, continues nothing and nudges nothing, whatever
-attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`closeoutAsked`, `endWords` in its
-`views/views-words.ts`), and files its sign-off nudge on it; `wf` and the board say what they said. An end with no `stated` key — any
-journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles `failed` with its
-note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`; retiring them
-is part 2 of stage 4a.
+attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`closeoutAsked` in its `views/views.verb.ts`,
+`endWords` in its `views/views-words.ts`), and files its sign-off nudge on it; `wf` and the board say what they said.
+An end with no `stated` key — any journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles
+`failed` with its note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`;
+retiring them is part 2 of stage 4a.
 
 **One attempt per start (stage 4a part 2, 2026-09-23).** Retired: `decide` starts one attempt at a task, and any end but
 `done` — failed, lost, unstartable, budget, deadline — settles it `failed`, noting the attempts (`1 attempt, none

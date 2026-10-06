@@ -126,7 +126,8 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
  * the link for the page that draws it.
  */
 export function BridgeWords({ bridge, ...data }: { bridge: Bridge } & Record<`data-${string}`, boolean>) {
-  if (bridge.url === null) return <span data-bridge-why>{`The web link is not up: ${bridge.why ?? 'its bridge says nothing'}`}</span>;
+  if (bridge.url === null)
+    return <span data-bridge-why className="wrap-anywhere">{`The web link is not up: ${bridge.why ?? 'its bridge says nothing'}`}</span>;
   return (
     <a href={bridge.url} target="_blank" rel="noreferrer" className={cn(LINK, 'break-all')} {...data}>
       {bridge.url}

@@ -6598,6 +6598,7 @@ test('Nemia asked bridged and not up: why, in place of her link; not asked: her 
   assert.doesNotMatch(down, /data-nemia-bridge|<a /, 'no link while it is not up');
   assert.match(down, /data-bridge-why[^>]*>The web link is not up: no `bridgeSessionId` yet\.</);
   assert.equal(down.split('is not up: no `bridgeSessionId`').length, 2, 'said once');
+  assert.match(down, /data-bridge-why[^>]*class="[^"]*\bwrap-anywhere\b/, 'a word it quotes breaks where it must, on a phone too');
   assert.match(down, /data-nemia-attach[^>]*>attach 01234567<\/code><button[^>]*data-copy/, 'the attach line still to copy');
 
   const unasked = await nemiaWith({ ...nemiaUp, reach: ['attach 01234567'], bridge: null });

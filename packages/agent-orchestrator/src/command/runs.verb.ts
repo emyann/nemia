@@ -147,8 +147,8 @@ function holdArgsRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia hold`: a run held until other runs ship, or with `--off` its hold lifted now. The api serves the lift alone, on
- * `DELETE /api/runs/:runId/hold`; a hold is put at the command line.
+ * `nemia hold`: a run held until other runs ship, or with `--off` its hold lifted now. The api serves both: it puts a hold on
+ * `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on `DELETE /api/runs/:runId/hold`.
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   name: 'hold',
@@ -180,7 +180,10 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   check: holdArgsRefusal,
   writes: true,
   nemia: 'hers',
-  route: { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
+  route: [
+    { method: 'POST', path: '/api/runs/:runId/hold', status: 200, sets: { off: false } },
+    { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } },
+  ],
   handler: Effect.fnUntraced(function* (args: Args) {
     const runId = textOf(args, 'runId') ?? '';
     if (args.off === true) {

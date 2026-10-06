@@ -864,7 +864,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 168, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 166, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

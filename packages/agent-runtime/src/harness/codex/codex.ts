@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
-import { codexOutput } from './stream.ts';
+import { CODEX_START, codexOutput } from './stream.ts';
 import { CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
@@ -104,8 +104,8 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
  * budgets; Claude Code's flags, as `codex exec` is another CLI. It reads what a session consumed from the same JSONL
  * (`codexOutput`: tokens from `turn.completed`, tool calls by item), each event it reads decoded by `CodexEventSchema` — a
  * line that does not decode fails `observe`, so every Codex session is unread, never gone — and the conversation from Codex's
- * own rollout of the thread rather than the stream: the rollout dates every record, and `exec --json` dates none. Its `nativeIdPattern`
- * finds the thread id Codex prints in its JSONL, which a resume and the rollout are found by.
+ * own rollout of the thread rather than the stream: the rollout dates every record, and `exec --json` dates none. Its `start` is
+ * the stream's `thread.started`, whose `thread_id` the worker reads as the session's id, which a resume and the rollout are found by.
  */
 export const codex: HarnessSpec = {
   name: 'codex',
@@ -163,7 +163,7 @@ export const codex: HarnessSpec = {
   transcript: { file: codexRolloutFile, events: codexRolloutEvents },
   noChannel:
     '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.',
-  nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
+  start: CODEX_START,
   /**
    * Trust is extended, never granted.
    *

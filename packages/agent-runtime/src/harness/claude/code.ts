@@ -24,7 +24,7 @@ import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
 import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
-import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec } from '../detached/detached.ts';
+import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec, type StartEvent } from '../detached/detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 import {
   CLAUDE_CONTEXT_TOKENS,
@@ -114,8 +114,11 @@ export const CLAUDE_JOB_ENV: Record<string, string> = {
   BASH_DEFAULT_TIMEOUT_MS: '600000',
 };
 
-/** The regex that finds Claude Code's own session id in what `claude -p` prints. */
-export const CLAUDE_SESSION_ID_PATTERN = '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"';
+/** How `claude -p --output-format stream-json`'s start decodes: its first line, `system`/`init`, and its `session_id`. */
+export const CLAUDE_INIT_START: StartEvent = { event: { type: 'system', subtype: 'init' }, id: 'session_id' };
+
+/** How `claude -p --output-format json`'s start decodes: the one object it prints, as it exits, a `result`, and its `session_id`. */
+export const CLAUDE_RESULT_START: StartEvent = { event: { type: 'result' }, id: 'session_id' };
 
 /** The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. */
 export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
@@ -127,7 +130,7 @@ export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
  * Claude Code run as `claude -p`, detached by the engine's worker rather than by the harness, its output one JSON object.
  *
  * - `command` asks for `--output-format json`: one object when it exits, which `readOutput` reads the final answer from —
- *   text output prints only the answer's prose — and which carries the session id `nativeIdPattern` looks for.
+ *   text output prints only the answer's prose — and which carries the session id, its `start` (`CLAUDE_RESULT_START`).
  * - `transcript` is the one `claude --bg` writes, read the same way, but only once the session has exited: its id is in
  *   the one object `--output-format json` prints, and that is printed last.
  */
@@ -139,7 +142,7 @@ export const claudeDetached: HarnessSpec = {
     env: { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
   }),
   readOutput: claudeResultOutput,
-  nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
+  start: CLAUDE_RESULT_START,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
   noChannel:
     "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
@@ -190,7 +193,7 @@ export const claudeJob: HarnessSpec = {
     closesOn: { key: 'type', value: 'result' },
   },
   readOutput: claudeStreamOutput,
-  nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
+  start: CLAUDE_INIT_START,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
   prepare: claudePrepare,
   refuses: claudePrintRefuses,

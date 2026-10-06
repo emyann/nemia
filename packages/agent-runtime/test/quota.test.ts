@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Exit } from 'effect';
+import { Effect, Exit, Tracer } from 'effect';
 import { claudeQuota, quotaOfResponse, USAGE_ARGS, usageEnv } from '../src/harness/claude/index.ts';
 import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from './scratch.ts';
@@ -280,4 +280,29 @@ test('REFUSED: a quota asked of a harness that has none, of one the engine has n
     assert.deepEqual([refused._tag, refused.message], ['QuotaRefused', words]);
   }
   assert.equal((fs.readFileSync(calls, 'utf8').match(/^args /gm) ?? []).length, asks, 'no refused quota started a claude');
+});
+
+test('a quota refused for a harness that reports none makes no span, and no error on a trace; an ask is one span, with its harness', async () => {
+  const engine = engineOver();
+  const spans: Tracer.NativeSpan[] = [];
+  const tracer = Tracer.make({
+    span(options) {
+      const span = new Tracer.NativeSpan(options);
+      spans.push(span);
+      return span;
+    },
+  });
+  const traced = <A, E>(asked: Effect.Effect<A, E>) => Effect.runPromise(Effect.exit(asked).pipe(Effect.withTracer(tracer)));
+  assert.equal(Exit.isFailure(await traced(engine.quota('fake'))), true, 'still refused');
+  assert.deepEqual(
+    spans.map((s) => s.name),
+    [],
+    'a refusal asks nothing, and traces nothing',
+  );
+  assert.equal(Exit.isSuccess(await traced(engine.quota('claude'))), true);
+  assert.deepEqual(
+    spans.map((s) => [s.name, s.attributes.get('harness'), s.status._tag === 'Ended' && Exit.isSuccess(s.status.exit)]),
+    [['Engine.quota', 'claude', true]],
+    'the ask of a harness that reports a quota is one span, ended well',
+  );
 });

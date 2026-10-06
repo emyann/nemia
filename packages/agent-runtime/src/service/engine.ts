@@ -464,9 +464,12 @@ const startOf =
  * harness, when none is, as its runner answers it (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument that is not
  * one harness's name; a harness this engine does not have, naming the ones it has; and one whose runner reports no quota, naming the
  * ones that do. Each call is one ask, and nothing is journalled.
+ *
+ * Traced only where it asks a harness, as `Engine.quota` with the `harness` asked: a refusal asks nothing and makes no span, so a
+ * harness that reports no quota, asked as every harness is, is no error on a trace.
  */
 const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): EngineShape['quota'] =>
-  Effect.fn('Engine.quota')(function* (harness?: string) {
+  Effect.fnUntraced(function* (harness?: string) {
     const refuse = (message: string) => Effect.fail(new QuotaRefused({ message }));
     const args = [...arguments];
     if (args.length > 1 || (harness !== undefined && typeof harness !== 'string')) {
@@ -485,7 +488,7 @@ const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): Engine
         `the \`${name}\` harness reports no quota. ${some.length ? `Ask one that does: ${some.join(', ')}.` : 'None of the harnesses this engine has does.'}`,
       );
     }
-    return yield* ask;
+    return yield* ask.pipe(Effect.withSpan('Engine.quota', { attributes: { harness: name } }));
   });
 
 /**

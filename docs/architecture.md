@@ -70,7 +70,8 @@ A task's journal, its session files and its feed lines are removed only by `forg
 asks `forget` of every task its record names, and the tick asks again for one that had not settled (`src/forgetting/forgetting.verb.ts`).
 
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
-`agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
+`agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`); each spans the work it does, never an item it looks at and skips, which it
+counts as attributes on the span that skipped them (`rested` on `pass`, `kept` on the runtime's `tick`) — and the process chooses the
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set — its traces, its logs and every metric in its registry, the pass's and the steps' (`STEP_METRICS`,
 recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone). A session exports to the same

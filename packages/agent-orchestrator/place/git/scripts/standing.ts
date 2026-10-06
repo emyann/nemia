@@ -8,18 +8,33 @@
  * the `tip` its run recorded, `unknown` with none or one git cannot read. `pastBase` is said only where `onBase` is `yes`, null where git
  * cannot read the `baseRef`.
  *
- * One `for-each-ref` answers every branch git has, with its distance from `base` and from each `baseRef` (`%(ahead-behind:…)`, git 2.41).
+ * A branch may be asked with what was last read of it (`known`): the commit judged then (`tip`, null where none was) and its `pastBase`.
+ * Its `baseRef` is then left out of the listing, and its `pastBase` is the one known while the commit judged now is that `tip`, else asked
+ * of git as for a `baseRef` not listed: a hint, never believed past the commit it was read of.
+ *
+ * One `for-each-ref` answers every branch git has, with its distance from `base` and from each `baseRef` of a branch asked without `known`
+ * (`%(ahead-behind:…)`, git 2.41).
  * Git refuses that whole listing for one `baseRef` it cannot read: those it can are found in one more process and listed again without the
  * rest. A git older than 2.41 lists no distance at all: each branch is then asked one by one. Refuses a repository git cannot list and,
  * where a branch is asked of, a `base` git cannot read.
  */
 import { Malformed, git, gitSays, isDirectory, refused, serve, text, type Request } from './contract.ts';
 
-/** A branch asked of: its name, the tip its run recorded, and the commit its run was cut at. */
-type Asked = { branch: string; tip?: string; baseRef: string };
+/** What was last read of a branch: the commit judged, null where none was, and its `pastBase`, null where none was said. */
+type Known = { tip: string | null; pastBase: boolean | null };
+
+/** A branch asked of: its name, the tip its run recorded, the commit its run was cut at, and what was last read of it. */
+type Asked = { branch: string; tip?: string; baseRef: string; known?: Known };
 
 /** Whether a commit is within another: git's yes, its no, or unknown where git cannot read one of them. */
 type Within = 'yes' | 'no' | 'unknown';
+
+/** Whether `value` is a `Known`: `{ tip, pastBase }`, a string or null and a boolean or null. */
+const isKnown = (value: unknown): value is Known => {
+  if (typeof value !== 'object' || value === null) return false;
+  const { tip, pastBase } = value as Record<string, unknown>;
+  return (typeof tip === 'string' || tip === null) && (typeof pastBase === 'boolean' || pastBase === null);
+};
 
 /** The branches of `request`, each read, or `Malformed` naming the first that is not one. */
 function askedOf(request: Request): Asked[] {
@@ -28,10 +43,22 @@ function askedOf(request: Request): Asked[] {
     throw new Malformed(`the request's \`branches\` is ${JSON.stringify(value) ?? 'missing'}, where a list of branches is asked`);
   return value.map((b: unknown, i) => {
     const one = (b ?? {}) as Record<string, unknown>;
-    const tip = one.tip;
-    if (typeof one.branch !== 'string' || typeof one.baseRef !== 'string' || (tip !== undefined && typeof tip !== 'string'))
-      throw new Malformed(`the request's \`branches[${i}]\` is ${JSON.stringify(b)}, where { branch, tip?, baseRef } is asked`);
-    return { branch: one.branch, baseRef: one.baseRef, ...(typeof tip === 'string' ? { tip } : {}) };
+    const { tip, known } = one;
+    const wellFormed =
+      typeof one.branch === 'string' &&
+      typeof one.baseRef === 'string' &&
+      (tip === undefined || typeof tip === 'string') &&
+      (known === undefined || isKnown(known));
+    if (!wellFormed)
+      throw new Malformed(
+        `the request's \`branches[${i}]\` is ${JSON.stringify(b)}, where { branch, tip?, baseRef, known?: { tip, pastBase } } is asked`,
+      );
+    return {
+      branch: one.branch as string,
+      baseRef: one.baseRef as string,
+      ...(typeof tip === 'string' ? { tip } : {}),
+      ...(isKnown(known) ? { known } : {}),
+    };
   });
 }
 
@@ -75,11 +102,16 @@ function stood(repo: string, base: string, asked: readonly Asked[], listed: NonN
     const ahead = distance(name, to);
     return ahead === undefined ? within(repo, commit, to) : ahead === 0 ? 'yes' : 'no';
   };
-  return asked.map(({ branch, tip, baseRef }) => {
+  const pastOf = ({ branch, baseRef, known }: Asked, head: string | null, commit: string): Within => {
+    if (known?.tip === commit && known.pastBase !== null) return known.pastBase ? 'no' : 'yes';
+    return head ? withinOf(branch, head, baseRef) : within(repo, commit, baseRef);
+  };
+  return asked.map((one) => {
+    const { branch, tip } = one;
     const head = Object.hasOwn(listed.heads, branch) ? listed.heads[branch] : null;
     const commit = head ?? tip;
     const onBase: Within = !commit ? 'unknown' : head ? withinOf(branch, head, base) : within(repo, commit, base);
-    const past = onBase === 'yes' ? (head ? withinOf(branch, head, baseRef) : within(repo, commit!, baseRef)) : undefined;
+    const past = onBase === 'yes' ? pastOf(one, head, commit!) : undefined;
     const ahead =
       head === null ? null : (distance(branch, base) ?? Number(gitSays(repo, ['rev-list', '--count', `${base}..${head}`]) ?? NaN));
     return {
@@ -93,11 +125,12 @@ function stood(repo: string, base: string, asked: readonly Asked[], listed: NonN
 }
 
 /**
- * The listing the branches are read off: with each distance where git lists it, again without each `baseRef` it cannot read where it
+ * The listing the branches are read off: with each distance where git lists it — from `base`, and from the `baseRef` of each branch asked
+ * without `known` — again without each `baseRef` it cannot read where it
  * refuses one, and with none on a git that lists no distance. A refusal's words where git cannot list the branches, or read `base`.
  */
 function listed(repo: string, base: string, asked: readonly Asked[]): NonNullable<ReturnType<typeof listing>> | string {
-  const bases = [...new Set([base, ...asked.map((a) => a.baseRef)])];
+  const bases = [...new Set([base, ...asked.filter((a) => !a.known).map((a) => a.baseRef)])];
   const whole = listing(repo, bases);
   if (whole) return whole;
   const bare = listing(repo, []);

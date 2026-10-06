@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { RunPlace, runPlaceVerb } from '../place/place.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
-import type { BranchStood, PlaceOutcome, PlaceRequests } from '../place/place.ts';
+import type { BranchStood, KnownStood, PlaceOutcome, PlaceRequests } from '../place/place.ts';
 import { countSpawn, within, withinEffect } from '../meter/tally.store.ts';
 import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import { hasStarted, waitedOn } from '../wait/wait.ts';
@@ -39,8 +39,72 @@ export type PassStanding = {
 /** A repository, place and base branch as one key. */
 const keyOf = (repo: string, place: string, base: string): string => JSON.stringify([path.resolve(repo), place, base]);
 
+/** A branch as `standing` is asked of it. */
+type AskedBranch = PlaceRequests['standing']['branches'][number];
+
 /** One `standing` to ask: its place, and its request, each branch asked of once. */
-type Ask = { place: string; repo: string; base: string; branches: Map<string, PlaceRequests['standing']['branches'][number]> };
+type Ask = { place: string; repo: string; base: string; branches: Map<string, AskedBranch> };
+
+/**
+ * What the tick's passes last read of where branches stand, kept on its memo of runs at rest (`RestMemo`): for each repository, place and
+ * base branch asked, each branch's `baseRef` and what was read of it against that `baseRef`, handed back to the place as `known`. The place
+ * believes it only while the branch's commit is the one it was read of, and both are commit ids, so it never goes stale: a fresh one is a
+ * restart, which asks every `baseRef` once.
+ */
+export type StandingMemo = Map<string, KeptStood>;
+
+/** What a `StandingMemo` keeps of one repository, place and base branch: each branch's `baseRef`, and what was read of it against it. */
+type KeptStood = ReadonlyMap<string, { readonly baseRef: string; readonly known: KnownStood }>;
+
+/** A memo that holds nothing: what a daemon starts with. */
+export const freshStandingMemo = (): StandingMemo => new Map();
+
+/** A full commit id, as git names one in SHA-1 or SHA-256: a name that moves, as `main` does, is none. */
+const OBJECT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+
+/**
+ * What is kept of `asked` once `stood` is read of it: the commit judged and its `pastBase`, the commit null where none was judged or it is
+ * no commit id. Nothing where nothing was read of it, or its `baseRef` is no commit id: a fact against a name that moves is no fact.
+ */
+export const knownOf = (asked: AskedBranch, stood: BranchStood | undefined): KnownStood | undefined => {
+  if (!stood || !OBJECT_ID.test(asked.baseRef)) return undefined;
+  const commit = stood.tip ?? asked.tip;
+  const tip = commit !== undefined && OBJECT_ID.test(commit) ? commit : null;
+  return { tip, pastBase: tip === null ? null : stood.pastBase };
+};
+
+/** `branches`, each told what `kept` last read of it (`known`), where that was read against the `baseRef` it is asked against now. */
+export const toldOf = (branches: Iterable<AskedBranch>, kept: KeptStood | undefined): AskedBranch[] =>
+  [...branches].map((b) => {
+    const was = kept?.get(b.branch);
+    return was?.baseRef === b.baseRef ? { ...b, known: was.known } : b;
+  });
+
+/**
+ * `memo` made what `read` says of `asks`, read in that order: each ask answered keeps what was read of its branches (`knownOf`), one not
+ * answered what was kept before, and a repository, place and base no longer asked nothing.
+ */
+const remember = (memo: StandingMemo, asks: readonly Ask[], read: readonly StoodRead[]): void => {
+  const next: StandingMemo = new Map();
+  asks.forEach((ask, i) => {
+    const key = keyOf(ask.repo, ask.place, ask.base);
+    const stood = read[i];
+    if (!('answer' in stood)) {
+      const was = memo.get(key);
+      if (was) next.set(key, was);
+      return;
+    }
+    const answered = new Map(stood.answer.branches.map((b) => [b.branch, b]));
+    const kept = new Map<string, { baseRef: string; known: KnownStood }>();
+    for (const b of ask.branches.values()) {
+      const known = knownOf(b, answered.get(b.branch));
+      if (known) kept.set(b.branch, { baseRef: b.baseRef, known });
+    }
+    next.set(key, kept);
+  });
+  memo.clear();
+  for (const [key, kept] of next) memo.set(key, kept);
+};
 
 /** A run's result branches, none where its steps cannot be read. */
 const branchesOf = (run: Run): string[] => {
@@ -105,11 +169,12 @@ const stoodOutcome = (ask: Pick<Ask, 'place' | 'repo' | 'base'>, outcome: PlaceO
   return { ...where, unread };
 };
 
-/** One ask answered by its place within `STANDING_DEADLINE_MS`, or unread in words. */
-const stoodRead = (ask: Ask): Effect.Effect<StoodRead> =>
+/** One ask answered by its place within `STANDING_DEADLINE_MS`, or unread in words, each branch told what `memo` last read of it. */
+const stoodRead = (ask: Ask, memo: StandingMemo | undefined): Effect.Effect<StoodRead> =>
   Effect.suspend(() => {
     countSpawn();
-    const request = { repo: ask.repo, base: ask.base, branches: [...ask.branches.values()] };
+    const kept = memo?.get(keyOf(ask.repo, ask.place, ask.base));
+    const request = { repo: ask.repo, base: ask.base, branches: toldOf(ask.branches.values(), kept) };
     return runPlaceVerbAsync(ask.place, 'standing', request, { deadlineMs: STANDING_DEADLINE_MS, env: cachedEnv() });
   }).pipe(Effect.map((outcome) => stoodOutcome(ask, outcome)));
 
@@ -129,19 +194,31 @@ const byKey = (read: readonly StoodRead[]): Map<string, StoodRead> => new Map(re
  * Where the repositories of `runs` stand now, each repository, place and base branch asked at once (`asksOf`, of the result branches of
  * each run `own` asks of), metered as git, and written nowhere: what the tick's pass and a person's one-off verb read, as `trial` is asked
  * at a decision's read. A place that refuses or is not heard reads unread, never a failure; runs with no git run among them ask nothing.
+ * `memo`, the tick's, tells the place what it last read of each branch, and keeps what it reads now (`StandingMemo`); with none, every
+ * `baseRef` is asked.
  */
-export const standingNow = Effect.fn('standingNow')(function* (runs: readonly Run[], own: (run: GitRun) => boolean = asksOwn) {
+export const standingNow = Effect.fn('standingNow')(function* (
+  runs: readonly Run[],
+  own: (run: GitRun) => boolean = asksOwn,
+  memo?: StandingMemo,
+) {
   const placeOf = yield* placeReader;
-  const read = yield* withinEffect('git', Effect.forEach(asksOf(runs, placeOf, own), stoodRead, { concurrency: 'unbounded' }));
+  const asks = asksOf(runs, placeOf, own);
+  const read = yield* withinEffect(
+    'git',
+    Effect.forEach(asks, (ask) => stoodRead(ask, memo), { concurrency: 'unbounded' }),
+  );
+  if (memo) remember(memo, asks, read);
   return { read: byKey(read), placeOf, at: new Date().toISOString() } satisfies PassStanding;
 });
 
 /**
- * Where the pass's repositories stand (`standingNow`), written to `standing.json` for every read off the tick (`writeStanding`): called by
- * the tick's pass, and by a test standing for one, never by a reader. Fails with a refusal where the file cannot be written.
+ * Where the pass's repositories stand (`standingNow`, told what `memo` last read), written to `standing.json` for every read off the tick
+ * (`writeStanding`): called by the tick's pass, and by a test standing for one, never by a reader. Fails with a refusal where the file
+ * cannot be written.
  */
-export const passStanding = Effect.fn('passStanding')(function* (runs: readonly Run[]) {
-  const standing = yield* standingNow(runs);
+export const passStanding = Effect.fn('passStanding')(function* (runs: readonly Run[], memo?: StandingMemo) {
+  const standing = yield* standingNow(runs, asksOwn, memo);
   yield* tried(() => within('act', () => writeStanding(standing.at, [...standing.read.values()])));
   return standing;
 });

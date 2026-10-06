@@ -24,6 +24,7 @@ import type { Run, TaskPhase } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
+import { columnsListed, plantedGit } from './planted-git.ts';
 
 const ROOT = scratch('wf-pass-reads-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -506,4 +507,42 @@ test('REFUSED at the shipped deadline: a standing that never answers is stopped 
   assert.ok(places.length > 0, 'the pass read a repository');
   for (const p of places)
     assert.match('unread' in p ? p.unread : 'answered', /^the place was not heard: it gave no answer within 15 s, its deadline/);
+});
+
+test("a pass where no branch moved asks no distance from a run's base: a kept memo lists base's alone, a restart each base once", async () => {
+  const { b, repo } = await theStore();
+  await settledOne(b, repo, 'succeeded');
+  git(repo, 'commit', '-q', '--allow-empty', '-m', 'main moves on');
+  await settledOne(b, repo, 'succeeded');
+  await onePass(b);
+  const planted = plantedGit(process.env);
+  const was = process.env.PATH;
+  process.env.PATH = planted.env.PATH;
+  try {
+    const columns = async (memo: ReturnType<typeof freshRestMemo>) => {
+      const before = planted.said().length;
+      await runWith(b.e, tickRun({ memo }));
+      return columnsListed(planted.said().slice(before))
+        .filter((n) => n > 0)
+        .sort((a, b) => a - b);
+    };
+    const kept = freshRestMemo();
+    const cold = await columns(kept);
+    const read = readStanding()?.places.map((p) => ({ ...p, at: undefined }));
+    assert.ok(cold.length > 0 && cold.every((n) => n > 1), `base's column and one for each base of the runs: ${cold}`);
+    assert.ok(Math.max(...cold) > 2, `the runs on main were cut at more than one base: ${cold}`);
+    assert.deepEqual(
+      await columns(kept),
+      cold.map(() => 1),
+      "nothing moved: base's column alone, for each standing",
+    );
+    assert.deepEqual(
+      readStanding()?.places.map((p) => ({ ...p, at: undefined })),
+      read,
+      'and the same reading',
+    );
+    assert.deepEqual(await columns(freshRestMemo()), cold, 'a restart asks each base once');
+  } finally {
+    process.env.PATH = was;
+  }
 });

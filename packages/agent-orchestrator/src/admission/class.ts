@@ -38,7 +38,10 @@ type Classed = {
 /** The class a rule on a command's name gives every command it extends: an ask or an allow on `<name>:*`. */
 const covers = (c: CommandClass | undefined): boolean => c === 'answers' || c === 'prompts';
 
-/** Where one entry's class breaks the rules: none given, a read classed as a write, a write classed as a read, a flag a bare read leaves out. */
+/**
+ * Where one entry's class breaks the rules: none given, a read classed as a write, a write classed as a read, a flag a bare read leaves
+ * out.
+ */
 function ownBreaks(c: Classed): string[] {
   if (c.nemia === undefined) return [`${c.name} has no class: say who answers for it when an agent calls it — ${CLASSES}`];
   if (!c.writes && c.nemia !== 'read') return [`${c.name} writes nothing and is classed ${JSON.stringify(c.nemia)}: class it 'read'`];

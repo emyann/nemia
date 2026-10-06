@@ -18,7 +18,7 @@ import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
 import { composePrompt, memoryDir, nemiaDir, ownBin, readLevel, readNemia, SHIPPED_NEMIA, storeDenies } from './level.store.ts';
-import { nemiaFence } from './fence.ts';
+import { nemiaFence } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
 import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, nemiaSettings, type HerTask, type NemiaAct } from './nemia.ts';

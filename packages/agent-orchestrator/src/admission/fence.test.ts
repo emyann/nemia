@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { nemiaFence } from './fence.ts';
-import type { CommandClass } from '../admission/index.ts';
+import type { CommandClass } from './class.ts';
 
 /** A fixture table, one command of each class. */
 const TABLE: { name: string; nemia: CommandClass }[] = [

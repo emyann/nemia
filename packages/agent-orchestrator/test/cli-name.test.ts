@@ -37,6 +37,8 @@ const KEPT: readonly Kept[] = [
   { file: 'src/daemon/daemon.ts', text: "self: HolderKind = 'wf up'" },
   { file: 'src/cli/main.ts', text: "holder: 'wf up'" },
   { file: 'src/cli/main.ts', text: 'for the `wf` alias' },
+  { file: 'src/admission/admission.ts', text: "const PROGRAMS = ['nemia', 'wf'];" },
+  { file: 'src/admission/admission.ts', text: '(`nemia`, by any path, or `wf`)' },
   { file: 'src/cli/flags.ts', text: "export const WF_HINT = 'wf is now nemia: " },
   { file: 'src/cli/flags.ts', text: 'What `wf`, the alias of `nemia`, prints' },
 ];

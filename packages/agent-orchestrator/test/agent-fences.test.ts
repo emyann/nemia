@@ -46,8 +46,7 @@ import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { levelFile, promptFile, readNemia, storeDenies } from '../src/nemia/level.store.ts';
-import { nemiaFence } from '../src/nemia/fence.ts';
-import { admissionOf } from '../src/admission/index.ts';
+import { admissionOf, nemiaFence } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 

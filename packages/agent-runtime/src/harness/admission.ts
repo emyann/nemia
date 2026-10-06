@@ -24,7 +24,7 @@ export const ADMISSION_DECISIONS: ReadonlyArray<AdmissionAnswer['decision']> = [
 /** The keys admission has: a key beside them is a misspelling or a field no harness reads. */
 const ADMISSION_KEYS: readonly string[] = ['command', 'tools'];
 
-/** A tool's name as a harness gives it: a letter first, then letters, digits and underscores (`Bash`, `mcp__server__tool`). */
+/** A tool's name as a harness gives it: a letter first, then letters, digits and underscores (`Bash`, or an MCP tool's full name). */
 const TOOL = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /** A string a process can be handed, not empty: one with no NUL, which would end it early on its way to the program. */

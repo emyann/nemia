@@ -2,7 +2,7 @@
  * Her fence, derived from the command table's classes (`CommandClass`): the calls she runs unasked, those asked of the person, and those
  * out of her reach (`nemiaFence`). Pure: her task is filed with it (`nemiaSpec`), beside the store's denies and her admission.
  */
-import type { CommandClass } from '../admission/index.ts';
+import type { CommandClass } from './class.ts';
 
 /** An entry of the table as her fence reads it: its name and its class. */
 type Entry = { readonly name: string; readonly nemia: CommandClass };

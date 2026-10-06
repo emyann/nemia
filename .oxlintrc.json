@@ -845,7 +845,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/claude/code.ts"],
       "rules": {
-        "complexity": ["error", { "max": 24 }]
+        "complexity": ["error", { "max": 23 }]
       }
     },
     {

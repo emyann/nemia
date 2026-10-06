@@ -1,6 +1,7 @@
 /**
  * The keeper and `nemia level` over an engine board of the test's: her task filed long-lived in her folder, by her shipped definition and
- * the person's custom words, with the daemon's own bin first on her path, her fence derived from the table, her admission, and a deny on the store but her folder;
+ * the person's custom words, with the daemon's own bin first on her path, her fence derived from the table, her admission, and a deny
+ * on the store but her folder;
  * subscribed once it is open; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed at manual.
  * And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own, since `WF_ROOT` is read as
  * the module loads.
@@ -27,7 +28,7 @@ const { customInstructionsFile } = await import('../folder/folder.store.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
-const { nemiaFence } = await import('./fence.ts');
+const { nemiaFence } = await import('../admission/index.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
 
 const b = board();

@@ -71,7 +71,8 @@ asks `forget` of every task its record names, and the tick asks again for one th
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
-`OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set — its traces, its logs and every metric in its registry, the pass's and the steps' (`STEP_METRICS`,
+recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone).
 
 **The feed** is the orchestrator's, written once: `emitFeed` (`src/feed/feed.verb.ts`) appends each line to `feed.jsonl`, the record,
 logs it at Info with its run, step and word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,

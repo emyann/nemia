@@ -6198,7 +6198,7 @@ test('REFUSED at shipped defaults: a worktree on no branch — its session stopp
   assert.deepEqual([forgot.kind, forgot.removed, forgot.handedOff], ['forgotten', [q.wt], []]);
 });
 
-test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id plus the suffix of one of its files — `<id>.json`, `<id>.cancelled`, `<id>.asks`, as `ls runs/` gives them — exit 2, saying the id to give; its record, cancellation and asks stay. Nor does a run with no record take a live run's check logs: `nemia rm <id>-implement` leaves `<id>-implement-check.stderr`", async (t) => {
+test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id plus the suffix of one of its files — `<id>.json`, `<id>.cancelled`, `<id>.asks`, as `ls runs/` gives them — exit 2, saying the id to give; its record, cancellation and asks stay. Nor does a run with no record take a live run's check logs: `nemia rm <id>-implement` leaves `<id>-implement-check.stderr`, nor a run's whose record does not read", async (t) => {
   const repo = aRepo();
   const b = board();
   const live = await aParent(repo, b);
@@ -6245,6 +6245,14 @@ test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id 
   const sibling = await rmTyped(t, b.e, `${id}-implement`);
   assert.deepEqual([sibling.error, sibling.printed], [undefined, [`${id}-implement  no such run — nothing to forget`]]);
   assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
+
+  const torn = 'torn-record-x2';
+  fs.writeFileSync(path.join(ROOT, 'runs', `${torn}.json`), '{ "id": ');
+  fs.writeFileSync(path.join(ROOT, 'checks', `${torn}-review-check.stderr`), "a torn run's\n");
+  t.after(() => fs.rmSync(path.join(ROOT, 'runs', `${torn}.json`), { force: true }));
+  const prefix = await rmTyped(t, b.e, 'torn-record');
+  assert.deepEqual([prefix.error, prefix.printed], [undefined, ['torn-record  no such run — nothing to forget']]);
+  assert.ok(under('checks', `${torn}-review-check.stderr`), 'nor a run whose record does not read');
 });
 
 test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before `nemia rm` forgot it hands nothing off and collects nothing afterwards — its workspace, the repository, is still there, and its files directory is not made again', async () => {

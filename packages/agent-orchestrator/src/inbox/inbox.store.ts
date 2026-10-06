@@ -7,12 +7,9 @@
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `startRun`.
  */
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   ideaCard,
   inboxListing,
-  inboxNameOf,
   inboxNameRefusal,
   noCardLine,
   parseInboxCard,
@@ -28,7 +25,7 @@ import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { runStore } from '../record/files.store.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = (): string[] =>
@@ -176,18 +173,8 @@ export function dropFromInbox(name: string): InboxDropped {
 }
 
 /**
- * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on
- * the way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `nemia start <path>` go through
- * `startFromInbox`. A card not there is still a card's path, refused by name at start.
+ * The name of the inbox card `given` is a path to, as the store reads it (`runStore.inbox.nameAt`) — any path under the inbox, links
+ * resolved — or null for a path outside it, and for text: what makes `nemia start <path>` go through `startFromInbox`. A card not there
+ * is still a card's path, refused by name at start.
  */
-export function inboxNameAt(given: string): string | null {
-  const real = (at: string): string => {
-    try {
-      return fs.realpathSync(at);
-    } catch {
-      return at;
-    }
-  };
-  const at = path.resolve(given);
-  return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxDir()));
-}
+export const inboxNameAt = (given: string): string | null => runStore.inbox.nameAt(given);

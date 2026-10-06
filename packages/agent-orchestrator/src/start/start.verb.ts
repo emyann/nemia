@@ -406,7 +406,7 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
     fs.mkdirSync(dir, { recursive: true });
     for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
   } catch (err) {
-    fs.rmSync(path.dirname(dir), { recursive: true, force: true });
+    runStore.runs.forget(run.id);
     throw Object.assign(
       new Error(
         `--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
@@ -424,7 +424,7 @@ function renderAgents(run: Run, steps: readonly Workflow[], workflowDir: string,
   try {
     writeAgentFiles(run, steps, skillsFor(workflowDir, places));
   } catch (err) {
-    fs.rmSync(path.join(runsDir(), run.id), { recursive: true, force: true });
+    runStore.runs.forget(run.id);
     throw Object.assign(
       new Error(
         `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,

@@ -31,7 +31,7 @@ export type StatsTile = StatsHeadline & { from: string; to: string };
 
 /**
  * Mirrors the package's `Mark`: a day a run froze a step, an agent's instructions or a rendered skill that differs from what `since`, the
- * run of the same workflow folder before it, froze; with the run's keys and the steps and agents the item belongs to.
+ * run of the same factory and workflow folder before it, froze; with the run's keys and the steps and agents the item belongs to.
  */
 export type StatsMark = {
   day: string;

@@ -1,7 +1,7 @@
 /**
  * The change marks (`frozenOf`, `marksOf`, `marks.ts`) and their way through the stats (`statsOf`) and its words (`statsLines`): an item is
- * marked on the later run's day where its digest is known in both runs and differs, in series by workflow folder and by creation time,
- * never by a name or an order listed.
+ * marked on the later run's day where its digest is known in both runs and differs, in series by factory and workflow folder and by
+ * creation time, never by a name or an order listed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,14 +15,16 @@ const NOW = new Date('2026-09-30T12:00:00.000Z');
 const BUILD = '/a/workflows/build';
 const SKILL = 'review-a-change';
 
-/** A review step filled by agora, resolved as the parser resolves it: the agent's instructions before the step's own note. */
-function review(more: { instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {}): Workflow {
+/** A review step filled by agora, or the agent `more` names, as the parser resolves it: its instructions before the step's own note. */
+function review(
+  more: { agent?: string; instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {},
+): Workflow {
   const instructions = more.instructions === undefined ? 'You are Agora.' : more.instructions;
   const note = more.note ?? 'Review it.';
   const own = more.skills ?? [SKILL];
   const added = more.added?.filter((skill) => !own.includes(skill));
   const agent: StepAgent = {
-    name: 'agora',
+    name: more.agent ?? 'agora',
     keys: more.added ? ['skills'] : [],
     body: note,
     given: {},
@@ -59,6 +61,9 @@ function frozen(run: string, at: string, steps: Workflow[], version: string | nu
 /** Each mark as `run kind name since`. */
 const said = (runs: RunFrozen[]): string[] => marksOf(runs).map((m) => `${m.run} ${m.kind} ${m.name} since ${m.since}`);
 
+/** `run` as a run of `factory`. */
+const inFactory = (factory: string, run: RunFrozen): RunFrozen => ({ ...run, factory });
+
 test('a skill whose rendered copy changed is marked once, on the later run, naming the run before it; the same copy is not', () => {
   const runs = [frozen('r1', '2026-09-10T08:00:00.000Z', [review()], 'v1'), frozen('r2', '2026-09-11T23:59:00.000Z', [review()], 'v2')];
   assert.deepEqual(marksOf(runs), [
@@ -93,6 +98,28 @@ test('runs are compared within their workflow folder as recorded, never across t
   assert.deepEqual(said([one, frozen('r2', '2026-09-11T08:00:00.000Z', [review()], 'v2', '/a/workflows/build')]), [
     `r2 skill ${SKILL} since r1`,
   ]);
+});
+
+test('two factories that hire different agents into one step of one folder mark nothing as their runs alternate', () => {
+  const at = (day: number) => `2026-09-${day}T08:00:00.000Z`;
+  const runs = [
+    frozen('r1', at(10), [review()]),
+    inFactory('pipao', frozen('r2', at(11), [review({ agent: 'ada' })])),
+    frozen('r3', at(12), [review()]),
+    inFactory('pipao', frozen('r4', at(13), [review({ agent: 'ada' })])),
+  ];
+  assert.deepEqual(said(runs), []);
+});
+
+test("a hire changed within one factory is marked once, since that factory's run before, never another factory's", () => {
+  const at = (day: number) => `2026-09-${day}T08:00:00.000Z`;
+  const runs = [
+    inFactory('pipao', frozen('r1', at(10), [review()])),
+    frozen('r2', at(11), [review()]),
+    inFactory('pipao', frozen('r3', at(12), [review({ agent: 'ada' })])),
+    inFactory('pipao', frozen('r4', at(13), [review({ agent: 'ada' })])),
+  ];
+  assert.deepEqual(said(runs), ['r3 step review since r1']);
 });
 
 test('an item unknown in the run before is not marked, even where an older run knew another digest', () => {
@@ -164,10 +191,11 @@ test('an agent that fills two steps is one item, and a skill two steps give is o
   );
 });
 
-/** Two runs of build, agora's skill changed by the second, in the default factory, and a third run of another factory. */
+/** Two runs of build in the default factory, agora's skill changed by the second, and between them one of another factory, listed last. */
 const history = (): RunFrozen[] => [
-  { ...frozen('r1', '2026-09-10T08:00:00.000Z', [implement, review()], 'v1'), factory: 'other' },
+  frozen('r1', '2026-09-10T08:00:00.000Z', [implement, review()], 'v1'),
   frozen('r2', '2026-09-20T08:00:00.000Z', [implement, review()], 'v2'),
+  inFactory('other', frozen('o1', '2026-09-15T08:00:00.000Z', [implement, review()], 'v2')),
 ];
 
 test('stats mark a run in their days against a run before them, filtered and grouped as the facts are', () => {
@@ -176,7 +204,7 @@ test('stats mark a run in their days against a run before them, filtered and gro
   assert.deepEqual(
     range.all.marks.map((m) => [m.day, m.run, m.since]),
     [['2026-09-20', 'r2', 'r1']],
-    'r1 is before --from and of another factory, and is still what r2 is compared with',
+    'r1 is before --from and is still what r2 is compared with; o1, of another factory and between them, is not',
   );
   assert.deepEqual(statsOf(facts, { to: '2026-09-19' }, NOW).all.marks, [], 'a mark after --to is left out');
   assert.equal(statsOf(facts, { step: 'review' }, NOW).all.marks.length, 1, 'the skill is given by review');

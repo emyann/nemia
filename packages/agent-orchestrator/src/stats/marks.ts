@@ -1,6 +1,6 @@
 /**
  * The change marks of a store's history: each day a run of a workflow froze a step, an agent's instructions or a rendered skill that
- * differs from what the run of the same workflow folder before it froze for the same item, named on the later run's UTC day.
+ * differs from what the run of the same factory and workflow folder before it froze for the same item, named on the later run's UTC day.
  *
  * Pure: `frozenOf` turns one run's frozen steps, and the digests of the skills rendered for them, into its items (`RunFrozen`); `marksOf`
  * compares each item with the same item of the run before it (`Mark`). An item whose digest is unknown in either run is never marked,
@@ -26,7 +26,7 @@ export type RunFrozen = RunKeys & { day: string; at: string; workflowDir: string
 
 /**
  * A change on the day of the run that froze it: the item's kind and name, the steps and agents it belongs to, and `since`, the run of the
- * same workflow folder it is compared with.
+ * same factory and workflow folder it is compared with, the default factory being its own.
  */
 export type Mark = RunKeys & { day: string; kind: MarkKind; name: string; steps: string[]; agents: Array<string | null>; since: string };
 
@@ -120,7 +120,7 @@ const byCreated = (a: RunFrozen, b: RunFrozen): number => inOrder(a.at, b.at) ||
 const byMark = (a: Mark, b: Mark): number =>
   inOrder(a.day, b.day) || inOrder(a.run, b.run) || inOrder(a.kind, b.kind) || inOrder(a.name, b.name);
 
-/** The marks of one workflow folder's runs, each item against the nearest run before it that froze an item of that kind and name. */
+/** The marks of one factory's runs of a workflow folder, each item against the nearest run before that froze one of its kind and name. */
 function seriesMarks(runs: readonly RunFrozen[]): Mark[] {
   const last = new Map<string, { run: string; digest: string | null }>();
   const marks: Mark[] = [];
@@ -148,12 +148,16 @@ function seriesMarks(runs: readonly RunFrozen[]): Mark[] {
 }
 
 /**
- * Every change among what the runs froze (`Mark`), sorted by day, run, kind and name: runs go in series by their workflow folder as
- * recorded, never by its name, and an item is marked where its digest is known and differs from the one the run before it in the series
- * froze for the same item, known too.
+ * Every change among what the runs froze (`Mark`), sorted by day, run, kind and name: runs go in series by their factory, the default
+ * factory being its own, and their workflow folder as recorded, never by its name, so two factories that hire different agents into a
+ * step mark nothing; an item is marked where its digest is known and differs from the one the run before it in the series froze for the
+ * same item, known too.
  */
 export function marksOf(runs: readonly RunFrozen[]): Mark[] {
   const series = new Map<string, RunFrozen[]>();
-  for (const r of runs) series.set(r.workflowDir, [...(series.get(r.workflowDir) ?? []), r]);
+  for (const r of runs) {
+    const key = JSON.stringify([r.factory, r.workflowDir]);
+    series.set(key, [...(series.get(key) ?? []), r]);
+  }
   return [...series.values()].flatMap(seriesMarks).sort(byMark);
 }

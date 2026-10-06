@@ -186,7 +186,7 @@ type Allowance = { count: number; not: string };
  */
 const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
-  'test/transcript.test.ts': { count: 5, not: "a mocked clock's shift, wall and monotonic; three to convert" },
+  'test/transcript.test.ts': { count: 2, not: "a mocked clock's shift, wall and monotonic" },
   'test/remote-agent.test.ts': { count: 2, not: "a send's `until` a minute ahead, written into a run file" },
   'test/detached.test.ts': {
     count: 1,

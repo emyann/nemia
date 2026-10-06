@@ -40,6 +40,15 @@ export type SpawnRequest = {
   resumeFrom?: string;
   /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
   closeoutSchema?: object;
+  /**
+   * What the session's telemetry says it is: the labels its task was filed with, and `task`, its id. Set by the engine at every spawn;
+   * a harness that exports says it on its session's resource, and only when `telemetry` is set.
+   */
+  resource?: Record<string, string>;
+  /** The W3C trace context of the span that filed the task, journalled when its engine exports: the session's spans join that trace. */
+  traceparent?: string;
+  /** Where the session exports its telemetry: set by an engine given a collector (`telemetered`), absent otherwise, and then none is. */
+  telemetry?: { endpoint: string };
 };
 
 /**

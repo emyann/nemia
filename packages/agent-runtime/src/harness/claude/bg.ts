@@ -21,6 +21,8 @@ import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from 
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './transcript.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllowArgs, claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
+import { telemeteredFlags } from './telemetry.ts';
+import { withoutTelemetry } from '../telemetry.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
@@ -481,7 +483,7 @@ export const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
   '--name',
   r.name,
   ...fenceFlags(r.config),
-  ...claudeFlagsOf(admittedFlags(r.config)),
+  ...claudeFlagsOf(telemeteredFlags(admittedFlags(r.config), r)),
   '--permission-mode',
   r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...mcpArgs,
@@ -819,18 +821,23 @@ const refusedSpawn = (err: Error) => (err as NodeJS.ErrnoException).syscall?.sta
 const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
     countSpawn();
-    const child = execFile(cmd, args, { cwd: o.cwd, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resume(
-        err
-          ? Effect.fail(
-              new RunnerError({
-                verb: o.verb,
-                message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
-                ...(refusedSpawn(err) ? { refused: true } : {}),
-              }),
-            )
-          : Effect.succeed(stdout),
-      );
-    });
+    const child = execFile(
+      cmd,
+      args,
+      { cwd: o.cwd, env: withoutTelemetry(process.env), maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        resume(
+          err
+            ? Effect.fail(
+                new RunnerError({
+                  verb: o.verb,
+                  message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
+                  ...(refusedSpawn(err) ? { refused: true } : {}),
+                }),
+              )
+            : Effect.succeed(stdout),
+        );
+      },
+    );
     return Effect.sync(() => child.kill());
   });

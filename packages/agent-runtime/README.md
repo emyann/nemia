@@ -2002,6 +2002,7 @@ of pure code sits beside it.
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
 | `src/core/quote.ts` | how a sentence quotes what it did not write, pure: a value cut to 60 characters, another party's address, status text or words to 200, the cut marked `…` (`quote`), and a long list shown by its first three and how many more (`firstOf`) |
 | `src/core/clock.ts` | how a duration the runtime decides on is measured, pure (`elapsedMs`): on the monotonic clock when both moments were read in one boot, on the wall clock otherwise |
+| `src/core/labels.ts` | a task's labels, a Pod's `metadata.labels`: what the runtime refuses of them (`labelsRefusalOf`), and the key it says itself beside them, the task's id (`TASK_LABEL`) |
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
@@ -2025,6 +2026,7 @@ of pure code sits beside it.
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/admission.ts` | a task's admission, `Admission`: the command run before each call to the tools it names, the call it reads and the answer it gives (`AdmissionCall`, `AdmissionAnswer`), and the check of its shape every harness shares (`admissionRefusalOf`) |
 | `src/harness/trust.ts` | whether a harness trusts a folder to run a background session in, `trustedFolder`: read off the harness's own file, `undefined` for a harness that keeps no trust |
+| `src/harness/telemetry.ts` | where an engine's sessions export (`Telemetry`), the runner that tells each spawn (`telemetered`), the trace context of the span that filed a task (`traceparentOf`), and the variables no child inherits from the engine's process (`withoutTelemetry`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
@@ -2040,6 +2042,7 @@ of pure code sits beside it.
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`, `admissionHook`), which `bin/ae.ts` loads alone, before any engine |
+| `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, in a job's environment (`claudeTelemetryEnv`) and in a background session's `--settings` (`telemeteredFlags`) |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |

@@ -26,6 +26,7 @@ import type { Denial, Sighting, Usage, SessionState } from '../../core/index.ts'
 import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
 import { forgetFiles } from '../forget.ts';
+import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
 import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
@@ -37,7 +38,7 @@ export type HarnessSpec = {
   name: string;
   /**
    * The command that runs a brief to completion. Exit 0 is success; anything else is failure. `env`, when given, is laid over
-   * the worker's own environment for this process alone.
+   * the worker's own environment for this process alone: the engine's, less its telemetry (`withoutTelemetry`).
    */
   command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[]; env?: Record<string, string> };
   /**
@@ -748,6 +749,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             detached: true,
             stdio: 'ignore',
             cwd: r.cwd,
+            env: withoutTelemetry(process.env),
           });
           child.on('error', () => {});
           child.unref();

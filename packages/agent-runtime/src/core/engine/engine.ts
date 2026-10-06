@@ -30,6 +30,7 @@ import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
 import { configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession } from '../../harness/seam.ts';
+import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { CEILING_INSTEAD } from './filing.ts';
@@ -282,6 +283,8 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
           config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
           closeoutSchema: state.closeoutSchema,
           resumeFrom: attempt?.resumeFrom,
+          resource: { ...state.labels, [TASK_LABEL]: taskId },
+          traceparent: state.traceparent,
         })
         .pipe(
           Effect.as(undefined),

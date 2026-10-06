@@ -38,6 +38,7 @@ import {
   worktreeName,
 } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
+import { claudeTelemetryEnv } from './telemetry.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
 
@@ -132,7 +133,11 @@ export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
  */
 export const claudeDetached: HarnessSpec = {
   name: 'claude-detached',
-  command: (r, io) => ({ cmd: 'claude', args: claudePrintArgs(r, io, ['--output-format', 'json']), env: CLAUDE_JOB_ENV }),
+  command: (r, io) => ({
+    cmd: 'claude',
+    args: claudePrintArgs(r, io, ['--output-format', 'json']),
+    env: { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
+  }),
   readOutput: claudeResultOutput,
   nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
@@ -178,7 +183,7 @@ export const claudeJob: HarnessSpec = {
       'none',
       ...claudePrintFlags(r, io),
     ],
-    env: CLAUDE_JOB_ENV,
+    env: { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
   }),
   input: {
     line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),

@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { a2aServer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED } from './waits.ts';
 
 const ROOT = scratch('wf-remote-left-out-');
 process.env.WF_ROOT = ROOT;
@@ -91,59 +92,68 @@ for (const [what, text] of [
   ['with its entry refused', JSON.stringify({ reviewer: { url: 'ftp://a.example' } })],
   ['with its entry removed', '{}'],
 ] as const) {
-  test(`a2a-agents.json ${what}: a remote step at work is held, not ended lost, and a queued one is refused, and neither is handed to Claude Code`, async () => {
-    const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
-    const good = JSON.stringify({ reviewer: { url: server.url } });
-    try {
-      fs.writeFileSync(FILE, good);
-      const away = await started();
-      const until = Date.now() + 30_000;
-      while (!journal(away).some((e) => e.kind === 'spawned') || server.sent.length < 1) {
-        assert.ok(Date.now() < until, `${away} was never sent: ${JSON.stringify(journal(away))}`);
+  test(
+    `a2a-agents.json ${what}: a remote step at work is held, not ended lost, and a queued one is refused, and neither is handed to Claude Code`,
+    WAITED,
+    async (t) => {
+      const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
+      const good = JSON.stringify({ reviewer: { url: server.url } });
+      try {
+        fs.writeFileSync(FILE, good);
+        const away = await started();
+        await until(
+          t,
+          async () => {
+            if (journal(away).some((e) => e.kind === 'spawned') && server.sent.length >= 1) return true;
+            await said(['tick']);
+            return false;
+          },
+          `${away} spawned and sent to the agent`,
+          { everyMs: 0 },
+        );
+        const queued = await started();
         await said(['tick']);
-      }
-      const queued = await started();
-      await said(['tick']);
-      assert.ok(
-        journal(queued).some((e) => e.kind === 'filed'),
-        'the second step is filed, queued, before the file changes',
-      );
-      assert.equal(ended(away).length, 0, 'the first is at work on the agent');
+        assert.ok(
+          journal(queued).some((e) => e.kind === 'filed'),
+          'the second step is filed, queued, before the file changes',
+        );
+        assert.equal(ended(away).length, 0, 'the first is at work on the agent');
 
-      fs.writeFileSync(FILE, text);
-      fs.rmSync(CALLS, { force: true });
-      for (let i = 0; i < 4; i++) {
+        fs.writeFileSync(FILE, text);
+        fs.rmSync(CALLS, { force: true });
+        for (let i = 0; i < 4; i++) {
+          await said(['tick']);
+          await said(['ls']);
+        }
+        assert.equal(
+          fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8') : '',
+          '',
+          'Claude Code was asked nothing: no job spawned, and no listing looked in for a remote session',
+        );
+        assert.equal(ended(away).length, 0, `the step at work is held, neither there nor gone: ${JSON.stringify(journal(away))}`);
+        assert.equal(
+          journal(queued).some((e) => e.kind === 'spawned'),
+          false,
+          `the queued step was never spawned: ${JSON.stringify(journal(queued))}`,
+        );
+        const refused = ended(queued);
+        assert.equal(refused.length, 1, JSON.stringify(journal(queued)));
+        assert.equal(refused[0].reason, 'unstartable');
+        assert.match(String(refused[0].error), /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/);
+        assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
+
+        fs.writeFileSync(FILE, good);
         await said(['tick']);
-        await said(['ls']);
+        assert.equal(
+          ended(away).length,
+          0,
+          `once the file is fixed, the step at work is followed again on the agent, not ended: ${JSON.stringify(journal(away))}`,
+        );
+        assert.ok(journal(away).every((e) => e.kind !== 'ended' || e.observed !== 'lost'));
+      } finally {
+        fs.rmSync(FILE, { force: true });
+        await server.close();
       }
-      assert.equal(
-        fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8') : '',
-        '',
-        'Claude Code was asked nothing: no job spawned, and no listing looked in for a remote session',
-      );
-      assert.equal(ended(away).length, 0, `the step at work is held, neither there nor gone: ${JSON.stringify(journal(away))}`);
-      assert.equal(
-        journal(queued).some((e) => e.kind === 'spawned'),
-        false,
-        `the queued step was never spawned: ${JSON.stringify(journal(queued))}`,
-      );
-      const refused = ended(queued);
-      assert.equal(refused.length, 1, JSON.stringify(journal(queued)));
-      assert.equal(refused[0].reason, 'unstartable');
-      assert.match(String(refused[0].error), /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/);
-      assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
-
-      fs.writeFileSync(FILE, good);
-      await said(['tick']);
-      assert.equal(
-        ended(away).length,
-        0,
-        `once the file is fixed, the step at work is followed again on the agent, not ended: ${JSON.stringify(journal(away))}`,
-      );
-      assert.ok(journal(away).every((e) => e.kind !== 'ended' || e.observed !== 'lost'));
-    } finally {
-      fs.rmSync(FILE, { force: true });
-      await server.close();
-    }
-  });
+    },
+  );
 }

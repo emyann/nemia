@@ -16,6 +16,7 @@ import type { Run } from '../src/run.ts';
 import type { Workflow } from '../src/step/step.ts';
 import { CHECK_NICENESS, checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
 
 const ROOT = scratch('wf-check-handed-');
@@ -28,17 +29,19 @@ const { checksHandedRead } = await import('../src/views/views.verb.ts');
 
 const e = engine();
 
-/** Tick until the task has settled, for 20 s at most. */
-const settled = async (id: string) => {
-  const deadline = Date.now() + 20_000;
-  for (;;) {
-    const v = await Effect.runPromise(e.view(id));
-    if (v.state.settled) return v.state.settled;
-    assert.ok(Date.now() < deadline, `${id} never settled: ${v.phase}`);
-    await runWith(e, tickRun());
-    await new Promise((r) => setTimeout(r, 50));
-  }
-};
+/** Ticks in test `t`, every 50ms, until the task has settled; answers how. */
+const settled = (t: Waiter, id: string) =>
+  until(
+    t,
+    async () => {
+      const v = await Effect.runPromise(e.view(id));
+      if (v.state.settled) return v.state.settled;
+      await runWith(e, tickRun());
+      return undefined;
+    },
+    `${id} settled`,
+    { everyMs: 50 },
+  );
 
 const KILLED = Array.from({ length: 10 }, (_, i) => `wf mutants: killed #${i + 1} src/a.ts: "x" → "y", by test/a.test.ts (failed)`);
 const MARKED = [
@@ -54,8 +57,8 @@ const COMMAND = [
   `echo ${JSON.stringify(MARKED.at(-1))}`,
 ].join('\n');
 
-/** File `COMMAND` as `fileCheck` files a check, under `id`, and wait for it to settle. */
-const checked = async (id: string) => {
+/** File `COMMAND` as `fileCheck` files a check, under `id`, and wait in test `t` for it to settle. */
+const checked = async (t: Waiter, id: string) => {
   const workspace = scratch('wf-check-handed-ws-');
   await Effect.runPromise(
     e.file({
@@ -70,7 +73,7 @@ const checked = async (id: string) => {
       },
     }),
   );
-  assert.equal(await settled(id), 'succeeded');
+  assert.equal(await settled(t, id), 'succeeded');
 };
 
 /** What the step after `implement` is handed of its check `id`, over `engine`. */
@@ -84,37 +87,45 @@ const handed = async (id: string, engine = e) => {
   return said;
 };
 
-test('LIVE: the step after a checked step is handed every `wf <name>:` line of the whole stdout, not of the end the engine keeps', async () => {
-  const id = 'r-1-implement-check';
-  await checked(id);
-  const log = await Effect.runPromise(e.logs(id));
-  assert.doesNotMatch(log, /wf mutants: baseline/, 'the marked lines sit before the end the engine keeps, so its log cannot hand them');
-  assert.match(log, /wf check: no e2e/);
+test(
+  'LIVE: the step after a checked step is handed every `wf <name>:` line of the whole stdout, not of the end the engine keeps',
+  WAITED,
+  async (t) => {
+    const id = 'r-1-implement-check';
+    await checked(t, id);
+    const log = await Effect.runPromise(e.logs(id));
+    assert.doesNotMatch(log, /wf mutants: baseline/, 'the marked lines sit before the end the engine keeps, so its log cannot hand them');
+    assert.match(log, /wf check: no e2e/);
 
-  const said = await handed(id);
-  assert.ok(said && !('unreadable' in said), JSON.stringify(said));
-  assert.deepEqual(said.reported, MARKED);
-  assert.equal(said.partial, false);
-  assert.equal(said.verdict, 0);
-  assert.equal(said.stderr, '');
-});
+    const said = await handed(id);
+    assert.ok(said && !('unreadable' in said), JSON.stringify(said));
+    assert.deepEqual(said.reported, MARKED);
+    assert.equal(said.partial, false);
+    assert.equal(said.verdict, 0);
+    assert.equal(said.stderr, '');
+  },
+);
 
-test('LIVE: a check whose streams the runtime did not keep — one run before it kept them — is handed the end of its log, as partial', async () => {
-  const id = 'r-2-implement-check';
-  await checked(id);
-  const dir = path.join(ROOT, 'engine', 'runs', 'check');
-  const kept = fs.readdirSync(dir).filter((f) => f.includes(id.replace(/[^a-zA-Z0-9]+/g, '_')) && /\.(stdout|stderr)$/.test(f));
-  assert.equal(kept.length, 2, `the runtime keeps both streams in ${dir}: ${kept.join(', ')}`);
-  for (const f of kept) fs.rmSync(path.join(dir, f));
-  assert.equal(await Effect.runPromise(e.output(id, 'stdout')), undefined);
+test(
+  'LIVE: a check whose streams the runtime did not keep — one run before it kept them — is handed the end of its log, as partial',
+  WAITED,
+  async (t) => {
+    const id = 'r-2-implement-check';
+    await checked(t, id);
+    const dir = path.join(ROOT, 'engine', 'runs', 'check');
+    const kept = fs.readdirSync(dir).filter((f) => f.includes(id.replace(/[^a-zA-Z0-9]+/g, '_')) && /\.(stdout|stderr)$/.test(f));
+    assert.equal(kept.length, 2, `the runtime keeps both streams in ${dir}: ${kept.join(', ')}`);
+    for (const f of kept) fs.rmSync(path.join(dir, f));
+    assert.equal(await Effect.runPromise(e.output(id, 'stdout')), undefined);
 
-  const said = await handed(id);
-  assert.ok(said && !('unreadable' in said), JSON.stringify(said));
-  assert.equal(said.partial, true);
-  assert.equal(said.stderr, '');
-  assert.deepEqual(said.reported, MARKED.slice(-1), 'only the marked line in the end of the log');
-  assert.equal(said.verdict, 0);
-});
+    const said = await handed(id);
+    assert.ok(said && !('unreadable' in said), JSON.stringify(said));
+    assert.equal(said.partial, true);
+    assert.equal(said.stderr, '');
+    assert.deepEqual(said.reported, MARKED.slice(-1), 'only the marked line in the end of the log');
+    assert.equal(said.verdict, 0);
+  },
+);
 
 test('a check whose streams the engine cannot give is handed as unreadable, with why', async () => {
   const refusing = new Proxy(e, {

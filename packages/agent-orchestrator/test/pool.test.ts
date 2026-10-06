@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
 
 const ROOT = scratch('wf-pool-');
@@ -26,8 +27,6 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { engine, tickRun, runWith } = await import('../src/runner.ts');
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The fakes, their gates, and the count of `claude agents` calls. */
 const fakes = () => {
@@ -125,166 +124,184 @@ const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string
 
 const attempts = async (id: string) => (await Effect.runPromise(e.view(id))).state.attempts.length;
 
-/** Until every task is `phase` — a detached worker publishes a moment after the pass spawns it. */
-const until = async (ids: string[], phase: string) => {
-  const deadline = Date.now() + 15_000;
-  for (;;) {
-    const phases = await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase));
-    if (phases.every((p) => p === phase)) return;
-    if (Date.now() > deadline) assert.fail(`never all ${phase}: ${ids.map((id, i) => `${id} ${phases[i]}`).join(', ')}`);
-    await sleep(50);
-  }
-};
+/** Waits in test `t`, every 50ms, until every task is `phase` — a detached worker publishes a moment after the pass spawns it. */
+const reached = (t: Waiter, ids: string[], phase: string) =>
+  until(
+    t,
+    async () => (await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase))).every((p) => p === phase),
+    `${ids.join(', ')} ${phase}`,
+    { everyMs: 50 },
+  );
 
-/** Every task on the board stopped and settled, so the next case starts on an empty pool. */
-const drain = async () => {
+/** Every task on the board stopped and settled in test `t`, so the next case starts on an empty pool. */
+const drain = async (t: Waiter) => {
   for (const v of (await Effect.runPromise(e.list())).views) if (!v.state.settled) await Effect.runPromise(e.stop(v.id));
-  const deadline = Date.now() + 15_000;
-  while ((await Effect.runPromise(e.list())).views.some((v) => !v.state.settled)) {
-    assert.ok(Date.now() < deadline, 'the board drains');
-    await Effect.runPromise(e.tick());
-    await sleep(50);
-  }
+  await until(
+    t,
+    async () => {
+      if ((await Effect.runPromise(e.list())).views.every((v) => v.state.settled)) return true;
+      await Effect.runPromise(e.tick());
+      return false;
+    },
+    'the board drained',
+    { everyMs: 50 },
+  );
 };
 
-test("REFUSED at shipped defaults: a claude-detached session counts against claude's ceiling, the third claude task waits, and codex keeps its own", async (t) => {
-  try {
-    await fileInOrder(t, [
-      ['a1', 'claude-detached'],
-      ['a2', 'claude'],
-    ]);
-    await runWith(e, tickRun());
-    assert.equal((await attempts('a1')) + (await attempts('a2')), 0, 'admitted on this pass, started on the next');
-    assert.deepEqual(
-      [(await Effect.runPromise(e.view('a1'))).admission, (await Effect.runPromise(e.view('a2'))).admission],
-      ['admitted', 'admitted'],
-    );
-    await runWith(e, tickRun());
-    await until(['a1', 'a2'], 'running (working)');
+test(
+  "REFUSED at shipped defaults: a claude-detached session counts against claude's ceiling, the third claude task waits, and codex keeps its own",
+  WAITED,
+  async (t) => {
+    try {
+      await fileInOrder(t, [
+        ['a1', 'claude-detached'],
+        ['a2', 'claude'],
+      ]);
+      await runWith(e, tickRun());
+      assert.equal((await attempts('a1')) + (await attempts('a2')), 0, 'admitted on this pass, started on the next');
+      assert.deepEqual(
+        [(await Effect.runPromise(e.view('a1'))).admission, (await Effect.runPromise(e.view('a2'))).admission],
+        ['admitted', 'admitted'],
+      );
+      await runWith(e, tickRun());
+      await reached(t, ['a1', 'a2'], 'running (working)');
 
-    await fileInOrder(t, [
-      ['b1', 'claude'],
-      ['b2', 'claude-detached'],
-      ['c1', 'codex'],
-      ['c2', 'codex'],
-      ['c3', 'codex'],
-    ]);
-    await runWith(e, tickRun());
-    await runWith(e, tickRun());
-    assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
-    assert.equal(await attempts('b2'), 0, 'and so does a claude-detached one');
-    assert.equal((await Effect.runPromise(e.view('b1'))).admission, 'queued');
-    assert.equal((await attempts('c1')) + (await attempts('c2')), 2, 'codex is not counted in that pool');
-    assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
+      await fileInOrder(t, [
+        ['b1', 'claude'],
+        ['b2', 'claude-detached'],
+        ['c1', 'codex'],
+        ['c2', 'codex'],
+        ['c3', 'codex'],
+      ]);
+      await runWith(e, tickRun());
+      await runWith(e, tickRun());
+      assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
+      assert.equal(await attempts('b2'), 0, 'and so does a claude-detached one');
+      assert.equal((await Effect.runPromise(e.view('b1'))).admission, 'queued');
+      assert.equal((await attempts('c1')) + (await attempts('c2')), 2, 'codex is not counted in that pool');
+      assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
 
-    fake.open('a1');
-    await until(['a1'], 'running (done)');
-    await runWith(e, tickRun());
-    assert.equal((await Effect.runPromise(e.view('a1'))).state.settled, 'succeeded');
-    assert.equal(
-      (await Effect.runPromise(e.view('b1'))).admission,
-      'admitted',
-      "the claude-detached session ended, and the slot it freed is the pool's: b1, filed first, is admitted into it",
-    );
-    assert.equal(await attempts('b1'), 0, 'and starts a pass later');
-    await runWith(e, tickRun());
-    assert.equal(await attempts('b1'), 1, 'b1 took the slot');
-    assert.equal(await attempts('b2'), 0, 'and the pool is full again');
-    assert.equal((await Effect.runPromise(e.view('b2'))).admission, 'queued');
-  } finally {
-    await drain();
-  }
-});
+      fake.open('a1');
+      await reached(t, ['a1'], 'running (done)');
+      await runWith(e, tickRun());
+      assert.equal((await Effect.runPromise(e.view('a1'))).state.settled, 'succeeded');
+      assert.equal(
+        (await Effect.runPromise(e.view('b1'))).admission,
+        'admitted',
+        "the claude-detached session ended, and the slot it freed is the pool's: b1, filed first, is admitted into it",
+      );
+      assert.equal(await attempts('b1'), 0, 'and starts a pass later');
+      await runWith(e, tickRun());
+      assert.equal(await attempts('b1'), 1, 'b1 took the slot');
+      assert.equal(await attempts('b2'), 0, 'and the pool is full again');
+      assert.equal((await Effect.runPromise(e.view('b2'))).admission, 'queued');
+    } finally {
+      await drain(t);
+    }
+  },
+);
 
-test('REFUSED at shipped defaults: a check keeps its own pool beside a full Claude Code one, and a third check waits', async (t) => {
-  try {
-    await fileInOrder(t, [
-      ['p1', 'claude'],
-      ['p2', 'claude-detached'],
-    ]);
-    await runWith(e, tickRun());
-    await runWith(e, tickRun());
-    await until(['p1', 'p2'], 'running (working)');
+test(
+  'REFUSED at shipped defaults: a check keeps its own pool beside a full Claude Code one, and a third check waits',
+  WAITED,
+  async (t) => {
+    try {
+      await fileInOrder(t, [
+        ['p1', 'claude'],
+        ['p2', 'claude-detached'],
+      ]);
+      await runWith(e, tickRun());
+      await runWith(e, tickRun());
+      await reached(t, ['p1', 'p2'], 'running (working)');
 
-    await fileInOrder(t, [
-      ['q1', 'claude-detached'],
-      ['d1', 'check'],
-      ['d2', 'check'],
-      ['d3', 'check'],
-    ]);
-    await runWith(e, tickRun());
-    await runWith(e, tickRun());
-    assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
-    assert.equal((await attempts('d1')) + (await attempts('d2')), 2, 'a check is not counted in it');
-    assert.equal(await attempts('d3'), 0, 'and has a ceiling of its own');
-  } finally {
-    await drain();
-  }
-});
+      await fileInOrder(t, [
+        ['q1', 'claude-detached'],
+        ['d1', 'check'],
+        ['d2', 'check'],
+        ['d3', 'check'],
+      ]);
+      await runWith(e, tickRun());
+      await runWith(e, tickRun());
+      assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
+      assert.equal((await attempts('d1')) + (await attempts('d2')), 2, 'a check is not counted in it');
+      assert.equal(await attempts('d3'), 0, 'and has a ceiling of its own');
+    } finally {
+      await drain(t);
+    }
+  },
+);
 
-test("one pass — the runtime's tick, which admits — asks `claude agents` nothing, with claude jobs at work and waiting", async (t) => {
-  try {
-    await fileInOrder(
-      t,
-      ['s1', 's2', 's3', 's4'].map((id) => [id, 'claude'] as const),
-    );
-    const admitting = fake.agentsCalls();
-    const first = (await runWith(e, tickRun())).cost;
-    assert.equal(
-      fake.agentsCalls() - admitting,
-      0,
-      'no `claude agents` for the pass that admits s1 and s2: an admission is a word to the journals, and nothing has started',
-    );
-    assert.deepEqual(
-      [(await Effect.runPromise(e.view('s1'))).admission, (await Effect.runPromise(e.view('s3'))).admission],
-      ['admitted', 'queued'],
-    );
-    assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
-    assert.equal(first?.harnesses.claude?.spawned, 0);
-    await runWith(e, tickRun());
-    await until(['s1', 's2'], 'running (working)');
-    assert.equal((await Effect.runPromise(e.view('s3'))).admission, 'queued');
+test(
+  "one pass — the runtime's tick, which admits — asks `claude agents` nothing, with claude jobs at work and waiting",
+  WAITED,
+  async (t) => {
+    try {
+      await fileInOrder(
+        t,
+        ['s1', 's2', 's3', 's4'].map((id) => [id, 'claude'] as const),
+      );
+      const admitting = fake.agentsCalls();
+      const first = (await runWith(e, tickRun())).cost;
+      assert.equal(
+        fake.agentsCalls() - admitting,
+        0,
+        'no `claude agents` for the pass that admits s1 and s2: an admission is a word to the journals, and nothing has started',
+      );
+      assert.deepEqual(
+        [(await Effect.runPromise(e.view('s1'))).admission, (await Effect.runPromise(e.view('s3'))).admission],
+        ['admitted', 'queued'],
+      );
+      assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
+      assert.equal(first?.harnesses.claude?.spawned, 0);
+      await runWith(e, tickRun());
+      await reached(t, ['s1', 's2'], 'running (working)');
+      assert.equal((await Effect.runPromise(e.view('s3'))).admission, 'queued');
 
-    const before = fake.agentsCalls();
-    const { cost } = await runWith(e, tickRun());
-    assert.equal(
-      fake.agentsCalls() - before,
-      0,
-      "no `claude agents` for the whole pass: admission reads the views the runtime's pass built, not a list or a view that asks the harness again, and the observe is told the jobs it expects, listed off their run files",
-    );
-    assert.ok(cost, 'the pass says what it cost');
-    assert.equal(cost.harnesses.claude?.calls, 1, 'one observe of claude, as the meter counts the pass');
-    for (const [name, o] of Object.entries(cost.harnesses)) assert.equal(o.calls, 1, `${name} observed once`);
-    assert.equal(
-      cost.spawned,
-      0,
-      "no process started in the whole pass: a process one observe starts is counted against every harness observing in that moment (`ObserveCount`), so the count is the pass's own",
-    );
-    assert.equal(await attempts('s3'), 0, 'and s3 still waits');
-  } finally {
-    await drain();
-  }
-});
+      const before = fake.agentsCalls();
+      const { cost } = await runWith(e, tickRun());
+      assert.equal(
+        fake.agentsCalls() - before,
+        0,
+        "no `claude agents` for the whole pass: admission reads the views the runtime's pass built, not a list or a view that asks the harness again, and the observe is told the jobs it expects, listed off their run files",
+      );
+      assert.ok(cost, 'the pass says what it cost');
+      assert.equal(cost.harnesses.claude?.calls, 1, 'one observe of claude, as the meter counts the pass');
+      for (const [name, o] of Object.entries(cost.harnesses)) assert.equal(o.calls, 1, `${name} observed once`);
+      assert.equal(
+        cost.spawned,
+        0,
+        "no process started in the whole pass: a process one observe starts is counted against every harness observing in that moment (`ObserveCount`), so the count is the pass's own",
+      );
+      assert.equal(await attempts('s3'), 0, 'and s3 still waits');
+    } finally {
+      await drain(t);
+    }
+  },
+);
 
-test('REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine()` builds under it has no ceiling, so it admits nothing', async () => {
-  process.env.WF_MAX_CONCURRENT = 'abc';
-  try {
-    const refused = engine();
-    await Effect.runPromise(refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' }));
-    const err = await runWith(refused, tickRun()).then(
-      () => assert.fail('a pass under a ceiling that does not read resolved'),
-      (x: unknown) => x as Error,
-    );
-    assert.match(err.message, /^WF_MAX_CONCURRENT=abc is not a count from 1/);
-    for (let i = 0; i < 2; i++) await Effect.runPromise(refused.tick());
-    assert.equal(
-      (await Effect.runPromise(refused.view('r1'))).admission,
-      'queued',
-      "the runtime's own passes admit nothing with no ceiling",
-    );
-    assert.equal((await Effect.runPromise(refused.view('r1'))).state.attempts.length, 0);
-  } finally {
-    delete process.env.WF_MAX_CONCURRENT;
-    await drain();
-  }
-});
+test(
+  'REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine()` builds under it has no ceiling, so it admits nothing',
+  WAITED,
+  async (t) => {
+    process.env.WF_MAX_CONCURRENT = 'abc';
+    try {
+      const refused = engine();
+      await Effect.runPromise(refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' }));
+      const err = await runWith(refused, tickRun()).then(
+        () => assert.fail('a pass under a ceiling that does not read resolved'),
+        (x: unknown) => x as Error,
+      );
+      assert.match(err.message, /^WF_MAX_CONCURRENT=abc is not a count from 1/);
+      for (let i = 0; i < 2; i++) await Effect.runPromise(refused.tick());
+      assert.equal(
+        (await Effect.runPromise(refused.view('r1'))).admission,
+        'queued',
+        "the runtime's own passes admit nothing with no ceiling",
+      );
+      assert.equal((await Effect.runPromise(refused.view('r1'))).state.attempts.length, 0);
+    } finally {
+      delete process.env.WF_MAX_CONCURRENT;
+      await drain(t);
+    }
+  },
+);

@@ -196,7 +196,6 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/budget.test.ts': { count: 1, not: 'to convert' },
   'test/claude-code.test.ts': { count: 3, not: 'to convert' },
   'test/codex-agent.test.ts': { count: 1, not: 'to convert' },
-  'test/engine-verbs.test.ts': { count: 2, not: 'to convert' },
   'test/feed-rotation.test.ts': { count: 1, not: 'to convert' },
   'test/fixtures/leak-failing.ts': { count: 1, not: 'to convert' },
   'test/fixtures/leak-unguarded.ts': { count: 1, not: 'to convert' },

@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "verbs": ["open", "handoff", "status", "land", "trial"],
+  "verbs": ["open", "handoff", "status", "land", "trial", "export", "seal"],
   "denyWhileLanding": ["Bash(git commit:*)", "Bash(git merge --continue:*)"],
   "say": {
     "look": ["git diff {baseRef}", "git status"],

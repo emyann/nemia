@@ -1,6 +1,6 @@
 /**
  * A place's verbs heard (`runPlaceVerb`) and its declaration read (`readPlaceJson`), against scripts planted in a scratch skill: each of
- * the nine answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
+ * the twelve answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
  * refusal; a non-zero exit, a signal, a stdout that is not JSON or is empty, a script past its deadline and one that is not there are
  * each unread, with their words; a script past its deadline leaves nothing it started running, children deaf to SIGTERM killed, gone
  * and named; and a `place.json` that does not read as the contract is refused, naming the file and the field.
@@ -44,6 +44,8 @@ const REQUESTS: PlaceRequests = {
   land: { checkout: '/r', act: 'abort' },
   inventory: { repo: '/r', under: '/w', prefix: 'wf/x/' },
   remove: { repo: '/r', workspaces: [], branches: [] },
+  export: { repo: '/r', tag: 'v1', into: '/i' },
+  seal: { tree: '/i' },
 };
 
 const ANSWERS: PlaceAnswers = {
@@ -81,6 +83,8 @@ const ANSWERS: PlaceAnswers = {
     branches: [{ branch: 'wf/x/a', merged: false }],
   },
   remove: { removed: ['/w'], left: [{ path: '/v', said: 'locked' }], deleted: ['wf/x/a'], kept: [{ branch: 'wf/x/b', said: 'unmerged' }] },
+  export: { commit: 'abc' },
+  seal: { removed: true },
 };
 
 /** `verb` run on a skill whose script prints `value`. */

@@ -29,6 +29,10 @@ froze when it started; you need not run them. Each reads one JSON request on std
   order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.
 - `land` — commit the staged merge, or take it back: `{ "checkout", "act": "commit", "message" }` answers `{ "commit" }`, and
   `{ "checkout", "act": "abort" }` answers `{ "aborted": true }`.
+- `export` — a tag's tree written into an empty folder, from git's object store, never a working tree, for `nemia upgrade`:
+  `{ "repo", "tag", "into" }` answers `{ "commit" }`. The tree gets an empty repository of its own, nothing committed, so its checks can
+  list its files.
+- `seal` — that empty repository taken away once the checks passed: `{ "tree" }` answers `{ "removed" }`.
 
 A script that will not act prints `{ "refused": "<why>" }`. To see what one says, run it yourself:
 

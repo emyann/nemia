@@ -10,6 +10,10 @@ design → implement ⇄ review → land
 Implement's check runs the mutants Ada's closeout names (`mutants.ts`, read from the run's base, never from the tree it judges): each on a
 copy of her result, and a mutant its test does not kill refuses the step.
 
+Where the work touches `apps/web/` or `apps/api/`, or the root's `package.json`, `package-lock.json` or `turbo.json`, implement's check
+runs the whole e2e (`npm run e2e`, which builds the app), so a round reaches review with the board's pages passed; land's check runs it
+again on the merged tree.
+
 It also runs `pictures.ts`, read from the base as well, first: a change under `apps/web/src` touches the board's pages, and refuses the
 step unless the closeout's `artifacts` names a picture, an image file (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.avif`) of more than 0
 bytes, by an absolute path in the step's files directory (`WF_ARTIFACTS`) or from the workspace root. The refusal names the command that

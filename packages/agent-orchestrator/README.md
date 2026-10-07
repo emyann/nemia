@@ -1635,9 +1635,10 @@ output: implement.schema.json   # screenshots, pages
 
 - **The e2e runs once, on the merged tree.** `WF_BASE_REF` is set in every check the run executes on a step, so
   a round's check builds and runs no e2e, and a gated ship, where it is not set, runs the line whole on the merged
-  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it against a seeded store,
-  visits every page in headless Chromium in a light and a dark theme, asserts what each page must have, and
-  screenshots each into `WF_ARTIFACTS`.
+  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it to workers in parallel,
+  each against a seeded store of its own, visits every page in headless Chromium in the dark theme, and asserts what
+  each page must have; with `--photos`, in a light and a dark theme, screenshots each into `WF_ARTIFACTS`. This
+  repository's own build workflow runs it in implement's round check too.
 - **`implement` declares `screenshots` and `pages`**, and `review` reads the diff, is handed those and nothing else
   of implement, and looks at the screenshots and the pages side by side. Its schema can say where a finding is as
   `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that names

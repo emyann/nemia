@@ -37,8 +37,8 @@ takes no picture but a failing page's, `<page>-<theme>-failed.png`, and then exi
 
 `npm run e2e -- --photos --pages <name,…>` takes them: it visits in a light and then a dark theme, and
 pictures the pages named, each as `<page>-<theme>.png` with the pictures the page takes of itself
-(`<page>-<what>-<theme>.png`, its phone's among them where it sets one), into `$WF_ARTIFACTS`. The pages
-before them are visited unpictured, since each reads what those leave. A page is named as its file is,
+(`<page>-<what>-<theme>.png`, its phone's among them where it sets one), into `$WF_ARTIFACTS`, and
+visits no other: a page reads only the seed and what it writes itself. A page is named as its file is,
 without its number (`pages/NAMES` lists them); `--photos` alone pictures every page. Its last lines list
 the pictures.
 

@@ -16,7 +16,8 @@ description: "Build a change from its spec in this repository: tests first where
    change that adds no rule, saying why in `noMutants`.
 4. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
 5. **Check as the run will**: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`; and when `apps/web` changes,
-   `npm run build` and `npm run e2e`. Green is the floor, not the bar.
+   `npm run build` and `npm run e2e`, whole once; while you work, `npm run e2e -- --pages <name,…>` visits only the pages named. Green
+   is the floor, not the bar.
    You run as a job, and a turn you end is your last: run each long command in the foreground, where one call may take 10 minutes
    (`run_in_background` runs it there too), or start it with a shell `&` and wait on it with a blocking call
    (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).

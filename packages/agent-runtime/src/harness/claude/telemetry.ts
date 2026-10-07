@@ -1,6 +1,6 @@
 /**
- * A session's telemetry as Claude Code reads it: its own switch, OpenTelemetry's exporter variables and the W3C trace context
- * (`claudeTelemetryEnv`), handed to a job in its environment and to a background session in its `--settings` (`telemeteredFlags`),
+ * A session's telemetry as Claude Code reads it: its own switch, OpenTelemetry's exporter variables, its tools' details when asked, and
+ * the W3C trace context (`claudeTelemetryEnv`), handed to a job in its environment and to a background session in its `--settings` (`telemeteredFlags`),
  * since a background session is run by Claude Code's own service and carries none of the environment it was asked from.
  */
 import type { SpawnRequest } from '../seam.ts';
@@ -19,7 +19,8 @@ export const resourceAttributes = (resource: Record<string, string>): string =>
 /**
  * The variables a Claude Code session exports its telemetry under, to the collector `r.telemetry` names, or none when it names none:
  * metrics, events and spans, each over OTLP/HTTP as JSON; its resource the spawn's (`r.resource`); and the trace context it joins
- * (`r.traceparent`), which a job reads and a background session does not. The prompts', tools' and their contents' words stay off.
+ * (`r.traceparent`), which a job reads and a background session does not. The prompts' and their contents' words stay off, and so do
+ * the tools' inputs — a command's text, a file's path, an error's words — unless the collector asks for them (`toolDetails`).
  */
 export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
   if (!r.telemetry) return {};
@@ -31,6 +32,7 @@ export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
     OTEL_TRACES_EXPORTER: 'otlp',
     OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
     OTEL_EXPORTER_OTLP_ENDPOINT: r.telemetry.endpoint,
+    ...(r.telemetry.toolDetails === true ? { OTEL_LOG_TOOL_DETAILS: '1' } : {}),
     ...(r.resource ? { OTEL_RESOURCE_ATTRIBUTES: resourceAttributes(r.resource) } : {}),
     ...(r.traceparent ? { TRACEPARENT: r.traceparent } : {}),
   };

@@ -12,7 +12,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { Engine as EngineService, type HarnessConfig, type TaskView } from '../src/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
-import { traceparentOf, withoutTelemetry } from '../src/harness/telemetry.ts';
+import { traceparentOf, withoutTelemetry, type Telemetry } from '../src/harness/telemetry.ts';
 import { claudeTelemetryEnv, telemeteredFlags } from '../src/harness/claude/telemetry.ts';
 import { CLAUDE_JOB_ENV, claudeJob } from '../src/harness/claude/code.ts';
 import { claudeArgv, claudeOps } from '../src/harness/claude/bg.ts';
@@ -102,6 +102,29 @@ test("a background session is handed its telemetry in its --settings' env, over 
   assert.deepEqual(telemeteredFlags({ settings: '/a/settings.json' }, told), { settings: '/a/settings.json' }, 'a file is not rewritten');
 });
 
+/** `told`, with the engine's collector asking for its tools' details. */
+const detailed: SpawnRequest = { ...told, telemetry: { endpoint: ENDPOINT, toolDetails: true } };
+
+test("a Claude Code session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS, the one variable more", () => {
+  assert.deepEqual(claudeTelemetryEnv(detailed), { ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });
+  assert.equal(Object.keys(claudeTelemetryEnv(detailed)).length, Object.keys(claudeTelemetryEnv(told)).length + 1);
+  assert.deepEqual(claudeJob.command(detailed).env, { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });
+});
+
+test("a background session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS in its --settings' env", () => {
+  const given = { ...detailed, config: { claude: { settings: JSON.stringify({ env: { PATH: '/x' }, model: 'm' }) } } };
+  const argv = claudeArgv(given, []);
+  assert.deepEqual(JSON.parse(argv[argv.indexOf('--settings') + 1]), {
+    env: { PATH: '/x', ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' },
+    model: 'm',
+  });
+  assert.deepEqual(
+    telemeteredFlags({ settings: '/a/settings.json' }, detailed),
+    { settings: '/a/settings.json' },
+    'a file is not rewritten',
+  );
+});
+
 test("a span's trace context is W3C's, and a span whose ids are not trace context's has none", () => {
   const ids = { traceId: '0af7651916cd43dd8448eb211c80319c', spanId: 'b7ad6b7169203331' };
   assert.equal(traceparentOf({ ...ids, sampled: true }), TRACE);
@@ -111,7 +134,7 @@ test("a span's trace context is W3C's, and a span whose ids are not trace contex
 });
 
 /** An engine over a scratch store whose one harness, `rec`, records each spawn it is asked and starts nothing. */
-const recording = (telemetry?: { endpoint: string }) => {
+const recording = (telemetry?: Telemetry) => {
   const spawns: SpawnRequest[] = [];
   const rec: HarnessConfig = asyncOps({
     async spawn(r) {
@@ -158,6 +181,12 @@ test("an engine given a collector hands each spawn it, the task's labels with it
     'the labels are journalled with the task, read back through its store',
   );
   assert.equal(view.state.traceparent, spawn.traceparent);
+});
+
+test("an engine given a collector that asks for its tools' details hands each spawn both", async () => {
+  const { engine, spawns } = recording({ endpoint: ENDPOINT, toolDetails: true });
+  await filedUnder(engine);
+  assert.deepEqual(spawns[0].telemetry, { endpoint: ENDPOINT, toolDetails: true });
 });
 
 test('an engine given no collector hands a spawn none and journals no trace context, the task id still its resource', async () => {
@@ -207,6 +236,22 @@ test('REFUSED: a collector that is no absolute http(s) URL, before the engine is
         assert.equal(
           err.message,
           `\`telemetry: ${JSON.stringify(telemetry)}\` names no collector. Give \`{ endpoint }\`, the absolute http(s) URL of an OTLP/HTTP collector, like http://localhost:4318, or leave it out for no export.`,
+        );
+        return true;
+      },
+    );
+  }
+});
+
+test("REFUSED: a collector's toolDetails that is not true, before the engine is built", () => {
+  for (const toolDetails of [false, 1, 'yes']) {
+    const telemetry = { endpoint: ENDPOINT, toolDetails };
+    assert.throws(
+      () => builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), telemetry: telemetry as never })),
+      (err: Error) => {
+        assert.equal(
+          err.message,
+          `\`telemetry: ${JSON.stringify(telemetry)}\` asks for its tools' details with ${JSON.stringify(toolDetails)}. Give \`toolDetails: true\` for a session to export its tools' inputs, or leave it out.`,
         );
         return true;
       },

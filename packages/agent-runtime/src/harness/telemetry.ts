@@ -5,8 +5,12 @@
  */
 import type { RunnerOps } from './seam.ts';
 
-/** Where the sessions an engine starts export their telemetry over OTLP/HTTP: the collector's base URL, as the process was given it. */
-export type Telemetry = { endpoint: string };
+/**
+ * Where the sessions an engine starts export their telemetry over OTLP/HTTP: the collector's base URL, as the process was given it; and
+ * `toolDetails`, present and `true` only when each session is to export its tools' inputs too (a command's text, a file's path, an
+ * error's words), which a harness that can say them is told and one that cannot ignores. Absent, no session exports them.
+ */
+export type Telemetry = { endpoint: string; toolDetails?: true };
 
 /** The variables of a process's telemetry: OpenTelemetry's own, the W3C trace context, and the switches a harness reads. */
 const TELEMETRY_VARIABLE = /^(OTEL_.*|TRACEPARENT|TRACESTATE|CLAUDE_CODE_ENABLE_TELEMETRY|CLAUDE_CODE_ENHANCED_TELEMETRY_BETA)$/;
@@ -18,12 +22,19 @@ const TELEMETRY_VARIABLE = /^(OTEL_.*|TRACEPARENT|TRACESTATE|CLAUDE_CODE_ENABLE_
 export const withoutTelemetry = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
   Object.fromEntries(Object.entries(env).filter(([name]) => !TELEMETRY_VARIABLE.test(name)));
 
-/** Why `telemetry` is no collector to export to, or `undefined`: anything but an object whose `endpoint` is an absolute http(s) URL. */
+/**
+ * Why `telemetry` is no collector to export to, or `undefined`: anything but an object whose `endpoint` is an absolute http(s) URL, and
+ * one whose `toolDetails` is there and not `true`.
+ */
 export const telemetryRefusalOf = (telemetry: unknown): string | undefined => {
   if (telemetry === undefined) return undefined;
-  const endpoint = typeof telemetry === 'object' && telemetry !== null ? (telemetry as { endpoint?: unknown }).endpoint : undefined;
-  if (typeof endpoint === 'string' && URL.canParse(endpoint) && /^https?:$/.test(new URL(endpoint).protocol)) return undefined;
-  return `\`telemetry: ${JSON.stringify(telemetry)}\` names no collector. Give \`{ endpoint }\`, the absolute http(s) URL of an OTLP/HTTP collector, like http://localhost:4318, or leave it out for no export.`;
+  const given = typeof telemetry === 'object' && telemetry !== null ? (telemetry as { endpoint?: unknown; toolDetails?: unknown }) : {};
+  const { endpoint } = given;
+  if (!(typeof endpoint === 'string' && URL.canParse(endpoint) && /^https?:$/.test(new URL(endpoint).protocol)))
+    return `\`telemetry: ${JSON.stringify(telemetry)}\` names no collector. Give \`{ endpoint }\`, the absolute http(s) URL of an OTLP/HTTP collector, like http://localhost:4318, or leave it out for no export.`;
+  if (Object.hasOwn(given, 'toolDetails') && given.toolDetails !== true)
+    return `\`telemetry: ${JSON.stringify(telemetry)}\` asks for its tools' details with ${JSON.stringify(given.toolDetails)}. Give \`toolDetails: true\` for a session to export its tools' inputs, or leave it out.`;
+  return undefined;
 };
 
 /** A trace's id and a span's, as W3C trace context writes them: 32 and 16 lowercase hex digits, neither all zeros. */

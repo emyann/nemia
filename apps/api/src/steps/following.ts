@@ -33,7 +33,10 @@ type Entry = {
 };
 
 /** The upstreams opened, a step followed by nobody yet each (`followStep`): counted as they open, never as followers join one. */
-export const STEP_FOLLOWS = Metric.counter('api.step.follows', { description: 'the upstream followings of a step opened' });
+export const STEP_FOLLOWS = Metric.counter('api.step.follows', {
+  description: 'the upstream followings of a step opened',
+  incremental: true,
+});
 
 /**
  * The message being written after `m`, from `held`: the text of a block added to, or begun, by a piece of it; none once the block is

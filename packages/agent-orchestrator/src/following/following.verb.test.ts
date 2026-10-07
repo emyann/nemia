@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit, Layer, Logger, ManagedRuntime, Stream } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import type { StepMoment } from './following.ts';
+import { nextOf, type StepMoment } from './following.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
 
@@ -41,10 +41,16 @@ function writeRun(id: string, taskId: string | null): void {
 type Event = { id: string; at: string; kind: string; text: string };
 const said = (id: string): Event => ({ id, at: '2026-10-07T12:00:00.000Z', kind: 'text', text: id });
 
-/** A task on the test's engine: its attempts' moments, by number, its settle, and the history a read from its start gives. */
-type Task = { attempts: StepMoment<Event>[][]; settled: string | null; history: Event[] };
+/**
+ * A task on the test's engine: its attempts' moments, by number, how many of them have ended, its settle, and the history a read from its
+ * start gives.
+ */
+type Task = { attempts: StepMoment<Event>[][]; ended: number; settled: string | null; history: Event[] };
 
-/** An engine over `tasks`, counting each view; a task named in `unstreamed` is refused its follow as a harness that does not stream. */
+/**
+ * An engine over `tasks`, counting each view; a task named in `unstreamed` is refused its follow as a harness that does not stream. As the
+ * runtime does, its view gives each attempt that has ended its `endedAt`, and the stream of a last attempt that has ended fails refused.
+ */
 function engineOver(tasks: Map<string, Task>, unstreamed: string[] = []) {
   const views: string[] = [];
   const e = {
@@ -56,17 +62,30 @@ function engineOver(tasks: Map<string, Task>, unstreamed: string[] = []) {
           id,
           phase: 'running',
           sessionId: 's',
-          state: { brief: 'b', settled: t.settled, said: [], attempts: t.attempts.map((_, i) => ({ n: i + 1 })) },
+          state: {
+            brief: 'b',
+            settled: t.settled,
+            said: [],
+            attempts: t.attempts.map((_, i) => ({ n: i + 1, endedAt: i < t.ended ? AT : null })),
+          },
         };
       }),
-    follow: (id: string) =>
-      unstreamed.includes(id)
-        ? Effect.fail({ _tag: 'FollowRefused', message: `the \`x\` harness does not stream its sessions` })
-        : Effect.succeed(tasks.get(id)!.attempts.length ? Stream.fromIterable(tasks.get(id)!.attempts.at(-1)!) : undefined),
+    follow: (id: string) => (unstreamed.includes(id) ? Effect.fail(UNSTREAMED) : Effect.succeed(followed(tasks.get(id)!))),
     transcript: (id: string) => Effect.sync(() => ({ events: tasks.get(id)!.history, cursor: `c-${id}` })),
   } as unknown as Engine;
   return { e, views };
 }
+
+const AT = '2026-10-07T12:00:01.000Z';
+const UNSTREAMED = { _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' };
+
+/** The stream of `t`'s last attempt, none before one starts: refused, as the runtime's, once that attempt has ended. */
+const followed = (t: Task) =>
+  t.attempts.length === 0
+    ? undefined
+    : t.ended === t.attempts.length
+      ? Stream.fail({ _tag: 'RunnerError', refused: true, message: `attempt ${t.ended} has ended: there is no session to follow` })
+      : Stream.fromIterable(t.attempts.at(-1)!);
 
 /** A runtime with the feed's hub and no logger, over the engine `e`: let go once the test `t` ends. */
 function runtimeOf(t: TestContext, e: Engine) {
@@ -116,9 +135,10 @@ test(
         [
           { kind: 'state', state: 'working' },
           { kind: 'events', events: [said('a-1')], cursor: 'c1' },
-          { kind: 'state', state: 'input-required' },
+          { kind: 'state', state: 'completed' },
         ],
       ],
+      ended: 0,
       settled: null,
       history: [],
     };
@@ -134,6 +154,7 @@ test(
     );
     await line(rt, 'r-1', 'other', 'running');
     await line(rt, 'r-2', 'implement', 'running');
+    task.ended = 1;
     task.attempts.push([
       { kind: 'state', state: 'working' },
       { kind: 'events', events: [said('a-3')], cursor: 'c3' },
@@ -154,7 +175,7 @@ test(
       'streamed true',
       'state working',
       'events a-1',
-      'state input-required',
+      'state completed',
       'moved r-1-implement',
       'state working',
       'events a-1,u-2,a-3',
@@ -172,10 +193,11 @@ test("a step followed goes on to its try's task, saying moved, once the step's l
         { kind: 'state', state: 'failed' },
       ],
     ],
-    settled: 'failed',
+    ended: 0,
+    settled: null,
     history: [],
   };
-  const tried: Task = { attempts: [[{ kind: 'state', state: 'working' }]], settled: null, history: [said('b-1')] };
+  const tried: Task = { attempts: [[{ kind: 'state', state: 'working' }]], ended: 0, settled: null, history: [said('b-1')] };
   const { e } = engineOver(
     new Map([
       ['r-3-implement', first],
@@ -191,6 +213,8 @@ test("a step followed goes on to its try's task, saying moved, once the step's l
     () => `the first try: ${ids(got)}`,
     { bell: rung },
   );
+  first.ended = 1;
+  first.settled = 'failed';
   writeRun('r-3', 'r-3-implement-try2');
   await line(rt, 'r-3', 'implement', 'running');
   await until(
@@ -218,7 +242,7 @@ test(
   WAITED,
   async (t) => {
     writeRun('r-6', 'r-6-implement');
-    const task: Task = { attempts: [], settled: null, history: [] };
+    const task: Task = { attempts: [], ended: 0, settled: null, history: [] };
     const { e, views } = engineOver(new Map([['r-6-implement', task]]));
     const rt = runtimeOf(t, e);
     const got: StepMoment<Event>[] = [];
@@ -247,9 +271,54 @@ test(
   },
 );
 
+test(
+  "a step opened held on a person, its attempt ended, is said streamed, then follows the next attempt from its task's start, saying moved",
+  WAITED,
+  async (t) => {
+    writeRun('r-7', 'r-7-implement');
+    const task: Task = {
+      attempts: [[{ kind: 'events', events: [said('a-1')], cursor: 'c1' }]],
+      ended: 1,
+      settled: null,
+      history: [said('a-1')],
+    };
+    const { e, views } = engineOver(new Map([['r-7-implement', task]]));
+    const rt = runtimeOf(t, e);
+    const got: StepMoment<Event>[] = [];
+    const { ended, rung } = follow(rt, 'r-7', got);
+    await until(
+      t,
+      () => got.length === 1 && views.length === 1,
+      () => `said streamed, the ended attempt not followed: ${ids(got)}`,
+      { bell: rung },
+    );
+    task.attempts.push([{ kind: 'state', state: 'working' }]);
+    task.history = [said('a-1'), said('u-2')];
+    await line(rt, 'r-7', 'implement', 'running');
+    await until(
+      t,
+      () => got.some((m) => m.kind === 'state'),
+      () => `the next attempt: ${ids(got)}`,
+      { bell: rung },
+    );
+    task.settled = 'succeeded';
+    await line(rt, 'r-7', 'implement', 'verified');
+    assert.ok(Exit.isSuccess(await ended));
+    assert.deepEqual(ids(got), ['streamed true', 'moved r-7-implement', 'state working', 'events a-1,u-2', 'settled']);
+  },
+);
+
+test("a try whose attempt has ended is not followed: the following waits for the try's next attempt", () => {
+  const at = { taskId: 'r-8-implement', attempt: 1 };
+  assert.equal(nextOf(at, { taskId: 'r-8-implement-try2', attempt: 1, live: false, settled: false }), 'wait');
+  assert.deepEqual(nextOf(at, { taskId: 'r-8-implement-try2', attempt: 2, live: true, settled: false }), {
+    follow: { taskId: 'r-8-implement-try2', attempt: 2 },
+  });
+});
+
 test('a step whose harness does not stream is said not streamed, and the following ends there', async (t) => {
   writeRun('r-4', 'r-4-implement');
-  const { e } = engineOver(new Map([['r-4-implement', { attempts: [[]], settled: null, history: [] }]]), ['r-4-implement']);
+  const { e } = engineOver(new Map([['r-4-implement', { attempts: [[]], ended: 0, settled: null, history: [] }]]), ['r-4-implement']);
   const got: StepMoment<Event>[] = [];
   assert.ok(Exit.isSuccess(await follow(runtimeOf(t, e), 'r-4', got).ended));
   assert.deepEqual(ids(got), ['streamed false']);

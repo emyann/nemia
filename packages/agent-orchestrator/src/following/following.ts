@@ -23,21 +23,22 @@ export type FollowedAttempt = { taskId: string; attempt: number };
 
 /**
  * The step as one read finds it: the task its record names (none before one is filed), the number of that task's last attempt (0 before
- * one starts), and whether the task has settled.
+ * one starts), whether that attempt is live — started and its end not journalled — and whether the task has settled.
  */
-export type StepNow = { taskId: string | null; attempt: number; settled: boolean };
+export type StepNow = { taskId: string | null; attempt: number; live: boolean; settled: boolean };
 
 /** Where a following goes from a read: follow an attempt, wait for the step's next line of the feed, or end, the step finished. */
 export type Next = { follow: FollowedAttempt } | 'wait' | 'finished';
 
 /**
- * Where the following of a step at `at` goes, the step read as `now`. An attempt that has started and is not the one followed is followed:
- * the record's task changed (a try), or its task has a later attempt (a person's answer, the next turn). Else a settled task has finished
- * the step, and anything else waits: a task with no attempt yet, and one whose attempt ended before its next is filed. Pure.
+ * Where the following of a step at `at` goes, the step read as `now`. A live attempt that is not the one followed is followed: the
+ * record's task changed (a try), or its task has a later attempt (a person's answer, the next turn). Else a settled task has finished the
+ * step, and anything else waits: a task with no attempt yet, and one whose attempt ended — a step held on a person — until its next
+ * starts; the runtime follows no attempt that has ended. Pure.
  */
 export const nextOf = (at: FollowedAttempt | undefined, now: StepNow): Next => {
   if (now.taskId === null) return 'wait';
   const other = at === undefined || at.taskId !== now.taskId || at.attempt < now.attempt;
-  if (other && now.attempt > 0) return { follow: { taskId: now.taskId, attempt: now.attempt } };
+  if (other && now.live) return { follow: { taskId: now.taskId, attempt: now.attempt } };
   return now.settled ? 'finished' : 'wait';
 };

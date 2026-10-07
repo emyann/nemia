@@ -21,8 +21,8 @@ const FINISHED: Moment = { kind: 'settled' };
 type Hold = { unstreamed: boolean };
 
 /**
- * The step `step` of the run `runId` as it stands (`StepNow`): its record's task, that task's last attempt and whether it settled. Refused
- * (`Missing`) for a run the store has not and for a step with no task filed.
+ * The step `step` of the run `runId` as it stands (`StepNow`): its record's task, that task's last attempt, whether the journal has its
+ * end, and whether the task settled. Refused (`Missing`) for a run the store has not and for a step with no task filed.
  */
 const stepNowOf = (e: Engine, runId: string, step: string): Effect.Effect<StepNow, Refusal> =>
   Effect.gen(function* () {
@@ -35,7 +35,8 @@ const stepNowOf = (e: Engine, runId: string, step: string): Effect.Effect<StepNo
         }),
       );
     const view = yield* asked('view', e.view(taskId));
-    return { taskId, attempt: view.state.attempts.at(-1)?.n ?? 0, settled: view.state.settled !== null };
+    const last = view.state.attempts.at(-1);
+    return { taskId, attempt: last?.n ?? 0, live: last !== undefined && last.endedAt === null, settled: view.state.settled !== null };
   });
 
 /**
@@ -77,6 +78,26 @@ const attemptOf = (e: Engine, taskId: string, history: { after?: string } | unde
     ),
   );
 };
+
+/**
+ * Whether the harness of `taskId` streams, as the runtime's `follow` answers before it follows anything: `streamed`, or no, said in `hold`
+ * too, for a harness without it. Follows nothing: the task's last attempt may have ended, or there may be none yet.
+ */
+const streamedOf = (e: Engine, taskId: string, hold: Hold): Stream.Stream<Moment> =>
+  Stream.fromEffect(
+    asked(
+      'follow',
+      e.follow(taskId).pipe(
+        Effect.as(STREAMED),
+        Effect.catchTag('FollowRefused', () =>
+          Effect.sync(() => {
+            hold.unstreamed = true;
+            return UNSTREAMED;
+          }),
+        ),
+      ),
+    ),
+  );
 
 /** The whole events of `m` not in `seen`, as one moment, none when all were: each then counted seen. */
 const unseen = (m: Extract<Moment, { kind: 'events' }>, seen: Set<string>): Moment[] => {
@@ -130,10 +151,11 @@ const onward = (o: Onward, at: FollowedAttempt | undefined, cursor: number, read
  * what was written before is the transcript's to read.
  *
  * Its first moment says whether the step's harness streams (`streamed`); one that does not ends it there. Then each moment of the attempt
- * the step's record names, as the runtime hands it. When that attempt's stream ends, it waits for the feed's next line of the step, reads
- * the record again (`nextOf`), and goes on: to a later attempt of the same task — a person's answer, the next turn — or to the task of a
- * try, said `moved` and followed by that attempt's history from its start; or it ends with `settled`, the step's task settled with none
- * after it. A feed line written while an attempt is followed is read once it ends, from the cursor taken before it began.
+ * the step's record names, as the runtime hands it, while it is live; an attempt that has ended — the step held on a person — is passed
+ * as followed. When that attempt's stream ends, it waits for the feed's next line of the step, reads the record again (`nextOf`), and goes
+ * on: to a later attempt of the same task — a person's answer, the next turn — or to the task of a try, said `moved` and followed by that
+ * attempt's history from its start; or it ends with `settled`, the step's task settled with none after it. A feed line written while an
+ * attempt is followed is read once it ends, from the cursor taken before it began.
  *
  * Refused (`Missing`) for a run the store has not and a step with no task filed; fails with the feed's refusal of its cursor; dies of what
  * the engine fails with but a refusal to stream.
@@ -145,10 +167,11 @@ export const followStep = (runId: string, step: string, after?: string): Stream.
       const cursor = yield* tried(feedSize);
       const now = yield* stepNowOf(e, runId, step);
       const o: Onward = { e, runId, step, hold: { unstreamed: false }, ...(after === undefined ? {} : { after }) };
-      const opened = nextOf(undefined, now) === 'wait' ? Stream.take(attemptOf(e, now.taskId!, undefined, o.hold), 1) : Stream.empty;
+      const seen = now.attempt > 0 && !now.live ? { taskId: now.taskId!, attempt: now.attempt } : undefined;
+      const opened = nextOf(seen, now) === 'wait' ? streamedOf(e, now.taskId!, o.hold) : Stream.empty;
       return Stream.concat(
         opened,
-        Stream.suspend(() => (o.hold.unstreamed ? Stream.empty : onward(o, undefined, cursor, now))),
+        Stream.suspend(() => (o.hold.unstreamed ? Stream.empty : onward(o, seen, cursor, now))),
       ).pipe(
         Stream.mapAccum(
           () => true,

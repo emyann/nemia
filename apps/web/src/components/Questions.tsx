@@ -1,7 +1,8 @@
 /**
  * A closeout's questions, as data (`StepCloseout.questions`, decoded by agent-orchestrator's question/question.ts): read under a step's
- * output (`Questions`), and answered by choosing under a step that signed off blocked asking them (`QuestionsForm`), which sends the
- * answers to the api, where they are checked and written as the next try's message.
+ * output (`Questions`), and answered by choosing (`QuestionFields`) — under a step that signed off blocked asking them (`QuestionsForm`),
+ * at the gate of a step that asks them (`Gate`), and on the row that raises a blocked step's budget (`RaiseRow`). Each sends the answers
+ * to the api, where they are checked against what the step asks now and written in the package's words.
  */
 import { useId, useState } from 'react';
 import type { Question, QuestionAnswer, RetryMode } from '../lib/api';
@@ -87,7 +88,7 @@ export function Questions({ field, questions }: { field: string; questions: read
 }
 
 /** One question to answer: its options as radios, or checkboxes where it takes several, and a line for words of the person's own. */
-function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
+export function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
   const id = useId();
   const { chose, own } = said(draft, q);
   return (
@@ -123,6 +124,64 @@ function QuestionField({ q, n, draft, onDraft }: { q: Question; n: number; draft
         className={TEXTAREA}
       />
     </fieldset>
+  );
+}
+
+/**
+ * A question a step asks, as its agent wrote it, in a box that scrolls once it is long: under `asks:`, which the CLI's `decide` puts before
+ * it.
+ */
+export function Asks({ step, needs, ...data }: { step?: string; needs: string; 'data-asks'?: boolean; 'data-said'?: boolean }) {
+  return (
+    <div {...data} className="space-y-1">
+      <p>
+        {step && <strong>{step}</strong>}
+        {step && ' '}asks:
+      </p>{' '}
+      <Markdown className="max-h-72 overflow-y-auto pr-1">{needs}</Markdown>
+    </div>
+  );
+}
+
+/** Each question to answer, in the order asked, numbered from one: the fields every form that answers a step's questions draws. */
+export function QuestionFields({
+  questions,
+  draft,
+  onDraft,
+}: {
+  questions: readonly Question[];
+  draft: Draft;
+  onDraft: (next: Draft) => void;
+}) {
+  return questions.map((q, i) => <QuestionField key={q.title} q={q} n={i + 1} draft={draft} onDraft={onDraft} />);
+}
+
+/**
+ * `Choose the recommended answers`, beside the fields: it chooses each recommended option and leaves every other question as it was.
+ * Nothing where no question recommends one.
+ */
+export function RecommendButton({
+  questions,
+  draft,
+  onDraft,
+}: {
+  questions: readonly Question[];
+  draft: Draft;
+  onDraft: (next: Draft) => void;
+}) {
+  if (!questions.some((q) => q.recommended !== null)) return null;
+  return (
+    <button
+      type="button"
+      data-recommend-all
+      onClick={() => onDraft(recommendedDraft(questions, draft))}
+      className={cn(
+        BUTTON,
+        'bg-white text-neutral-900 ring-1 ring-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800',
+      )}
+    >
+      Choose the recommended answers
+    </button>
   );
 }
 
@@ -186,9 +245,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
           ask.mutate({ mode, answers: answersFrom(offer.questions, draft), ...(note.trim() ? { message: note } : {}) });
         }}
       >
-        {offer.questions.map((q, i) => (
-          <QuestionField key={q.title} q={q} n={i + 1} draft={draft} onDraft={setDraft} />
-        ))}
+        <QuestionFields questions={offer.questions} draft={draft} onDraft={setDraft} />
         <label htmlFor={`${field}-note`} className="sr-only">
           A note to {offer.step} beside the answers
         </label>
@@ -210,19 +267,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
           >
             {ask.isPending ? 'Asking…' : 'Answer and continue'}
           </button>
-          {offer.questions.some((q) => q.recommended !== null) && (
-            <button
-              type="button"
-              data-recommend-all
-              onClick={() => setDraft(recommendedDraft(offer.questions, draft))}
-              className={cn(
-                BUTTON,
-                'bg-white text-neutral-900 ring-1 ring-neutral-300 hover:bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800',
-              )}
-            >
-              Choose the recommended answers
-            </button>
-          )}
+          <RecommendButton questions={offer.questions} draft={draft} onDraft={setDraft} />
           <ModeChoice name={`${field}-mode`} step={offer.step} mode={mode} onMode={setMode} />
         </div>
       </form>

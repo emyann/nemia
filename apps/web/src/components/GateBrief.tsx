@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { decisionQuery, type RunDetail } from '../lib/api';
-import { needOf, stepAnchor } from '../lib/asks';
+import { askedIn, needOf, stepAnchor } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { gateBrief, gateFacts, gateOfStep, needWords } from '../lib/gate';
 import { cn } from '../lib/utils';
@@ -69,7 +69,15 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       <FactList runId={run.id} facts={facts} label="What to decide on" className="border-t border-amber-200 pt-2 dark:border-amber-900" />
       <StepPolicy layers={step.layers} />
       <div className="border-t border-amber-200 pt-3 dark:border-amber-900">
-        <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={gate.back} acts={gate.ends} framed={false} />
+        <Gate
+          runId={run.id}
+          step={step.name}
+          approveLine={step.commands.approve}
+          back={gate.back}
+          acts={gate.ends}
+          framed={false}
+          questions={askedIn(step.closeout)}
+        />
       </div>
     </section>
   );

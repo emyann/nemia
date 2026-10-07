@@ -2550,3 +2550,171 @@ export function seed(root: string, now = Date.now()): void {
 
   seedDecisions(root, repo, baseRef, now);
 }
+
+/** A field of questions as the loader expands `"x-shape": "questions"`, and the run freezes it: the web imports no package. */
+export const ASKED = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'The question, in one line. Unique among these questions.' },
+      body: { type: 'string', description: 'What the person needs to know to answer it: the context, and what depends on the answer.' },
+      options: {
+        type: 'array',
+        description: 'The answers you see, at least one. The person may also answer in their own words.',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: 'The option, in a few words. Unique among this question’s options.' },
+            meaning: { type: 'string', description: 'What choosing it means: what you would do, and what it costs.' },
+          },
+          required: ['label', 'meaning'],
+          additionalProperties: false,
+        },
+      },
+      recommended: { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' },
+      multiple: { type: 'boolean', description: 'Whether several options may be chosen together.' },
+    },
+    required: ['title', 'body', 'options', 'recommended', 'multiple'],
+    additionalProperties: false,
+  },
+  description: 'What is still undecided.',
+};
+
+/**
+ * A run whose steps ask a person questions as data, written by a page for its visit and taken back before it ends (`writeAsking`): `design`
+ * waits at its gate having asked two — one that takes a single answer and recommends one, one that takes several and recommends none —
+ * and `palette` signed off blocked past its budget of $1, having spent $1.50, asking one.
+ */
+export const ASKING = {
+  id: 'gate-questions-e2e',
+  title: 'Questions at a gate',
+  gated: 'design',
+  raised: 'palette',
+  needs: 'One question before the palette is picked.',
+  note: 'Cut the terminal to its own card.',
+  objection: 'Smaller: the shape alone.',
+  spent: '$1.50',
+  cut: {
+    title: 'How is the card cut?',
+    body: 'It is **big**: the shape, the board and the terminal.',
+    options: [
+      { label: 'Shape first', meaning: 'The shape and the board now, the terminal later.' },
+      { label: 'All at once', meaning: 'One card, three times the review.' },
+    ],
+    recommended: 'Shape first',
+    multiple: false,
+  },
+  where: {
+    title: 'Where do the answers go?',
+    body: 'Either, or both.',
+    options: [
+      { label: 'Into the retry', meaning: 'The next try is told them.' },
+      { label: 'With the approval', meaning: 'A gate carries them.' },
+    ],
+    recommended: null,
+    multiple: true,
+  },
+  tone: {
+    title: 'Warm colours, or cool ones?',
+    body: 'Both palettes are drafted; the dark theme takes one.',
+    options: [
+      { label: 'Warm', meaning: 'Amber and rose, as the board has now.' },
+      { label: 'Cool', meaning: 'Slate and teal, quieter at night.' },
+    ],
+    recommended: 'Cool',
+    multiple: false,
+  },
+} as const;
+
+/**
+ * Writes ASKING into the store at `root` — its record, its folder and its two tasks, each ended once with the closeout it gave, flat as a
+ * harness writes it, palette's with what it cost — and answers every path written, to take back.
+ */
+export function writeAsking(root: string, now = Date.now()): string[] {
+  const { id, gated, raised } = ASKING;
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const dir = path.join(root, 'workflow-gate-questions');
+  const schema = { type: 'object', properties: { open: ASKED }, required: ['open'], additionalProperties: false };
+  const task = (step: string) => path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`);
+  const ran = (step: string, began: number, closeout: object, usage?: object) =>
+    write(
+      task(step),
+      lines([
+        { kind: 'filed', at: ago(began), brief: `Do ${step}.`, cwd: '/code/hkb-v2', maxAttempts: 1, harness: 'claude' },
+        { kind: 'starting', at: ago(began - 0.1), attempt: 1 },
+        { kind: 'spawned', at: ago(began - 0.1), attempt: 1 },
+        {
+          kind: 'ended',
+          at: ago(began - 2),
+          attempt: 1,
+          sessionId: `ae/${id}-${step}/1`,
+          observed: 'done',
+          reason: 'harness',
+          closeout,
+          ...(usage ? { usage } : {}),
+        },
+        { kind: 'settled', at: ago(began - 2), outcome: 'succeeded' },
+      ]),
+    );
+  ran(gated, 9, {
+    outcome: 'done',
+    summary: 'The design, two questions left open.',
+    needs: null,
+    artifacts: [],
+    open: [ASKING.cut, ASKING.where],
+  });
+  ran(
+    raised,
+    6,
+    { outcome: 'blocked', summary: 'Drafted a warm palette and a cool one.', needs: ASKING.needs, artifacts: [], open: [ASKING.tone] },
+    {
+      turns: 11,
+      toolCalls: 19,
+      inputTokens: 980_000,
+      cacheReadTokens: 820_000,
+      cacheWriteTokens: 159_995,
+      uncachedTokens: 5,
+      peakContextTokens: 131_000,
+      firstContextTokens: 20_010,
+      firstCacheWriteTokens: 20_000,
+      outputTokens: 12_300,
+      costUsd: 1.5,
+      apiMs: 290_000,
+      toolMs: 9_000,
+    },
+  );
+  write(path.join(dir, `${gated}.md`), `---\nplace: git\nharness: claude\noutput: open.schema.json\n---\nDo ${gated}.\n`);
+  write(path.join(dir, `${raised}.md`), `---\nplace: git\nharness: claude\nbudget: 1\noutput: open.schema.json\n---\nDo ${raised}.\n`);
+  write(
+    path.join(dir, 'open.schema.json'),
+    `${JSON.stringify({ ...schema, properties: { open: { 'x-shape': 'questions', description: ASKED.description } } }, null, 2)}\n`,
+  );
+  const output = { file: 'open.schema.json', schema };
+  const record = path.join(root, 'runs', `${id}.json`);
+  write(
+    record,
+    JSON.stringify(
+      {
+        id,
+        repo: '/code/hkb-v2',
+        workspace: '/code/hkb-v2',
+        baseRef: '19c9365',
+        branch: 'main',
+        isolate: true,
+        brief: `${ASKING.title}\n\nA run written by the gate's question pages of npm run e2e, and taken back when they leave.`,
+        workflowDir: dir,
+        workflow: [
+          { name: gated, after: [], body: `Do ${gated}.`, harness: 'claude', output },
+          { name: raised, after: [], body: `Do ${raised}.`, harness: 'claude', budget: 1, output },
+        ],
+        gates: [gated],
+        createdAt: ago(10),
+        steps: { [gated]: { taskId: `${id}-${gated}` }, [raised]: { taskId: `${id}-${raised}` } },
+      },
+      null,
+      2,
+    ),
+  );
+  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task(gated), task(raised)];
+}

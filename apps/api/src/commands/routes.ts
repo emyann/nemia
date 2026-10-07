@@ -83,8 +83,8 @@ const routeShort = ({ method, path }: Route): string => {
 };
 
 /**
- * Why a body carries a key another command takes on the api alone and this one does not, 422 — a person's `answers` sent to an
- * approval, which would go nowhere — or null.
+ * Why a body carries a key another command takes on the api alone and this one does not, 422 — a person's `answers` sent to a round,
+ * which would go nowhere — or null.
  */
 function foreignKey(command: CommandSpec, route: Route, table: readonly CommandSpec[], value: unknown, shape: string): Refusal | null {
   if (typeof value !== 'object' || value === null) return null;
@@ -92,7 +92,7 @@ function foreignKey(command: CommandSpec, route: Route, table: readonly CommandS
     if (!Object.hasOwn(value, key) || command.apiTakes?.includes(key)) continue;
     return {
       status: 422,
-      error: `\`${key}\` is not a key ${routeShort(route)} takes — ${takers.map(routeShort).join(', ')} takes it — so it would go nowhere: ${shape}.`,
+      error: `\`${key}\` is not a key ${routeShort(route)} takes — ${takers.map(routeShort).join(', ')} ${takers.length > 1 ? 'take' : 'takes'} it — so it would go nowhere: ${shape}.`,
     };
   }
   return null;

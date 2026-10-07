@@ -4,6 +4,7 @@ import type { Page } from 'playwright';
 import { fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
+import { ASKED } from '../seed.ts';
 import { OUT, store } from '../world.ts';
 
 /**
@@ -50,36 +51,6 @@ const QUESTIONS = {
 
 /** The repository the run says it is of: none on disk. */
 const REPO_SAID = '/code/hkb-v2';
-
-/** A field of questions as the loader expands `"x-shape": "questions"`, and the run freezes it: the web imports no package. */
-const ASKED = {
-  type: 'array',
-  items: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: 'The question, in one line. Unique among these questions.' },
-      body: { type: 'string', description: 'What the person needs to know to answer it: the context, and what depends on the answer.' },
-      options: {
-        type: 'array',
-        description: 'The answers you see, at least one. The person may also answer in their own words.',
-        items: {
-          type: 'object',
-          properties: {
-            label: { type: 'string', description: 'The option, in a few words. Unique among this question’s options.' },
-            meaning: { type: 'string', description: 'What choosing it means: what you would do, and what it costs.' },
-          },
-          required: ['label', 'meaning'],
-          additionalProperties: false,
-        },
-      },
-      recommended: { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' },
-      multiple: { type: 'boolean', description: 'Whether several options may be chosen together.' },
-    },
-    required: ['title', 'body', 'options', 'recommended', 'multiple'],
-    additionalProperties: false,
-  },
-  description: 'What is still undecided.',
-};
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

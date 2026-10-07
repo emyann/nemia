@@ -115,9 +115,16 @@ export const askRound = (runId: string, how: { step?: string; budget?: number })
  * words for a step that may not be approved, or for empty words — or the api's own about the request; and an answer the board does not
  * read, saying the approval may be written.
  *
+ * With `answers`, a person's answers to the questions the step asks at its gate: the api checks them against what the step asks now and
+ * writes them, `message` their note, as the approval's words — or refuses them, and nothing is approved.
+ *
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
  */
-export const approveStep = (runId: string, step: string, how: { message?: string }): Promise<Approved> =>
+export const approveStep = (
+  runId: string,
+  step: string,
+  how: { message?: string; answers?: readonly QuestionAnswer[] },
+): Promise<Approved> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`, ApprovedSchema, {
     body: how,
     may: "The approval may be written: look at the step on the run's page before approving again.",

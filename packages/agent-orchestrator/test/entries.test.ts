@@ -452,6 +452,7 @@ const PINNED: Record<string, string[]> = {
     'answerOf',
     'answerRefusal',
     'answerText',
+    'approvedAnswerText',
     'approvalOf',
     'approvalRefusal',
     'approvalWordsRefusal',

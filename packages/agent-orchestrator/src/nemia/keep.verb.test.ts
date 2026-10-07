@@ -366,3 +366,19 @@ test('REFUSED: a tell the runtime refuses leaves her filed instruction as it was
   assert.deepEqual(await beat(), []);
   fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
 });
+
+test('REFUSED: custom words that do not read are told to no one while she is kept, naming the clear; a stop at manual is never held by them', async () => {
+  await keptAnew();
+  const filed = fs.readFileSync(promptFile(), 'utf8');
+  const told = b.said.length;
+  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), '---\ntools: Bash\n---\nUse Bash.\n');
+  await assert.rejects(beat(), (err: Error) => {
+    assert.ok(err.message.includes('nemia agents custom nemia --clear'), err.message);
+    return true;
+  });
+  assert.equal(b.said.length, told, 'told nothing');
+  assert.equal(fs.readFileSync(promptFile(), 'utf8'), filed);
+  await runWith(e, LEVEL.handler({ level: 'manual' }));
+  assert.deepEqual(await beat(), ['stop', 'drop'], 'stopped all the same');
+  fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
+});

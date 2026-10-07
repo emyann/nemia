@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { autoQuery, confirmRule, dropRule, type AutoList, type AutoRule } from '../lib/api';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
-import { CustomInstructions } from './CustomInstructions';
+import { CustomInstructions, SESSION } from './CustomInstructions';
 
 /** A write of a rule: `confirm` puts it in force as its `words` read, `drop` takes it out. */
 type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; id: string };
@@ -41,7 +41,7 @@ export function AutoRules({ agent }: { agent: string }) {
         In a factory at Auto, an answer these rules allow in the run's state is given without asking you; anything else is asked, as at
         Semi-auto. She proposes rules from your custom instruction, and none is in force until you confirm it here.
       </p>
-      <CustomInstructions name={agent} />
+      <CustomInstructions name={agent} reach={SESSION} />
       {data ? (
         <AutoParts list={data} pending={write.isPending} onAsk={ask} />
       ) : (

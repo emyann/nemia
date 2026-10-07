@@ -6323,6 +6323,26 @@ test("an agent's custom instructions are anchored, so a step's page links to whe
   assert.match(await routedWith(createElement(CustomInstructions, { name: 'writer' })), /<section id="custom-instructions"/);
 });
 
+test("an agent's custom instructions say a run keeps the words it froze; the store's own agent's, beside her rules, that her next session takes them", async () => {
+  const { CustomInstructions } = await import('../src/components/CustomInstructions.tsx');
+  const { AutoRules } = await import('../src/components/AutoRules.tsx');
+  const hired = await routedWith(createElement(CustomInstructions, { name: 'writer' }));
+  assert.match(hired, /data-custom-frozen[^>]*>A run already started keeps the words it froze/, 'a hired agent: a run keeps what it froze');
+  assert.match(hired, /wherever it is hired/);
+  assert.doesNotMatch(hired, /data-custom-filed/);
+  const hers = await routedWith(createElement(AutoRules, { agent: 'nemia' }));
+  assert.match(hers, /<section id="custom-instructions"/, 'her rules sit beside her custom instruction');
+  assert.match(
+    hers,
+    /data-custom-filed[^>]*>Her open session keeps the words it was filed with: a save or a clear takes effect when her session is next filed/,
+  );
+  assert.doesNotMatch(
+    hers,
+    /data-custom-frozen|A run already started|wherever it is hired|runs started from now/,
+    'no run freezes her words',
+  );
+});
+
 /** `StepPolicy` drawn as a server draws it. */
 const policyMarkup = (layers: StepLayers): string => renderToStaticMarkup(createElement(StepPolicy, { layers }));
 

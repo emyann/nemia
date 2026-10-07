@@ -17,7 +17,7 @@ import { nemia } from './nemia/nemia.ts';
 import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
-import { steps } from './steps/index.ts';
+import { Followings, steps } from './steps/index.ts';
 import { engineRead, Engine, StoreRoot } from './store.ts';
 import { builder, remover, workflows, yours } from './workflows/index.ts';
 
@@ -50,7 +50,8 @@ const RELEASE = leaseRelease(runningRelease());
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
  * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
- * kept nothing yet (`ReadMemo`), and the hub the feed's lines are published to as the process's daemon writes them (`feedHubLayer`).
+ * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), and the hub the feed's lines are published to as the
+ * process's daemon writes them (`feedHubLayer`).
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
   Layer.mergeAll(
@@ -60,6 +61,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     McpAsker.live,
     QuotaAsker.live,
     ReadMemo.live,
+    Followings.live,
     feedHubLayer(),
   );
 

@@ -328,6 +328,11 @@ test(
     const text = { value: '' };
     const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
     assert.deepEqual(
+      early[0],
+      { event: 'following', data: JSON.stringify({ streamed: false }) },
+      'first, that a background session is not pushed: it is read again every second',
+    );
+    assert.deepEqual(
       eventsIn(early).map((e) => e.id),
       ['u-1:0', 'a-1:0', 'a-2:0'],
       'what was written when it connected',

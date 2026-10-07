@@ -1,0 +1,256 @@
+/**
+ * A step followed live over HTTP (`GET …/transcript/stream`) on the app's registry (`Followings`): over the api's own engine with its
+ * `view`, `transcript` and `follow` the test's, whose attempts' moments the test pushes as they come, and the feed's lines written on
+ * the app's runtime, which wake the following between attempts. What it proves: followers of one step share one upstream, a late
+ * joiner is handed the message so far, and a held task's next turn is followed on the same stream.
+ */
+import { root } from '../../test/harness.ts';
+import { test, type TestContext } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Cause, Effect, Layer, Logger, Metric, Queue, Stream } from 'effect';
+import { emitFeed, engine } from 'agent-orchestrator';
+import { appOf, liveOf } from '../app.ts';
+import { Engine } from '../store.ts';
+import { STEP_FOLLOWS, type TranscriptEvent } from './following.ts';
+import { bell, until, WAITED } from '../../test/waits.ts';
+
+/** One moment of a live attempt, as the engine's `follow` hands it. */
+type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Service']['follow']>>>>;
+
+const RUN = 'r-follow';
+const STEPS = ['implement', 'review', 'late', 'held'];
+fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+fs.writeFileSync(
+  path.join(root, 'runs', `${RUN}.json`),
+  JSON.stringify({
+    id: RUN,
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'Follow it',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: '2026-10-07T12:00:00.000Z',
+    workflow: STEPS.map((name) => ({ name, after: [], body: `${name} it.` })),
+    steps: Object.fromEntries(STEPS.map((name) => [name, { taskId: `t-${name}` }])),
+  }),
+);
+
+const said = (id: string, text = id): TranscriptEvent => ({ id, at: '2026-10-07T12:00:00.000Z', role: 'assistant', kind: 'text', text });
+
+/** A task on the test's engine: its attempts' live moments, each a queue the test offers to, whether it settled, and its conversation. */
+type Task = { attempts: Queue.Queue<Followed, Cause.Done>[]; settled: string | null; history: TranscriptEvent[] };
+
+/** An engine over `tasks`, the api's own but for `view`, `transcript` and `follow`, counting each follow and each follow let go. */
+function engineOver(tasks: Map<string, Task>) {
+  const follows: string[] = [];
+  const closed: string[] = [];
+  const real = engine();
+  const e = {
+    ...real,
+    view: (id: string) =>
+      Effect.sync(() => ({
+        id,
+        phase: 'running',
+        sessionId: 's',
+        state: { brief: 'b', settled: tasks.get(id)!.settled, said: [], attempts: tasks.get(id)!.attempts.map((_, i) => ({ n: i + 1 })) },
+      })),
+    transcript: (id: string, after?: string) =>
+      Effect.sync(() => {
+        const { history } = tasks.get(id)!;
+        return { events: history.slice(Number(after ?? 0)), cursor: String(history.length) };
+      }),
+    follow: (id: string) =>
+      Effect.sync(() => {
+        follows.push(id);
+        const live = tasks.get(id)!.attempts.at(-1);
+        return live ? Stream.fromQueue(live).pipe(Stream.ensuring(Effect.sync(() => closed.push(id)))) : undefined;
+      }),
+  } as unknown as ReturnType<typeof engine>;
+  return { e, follows, closed };
+}
+
+/** A live attempt, which says first that it is working, as the runtime's subscription hands its task first. */
+const attempt = () => {
+  const q = Effect.runSync(Queue.unbounded<Followed, Cause.Done>());
+  Queue.offerUnsafe(q, { kind: 'state', state: 'working' });
+  return q;
+};
+
+/** A task with one attempt in flight, nothing said yet but `history`. */
+const working = (history: TranscriptEvent[] = []): Task => ({ attempts: [attempt()], settled: null, history });
+
+/** `m` said by the attempt `n` (from 1) of `task`. */
+const push = (task: Task, n: number, m: Followed) => Queue.offerUnsafe(task.attempts[n - 1], m);
+
+/** An app over the engine `e`, its runtime let go once the test `t` ends. */
+function appOver(t: TestContext, e: ReturnType<typeof engine>) {
+  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e)));
+  t.after(() => own.runtime.dispose());
+  return own;
+}
+
+type Block = { event?: string; data?: string; id?: string };
+const blocks = (text: string): Block[] =>
+  text
+    .split('\n\n')
+    .filter((b) => b.trim())
+    .map((b) => {
+      const block: Block = {};
+      for (const line of b.split('\n')) {
+        const at = line.indexOf(':');
+        if (at > 0) block[line.slice(0, at) as keyof Block] = line.slice(at + 1).trimStart();
+      }
+      return block;
+    });
+
+/** One follower of the step `step`: what it was sent so far (`said`), waited on until `holds` does, and let go (`leave`). */
+async function follower(t: TestContext, app: ReturnType<typeof appOver>['app'], step: string) {
+  const res = await app.request(`/api/runs/${RUN}/steps/${step}/transcript/stream`);
+  if (res.status !== 200) assert.fail(await res.text());
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  const rung = bell();
+  const got = () => blocks(text.slice(0, text.lastIndexOf('\n\n') + 2));
+  const pump = async (): Promise<void> => {
+    const { done, value } = await reader.read();
+    if (done) return;
+    text += decoder.decode(value, { stream: true });
+    rung.ring();
+    return pump();
+  };
+  const finished = pump();
+  const wait = (holds: (s: Block[]) => boolean, what: string) =>
+    until(
+      t,
+      () => holds(got()),
+      () => `${what}: ${JSON.stringify(got())}`,
+      { bell: rung },
+    );
+  const ended = async () => {
+    await finished;
+    return got();
+  };
+  return { said: got, wait, ended, leave: () => reader.cancel() };
+}
+
+const kinds = (s: Block[]) => s.map((b) => (b.event === 'transcript' ? `transcript ${JSON.parse(b.data!).id}` : `${b.event} ${b.data}`));
+const follows = () => Effect.runSync(Metric.value(STEP_FOLLOWS)).count;
+
+/** A line of the feed for the step `step`, saying `word`, as a pass of the tick writes it, on the app's runtime, unlogged. */
+const line = (own: ReturnType<typeof appOver>, step: string, word: string) =>
+  own.runtime.runPromise(
+    emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: step, word }] }]])).pipe(Effect.provide(Logger.layer([]))),
+  );
+
+test(
+  'two followers of a step share one upstream, both handed each moment; another step opens its own; both gone, it is let go',
+  WAITED,
+  async (t) => {
+    const implement = working([said('a-1')]);
+    const tasks = new Map([
+      ['t-implement', implement],
+      ['t-review', working()],
+    ]);
+    const { e, follows: asked, closed } = engineOver(tasks);
+    const own = appOver(t, e);
+    const before = follows();
+    const one = await follower(t, own.app, 'implement');
+    const two = await follower(t, own.app, 'implement');
+    for (const f of [one, two]) await f.wait((s) => s.length >= 2, 'following, then the history');
+    push(implement, 1, { kind: 'partial', key: 'k', text: 'Hel', append: true, last: false });
+    implement.history.push(said('a-2'));
+    push(implement, 1, { kind: 'events', events: [said('a-2')], cursor: '2' });
+    for (const f of [one, two]) await f.wait((s) => kinds(s).includes('transcript a-2'), 'the moments pushed');
+    assert.deepEqual(kinds(one.said()), kinds(two.said()), 'both handed the same');
+    assert.deepEqual(kinds(one.said()), [
+      'following {"streamed":true}',
+      'transcript a-1',
+      'partial {"key":"k","delta":"Hel","last":false}',
+      'transcript a-2',
+    ]);
+    assert.equal(follows() - before, 1, 'one upstream opened for the two followers');
+    assert.deepEqual(asked, ['t-implement'], "the engine's follow asked once");
+    const other = await follower(t, own.app, 'review');
+    await other.wait((s) => s.length >= 1, 'following');
+    assert.equal(follows() - before, 2, 'a follower of another step opens its own');
+    await one.leave();
+    await two.leave();
+    await until(
+      t,
+      () => closed.includes('t-implement'),
+      () => `the upstream let go once both left: ${closed}`,
+    );
+    assert.ok(!closed.includes('t-review'), 'the other step still followed');
+    await other.leave();
+  },
+);
+
+test(
+  'a follower who joins mid-message is handed the text so far as one piece, then the rest live, then the whole message',
+  WAITED,
+  async (t) => {
+    const late = working([said('a-1')]);
+    const { e } = engineOver(new Map([['t-late', late]]));
+    const own = appOver(t, e);
+    const first = await follower(t, own.app, 'late');
+    await first.wait((s) => s.length >= 2, 'following, then the history');
+    push(late, 1, { kind: 'partial', key: 'k', text: 'Hel', append: true, last: false });
+    push(late, 1, { kind: 'partial', key: 'k', text: 'lo', append: true, last: false });
+    await first.wait((s) => s.filter((b) => b.event === 'partial').length === 2, 'the two pieces');
+    const joiner = await follower(t, own.app, 'late');
+    await joiner.wait((s) => s.some((b) => b.event === 'partial'), 'the message so far');
+    push(late, 1, { kind: 'partial', key: 'k', text: ' there', append: true, last: false });
+    push(late, 1, { kind: 'partial', key: 'k', text: '', append: true, last: true });
+    late.history.push(said('a-2', 'Hello there'));
+    push(late, 1, { kind: 'events', events: [said('a-2', 'Hello there')], cursor: '2' });
+    await joiner.wait((s) => kinds(s).includes('transcript a-2'), 'the whole message');
+    assert.deepEqual(kinds(joiner.said()), [
+      'following {"streamed":true}',
+      'transcript a-1',
+      'partial {"key":"k","delta":"Hello","last":false}',
+      'partial {"key":"k","delta":" there","last":false}',
+      'partial {"key":"k","delta":"","last":true}',
+      'transcript a-2',
+    ]);
+    await first.leave();
+    await joiner.leave();
+  },
+);
+
+test(
+  "a held task's stream stays open while it waits on a person, then says moved and follows its next turn to its end",
+  WAITED,
+  async (t) => {
+    const held = working([said('a-1')]);
+    const { e } = engineOver(new Map([['t-held', held]]));
+    const own = appOver(t, e);
+    const f = await follower(t, own.app, 'held');
+    push(held, 1, { kind: 'state', state: 'input-required' });
+    Queue.endUnsafe(held.attempts[0]);
+    await f.wait((s) => s.length >= 2, 'following, then the history');
+    held.history.push(said('u-2'), said('a-3'));
+    held.attempts.push(attempt());
+    await line(own, 'held', 'running');
+    await f.wait((s) => kinds(s).includes('transcript a-3'), "the next turn's history");
+    held.history.push(said('a-4'));
+    push(held, 2, { kind: 'events', events: [said('a-4')], cursor: '4' });
+    Queue.endUnsafe(held.attempts[1]);
+    held.settled = 'succeeded';
+    await line(own, 'held', 'verified');
+    assert.deepEqual(kinds(await f.ended()), [
+      'following {"streamed":true}',
+      'transcript a-1',
+      'moved {"taskId":"t-held"}',
+      'transcript a-1',
+      'transcript u-2',
+      'transcript a-3',
+      'transcript a-4',
+      'settled {"cursor":"4"}',
+    ]);
+  },
+);

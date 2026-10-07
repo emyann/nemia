@@ -28,26 +28,33 @@ const standing = (kind: 'ticking' | 'stalled'): DaemonStanding => {
   return { kind, file, last: NOW, quiet: kind === 'ticking' ? 1_000 : 3_600_000, identity: 'same' };
 };
 
-/** A lease read as `kinds` say, one a reading, then as the last of them for good, and how many times it was read. */
-function scripted(kinds: readonly ('ticking' | 'stalled')[]): { lease: () => DaemonStanding; reads: () => number } {
+/** A lease read as `kinds` say, one a reading, then as the last of them; how many times it was read; and its end, four readings after. */
+function scripted(kinds: readonly ('ticking' | 'stalled' | 'none')[]) {
   let read = 0;
-  return { lease: () => standing(kinds[Math.min(read++, kinds.length - 1)]), reads: () => read };
+  let spent = () => {};
+  const end = new Promise<void>((resolve) => (spent = resolve));
+  const lease = (): DaemonStanding => {
+    if (++read >= kinds.length + 4) spent();
+    const kind = kinds[Math.min(read - 1, kinds.length - 1)];
+    return kind === 'none' ? { kind } : standing(kind);
+  };
+  return { lease, reads: () => read, end };
 }
 
-/** The first `n` lines `livenessLines` says of `lease`, polled as fast as the stream goes. */
-const said = (lease: () => DaemonStanding, n: number) =>
+/** The first `n` lines `livenessLines` says of `lease`, polled as fast as the stream goes, or those it said before the lease's end. */
+const said = (lease: ReturnType<typeof scripted>, n: number) =>
   Effect.runPromise(
     Stream.runCollect(
       Stream.take(
-        livenessLines(lease, '1 millis', () => NOW),
+        livenessLines(lease.lease, '1 millis', () => NOW),
         n,
-      ),
+      ).pipe(Stream.interruptWhen(Effect.promise(() => lease.end))),
     ),
   );
 
 test('the watch says the store down once when its daemon goes silent, and up once when it ticks again', async () => {
   const lease = scripted(['ticking', 'ticking', 'stalled', 'stalled', 'stalled', 'ticking', 'ticking']);
-  const lines = await said(lease.lease, 2);
+  const lines = await said(lease, 2);
   assert.deepEqual(
     lines.map((l) => l.state),
     ['down', 'up'],
@@ -61,12 +68,12 @@ test('the watch says the store down once when its daemon goes silent, and up onc
 });
 
 test('a watch started while the store is down says so at once', async () => {
-  const lines = await said(scripted(['stalled', 'ticking']).lease, 2);
+  const lines = await said(scripted(['stalled', 'ticking']), 2);
   assert.deepEqual(
     lines.map((l) => l.state),
     ['down', 'up'],
   );
-  const none = await said(() => ({ kind: 'none' }), 1);
+  const none = await said(scripted(['none']), 1);
   assert.deepEqual(
     none.map((l) => l.state),
     ['down'],

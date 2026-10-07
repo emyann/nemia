@@ -92,7 +92,11 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">Custom instructions</h2>
         <p className="text-xs text-neutral-600 dark:text-neutral-400">{reach.told(<code className="font-mono">{name}</code>)}</p>
-        <p {...{ [`data-custom-${reach.takes.mark}`]: true }} className="text-xs text-neutral-600 dark:text-neutral-400">
+        <p
+          data-custom-frozen={reach.takes.mark === 'frozen' || undefined}
+          data-custom-filed={reach.takes.mark === 'filed' || undefined}
+          className="text-xs text-neutral-600 dark:text-neutral-400"
+        >
           {reach.takes.words}
         </p>
       </div>

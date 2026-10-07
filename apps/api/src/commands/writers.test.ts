@@ -1,9 +1,10 @@
 /**
  * The library's writers on the api, held to the one spec the command line parses too: each route of `agents write`, `agents copy`,
- * `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows remove`, sent as the board sends it, hands its entry's handler only the
- * keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is answered as it would be.
- * The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken is refused in the one
- * sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the command line.
+ * `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows remove`, sent as the board sends it, hands its entry's
+ * handler only the keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is
+ * answered as it would be. The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken
+ * is refused in the one sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the
+ * command line.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';

@@ -14,9 +14,10 @@ type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; 
 const DEFAULT_ID = 'default';
 
 /**
- * An agent's rules for Auto on Nemia's settings: the custom instruction they come from, written there, the rules in force with the default marked and a
- * Drop each, what the agent proposed with a Confirm each and whether the instruction changed since, and the words kept as guidance, which
- * nothing enforces. A write sets what the part shows from the api's answer and reads the rules again; a refusal is shown in its words.
+ * An agent's rules for Auto on Nemia's settings: the custom instruction they come from, written there, the rules in force with the
+ * default marked and a Drop each, what the agent proposed with a Confirm each, sending the words read, and whether the instruction changed
+ * since, and the words kept as guidance, which nothing enforces. A write sets what the part shows from the api's answer and reads the
+ * rules again; a refusal is shown in its words.
  */
 export function AutoRules({ agent }: { agent: string }) {
   const queryClient = useQueryClient();

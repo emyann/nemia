@@ -1,7 +1,8 @@
 /**
  * An agent's rules for `auto` on disk, under a scratch store: a proposal touches the proposal's file alone; the first confirm seeds the
- * person's list with the rule that ships beside the one confirmed, and binds to the words the person read; a drop takes a rule out, the default among them; each refusal by its
- * kind writes nothing; and a proposal is stale once the custom instruction it was read from changes.
+ * person's list with the rule that ships beside the one confirmed, and binds to the words the person read; a drop takes a rule out, the
+ * default among them; each refusal by its kind writes nothing; and a proposal is stale once the custom instruction it was read from
+ * changes.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -1,22 +1,28 @@
 /**
- * The daemon's deliverer of subscriptions: for each subscription on disk, the feed followed from where its deliverer was (`followFeed`), a
- * wake line said to its task at once through the engine's `say`, with the digest that rides it, and each routine line folded into the
- * digest, said alone once `digestEvery` minutes have passed with no wake (`sortLine`, `messageOf`, `digestOf`, `digestDue`).
+ * The daemon's deliverer of subscriptions: for each subscription on disk, the feed followed from where its deliverer was (`followFeed`), and
+ * each read of it delivered as one: the wake lines it holds said to its task at once, in one message through the engine's `say`, with the
+ * digest that rides them, and each routine line folded into the digest, said alone once `digestEvery` minutes have passed with no wake
+ * (`readDelivered`, `messageOf`, `digestOf`, `digestDue`).
  *
- * Where it is with each is written after each line, and after a line is said only once `say` resolved, so a restart, read from the
- * deliverer's file, neither repeats nor drops a line: a line is told at least once, to the harness's inbox. The file is stamped with the
- * subscription it is for, so one put again under the same name starts from its own `from`. A `say` that fails is said
- * again, for ever, on a capped exponential backoff, each failure a warning; the feed is not read on meanwhile. A feed cut under the cursor
- * is read again from its start. Each beat the subscriptions are read again: one gone is stopped and its deliverer's file dropped, one new
- * or changed is started (`FiberMap`).
+ * A read is everything the feed's reader has handed on since the deliverer last took, at least one item: a pass's lines come together, and
+ * lines that come while a `say` is in flight or waits on its backoff are gathered for the next message, up to the hub's 1024 items. No
+ * window waits for more: the first line of a wake is said as soon as the deliverer is free.
+ *
+ * Where it is with each is written after each read, and after a read that holds a wake only once its `say` resolved, so a restart, read
+ * from the deliverer's file, drops no line: a message is told at least once, to the harness's inbox, and said again whole by a deliverer
+ * stopped before its cursor was written. The file is stamped with the subscription it is for, so one put again under the same name starts
+ * from its own `from`. A `say` that fails is said again whole, for ever, on a capped exponential backoff, each failure a warning; the feed
+ * read meanwhile waits for the next message. A feed cut under the cursor is read again from its start. Each beat the subscriptions are
+ * read again: one gone is stopped and its deliverer's file dropped, one new or changed is started (`FiberMap`).
  *
  * A scoped subscription carries only the lines of runs whose factory is at its floor or above (`atLeast`), read as each line comes: the
  * run's factory once per run, frozen at its start, and the factory's level each time, so a raise counts from its start to its end. A
- * line below the floor, or of a run that does not read, is passed: the cursor moves on, and nothing is said or folded.
+ * line below the floor, or of a run that does not read, is passed: the cursor moves on, and nothing is said or folded of it.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) once it holds the store.
  */
 import { Cause, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
+import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { instantNow } from '../daemon/daemon.store.ts';
 import type { FeedLine } from '../feed/feed.ts';
 import { followFeed, type Followed } from '../feed/feed.verb.ts';
@@ -24,7 +30,7 @@ import { EngineService } from '../runtime-client.ts';
 import { atLeast } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { dropDelivery, listDeliveries, listSubscriptions, readDelivery, writeDelivery } from './subscription.store.ts';
-import { digestDue, digestOf, messageOf, resumedAt, sortLine, type Delivery, type Subscription } from './subscription.ts';
+import { digestDue, digestOf, readDelivered, resumedAt, type Delivery, type Subscription } from './subscription.ts';
 
 /** The wake lines said to subscribers. */
 export const SUBSCRIPTION_WAKES = Metric.counter('subscription.wakes', { description: 'the wake lines of the feed said to a subscriber' });
@@ -117,18 +123,19 @@ const carries = (d: Delivering, run: string): Effect.Effect<boolean> => {
 };
 
 /**
- * A line of the feed, ending at `cursor`: one the subscription does not carry passed; a wake said with the digest it carries, then the
- * cursor kept; else folded into the digest.
+ * One read of the feed, its lines ending at `cursor`, delivered: a line the subscription does not carry passed; where a carried line
+ * wakes, the message said, then the cursor kept; else the routine lines folded into the digest.
  */
-const onLine = (d: Delivering, line: FeedLine, cursor: number): Effect.Effect<void, never, EngineService> =>
+const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, never, EngineService> =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
-    if (!(yield* carries(d, line.run))) return yield* keep(d, { ...at, cursor });
-    if (sortLine(line, d.sub.wake) === 'routine')
-      return yield* keep(d, { cursor, digest: [...at.digest, line], since: at.since ?? instantNow() });
-    yield* told(d.name, d.sub, messageOf(line, at.digest), d.o);
-    yield* Metric.update(SUBSCRIPTION_WAKES, 1);
-    yield* keep(d, { cursor, digest: [] });
+    const carried = yield* Effect.filter(lines, (line) => carries(d, line.run));
+    const read = readDelivered(at, carried, d.sub.wake, cursor, instantNow());
+    if (read.message !== undefined) {
+      yield* told(d.name, d.sub, read.message, d.o);
+      yield* Metric.update(SUBSCRIPTION_WAKES, read.wakes);
+    }
+    yield* keep(d, read.next);
   });
 
 /** The digest said alone where it is due, then emptied. */
@@ -141,20 +148,40 @@ const digestPass = (d: Delivering): Effect.Effect<void, never, EngineService> =>
     yield* keep(d, { cursor: at.cursor, digest: [] });
   });
 
-/** What the deliverer does of an item of the feed it follows: a line, one at a time; a feed that does not read, a warning. */
-const onItem =
+/**
+ * What the deliverer does of one read of the feed it follows: a feed that does not read, a warning; its lines, delivered as one, under the
+ * lock; a read with none, nothing.
+ */
+const onRead =
   (d: Delivering) =>
-  (item: Followed): Effect.Effect<void, never, EngineService> =>
-    item.kind === 'line'
-      ? d.lock.withPermit(onLine(d, item.line, item.cursor))
-      : item.kind === 'unreadable'
-        ? Effect.logWarning(`the subscription ${d.name} waits for the feed to read: ${item.error}`)
-        : Effect.void;
+  (items: NonEmptyReadonlyArray<Followed>): Effect.Effect<void, never, EngineService> =>
+    Effect.gen(function* () {
+      for (const item of items)
+        if (item.kind === 'unreadable') yield* Effect.logWarning(`the subscription ${d.name} waits for the feed to read: ${item.error}`);
+      const lines = items.flatMap((item) => (item.kind === 'line' ? [item] : []));
+      const last = lines.at(-1);
+      if (last)
+        yield* d.lock.withPermit(
+          onLines(
+            d,
+            lines.map((item) => item.line),
+            last.cursor,
+          ),
+        );
+    });
 
-/** The feed followed from the cursor, for ever; cut under it, read again from its start. */
+/** How many items of the feed a deliverer gathers while it says a message: the hub's own capacity (`feedHubLayer`). */
+const GATHERED = 1024;
+
+/** The feed followed from the cursor, for ever, a read at a time; cut under it, read again from its start. */
 const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
   Effect.suspend(() => Ref.get(d.state)).pipe(
-    Effect.flatMap((at) => followFeed(at.cursor, { beat: d.o.beat }).pipe(Stream.runForEach(onItem(d)))),
+    Effect.flatMap((at) =>
+      followFeed(at.cursor, { beat: d.o.beat }).pipe(
+        Stream.buffer({ capacity: GATHERED, strategy: 'suspend' }),
+        Stream.runForEachArray(onRead(d)),
+      ),
+    ),
     Effect.catch((cut) =>
       Effect.logWarning(`the subscription ${d.name} reads the feed again from its start: ${cut.message}`).pipe(
         Effect.andThen(d.lock.withPermit(Ref.get(d.state).pipe(Effect.flatMap((at) => keep(d, { ...at, cursor: 0 }))))),

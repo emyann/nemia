@@ -1,16 +1,17 @@
 /**
  * The deliverer over the feed on disk and an engine of the test's, whose `say` records what each task is told and fails where a test says:
- * a wake line said once, with the digest riding it; a digest said alone once due, and never before; a restart that neither repeats nor
- * drops a line; the cursor held while `say` fails; an unsubscribe that stops delivery; a name subscribed again that starts from its own
- * `from`; a feed cut under the cursor read again from its start; and a subscription scoped by a floor told only of the runs of factories
- * at it or above. Each test
- * runs a deliverer of its own and waits for what it counts. A store of its own, since `WF_ROOT` is read as the module loads.
+ * a wake line said once, with the digest riding it; the wake lines of one read said in one message, a gate's two lines and several
+ * gates alike, over the file and over the hub; a digest said alone once due, and never before; a restart that neither repeats nor drops a
+ * line, and one between a `say` and its cursor that says the message again; the cursor held while `say` fails, the message said again
+ * whole; an unsubscribe that stops delivery; a name subscribed again that starts from its own `from`; a feed cut under the cursor read
+ * again from its start; and a subscription scoped by a floor told only of the runs of factories at it or above. Each test runs a
+ * deliverer of its own and waits for what it counts. A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Duration, Effect, Fiber, Metric, Schedule } from 'effect';
+import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
@@ -20,15 +21,20 @@ process.env.WF_ROOT = ROOT;
 const { SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deliver.verb.ts');
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
-const { feedFile, feedSize } = await import('../feed/feed.store.ts');
+const { feedFile, feedSize, readFeed } = await import('../feed/feed.store.ts');
+const { emitFeed, FEED_FOLLOWERS, feedHubLayer } = await import('../feed/feed.verb.ts');
 const { engineOf, over } = await import('../runtime-client.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
 
-/** What each task was told, in order; how many times each was asked; and the tasks whose `say` fails for now. */
+/**
+ * What each task was told, in order; what each was asked, in order; the tasks whose `say` fails for now; and the tasks whose next `say` is
+ * told and never resolves, as a deliverer stopped between a `say` and its cursor.
+ */
 const told = new Map<string, string[]>();
-const asked = new Map<string, number>();
+const asked = new Map<string, string[]>();
 const failing = new Set<string>();
+const hanging = new Set<string>();
 /** Rung as a task is told. */
 const toldBell = bell();
 
@@ -36,19 +42,23 @@ const e = {
   ...engineOf(board().layer),
   say: (task: string, text: string) =>
     Effect.suspend(() => {
-      asked.set(task, (asked.get(task) ?? 0) + 1);
+      asked.set(task, [...(asked.get(task) ?? []), text]);
       if (failing.has(task)) return Effect.fail({ _tag: 'SayUnsent', message: 'its session is not listed' } as never);
       told.set(task, [...(told.get(task) ?? []), text]);
       toldBell.ring();
+      if (hanging.delete(task)) return Effect.never;
       return Effect.succeed({ at: new Date().toISOString(), text } as never);
     }),
 };
 
+/** The deliverer, at a pace a test waits on. */
+const delivering = over(e)(
+  deliver({ every: '10 millis', beat: '10 millis', digestCheck: '10 millis', retry: '5 millis', retryCap: '20 millis' }),
+);
+
 /** A deliverer at a pace a test waits on, running until the answer is called, or else until test `t` ends, whatever its verdict. */
 const running = (t: TestContext): (() => Promise<void>) => {
-  const fiber = Effect.runFork(
-    over(e)(deliver({ every: '10 millis', beat: '10 millis', digestCheck: '10 millis', retry: '5 millis', retryCap: '20 millis' })),
-  );
+  const fiber = Effect.runFork(delivering);
   const stop = () => Effect.runPromise(Fiber.interrupt(fiber)).then(() => undefined);
   t.after(stop);
   return stop;
@@ -75,6 +85,18 @@ const digestChecks = (): number => Effect.runSync(Metric.value(SUBSCRIPTION_DIGE
 
 const toldTo = (task: string): string[] => told.get(task) ?? [];
 
+/** The lines of a message told, each a line of the feed, between its heading and the digest riding it. */
+const wakesIn = (message: string): string[] => message.split('\n\n')[0].split('\n').slice(1);
+
+/** A gate's two lines at one instant, as the tick writes them: the run's, waiting on a person, then its step's at `land`. */
+const gate = (run: string): object[] => {
+  const at = new Date().toISOString();
+  return [
+    { at, run, word: 'awaiting approval', note: 'waiting on you: approve land' },
+    { at, run, step: 'land', word: 'awaiting approval', note: `approve it: nemia approve ${run} land` },
+  ];
+};
+
 test(
   'a wake line is said once, the routine lines before it riding it as one digest, and the cursor kept once it is said',
   WAITED,
@@ -98,6 +120,63 @@ test(
     dropSubscription('once');
   },
 );
+
+test("REFUSED: one gate's two lines are one say, holding both in feed order", WAITED, async (t) => {
+  subscribed('gate', 't-gate');
+  appended(...gate('r-20'));
+  const stop = running(t);
+  await held(t, () => readDelivery('gate')?.cursor === feedSize(), 'the cursor at the end of the feed');
+  assert.equal(toldTo('t-gate').length, 1, 'one say for one gate');
+  assert.deepEqual(
+    wakesIn(toldTo('t-gate')[0]).map((l) => l.split('  ').slice(2).join(' ')),
+    ['r-20 — awaiting approval · waiting on you: approve land', 'r-20 land awaiting approval · approve it: nemia approve r-20 land'],
+  );
+  await stop();
+  dropSubscription('gate');
+});
+
+test('three gates in one read: one say, their lines in feed order, with the digest once', WAITED, async (t) => {
+  subscribed('gates', 't-gates');
+  appended(line('r-21', 'running'), ...gate('r-22'), ...gate('r-23'), ...gate('r-24'));
+  const stop = running(t);
+  await held(t, () => readDelivery('gates')?.cursor === feedSize(), 'the cursor at the end of the feed');
+  assert.equal(toldTo('t-gates').length, 1, 'one say for one read');
+  const [said] = toldTo('t-gates');
+  assert.deepEqual(
+    wakesIn(said).map((l) => l.split('  ').slice(2, 4).join(' ')),
+    ['r-22 —', 'r-22 land', 'r-23 —', 'r-23 land', 'r-24 —', 'r-24 land'],
+  );
+  assert.equal(said.split('Since your last news:').length, 2, 'the digest said once');
+  assert.match(said, /Since your last news:\n1 routine line of the feed:\n {2}\S+ {2}r-21 {2}build {2}running$/);
+  assert.deepEqual(readDelivery('gates')?.digest, []);
+  await stop();
+  dropSubscription('gates');
+});
+
+test("a gate published to the process's hub is one say, as the daemon delivers it", WAITED, async (t) => {
+  const rt = ManagedRuntime.make(Layer.merge(feedHubLayer(), Logger.layer([])));
+  t.after(() => rt.dispose());
+  subscribed('hub', 't-hub');
+  const following = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
+  const was = following();
+  const fiber = rt.runFork(delivering);
+  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  await held(t, () => following() > was, 'the deliverer following the hub');
+  const judged = {
+    run: { word: 'awaiting approval', note: 'waiting on you: approve land' },
+    steps: [{ name: 'land', word: 'awaiting approval' }],
+  };
+  const others = new Set(readFeed().lines.map((l) => l.run));
+  await rt.runPromise(emitFeed(new Map([['r-25', judged]]), { unjudged: others }));
+  await held(t, () => readDelivery('hub')?.cursor === feedSize(), 'the cursor at the end of the feed');
+  assert.equal(toldTo('t-hub').length, 1, 'one say for the pass');
+  assert.deepEqual(
+    wakesIn(toldTo('t-hub')[0]).map((l) => l.split('  ').slice(2, 4).join(' ')),
+    ['r-25 —', 'r-25 land'],
+  );
+  await Effect.runPromise(Fiber.interrupt(fiber));
+  dropSubscription('hub');
+});
 
 test('a digest falls due after its minutes with no wake: said alone, then emptied', WAITED, async (t) => {
   const from = subscribed('quiet', 't-quiet');
@@ -155,15 +234,43 @@ test('the cursor stays while say fails, said again after a backoff until it is t
   appended(line('r-6', 'running'));
   await held(t, () => readDelivery('held')?.digest.length === 1, 'the routine line folded');
   const before = readDelivery('held')!;
-  appended(line('r-6', 'blocked'));
-  await held(t, () => (asked.get('t-held') ?? 0) >= 3, 'say asked three times');
+  appended(line('r-6', 'blocked'), line('r-6', 'running'), line('r-6b', 'failed ✗ check (exit 1)'));
+  await held(t, () => (asked.get('t-held') ?? []).length >= 3, 'say asked three times');
   assert.deepEqual(readDelivery('held'), before, 'neither the cursor nor the digest moved while say fails');
   failing.delete('t-held');
   await held(t, () => toldTo('t-held').length === 1, 'said once say takes it');
   await held(t, () => readDelivery('held')?.cursor === feedSize(), 'the cursor kept after it');
   assert.equal(toldTo('t-held').length, 1);
+  const [said] = toldTo('t-held');
+  assert.deepEqual(new Set(asked.get('t-held')), new Set([said]), 'every try said the message whole, and the same');
+  assert.deepEqual(
+    wakesIn(said).map((l) => l.split('  ').slice(2).join(' ')),
+    ['r-6 build blocked', 'r-6b build failed ✗ check (exit 1)'],
+  );
+  assert.match(said, /Since your last news:\n2 routine lines of the feed:\n.*r-6 {2}build {2}running\n.*r-6 {2}build {2}running$/);
   await stop();
   dropSubscription('held');
+});
+
+test('a restart between a say and its cursor write says the message again: at least once, never dropped', WAITED, async (t) => {
+  const from = subscribed('between', 't-between');
+  hanging.add('t-between');
+  let stop = running(t);
+  appended(line('r-26', 'awaiting approval'), line('r-27', 'blocked'));
+  await held(t, () => toldTo('t-between').length === 1, 'told once, its say never resolving');
+  await stop();
+  assert.equal(readDelivery('between')?.cursor ?? from, from, 'the cursor never moved: the say did not resolve');
+  stop = running(t);
+  await held(t, () => readDelivery('between')?.cursor === feedSize(), 'the cursor at the end of the feed');
+  const [first, again] = toldTo('t-between');
+  assert.equal(toldTo('t-between').length, 2, 'said again once the restarted deliverer read from its cursor');
+  assert.equal(again, first, 'the same message, whole');
+  assert.deepEqual(
+    wakesIn(first).map((l) => l.split('  ').slice(2).join(' ')),
+    ['r-26 build awaiting approval', 'r-27 build blocked'],
+  );
+  await stop();
+  dropSubscription('between');
 });
 
 test('a failed say is said again after a backoff that doubles from retry and never waits longer than retryCap', () => {
@@ -266,7 +373,11 @@ test(
     const stop = running(t);
     appended(line('r-pipao', 'running'), line('r-pipao', 'awaiting approval'), line('r-gone', 'awaiting approval'));
     appended(line('r-hkb', 'awaiting approval'));
-    await held(t, () => toldTo('t-everything').length === 3, 'every wake said to the one unscoped');
+    const wakesTold = () =>
+      toldTo('t-everything')
+        .flatMap(wakesIn)
+        .filter((l) => l.includes('awaiting approval')).length;
+    await held(t, () => wakesTold() === 3, 'every wake said to the one unscoped');
     await held(t, () => readDelivery('floored')?.cursor === feedSize(), "the floored one's cursor past every line");
     assert.equal(toldTo('t-floored').length, 1);
     assert.match(toldTo('t-floored')[0], /^The feed needs your judgement:\n {2}\S+ {2}r-hkb {2}build {2}awaiting approval$/);

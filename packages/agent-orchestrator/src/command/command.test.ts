@@ -520,6 +520,12 @@ test("the table's help is today's, word for word", () => {
       '  nemia service status [--name <name>]',
       '                               the login service and the lease: whether it is installed and runs,',
       '                               the checkout it runs, who holds the store, and lingering',
+      '  nemia service restart [--name <name>]',
+      "                               restart the service's daemon on the code it runs: pause the store, wait",
+      '                               for landing checks, stop it, start the service, and resume once the new',
+      '                               daemon has completed its first pass; refused, naming the log, when that',
+      '                               pass fails. A pause a person put stands. Starts the service where',
+      "                               nothing ticks; a daemon started by hand is named with --take-over's line",
       '  nemia upgrade <tag> [--repo <path>] [--name <name>]',
       "                               build the tag from a clean export into the store's releases/<tag>:",
       '                               npm ci, npm run build and npm run release:check there, on a trial',
@@ -557,8 +563,11 @@ test("the table's help is today's, word for word", () => {
       '                               nemia up --stats: what the last pass cost, phase by phase — read, not',
       '                               run, so it fits while a daemon holds the store; where none does,',
       '                               nemia tick --stats',
-      '  nemia watch [cursor]',
-      "                               nemia feed's lines, followed as the tick writes them, until ^C",
+      '  nemia watch [cursor] [--json] [--wake] [--wake-word <word>]...',
+      "                               nemia feed's lines, followed as the tick writes them, until ^C, and a",
+      '                               daemon down line when nothing ticks the store, daemon up when it does',
+      '                               again. --json: one JSON object a line, a feed line with its cursor;',
+      '                               --wake: only the lines that wait on a person; --wake-word: these words',
       '  nemia admit [--at-least <level>] [--auto <agent>]',
       "                               a call's admission: the call a session is about to make, on stdin, answered",
       '                               ask where it answers what waits on you;',
@@ -760,7 +769,7 @@ test("REFUSED at shipped defaults: nemia tick's, nemia up's and nemia watch's ar
   assert.equal(refusedBy(up, ['10', '20']), 'nemia up takes one pass interval at most, and was given 20 too: nemia up [ms].');
   assert.equal(refusedBy(up, ['10']), null);
   const cursor =
-    'nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: nemia watch [cursor]';
+    'nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: nemia watch [cursor] [--json] [--wake] [--wake-word <word>]...';
   for (const argv of [['x'], ['1', '2'], ['--from']]) assert.equal(refusedBy(entry('watch'), argv), cursor, argv.join(' '));
   assert.equal(refusedBy(entry('watch'), ['12']), null);
 });

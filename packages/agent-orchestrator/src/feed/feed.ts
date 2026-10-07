@@ -285,4 +285,4 @@ export const deniedNote = (calls: readonly string[], running: readonly string[] 
 
 /** The refusal of a cursor `nemia feed` or `nemia watch` does not take: a second, or anything but a whole number of bytes. */
 export const cursorTakes = (verb: 'feed' | 'watch'): string =>
-  `nemia ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: nemia ${verb} [cursor]`;
+  `nemia ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: nemia ${verb} [cursor]${verb === 'watch' ? ' [--json] [--wake] [--wake-word <word>]...' : ''}`;

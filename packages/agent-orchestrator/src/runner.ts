@@ -207,7 +207,8 @@ export type { Factory, FactoryListing, Hires, InstructionAt } from './factory/fa
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine, FeedPublished } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
-export { DEFAULT_WAKE, subscriptionNameRefusal } from './subscription/subscription.ts';
+export { DEFAULT_WAKE, subscriptionNameRefusal, wakeOf, watchedLine } from './subscription/subscription.ts';
+export type { Watched } from './subscription/subscription.ts';
 export {
   DAEMON_FILE,
   DEFAULT_EVERY_MS,
@@ -218,12 +219,14 @@ export {
   everyOf,
   holderOf,
   holderWords,
+  livenessLine,
+  livenessWords,
   staleAfterMs,
   START_WORDS,
   takenFromLine,
   takeoverLine,
 } from './daemon/daemon.ts';
-export type { DaemonFile, DaemonStanding, HolderKind, Identity } from './daemon/daemon.ts';
+export type { DaemonFile, DaemonStanding, HolderKind, Identity, Liveness } from './daemon/daemon.ts';
 export {
   HOME,
   acceptFile,

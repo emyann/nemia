@@ -521,14 +521,27 @@ const UP: Ran = {
   only: { side: 'cli', why: 'nemia up holds the store as long as its process lives; the api holds none' },
 };
 
-/** `nemia watch`: the feed followed from a cursor until it is stopped. */
+/** The refusal of a `--wake-word` given no word. */
+const WAKE_WORD_TAKES =
+  "nemia watch --wake-word takes a word, found in a feed line's word or leading a part of its note: nemia watch --wake-word <word>";
+
+/** `nemia watch`: the feed followed from a cursor until it is stopped, with the store's liveness. */
 const WATCH: Ran = {
   name: 'watch',
-  usage: '[cursor]',
-  help: ["nemia feed's lines, followed as the tick writes them, until ^C"],
+  usage: '[cursor] [--json] [--wake] [--wake-word <word>]...',
+  help: [
+    "nemia feed's lines, followed as the tick writes them, until ^C, and a",
+    'daemon down line when nothing ticks the store, daemon up when it does',
+    'again. --json: one JSON object a line, a feed line with its cursor;',
+    '--wake: only the lines that wait on a person; --wake-word: these words',
+  ],
   spec: {
     positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],
-    flags: [],
+    flags: [
+      { flag: '--json', kind: 'switch', key: 'json' },
+      { flag: '--wake', kind: 'switch', key: 'wake' },
+      { flag: '--wake-word', kind: 'text', key: 'wakeWord', many: true, takes: WAKE_WORD_TAKES },
+    ],
     unknown: () => cursorTakes('watch'),
   },
   check: (args) => {

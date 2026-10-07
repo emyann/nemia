@@ -1048,7 +1048,7 @@ test(
 test('`wf --help` names nemia feed and nemia watch, and says which feed is whose', async (t) => {
   const printed = (await printedBy(t, board().e, '--help')).join('\n');
   assert.match(printed, /^ {2}nemia feed \[cursor\]$/m);
-  assert.match(printed, /^ {2}nemia watch \[cursor\]$/m);
+  assert.match(printed, /^ {2}nemia watch \[cursor\] \[--json\] \[--wake\] \[--wake-word <word>\]\.\.\.$/m);
   assert.match(printed, /nemia watch follows what the workflow decides/);
   assert.match(printed, /ae watch/);
 });

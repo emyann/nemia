@@ -1,6 +1,6 @@
 ---
 name: create-a-factory
-description: Make a whole factory, short of a run — create it, attach its workflows, draft its workflows, agents and skills for the person to place, hire agents into steps, write its instruction, try an agent on a short brief — and stop before any work starts.
+description: Make a whole factory, short of a run — create it, write its workflows, agents and skills into yours, attach its workflows, hire agents into steps, write its instruction, try an agent on a short brief — and stop before any work starts.
 ---
 # Create a factory
 
@@ -22,24 +22,32 @@ build on it rather than beside it.
 A factory has its own level, `nemia level <level> --factory <name>`, and follows the store's until it has one. Its level is the person's
 to set: you never raise it.
 
-## 3. Its workflows, agents and skills, drafted for the person to place
+## 3. Its workflows, agents and skills, written into yours
 
-You never write in a factory's repositories, and no verb writes a workflow, an agent or a skill for you. Draft each in your own folder,
-under `drafts/<factory>/`, as the factory will read it:
+You write a factory's workflows, agents and skills yourself, into yours, never into its repositories. Each write prompts the person: say
+what it writes and why, then run it. Write the file or folder in your own folder first, under `drafts/<factory>/`, as the factory will
+read it, then write it into yours from there:
 
-- a workflow: `drafts/<factory>/<workflow>/`, a markdown file per step, its keys in its frontmatter;
-- an agent: `drafts/<factory>/agents/<name>.md`;
-- a skill: `drafts/<factory>/skills/<name>/SKILL.md`.
+- an agent: `drafts/<factory>/agents/<name>.md`, with the result schema its `output:` names beside it —
+  `nemia agents write yours --file drafts/<factory>/agents/<name>.md`;
+- a skill: `drafts/<factory>/skills/<name>/SKILL.md` — `nemia skills write yours --file drafts/<factory>/skills/<name>/SKILL.md`;
+- a workflow: `drafts/<factory>/<workflow>/`, a markdown file per step, its keys in its frontmatter, and its README —
+  `nemia workflows write yours <workflow> --folder drafts/<factory>/<workflow>`.
 
-To start from one that exists, copy it there and change the copy. Show the person each draft, and ask them to place it: on the board
-(its Workflows and Agents pages), or as a copy into the repository's `workflows/` folder, committed there.
+To start from one that exists, copy it there and change the copy. To change one in yours, write it again with `--version`, the version
+it was read at: a write without one, of a name there already, is refused naming the version it is at now — read it again, and write
+your change on what it holds. `nemia agents remove` and `nemia workflows remove` take one back, at its version too.
 
-**A draft changes no factory.** Nothing in your folder is read by one until the person places it. Keep a pending fact naming each draft
-not yet placed, and check with `nemia agents --repo <path>` and the repository's `workflows/` folder that it is there once they say so.
+**Two things no verb writes**: a workflow's own `*.schema.json`, beside its steps, and a skill's files beside its SKILL.md. Draft those
+in the same folder, show the person each, and ask them to place it — on the board, or copied into yours by hand. Keep a pending fact
+naming each until they say it is there, and check that it is.
+
+What you write is the factory's words, and its taste is the person's: name each file you wrote when you say what stands, so they read it
+before work depends on it.
 
 ## 4. Attach its workflows
 
-`nemia factory attach <factory> <workflow>`, by the workflow's folder name, once it is placed. `nemia factory detach` takes one back.
+`nemia factory attach <factory> <workflow>`, by the workflow's folder name, once it is written. `nemia factory detach` takes one back.
 
 ## 5. Hire agents into steps
 
@@ -56,15 +64,17 @@ Words a person adds to one agent without rewriting it are its custom instruction
 
 ## 7. Try an agent on a short brief
 
-Before work depends on an agent, propose a short trial: a card for a one-step run of it, on a brief small enough to read in a minute
-(`nemia inbox add`, with the `write-a-card` skill). The person starts it, and you bring what it did.
+Before work depends on an agent, try it: `nemia agents try yours <name> --brief "<words>"`, on a brief small enough to read in a minute.
+A try is yours to run unasked: one step of that agent, in a folder of its own, capped at a dollar, one at a time an agent. Say that you
+started it, follow it with `nemia ls`, and bring what it did.
 
 ## 8. Stop, and say what stands
 
 Say what is in place and what is not, apart:
 
 - **Placed**: the factory, its repositories, the workflows attached, each hire, its instruction — as `nemia factory` reads them now.
-- **Drafted, not placed**: each draft still only in your folder.
+- **Written**: each workflow, agent and skill you wrote into yours, by its file, for the person to read; and each try, with what it did.
+- **Drafted, not placed**: each schema or skill file still only in your folder.
 - **Next**: the first card to start, or the draft to place first.
 
 Never call a factory complete while a draft of it waits to be placed.

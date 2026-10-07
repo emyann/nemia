@@ -162,8 +162,8 @@ export function cardToStart(file: string, text: string, after: readonly string[]
 const KEY_LINE = /^[A-Za-z][\w-]*\s*:/;
 
 /**
- * What `nemia start` says of `key` in the frontmatter of `file`, a key a plan's card lacks: that the block is read as a card's, never as the
- * brief, and the fix — the inbox, whose cards read their keys, else the line or the block deleted.
+ * What `nemia start` says of `key` in the frontmatter of `file`, a key a plan's card lacks: that the block is read as a card's, never as
+ * the brief, and the fix — the inbox, whose cards read their keys, else the line or the block deleted.
  */
 const startUnknown = (file: string, key: string): string =>
   `${file}: \`${key}\` is not a key a plan's card has: nemia start reads a file that opens with a frontmatter block as a plan's card, whose keys are ${CARD_KEYS.join(' and ')}, and never takes the block into its brief. If they are an inbox card's keys, file it in the inbox, whose cards read them: nemia inbox add ${file}, then nemia start the card it files (nemia inbox --help). Else delete the line, or the whole block to start the file as a brief.`;

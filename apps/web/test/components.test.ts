@@ -6494,22 +6494,22 @@ test("an agent's custom instructions are anchored, so a step's page links to whe
   assert.match(await routedWith(createElement(CustomInstructions, { name: 'writer' })), /<section id="custom-instructions"/);
 });
 
-test("an agent's custom instructions say a run keeps the words it froze; the store's own agent's, beside her rules, that her next session takes them", async () => {
+test("an agent's custom instructions say a run keeps the words it froze; the store's own agent's, beside her rules, that her open session is told them", async () => {
   const { CustomInstructions } = await import('../src/components/CustomInstructions.tsx');
   const { AutoRules } = await import('../src/components/AutoRules.tsx');
   const hired = await routedWith(createElement(CustomInstructions, { name: 'writer' }));
   assert.match(hired, /data-custom-frozen[^>]*>A run already started keeps the words it froze/, 'a hired agent: a run keeps what it froze');
   assert.match(hired, /wherever it is hired/);
-  assert.doesNotMatch(hired, /data-custom-filed/);
+  assert.doesNotMatch(hired, /data-custom-told|open session/);
   const hers = await routedWith(createElement(AutoRules, { agent: 'nemia' }));
   assert.match(hers, /<section id="custom-instructions"/, 'her rules sit beside her custom instruction');
   assert.match(
     hers,
-    /data-custom-filed[^>]*>Her open session keeps the words it was filed with: a save or a clear takes effect when her session is next filed\. To file it again, set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back\./,
+    /data-custom-told[^>]*>Her open session is told a save or a clear at her keeper’s next beat, within seconds: no restart/,
   );
   assert.doesNotMatch(
     hers,
-    /data-custom-frozen|A run already started|wherever it is hired|runs started from now/,
+    /data-custom-frozen|A run already started|wherever it is hired|runs started from now|next filed|keeps the words it was filed with/,
     'no run freezes her words',
   );
 });

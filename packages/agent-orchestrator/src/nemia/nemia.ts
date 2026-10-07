@@ -76,11 +76,14 @@ export type HerTask = { settled: boolean; stopRequested: boolean };
  */
 export type NemiaState = 'off' | 'due' | 'filed' | 'kept' | 'stopped' | 'leaving';
 
-/** What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription. */
-export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop';
+/** What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription, tell her open task her custom words. */
+export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'tell';
 
-/** What the keeper reads of the levels: whether any factory, the default one included, is above `manual` now, and her task's id. */
-export type Keeping = { above: boolean; task?: string };
+/**
+ * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now, her task's
+ * id, and whether the instruction that composes now is not the one her task was filed with (`stale`), read only while she is kept.
+ */
+export type Keeping = { above: boolean; task?: string; stale?: boolean };
 
 /** What the keeper reads of her subscription: the task it tells, and whether it carries her floor (`NEMIA_FLOOR`). */
 export type HerSubscription = { task: string; scoped: boolean };
@@ -101,8 +104,9 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
 
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
- * without her floor; at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing. A
- * task settled from outside is never filed again: the person said so by stopping it. Pure.
+ * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`); at
+ * `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing. A task settled from
+ * outside is never filed again: the person said so by stopping it. Pure.
  */
 export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
   const state = nemiaState(keeping, task, subscribed);
@@ -111,8 +115,32 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   if (state === 'filed') return [...dropped, 'subscribe'];
   if (state === 'stopped') return dropped;
   if (state === 'leaving') return [...(isOpen(task) ? (['stop'] as const) : []), ...dropped];
-  return [];
+  return keeping.stale === true ? ['tell'] : [];
 }
+
+/** The instruction her session is filed with: her shipped instruction `body`, then the person's `custom` words where there are any. */
+export const nemiaPrompt = (body: string, custom: string | undefined): string =>
+  `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
+
+/** The custom words her session was last filed or told with, as the keeper records them: `words` absent for none. */
+export type ToldCustom = { words?: string };
+
+/**
+ * Whether the person's custom words `now` differ from those her session has: those of the keeper's record `told`; where it kept none yet,
+ * for a session filed before it kept one, whether her filed instruction `filed` ends with them. Her shipped instruction is never compared,
+ * and with no record no removal is owed: whether she had words is unknown. Pure.
+ */
+export const customChanged = (told: ToldCustom | undefined, now: string | undefined, filed: string | undefined): boolean =>
+  told === undefined ? now !== undefined && !(filed ?? '').endsWith(`\n\n${now}\n`) : told.words !== now;
+
+/**
+ * What her open task is told once the person's custom instruction for her changed: the words `custom` whole, which replace those she was
+ * started with, or, where undefined, that they were removed and she has none. Pure.
+ */
+export const toldCustom = (custom: string | undefined): string =>
+  custom === undefined
+    ? 'The person removed their custom instruction for you: you now have none, and the one you were started with no longer holds.'
+    : `The person's custom instruction for you changed. It now reads as below, and replaces the one you were started with:\n\n${custom}`;
 
 /** One edge of her machine: from a state, on what the keeper reads, to a state, by what it does. */
 export type NemiaEdge = { from: NemiaState; to: NemiaState; event: string; action: string };
@@ -126,12 +154,16 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 /** Every state, in the order a session goes through them. */
 const STATES: NemiaState[] = ['off', 'due', 'filed', 'kept', 'stopped', 'leaving'];
 
-/** The keeper's moves, a stop or end from outside, which it never undoes, and the end of the last raise above `manual` as it passes. */
+/**
+ * The keeper's moves, a change of her custom words told, a stop or end from outside, which it never undoes, and the end of the last raise
+ * above `manual` as it passes.
+ */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
   { from: 'filed', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
   { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
+  { from: 'kept', to: 'kept', event: 'CUSTOM_CHANGED', action: 'tell' },
   { from: 'stopped', to: 'stopped', event: 'SUBSCRIBED', action: 'drop' },
   { from: 'leaving', to: 'off', event: 'OPEN_OR_SUBSCRIBED', action: 'stop, drop' },
   { from: 'due', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
@@ -141,11 +173,13 @@ const EDGES: NemiaEdge[] = [
 
 /**
  * The person's verbs: `nemia level` putting some factory above `manual` (the store's level, a factory's default or a raise), asked first
- * whether her folder is trusted, and putting none above it (a level set, or a raise ended early).
+ * whether her folder is trusted, and putting none above it (a level set, or a raise ended early); and `nemia agents custom nemia`
+ * setting or clearing her custom words, which the next beat tells her.
  */
 export const NEMIA_VERBS: NemiaVerb[] = [
   { verb: 'level (a factory above manual)', from: ['off', 'stopped', 'leaving'], to: 'due', guard: 'trusted', by: 'person' },
   { verb: 'level (none above manual)', from: ['due', 'filed', 'kept', 'stopped'], to: 'leaving', guard: 'always', by: 'person' },
+  { verb: 'agents custom nemia (set or clear)', from: ['kept'], to: 'kept', guard: 'always', by: 'person' },
 ];
 
 /** Her machine as plain data, a fresh copy each call. */
@@ -157,7 +191,7 @@ export const nemiaGraph = (): NemiaGraph => ({
   verbs: NEMIA_VERBS.map((v) => ({ ...v, from: [...v.from] })),
 });
 
-/** Her machine as a Mermaid state diagram, edges then verbs, which the package's README holds between its `diagram:nemia` markers. */
+/** Her machine as a Mermaid state diagram, edges then verbs, held in the package's `docs/features.md` between `diagram:nemia` markers. */
 export const nemiaDiagram = (graph: NemiaGraph = nemiaGraph()): string =>
   [
     'stateDiagram-v2',

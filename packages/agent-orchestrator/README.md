@@ -2799,8 +2799,8 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
 
 What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
 for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
-board's Settings, though no place names her), read once, as her session is filed: an open session keeps
-the words it was filed with, so a change takes effect after `nemia level manual`, then `nemia level semi-auto`; a factory's rules are its
+board's Settings, though no place names her), read as her session is filed; a write or a clear while she is kept is told to her open
+session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`

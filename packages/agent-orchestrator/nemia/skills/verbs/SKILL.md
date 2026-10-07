@@ -84,7 +84,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told
                                after its instructions. Bare, prints them; --file writes them (- for
                                stdin); --clear removes them. Words only: a frontmatter block is
-                               refused. A run keeps the words it was started with
+                               refused. A run keeps the words it was started with; nemia, the
+                               store's own agent, is told them in her open session
                                reads bare; prompts the person given --file, --clear
   nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]
                                Nemia, the store's own agent: bare, where she is, each factory's level and

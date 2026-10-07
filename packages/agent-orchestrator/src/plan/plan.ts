@@ -122,10 +122,11 @@ function afterOf(file: string, after: string | undefined): string[] {
 export type StartCard = { file: string; workflow?: string; after: string[]; body: string };
 
 /**
- * A file `nemia start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:`, or an inbox
- * card's `repo:`, so a card carried out of the inbox reads as a card and is refused by name — or null when it is not: no frontmatter, one
- * with any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the file's whole text is the
- * brief, so a brief that happens to start with `---` is not eaten. Pure.
+ * A file `nemia start` is given, read as a plan's card when it opens with a frontmatter block of keys — every line of it a key, a word
+ * and a colon (`KEY_LINE`) — or null when it does not: no frontmatter, one with a line of prose, one with nothing in it, or one that never
+ * closes. Null means the file's whole text is the brief, so a brief that happens to start with `---` is not eaten; a block of keys is never
+ * taken into one. A key a plan's card lacks is refused by name, an inbox card's among them, naming `nemia inbox add <file>`, whose cards
+ * read those keys (`startUnknown`). Pure.
  *
  * `nemia plan` prints `nemia start <card> --after …` for each card it did not start, and this is what makes that command start the card's
  * body. Read as a card, a file is held to what `nemia plan` holds a card to — a key set twice or to nothing, an empty body, an `after:`
@@ -144,10 +145,8 @@ export function cardToStart(file: string, text: string, after: readonly string[]
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith('#'));
-  const isCardLine = (line: string) =>
-    line.indexOf(':') > 0 && ([...CARD_KEYS, 'repo'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
-  if (!lines.length || !lines.every(isCardLine)) return null;
-  const keys = readCardKeys(file, split.block!);
+  if (!lines.length || !lines.every((line) => KEY_LINE.test(line))) return null;
+  const keys = frontmatterKeys(file, split.block!, CARD_KEYS, (key) => startUnknown(file, key));
   const body = bodyOf(file, split.body);
   const waits = afterOf(file, keys.after);
   if (waits.length && !after.length) {
@@ -158,6 +157,16 @@ export function cardToStart(file: string, text: string, after: readonly string[]
   }
   return { file, ...(keys.workflow !== undefined ? { workflow: keys.workflow } : {}), after: waits, body };
 }
+
+/** A frontmatter line that is a key: a word of letters, digits, `_` and `-`, then a colon. A sentence with a colon is none. */
+const KEY_LINE = /^[A-Za-z][\w-]*\s*:/;
+
+/**
+ * What `nemia start` says of `key` in the frontmatter of `file`, a key a plan's card lacks: that the block is read as a card's, never as the
+ * brief, and the fix — the inbox, whose cards read their keys, else the line or the block deleted.
+ */
+const startUnknown = (file: string, key: string): string =>
+  `${file}: \`${key}\` is not a key a plan's card has: nemia start reads a file that opens with a frontmatter block as a plan's card, whose keys are ${CARD_KEYS.join(' and ')}, and never takes the block into its brief. If they are an inbox card's keys, file it in the inbox, whose cards read them: nemia inbox add ${file}, then nemia start the card it files (nemia inbox --help). Else delete the line, or the whole block to start the file as a brief.`;
 
 /** A card's frontmatter as key → value: every line a key a card has, set once, to something. */
 function readCardKeys(file: string, block: string): Partial<Record<CardKey, string>> {

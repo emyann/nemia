@@ -145,6 +145,8 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
                                a card of a plan (nemia plan --help) starts its body: --workflows is its
                                workflow: unless given, and its after: needs an --after for each
+                               a frontmatter block of keys a plan's card lacks is refused by its key,
+                               never taken as the brief: file an inbox card with nemia inbox add <file>
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
                                --factory <name>: the workflow must be attached to the factory, whose

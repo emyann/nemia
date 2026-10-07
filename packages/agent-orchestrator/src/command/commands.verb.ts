@@ -209,6 +209,7 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
   ticks: true,
   nemia: 'answers',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
+  apiTakes: ['answers'],
   apiKeys: ['try', 'at', 'message', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);

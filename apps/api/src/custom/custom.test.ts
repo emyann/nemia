@@ -168,7 +168,7 @@ test('DELETE reads no body: what its route fixes clears the words, whatever the 
   const foreign = await refused(() => send('PUT', '/api/custom-instructions/scribe', { words: 'Hi.', answers: [] }), 422);
   assert.equal(
     foreign,
-    '`answers` is not a key PUT …/custom-instructions/:name takes — POST …/retry takes it — so it would go nowhere: ' +
+    '`answers` is not a key PUT …/custom-instructions/:name takes — POST …/retry, POST …/approve take it — so it would go nowhere: ' +
       '`{ "words": "<what the agent is told after its instructions>" }`.',
   );
 });

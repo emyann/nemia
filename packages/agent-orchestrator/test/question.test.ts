@@ -9,6 +9,7 @@ import { closeoutSchemaOf, looseAt, parseCloseout } from '../src/closeout/closeo
 import {
   answerRefusal,
   answerText,
+  approvedAnswerText,
   askedQuestions,
   expandShapes,
   QUESTIONS_SCHEMA,
@@ -234,6 +235,14 @@ test('answerRefusal refuses a question left with neither a choice nor words', ()
   assert.match(answerRefused([{ question: cut.title, chose: ['a'] }]), /"Where do the answers go\?" is not answered/);
 });
 
+test('answerRefusal refuses any answers to a step that asks no questions now, an empty list among them', () => {
+  for (const answers of [[], [{ question: cut.title, chose: ['a'] }]]) {
+    const why = answerRefusal([], answers);
+    assert.ok(why, `${JSON.stringify(answers)} was let through to a step that asks nothing`);
+    assert.match(why, /The step asks no questions now/);
+  }
+});
+
 test('answerRefusal refuses a question answered twice', () => {
   assert.match(
     answerRefused([
@@ -275,4 +284,34 @@ test('answerText says each answer in the order asked, the note, and who answered
     answerText([cut], [{ question: cut.title, chose: [], own: 'Neither.' }]),
     'Answers to your questions:\n\n1. How is the card cut?\n   In my own words: Neither.\n\nAnswered by: person, on the board',
   );
+});
+
+test('approvedAnswerText says the answers for the steps after the gate: whose questions they answer, each in the order asked, the note, and who answered', () => {
+  const text = approvedAnswerText(
+    'design',
+    [cut, where],
+    [
+      { question: where.title, chose: ['gate'] },
+      { question: cut.title, chose: ['b'], own: 'Fine.' },
+    ],
+    ' Go. ',
+  );
+  assert.equal(
+    text,
+    [
+      "The person's answers to design's questions:",
+      '',
+      '1. How is the card cut?',
+      '   Chose: b — All of it at once.',
+      '   In my own words: Fine.',
+      '',
+      '2. Where do the answers go?',
+      '   Chose: gate — With the approval.',
+      '',
+      'Note: Go.',
+      '',
+      'Answered by: person, on the board',
+    ].join('\n'),
+  );
+  assert.ok(!approvedAnswerText('design', [cut], [{ question: cut.title, chose: ['a'] }]).includes('Answers to your questions'));
 });

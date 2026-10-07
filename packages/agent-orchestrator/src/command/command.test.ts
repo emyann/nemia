@@ -312,8 +312,8 @@ test("the table's help is today's, word for word", () => {
       '                               what you have to say to any step you try again; not with --recheck.',
       '                               The next argument is the answer, whatever it starts with; an answer',
       "                               that is only one of these flags' names goes as --message=<answer>;",
-      '                               --budget <amount>: for a step over budget or budget exhausted, its',
-      '                               cap raised to that many dollars, above what its tries have cost',
+      '                               --budget <amount>: for a step with a budget: that waits on you, its',
+      '                               cap raised to that many dollars, above its cap and what it has cost',
       '  nemia approve <runId> <step> [--message "<words>"]',
       '                               let a step waiting at its gate hand on: what waits on it is filed on',
       '                               the next tick, and every step after the gate is handed your words',
@@ -390,6 +390,17 @@ test("the table's help is today's, word for word", () => {
       '                               after its instructions. Bare, prints them; --file writes them (- for',
       '                               stdin); --clear removes them. Words only: a frontmatter block is',
       '                               refused. A run keeps the words it was started with',
+      '  nemia agents write yours [<name>] --file <name>.md [--version <v>]',
+      '                               an agent of yours written from its file: <name> is the agent it',
+      '                               changes or renames, at the --version it was read at; none, a new one',
+      '  nemia agents remove yours <name> --version <v>',
+      '                               an agent of yours removed, at the --version it was read at',
+      '  nemia agents try yours <name> --brief <words>',
+      '                               an agent of yours tried on a short brief, in a folder of its own,',
+      '                               capped at $1',
+      '  nemia skills write yours [<name>] --file <SKILL.md> [--version <v>]',
+      '                               a skill of yours written from its SKILL.md: <name> is the skill it',
+      '                               changes, at the --version it was read at; none, a new one',
       '  nemia cancel <runId>',
       '                               stop what it has in flight; file nothing more',
       '  nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
@@ -515,6 +526,11 @@ test("the table's help is today's, word for word", () => {
       "                               this nemia's release, an install's tag or a checkout, and its folder;",
       "                               the release the store's releases/current names; and the release the",
       '                               daemon runs, from its lease. --json: the whole answer',
+      '  nemia workflows write yours <name> --folder <draft> [--version <v>]',
+      '                               a workflow folder of yours written from the steps and README of a',
+      '                               draft folder; one there already, at the --version it was read at',
+      '  nemia workflows remove yours <name> --version <v>',
+      '                               a workflow folder of yours removed, at the --version it was read at',
       '  nemia tick [--stats]',
       '                               one pass: tick the engine, file what became ready — refused while a',
       '                               daemon (the api, or a nemia up) ticks the store, since it runs the same',
@@ -777,15 +793,16 @@ test('a table breaks its rules: a why left empty, of a route served by hand, of 
   ]);
 });
 
-test('a table breaks its rules: a flag the api alone takes on an entry the table generates no route of', () => {
+test('a table breaks its rules: a flag the api alone takes on an entry with no route that hands it', () => {
   const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
   assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: CARD, handler }], []), []);
-  const broken = ["a's --words is taken on the api alone, and the table generates no route of it: route it, or take the flag out"];
-  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...put, hand: 'by hand' }, spec: CARD, handler }], []), broken);
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...put, hand: 'by hand' }, spec: CARD, handler }], []), []);
+  const broken = ["a's --words is taken on the api alone, and no route of the entry hands it: route it, or take the flag out"];
   assert.deepEqual(
     commandBreaks([{ name: 'a', route: { method: 'GET', path: '/api/cards/:name', status: 200 }, spec: CARD, handler }], []),
     broken,
   );
+  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: 'a file' }, spec: CARD, handler }], []), broken);
 });
 
 test('a table breaks its rules on each of an entry’s routes: one routed on another’s path, and a key one of them sets that no flag fills', () => {

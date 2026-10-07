@@ -55,7 +55,7 @@ import {
   budgetOf,
   gatesOf,
   hasGate,
-  isGitRun,
+  isRepositoryRun,
   loopOver,
   overBudget,
   ownStatus,
@@ -222,12 +222,12 @@ export type RunDetail = {
   brief: string;
   /** The line that prints what there is to decide on the run, built off the table (`decideLine`). */
   decide: string;
-  /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run, which has none of them. */
+  /** A repository run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run, which has none. */
   repo: string | null;
   place: PlaceKind;
   /**
    * Where a folder run's work is: the directory its steps' folders are made under (`workRoot`), which is what a person is given in
-   * place of a repository and a branch — there is nothing to check out, and nothing to merge. Null on a git run, whose work is on
+   * place of a repository and a branch — there is nothing to check out, and nothing to merge. Null on a repository run, whose work is on
    * its branch.
    */
   work: string | null;
@@ -317,7 +317,7 @@ export type RunDetail = {
     workspace: string | null;
     /**
      * For a step of a folder run, every file its folder holds now, each as `folderFiles` reads it: the whole of what it made, not
-     * only what its closeout named. Empty for a step of a git run, whose work is a branch to read, and for one not filed yet.
+     * only what its closeout named. Empty for a step of a repository run, whose work is a branch to read, and for one not filed yet.
      */
     files: StepArtifact[];
     /**
@@ -353,8 +353,8 @@ export type RunDetail = {
     lastLine: string | null;
     /**
      * What a person said to the session of the step's current try while it ran — with `nemia say`, or the session page's prompt box — in
-     * the order said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one
-     * nobody told.
+     * the order said: the engine's `said` entries on its task, off the views the request already read, each with the last event of the
+     * session's transcript before its words went (`after`). Empty for a step not filed, and one nobody told.
      */
     said: Said[];
     /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */
@@ -639,7 +639,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
     decide: decideLine(run.id),
     repo: run.repo ?? null,
     place: placeOf(run),
-    work: isGitRun(run) ? null : run.workspace,
+    work: isRepositoryRun(run) ? null : run.workspace,
     workflowDir: run.workflowDir,
     try: tryOf(run, home),
     baseRef: run.baseRef ?? null,
@@ -829,5 +829,5 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
 /** What of a run `nemia prune` would find on disk (`RunDetail.onDisk`): two stats, and no git. */
 function onDiskOf(run: Run, home: string): RunDetail['onDisk'] {
   const files = path.dirname(artifactsDir(run, '_'));
-  return { worktrees: isGitRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
+  return { worktrees: isRepositoryRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
 }

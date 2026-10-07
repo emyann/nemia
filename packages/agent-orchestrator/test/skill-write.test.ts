@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { renderSkill, skillDraftOf, skillEntryOf, splitFrontmatter, withPreload, WorkflowError, type SkillDraft } from '../src/workflow.ts';
-import { agentVersion, preloads, skillVersion } from '../src/folder/folder.store.ts';
+import { agentVersion } from '../src/agents/read.store.ts';
+import { preloads, skillVersion } from '../src/skills/read.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-write-');
@@ -202,7 +203,9 @@ test('a skill is made in the library, read by the store, and refused a second ti
   refuses(
     () => writeSkill(LIBRARY, { ...DRAFT, description: 'Something else.' }, { version: null }),
     'Conflict',
-    /skills\/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it\./,
+    new RegExp(
+      `skills/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it: it is at version ${skillVersion(path.join(LIBRARY, 'tidy-notes'))}, and a write given that version changes it\\.$`,
+    ),
   );
 });
 

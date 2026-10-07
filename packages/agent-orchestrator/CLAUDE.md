@@ -37,8 +37,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   in `parseAgent`, `asNamed`, `unreadReading` (`src/roster/roster.ts`) and `formerKeyLines`; `FORMER_KEYS` is typed
   to step keys and cannot hold one.
 - **A key added to `AGENT_KEYS` that is no role key is excluded in three places** (`ROLE_KEYS` in the api's `builder.ts` and in
-  `src/roster/roster.ts`, the web's `lib/agents.ts`); a key naming a file beside the agent is digested by `agentVersion` and by the api's
-  `versionOf`.
+  `src/roster/roster.ts`, the web's `lib/agents.ts`); a key naming a file beside the agent is digested by `agentVersion` and by
+  `workflowVersion` (`src/folder/version.store.ts`).
 - **A folder is read with its places** (`lookupRoots`): a reader outside `wf start` passes `Places` (`placesOf(repo)`), and a version is
   checked with the places it was listed with (`skillsAt`). Who names an agent is read in every place that falls back to it (`repoUsers`),
   and a guard added at load goes on every verb that sets the same thing (`autoDropped`).
@@ -51,8 +51,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   (`ending/ending.ts`), as `toDecide` and `wf decide` do.
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts
   is written back in the form the file has (`contextText`). Code outside the package reads a step's frontmatter by calling the
-  package's reader (`splitFrontmatter`, from `agent-orchestrator/workflow`), never a parser of its own `(no test yet)`;
-  `frontmatterValue` in `apps/api/src/workflows/workflows.ts` is one today.
+  package's reader (`splitFrontmatter`, from `agent-orchestrator/workflow`), never a parser of its own `(no test yet)`.
 - **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: a
   person's factories get no workflow or agent from the package, and a guard over what ships reads `shippedFolders()`.
 - **The api reads `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`**, its tests with
@@ -124,6 +123,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **The tick reads git through one `standing` a repository, place and base a pass** (`passStanding`, `standingReader`): a question it
   did not ask is `unread`, never asked again, so a new git read in the pass belongs in the ask (`asksOf`), held by
   `test/pass-reads.test.ts`.
+- **The pass tells `standing` what it last read of each branch (`known`, `StandingMemo`)**: a `baseRef` is listed only for a branch told
+  nothing, so a column added to the listing comes back on every pass unless the hint covers it (`test/standing.test.ts`).
 - **Only the tick writes `standing.json`**: a reader off the tick (`nemia ls`, the board's list) reads it (`standingSnapshot`), and a
   person's one-off verb asks the place live (`standingNow`, `standingLive`); neither runs git through a reader of its own.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).

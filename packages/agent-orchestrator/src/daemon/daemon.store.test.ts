@@ -772,8 +772,8 @@ test('a cost reads back as written, and REFUSED: half a file, another shape, a p
   assert.equal(parsePassCost(text.slice(0, text.length / 2)), undefined, 'half of one');
   assert.equal(parsePassCost('[]'), undefined);
   assert.equal(parsePassCost(JSON.stringify({ sessions: 2, runs: 0 })), undefined, 'tick.json is not one');
-  const { git: _, ...noGit } = COST.phases;
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, phases: noGit })), undefined, 'a phase missing');
+  const { place: _, ...noPlace } = COST.phases;
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, phases: noPlace })), undefined, 'a phase missing');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, ms: -1 })), undefined);
   assert.equal(
     parsePassCost(JSON.stringify({ ...COST, phases: { ...COST.phases, act: { ...COST.phases.act, bytes: 'many' } } })),

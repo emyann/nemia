@@ -12,9 +12,9 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { RunPlace, runPlaceVerb } from '../place/place.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
-import type { BranchStood, PlaceOutcome, PlaceRequests } from '../place/place.ts';
-import { countSpawn, within, withinEffect } from '../meter/tally.store.ts';
-import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import type { BranchStood, KnownStood, PlaceOutcome, PlaceRequests } from '../place/place.ts';
+import { within } from '../meter/tally.store.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { shippedOver } from '../branches/index.ts';
@@ -31,7 +31,7 @@ export const STANDING_DEADLINE_MS = 15_000;
  */
 export type PassStanding = {
   readonly read: ReadonlyMap<string, StoodRead>;
-  readonly placeOf: (run: GitRun) => string | undefined;
+  readonly placeOf: (run: RepositoryRun) => string | undefined;
   readonly at?: string;
   readonly unasked?: string;
 };
@@ -39,8 +39,72 @@ export type PassStanding = {
 /** A repository, place and base branch as one key. */
 const keyOf = (repo: string, place: string, base: string): string => JSON.stringify([path.resolve(repo), place, base]);
 
+/** A branch as `standing` is asked of it. */
+type AskedBranch = PlaceRequests['standing']['branches'][number];
+
 /** One `standing` to ask: its place, and its request, each branch asked of once. */
-type Ask = { place: string; repo: string; base: string; branches: Map<string, PlaceRequests['standing']['branches'][number]> };
+type Ask = { place: string; repo: string; base: string; branches: Map<string, AskedBranch> };
+
+/**
+ * What the tick's passes last read of where branches stand, kept on its memo of runs at rest (`RestMemo`): for each repository, place and
+ * base branch asked, each branch's `baseRef` and what was read of it against that `baseRef`, handed back to the place as `known`. The place
+ * believes it only while the branch's commit is the one it was read of, and both are commit ids, so it never goes stale: a fresh one is a
+ * restart, which asks every `baseRef` once.
+ */
+export type StandingMemo = Map<string, KeptStood>;
+
+/** What a `StandingMemo` keeps of one repository, place and base branch: each branch's `baseRef`, and what was read of it against it. */
+type KeptStood = ReadonlyMap<string, { readonly baseRef: string; readonly known: KnownStood }>;
+
+/** A memo that holds nothing: what a daemon starts with. */
+export const freshStandingMemo = (): StandingMemo => new Map();
+
+/** A full commit id, as git names one in SHA-1 or SHA-256: a name that moves, as `main` does, is none. */
+const OBJECT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+
+/**
+ * What is kept of `asked` once `stood` is read of it: the commit judged and its `pastBase`, the commit null where none was judged or it is
+ * no commit id. Nothing where nothing was read of it, or its `baseRef` is no commit id: a fact against a name that moves is no fact.
+ */
+export const knownOf = (asked: AskedBranch, stood: BranchStood | undefined): KnownStood | undefined => {
+  if (!stood || !OBJECT_ID.test(asked.baseRef)) return undefined;
+  const commit = stood.tip ?? asked.tip;
+  const tip = commit !== undefined && OBJECT_ID.test(commit) ? commit : null;
+  return { tip, pastBase: tip === null ? null : stood.pastBase };
+};
+
+/** `branches`, each told what `kept` last read of it (`known`), where that was read against the `baseRef` it is asked against now. */
+export const toldOf = (branches: Iterable<AskedBranch>, kept: KeptStood | undefined): AskedBranch[] =>
+  [...branches].map((b) => {
+    const was = kept?.get(b.branch);
+    return was?.baseRef === b.baseRef ? { ...b, known: was.known } : b;
+  });
+
+/**
+ * `memo` made what `read` says of `asks`, read in that order: each ask answered keeps what was read of its branches (`knownOf`), one not
+ * answered what was kept before, and a repository, place and base no longer asked nothing.
+ */
+const remember = (memo: StandingMemo, asks: readonly Ask[], read: readonly StoodRead[]): void => {
+  const next: StandingMemo = new Map();
+  asks.forEach((ask, i) => {
+    const key = keyOf(ask.repo, ask.place, ask.base);
+    const stood = read[i];
+    if (!('answer' in stood)) {
+      const was = memo.get(key);
+      if (was) next.set(key, was);
+      return;
+    }
+    const answered = new Map(stood.answer.branches.map((b) => [b.branch, b]));
+    const kept = new Map<string, { baseRef: string; known: KnownStood }>();
+    for (const b of ask.branches.values()) {
+      const known = knownOf(b, answered.get(b.branch));
+      if (known) kept.set(b.branch, { baseRef: b.baseRef, known });
+    }
+    next.set(key, kept);
+  });
+  memo.clear();
+  for (const [key, kept] of next) memo.set(key, kept);
+};
 
 /** A run's result branches, none where its steps cannot be read. */
 const branchesOf = (run: Run): string[] => {
@@ -51,18 +115,20 @@ const branchesOf = (run: Run): string[] => {
   }
 };
 
-/** Whether `run`'s own result branches are asked: a git run that cut worktrees of its own and was not called off; a prune keeps them. */
-const asksOwn = (run: Run): run is GitRun => isGitRun(run) && run.isolate && !run.cancelledAt;
+/**
+ * Whether `run`'s own result branches are asked: a repository run that cut worktrees of its own and was not called off; a prune keeps them.
+ */
+const asksOwn = (run: Run): run is RepositoryRun => isRepositoryRun(run) && run.isolate && !run.cancelledAt;
 
 /**
- * The asks over `runs`: one for each repository, place and base branch a git run of them is in, each asked of the result branches of every
- * run `own` asks of — by default one that cut worktrees and was not called off (`asksOwn`): what the list shows and a
- * decision reads — of the runs waited on there (`waitedOn`: `--after` and a hold's `--until`), and of the runs a run not yet started is
- * handed as context, with the tip each recorded and the commit it was cut at.
+ * The asks over `runs`: one for each repository, place and base branch a repository run of them is in, each asked of the result branches of
+ * every run `own` asks of — by default one that cut worktrees and was not called off (`asksOwn`): what the list shows and a decision reads
+ * — of the runs waited on there (`waitedOn`: `--after` and a hold's `--until`), and of the runs a run not yet started is handed as context,
+ * with the tip each recorded and the commit it was cut at.
  */
-function asksOf(runs: readonly Run[], placeOf: PassStanding['placeOf'], own: (run: GitRun) => boolean): Ask[] {
+function asksOf(runs: readonly Run[], placeOf: PassStanding['placeOf'], own: (run: RepositoryRun) => boolean): Ask[] {
   const asks = new Map<string, Ask>();
-  const askOf = (run: GitRun): Ask | undefined => {
+  const askOf = (run: RepositoryRun): Ask | undefined => {
     const place = placeOf(run);
     if (place === undefined) return undefined;
     const key = keyOf(run.repo, place, run.branch);
@@ -72,19 +138,19 @@ function asksOf(runs: readonly Run[], placeOf: PassStanding['placeOf'], own: (ru
   };
   const byId = new Map(runs.map((r) => [r.id, r]));
   for (const run of runs) {
-    if (!isGitRun(run)) continue;
+    if (!isRepositoryRun(run)) continue;
     const ask = askOf(run);
     if (own(run)) askedOf(ask, run);
     const related = [...waitedOn(run), ...(hasStarted(run) || run.cancelledAt ? [] : (run.context ?? []))];
     for (const other of related.map((id) => byId.get(id))) {
-      if (other && isGitRun(other) && !other.cancelledAt) askedOf(askOf(other), other);
+      if (other && isRepositoryRun(other) && !other.cancelledAt) askedOf(askOf(other), other);
     }
   }
   return [...asks.values()];
 }
 
 /** `ask`, where there is one, asked of each result branch of `run` too, with the tip it recorded and the commit it was cut at. */
-function askedOf(ask: Ask | undefined, run: GitRun): void {
+function askedOf(ask: Ask | undefined, run: RepositoryRun): void {
   for (const branch of ask ? branchesOf(run) : []) {
     const tip = run.tips?.[branch];
     ask!.branches.set(branch, { branch, baseRef: run.baseRef, ...(tip ? { tip } : {}) });
@@ -105,16 +171,16 @@ const stoodOutcome = (ask: Pick<Ask, 'place' | 'repo' | 'base'>, outcome: PlaceO
   return { ...where, unread };
 };
 
-/** One ask answered by its place within `STANDING_DEADLINE_MS`, or unread in words. */
-const stoodRead = (ask: Ask): Effect.Effect<StoodRead> =>
+/** One ask answered by its place within `STANDING_DEADLINE_MS`, or unread in words, each branch told what `memo` last read of it. */
+const stoodRead = (ask: Ask, memo: StandingMemo | undefined): Effect.Effect<StoodRead> =>
   Effect.suspend(() => {
-    countSpawn();
-    const request = { repo: ask.repo, base: ask.base, branches: [...ask.branches.values()] };
+    const kept = memo?.get(keyOf(ask.repo, ask.place, ask.base));
+    const request = { repo: ask.repo, base: ask.base, branches: toldOf(ask.branches.values(), kept) };
     return runPlaceVerbAsync(ask.place, 'standing', request, { deadlineMs: STANDING_DEADLINE_MS, env: cachedEnv() });
   }).pipe(Effect.map((outcome) => stoodOutcome(ask, outcome)));
 
 /** Where a run's place verbs run from (`RunPlace`), undefined for a run naming a place this nemia does not ship. */
-export const placeReader = Effect.map(RunPlace, (dirOf) => (run: GitRun): string | undefined => {
+export const placeReader = Effect.map(RunPlace, (dirOf) => (run: RepositoryRun): string | undefined => {
   try {
     return dirOf(run);
   } catch {
@@ -127,21 +193,30 @@ const byKey = (read: readonly StoodRead[]): Map<string, StoodRead> => new Map(re
 
 /**
  * Where the repositories of `runs` stand now, each repository, place and base branch asked at once (`asksOf`, of the result branches of
- * each run `own` asks of), metered as git, and written nowhere: what the tick's pass and a person's one-off verb read, as `trial` is asked
- * at a decision's read. A place that refuses or is not heard reads unread, never a failure; runs with no git run among them ask nothing.
+ * each run `own` asks of), metered as the place, and written nowhere: what the tick's pass and a person's one-off verb read, as `trial`
+ * is asked at a decision's read. A place that refuses or is not heard reads unread, never a failure; runs with no repository run among
+ * them ask nothing. `memo`, the tick's, tells the place what it last read of each branch, and keeps what it reads now (`StandingMemo`);
+ * with none, every `baseRef` is asked.
  */
-export const standingNow = Effect.fn('standingNow')(function* (runs: readonly Run[], own: (run: GitRun) => boolean = asksOwn) {
+export const standingNow = Effect.fn('standingNow')(function* (
+  runs: readonly Run[],
+  own: (run: RepositoryRun) => boolean = asksOwn,
+  memo?: StandingMemo,
+) {
   const placeOf = yield* placeReader;
-  const read = yield* withinEffect('git', Effect.forEach(asksOf(runs, placeOf, own), stoodRead, { concurrency: 'unbounded' }));
+  const asks = asksOf(runs, placeOf, own);
+  const read = yield* Effect.forEach(asks, (ask) => stoodRead(ask, memo), { concurrency: 'unbounded' });
+  if (memo) remember(memo, asks, read);
   return { read: byKey(read), placeOf, at: new Date().toISOString() } satisfies PassStanding;
 });
 
 /**
- * Where the pass's repositories stand (`standingNow`), written to `standing.json` for every read off the tick (`writeStanding`): called by
- * the tick's pass, and by a test standing for one, never by a reader. Fails with a refusal where the file cannot be written.
+ * Where the pass's repositories stand (`standingNow`, told what `memo` last read), written to `standing.json` for every read off the tick
+ * (`writeStanding`): called by the tick's pass, and by a test standing for one, never by a reader. Fails with a refusal where the file
+ * cannot be written.
  */
-export const passStanding = Effect.fn('passStanding')(function* (runs: readonly Run[]) {
-  const standing = yield* standingNow(runs);
+export const passStanding = Effect.fn('passStanding')(function* (runs: readonly Run[], memo?: StandingMemo) {
+  const standing = yield* standingNow(runs, asksOwn, memo);
   yield* tried(() => within('act', () => writeStanding(standing.at, [...standing.read.values()])));
   return standing;
 });
@@ -155,7 +230,7 @@ export const NOTHING_READ: PassStanding = { read: new Map(), placeOf: () => unde
  */
 export const headsOver =
   (git: BranchReader) =>
-  (run: GitRun): Readonly<Record<string, string>> =>
+  (run: RepositoryRun): Readonly<Record<string, string>> =>
     Object.fromEntries(git.heads(run.repo));
 
 /** What a read off the tick says of a question no pass asked, with no `standing.json`: no pass has read it yet. */
@@ -225,7 +300,7 @@ export const standingWhen = Effect.fn('standingWhen')(function* (runs: readonly 
 export type StandingAsker = Effect.Success<ReturnType<typeof standingWhen>>;
 
 /** What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of. */
-export const asksOwnOr = (ids: readonly string[]): ((run: GitRun) => boolean) => {
+export const asksOwnOr = (ids: readonly string[]): ((run: RepositoryRun) => boolean) => {
   const asked = new Set(ids);
   return (run) => asked.has(run.id) || asksOwn(run);
 };
@@ -241,23 +316,22 @@ export const standingLiveOf = Effect.fn('standingLiveOf')(function* (ids: readon
  * does not ship, and a reading the place gave none of.
  */
 export function headsNow(run: Run, placeOf: PassStanding['placeOf']): Readonly<Record<string, string>> | undefined {
-  if (!isGitRun(run)) return undefined;
+  if (!isRepositoryRun(run)) return undefined;
   const place = placeOf(run);
   if (place === undefined) return undefined;
-  countSpawn();
   const request = { repo: path.resolve(run.repo), base: run.branch, branches: [] };
-  const outcome = within('git', () => runPlaceVerb(place, 'standing', request, { deadlineMs: STANDING_DEADLINE_MS, env: cachedEnv() }));
+  const outcome = runPlaceVerb(place, 'standing', request, { deadlineMs: STANDING_DEADLINE_MS, env: cachedEnv() });
   return 'answer' in outcome ? outcome.answer.heads : undefined;
 }
 
 /** What was read of the repository, place and base branch `run` is in, or undefined where none was. */
-const stoodOf = (standing: PassStanding, run: GitRun): StoodRead | undefined => {
+const stoodOf = (standing: PassStanding, run: RepositoryRun): StoodRead | undefined => {
   const place = standing.placeOf(run);
   return place === undefined ? undefined : standing.read.get(keyOf(run.repo, place, run.branch));
 };
 
 /** Every branch of `run`'s repository and its commit, as it was read; undefined where none was. */
-export const headsFor = (standing: PassStanding, run: GitRun): Readonly<Record<string, string>> | undefined => {
+export const headsFor = (standing: PassStanding, run: RepositoryRun): Readonly<Record<string, string>> | undefined => {
   const stood = stoodOf(standing, run);
   return stood && 'answer' in stood ? stood.answer.heads : undefined;
 };
@@ -275,7 +349,7 @@ const repoHeads = (standing: PassStanding, repo: string): Readonly<Record<string
  */
 export function standingReader(standing: PassStanding): BranchReader {
   const unasked = standing.unasked ?? 'not asked on this read';
-  const stoodBranch = (run: GitRun, branch: string): BranchStood | undefined => {
+  const stoodBranch = (run: RepositoryRun, branch: string): BranchStood | undefined => {
     const stood = stoodOf(standing, run);
     return stood && 'answer' in stood ? stood.answer.branches.find((b) => b.branch === branch) : undefined;
   };

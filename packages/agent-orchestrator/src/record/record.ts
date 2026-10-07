@@ -1,5 +1,5 @@
 /**
- * A run's record, as data: its shape (`Run`, a `GitRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Approval`,
+ * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Approval`,
  * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `Landed`), the try it
  * is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares (`andList`,
  * `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
@@ -29,13 +29,13 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 export type CloseoutAsked = boolean | 'unsigned';
 
 /**
- * A run record: a git run (`GitRun`), whose steps work on branches of one repository, or a folder run (`FolderRun`), whose steps work
- * in folders the run makes and which needs no repository. Which is `place`, frozen at start: absent on a git run, as on any record
- * that names no kind, and `{ kind: 'folder' }` on a folder run, an object so that another kind can say which workspace it is.
+ * A run record: a repository run (`RepositoryRun`), whose steps work on branches of one repository, or a folder run (`FolderRun`), whose
+ * steps work in folders the run makes and which needs no repository. Which is `place`, frozen at start: absent on a repository run, as
+ * on any record that names no kind, and `{ kind: 'folder' }` on a folder run, an object so that another kind can say which workspace it is.
  */
-export type Run = GitRun | FolderRun;
+export type Run = RepositoryRun | FolderRun;
 
-export type GitRun = RunBase & {
+export type RepositoryRun = RunBase & {
   place?: undefined;
   /** The repository the work is about. */
   repo: string;
@@ -68,14 +68,14 @@ export type FolderRun = RunBase & {
   stagedFile?: undefined;
 };
 
-/** The kinds of workspace a run's steps work in: `git`, which a record without `place` is, and `folder`. */
-export type PlaceKind = 'git' | 'folder';
+/** The kinds of workspace a run's steps work in: `repository`, which a record without `place` is, and `folder`. */
+export type PlaceKind = 'repository' | 'folder';
 
 /** Which kind of workspace a run's steps work in. Pure. */
-export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'git';
+export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'repository';
 
-/** Whether a run is a git run: what reading its repository, base and branches needs. */
-export const isGitRun = (run: Run): run is GitRun => placeOf(run) === 'git';
+/** Whether a run is a repository run: what reading its repository, base and branches needs. */
+export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'repository';
 
 type RunBase = {
   id: string;
@@ -124,8 +124,9 @@ type RunBase = {
    */
   gates?: string[];
   /**
-   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is
-   * one of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
+   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a repository run's
+   * `repo` is one of its repositories. Absent on a run in the default factory, which is every record written before a run named its
+   * factory.
    */
   factory?: string;
   /**

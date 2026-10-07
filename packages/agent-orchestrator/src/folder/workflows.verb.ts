@@ -1,22 +1,28 @@
 /**
- * The board's workflow folders as entries of the command table, each served on the api alone: a folder written from its steps
- * (`WORKFLOWS_WRITE`, `writeWorkflow`), a folder of yours removed (`WORKFLOWS_REMOVE`, `removeWorkflow`), the folders it lists, each loaded
- * (`WORKFLOWS_LIST`, `loadWorkflows`), and one step of a folder (`WORKFLOWS_STEP`). The api resolves which folder a request names, and
- * words the board's answer around what each entry answers.
+ * The workflow folders as entries of the command table: a folder of yours written from its steps (`WORKFLOWS_WRITE`, `writeWorkflow`) and
+ * removed (`WORKFLOWS_REMOVE`, `removeWorkflow`), each checked against the version it was read at, served on both sides — the command line
+ * reads a draft folder (`cli/writers.ts`), the builder sends its steps; and the folders the board lists, each loaded (`WORKFLOWS_LIST`,
+ * `loadWorkflows`), and one step of a folder (`WORKFLOWS_STEP`), on the api alone. The api resolves which folder a read names, and words
+ * the board's answer around what each entry answers.
  */
-import { tried } from '../runtime-client.ts';
+import fs from 'node:fs';
 import path from 'node:path';
+import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { fillsOf } from '../factory/factory.ts';
+import { apiKey, cliPath, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import { fillsOf, workflowNameRefusal } from '../factory/factory.ts';
 import { readFactories, readFactory } from '../factory/factory.store.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
-import { isDirectory } from '../record/record.store.ts';
+import { HOME, isDirectory } from '../record/record.store.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
-import { stillNeeded } from './folder.ts';
-import { loadWorkflows, type Places } from './folder.store.ts';
+import { stillNeeded, workflowStale, workflowTaken } from './folder.ts';
+import { loadWorkflows } from './folder.store.ts';
+import type { Places } from '../skills/read.store.ts';
+import { workflowVersion } from './version.store.ts';
 import { removeWorkflow, writeWorkflow, type WorkflowRemoved, type WorkflowWritten } from './write.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -56,20 +62,73 @@ function fillsIn(args: Args) {
 const WRITE_HAND =
   'the builder guards the write, decodes its steps in its own words, judges and writes the schemas pasted beside them, and reads the folder back';
 
+/** `--repo`, which the board hands for the repository a folder's agents and skills are looked for in; the command line looks in yours. */
+const REPO = apiKey('repo', "the board names the repository it lists a folder's agents from; the command line names none, and reads yours");
+
 /**
- * A folder of yours written from its steps (`writeWorkflow`, which judges the whole folder before a byte is written): `dir`, the folder the
- * api resolved; `draft`, the steps as JSON text, decoded by the route before; `readme`, the folder's README where one is given.
+ * The folder of yours a writer (`who`) names, `<home>/workflows/<name>`, checked against the version it was read at (`version`) before a
+ * write or a removal (`does`): refused, as `Invalid`, for a place but yours (`yoursOrRefused`) and for a name no folder of yours has
+ * (`workflowNameRefusal`); something there already that is no folder, written, as a `Conflict` (`workflowTaken`); a folder there already,
+ * written with no version, as a `Conflict` naming the version it is at; one not there, written with a version, as `Missing`; and one
+ * changed since its version was read, as a `Conflict` (`workflowStale`). A removal with no version is refused naming the version; one of
+ * what is not a folder there is left to `removeWorkflow`'s refusal.
  */
-export const WORKFLOWS_WRITE: Command<WorkflowWritten> = {
+function versionHeld(who: string, does: 'write' | 'remove', args: Args, home: string): string {
+  const name = textOf(args, 'name') ?? '';
+  const yours = yoursOrRefused(who, 'workflows', textOf(args, 'from') ?? '', name, textOf(args, 'repo') ?? '', home);
+  const badName = workflowNameRefusal(name);
+  if (badName) throw new Invalid({ message: `${who}: ${badName}` });
+  const dir = path.join(yours, name);
+  const version = textOf(args, 'version');
+  const there = fs.lstatSync(dir, { throwIfNoEntry: false });
+  if (!there) {
+    if (does === 'write' && version !== undefined)
+      throw new Missing({ message: `${dir} is not there: it was removed since it was read. Write it with no version to make it again.` });
+    return dir;
+  }
+  if (!there.isDirectory()) {
+    if (does === 'write') throw new Conflict({ message: workflowTaken(dir, null) });
+    return dir;
+  }
+  const now = workflowVersion(dir, placesOf(args, home));
+  if (version === undefined) {
+    if (does === 'write') throw new Conflict({ message: workflowTaken(dir, now) });
+    throw new Invalid({
+      message: `${dir} is at version ${now}, and a removal is checked against the version it was read at, so a folder changed since is not removed unseen. Give that version to remove it.`,
+    });
+  }
+  if (now !== version) throw new Conflict({ message: workflowStale[does](dir, version, now) });
+  return dir;
+}
+
+/**
+ * A folder of yours, `<home>/workflows/<name>`, written from its steps (`writeWorkflow`, which judges the whole folder before a byte is
+ * written), checked first against the version it was read at (`versionHeld`): `draft`, the steps as JSON text, which the command line
+ * reads off `--folder`; `readme`, the folder's README where one is given. Answers what was written, and the version the folder is at now.
+ */
+export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
   name: 'workflows write',
-  usage: '<from> [<name>]',
-  help: ['a workflow folder of yours written from its steps'],
-  spec: apiSpec(
+  usage: 'yours <name> --folder <draft> [--version <v>]',
+  help: [
+    'a workflow folder of yours written from the steps and README of a',
+    'draft folder; one there already, at the --version it was read at',
+  ],
+  spec: writerSpec(
+    'workflows write',
+    'yours <name> --folder <draft> [--version <v>]',
+    [FROM, { key: 'name', takes: 'required', kind: 'name' }],
     [
-      { key: 'from', takes: 'required', kind: 'name' },
-      { key: 'name', takes: 'optional', kind: 'name' },
+      cliPath(
+        'workflows write',
+        'folder',
+        'the draft folder whose steps and README to write',
+        'the api is sent the steps themselves, never a folder to read',
+      ),
+      versionFlag('workflows write', 'the folder'),
+      apiKey('draft', 'the command line reads the steps off --folder, into the form the builder sends'),
+      apiKey('readme', 'the command line reads the README off --folder, as the builder sends the one written'),
+      REPO,
     ],
-    ['dir', 'draft', 'readme', 'repo'],
   ),
   writes: true,
   nemia: 'prompts',
@@ -77,14 +136,17 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten> = {
     { method: 'POST', path: '/api/workflows/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/workflows/:from/:name', status: 200, hand: WRITE_HAND },
   ],
-  only: { side: 'api', why: "the board's builder writes a folder from a form; at the command line a person edits the folder's files" },
-  handler: (args, _env, home) =>
-    tried(() =>
-      writeWorkflow(textOf(args, 'dir') ?? '', JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[], textOf(args, 'readme'), {
-        places: placesOf(args, home),
-      }),
-    ),
-  print: () => [],
+  handler: (args, _env, home = HOME) =>
+    tried(() => {
+      const dir = versionHeld('nemia workflows write', 'write', args, home);
+      const steps = JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[];
+      const written = writeWorkflow(dir, steps, textOf(args, 'readme'), { places: placesOf(args, home) });
+      return { ...written, version: workflowVersion(written.dir, placesOf(args, home)) };
+    }),
+  print: ({ dir, version, written, kept, removed }) => [
+    `${path.basename(dir)} written in ${dir}, at version ${version}: ${[...written, ...kept].join(', ')}`,
+    ...(removed.length ? [`removed: ${removed.join(', ')}`] : []),
+  ],
 };
 
 /**
@@ -112,19 +174,19 @@ function usersOf(dir: string): string[] {
 }
 
 /**
- * A folder of yours removed whole (`removeWorkflow`): `dir`, the folder the api resolved. Refused, with nothing removed, while a run, a
- * queued card or a factory still needs it (`usersOf`), each named with the command that frees it.
+ * A folder of yours, `<home>/workflows/<name>`, removed whole (`removeWorkflow`), checked first against the version it was read at
+ * (`versionHeld`). Refused, with nothing removed, while a run, a queued card or a factory still needs it (`usersOf`), each named with the
+ * command that frees it.
  */
 export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
   name: 'workflows remove',
-  usage: '<from> <name>',
-  help: ['a workflow folder of yours removed'],
-  spec: apiSpec(
-    [
-      { key: 'from', takes: 'required', kind: 'name' },
-      { key: 'name', takes: 'required', kind: 'name' },
-    ],
-    ['dir', 'repo'],
+  usage: 'yours <name> --version <v>',
+  help: ['a workflow folder of yours removed, at the --version it was read at'],
+  spec: writerSpec(
+    'workflows remove',
+    'yours <name> --version <v>',
+    [FROM, { key: 'name', takes: 'required', kind: 'name' }],
+    [versionFlag('workflows remove', 'the folder'), REPO],
   ),
   writes: true,
   nemia: 'prompts',
@@ -132,15 +194,14 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
     method: 'DELETE',
     path: '/api/workflows/:from/:name',
     status: 200,
-    hand: 'the builder guards the removal, and refuses a folder changed since the board read it by its version',
+    hand: 'the builder guards the removal, and decodes its version in its own words',
   },
-  only: { side: 'api', why: 'the board removes a workflow of yours; at the command line a person removes its folder' },
-  handler: (args, _env, home) =>
+  handler: (args, _env, home = HOME) =>
     tried(() => {
-      const dir = path.resolve(textOf(args, 'dir') ?? '');
-      return removeWorkflow(dir, { ...(home !== undefined && { home }), users: usersOf(dir) });
+      const dir = path.resolve(versionHeld('nemia workflows remove', 'remove', args, home));
+      return removeWorkflow(dir, { home, users: usersOf(dir) });
     }),
-  print: () => [],
+  print: ({ dir, removed }) => [`removed ${dir}: ${removed.join(', ')}`],
 };
 
 /** A folder loaded (`steps`), or why it does not load (`error`, the loader's words). */

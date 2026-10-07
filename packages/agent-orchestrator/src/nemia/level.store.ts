@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { wfRoot } from '../config/config.store.ts';
-import { readCustomInstructions } from '../agents/custom-file.store.ts';
+import { readCustomInstructions } from '../agents/read.store.ts';
 import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';

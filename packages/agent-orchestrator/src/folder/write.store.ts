@@ -1,8 +1,8 @@
 /**
  * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves, and one of yours removed whole
  * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAround`); and whether a folder holds the workflows the board
- * lists (`isWorkflowsHolder`). A store beside `folder.store.ts`: it imports neither the engine nor a controller. A run that froze its
- * folder at `nemia start` is changed by none of it.
+ * lists (`isWorkflowsHolder`). A store beside `folder.store.ts`, reading through the agents and skills reads: it imports neither the
+ * engine nor a controller. A run that froze its folder at `nemia start` is changed by none of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,7 +12,8 @@ import { codexModeWritten } from '../former/former.ts';
 import { parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
-import { agentsFor, skillsFor, type Places } from './folder.store.ts';
+import { agentsFor } from '../agents/read.store.ts';
+import { skillsFor, type Places } from '../skills/read.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 import { readFactories } from '../factory/factory.store.ts';
 

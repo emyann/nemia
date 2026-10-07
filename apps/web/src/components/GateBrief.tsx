@@ -32,8 +32,8 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
       </Waits>
     );
   if (need) return <Waits run={run} anchor={step.name} kind={need.kind} said={needWords(need)} />;
-  if (run.toDecide?.kind === 'git' && run.cancelledAt === null)
-    return <Waits run={run} anchor={null} kind="git" said={`The run's result waits on you: ${run.toDecide.said}.`} />;
+  if (run.toDecide?.kind === 'result' && run.cancelledAt === null)
+    return <Waits run={run} anchor={null} kind="result" said={`The run's result waits on you: ${run.toDecide.said}.`} />;
   return null;
 }
 

@@ -59,7 +59,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
-const { StepPolicy, Told } = await import('../src/components/Told.tsx');
+const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
@@ -134,7 +134,7 @@ function runWith(note: string | null): RunDetail {
     brief: 'Go round again',
     decide: 'nemia decide r-1',
     repo: '/code/app',
-    place: 'git',
+    place: 'repository',
     work: null,
     workflowDir: '/code/app/workflow',
     workflowPage: null,
@@ -557,7 +557,7 @@ function summaryRun(): RunSummary {
   return {
     id: 'r-1',
     repo: '/code/app',
-    place: 'git',
+    place: 'repository',
     work: null,
     brief: 'Tile it',
     workflowDir: '/code/app/workflow',
@@ -2780,6 +2780,24 @@ test("an agent's question is drawn as its markdown after `asks:`, in the banner 
   assert.doesNotMatch(blocked, /data-markdown/, "the harness's words and the session's last line are said as they are");
 });
 
+test("a result nobody decided is asked in the inspector, with the way to the run's Decide section; a run called off asks nothing", async () => {
+  const { Asked } = await import('../src/components/GateBrief.tsx');
+  const toDecide = {
+    kind: 'result' as const,
+    branches: ['wf/r-1/ship'],
+    said: 'merge or drop wf/r-1/ship',
+    command: 'git merge wf/r-1/ship',
+  };
+  const run = { ...needing('succeeded', {}, { waitingOnYou: [] }), toDecide };
+  const asked = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
+  assert.match(asked, /data-asked="result"/);
+  assert.ok(textContentOf(asked).includes("The run's result waits on you: merge or drop wf/r-1/ship."), asked);
+  assert.match(asked, /<a data-answer-link="true"[^>]*href="\/runs\/r-1#decide"/);
+
+  const called = { ...needing('succeeded', {}, { waitingOnYou: [], cancelledAt: at }), toDecide };
+  assert.equal(await routedWith(createElement(Asked, { run: called, step: called.steps[0] })), '');
+});
+
 test('a short string in a closeout is drawn as markdown; a number as it is', async () => {
   const { FieldView } = await import('../src/components/Outcome.tsx');
   const field = (value: unknown): string =>
@@ -3067,13 +3085,13 @@ test("the to-decide banner says what `wf ls` says after `→ to decide:`, and li
   assert.match(html, /<a href="#step-ship" data-approve="ship" class="underline underline-offset-2">/);
 
   const branch = {
-    kind: 'git' as const,
+    kind: 'result' as const,
     branches: ['wf/r-1/implement'],
     said: 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1',
     command: 'wf decide r-1',
   };
   const ahead = withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: branch } }));
-  assert.match(ahead, /data-to-decide="git"/);
+  assert.match(ahead, /data-to-decide="result"/);
   assert.deepEqual(textsOf(ahead), ['To decide:', branch.said], 'a branch nobody merged: the words, and the command in them');
   assert.doesNotMatch(ahead, /<a /, 'it names no step to link to');
 
@@ -6394,6 +6412,21 @@ test("at a gate, the step's policy is drawn open: its words, the skills it adds,
   );
 });
 
+/** `StepBody` drawn as a server draws it. */
+const bodyMarkup = (body: string | null, layers: StepLayers | null): string =>
+  renderToStaticMarkup(createElement(StepBody, { body, layers }));
+
+test("REFUSED: a step whose run froze its layers draws no body above its fold, which says each of the body's words by layer", () => {
+  assert.equal(bodyMarkup('You are the writer.\n\nBe terse.\n\nWrite the note.', LAYERS), '', "an agent's step");
+  assert.equal(bodyMarkup('Read the note.', { ...LAYERS, agent: null, instructions: null, custom: null }), '', 'a step with no agent');
+});
+
+test('a step whose run froze no layers draws its body, all the record says of its words; an empty body draws nothing', () => {
+  assert.match(bodyMarkup('Write the **note**.', null), /<div data-markdown="true"[^>]*><p[^>]*>Write the <strong>note<\/strong>\.<\/p>/);
+  assert.equal(bodyMarkup(null, null), '');
+  assert.equal(bodyMarkup('', null), '');
+});
+
 /** `StepForm` for one step of `writer`'s, inside a router, with the listing's layers `layers`: its agent, a policy key and a wiring key. */
 async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 'writer'): Promise<string> {
   const { StepForm } = await import('../src/components/StepForm.tsx');
@@ -6500,7 +6533,7 @@ test("the tick's pass on the Stats page: a column a bucket with its count, a bar
   assert.match(html, /title="&gt; 5000 ms: 1 pass"/, 'the open bucket names its end on hover');
   assert.deepEqual(
     [...html.matchAll(/data-part="([a-z]+)"/g)].map((m) => m[1]),
-    ['git', 'records'],
+    ['place', 'records'],
   );
   assert.match(html, /data-part="records"[^]*?1\.00 ms <span[^>]*>&lt; 1%</);
   assert.deepEqual(

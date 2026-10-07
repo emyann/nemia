@@ -2,7 +2,7 @@
  * Pruning a finished run: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`)
  * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`). Pure.
  */
-import { andList, isGitRun, prunedWords, type GitRun, type Pruned, type Run } from '../record/record.ts';
+import { andList, isRepositoryRun, prunedWords, type RepositoryRun, type Pruned, type Run } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import type { Decision } from '../decide/decide.ts';
@@ -97,7 +97,7 @@ export function pruneRefusal(
   const id = run.id;
   const again = pruneAgain(id, { unmerged, artifacts });
   const agreed = unmerged || (Boolean(run.pruned) && !facts.files);
-  if (!isGitRun(run)) {
+  if (!isRepositoryRun(run)) {
     return `a folder run: its steps' folders are its work, kept with the run until it is forgotten — no worktree to prune. nemia rm ${id} forgets it with them.`;
   }
   const said: string[] = [];
@@ -124,7 +124,7 @@ export function pruneRefusal(
 /**
  * Why `nemia prune` waits on a run that finished and nobody has decided: its branch, or the repository it worked in, is what is read. Pure.
  */
-function unmergedRefusal(run: GitRun, artifacts: boolean): string {
+function unmergedRefusal(run: RepositoryRun, artifacts: boolean): string {
   const again = pruneAgain(run.id, { unmerged: true, artifacts });
   return run.isolate
     ? `it finished and is not merged into ${run.branch}: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: ${again}`

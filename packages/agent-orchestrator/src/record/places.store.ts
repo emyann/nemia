@@ -1,8 +1,8 @@
 /**
- * Where a run's steps work, for a run that is not a git run: the kinds of workspace a team can say beside git's (`place` on the run
+ * Where a run's steps work, for a run that is not a repository run: the kinds of workspace a team can say beside git's (`place` on the run
  * record). There is one, `folder` (`place: folder`), and nothing here reads git, the network, or the engine.
  *
- * A git run's steps work in worktrees of its repository, cut and handed off by its place skill (`make`, `handoff`), and asked of in
+ * A repository run's steps work in worktrees of its repository, cut and handed off by its place skill (`make`, `handoff`), and asked of in
  * worktree.store.ts, branches.store.ts, forget.verb.ts and prune.verb.ts. A folder run is the other kind, whole: what
  * `advance` makes for a step, what it does when the step is finished, and where it all lives, which is under the run's own directory in the
  * store, so `nemia rm` forgets it with the record and runs no git.
@@ -18,8 +18,8 @@ export type Place = {
   /** The directory a step works in, made real before the step is filed, and what the step's brief is told about it. */
   make(run: FolderRun, plan: WorkspacePlan, step: string): { workspace: string; notes: string[] };
   /**
-   * What is due when a step is finished, beside collecting its artifacts, which every kind does: a git run commits what the step left
-   * uncommitted; a folder has nothing to commit, and its files are where the step left them.
+   * What is due when a step is finished, beside collecting its artifacts, which every kind does: a repository run commits what the step
+   * left uncommitted; a folder has nothing to commit, and its files are where the step left them.
    */
   handOff(run: FolderRun, step: string): void;
 };

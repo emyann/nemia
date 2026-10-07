@@ -13,6 +13,7 @@ import { runPlaceVerbAsync } from './place-async.store.ts';
 import type { PlaceOutcome, PlaceRequests, PlaceVerb } from './place.ts';
 import { running } from '../../test/running.ts';
 import { scratch } from '../../test/scratch.ts';
+import { meteredPass } from '../meter/tally.store.ts';
 
 /** A skill folder holding one script, `scripts/<verb>.ts`, whose body is `body`. */
 function planted(verb: PlaceVerb, body: string): string {
@@ -51,6 +52,22 @@ test('make answers off the loop as runPlaceVerb answers: the request handed with
   const outcome = await ran(dir, 'make', MAKE);
   assert.ok('answer' in outcome, JSON.stringify(outcome));
   assert.deepEqual(outcome.answer, { workspace: fs.realpathSync(dir), branch: 'wf/x/a', conflicts: ['wf/x/b'], notes: ['1'] });
+});
+
+test('a verb run off the loop in a pass is counted in its place phase, its process and its time; one with no script starts nothing', async () => {
+  const answer = { workspace: '/w', branch: 'wf/x/a', conflicts: [], notes: [] };
+  const dir = planted('make', `process.stdout.write(${JSON.stringify(JSON.stringify(answer))});\n`);
+  const { tallies } = await Effect.runPromise(meteredPass(runPlaceVerbAsync(dir, 'make', MAKE)));
+  assert.ok(tallies);
+  const { spawned, calls, ms } = tallies.kinds.place;
+  assert.deepEqual({ spawned, calls }, { spawned: 1, calls: 1 });
+  assert.ok(ms > 0, "its time is the place's");
+  const none = await Effect.runPromise(meteredPass(runPlaceVerbAsync(scratch('wf-place-async-none-'), 'make', MAKE)));
+  assert.ok(none.tallies);
+  assert.deepEqual(
+    Object.values(none.tallies.kinds).map((k) => k.spawned),
+    Object.values(none.tallies.kinds).map(() => 0),
+  );
 });
 
 test('REFUSED: a refusal at exit 0 is the refusal; a non-zero exit, an answer of another shape and no script are each unread, with why', async () => {

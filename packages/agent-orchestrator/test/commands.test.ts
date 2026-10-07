@@ -17,7 +17,7 @@ test('the commands whose work waits on the next pass tick, and no read, nor up, 
     TABLE.filter((c) => c.ticks === true)
       .map((c) => c.name)
       .sort(),
-    ['accept', 'approve', 'cancel', 'inbox queue', 'merge', 'plan', 'resume', 'retry', 'round', 'start'],
+    ['accept', 'agents try', 'approve', 'cancel', 'inbox queue', 'merge', 'plan', 'resume', 'retry', 'round', 'start'],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true && (!c.writes || ['up', 'tick', 'watch'].includes(c.name))).map((c) => c.name),

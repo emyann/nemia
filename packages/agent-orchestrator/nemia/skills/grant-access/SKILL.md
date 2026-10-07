@@ -1,6 +1,6 @@
 ---
 name: grant-access
-description: When a step was denied a call (a feed line's denied: note), read what it was denied and why, and propose to the person the narrowest grant that would have let it through, or say the deny is kept on purpose.
+description: "When a step was denied a call (a feed line's denied: note), read what it was denied and why, and propose to the person the narrowest grant that would have let it through, or say the deny is kept on purpose."
 ---
 # Grant access
 

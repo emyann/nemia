@@ -55,7 +55,7 @@ test('REFUSED: the box is closed, saying why and where to go instead, for a run 
   }
 });
 
-const said = (at: string, text: string, attempt = 1): Said => ({ at, attempt, text });
+const said = (at: string, text: string, attempt = 1, after: Said['after'] = null): Said => ({ at, attempt, text, after });
 const at = (s: number) => new Date(Date.UTC(2026, 8, 14, 16, 0, s)).toISOString();
 
 test('what the page has just said is shown beside what the api read, once each, in the order said — and once the read has it, once', () => {
@@ -117,7 +117,7 @@ const arrival = (id: string, s: number, text: string): TranscriptEvent => event(
 
 test("words the session's transcript shows reaching it are drawn once, as what was said, where they reached it — read between calls by a working session, or starting an idle one's turn", () => {
   const words = 'Widen the scope to apps/api too.';
-  const told = said(at(12), words);
+  const told = said(at(12), words, 1, { kind: 'text', id: 'a-1' });
   const drawnWith = (turns: ReturnType<typeof withSaid>) =>
     turns.filter((t) => (t.kind === 'system' || t.kind === 'told') && t.text.includes(words)).length;
 
@@ -138,7 +138,7 @@ test("words the session's transcript shows reaching it are drawn once, as what w
     'where the words reached it',
   );
 
-  const late = said(at(44), words);
+  const late = said(at(44), words, 1, { kind: 'text', id: 'a-2' });
   const idle = [...EVENTS, arrival('idle-1', 45, `Another Claude session sent a message:\n${words}`)];
   assert.equal(
     drawnWith(withSaid(foldTranscript(idle), [late])),
@@ -150,31 +150,51 @@ test("words the session's transcript shows reaching it are drawn once, as what w
   const turns = withSaid(foldTranscript(heardIdle.events), heardIdle.said);
   assert.equal(drawnWith(turns), 1);
   assert.deepEqual(turns.at(-1), { kind: 'told', key: `told:1:${at(44)}`, at: at(44), attempt: 1, text: words, arrived: at(45) });
-
-  assert.equal(
-    heardIn([arrival('att-2', 11, words)], [told]).said[0].arrived,
-    at(11),
-    'handed over a moment before the engine journalled them, as it hands them over first: still their arrival',
-  );
 });
 
-test("REFUSED as an arrival: a line with other words, one that only mentions them, one written well before they were said, the session's own words, and a second line for words said once — each stays the session's, and words it has not shown have none", () => {
-  const words = 'Widen the scope.';
-  const told = said(at(30), words);
-  const others = [
-    arrival('other', 31, 'Background session idle'),
-    arrival('mention', 32, `Someone said: ${words} Ignore it.`),
-    arrival('before', 20, words),
-    event('echo', 33, 'text', { text: words }),
-  ];
-  const kept = heardIn([...EVENTS, ...others], [told]);
-  assert.deepEqual(kept.said, [{ ...told, arrived: null }]);
-  assert.deepEqual(kept.events, [...EVENTS, ...others]);
+test("words said to a session whose clock runs behind the api's arrive all the same: the line after their mark, stamped before they were said", () => {
+  const words = 'Widen the scope to apps/api too.';
+  const told = said(at(30), words, 1, { kind: 'text', id: 'a-1' });
+  const behind = [...EVENTS.slice(0, 2), arrival('behind', 24, words), ...EVENTS.slice(2)];
+  const heard = heardIn(behind, [told]);
+  assert.deepEqual(heard.said, [{ ...told, arrived: at(24) }], 'six seconds behind by its stamp, after the mark by its place');
+  assert.deepEqual(heard.events, EVENTS, "the session's line for the words is taken out, and nothing else");
+});
 
-  const lines = [arrival('first', 31, words), arrival('second', 33, words)];
-  const one = heardIn(lines, [told]);
-  assert.deepEqual([one.said.map((s) => s.arrived), one.events], [[at(31)], [lines[1]]], 'said once, one arrival');
-  const two = heardIn(lines, [said(at(32), words), told]);
-  assert.deepEqual([two.said.map((s) => s.arrived), two.events], [[at(31), at(33)], []], 'said twice, two arrivals, in the order said');
+test("words journalled with no mark are looked for from the transcript's start, and words whose mark the transcript does not hold yet have no arrival", () => {
+  const words = 'Widen the scope.';
+  const lines = [arrival('first', 1, words), ...EVENTS];
+  assert.deepEqual(
+    heardIn(lines, [said(at(30), words)]).said.map((s) => s.arrived),
+    [at(1)],
+    'no mark: its first line, whenever stamped',
+  );
+  const unseen = heardIn(lines, [said(at(30), words, 1, { kind: 'tool_use', id: 'c-9' })]);
+  assert.deepEqual([unseen.said.map((s) => s.arrived), unseen.events], [[null], lines], 'a mark not among the events yet: none, all kept');
+});
+
+test("REFUSED as an arrival: a line with other words, one that only mentions them, one before their mark though stamped after they were said, the session's own words, and a second line for words said once — each stays the session's, and words it has not shown have none", () => {
+  const words = 'Widen the scope.';
+  const told = said(at(30), words, 1, { kind: 'tool_use', id: 'c-2' });
+  const before = [...EVENTS.slice(0, 3), arrival('before', 35, words), ...EVENTS.slice(3)];
+  const others = [
+    arrival('other', 41, 'Background session idle'),
+    arrival('mention', 42, `Someone said: ${words} Ignore it.`),
+    event('echo', 43, 'text', { text: words }),
+  ];
+  const kept = heardIn([...before, ...others], [told]);
+  assert.deepEqual(kept.said, [{ ...told, arrived: null }]);
+  assert.deepEqual(kept.events, [...before, ...others]);
+
+  const lines = [event('a-0', 29, 'text', { text: 'Working.' }), arrival('first', 31, words), arrival('second', 33, words)];
+  const first = said(at(30), words, 1, { kind: 'text', id: 'a-0' });
+  const one = heardIn(lines, [first]);
+  assert.deepEqual([one.said.map((s) => s.arrived), one.events], [[at(31)], [lines[0], lines[2]]], 'said once, one arrival');
+  const two = heardIn(lines, [said(at(32), words, 1, { kind: 'system', id: 'first' }), first]);
+  assert.deepEqual(
+    [two.said.map((s) => s.arrived), two.events],
+    [[at(31), at(33)], [lines[0]]],
+    'said twice, two arrivals, in the order said',
+  );
   assert.deepEqual(heardIn(EVENTS, []), { events: EVENTS, said: [] }, 'nothing said, nothing taken');
 });

@@ -4,12 +4,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { GitRun } from '../record/record.ts';
+import type { RepositoryRun } from '../record/record.ts';
 import type { Consumed } from '../status/status.ts';
 import type { AttemptClock, TaskClock } from './timeline.ts';
 import { atWork, runTokens } from './took.ts';
 
-const run = (steps: GitRun['steps']): GitRun => ({
+const run = (steps: RepositoryRun['steps']): RepositoryRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',

@@ -17,7 +17,8 @@
  * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the files
- * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `lookup.store.ts` (the workflow folders
+ * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents/read.store.ts` and
+ * `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the workflow folders
  * a place holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an
  * agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and
  * a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read),
@@ -46,7 +47,7 @@ export {
   touchedLines,
 } from './branches/index.ts';
 export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
-export { isGitRun, placeOf } from './run.ts';
+export { isRepositoryRun, placeOf } from './run.ts';
 export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
@@ -132,7 +133,7 @@ export {
 export { outputLines } from './closeout/closeout.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
-export type { FolderRun, GitRun, PlaceKind } from './run.ts';
+export type { FolderRun, RepositoryRun, PlaceKind } from './run.ts';
 export type {
   Acceptance,
   Approval,
@@ -161,25 +162,17 @@ export type {
 export type { AtWork, RunTokens, SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry/index.ts';
 export {
-  agentsFor,
   agentUsers,
-  agentVersion,
-  cardSkills,
-  preloads,
   formerKeyLines,
-  isShippedPlace,
-  loadAgents,
   loadWorkflows,
-  lookupRoots,
-  skillsFor,
-  skillVersion,
   workflowDescription,
   workflowFolder,
   workflowReadme,
   workflowsIn,
 } from './folder/folder.store.ts';
-export type { Places } from './folder/folder.store.ts';
-export { customInstructionsFile, readCustomInstructions } from './agents/custom-file.store.ts';
+export { cardSkills, isShippedPlace, lookupRoots, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
+export type { Places } from './skills/read.store.ts';
+export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';
@@ -318,12 +311,16 @@ export type {
   Unread,
 } from './place/place.ts';
 export { writeWorkflow } from './folder/write.store.ts';
+export { workflowStale, workflowTaken } from './folder/folder.ts';
+export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
 export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
 export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
-export { TRY_STEP, triesDir, tryDir, writeTryFolder } from './roster/try.store.ts';
+export { TRY_STEP, triesDir, tryDir, tryFolder, writeTryFolder } from './try/try.store.ts';
+export { skillCopyCommand, untriedOf, yourAgentsDir, type Untried } from './try/try.ts';
+export { repoWriteRefusal } from './yours/yours.ts';
 export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead, FilledStep } from './roster/roster.ts';
 export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';
@@ -420,7 +417,7 @@ export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export { AUTO_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
-export { CLI, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
+export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';

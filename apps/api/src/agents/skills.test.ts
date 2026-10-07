@@ -14,11 +14,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { engine } from 'agent-orchestrator';
+import { engine, skillCopyCommand } from 'agent-orchestrator';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { copyCommand, listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
+import { listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
 import { TEAM } from '../../test/team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
@@ -479,7 +479,7 @@ test("a skill's copy command, run as the page gives it, puts the folder under it
   const checkout = path.join(scratch('nemia-api-skills-copy-'), "Jo's work", 'repo');
   fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
   const into = path.join(checkout, '.claude', 'skills');
-  const run = () => execFileSync('sh', ['-c', copyCommand(path.join(LIBRARY, 'mine'), into)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const run = () => execFileSync('sh', ['-c', skillCopyCommand(path.join(LIBRARY, 'mine'), into)], { stdio: ['ignore', 'pipe', 'pipe'] });
   run();
   assert.deepEqual(fs.readdirSync(into), ['mine'], 'the folder is copied under its name, not spilled into skills/');
   assert.equal(

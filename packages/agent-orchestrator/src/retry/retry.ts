@@ -69,7 +69,9 @@ import { heldLater } from '../round/round.ts';
  * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
  * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
  * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
- * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia round`'s.
+ * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia round`'s. Any other step with a
+ * cap that may be tried takes a `--budget` too, above its floor (`raiseOf`), which `carries` and `retryRefusal` read: `raise` marks only
+ * the steps a session of which must carry one.
  *
  * And a step whose work the run is parked on at an ending step's gate (`waitsAtGate`), with nothing after it filed: the ending has nothing
  * of its own to object to — it has not run — so a send-back there goes to the work, which is this step (`sendBackTo`).
@@ -153,11 +155,19 @@ export function retryable(
 }
 
 /**
- * Whether a person's ask carries what a try of its step needs past its budget (`Raise`): a `--budget` above it, on an ask that files a
- * session.
+ * Whether a person's ask carries what a try of its step needs, and nothing it cannot take. A recheck files no session, and carries. An ask
+ * with no `--budget` carries unless the step is past its budget (`raise`). An ask with one carries only on a step with a cap, and only
+ * above its floor (`raiseOf`): what its tries have cost, and the cap in force.
+ *
+ * @param raise The raise a session of the step must carry: set on a step over its budget, or ended at it (`retryable`).
+ * @param floor What any `--budget` on the step must pass (`raiseOf`): undefined for a step with no `budget:`.
  */
-export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined): boolean =>
-  !raise || a.mode === 'recheck' || (a.budget !== undefined && a.budget > raise.above);
+export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined, floor: Raise | undefined): boolean =>
+  a.mode === 'recheck' || (a.budget === undefined ? !raise : floor !== undefined && a.budget > floor.above);
+
+/** What a due try takes from its ask's `--budget`: the cap it raises to, on a session, and `pastCap` where the step was past its budget. */
+const raisedBy = (ask: RetryAsk, raise: Raise | undefined): Pick<Retry, 'budget' | 'pastCap'> =>
+  ask.budget === undefined || ask.mode === 'recheck' ? {} : { budget: ask.budget, ...(raise ? { pastCap: true as const } : {}) };
 
 /**
  * Whether a person's ask says what a send-back from a gate needs (`sendsBack`): words. One with none — written while the step's harness
@@ -198,7 +208,8 @@ export function pauseAskVoid(
   if (currentOf(run, a) !== a.interrupted) return true;
   const phase = phaseOf(a.interrupted);
   if (!SETTLED.has(phase)) return false;
-  return phase !== 'stopped' || !carries(a, overBudget(step, run, spendOf) ? raiseOf(step, run, spendOf) : undefined);
+  const floor = raiseOf(step, run, spendOf);
+  return phase !== 'stopped' || !carries(a, overBudget(step, run, spendOf) ? floor : undefined, floor);
 }
 
 /**
@@ -242,8 +253,9 @@ export const pauseAsksVoid = (
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
  *
  * A step over its budget, or ended at it, is never tried on the run's word — it is not `failed (check)`, so `retries:` files nothing — and
- * a person's ask for a session of it is due only with a `--budget` above what it has spent (`Raise`), which the try carries and the record
- * keeps.
+ * a person's ask for a session of it is due only with a `--budget` above what it has spent (`Raise`), the try marked `pastCap`. An ask with
+ * a `--budget` on any step is due only where the step has a cap and the amount is above its floor (`carries`). The try carries it, and the
+ * record keeps it.
  *
  * A step at its gate, or approved and not handed on (`sendsBack`), is tried only on an ask with words (`heard`): a wordless one, asked
  * while its harness blocked the session that then signed off, would send it back with nothing to change, before anyone read what it handed
@@ -289,7 +301,12 @@ export function retriesDue(
     if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
     const ask = open.find(
-      (a) => a.step === step.name && a.try === next && ways.includes(a.mode) && carries(a, raise) && heard(a, sendsBack),
+      (a) =>
+        a.step === step.name &&
+        a.try === next &&
+        ways.includes(a.mode) &&
+        carries(a, raise, raiseOf(step, run, spendOf)) &&
+        heard(a, sendsBack),
     );
     if (ask) {
       due.push({
@@ -298,7 +315,7 @@ export function retriesDue(
         mode: ask.mode,
         ...(ask.model ? { model: ask.model } : {}),
         ...(ask.message !== undefined ? { message: ask.message } : {}),
-        ...(raise && ask.mode !== 'recheck' ? { budget: ask.budget } : {}),
+        ...raisedBy(ask, raise),
         by: askedBy(ask),
         ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),

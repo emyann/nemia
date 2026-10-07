@@ -32,12 +32,12 @@ import {
 /** Mirrors `RunListing` in apps/api/src/runs/runs.ts: a run's summary, and the address of its workflow's page. */
 export type RunSummary = {
   id: string;
-  /** The repository a git run is about; null for a folder run (`place`), which has none. */
+  /** The repository a repository run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
   /** The factory the run was started in, as its record names it; null for a run of the default factory, whose record names none. */
   factory: string | null;
   place: PlaceKind;
-  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run. */
+  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a repository run. */
   work: string | null;
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */

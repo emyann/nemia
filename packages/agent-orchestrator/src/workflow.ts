@@ -32,7 +32,8 @@
  * first tick. A `check:` the parser drops is a constraint nobody enforces.
  *
  * **This entry is the format as data, and reads nothing.** It parses and checks text, and writes a step or an agent back to text;
- * `folder.store.ts` is what reads a folder from disk and hands it here (`loadWorkflows`, `loadAgents`, `workflowFolder`, …). So
+ * `folder.store.ts` is what reads a folder from disk and hands it here (`loadWorkflows`, `workflowFolder`, …), and `agents/read.store.ts`
+ * and `skills/read.store.ts` the agents and skills beside it (`loadAgents`, `skillsFor`, …). So
  * `agent-orchestrator/workflow`, this file, is the format alone, re-exported by name from where it lives, and the readers are exported
  * from the package's root (`docs/architecture.md`).
  */
@@ -117,6 +118,7 @@ export {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
   agentCard,
+  agentDraftOf,
   agentNameRefusal,
   cardRetired,
   CLAUDE_CODE_IGNORED,

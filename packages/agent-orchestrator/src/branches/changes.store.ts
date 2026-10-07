@@ -1,5 +1,5 @@
 /**
- * What a git run's branches changed, as its place's `report` says it on each read (`changesOf`), and what is at a path on a branch
+ * What a repository run's branches changed, as its place's `report` says it on each read (`changesOf`), and what is at a path on a branch
  * (`presentOn`). Nothing is kept between reads: a decision reads the place live, and an answer the place refuses or never gives is said
  * as not known (`notKnown`), never as a branch that changed nothing.
  *
@@ -8,7 +8,7 @@
  */
 import type { Changes, ChangedFile, PlaceRequests } from '../place/place.ts';
 import { placeDirOf, runPlaceVerb } from '../place/place.store.ts';
-import type { GitRun } from '../record/record.ts';
+import type { RepositoryRun } from '../record/record.ts';
 import { CHECK_AFFECTING, notKnown, radius, sensitivePaths, workspacesIn, type Radius } from './branches.ts';
 
 /** A top-level markdown file a branch added, and its text. */
@@ -27,7 +27,7 @@ export type BranchChanges = {
 
 /** What the place's `report` answers for `run`, or what it said instead: its refusal, or why it was not heard. */
 function reportOf(
-  run: GitRun,
+  run: RepositoryRun,
   ask: Partial<PlaceRequests['report']> & Pick<PlaceRequests['report'], 'branches'>,
   skillDir: string,
 ): Changes | { readonly unknown: string } {
@@ -57,7 +57,7 @@ const addedText = (diff: string): string =>
  * and so is everything of a read the place refused or never answered, in the place's words.
  */
 export function changesOf(
-  run: GitRun,
+  run: RepositoryRun,
   branches: readonly string[],
   globs: readonly string[] = CHECK_AFFECTING,
   skillDir: string = placeDirOf(run),
@@ -110,7 +110,7 @@ function notesFrom(files: readonly string[], diffOf: (p: string) => string | { e
  * path of a branch the place has not, whose files are on no branch — or what the place said instead of answering.
  */
 export function presentOn(
-  run: GitRun,
+  run: RepositoryRun,
   branch: string,
   paths: readonly string[],
   skillDir: string = placeDirOf(run),

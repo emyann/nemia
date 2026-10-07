@@ -1,5 +1,5 @@
 /**
- * `nemia start` opens a git run's place (`openPlace`): the package's own place (`SHIPPED_PLACE`) unless a layer gives another
+ * `nemia start` opens a repository run's place (`openPlace`): the package's own place (`SHIPPED_PLACE`) unless a layer gives another
  * (`StartPlace`). Its `open` answers the record's base, branch and repository, and the record names the place it ran (`placeSkill`). A
  * place that refuses, or that leaves out a verb the workflow's run needs of it, refuses the start in its words, and nothing is written. A
  * SIGINT to `nemia start` is not passed on to `open`'s process group, which outlives it. `WF_ROOT` is set before the import, since the
@@ -19,7 +19,7 @@ const ROOT = scratch('wf-start-place-');
 process.env.WF_ROOT = ROOT;
 const { startRun, StartPlace } = await import('../src/start/start.verb.ts');
 const { SHIPPED_PLACE } = await import('../src/place/place.store.ts');
-const { skillVersion } = await import('../src/folder/folder.store.ts');
+const { skillVersion } = await import('../src/skills/read.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 

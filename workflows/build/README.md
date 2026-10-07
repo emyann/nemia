@@ -15,6 +15,12 @@ step unless the closeout's `artifacts` names a picture, an image file (`.png`, `
 bytes, by an absolute path in the step's files directory (`WF_ARTIFACTS`) or from the workspace root. The refusal names the command that
 takes them, `npm run e2e -- --photos --pages <name,…>`. A change only under `apps/web/test` asks for none.
 
+It runs `probe.ts`, read from the base as well: a session a step starts to measure something, a probe, is named `<run>-probe-<label>`
+(`node workflows/build/probe.ts start <label> -- <prompt>`), runs in the machinery's trusted folder `$WF_ROOT/probes`, and says in its
+first message whether the person must act; it reaches the person's phone through Remote Control only with `--answer`, and the step then
+stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the run is live, naming `probe.ts stop`. Ada's
+and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a harness's trust or local settings anywhere.
+
 Review counts what it closes out on (`tally: findings, findings.kind=placement, mutants.proves`): the findings of each round, those of
 them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern), and the mutants it judged to
 prove their rule. `wf stats` totals each per day, `—` on a day no review closed out.

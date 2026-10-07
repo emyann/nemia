@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
-import { agentUsers, agentVersion, loadAgents, loadWorkflows } from '../src/folder/folder.store.ts';
+import { agentUsers, loadWorkflows } from '../src/folder/folder.store.ts';
+import { agentVersion, loadAgents } from '../src/agents/read.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
 
@@ -213,7 +214,9 @@ test('a new agent over one that is there, and an edit of one that is not, are re
   fresh();
   refused(
     () => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version: null }),
-    /^agents\/reviewer\.md is there already/,
+    new RegExp(
+      `^agents/reviewer\\.md is there already\\. Give the new agent another name, or open it and change it: it is at version ${agentVersion(AGENTS, 'reviewer')}, and a write given that version changes it\\.$`,
+    ),
     'Conflict',
   );
   refused(() => writeAgent(AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');

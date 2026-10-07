@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillNameRefusal, skillTurnCost, tokensAbout } from '../src/workflow.ts';
-import { preloads, skillsFor } from '../src/folder/folder.store.ts';
+import { preloads, skillsFor } from '../src/skills/read.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
 

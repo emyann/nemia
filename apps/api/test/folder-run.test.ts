@@ -1,7 +1,7 @@
 /**
  * A folder run (`workspace: folder`, `place: { kind: 'folder' }` on the record), as the board reads it: no repository, no base, no
- * branch. The list, the detail and the decision answer for it without throwing, and say what the record says — null where a git run
- * has a repository — rather than a git run's words. In a scratch store, with no git repository anywhere.
+ * branch. The list, the detail and the decision answer for it without throwing, and say what the record says — null where a repository run
+ * has a repository — rather than a repository run's words. In a scratch store, with no git repository anywhere.
  *
  * And a folder team as the board finds and files for it, with the repository the api is pointed at a plain directory that is no
  * repository at all: `repoOf` resolves a path and never asks git, so the api runs, the store's own workflows list, and a card for a
@@ -64,7 +64,7 @@ fs.writeFileSync(
   path.join(root, 'runs', 'f-notes.json'),
   JSON.stringify({
     id: 'f-notes',
-    /** A folder run whose one step signed off: its record as `nemia start` writes one, with `place` and none of a git run's fields. */
+    /** A folder run whose one step signed off: its record as `nemia start` writes one, with `place`, none of a repository run's fields. */
     place: { kind: 'folder' },
     workspace: work,
     brief: 'Write a note.',
@@ -109,6 +109,39 @@ test('the runs list shows a folder run with no repository, and says its kind', a
   assert.equal(run.place, 'folder');
 });
 
+test("the runs list says each run's place in the store's words: a folder run's, and a repository's for a record with no place", async () => {
+  const record = path.join(root, 'runs', 'r-repo.json');
+  fs.writeFileSync(
+    record,
+    JSON.stringify({
+      id: 'r-repo',
+      repo: notARepo,
+      workspace: notARepo,
+      baseRef: 'main',
+      branch: 'main',
+      isolate: true,
+      brief: 'Make the change.',
+      createdAt: at,
+      workflowDir: onRepo,
+      workflow: [{ name: 'implement', after: [], body: 'Make the change.' }],
+      steps: { implement: { taskId: null } },
+    }),
+  );
+  try {
+    const listed = (await (await app.request('/api/runs')).json()) as { id: string; place: unknown }[];
+    assert.deepEqual(
+      listed.map((r) => [r.id, r.place]),
+      [
+        ['f-notes', 'folder'],
+        ['r-repo', 'repository'],
+      ],
+    );
+    assert.equal(((await (await app.request('/api/runs/r-repo')).json()) as { place: unknown }).place, 'repository');
+  } finally {
+    fs.rmSync(record);
+  }
+});
+
 test("a folder run's detail has no repository, base, branch or isolation — where its work is instead, and its step's folder", async () => {
   const res = await app.request('/api/runs/f-notes');
   assert.equal(res.status, 200);
@@ -128,7 +161,7 @@ test("a folder run's detail has no repository, base, branch or isolation — whe
     ['folder', null],
     'a step frozen as `workspace: folder`, the former spelling, is shown as `place: folder`',
   );
-  assert.equal(run.work, work, 'the one thing a person needs to find what it made, where a git run has a repository and a branch');
+  assert.equal(run.work, work, 'the one thing a person needs to find what it made, where a repository run has a repository and a branch');
   const [write] = run.steps;
   assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
   for (const said of [run.warning, run.fromNote, ...run.steps.map((s) => s.note)]) {

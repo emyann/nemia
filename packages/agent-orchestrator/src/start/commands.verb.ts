@@ -11,7 +11,7 @@ import { writersOf } from '../factory/factory.ts';
 import { formerKeyLines } from '../folder/folder.store.ts';
 import { ignoredRepoLine } from '../inbox/inbox.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { inputsDir, stepsOf } from '../record/record.store.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
@@ -215,9 +215,9 @@ function startedLines(started: Started): string[] {
   return [
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
     ...fromLines(started),
-    ...(run.factory ? [`factory: ${run.factory}${isGitRun(run) ? `, on ${run.repo}` : ''}`] : []),
+    ...(run.factory ? [`factory: ${run.factory}${isRepositoryRun(run) ? `, on ${run.repo}` : ''}`] : []),
     ...mountLines(run),
-    `workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
+    `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
     ...(run.after?.length
       ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has shipped onto ${run.branch}`]

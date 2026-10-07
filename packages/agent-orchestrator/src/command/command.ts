@@ -292,6 +292,18 @@ export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: A
   return [CLI, command.name, ...words, ...flagged].join(' ');
 }
 
+/**
+ * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
+ * help prints them; who answers for one is its table entry's of the same name, served on the api alone.
+ */
+export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help'>[] = [
+  {
+    name: 'decide',
+    usage: '<runId> [--sensitive <globs>]',
+    help: ['what the run produced, and the choice it leaves you (nemia decide --help)'],
+  },
+];
+
 /** The column the help's lines under a command start at. */
 const HELP_INDENT = ' '.repeat(31);
 
@@ -335,7 +347,8 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
 /**
  * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, which the command
  * would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one side alone takes; and a
- * flag the api alone takes on an entry the table generates no route of, which nothing would ever hand it.
+ * flag the api alone takes on an entry with no route that hands it — one the table generates, or one served by hand — which nothing would
+ * ever hand it.
  */
 function sideBreaks(c: Entry): string[] {
   const breaks: string[] = [];
@@ -351,10 +364,8 @@ function sideBreaks(c: Entry): string[] {
   for (const f of c.spec?.flags ?? []) {
     if (f.only !== undefined && !f.only.why.trim())
       breaks.push(`${c.name}'s ${f.flag} is taken on the ${f.only.side} alone and says no why: say why`);
-    if (f.only?.side === 'api' && !routeList(c).some(generated))
-      breaks.push(
-        `${c.name}'s ${f.flag} is taken on the api alone, and the table generates no route of it: route it, or take the flag out`,
-      );
+    if (f.only?.side === 'api' && !routeList(c).some((r) => generated(r) || r.hand !== undefined))
+      breaks.push(`${c.name}'s ${f.flag} is taken on the api alone, and no route of the entry hands it: route it, or take the flag out`);
   }
   return breaks;
 }

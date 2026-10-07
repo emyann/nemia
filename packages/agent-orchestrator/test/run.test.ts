@@ -127,7 +127,7 @@ import {
   type InputFile,
   type RetryBriefing,
   type RoundAsk,
-  type GitRun,
+  type RepositoryRun,
   type Run,
   type Said,
   type StepRecord,
@@ -180,7 +180,7 @@ import { CLOSEOUT_FIELDS, parseAgent, parseWorkflow, type OutputSchema, type Wor
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
 const STEPS = [step('implement'), step('review', ['implement'])];
 
-const run = (steps: Record<string, string | null>, rest: Partial<GitRun> = {}): GitRun => ({
+const run = (steps: Record<string, string | null>, rest: Partial<RepositoryRun> = {}): RepositoryRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',
@@ -947,7 +947,7 @@ test('a run id is readable, and step ids share its prefix', async () => {
 });
 
 /** A run whose two steps are done and whose result sits on a branch. */
-const finished = (extra: Partial<GitRun> = {}) =>
+const finished = (extra: Partial<RepositoryRun> = {}) =>
   run(
     { implement: 't1', review: 't2' },
     {
@@ -1330,7 +1330,7 @@ const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
 /** `implement` filed and settled as the phases say; its check filed under `checkId`, if given. */
-const withCheck = (checkId: string | null, extra: Partial<GitRun> = {}) =>
+const withCheck = (checkId: string | null, extra: Partial<RepositoryRun> = {}) =>
   run(
     {},
     {
@@ -1814,7 +1814,7 @@ test('a check stopped before it printed its exit code reads unfinished, never a 
 /** `implement` checked, with `retries: 2`; `review` waits on it. */
 const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
-const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<GitRun> = {}) =>
+const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<RepositoryRun> = {}) =>
   run(
     {},
     {
@@ -3203,7 +3203,7 @@ const answered: Closeout = {
  * The loop on round `n`: implement's `i<n>` checked by `c<n>`, review's `r<n>`, each with its earlier rounds behind it — and ship
  * unfiled.
  */
-const inRound = (n: number, extra: Partial<GitRun> = {}): Run => {
+const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
   const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
@@ -3363,7 +3363,7 @@ test("a person's `nemia round` takes an exhausted loop once more, once: an ask f
 /** Why a person judged a loop's findings later work rather than this run's: the whole reason what waits on the loop was filed. */
 const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
 /** Try `t` of review, accepted as it stands at a known time. */
-const acceptedTry = (t: number, message: string = ENOUGH): Partial<GitRun> => ({
+const acceptedTry = (t: number, message: string = ENOUGH): Partial<RepositoryRun> => ({
   acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message }],
 });
 
@@ -4034,7 +4034,7 @@ const shippedOnly = (...ids: string[]) => {
 };
 
 /** Another run's record, as a parent's. */
-const record = (id: string, rest: Partial<GitRun> = {}): Run => run({ implement: 'x' }, { id, ...rest });
+const record = (id: string, rest: Partial<RepositoryRun> = {}): Run => run({ implement: 'x' }, { id, ...rest });
 
 test('a record from before there was an `after` reads as ready, and so does a run started without one — and no parent is read for either', () => {
   const legacy = run({ implement: null, review: null });
@@ -4113,7 +4113,7 @@ test('`waitsOf` says why a parent may never ship — no such run, cancelled, a r
 
 test("a pass records the tips of a finished run's result branches — succeeded or failed, never running or cancelled, never --no-worktree — writes nothing when none moved, and keeps a tip once its branch is gone", () => {
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
-  const branched = (rest: Partial<GitRun> = {}): Run => {
+  const branched = (rest: Partial<RepositoryRun> = {}): Run => {
     const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
     for (const name of ['a', 'b', 'c']) r.steps[name].branch = `wf/r-1/${name}`;
     return r;
@@ -4266,7 +4266,7 @@ test('REFUSED at `nemia start --after`, on either side, when a folder run is inv
     assert.equal(
       afterRefusal([id], { place: { kind: 'folder' } }, parentOf),
       `--after ${id}: this run's team works in folders (place: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`,
-      `${id}: a folder run's own --after is refused whatever it names: a git run, a folder run, or no run at all`,
+      `${id}: a folder run's own --after is refused whatever it names: a repository run, a folder run, or no run at all`,
     );
   }
   assert.equal(afterRefusal([], { place: { kind: 'folder' } }, parentOf), null);
@@ -5564,7 +5564,9 @@ test("a step over its budget is tried again only on a person's `--budget` above 
     );
   assert.deepEqual(due([askFor(3)]), [], 'without --budget, no tick honours it');
   assert.deepEqual(due([{ ...askFor(3), budget: 4.25 }]), [], 'nor with one that is not above what it spent');
-  assert.deepEqual(due([{ ...askFor(3, 'fresh'), budget: 10 }]), [{ step: 'implement', try: 3, mode: 'fresh', budget: 10, by: 'ask' }]);
+  assert.deepEqual(due([{ ...askFor(3, 'fresh'), budget: 10 }]), [
+    { step: 'implement', try: 3, mode: 'fresh', budget: 10, pastCap: true, by: 'ask' },
+  ]);
   assert.deepEqual(
     due([askFor(3, 'recheck')]),
     [{ step: 'implement', try: 3, mode: 'recheck', by: 'ask' }],
@@ -5589,7 +5591,7 @@ test("a step over its budget is tried again only on a person's `--budget` above 
   );
 });
 
-test('REFUSED by name: `nemia retry` of a step over its budget without `--budget`, or with one not above what it spent; `--budget` on a step that is not; on `--recheck`; and an ask left waiting without one', () => {
+test('REFUSED by name: `nemia retry` of a step over its budget without `--budget`, or with one not above what it spent; `--budget` not above the cap in force on a step under it, on a step with no `budget:`, on one the run tries itself, on `--recheck`; and an ask left waiting without one', () => {
   const r = refusedTwice();
   const p = phases(REFUSED_TWICE);
   const spent = spends({ t0: 1.75, t1: 2.5 });
@@ -5630,8 +5632,31 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
   assert.match(refusal({ mode: 'nudge', budget: 0 })!, /^--budget 0 is not an amount\./);
   assert.equal(
     refusal({ mode: 'nudge', budget: 10 }, [], spends({ t0: 1, t1: 1 })),
-    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed (check): its tries have cost $2.00 of its $3 budget, which is not what stops it. Try it without --budget: nemia retry r-1 implement.',
+    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
+    'under its cap with `retries:` left, the step is not waiting on a person',
   );
+  assert.equal(
+    refusal({ mode: 'nudge', budget: 3 }, [], spends({ t0: 1, t1: 1 })),
+    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
+    'what the run does itself is said first, so the fix is never a --budget it would refuse next',
+  );
+  const spentOut: Workflow[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
+  const outOfRetries = (how: RetryHow) =>
+    retryRefusal(
+      spentOut,
+      r,
+      'implement',
+      how,
+      p,
+      signedDone,
+      asked,
+      () => 1,
+      [],
+      () => false,
+      spends({ t0: 1, t1: 1 }),
+    );
+  assert.equal(outOfRetries({ mode: 'nudge', budget: 10 }), null, '`retries:` spent, under its cap: a raise is taken');
+  assert.match(outOfRetries({ mode: 'nudge', budget: 2.5 })!, /^--budget 2\.5 is not above \$3, the \$3 cap in force on implement/);
   assert.equal(
     retryRefusal(
       STEPS,
@@ -5642,7 +5667,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
       signedDone,
       asked,
     ),
-    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed, and has no `budget:` to raise. Try it without --budget: nemia retry r-1 implement.',
+    "--budget raises a step's cap, and implement has no `budget:`, so there is no cap to raise. Try it without --budget: nemia retry r-1 implement.",
   );
   assert.match(
     refusal({ mode: 'nudge', budget: 10 }, [askFor(3)])!,
@@ -5652,6 +5677,64 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
     refusal({ mode: 'nudge' }, [{ ...askFor(3), budget: 10 }])!,
     /^try 3 of implement is already asked for/,
     'an ask that carries enough is waited for',
+  );
+});
+
+test('a step blocked under its cap takes a `--budget` above it, and the tick files the try with it: not past its cap, so no `pastCap`; one not above the cap in force, or on a step with no `budget:`, is REFUSED by name, and an ask left with one is never due', () => {
+  const B20: Workflow[] = [{ ...step('implement'), budget: 20 }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'a try with a larger budget, about $15–25' });
+  const spent = spends({ t1: 19.27 });
+  const refusal = (how: RetryHow, asks: RetryAsk[] = []) =>
+    retryRefusal(
+      B20,
+      r,
+      'implement',
+      how,
+      p,
+      blocked,
+      asked,
+      () => undefined,
+      asks,
+      () => false,
+      spent,
+    );
+  const due = (asks: RetryAsk[]) =>
+    retriesDue(
+      B20,
+      r,
+      p,
+      blocked,
+      asked,
+      () => undefined,
+      asks,
+      () => false,
+      spent,
+    );
+  assert.equal(refusal({ mode: 'nudge', budget: 40 }), null);
+  assert.equal(refusal({ mode: 'nudge' }), null, 'nor is a try without one refused: the cap is not what stops it');
+  for (const low of [15, 20]) {
+    assert.equal(
+      refusal({ mode: 'nudge', budget: low }),
+      `--budget ${low} is not above $20, the $20 cap in force on implement, whose tries have cost $19.27: --budget only ever raises the cap. Give more than $20: nemia retry r-1 implement --budget <amount>.`,
+    );
+  }
+  assert.deepEqual(due([{ ...askFor(2), budget: 40 }]), [{ step: 'implement', try: 2, mode: 'nudge', budget: 40, by: 'ask' }]);
+  assert.deepEqual(due([{ ...askFor(2), budget: 20 }]), [], 'an ask not above the cap in force is never due');
+  assert.match(
+    refusal({ mode: 'nudge', budget: 40 }, [{ ...askFor(2), budget: 20 }])!,
+    /^try 2 of implement is asked for \(--nudge, at .*\) with --budget 20, not above \$20, so no tick honours it\. Delete that ask — retry-implement-2, in the run's \.asks directory — and ask again: nemia retry r-1 implement --budget <amount>\.$/,
+  );
+
+  const free = run({ implement: 't1', review: null });
+  const failed = phases({ t1: 'failed' });
+  const unbudgeted = (asks: RetryAsk[]) => retriesDue(STEPS, free, failed, signedDone, asked, () => undefined, asks);
+  assert.deepEqual(unbudgeted([{ ...askFor(2), budget: 10 }]), [], 'no `budget:`: an ask with a --budget is never due');
+  assert.deepEqual(unbudgeted([askFor(2)]), [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
+  assert.match(
+    retryRefusal(STEPS, free, 'implement', { mode: 'nudge' }, failed, signedDone, asked, () => undefined, [{ ...askFor(2), budget: 10 }])!,
+    /^try 2 of implement is asked for \(--nudge, at .*\) with --budget 10, and implement has no `budget:`, so there is no cap to raise and no tick honours it\. Delete that ask — retry-implement-2, in the run's \.asks directory — and ask again: nemia retry r-1 implement\.$/,
   );
 });
 
@@ -6888,7 +6971,7 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
 });
 
 test('a try past a budget is told why its last try ended on its own work — unsigned, failed, stopped, blocked, its check — and, beside it, that its budget was reached and raised; one ended at its budget is told that once', () => {
-  const brief = (status: StepStatus, budget?: number) =>
+  const brief = (status: StepStatus, budget?: number, pastCap: boolean = budget !== undefined) =>
     retrySection(step('implement'), {
       try: 2,
       by: 'ask',
@@ -6896,6 +6979,7 @@ test('a try past a budget is told why its last try ended on its own work — uns
       resumed: true,
       status,
       ...(budget !== undefined ? { budget } : {}),
+      ...(pastCap ? { pastCap: true as const } : {}),
     });
   assert.match(
     brief('unsigned', 10),
@@ -6914,6 +6998,9 @@ test('a try past a budget is told why its last try ended on its own work — uns
   assert.match(ended, /ended by its harness at this step's budget/);
   assert.doesNotMatch(ended, /had together cost its budget or more/, 'said once');
   assert.doesNotMatch(brief('unsigned'), /budget/, 'a try with no raise says nothing of a budget');
+  const under = brief('blocked', 40, false);
+  assert.match(under, /raising this step's budget to \$40\./);
+  assert.doesNotMatch(under, /had together cost/, 'a raise on a step under its cap is not said to be past it');
 
   const B: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });
@@ -7086,7 +7173,7 @@ test("REFUSED at shipped defaults: a person's ask no pass has spent — one the 
 
 test('REFUSED at shipped defaults: a run another run waits on and has not started names the runs it would strand, and how to free it; a child that started, was called off, or waits on another run strands nothing', () => {
   const parent = run({ implement: 't1', review: 't2' });
-  const child = (id: string, rest: Partial<GitRun> = {}) => run({ implement: null, review: null }, { id, after: ['r-1'], ...rest });
+  const child = (id: string, rest: Partial<RepositoryRun> = {}) => run({ implement: null, review: null }, { id, after: ['r-1'], ...rest });
   assert.equal(
     forgetRefusal(STEPS, parent, DONE, [child('c-2'), child('c-1')], signedDone, asked),
     'c-1 and c-2 wait on it and have not started: forgotten, each would read waiting on r-1 (no such run) for ever. Let them start first, on the pass after nemia decide says r-1 has shipped, or call them off: nemia cancel c-1, nemia cancel c-2.',
@@ -7401,7 +7488,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
 /** `plan → implement → review`, as dev-planned is, with the steps it is given in place of its own. */
 const PLANNED: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
 /** Plan signed off done, implement and review not filed; gated at plan by `--gate plan` unless told otherwise. */
-const atPlan = (extra: Partial<GitRun> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
+const atPlan = (extra: Partial<RepositoryRun> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
 const PLAN_DONE = phases({ t1: 'succeeded' });
 const approval = (step: string, n: number, message?: string) => ({
   step,
@@ -7438,7 +7525,7 @@ test('`holdsOpen`: a step keeps its task open while a word from a person is what
       () => undefined,
     );
   const plan = step('plan');
-  const at = (extra: Partial<GitRun> = {}) => run({ plan: 't1', implement: null }, extra);
+  const at = (extra: Partial<RepositoryRun> = {}) => run({ plan: 't1', implement: null }, extra);
   assert.equal(holds(plan, at(), 'succeeded', said('blocked')), true, 'signed off blocked');
   assert.equal(holds(plan, at({ gates: ['plan'] }), 'succeeded', signedDone()), true, 'at its gate');
   const checked = { ...plan, check: 'npm test' };
@@ -7513,7 +7600,7 @@ test('REFUSED by the gate at shipped defaults, pass after pass: a gated step tha
 
 test('a gated step with `check:` is verified first, then held: checking while its check is due or running, `failed (check)` when it refuses — no gate on unverified work — and awaiting approval once it passes', () => {
   const gated: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
-  const at = (checkId: string | null, extra: Partial<GitRun> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
+  const at = (checkId: string | null, extra: Partial<RepositoryRun> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
   const due = assess(gated, at(null), phases({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual([due.check, due.ready], [['implement'], []], 'its check is filed first');
   assert.equal(stepStatus(gated[0], at('c1'), phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked), 'checking');
@@ -7595,7 +7682,7 @@ test('`nemia ls` at a gate: the step reads `awaiting approval`, with the two com
 });
 
 test('`nemia decide` at a gate: the run is awaiting you, its outcome blocked, the step named under `awaitingApproval` — and a gated run is not shipped while it waits, merged or not, so a run `--after` it is not ready; approved, it ships as any run', () => {
-  const gatedAtReview = (extra: Partial<GitRun> = {}) => finished({ gates: ['review'], ...extra });
+  const gatedAtReview = (extra: Partial<RepositoryRun> = {}) => finished({ gates: ['review'], ...extra });
   const d = decision(STEPS, gatedAtReview(), DONE, nothingShipped, signedDone, asked);
   assert.equal(d.kind, 'awaiting');
   assert.deepEqual(
@@ -8073,7 +8160,7 @@ const SHIP: Workflow = {
 };
 const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
 /** implement and review done on the run's branch, ship never filed. */
-const atEnd = (extra: Partial<GitRun> = {}) =>
+const atEnd = (extra: Partial<RepositoryRun> = {}) =>
   run(
     {},
     {
@@ -8539,7 +8626,7 @@ test('`to decide` in a folder with no ending step: a finished run whose branch i
     () => undefined,
     AHEAD,
   );
-  assert.deepEqual([ahead.status, ahead.toDecide], ['succeeded', { kind: 'git', branches: ['wf/r-1/implement'] }]);
+  assert.deepEqual([ahead.status, ahead.toDecide], ['succeeded', { kind: 'result', branches: ['wf/r-1/implement'] }]);
   assert.equal(
     toDecideWords(finished(), ahead.toDecide!),
     'wf/r-1/implement is ahead of main, and nothing has merged it — nemia decide r-1',
@@ -9074,7 +9161,7 @@ test("a gate on the last step of a folder that merges nothing: approving accepts
     );
   assert.deepEqual(
     [approved().status, approved().toDecide],
-    ['succeeded', { kind: 'git', branches: ['wf/r-1/implement'] }],
+    ['succeeded', { kind: 'result', branches: ['wf/r-1/implement'] }],
     'approved: nothing merges its branch, so the run is one to decide until git says the branch landed',
   );
   const landed = assess(
@@ -9438,7 +9525,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
       [write, a, b, join].map((s) => ({ ...s, workspace: undefined })),
     ),
     /has been merged into this branch/,
-    "the same shapes on a git run still say git's words: the folder's are said only on a folder run",
+    "the same shapes on a repository run still say git's words: the folder's are said only on a folder run",
   );
 });
 
@@ -9446,7 +9533,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
 const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'main', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
-const atLanding = (rest: Partial<GitRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
+const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
   ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
   steps: {
     implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
@@ -9855,7 +9942,7 @@ test("`nemia retry`'s refusals, whole: a `--model` an `auto` step would drop, on
   const waiting = { t1: 'succeeded', c1: 'stopped' } as const;
   assert.equal(
     refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }),
-    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed (check), and has no `budget:` to raise. Try it without --budget: nemia retry r-1 implement.',
+    "--budget raises a step's cap, and implement has no `budget:`, so there is no cap to raise. Try it without --budget: nemia retry r-1 implement.",
   );
   assert.equal(
     refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]),
@@ -10017,7 +10104,7 @@ test('`forgetRefusal` keeps its order between every two reasons that can stand t
 });
 
 /** implement signed off blocked, and review never filed: a failed run with nothing in flight that waits on a person. */
-const blockedRun = (rest: Partial<GitRun> = {}) => run({ implement: 't1', review: null }, rest);
+const blockedRun = (rest: Partial<RepositoryRun> = {}) => run({ implement: 't1', review: null }, rest);
 const BLOCKED_SAID = signedOff({ implement: said('blocked') });
 
 test('REFUSED to be finished: a failed run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
@@ -10038,7 +10125,7 @@ test('REFUSED to be finished: a failed run whose step signed off blocked waits o
 
 test('a blocked run called off waits on no one in `nemia ls`, `nemia decide` or the feed, and its steps say what they said', () => {
   const p = phases({ t1: 'succeeded' });
-  const listed = (r: GitRun) =>
+  const listed = (r: RepositoryRun) =>
     listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked });
   const called = blockedRun(CANCELLED);
   const l = listed(called);
@@ -10068,14 +10155,14 @@ test('a blocked run called off waits on no one in `nemia ls`, `nemia decide` or 
 
 test('REFUSED to be finished: a run waiting on a person in any status `nemia ls` says so of — unsigned, budget exhausted, denied, an unreadable closeout — is called off by `nemia cancel`', () => {
   const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
-  const cases: Array<[string, Workflow[], GitRun, ReturnType<typeof signedOff>, SpendOf, StepStatus]> = [
-    ['unsigned, its nudge spent', STEPS, signedOffOnce(blockedRun()) as GitRun, signedOff({}), () => undefined, 'unsigned'],
+  const cases: Array<[string, Workflow[], RepositoryRun, ReturnType<typeof signedOff>, SpendOf, StepStatus]> = [
+    ['unsigned, its nudge spent', STEPS, signedOffOnce(blockedRun()) as RepositoryRun, signedOff({}), () => undefined, 'unsigned'],
     ['cut off at its budget', STEPS, blockedRun(), signedOff({ implement: said('done') }), spends({}, ['t1']), 'budget exhausted'],
     ['denied a call', DENYING, blockedRun(), signedOff({ implement: said('done') }), deniedSpend({ t1: ['Bash(x)'] }), 'denied'],
     [
       'a closeout that does not read, nudge spent',
       STEPS,
-      signedOffOnce(blockedRun()) as GitRun,
+      signedOffOnce(blockedRun()) as RepositoryRun,
       signedOff({ implement: { error: 'outcome: not done or blocked' } }),
       () => undefined,
       'unsigned',
@@ -10102,8 +10189,8 @@ test('REFUSED to be finished: a run waiting on a person in any status `nemia ls`
 });
 
 test('a stopped step holds its run but waits on no one for admission: Nemia retries an unsigned step and a failed check unasked, and `nemia cancel` calls the run off', () => {
-  const cases: Array<[StepStatus, Workflow[], GitRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
-    ['unsigned', STEPS, signedOffOnce(blockedRun()) as GitRun, { t1: 'succeeded' }, () => undefined],
+  const cases: Array<[StepStatus, Workflow[], RepositoryRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
+    ['unsigned', STEPS, signedOffOnce(blockedRun()) as RepositoryRun, { t1: 'succeeded' }, () => undefined],
     ['failed (check)', CHECKED, withCheck('c1'), { t1: 'succeeded', c1: 'failed' }, signedDone],
   ];
   for (const [status, steps, r, ended, closeoutOf] of cases) {

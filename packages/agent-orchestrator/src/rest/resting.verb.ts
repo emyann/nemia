@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { followedFeed } from './rest.verb.ts';
 
 /** One run's answer and what it was judged on. */
@@ -64,7 +64,7 @@ const tipsOf = (
   branches: readonly string[],
   heads: (repo: string) => ReadonlyMap<string, string>,
 ): Record<string, string | null> =>
-  isGitRun(run) && branches.length
+  isRepositoryRun(run) && branches.length
     ? Object.fromEntries([...new Set([...branches, run.branch])].map((b) => [b, heads(run.repo).get(b) ?? null]))
     : {};
 

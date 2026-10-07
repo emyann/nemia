@@ -123,6 +123,13 @@ admission carry her floor, `semi-auto`, so a factory at `manual` is left alone. 
 — her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
 repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control).
 
+**The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it
+was read at, and an agent of yours tried on a short brief, each one entry of the command table served on both sides
+(`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts`), its handler refusing a place but yours. The
+command line reads a person's file or draft folder into the form the board sends (`src/cli/writers.ts`); the api guards the write and
+words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
+`apps/api/src/commands/writers.test.ts`).
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in
@@ -162,7 +169,10 @@ it: a finished run judged at rest on a full pass is answered from its memo while
 its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest/rest.ts`, `restMemo` in
 `src/tick/tick.verb.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
 restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
-(`WF_VERIFY_REST`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
+(`WF_VERIFY_REST`). Beside it, on the same memo, the pass's `standing` keeps what it last read of each result branch against
+its run's `baseRef`, keyed by two commit ids — the commit judged and the `baseRef` — so a fact that never goes stale; the place believes it
+only while the branch's commit is still the one judged, and a restart asks every `baseRef` once (`StandingMemo` in
+`src/standing/standing.verb.ts`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
 while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
 `src/stats/stats.verb.ts`), and the board's list of runs one more: each finished run's summary, while its record, its files in the
 store, its tasks on the feed and its branches' tips stand (`RestingMemo` in `src/rest/resting.verb.ts`, read by the list's `runs` entry
@@ -204,13 +214,14 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
-  custom.store, custom-file.store, skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store,
-  config.store, series.store, subscription.store, level.store and a2a.store in the folders. They load as a tree. At the bottom
-  are record/places.store.ts, agents/custom-file.store.ts (the read of a person's custom instructions), meter/tally.store.ts
-  (the pass's meter) and config/config.store.ts, which import no store file. folder/folder.store.ts imports only
-  agents/custom-file.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
+  custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
+  places.store, config.store, series.store, subscription.store, level.store and a2a.store in the folders. They load as a tree. At
+  the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
+  meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file. agents/read.store.ts (the
+  agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
+  agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
   record/steps.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
-  imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.
+  imports only record.store.ts, the two reads and factory/factory.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
   each.
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick

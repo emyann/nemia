@@ -533,13 +533,13 @@
     {
       "files": ["apps/web/src/routes/runs.$runId.tsx"],
       "rules": {
-        "complexity": ["error", { "max": 23 }]
+        "complexity": ["error", { "max": 22 }]
       }
     },
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 138, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 137, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 41 }],
         "sonarjs/cognitive-complexity": ["error", 59]
       }
@@ -830,7 +830,12 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 227, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 157, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/agent-runtime/src/service/say.ts"],
+      "rules": {
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }

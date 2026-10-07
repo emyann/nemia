@@ -237,6 +237,8 @@ export const SAYING = {
   line: 'Drafting the outline, one section at a time.',
   /** What the `say` page tells it. */
   words: 'Widen the draft to the api section too, and keep the outline short.',
+  /** The last event of its conversation as seeded, its call, which the engine journals the words `after`. */
+  mark: { kind: 'tool_use', id: 'toolu_draft_read' },
 } as const;
 
 /** Where in the store the stand-in for draft's inbox listens: a Unix socket run.ts opens before the api starts. */
@@ -559,7 +561,7 @@ export const FOLDER = {
 } as const;
 
 /**
- * Write FOLDER into the store at `root`: its workflow folder, its record with `place` and none of a git run's fields, a journal per
+ * Write FOLDER into the store at `root`: its workflow folder, its record with `place` and none of a repository run's fields, a journal per
  * step, and the files the steps left — in `write`'s folder, and the note collected beside the record as the run collects a named file.
  * Times are minutes before `now`.
  *
@@ -1276,7 +1278,7 @@ export const PASS = {
       journals: { ms: 40, calls: 30, bytes: 800_000, reads: 30, spawned: 0 },
       observe: { ms: 120, calls: 1, bytes: 0, reads: 0, spawned: 1 },
       runtime: { ms: 8, calls: 1, bytes: 0, reads: 0, spawned: 0 },
-      git: { ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 },
+      place: { ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 },
       assess: { ms: 16.4, calls: 0, bytes: 0, reads: 0, spawned: 0 },
       act: { ms: 3, calls: 2, bytes: 0, reads: 0, spawned: 0 },
     },
@@ -1308,7 +1310,7 @@ export const RECENT = {
         journals: ms * 0.18,
         observe: ms * 0.5,
         runtime: ms * 0.05,
-        git: ms * 0.03,
+        place: ms * 0.03,
         assess: ms * 0.08,
         act: ms * 0.02,
       },
@@ -1789,7 +1791,7 @@ function draftConversation(ago: (minutes: number) => string): object[] {
     said('user', 'draft-user-1', 2.4, SAYING.prompt),
     said('assistant', 'draft-assistant-1', 2.3, [{ type: 'text', text: SAYING.line }]),
     said('assistant', 'draft-assistant-2', 2.2, [
-      { type: 'tool_use', id: 'toolu_draft_read', name: 'Read', input: { file_path: '/code/hkb-v2/README.md' } },
+      { type: 'tool_use', id: SAYING.mark.id, name: 'Read', input: { file_path: '/code/hkb-v2/README.md' } },
     ]),
   ];
 }

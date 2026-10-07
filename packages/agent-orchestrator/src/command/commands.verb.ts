@@ -113,8 +113,8 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     'what you have to say to any step you try again; not with --recheck.',
     'The next argument is the answer, whatever it starts with; an answer',
     "that is only one of these flags' names goes as --message=<answer>;",
-    '--budget <amount>: for a step over budget or budget exhausted, its',
-    'cap raised to that many dollars, above what its tries have cost',
+    '--budget <amount>: for a step with a budget: that waits on you, its',
+    'cap raised to that many dollars, above its cap and what it has cost',
   ],
   spec: {
     positionals: RUN_STEP,
@@ -324,7 +324,14 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
  * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them. It takes every word after the
  * step as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
  */
-const SAY: Command<{ at: string; attempt: number; text: string; try: number; taskId: string }> = {
+const SAY: Command<{
+  at: string;
+  attempt: number;
+  text: string;
+  after: { kind: string; id: string } | null;
+  try: number;
+  taskId: string;
+}> = {
   name: 'say',
   usage: '<runId> <step> "<words>"',
   help: [
@@ -341,12 +348,12 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   writes: true,
   nemia: 'hers',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
-  apiKeys: ['at', 'attempt', 'text'],
+  apiKeys: ['at', 'attempt', 'text', 'after'],
   handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);
     const told = yield* sayRun(runId, step, textOf(args, 'text') ?? '');
-    const { at, attempt, text } = told.said;
-    return { at, attempt, text, try: told.try, taskId: told.taskId };
+    const { at, attempt, text, after } = told.said;
+    return { at, attempt, text, after: after ?? null, try: told.try, taskId: told.taskId };
   }),
   print({ at, attempt, text, try: tryNo, taskId }, args) {
     const { runId, step } = named(args);
@@ -451,7 +458,7 @@ const agentsSpec = (positionals: CommandSpec['spec']['positionals']): CommandSpe
   unknown: (arg) =>
     arg.startsWith('-')
       ? `nemia agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-      : `nemia agents takes no argument but card <name> or custom <name>: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
+      : `nemia agents takes no argument but card <name>, custom <name>, or write, remove and try on yours: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
   apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
 });
 

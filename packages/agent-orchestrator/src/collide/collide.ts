@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import type { Trials } from '../place/place.ts';
-import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { endingSteps, type ToDecide } from '../ending/ending.ts';
 import { landingRefusedOn } from '../merge/merge.ts';
@@ -42,13 +42,13 @@ export type Collisions = {
 };
 
 /**
- * The other runs whose branches may collide with `run`'s: git runs on the same repository and the same base branch, each step in a
+ * The other runs whose branches may collide with `run`'s: repository runs on the same repository and the same base branch, each step in a
  * worktree of its own, neither called off nor pruned. A held run is kept: its branches still land on the same base.
  */
-export const othersInFlight = (run: GitRun, runs: readonly Run[]): GitRun[] =>
+export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]): RepositoryRun[] =>
   runs.filter(
-    (o): o is GitRun =>
-      isGitRun(o) &&
+    (o): o is RepositoryRun =>
+      isRepositoryRun(o) &&
       o.id !== run.id &&
       o.isolate &&
       !o.cancelledAt &&
@@ -89,7 +89,12 @@ function summary(onto: string, inFlight: readonly string[], colliding: readonly 
 }
 
 /** The semantic conflict at `ending`: its landing check refused the merged tree on the base as it is now, though every branch merges. */
-function semanticOf(run: GitRun, ending: string | undefined, base: readonly StandingMerge[], sha: string | null): Collisions['semantic'] {
+function semanticOf(
+  run: RepositoryRun,
+  ending: string | undefined,
+  base: readonly StandingMerge[],
+  sha: string | null,
+): Collisions['semantic'] {
   if (!ending || !sha || !base.length || !base.every((b) => 'clean' in b && b.clean)) return null;
   const check = landingRefusedOn(run.steps[ending], sha);
   if (!check) return null;
@@ -107,7 +112,7 @@ function semanticOf(run: GitRun, ending: string | undefined, base: readonly Stan
  * place names now.
  */
 export function collisionsOf(
-  run: GitRun,
+  run: RepositoryRun,
   ending: string | undefined,
   ours: readonly string[],
   theirs: readonly Theirs[],

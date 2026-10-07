@@ -18,8 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { tryFolder } from './try.ts';
-import { runWith, startRun, engine } from 'agent-orchestrator';
+import { runWith, startRun, engine, tryFolder } from 'agent-orchestrator';
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
 process.env.HKB_REPO = repo;
@@ -371,7 +370,7 @@ test('the listing says why an agent cannot be tried, in the words the try refuse
   assert.equal(of('yours', 'coder').untried!.copy, null);
   assert.match(of('yours', 'faraway').untried!.why, /remote agent/);
   assert.match(of('yours', 'bridged').untried!.why, /remote: true/);
-  assert.match(of('yours', 'agents').untried!.why, /cannot be tried from the board/);
+  assert.match(of('yours', 'agents').untried!.why, /cannot be tried: its try's folder/);
   assert.ok(of('repo', 'grader').untried!.copy!.includes('grader.schema.json'), JSON.stringify(of('repo', 'grader')));
   assert.equal(
     of('repo', 'critic').untried!.copy,
@@ -380,8 +379,8 @@ test('the listing says why an agent cannot be tried, in the words the try refuse
 });
 
 test('an empty brief is refused, and a brief that is no string', async () => {
-  await refused(tryIt('scribe', { brief: '   ' }), 422, /the brief is empty/);
-  await refused(tryIt('scribe', { brief: '' }), 422, /the brief is empty/);
+  await refused(tryIt('scribe', { brief: '   ' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
+  await refused(tryIt('scribe', { brief: '' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
   await refused(tryIt('scribe', {}), 400, /`brief` is what the agent is asked to do/);
   await refused(tryIt('scribe', 'not json'), 400, /takes a JSON body/);
   await refused(
@@ -398,8 +397,8 @@ test('an empty brief is refused, and a brief that is no string', async () => {
 
 test('an agent not there, one named as a try folder cannot be, and one giving a skill only the repository has, are refused', async () => {
   await refused(tryIt('nobody', { brief: 'Do it.' }), 404, /no agent named 'nobody'/);
-  await refused(tryIt('agents', { brief: 'Do it.' }), 422, /cannot be tried from the board/);
-  await refused(tryIt('skills', { brief: 'Do it.' }), 422, /cannot be tried from the board/);
+  await refused(tryIt('agents', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
+  await refused(tryIt('skills', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
   const error = await refused(tryIt('borrower', { brief: 'Borrow it.' }), 422, /only the repository has/);
   assert.ok(error.includes(path.join(repo, '.claude', 'skills', 'theirs')), 'naming where the skill is');
   assert.ok(error.includes(path.join(root, 'workflows', 'skills')), 'and the library to copy it into');

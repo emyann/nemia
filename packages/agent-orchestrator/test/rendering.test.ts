@@ -12,15 +12,9 @@ import path from 'node:path';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
 import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
 import { autoDropped, modeOf, parseAgent, parseWorkflow, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
-import {
-  PLACE_SKILLS,
-  agentsFor,
-  agentVersion,
-  isShippedPlace,
-  loadWorkflows,
-  lookupRoots,
-  skillsFor,
-} from '../src/folder/folder.store.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
+import { PLACE_SKILLS, isShippedPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
 import { SHIPPED_PLACE } from '../src/place/place.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
@@ -680,7 +674,7 @@ test('a rendered step whose plugin is under another name, as a start before the 
   assert.equal(fs.readdirSync(agentFilesDir(run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin, and names none');
 });
 
-test("a git run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
+test("a repository run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
   git('init', '-q', '-b', 'main');

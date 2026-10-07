@@ -211,9 +211,9 @@ export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: 
 }
 
 /**
- * Why a git run on `repo` cannot start in `factory`, or undefined when `repo` is one of its repositories, each compared as `path.resolve`
- * spells it: the factory's list named, sorted, with the `--repo` that starts it in one, or the `nemia factory add` that files a factory on
- * `repo`, since none adds a repository to a factory.
+ * Why a repository run on `repo` cannot start in `factory`, or undefined when `repo` is one of its repositories, each compared as
+ * `path.resolve` spells it: the factory's list named, sorted, with the `--repo` that starts it in one, or the `nemia factory add` that
+ * files a factory on `repo`, since none adds a repository to a factory.
  */
 export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: string): string | undefined {
   const repos = factory.repos.map((r) => path.resolve(r));

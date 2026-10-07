@@ -2358,16 +2358,18 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
   never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
   `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: auto`, with every factory's folders mounted
-  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one. Her
-  settings ask the person each write: her `askTools:` (every verb that writes, `wf` and `ae`), and an `Edit` on each folder of the store
-  but hers, read at filing (`storeAsks`); and they put the daemon's own `nemia` first on her `PATH` (`ownBin`).
+  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one. At 5b
+  her settings asked the person each write, through an askTools: list in her instruction and an Edit asked on each folder of the store
+  but hers; card A replaced both (*at Semi-auto, only what waits on the person prompts*, below): her fence is derived from the command
+  classes (`nemiaFence`), the store outside her folder is denied her edits (`storeDenies`), and `readNemia` refuses an askTools: line.
+  Her settings put the daemon's own `nemia` first on her `PATH` (`ownBin`).
 - **Her subscription is `nemia`**, with the default wake words and `denied:`, and a digest once a day; `nemia subscribe nemia` and `nemia
   unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
 - **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in
   `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
 - **What she is ships in `packages/agent-orchestrator/nemia/`**: `nemia.md` (her instruction, her allow list of read verbs and her deny
   list: push, a forced branch delete, a merge, a kill by name, a pull request or release by `gh`, `browser_run_code_unsafe`), and her
-  skills `recap`, `bring-a-gate`, `grant-access` and `commission-a-workflow`. A factory's own rules are its instruction (`NEMIA.md`), which she reads
+  skills: at 5b `recap`, bring-a-gate, `grant-access` and `commission-a-workflow`; card B's (below) are today's. A factory's own rules are its instruction (`NEMIA.md`), which she reads
   before acting there; this repository's is `NEMIA.md` at its root.
 
 Her machine, drawn by its code:
@@ -2468,6 +2470,54 @@ Tested in `src/level/level.test.ts` (a raise until its end, never at it; the str
 `src/nemia/keep.verb.test.ts` (a raise keeps her, its end passing stops her with no write; an end; the refusals),
 `src/admission/admission.test.ts` and `src/admission/admit.verb.test.ts` (denied below the floor, asked unread, no change above it),
 `src/subscription/deliver.verb.test.ts` (a floored subscription told nothing of a factory below it) and `src/admission/fence.test.ts`.
+
+## Shipped: her skills — her verbs generated, what waits, a factory, a card
+
+Card B of the third Nemia amendment: what ships with her (`nemia/`) teaches her card A's model. What waits on the person she brings in
+chat with a recommendation, then runs the verb they choose with their words as `--message`, so its prompt is their decision, asked once;
+what prompts, prompts; the rest is hers, on her judgement, and said.
+
+- **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
+  class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
+  *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
+  make it prompt; `out` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
+  (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
+  table, naming the command that regenerates it:
+  `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
+- **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for each of what card A's admission counts as waiting on the
+  person (`WAITS_ON_PERSON`) — a step at its gate, a step's question, a loop out of rounds and a step at its cap — each naming its read
+  and its answering verbs; `commission-a-workflow` brings a proposal as a card to start, fold or drop;
+  `create-a-factory` makes a whole factory short of a run, writing its workflows, agents and skills into yours (platform slice 7a);
+  `write-a-card` writes a card with the person's words, today's facts, done-when, proof, a first measure, a size from measured
+  costs and where it goes. Her instruction's *Where you stand* says what waits, what prompts and what is hers.
+- **Held**: `test/nemia-shipped.test.ts` refuses "gate" in what ships but for a step's gate, and reads each of her skills as Claude Code
+  would; `test/skills-rendered.test.ts` parses each frontmatter as YAML.
+- **Served on the CLI by platform slice 7a**: the writers of workflows, agents and skills and an agent's try, below.
+
+## Shipped: the library's writers at the command line (Nemia platform slice 7a)
+
+`nemia agents write`, `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows remove`, each one entry of the
+command table served on both sides: the same handler, refusals and help as its route on the api. Approved with the design: yours only;
+a write or a removal is checked against the version it was read at, and one without it is refused naming the version it is at now, so
+the caller runs it again with `--version`; a workflow's own schemas left to a follow-up card.
+
+- **The entries**: `AGENTS_WRITE`, `AGENTS_REMOVE` and `AGENTS_TRY` (`src/agents/library.verb.ts`), `SKILLS_WRITE`
+  (`src/skills/skills.verb.ts`), `WORKFLOWS_WRITE` and `WORKFLOWS_REMOVE` (`src/folder/workflows.verb.ts`), their flags from
+  `src/yours/yours.ts`: `--version` on both sides, a path the command line alone takes (`--file`, `--folder`) and the form the api
+  alone hands (`draft`, `schema`, `change`, `readme`). Each handler resolves yours from its store and refuses any other place
+  (`yoursOrRefused`, `src/yours/yours.ts`).
+- **The runners** (`src/cli/writers.ts`): an agent's file read into its draft with the result schema its `output:` names beside it, a
+  SKILL.md into the skill's form, a draft folder's steps and README as a start reads them; then handed to the handler without the path.
+  `agents remove`, `agents try` and `workflows remove` need none.
+- **The try** (`tryAgent`, `src/try/try.verb.ts`) refuses, in order, the place, an empty brief, an agent not there or that does not
+  read, one a try cannot run, a skill only the repository has, and a try of it still moving; then writes its folder and starts a run with
+  no repository, capped at `TRY_BUDGET`. It ticks: typed with no daemon, it starts one.
+- **Her skills**: the verbs skill lists the six by class (a write or a removal prompts the person, a try is hers), and
+  `create-a-factory` writes a factory's workflows, agents and skills itself, tries an agent with `nemia agents try`, and drafts only a
+  workflow's own `*.schema.json` and a skill's extra files for the person to place.
+- **Held**: `test/writers-cli.test.ts` (each write read back and each refusal, through `main`, and the keys the command line hands a
+  handler against its spec), `apps/api/src/commands/writers.test.ts` (the keys each route hands, against the same spec),
+  `test/verbs-skill.test.ts`, `test/demand-cli.test.ts` (the try starts a daemon) and `src/folder/workflows.verb.test.ts`.
 
 ## Shipped: freeing the space — `wf prune`
 
@@ -3629,7 +3679,7 @@ What was built, four commits:
 - **`to decide`**, the fifth reason a run waits on a person, in `assess` and `listing` (`toDecide`, `ToDecide`, `toDecideWords`): the run is
   at its result and a last step's gate has nobody's approval — `{ kind: 'approve', step, says }`, `says` being the first line of the step's
   prose for an ending that has not run and null for a gated step that has, whose closeout is what to read — or, where no step of the
-  workflow merges (`merges`), every step finished and a result branch is ahead of the base and not gone, `{ kind: 'git', branches }`. A
+  workflow merges (`merges`), every step finished and a result branch is ahead of the base and not gone, `{ kind: 'result', branches }`. A
   gate a run was started with, `--gate <the last step>`, is the second kind: approving accepts what that step did, and what becomes of the
   branch is still a person's, so the git commands are printed for it. Level-triggered: `branchStandings` asks git on the pass that asks and stores nothing, as `shipped` is asked
   and not stored, so a branch a person merged by hand stops being one to decide with nobody telling the run. `wf ls` says
@@ -3853,7 +3903,7 @@ What it leaves:
 What the board calls:
 
 - **`listing(...).toDecide` and `assess(...).toDecide`** (`ToDecide`): `{ kind: 'approve', step, says }` — `says` is the ending step's first
-  line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'git', branches }`. `assess` and `listing` take the
+  line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'result', branches }`. `assess` and `listing` take the
   branch standings last (`branchStandings(run, resultBranches(run))` in branches/branches.store.ts, which reads git); without them only the gate says a run
   is one to decide.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
@@ -4502,7 +4552,7 @@ folder`, the first of a family of kinds; the record freezes `place: { kind: 'fol
 the git words are not renamed. No change to `packages/agent-runtime`: a task's `cwd` was all a folder needed.
 
 - **The word** (`workflow/validate.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
-- **The run** (`record/record.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
+- **The run** (`record/record.ts`). `Run` is `RepositoryRun | FolderRun`; `placeOf`, `isRepositoryRun`. The git-only readers take a `RepositoryRun`, so every
   caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
 - **Start** (`start.verb.ts`, `cli/start.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
@@ -4741,7 +4791,7 @@ types). When P3's reach keys are built they want a name that is not `capabilitie
 **Superseded 2026-09-25 by agents card 2: the card is generated, and the `.skills.json` files are gone.** An agent's card lists one entry
 per skill its `skills:` composes, read off that skill's SKILL.md frontmatter — the folder's name as `id`, `title:` as `name` (else the
 frontmatter's `name`, else the id), `description` (required), `tags` (`[id]` when it gives none) and `examples` — and an agent with no
-skills gets one entry made from its own description (`cardSkills` in `folder.store.ts`). Nobody writes a card: a `card:` line, and a
+skills gets one entry made from its own description (`cardSkills` in `skills/read.store.ts`). Nobody writes a card: a `card:` line, and a
 `skills:` line naming a `.json`, are refused at load with a message saying what replaced them, and so is a board page that still sends
 the card's file (`card`, `cardText`, `skillsText`, a 400). An edit of a composed SKILL.md moves the agent's version, so a stale save is
 refused. The board shows the generated entries read-only where the form used to write the file, and says a card that does not read in

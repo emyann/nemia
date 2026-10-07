@@ -8,10 +8,11 @@ import { holdWord } from '../wait/wait.ts';
 
 /**
  * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the
- * step's task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: views.verb.ts
- * reads it off the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
+ * step's task, the words as given, and the last event of the session's transcript before they went (`after`, `{ kind, id }`, null when
+ * the engine read none). The engine's own `Said`, named here because this file does not import the engine: views.verb.ts reads it off
+ * the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
  */
-export type Said = { at: string; attempt: number; text: string };
+export type Said = { at: string; attempt: number; text: string; after?: { kind: string; id: string } | null };
 
 /** What was said to one of a step's tries: the engine's entry, and the try whose task it is on. */
 export type SaidTo = Said & { try: number };

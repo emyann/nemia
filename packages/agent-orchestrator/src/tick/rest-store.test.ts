@@ -16,7 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { nameFor, Engine, type Sighting } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
-import type { GitRun, Run } from '../run.ts';
+import type { RepositoryRun, Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
 import { Effect } from 'effect';
@@ -28,7 +28,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { addToInbox, approveRun, forgetRun, isGitRun, prune, queueInInbox, readInbox, retryRun, startRun } = await import('../runner.ts');
+const { addToInbox, approveRun, forgetRun, isRepositoryRun, prune, queueInInbox, readInbox, retryRun, startRun } =
+  await import('../runner.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
@@ -185,13 +186,13 @@ const started = async (n: number, workflowDir = ONE, repo = REPO, isolate = fals
 
 const journals = (c: PassCost) => c.phases.journals.calls;
 const observes = (c: PassCost) => c.phases.observe.calls;
-const gits = (c: PassCost) => c.phases.git.spawned;
+const places = (c: PassCost) => c.phases.place.spawned;
 
 /** The store at each size, and the pass each was measured at: built once, read by the tests that follow. */
 const sizes: Array<{ finished: number; cost: PassCost; fresh?: PassCost }> = [];
 const ISOLATED_REPOS = [aRepo(), aRepo()];
 
-test('a pass costs as many journal reads, observes and git processes on 200 finished runs as on none: what is in flight sets it', async () => {
+test('a pass costs as many journal reads, observes and place processes on 200 finished runs as on none: what is in flight sets it', async () => {
   inFlight.push(...(await started(3)));
   sizes.push({ finished: 0, cost: await steady() });
 
@@ -217,8 +218,8 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
     assert.equal(journals(c), journals(none), `${at} finished runs: no journal read more than the runs in flight make`);
     assert.equal(observes(c), observes(none), `${at} finished runs: no observe more`);
     assert.equal(
-      gits(c),
-      gits(none) + ISOLATED_REPOS.length,
+      places(c),
+      places(none) + ISOLATED_REPOS.length,
       `${at} finished runs: one for-each-ref a repository whose runs' tips are read (three runs on each of two), and no more`,
     );
     assert.equal(c.spawned, none.spawned + ISOLATED_REPOS.length, `${at} finished runs: no process more than those`);
@@ -263,8 +264,8 @@ test('the same store, the memo emptied before every pass as a restarted daemon h
     `each of the 200 finished runs' tasks read (${journals(fresh)} reads, against ${journals(twoHundred)})`,
   );
   assert.equal(
-    gits(fresh),
-    gits(twoHundred),
+    places(fresh),
+    places(twoHundred),
     "the six runs whose tips are read ask no git of their own: their tips are read off the heads of the pass's one `standing` a repository",
   );
   assert.equal(
@@ -293,12 +294,12 @@ const answered = async (id: string) => (await verified()).runs.find((a) => a.run
 /** The ids of the runs a test has taken with `aResting`, each taken once. */
 const touched = new Set<string>();
 /** A finished run worked in place, from the store built above, not yet touched by a test; `isolate` picks one in a worktree instead. */
-const aResting = (isolate = false): GitRun => {
+const aResting = (isolate = false): RepositoryRun => {
   const run = listRuns().find(
     (r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && MEMO.runs.has(r.id),
   );
   assert.ok(run, 'a run at rest is left to touch');
-  assert.ok(isGitRun(run), `${run.id} works on a repository`);
+  assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   touched.add(run.id);
   return run;
 };
@@ -460,7 +461,7 @@ test('REFUSED: a repository whose standing is unread answers none of its runs wi
       .map((r) => r.id),
   );
   const unread = unreadPlace();
-  const placed = (r: Pick<GitRun, 'id' | 'placeSkill'>) => (there.has(r.id) ? unread : placeDirOf(r));
+  const placed = (r: Pick<RepositoryRun, 'id' | 'placeSkill'>) => (there.has(r.id) ? unread : placeDirOf(r));
   const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }).pipe(Effect.provideService(RunPlace, placed)));
   assert.equal(pass.cost!.rested, before - tippedThere, 'every run of it whose tips the memo holds is judged in full, and no other');
   assert.equal(readRun(run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
@@ -631,12 +632,16 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
   console.log(
     'COST',
     JSON.stringify({
-      before: { rested: before.rested, git: gits(before), journals: journals(before), spawned: before.spawned },
-      after: { rested: after.rested, git: gits(after), journals: journals(after), spawned: after.spawned },
+      before: { rested: before.rested, place: places(before), journals: journals(before), spawned: before.spawned },
+      after: { rested: after.rested, place: places(after), journals: journals(after), spawned: after.spawned },
     }),
   );
   assert.equal(after.rested, before.rested, 'every one of them answered from memory');
-  assert.equal(gits(after), gits(before), 'no git process of their own: a hand-off tried in a directory that is gone was one each a pass');
+  assert.equal(
+    places(after),
+    places(before),
+    'no place process of their own: a hand-off tried in a directory that is gone was one each a pass',
+  );
   assert.equal(journals(after), journals(before), 'and no journal read');
 });
 

@@ -1596,9 +1596,15 @@ node bin/ae.ts say <id> Widen the scope to apps/api too.   # the words are every
 
 **Why it exists.** A step steered mid-flight by cross-session message left nothing on its run, so its reviewer
 could not tell a change a person had authorised from a step overstepping. Now the words are a `said` entry on
-the task's journal — `at`, `attempt`, `text` — in the feed, in `ae show`, and on `state.said`. **`decide` never
+the task's journal — `at`, `attempt`, `text`, `after` — in the feed, in `ae show`, and on `state.said`. **`decide` never
 reads it**, and a test pins that: what was said to a session is a fact for whoever reviews the work, not a
 judgement on it.
+
+**Where the transcript stood.** `after` is the last event of the session's transcript, `{ kind, id }`, read just
+before the words are handed over (`transcriptEndOf`, `src/service/transcript-end.ts`), or null when it held none,
+its harness keeps none, or the read failed, which never stops the words. Whatever the session writes of them
+stands after that event in its own record, so a reader finds their arrival by the transcript's order, never by
+comparing `at`, the engine's clock, with the session's times, another process's clock that may read seconds off.
 
 **The words go first, the entry after.** A `said` on the record is words a harness took, and a `say` that
 rejects has journalled nothing. The price is a crash window: a process killed between the two has delivered
@@ -2133,12 +2139,14 @@ of pure code sits beside it.
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
-| `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `say.ts`'s `SayRefused` and `SayUnsent`, and the core's) |
 | `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
 | `src/service/harness-refusal.ts` | `harnessRefusalOf`: what the engine refuses of a task on the harness it names, in that harness's words — a knob the harness lacks, an argument only another takes (`mountsMisplaced` among them), a session that would not stay open, and the harness's own `refuses` |
+| `src/service/say.ts` | the engine's `say` verb, `sayVerbOf`, and `SayRefused` and `SayUnsent`: words handed to the attempt in flight through its harness, then journalled with where its transcript stood (`after`) |
+| `src/service/transcript-end.ts` | `transcriptEndOf`: the last event of a session's transcript as a `TranscriptMark`, or null when there is none to read; never fails |
 | `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
 | `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none, and `configRefusal`, what they refuse of a task's configuration, exported for the layers above to ask before they file |
 | `src/service/refusal.ts` | `refusalWords`: a verb's refusal in words — an `Error` led by the verb whose `exitCode` is 2 — for a caller that answers with a sentence and an exit code: `ae` and the orchestrator |

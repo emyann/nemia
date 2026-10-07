@@ -216,7 +216,7 @@ const passAt = (at: string, unobserved?: string[]): PassCostRead => ({
   overheadMs: 0.4,
   rested: 0,
   phases: Object.fromEntries(
-    ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p) => [
+    ['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act'].map((p) => [
       p,
       { ms: 10, calls: 1, bytes: 0, reads: 1, spawned: 0 },
     ]),

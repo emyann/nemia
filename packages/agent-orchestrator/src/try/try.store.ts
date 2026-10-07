@@ -1,16 +1,13 @@
 /**
- * An agent's try folder in the store: `tries/<agent>/try.md`, beside `workflows/`, a hidden one-step folder team the board writes and
- * starts. The store writes its step file; what the file says is the caller's.
+ * An agent's try folder in the store: `tries/<agent>/try.md`, beside `workflows/`, a hidden one-step folder team a try writes and
+ * starts. The store writes its step file; what the file says is `tryText`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
+import { triesDir, tryDir, tryFence, tryText, type FencedKeys } from './try.ts';
 
-/** Where every try's folder is: `tries/` in the store `home`, beside `workflows/`. */
-export const triesDir = (home: string): string => path.join(home, 'tries');
-
-/** The folder the agent `name`'s try is started from. */
-export const tryDir = (name: string, home: string): string => path.join(triesDir(home), name);
+export { triesDir, tryDir };
 
 /** The step a try's folder has, and so the one step of its run. */
 export const TRY_STEP = 'try';
@@ -26,7 +23,7 @@ export function writeTryFolder(name: string, text: string, home: string): string
   for (const at of [triesDir(home), dir, file]) {
     if (fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink()) {
       throw new Invalid({
-        message: `${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`,
+        message: `${at} is a link, and a try's folder is written by the store: make it a folder of its own, or remove it.`,
       });
     }
   }
@@ -38,4 +35,14 @@ export function writeTryFolder(name: string, text: string, home: string): string
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, text);
   return dir;
+}
+
+/**
+ * The try folder of an agent whose keys are `keys`, written (`writeTryFolder`) with its step file (`tryText`) at the agent's `version`;
+ * answers the folder. Refuses (`Invalid`) an agent the try cannot fence (`tryFence`), and a folder or a step file that is a link.
+ */
+export function tryFolder(name: string, version: string, keys: FencedKeys, home: string): string {
+  const fence = tryFence(name, keys);
+  if (typeof fence === 'string') throw new Invalid({ message: fence });
+  return writeTryFolder(name, tryText(name, version, fence), home);
 }

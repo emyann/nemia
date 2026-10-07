@@ -11,7 +11,7 @@ import { AGENTS_FOLDER } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { fillsOf, type Factory, type FactoryListing } from '../factory/factory.ts';
-import { lookupRoots, type Places } from '../folder/folder.store.ts';
+import { lookupRoots, type Places } from '../skills/read.store.ts';
 import { foldersIn } from '../folder/lookup.store.ts';
 import type { AgentPlace, FilledStep } from './roster.ts';
 

@@ -536,7 +536,7 @@ const PASS = {
   overheadMs: 0.4,
   rested: 0,
   phases: Object.fromEntries(
-    ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p, k) => [
+    ['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act'].map((p, k) => [
       p,
       { ms: k * 10, calls: 1, bytes: p === 'journals' ? 812_000 : 0, reads: 1, spawned: p === 'observe' ? 1 : 0 },
     ]),
@@ -556,6 +556,6 @@ test('GET /api/ceilings serves what the last pass cost beside the ceilings, cap 
 
   fs.writeFileSync(stats, JSON.stringify(PASS).slice(0, 80));
   assert.equal((await ceilings()).pass, null, 'half a file is no pass');
-  fs.writeFileSync(stats, JSON.stringify({ ...PASS, phases: { ...PASS.phases, git: undefined } }));
+  fs.writeFileSync(stats, JSON.stringify({ ...PASS, phases: { ...PASS.phases, place: undefined } }));
   assert.equal((await ceilings()).pass, null, 'nor one missing a phase');
 });

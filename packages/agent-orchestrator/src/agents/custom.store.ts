@@ -1,14 +1,13 @@
 /**
  * A person's custom instructions, written: one file per agent name in their store (`customInstructionsFile`), what they add to an agent
- * they use without rewriting it. Read beside it (`custom-file.store.ts`) by the load (`readCustomInstructions`), which a run does once,
+ * they use without rewriting it. Read beside it (`agents/read.store.ts`) by the load (`readCustomInstructions`), which a run does once,
  * at `nemia start`: a write or a clear reaches only the runs started after it. The one writer of the folder, and its reader for a person's
  * command and the board alike: a name no place has is refused here, read, written or cleared, so both refuse it in the same words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { customInstructionsRefusal } from './agents.ts';
-import { customInstructionsFile, notAFileRefusal, readCustomInstructions } from './custom-file.store.ts';
-import { agentsFor } from '../folder/folder.store.ts';
+import { agentsFor, customInstructionsFile, notAFileRefusal, readCustomInstructions } from './read.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 
 /** The store's own agent, Nemia, whom no place names: she ships in this package, and her custom instruction is the person's. */

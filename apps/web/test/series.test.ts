@@ -32,7 +32,7 @@ const READ: SeriesRead = {
       points: [point('2026-10-05T10:01:00.000Z', 90, { p50: 20, p95: 80 }), point('2026-10-05T10:00:00.000Z', 30, { p50: 10, p95: 25 })],
     },
     { s: 'quota.used', l: { harness: 'h', window: 'week' }, points: [point('2026-10-05T10:00:00.000Z', 42)] },
-    { s: 'pass.phase.ms', l: { phase: 'git' }, points: [point('2026-10-05T10:00:00.000Z', 7)] },
+    { s: 'pass.phase.ms', l: { phase: 'place' }, points: [point('2026-10-05T10:00:00.000Z', 7)] },
   ],
 };
 

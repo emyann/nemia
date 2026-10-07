@@ -25,7 +25,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { EngineShape, Event, FeedEntry, Sighting, TaskSpec } from '../src/index.ts';
+import type { EngineShape, Event, FeedEntry, Sighting, TaskSpec, TranscriptEvent } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED, type Waiter } from './waits.ts';
 import type { AsyncJournal, AsyncRunner } from './promise-runner.ts';
@@ -729,6 +729,72 @@ test("an AsyncRunner's say that rejects journals nothing; a journal that fails a
       e._tag === 'SayUnsent' && /was given the words, but they could not be journalled \(the store is read-only now\)/.test(e.message),
   );
   assert.equal(heard.length, 1, 'the words did go');
+});
+
+/**
+ * `promiseHarness` with a conversation: `transcript` answers `events` as they stand, or rejects with `unread`, and `say` puts the words'
+ * arrival on the end of them, as a session that reads them writes it.
+ */
+const talkingHarness = (heard: string[], events: TranscriptEvent[], unread?: string): AsyncRunner => {
+  const base = promiseHarness([]);
+  return {
+    ...base,
+    async transcript() {
+      if (unread) throw new Error(unread);
+      return { events: [...events], cursor: String(events.length) };
+    },
+    async say(_session, text) {
+      heard.push(text);
+      events.push({ id: `arrival-${heard.length}`, at: new Date().toISOString(), role: 'system', kind: 'system', text });
+    },
+  };
+};
+
+const toldThrough = async (harness: AsyncRunner) => {
+  const engine = builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(harness) } }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+  await Effect.runPromise(engine.tick());
+  return { engine, id };
+};
+
+test("said's after is the last event the session's transcript held before the words were handed over, never the one they wrote", async () => {
+  const heard: string[] = [];
+  const at = new Date().toISOString();
+  const events: TranscriptEvent[] = [
+    { id: 'u-1', at, role: 'user', kind: 'text', text: 'Implement it.' },
+    { id: 'c-1', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: {} } },
+  ];
+  const { engine, id } = await toldThrough(talkingHarness(heard, events));
+  const said = await Effect.runPromise(engine.say(id, 'hello'));
+  assert.deepEqual(heard, ['hello'], 'the words were handed over');
+  assert.deepEqual(said.after, { kind: 'tool_use', id: 'c-1' });
+  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled with it');
+  const again = await Effect.runPromise(engine.say(id, 'and again'));
+  assert.deepEqual(again.after, { kind: 'system', id: 'arrival-1' }, "said again: after the first words' arrival");
+});
+
+test("said's after is null when the harness keeps no conversation, holds no event yet, or cannot read it: the words still go, and are journalled", async () => {
+  const quiet: string[] = [];
+  const keepsNone = await toldThrough(promiseHarness([]));
+  assert.equal((await Effect.runPromise(keepsNone.engine.say(keepsNone.id, 'hello'))).after, null, 'no conversation kept');
+  const empty = await toldThrough(talkingHarness(quiet, []));
+  assert.equal((await Effect.runPromise(empty.engine.say(empty.id, 'hello'))).after, null, 'none held yet');
+  const unread: string[] = [];
+  const failing = await toldThrough(talkingHarness(unread, [], 'the transcript is gone'));
+  const said = await Effect.runPromise(failing.engine.say(failing.id, 'hello'));
+  assert.equal(said.after, null, 'a read that failed');
+  assert.deepEqual(unread, ['hello'], 'the words went all the same');
+  assert.deepEqual((await Effect.runPromise(failing.engine.view(failing.id))).state.said, [said]);
+});
+
+test('a said journalled with no after reads back with a null one', async () => {
+  const journal = memoryJournal();
+  const engine = builtEngine(EngineService.layer({ journal: asyncStore(journal), harnesses: { mine: asyncOps(promiseHarness([])) } }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+  await Effect.runPromise(engine.tick());
+  const at = new Date().toISOString();
+  await journal.append(id, { kind: 'said', at, attempt: 1, text: 'from before' });
+  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [{ at, attempt: 1, text: 'from before', after: null }]);
 });
 
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));

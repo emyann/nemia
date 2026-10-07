@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit, Stream } from 'effect';
 import { detachedOps } from '../src/harness/detached/detached.ts';
-import { claudeJob } from '../src/harness/claude/code.ts';
+import { claudeCodeOps, claudeJob } from '../src/harness/claude/code.ts';
+import type { RunnerError } from '../src/harness/error.ts';
 import { claudeTranscriptEvents } from '../src/harness/claude/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
@@ -137,4 +138,12 @@ test('REFUSED: a name with no run is not followed', async () => {
   const exit = await follow(j.ops, 'ae/f4/2', []);
   assert.ok(Exit.isFailure(exit));
   assert.equal((Cause.squash(exit.cause) as Error).message, 'claude: no session `ae/f4/2` is there to follow: there is no run of it.');
+});
+
+test("REFUSED: a session under the engine's name that no job's run file answers, as a background session, refused to stream", async () => {
+  const exit = await Effect.runPromiseExit(Stream.runDrain(claudeCodeOps({ root: scratch('ae-follow-') }).follow!('ae/f5/1')));
+  assert.ok(Exit.isFailure(exit));
+  const err = Cause.squash(exit.cause) as RunnerError;
+  assert.equal(err.refused, true, 'refused, so a follower reads its transcript again instead');
+  assert.match(err.message, /^claude: a background session does not stream yet/);
 });

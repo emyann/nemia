@@ -245,7 +245,8 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  *   let go of.
  * - `transcript` reads a job by its name while it runs, and by Claude Code's id — an ended job's, or a background
  *   session's — the same transcript file either way, which the background reader finds by that id.
- * - `follow` follows a job live (`claudePartials`); a background session is refused (`BG_UNFOLLOWED`).
+ * - `follow` follows a job live (`claudePartials`); a background session is refused (`BG_UNFOLLOWED`), and so is a name no job's run
+ *   file answers, as `find` reads it: a session filed under the engine's name and run `--bg`.
  * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
  *   Code's inbox.
  * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
@@ -313,7 +314,15 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
 
     transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
-    follow: (sessionId) => (isClaudeJob(sessionId) ? job.follow!(sessionId) : Stream.fail(BG_UNFOLLOWED)),
+    follow: (sessionId) =>
+      isClaudeJob(sessionId)
+        ? Stream.unwrap(
+            findJob(sessionId).pipe(
+              Effect.map((found) => (found ? job.follow!(sessionId) : Stream.fail(BG_UNFOLLOWED))),
+              Effect.catchCause(() => Effect.succeed(job.follow!(sessionId))),
+            ),
+          )
+        : Stream.fail(BG_UNFOLLOWED),
 
     say: (session, text) => of(session.sessionId).say!(session, text),
 

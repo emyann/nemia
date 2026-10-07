@@ -7,7 +7,7 @@ import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { readCustomInstructions } from '../agents/custom-file.store.ts';
+import { readCustomInstructions } from '../agents/read.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { DEFAULT_AUTO, listInForce, ruleRefusal, ruleWords, type AutoRule } from './auto.ts';

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { scratch } from '../../test/scratch.ts';
-import { customInstructionsFile } from '../agents/custom-file.store.ts';
+import { customInstructionsFile } from '../agents/read.store.ts';
 import { DEFAULT_AUTO, ruleWords } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, writeProposed } from './auto.store.ts';
 import { autoListOf, proposalOf } from './auto.verb.ts';

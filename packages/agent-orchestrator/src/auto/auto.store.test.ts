@@ -22,7 +22,7 @@ const PROPOSAL = JSON.stringify({
 });
 
 /** The words the person reads of `tries`, as proposed, and of the default. */
-const TRIES = ruleWords(proposalOf(PROPOSAL).rules[0]!);
+const TRIES = ruleWords(proposalOf(PROPOSAL).rules[0]);
 const DEFAULT = ruleWords(DEFAULT_AUTO);
 
 /** A scratch store where nemia proposed `PROPOSAL` from no custom instruction. */

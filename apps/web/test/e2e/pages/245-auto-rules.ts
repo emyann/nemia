@@ -19,8 +19,8 @@ const PROPOSAL = {
   digest: createHash('sha256').update(INSTRUCTION).digest('hex').slice(0, 16),
 };
 
-/** Press `control`, wait for the api's answer to the rule's write by `method`, and refuse any but a 200. */
-async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string): Promise<void> {
+/** Press `control`, wait for the api's answer to the rule's write by `method`, and refuse any but a 200: the body the board sent. */
+async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string): Promise<unknown> {
   const [answer] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname.startsWith('/api/auto/nemia/rules/'), {
       timeout: WAIT_MS,
@@ -29,14 +29,23 @@ async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', wha
   ]);
   if (answer.status() !== 200) throw new Refused(`${what} — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
+  return answer.request().postDataJSON();
+}
+
+/** Refuse a confirm whose body is not the words `rule` reads on the board. */
+async function expectWordsSent(sent: unknown, rule: Locator, what: string): Promise<void> {
+  const words = (await rule.locator('[data-auto-words]').textContent()) ?? '';
+  if (JSON.stringify(sent) !== JSON.stringify({ words }))
+    throw new Refused(`${what} sends the words the person read, ${JSON.stringify(words)} — it sent ${JSON.stringify(sent)}`);
 }
 
 export default {
   /**
    * Her rules at Auto on the store's Settings, beside the custom instruction they come from: the default in force, marked Default, since
    * nothing is confirmed; what she proposed, a Confirm on it, and the words kept as guidance. A confirm puts the rule in force beside the
-   * default and marks it so among what she proposed; a drop of the default leaves the rule alone in force and offers the default back. The
-   * instruction, the proposal and the person's list are written by the page and taken back after.
+   * default and marks it so among what she proposed, sending the words the person read; a drop of the default leaves the rule alone in
+   * force and offers the default back, which puts it back as it ships. The instruction, the proposal and the person's list are written by
+   * the page and taken back after.
    */
   name: 'auto-rules',
   route: '/settings',
@@ -51,10 +60,10 @@ export default {
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       const part = page.locator('[data-nemia-section] [data-auto-rules]');
-      await expectVisible(
-        part.locator('[data-auto-instruction="true"]', { hasText: INSTRUCTION }),
-        'her rules sit beside your instruction',
-      );
+      const words = part.locator('[data-custom-instructions] textarea');
+      await expectVisible(words, 'her rules sit beside your instruction, written there');
+      if ((await words.inputValue()) !== INSTRUCTION)
+        throw new Refused(`as you wrote it — it reads ${JSON.stringify(await words.inputValue())}`);
       const inForce = part.locator('[data-auto-in-force]');
       await expectVisible(
         inForce.getByText('In force: the default, since you confirmed none'),
@@ -74,7 +83,8 @@ export default {
       );
       await settled(page);
       await photograph(part, path.join(OUT, `auto-rules-proposed-${await themeOf(page)}.png`));
-      await wrote(page, proposed.locator('[data-auto-confirm]'), 'PUT', 'the proposed rule is confirmed');
+      const sent = await wrote(page, proposed.locator('[data-auto-confirm]'), 'PUT', 'the proposed rule is confirmed');
+      await expectWordsSent(sent, proposed, 'a confirm');
       await expectVisible(inForce.locator('[data-auto-rule="retry-implement"]'), 'the rule confirmed is in force');
       await expectVisible(inForce.locator('[data-auto-rule="default"]'), 'beside the default');
       await expectVisible(proposed.locator('[data-auto-confirmed]'), 'and reads in force among what she proposed');
@@ -83,6 +93,9 @@ export default {
       await expectVisible(inForce.locator('[data-auto-default-back]'), 'and offered back');
       await settled(page);
       await photograph(part, path.join(OUT, `auto-rules-confirmed-${await themeOf(page)}.png`));
+      const back = await wrote(page, inForce.locator('[data-auto-default-back]'), 'PUT', 'the default is put back');
+      await expectWordsSent(back, inForce.locator('[data-auto-rule="default"]'), 'a put-back');
+      await expectVisible(inForce.locator('[data-auto-rule="default"] [data-auto-default]'), 'the default is in force again, as it ships');
     } finally {
       fs.rmSync(instruction, { force: true });
       fs.rmSync(auto, { recursive: true, force: true });

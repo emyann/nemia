@@ -5,15 +5,16 @@ import { Button } from '@/components/ui/button';
 import { autoQuery, confirmRule, dropRule, type AutoList, type AutoRule } from '../lib/api';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
+import { CustomInstructions } from './CustomInstructions';
 
-/** A write of a rule: `confirm` puts it in force, `drop` takes it out. */
-type RuleAsk = { verb: 'confirm' | 'drop'; id: string };
+/** A write of a rule: `confirm` puts it in force as its `words` read, `drop` takes it out. */
+type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; id: string };
 
 /** The id of the rule that ships, which a person puts back after a drop. */
 const DEFAULT_ID = 'default';
 
 /**
- * An agent's rules for Auto on Nemia's settings: the custom instruction they come from, the rules in force with the default marked and a
+ * An agent's rules for Auto on Nemia's settings: the custom instruction they come from, written there, the rules in force with the default marked and a
  * Drop each, what the agent proposed with a Confirm each and whether the instruction changed since, and the words kept as guidance, which
  * nothing enforces. A write sets what the part shows from the api's answer and reads the rules again; a refusal is shown in its words.
  */
@@ -22,7 +23,7 @@ export function AutoRules({ agent }: { agent: string }) {
   const query = autoQuery(agent);
   const { data, error } = useQuery(query);
   const write = useMutation({
-    mutationFn: ({ verb, id }: RuleAsk) => (verb === 'confirm' ? confirmRule(agent, id) : dropRule(agent, id)),
+    mutationFn: (rule: RuleAsk) => (rule.verb === 'confirm' ? confirmRule(agent, rule.id, rule.words) : dropRule(agent, rule.id)),
     onSuccess: (now) => {
       queryClient.setQueryData(query.queryKey, now);
       void queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true });
@@ -39,6 +40,7 @@ export function AutoRules({ agent }: { agent: string }) {
         In a factory at Auto, an answer these rules allow in the run's state is given without asking you; anything else is asked, as at
         Semi-auto. She proposes rules from your custom instruction, and none is in force until you confirm it here.
       </p>
+      <CustomInstructions name={agent} />
       {data ? (
         <AutoParts list={data} pending={write.isPending} onAsk={ask} />
       ) : (
@@ -60,7 +62,6 @@ export function AutoRules({ agent }: { agent: string }) {
 function AutoParts({ list, pending, onAsk }: { list: AutoList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
   return (
     <>
-      <Instruction words={list.instruction} />
       <InForce list={list} pending={pending} onAsk={onAsk} />
       <Proposed list={list} pending={pending} onAsk={onAsk} />
     </>
@@ -77,24 +78,13 @@ function Sub({ heading, children, ...data }: { heading: string; children: ReactN
   );
 }
 
-/** The custom instruction her rules come from, or how to give her one. */
-function Instruction({ words }: { words: string | null }) {
-  return (
-    <Sub heading="Your custom instruction" data-auto-instruction={words !== null}>
-      {words === null ? (
-        <p className="text-sm text-muted-foreground">None: write one on her agent page, and she proposes rules from it.</p>
-      ) : (
-        <pre className="rounded-md border bg-muted/40 px-3 py-2 font-sans text-sm break-words whitespace-pre-wrap">{words}</pre>
-      )}
-    </Sub>
-  );
-}
-
 /** One rule in its words, with what is said and offered beside it. */
 function Rule({ rule, children }: { rule: AutoRule; children?: ReactNode }) {
   return (
     <li data-auto-rule={rule.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2">
-      <span className="min-w-0 flex-1 text-sm">{rule.words}</span>
+      <span data-auto-words className="min-w-0 flex-1 text-sm">
+        {rule.words}
+      </span>
       <span className="flex items-center gap-2">{children}</span>
     </li>
   );
@@ -131,7 +121,7 @@ function InForce({ list, pending, onAsk }: { list: AutoList; pending: boolean; o
             size="sm"
             data-auto-default-back
             isDisabled={pending}
-            onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID })}
+            onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID, words: list.shipped.words })}
           >
             Put the default back
           </Button>
@@ -167,7 +157,12 @@ function Proposed({ list, pending, onAsk }: { list: AutoList; pending: boolean; 
                   In force
                 </Badge>
               ) : (
-                <Button size="sm" data-auto-confirm isDisabled={pending} onPress={() => onAsk({ verb: 'confirm', id: rule.id })}>
+                <Button
+                  size="sm"
+                  data-auto-confirm
+                  isDisabled={pending}
+                  onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}
+                >
                   Confirm
                 </Button>
               )}

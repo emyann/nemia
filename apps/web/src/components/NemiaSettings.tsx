@@ -1,10 +1,9 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import {
   levelQuery,
   nemiaFactQuery,
@@ -17,17 +16,7 @@ import {
   type NemiaLevel,
 } from '../lib/api';
 import { DEFAULT_NAME } from '../lib/factories';
-import {
-  autoOffered,
-  factoryWords,
-  levelWord,
-  offeredLevel,
-  PRUNE_WORDS,
-  RAISE_STRETCHES,
-  raisesOver,
-  sessionOf,
-  spendWords,
-} from '../lib/nemia';
+import { factoryWords, freshLevel, LEVELS, levelWord, PRUNE_WORDS, RAISE_STRETCHES, raisesOver, sessionOf, spendWords } from '../lib/nemia';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { AutoRules } from './AutoRules';
@@ -35,7 +24,7 @@ import { CopyButton } from './CopyButton';
 import { BridgeWords } from './Facts';
 
 /**
- * Nemia, the store's own agent, on the Settings page: the store's level with its switch, each factory's level with its default and a
+ * Nemia, the store's own agent, on the Settings page: the store's level and where it is picked, each factory's level with its default and a
  * raise for a stretch, her rules at Auto, her session's state, how to reach it, what her sessions cost and what a person allowed her,
  * then her memory, read-only. A write sets what the section shows from the api's answer and reads her
  * level again; a refusal is shown in the api's words.
@@ -101,29 +90,55 @@ function Part({ heading, children, ...data }: { heading: string; children: React
 }
 
 /**
- * Her level: the Semi-auto switch, selected while she is above Manual, which writes Manual or Semi-auto; the Auto switch, selected while
- * she is at Auto, which writes Auto or Semi-auto; and since when she is there. Each word is a label of its own beside its switch, naming
- * its input, since React Aria's switch is a label round its input.
+ * A level picked among Manual, Semi-auto and Auto, named `label`, showing `level`: a pick of another writes it, a pick of the same none.
+ * `marks` say where it is pressed.
  */
+function LevelSelect({
+  label,
+  level,
+  pending,
+  onPick,
+  marks,
+}: {
+  label: string;
+  level: Level;
+  pending: boolean;
+  onPick: (level: Level) => void;
+  marks: Record<`data-${string}`, boolean>;
+}) {
+  return (
+    <Select
+      aria-label={label}
+      value={level}
+      onChange={(key) => {
+        const picked = LEVELS.find((each) => each === key);
+        if (picked !== undefined && picked !== level) onPick(picked);
+      }}
+      isDisabled={pending}
+    >
+      <SelectTrigger size="sm" {...marks} className="w-28">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {LEVELS.map((each) => (
+            <SelectItem key={each} id={each}>
+              {levelWord(each)}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Her level, picked among the three, what it means, and since when she is there. */
 function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: boolean; onAsk: (level: Level) => void }) {
-  const id = useId();
-  const autoId = useId();
   const now = useNow(60_000);
   return (
     <Part heading="Level" data-nemia-level={nemia.level}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2">
-          <Switch id={id} isSelected={nemia.level !== 'manual'} isDisabled={pending} onChange={() => onAsk(offeredLevel(nemia))} />
-          <label htmlFor={id} data-nemia-switch className="cursor-pointer text-sm">
-            Semi-auto
-          </label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch id={autoId} isSelected={nemia.level === 'auto'} isDisabled={pending} onChange={() => onAsk(autoOffered(nemia))} />
-          <label htmlFor={autoId} data-nemia-auto className="cursor-pointer text-sm">
-            Auto
-          </label>
-        </div>
+        <LevelSelect label="Her level" level={nemia.level} pending={pending} onPick={onAsk} marks={{ 'data-nemia-pick': true }} />
         {pending && <span className="text-xs text-muted-foreground">Writing…</span>}
       </div>
       <p className="text-xs text-muted-foreground">
@@ -134,12 +149,12 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
   );
 }
 
-/** What each level of hers means, and what its switches do from there. */
+/** What each level of hers means. */
 const LEVEL_LINES: Record<Level, string> = {
-  manual: 'Manual: no session of hers is kept unless a factory is above Manual. On, Semi-auto files her one at the keeper’s next beat.',
+  manual: 'Manual: no session of hers is kept unless a factory is above Manual. Above it, the keeper files her one at its next beat.',
   'semi-auto':
-    'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. Off, Manual stops her session at its next beat, unless a factory is still above Manual.',
-  auto: 'Auto: as Semi-auto, but an answer the rules you confirmed allow in the run’s state is given without asking you. Off, Semi-auto asks you every answer again.',
+    'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. At Manual, her session stops at its next beat, unless a factory is still above Manual.',
+  auto: 'Auto: as Semi-auto, but an answer the rules you confirmed allow in the run’s state is given without asking you. It holds in a session of hers filed since the board offered Auto: one kept from before asks you every answer until it is filed again — set Manual, and once her session reads Off, Auto.',
 };
 
 /**
@@ -174,12 +189,10 @@ function FactoriesPart({
 }
 
 /**
- * One factory's level, its words, and what a person sets of it: its default by two switches, Semi-auto and Auto, a raise to a level over
- * its default for a chosen stretch, and the end of a raise in force. The default factory's level is the store's, set by the switches above.
+ * One factory's level, its words, and what a person sets of it: its default, picked among the three, a raise to a level over its default
+ * for a chosen stretch, and the end of a raise in force. The default factory's level is the store's, picked above.
  */
 function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date; pending: boolean; onAsk: (ask: LevelAsk) => void }) {
-  const id = useId();
-  const autoId = useId();
   const byDefault = row.factory === DEFAULT_NAME;
   return (
     <div data-factory-level={row.factory} data-level={row.level} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
@@ -197,30 +210,16 @@ function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date
       </p>
       {!byDefault && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="flex items-center gap-2">
-            <Switch
-              id={id}
-              size="sm"
-              isSelected={row.default !== 'manual'}
-              isDisabled={pending}
-              onChange={(on) => onAsk({ level: on ? 'semi-auto' : 'manual', factory: row.factory })}
+          <span className="flex items-center gap-2 text-sm">
+            By default
+            <LevelSelect
+              label={`${row.factory}'s level by default`}
+              level={row.default}
+              pending={pending}
+              onPick={(level) => onAsk({ level, factory: row.factory })}
+              marks={{ 'data-factory-default': true }}
             />
-            <label htmlFor={id} data-factory-default className="cursor-pointer text-sm">
-              Semi-auto by default
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id={autoId}
-              size="sm"
-              isSelected={row.default === 'auto'}
-              isDisabled={pending}
-              onChange={(on) => onAsk({ level: on ? 'auto' : 'semi-auto', factory: row.factory })}
-            />
-            <label htmlFor={autoId} data-factory-auto-default className="cursor-pointer text-sm">
-              Auto by default
-            </label>
-          </div>
+          </span>
           {row.raise !== null ? (
             <Button
               variant="outline"
@@ -310,7 +309,7 @@ function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bo
       )}
       {kind === 'stopped' && (
         <div>
-          <Button variant="outline" size="sm" data-nemia-restart isDisabled={pending} onPress={() => onAsk('semi-auto')}>
+          <Button variant="outline" size="sm" data-nemia-restart isDisabled={pending} onPress={() => onAsk(freshLevel(nemia.level))}>
             Start a fresh session
           </Button>
         </div>

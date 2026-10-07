@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, pickLevel, themeOf } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -9,14 +9,17 @@ import { OUT, store } from '../world.ts';
 /** The facts the page seeds in her memory, by name, with their words. */
 const FACTS = { 'owner.md': 'The owner reads in Montreal time.\n', 'style.md': 'Short sentences; evidence first.\n' } as const;
 
-/** Click the Semi-auto switch's label, wait for the api's answer to the level's write, and refuse any but a 200: the level it wrote. */
-async function switched(page: Page, section: Locator): Promise<{ level: string; task: string | null }> {
+/** Pick `word` as her level, wait for the api's answer to the level's write, and refuse any but a 200: the level it wrote. */
+async function switched(
+  page: Page,
+  section: Locator,
+  word: 'Manual' | 'Semi-auto' | 'Auto',
+): Promise<{ level: string; task: string | null }> {
   const [answer] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', { timeout: WAIT_MS }),
-    section.locator('[data-nemia-switch]').click(),
+    pickLevel(page, section.locator('[data-nemia-pick]'), word),
   ]);
-  if (answer.status() !== 200)
-    throw new Refused(`the switch writes her level — the api answered ${answer.status()}: ${await answer.text()}`);
+  if (answer.status() !== 200) throw new Refused(`a pick writes her level — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
   return (await answer.json()) as { level: string; task: string | null };
 }
@@ -48,9 +51,10 @@ async function photographPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * Nemia's section on the store's Settings, her folder trusted: the switch writes Semi-auto, which says it asks what waits on you, and her
-   * session reads not filed yet, naming its task, since the e2e's api keeps no keeper; her memory lists the seeded facts and opens one; the
-   * switch then writes Manual and her session reads off. The trust, the facts and the level are written by the page and taken back after.
+   * Nemia's section on the store's Settings, her folder trusted: a pick of Semi-auto writes it, which says it asks what waits on you, and
+   * her session reads not filed yet, naming its task, since the e2e's api keeps no keeper; her memory lists the seeded facts and opens one;
+   * a pick of Auto keeps her task and says a session kept from before asks every answer until filed again; a pick of Manual then writes
+   * it and her session reads off. The trust, the facts and the level are written by the page and taken back after.
    */
   name: 'nemia',
   route: '/settings',
@@ -69,7 +73,7 @@ export default {
       await idle(page);
       const section = page.locator('[data-nemia-section]');
       await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'her session is off, no level ever set');
-      const on = await switched(page, section);
+      const on = await switched(page, section, 'Semi-auto');
       if (on.level !== 'semi-auto' || on.task === null) throw new Refused(`Semi-auto is written with a task — ${JSON.stringify(on)}`);
       await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
       await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'her session reads not filed yet');
@@ -82,8 +86,17 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `nemia-on-${await themeOf(page)}.png`), { fullPage: true });
       await photographPhone(page);
-      const off = await switched(page, section);
-      if (off.level !== 'manual') throw new Refused(`the switch then writes Manual — ${JSON.stringify(off)}`);
+      const auto = await switched(page, section, 'Auto');
+      if (auto.level !== 'auto' || auto.task !== on.task) throw new Refused(`Auto is written, her task kept — ${JSON.stringify(auto)}`);
+      await expectVisible(section.locator('[data-nemia-level="auto"]'), 'her level reads Auto');
+      await expectVisible(
+        section.getByText('one kept from before asks you every answer until it is filed again'),
+        'Auto says it holds in a session filed since',
+      );
+      await settled(page);
+      await photograph(page, path.join(OUT, `nemia-auto-${await themeOf(page)}.png`), { fullPage: true });
+      const off = await switched(page, section, 'Manual');
+      if (off.level !== 'manual') throw new Refused(`a pick of Manual then writes it — ${JSON.stringify(off)}`);
       await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'and her session reads off');
     } finally {
       if (before === null) fs.rmSync(config, { force: true });

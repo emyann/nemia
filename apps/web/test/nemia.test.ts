@@ -1,7 +1,7 @@
 /**
  * Nemia on the board: her session's state judged from the orchestrator's facts (`sessionOf`), kept while any factory is above Manual, the
- * level the switch writes, a factory's level in words, her spend in words, and the mirror of what the api answers of her, which decodes
- * her level and memory and refuses an answer it does not read.
+ * levels picked among and the one a fresh session is asked at, a factory's level in words, her spend in words, and the mirror of what
+ * the api answers of her, which decodes her level and memory and refuses an answer it does not read.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,16 +15,7 @@ import {
   type NemiaMemory,
 } from '../src/lib/api/nemia.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import {
-  autoOffered,
-  factoryWords,
-  offeredLevel,
-  PRUNE_WORDS,
-  RAISE_STRETCHES,
-  raisesOver,
-  sessionOf,
-  spendWords,
-} from '../src/lib/nemia.ts';
+import { factoryWords, freshLevel, LEVELS, PRUNE_WORDS, RAISE_STRETCHES, raisesOver, sessionOf, spendWords } from '../src/lib/nemia.ts';
 
 /** Where she is, as the api answers it: off, never set, unless `over` says otherwise. */
 const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
@@ -111,13 +102,11 @@ test('the phase is never read: any word there judges the same', () => {
   for (const phase of ['running', 'settled', 'whatever']) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
 });
 
-test('the Semi-auto switch offers Manual from above it and Semi-auto from Manual; the Auto switch, Semi-auto from Auto, else Auto', () => {
-  assert.equal(offeredLevel({ level: 'semi-auto' }), 'manual');
-  assert.equal(offeredLevel({ level: 'auto' }), 'manual');
-  assert.equal(offeredLevel({ level: 'manual' }), 'semi-auto');
-  assert.equal(autoOffered({ level: 'auto' }), 'semi-auto');
-  assert.equal(autoOffered({ level: 'semi-auto' }), 'auto');
-  assert.equal(autoOffered({ level: 'manual' }), 'auto');
+test('the levels are picked among lowest first, and a fresh session keeps her level above Manual, Semi-auto from Manual', () => {
+  assert.deepEqual([...LEVELS], ['manual', 'semi-auto', 'auto']);
+  assert.equal(freshLevel('auto'), 'auto', 'a fresh session at Auto stays at Auto');
+  assert.equal(freshLevel('semi-auto'), 'semi-auto');
+  assert.equal(freshLevel('manual'), 'semi-auto');
 });
 
 test('a factory is raised to each level over its default, lowest first, and to none over Auto', () => {

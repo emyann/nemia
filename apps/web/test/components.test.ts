@@ -6566,6 +6566,10 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(NemiaSettings)));
 }
 
+/** The level the Select pressed at `mark` shows in `html`, or undefined where there is none. */
+const pickedAt = (html: string, mark: string): string | undefined =>
+  html.slice(html.indexOf(mark)).match(/data-slot="select-value"[^>]*><span[^>]*>([^<]*)</)?.[1];
+
 /** Her session up and reached, on Semi-auto. */
 const nemiaUp = {
   level: 'semi-auto',
@@ -6613,10 +6617,30 @@ test("REFUSED to offer: the default factory's own switch or raise, a raise over 
   assert.match(of('harbour'), /Semi-auto by default \(its own\)\./);
 });
 
-test('Nemia off: the Semi-auto switch unselected, her session off, no reach, and her memory empty with how to prune it', async () => {
+test('at Auto: her level and a factory by default picked at Auto in one control each, and a session kept from before named', async () => {
+  const html = await nemiaWith({
+    ...nemiaUp,
+    level: 'auto',
+    factories: [{ factory: 'quay', level: 'auto', default: 'auto', own: 'auto', raise: null }],
+  });
+  assert.equal(pickedAt(html, 'data-nemia-pick'), 'Auto');
+  assert.equal(pickedAt(html, 'data-factory-default'), 'Auto');
+  assert.equal(
+    html.split('data-slot="select-trigger"').length - 1,
+    2,
+    'one control for her level, one for the factory: no raise over Auto',
+  );
+  assert.doesNotMatch(html, /data-slot="switch"/, 'no switch beside it');
+  assert.match(
+    html,
+    /one kept from before asks you every answer until it is filed again — set Manual, and once her session reads Off, Auto\./,
+  );
+});
+
+test('Nemia off: her level picked at Manual, her session off, no reach, and her memory empty with how to prune it', async () => {
   const html = await nemiaWith({});
   assert.match(html, /data-nemia-level="manual"/);
-  assert.doesNotMatch(html, /data-slot="switch"[^>]*data-selected="true"/, 'the switch is not on');
+  assert.equal(pickedAt(html, 'data-nemia-pick'), 'Manual');
   assert.match(html, /data-nemia-session="true" data-state="off"/);
   assert.doesNotMatch(html, /data-nemia-reach/);
   assert.doesNotMatch(html, /data-nemia-restart/);
@@ -6624,12 +6648,12 @@ test('Nemia off: the Semi-auto switch unselected, her session off, no reach, and
   assert.match(html, /data-nemia-prune[^>]*>She keeps these facts herself[^<]*ask her to in her session\./);
 });
 
-test('Nemia up: the switch selected, her task and phase, the attach line as code to copy and the rest as words, her spend and allows', async () => {
+test('Nemia up: her level picked at Semi-auto, her task and phase, the attach line as code to copy and the rest as words, her spend and allows', async () => {
   const html = await nemiaWith({ ...nemiaUp, spend: { usd: 1.25, measured: 2, unmeasured: 0 }, allows: ['Bash(git status)'] }, [
     'owner',
     'style',
   ]);
-  assert.match(html, /data-slot="switch"[^>]*data-selected="true"/);
+  assert.equal(pickedAt(html, 'data-nemia-pick'), 'Semi-auto');
   assert.match(html, /data-state="up"/);
   assert.match(html, /data-nemia-task[^>]*>nemia-1</);
   assert.match(html, /data-nemia-phase[^>]*>running</);

@@ -1,6 +1,7 @@
 /**
  * An agent's rules for Auto on the board: the mirror of what the api answers, which decodes the rules in force, the proposal and the
- * custom instruction and refuses an answer it does not read, and the writes of a confirm and a drop, each on its route with an empty body.
+ * custom instruction and refuses an answer it does not read, and the writes of a confirm, sending the words the person read, and a drop,
+ * with an empty body, each on its route.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,6 +23,7 @@ const LIST: AutoList = {
   file: '/store/auto/nemia.json',
   isDefault: true,
   rules: [DEFAULT],
+  shipped: DEFAULT,
   proposed: {
     file: '/store/auto/nemia.proposed.json',
     at: '2026-10-06T12:00:00.000Z',
@@ -59,7 +61,9 @@ test('her rules read back what the api answered, a key it does not read dropped'
   assert.deepEqual(await readAuto(), { ...LIST, proposed: null, instruction: null });
 });
 
-test('REFUSED: a condition the board has no word for, a rule with no words, and an answer with no proposal key', async (t) => {
+test('REFUSED: an answer no rule gives, a condition the board has no word for, a rule with no words, and no proposal key', async (t) => {
+  answering(t, { ...LIST, rules: [{ ...DEFAULT, answer: 'accept' }] });
+  await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.answer/.test(err.message));
   answering(t, { ...LIST, rules: [{ ...DEFAULT, when: ['cheap'] }] });
   await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.when\[0\]/.test(err.message));
   const { words: _words, ...unworded } = DEFAULT;
@@ -73,12 +77,12 @@ test('REFUSED: a condition the board has no word for, a rule with no words, and 
   await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at proposed, the value is missing/.test(err.message));
 });
 
-test('a confirm is a PUT and a drop a DELETE on the rule, each sending an empty body and reading the rules back', async (t) => {
+test('a confirm is a PUT sending the words read and a drop a DELETE sending an empty body, each reading the rules back', async (t) => {
   const calls = answering(t, LIST);
-  assert.deepEqual(await confirmRule('nemia', 'tries'), LIST);
+  assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
   assert.deepEqual(await dropRule('nemia', 'default'), LIST);
   assert.deepEqual(calls, [
-    { method: 'PUT', path: '/api/auto/nemia/rules/tries', body: {} },
+    { method: 'PUT', path: '/api/auto/nemia/rules/tries', body: { words: 'Try again.' } },
     { method: 'DELETE', path: '/api/auto/nemia/rules/default', body: {} },
   ]);
 });

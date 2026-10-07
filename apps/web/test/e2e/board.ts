@@ -55,6 +55,12 @@ export async function pick(page: Page, choice: string): Promise<void> {
     .click();
 }
 
+/** Opens the Select pressed at `trigger` and picks the level said `word` among its options. */
+export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | 'Semi-auto' | 'Auto'): Promise<void> {
+  await trigger.click();
+  await page.getByRole('option', { name: word, exact: true }).click();
+}
+
 /**
  * On every page: the header with the logo and the bell, the rail with its places in their order, and the sidebar with its factory picker,
  * reading the factory the address picks or All factories, and its sections in their order, the Floor only with a factory picked.

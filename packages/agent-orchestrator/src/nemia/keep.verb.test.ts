@@ -416,3 +416,14 @@ test('a session kept before the keeper recorded what she was told is judged by t
   fs.writeFileSync(toldFile(), '["not", "a record"]\n');
   assert.deepEqual(await beat(), [], 'a record that does not read is none');
 });
+
+test('her task filed with custom words records them, so their removal is told to her', async () => {
+  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Polish.\n');
+  await keptAnew();
+  assert.equal(fs.readFileSync(toldFile(), 'utf8'), '{"words":"Answer in Polish."}\n', 'filed with them');
+  const told = b.said.length;
+  fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
+  assert.deepEqual(await beat(), ['tell']);
+  assert.match(b.said.at(-1)!.text, /removed their custom instruction/);
+  assert.equal(b.said.length, told + 1);
+});

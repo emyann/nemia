@@ -8,16 +8,17 @@
  * scratch ones (`root`, `config`).
  */
 import { config, observations, registry, root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect } from 'effect';
+import { Effect, Layer, Logger } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { StepTranscript } from './steps.ts';
-import { app } from '../app.ts';
-import { engine } from 'agent-orchestrator';
+import { app, appOf, liveOf } from '../app.ts';
+import { Engine } from '../store.ts';
+import { emitFeed, engine } from 'agent-orchestrator';
 
 const T0 = Date.parse('2026-09-13T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -101,6 +102,12 @@ const runningTask = (taskId: string) => {
   rows.push({ name: `ae/${taskId}/1`, sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: T0 });
   fs.writeFileSync(registry, JSON.stringify(rows));
   return sessionId;
+};
+
+/** The row `claude agents` lists for the attempt of `taskId`, changed by `change`. */
+const listed = (taskId: string, change: object) => {
+  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as { name: string }[];
+  fs.writeFileSync(registry, JSON.stringify(rows.map((r) => (r.name === `ae/${taskId}/1` ? { ...r, ...change } : r))));
 };
 
 const RUN = 'r-talk';
@@ -318,7 +325,7 @@ async function readUntil(
 }
 
 test(
-  'the stream of a live task follows it: what the session writes next is sent as it is written, and `settled` once the task settles',
+  'the stream of a live background session follows it, pushed: what the session writes next is sent as it is written, once each, and `settled` once its task settles',
   { timeout: 30_000 },
   async () => {
     const sessionId = runningTask('t-live');
@@ -332,8 +339,8 @@ test(
     const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
     assert.deepEqual(
       early[0],
-      { event: 'following', data: JSON.stringify({ streamed: false }) },
-      'first, that a background session is not pushed: it is read again every second',
+      { event: 'following', data: JSON.stringify({ streamed: true }) },
+      'first, that a background session is pushed: followed from its transcript, not read again every second',
     );
     assert.deepEqual(
       eventsIn(early).map((e) => e.id),
@@ -343,8 +350,14 @@ test(
     assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
 
     writeTranscript(sessionId, lines.slice(4));
-    await sleep(1_500);
+    await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
     journal('t-live', ending('t-live', sessionId));
+    listed('t-live', { state: 'done', status: 'idle' });
+    await Effect.runPromise(
+      emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: 'live', word: 'succeeded' }] }]])).pipe(
+        Effect.provide(Logger.layer([])),
+      ),
+    );
 
     const said = await readUntil(reader, text, () => false);
     const whole = await Effect.runPromise(engine().transcript('t-live'));
@@ -381,17 +394,33 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
   assert.match(error, /`nemia logs r-talk broken` reads its output from the command line\.$/);
 });
 
+/**
+ * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it: its steps are
+ * read on a beat. Its runtime is let go once the test `t` ends.
+ */
+function unstreamedApp(t: TestContext) {
+  const unstreamed = {
+    ...engine(),
+    follow: () => Effect.fail({ _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' }),
+  } as unknown as ReturnType<typeof engine>;
+  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(unstreamed)));
+  t.after(() => own.runtime.dispose());
+  return own.app;
+}
+
 test(
-  'a read that fails mid-stream is said once and read again every second: following resumes from the same cursor, and ends settled',
+  'a read that fails mid-stream on the beat of a harness that does not stream is said once and read again every second: following resumes from the same cursor, and ends settled',
   { timeout: 30_000 },
-  async () => {
+  async (t) => {
+    const app = unstreamedApp(t);
     const sessionId = runningTask('t-flaky');
     const lines = conversation(sessionId);
     writeTranscript(sessionId, lines.slice(0, 4));
     const res = await app.request(streamUrl('flaky'));
     const reader = res.body!.getReader();
     const text = { value: '' };
-    await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
+    const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
+    assert.deepEqual(early[0], { event: 'following', data: JSON.stringify({ streamed: false }) }, 'read on a beat, not pushed');
 
     const aside = `${journalFile('t-flaky')}.aside`;
     fs.renameSync(journalFile('t-flaky'), aside);
@@ -435,9 +464,10 @@ test(
 );
 
 test(
-  "a task that leaves the engine's record mid-stream ends the stream: `unreadable`, not tried again, and never `settled`",
+  "a task that leaves the engine's record mid-stream on the beat of a harness that does not stream ends the stream: `unreadable`, not tried again, and never `settled`",
   { timeout: 30_000 },
-  async () => {
+  async (t) => {
+    const app = unstreamedApp(t);
     const sessionId = runningTask('t-vanishing');
     writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
     const res = await app.request(streamUrl('vanishing'));

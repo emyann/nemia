@@ -343,7 +343,7 @@ test('REFUSED: a key handed to a handler that its spec gives the command line al
 
 test('the command line hands each writer’s handler only what the api’s body could, read off the one spec both sides parse', async (t) => {
   const agent = drafted('agents/spec.md', SCRIBE);
-  drafted('agents/spec.schema.json', SCHEMA);
+  drafted('agents/scribe.schema.json', SCHEMA);
   const skill = drafted('skills/spec/SKILL.md', TIDY.replace('name: tidy', 'name: spec'));
   const typedArgs: Record<string, string[]> = {
     'agents write': ['agents', 'write', 'yours', 'spec', '--file', agent, '--version', 'v'],

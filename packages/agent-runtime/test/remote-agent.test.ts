@@ -81,8 +81,15 @@ const journalOf = (root: string, id: string) =>
     .trim()
     .split('\n')
     .map((l) => JSON.parse(l) as { kind: string; at: string });
-const writeJournal = (root: string, id: string, events: object[]) =>
-  fs.writeFileSync(path.join(root, 'tasks', `${id}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''));
+/**
+ * Replaces `id`'s journal with `events`, by rename: an engine that read it before resumes an in-place edit at its old offset, so an
+ * edit of another length would be read from mid-line.
+ */
+const writeJournal = (root: string, id: string, events: object[]) => {
+  const file = path.join(root, 'tasks', `${id}.jsonl`);
+  fs.writeFileSync(`${file}.edit`, events.map((e) => `${JSON.stringify(e)}\n`).join(''));
+  fs.renameSync(`${file}.edit`, file);
+};
 const entryFile = (root: string, name: string) => path.join(root, 'remote', `${encodeURIComponent(name)}.json`);
 /** The start and the spawn of a journal as if written `ms` earlier, on the wall clock and on the monotonic clock of their boot. */
 const agedBy = (events: object[], ms: number): object[] =>

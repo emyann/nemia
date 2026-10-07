@@ -1,17 +1,18 @@
 /**
  * The deliverer over the feed on disk and an engine of the test's, whose `say` records what each task is told and fails where a test says:
  * a wake line said once, with the digest riding it; the wake lines of one read said in one message, a gate's two lines and several
- * gates alike, over the file and over the hub; a digest said alone once due, and never before; a restart that neither repeats nor drops a
- * line, and one between a `say` and its cursor that says the message again; the cursor held while `say` fails, the message said again
- * whole; an unsubscribe that stops delivery; a name subscribed again that starts from its own `from`; a feed cut under the cursor read
- * again from its start; and a subscription scoped by a floor told only of the runs of factories at it or above. Each test runs a
- * deliverer of its own and waits for what it counts. A store of its own, since `WF_ROOT` is read as the module loads.
+ * gates alike, over the file and over the hub, and the lines published while a `say` is in flight gathered into the next; a digest said
+ * alone once due, and never before; a restart that neither repeats nor drops a line, and one between a `say` and its cursor that says the
+ * message again; the cursor held while `say` fails, the message said again whole; an unsubscribe that stops delivery; a name subscribed
+ * again that starts from its own `from`; a feed cut under the cursor read again from its start; and a subscription scoped by a floor told
+ * only of the runs of factories at it or above. Each test runs a deliverer of its own and waits for what it counts. A store of its own,
+ * since `WF_ROOT` is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, Schedule } from 'effect';
+import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
@@ -22,7 +23,7 @@ const { SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deli
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
 const { feedFile, feedSize, readFeed } = await import('../feed/feed.store.ts');
-const { emitFeed, FEED_FOLLOWERS, feedHubLayer } = await import('../feed/feed.verb.ts');
+const { emitFeed, FEED_FOLLOWERS, FeedHub, feedHubLayer } = await import('../feed/feed.verb.ts');
 const { engineOf, over } = await import('../runtime-client.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
@@ -177,6 +178,41 @@ test("a gate published to the process's hub is one say, as the daemon delivers i
   await Effect.runPromise(Fiber.interrupt(fiber));
   dropSubscription('hub');
 });
+
+test(
+  'REFUSED: the lines published while a say is in flight are gathered: one more say holds them all, in feed order',
+  WAITED,
+  async (t) => {
+    const rt = ManagedRuntime.make(Layer.merge(feedHubLayer(), Logger.layer([])));
+    t.after(() => rt.dispose());
+    subscribed('busy', 't-busy');
+    failing.add('t-busy');
+    const following = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
+    const was = following();
+    const paced = { every: '10 millis', beat: '1 hour', digestCheck: '10 millis', retry: '5 millis', retryCap: '20 millis' } as const;
+    const fiber = rt.runFork(over(e)(deliver(paced)));
+    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    await held(t, () => following() > was, 'the deliverer following the hub');
+    const awaiting = { run: { word: 'awaiting approval', note: 'waiting on you: approve land' }, steps: [] };
+    const takenAll = () => rt.runSync(Effect.map(FeedHub, (hub) => (hub ? PubSub.sizeUnsafe(hub) : 1))) === 0;
+    const published = (run: string) =>
+      rt.runPromise(emitFeed(new Map([[run, awaiting]]), { unjudged: new Set(readFeed().lines.map((l) => l.run)) }));
+    await published('r-40');
+    await held(t, () => (asked.get('t-busy') ?? []).length >= 1, 'the first message asked, its say failing');
+    await published('r-41');
+    await held(t, takenAll, 'r-41 taken off the hub by the reader');
+    await published('r-42');
+    failing.delete('t-busy');
+    await held(t, () => readDelivery('busy')?.cursor === feedSize(), 'the cursor at the end of the feed');
+    assert.deepEqual(
+      toldTo('t-busy').map((said) => wakesIn(said).map((l) => l.split('  ')[2])),
+      [['r-40'], ['r-41', 'r-42']],
+      'the first message alone, then one say for both lines that came while it was in flight',
+    );
+    await Effect.runPromise(Fiber.interrupt(fiber));
+    dropSubscription('busy');
+  },
+);
 
 test('a digest falls due after its minutes with no wake: said alone, then emptied', WAITED, async (t) => {
   const from = subscribed('quiet', 't-quiet');

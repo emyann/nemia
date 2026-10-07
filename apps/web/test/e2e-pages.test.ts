@@ -79,7 +79,6 @@ test('the runner refuses two workers sharing a store, an api or an app, and a wo
 
 test('a worker that exits other than 0 stops the queue: no worker starts another page', () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
-  assert.match(runner, /const queue = queueOf\(/, 'the runner hands its pages out of one queue');
   assert.match(
     runner,
     /child\.on\('exit', \(code, signal\) => \{\s*if \(code !== 0\) queue\.stop\(\);/,

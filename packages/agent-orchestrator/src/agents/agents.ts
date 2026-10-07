@@ -390,11 +390,12 @@ export function renderAgent(draft: AgentDraft): string {
 }
 
 /**
- * The draft of the agent `name` whose file holds `text`, as `renderAgent` takes it back: read by `parseAgent`, so what it refuses is
- * refused here in its words, the former `systemPrompt:` read as `harnessPrompt:` and `color` dropped. Pure.
+ * The draft of the agent `name` whose file holds `text`, as `renderAgent` takes it back: read by `parseAgent`, with `read` the file a
+ * result schema names beside it where it was read from a folder, so what it refuses is refused here in its words, the former
+ * `systemPrompt:` read as `harnessPrompt:` and `color` dropped. Pure.
  */
-export function agentDraftOf(name: string, text: string): AgentDraft {
-  const agent = parseAgent(name, text);
+export function agentDraftOf(name: string, text: string, read?: (file: string) => string | undefined): AgentDraft {
+  const agent = parseAgent(name, text, read);
   return {
     name,
     role: agent.role ?? null,

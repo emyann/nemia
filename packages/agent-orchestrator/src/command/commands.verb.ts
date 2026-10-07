@@ -450,7 +450,7 @@ const agentsSpec = (positionals: CommandSpec['spec']['positionals']): CommandSpe
   unknown: (arg) =>
     arg.startsWith('-')
       ? `nemia agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-      : `nemia agents takes no argument but card <name> or custom <name>: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
+      : `nemia agents takes no argument but card <name>, custom <name>, or write, remove and try on yours: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
   apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
 });
 

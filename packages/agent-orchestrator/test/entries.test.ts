@@ -674,6 +674,7 @@ const PINNED: Record<string, string[]> = {
     'outputFields',
     'ownSkill',
     'parseAgent',
+    'agentDraftOf',
     'parseFolder',
     'parseWorkflow',
     'PLACES',

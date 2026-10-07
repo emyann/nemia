@@ -117,6 +117,7 @@ export {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
   agentCard,
+  agentDraftOf,
   agentNameRefusal,
   cardRetired,
   CLAUDE_CODE_IGNORED,

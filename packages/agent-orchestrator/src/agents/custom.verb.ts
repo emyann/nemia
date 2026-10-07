@@ -7,7 +7,7 @@ import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts'
 import type { Command } from '../command/entry.verb.ts';
 import { customInstructionsFile } from './read.store.ts';
 import { HOME } from '../record/record.store.ts';
-import { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom.store.ts';
+import { clearCustomInstructions, customInstructionsFor, isStoreAgent, writeCustomInstructions } from './custom.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -66,6 +66,9 @@ type Cleared = { name: string; file: string; removed: boolean };
 /** What a write or a clear says of a run already started. */
 const KEPT = 'a run already started keeps the words it was started with';
 
+/** What a write or a clear says of the store's own agent's open session (`isStoreAgent`), which no run freezes. */
+const TOLD = "her open session is told at the keeper's next beat";
+
 /**
  * `nemia agents custom`: the custom instructions for the agent `name` in the store `home` — read bare, written from `words`, removed with
  * `clear` — for a run on `repo`, `.` where none is named. Refused, writing nothing, as the package refuses: a name no place has, blank
@@ -79,7 +82,8 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
     'rewriting it, kept in <store>/custom-instructions/<name>.md and told',
     'after its instructions. Bare, prints them; --file writes them (- for',
     'stdin); --clear removes them. Words only: a frontmatter block is',
-    'refused. A run keeps the words it was started with',
+    'refused. A run keeps the words it was started with; nemia, the',
+    "store's own agent, is told them in her open session",
   ],
   spec: SPEC,
   check: (args) =>
@@ -110,12 +114,19 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
     }),
   print(data, args) {
     const name = data.name;
+    const hers = isStoreAgent(name);
     if ('removed' in data)
       return [
-        data.removed ? `${name}: custom instructions removed, ${data.file} — ${KEPT}` : `${name} has no custom instructions to remove`,
+        data.removed
+          ? `${name}: custom instructions removed, ${data.file} — ${hers ? TOLD : KEPT}`
+          : `${name} has no custom instructions to remove`,
       ];
     if (args.words !== undefined)
-      return [`${name}: custom instructions written to ${data.file}, told after its instructions in every run started from now — ${KEPT}`];
+      return [
+        hers
+          ? `${name}: custom instructions written to ${data.file}, told after her instructions in every session she is filed with — ${TOLD}`
+          : `${name}: custom instructions written to ${data.file}, told after its instructions in every run started from now — ${KEPT}`,
+      ];
     if (data.words === null)
       return [`${name} has no custom instructions. Set them with nemia agents custom ${name} --file <path>, or --file - for stdin.`];
     return [data.file, '', data.words];

@@ -210,6 +210,24 @@ test('nemia agents custom writes your words for an agent into your store, prints
   assert.equal((await printedBy(t, 'agents', '--repo', repo)).out.includes('custom instructions:'), false);
 });
 
+test("nemia agents custom nemia is accepted and says her open session is told at the keeper's next beat, never that she keeps old words", async (t) => {
+  const repo = repoAt('custom-nemia');
+  const words = path.join(repo, 'words.md');
+  fs.writeFileSync(words, 'Answer in French.\n');
+  const file = path.join(CUSTOM, 'nemia.md');
+  try {
+    const written = (await printedBy(t, 'agents', 'custom', 'nemia', '--file', words, '--repo', repo)).out;
+    assert.ok(written.includes(file) && written.includes("her open session is told at the keeper's next beat"), written);
+    assert.equal(written.includes('keeps the words it was started with'), false, written);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'Answer in French.\n');
+    const cleared = (await printedBy(t, 'agents', 'custom', 'nemia', '--clear', '--repo', repo)).out;
+    assert.match(cleared, /^nemia: custom instructions removed, .* — her open session is told at the keeper's next beat$/);
+    assert.equal(fs.existsSync(file), false);
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
 test('nemia agents custom replaces a link at the file with the words, and never writes through it', async (t) => {
   const repo = repoAt('custom-link');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');

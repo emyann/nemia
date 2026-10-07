@@ -118,7 +118,7 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   return keeping.stale === true ? ['tell'] : [];
 }
 
-/** The instruction her session is filed with: her shipped instruction `body`, then the person's `custom` words where there are any. Pure. */
+/** The instruction her session is filed with: her shipped instruction `body`, then the person's `custom` words where there are any. */
 export const nemiaPrompt = (body: string, custom: string | undefined): string =>
   `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
 
@@ -143,7 +143,10 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 /** Every state, in the order a session goes through them. */
 const STATES: NemiaState[] = ['off', 'due', 'filed', 'kept', 'stopped', 'leaving'];
 
-/** The keeper's moves, a change of her custom words told, a stop or end from outside, which it never undoes, and the end of the last raise above `manual` as it passes. */
+/**
+ * The keeper's moves, a change of her custom words told, a stop or end from outside, which it never undoes, and the end of the last raise
+ * above `manual` as it passes.
+ */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
@@ -177,7 +180,7 @@ export const nemiaGraph = (): NemiaGraph => ({
   verbs: NEMIA_VERBS.map((v) => ({ ...v, from: [...v.from] })),
 });
 
-/** Her machine as a Mermaid state diagram, edges then verbs, which the package's `docs/features.md` holds between its `diagram:nemia` markers. */
+/** Her machine as a Mermaid state diagram, edges then verbs, held in the package's `docs/features.md` between `diagram:nemia` markers. */
 export const nemiaDiagram = (graph: NemiaGraph = nemiaGraph()): string =>
   [
     'stateDiagram-v2',

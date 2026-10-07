@@ -94,6 +94,18 @@ test('with no factory above manual, her open task is stopped and her subscriptio
   assert.equal(nemiaState({ above: false }, undefined, undefined), 'off');
 });
 
+test('REFUSED: no task is filed while her folder is not trusted; once it is, or for a harness that keeps no trust, she is filed', () => {
+  const UNTRUSTED: Keeping = { ...SEMI, trusted: false };
+  assert.equal(nemiaState(UNTRUSTED, undefined, undefined), 'untrusted');
+  assert.deepEqual(nemiaDue(UNTRUSTED, undefined, undefined), [], 'her session waits for the person to trust her folder');
+  assert.deepEqual(nemiaDue(UNTRUSTED, undefined, OLDER), [], 'nothing owed while she waits');
+  assert.deepEqual(nemiaDue({ ...SEMI, trusted: true }, undefined, undefined), ['file']);
+  assert.deepEqual(nemiaDue(SEMI, undefined, undefined), ['file'], 'a harness that keeps no trust');
+  assert.equal(nemiaState(UNTRUSTED, OPEN, undefined), 'filed', 'trust lost later never stops a running session');
+  assert.equal(nemiaState(UNTRUSTED, OPEN, HERS), 'kept');
+  assert.equal(nemiaState({ above: false, trusted: false }, undefined, undefined), 'off', 'manual: nothing waits');
+});
+
 test('REFUSED: a word that is no level; manual, semi-auto and auto are levels', () => {
   assert.equal(levelRefusal('manual'), undefined);
   assert.equal(levelRefusal('semi-auto'), undefined);
@@ -117,6 +129,11 @@ test('her diagram draws every edge and each verb from every state it is taken fr
     ['level (a factory above manual)', 'level (none above manual)', 'agents custom nemia (set or clear)'],
   );
   assert.ok(drawn.includes('  kept --> kept: CUSTOM_CHANGED / tell'));
+  assert.ok(drawn.includes('  untrusted --> due: FOLDER_TRUSTED / nothing'));
+  assert.ok(
+    graph.verbs.every((v) => v.guard === 'always'),
+    'no verb of the person asks her folder trusted',
+  );
 });
 
 test("a step's denied calls wake her, and only her: the default wake words leave them to the digest", () => {

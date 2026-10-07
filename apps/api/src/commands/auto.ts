@@ -1,10 +1,14 @@
 /**
  * The words of the routes that put an agent's rule for auto in force and take one out (`nemia auto confirm`, `nemia auto drop`): the
- * person's, from the board; each takes no body but none or `{}`, and a name that is no agent's is refused before it.
+ * person's, from the board. A confirm takes the rule's words as the person read them, and a drop no body but none or `{}`; a name that is
+ * no agent's is refused before either.
  */
 import { agentNameRefusal } from 'agent-orchestrator/workflow';
 import type { Guarded } from '../guard.ts';
 import type { Named, RouteWords } from './words.ts';
+
+/** The body a confirm takes: the rule's words, as the person read them. */
+const CONFIRM_SHAPE = '`{ "words": "<the rule\'s words, as read>" }`';
 
 /** A rule for auto confirmed or dropped, the guard's words of the route `at`. */
 const ruleGuard = (at: Named, off: boolean): Guarded => ({
@@ -15,8 +19,10 @@ const ruleGuard = (at: Named, off: boolean): Guarded => ({
     ? 'what the rule allowed is asked of you again'
     : 'at auto, the agent gives the answer the rule names unasked wherever the run meets its conditions',
   reach: off ? "drop it on the agent's settings on the board" : "confirm it on the agent's settings on the board",
-  instead: off ? `Drop it with \`nemia auto drop ${at.name} <id>\`` : `Confirm it with \`nemia auto confirm ${at.name} <id>\``,
-  shape: '`{}`',
+  instead: off
+    ? `Drop it with \`nemia auto drop ${at.name} <id>\``
+    : `Confirm it with \`nemia auto confirm ${at.name} <id> --words '<words>'\``,
+  shape: off ? '`{}`' : CONFIRM_SHAPE,
 });
 
 /** Why the text `text` a rule's route `at` was sent is no body it reads, or null for none or `{}`. */
@@ -37,13 +43,13 @@ const agentNamed = (at: Named): string | null => {
   return wrong === undefined ? null : `${at.method} ${at.path}: ${wrong}`;
 };
 
-/** A rule for auto put in force, as the guard's refusals word it. */
+/** A rule for auto put in force, as the guard's refusals word it, and its body: the rule's words, as the person read them. */
 export const AUTO_CONFIRM: RouteWords = {
-  shape: '`{}`',
+  shape: CONFIRM_SHAPE,
   guard: (at) => ruleGuard(at, false),
-  issue: (at) => () => `${at.method} ${at.path} takes no body but \`{}\`.`,
+  issue: (at) => () => `${at.method} ${at.path} takes the rule's words as you read them, and no other key: ${CONFIRM_SHAPE}.`,
   named: agentNamed,
-  bodyless: noBody,
+  strict: true,
 };
 
 /** A rule for auto taken out of force, as the guard's refusals word it. */

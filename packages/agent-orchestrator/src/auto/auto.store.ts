@@ -11,7 +11,7 @@ import { Result, Schema } from 'effect';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { AUTO_ANSWERS, AUTO_FOLDER, CONDITIONS, DEFAULT_AUTO, DEFAULT_ID, type AutoRule } from './auto.ts';
+import { AUTO_ANSWERS, AUTO_FOLDER, CONDITIONS, DEFAULT_AUTO, DEFAULT_ID, ruleWords, type AutoRule } from './auto.ts';
 
 /** A rule as the files keep it. */
 const RuleSchema = Schema.Struct({
@@ -135,15 +135,20 @@ export function writeProposed(home: string, agent: string, proposed: Proposed): 
 }
 
 /**
- * Confirms the rule `id` for `agent` in the store `home` at `now`: the rule it proposed, or the rule that ships (`default`), added to the
- * person's list, which a first confirm seeds with the rule that ships. The list written. Refused, writing nothing: a rule it did not
- * propose (`Missing`), and one in force already (`Conflict`).
+ * Confirms the rule `id` for `agent` in the store `home` at `now`, as the person read it in `words`: the rule it proposed, or the rule
+ * that ships (`default`), added to the person's list, which a first confirm seeds with the rule that ships. The list written. Refused,
+ * writing nothing: a rule it did not propose (`Missing`), one whose words are no longer `words`, proposed again since (`Conflict`), and one
+ * in force already (`Conflict`).
  */
-export function confirmRule(home: string, agent: string, id: string, now: Date): Confirmed {
+export function confirmRule(home: string, agent: string, id: string, words: string, now: Date): Confirmed {
   const rule = id === DEFAULT_ID ? DEFAULT_AUTO : readProposed(home, agent)?.rules.find((r) => r.id === id);
   if (rule === undefined)
     throw new Missing({
       message: `${agent} proposed no rule ${id}: see what it proposed with nemia auto ${agent}, or ask it to propose again.`,
+    });
+  if (ruleWords(rule) !== words)
+    throw new Conflict({
+      message: `${agent}'s rule ${id} now reads "${ruleWords(rule)}", not the words you confirmed: read it again with nemia auto ${agent}, and confirm what it says.`,
     });
   const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_AUTO];
   if (rules.some((r) => r.id === id))

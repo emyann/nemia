@@ -10,7 +10,7 @@ import { agentNameRefusal } from '../agents/agents.ts';
 import { readCustomInstructions } from '../agents/custom-file.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { listInForce, ruleRefusal, ruleWords, type AutoRule } from './auto.ts';
+import { DEFAULT_AUTO, listInForce, ruleRefusal, ruleWords, type AutoRule } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
 
 /** A rule with its words, as the person reads it. */
@@ -19,7 +19,8 @@ export type WordedRule = AutoRule & { words: string };
 /**
  * An agent's rules, read: the agent, the file of the person's list, whether the rule that ships is in force for want of one (`isDefault`),
  * the rules in force, what the agent proposed, each rule saying whether it is in force, with the words it keeps as guidance and whether the
- * custom instruction changed since (`stale`), or null for nothing proposed; and the custom instruction, or null for none.
+ * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the rule that
+ * ships, with its words, to be confirmed again (`shipped`).
  */
 export type AutoList = {
   agent: string;
@@ -34,6 +35,7 @@ export type AutoList = {
     stale: boolean;
   } | null;
   instruction: string | null;
+  shipped: WordedRule;
 };
 
 /** The agent's name in `args`. */
@@ -41,6 +43,9 @@ const agentIn = (args: Args): string => String(args.name ?? '');
 
 /** The rule's id in `args`. */
 const idIn = (args: Args): string => String(args.id ?? '');
+
+/** The words of the rule the person read in `args`. */
+const wordsIn = (args: Args): string => String(args.words ?? '');
 
 /** A rule with its words. */
 const worded = (rule: AutoRule): WordedRule => ({ ...rule, words: ruleWords(rule) });
@@ -67,6 +72,7 @@ export function autoListOf(home: string, agent: string): AutoList {
             stale: proposed.digest !== digestOf(instruction),
           },
     instruction: instruction ?? null,
+    shipped: worded(DEFAULT_AUTO),
   };
 }
 
@@ -86,7 +92,7 @@ function listLines(list: AutoList): string[] {
     `proposed at ${p.at}${p.stale ? ', before the custom instruction last changed' : ''}:`,
     ...p.rules.map((r) => `  ${r.id}${r.confirmed ? ' (in force)' : ''}: ${r.words}`),
     ...(p.guidance.length ? ['kept as guidance, which the machinery cannot hold:', ...p.guidance.map((g) => `  ${g}`)] : []),
-    `confirm one with nemia auto confirm ${list.agent} <id>; drop one in force with nemia auto drop ${list.agent} <id>.`,
+    `confirm one with nemia auto confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia auto drop ${list.agent} <id>.`,
   ];
 }
 
@@ -200,24 +206,44 @@ export const AUTO_PROPOSE: Command<AutoList> = {
   ],
 };
 
-/** `nemia auto confirm <agent> <id>`: a rule the agent proposed put in force, the person's; asked of them every time an agent calls it. */
+/**
+ * `nemia auto confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it, the person's; asked of
+ * them every time an agent calls it. Refused: a confirm with no words.
+ */
 export const AUTO_CONFIRM: Command<AutoList> = {
   name: 'auto confirm',
-  usage: '<agent> <id>',
+  usage: "<agent> <id> --words '<words>'",
   help: [
-    'put in force a rule the agent proposed, or the default again: from',
-    'then on, at auto, the answer it names is given unasked where it holds.',
-    'Your first confirm keeps the default beside it. Asked of you every time',
+    'put in force a rule the agent proposed, or the default again, as its',
+    'words read: from then on, at auto, the answer it names is given unasked',
+    'where it holds. Refused once the rule reads otherwise. Your first confirm',
+    'keeps the default beside it. Asked of you every time',
   ],
-  spec: ruleSpec('auto confirm'),
-  check: (args) => agentNameRefusal(agentIn(args)) ?? null,
+  spec: {
+    ...ruleSpec('auto confirm'),
+    flags: [
+      {
+        flag: '--words',
+        kind: 'text',
+        key: 'words',
+        takes: "--words takes the rule's words as you read them in nemia auto <agent>: nemia auto confirm <agent> <id> --words '<words>'",
+      },
+    ],
+    unknown: (arg) =>
+      `nemia auto confirm takes an agent's name, a rule's id and --words '<words>', not ${arg}: nemia auto confirm <agent> <id> --words '<words>'.`,
+  },
+  check: (args) =>
+    agentNameRefusal(agentIn(args)) ??
+    (wordsIn(args).trim()
+      ? null
+      : `nemia auto confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia auto ${agentIn(args) || '<agent>'}.`),
   writes: true,
   nemia: 'prompts',
   asksAlways: true,
   route: { method: 'PUT', path: '/api/auto/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>
     tried(() => {
-      confirmRule(home, agentIn(args), idIn(args), new Date());
+      confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date());
       return autoListOf(home, agentIn(args));
     }),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],

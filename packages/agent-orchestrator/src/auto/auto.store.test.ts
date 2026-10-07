@@ -1,6 +1,6 @@
 /**
  * An agent's rules for `auto` on disk, under a scratch store: a proposal touches the proposal's file alone; the first confirm seeds the
- * person's list with the rule that ships beside the one confirmed; a drop takes a rule out, the default among them; each refusal by its
+ * person's list with the rule that ships beside the one confirmed, and binds to the words the person read; a drop takes a rule out, the default among them; each refusal by its
  * kind writes nothing; and a proposal is stale once the custom instruction it was read from changes.
  */
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { scratch } from '../../test/scratch.ts';
 import { customInstructionsFile } from '../agents/custom-file.store.ts';
-import { DEFAULT_AUTO } from './auto.ts';
+import { DEFAULT_AUTO, ruleWords } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, writeProposed } from './auto.store.ts';
 import { autoListOf, proposalOf } from './auto.verb.ts';
 
@@ -20,6 +20,10 @@ const PROPOSAL = JSON.stringify({
   rules: [{ id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 20 }],
   guidance: ['be kind to the reviewer'],
 });
+
+/** The words the person reads of `tries`, as proposed, and of the default. */
+const TRIES = ruleWords(proposalOf(PROPOSAL).rules[0]!);
+const DEFAULT = ruleWords(DEFAULT_AUTO);
 
 /** A scratch store where nemia proposed `PROPOSAL` from no custom instruction. */
 function proposed(): string {
@@ -41,7 +45,7 @@ function refusal(fn: () => unknown): { kind: string; message: string } {
 test("a proposal writes the agent's file alone; the person's list stays as it was, and the default stays in force", () => {
   const home = proposed();
   assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
-  confirmRule(home, 'nemia', 'tries', NOW);
+  confirmRule(home, 'nemia', 'tries', TRIES, NOW);
   const before = fs.readFileSync(confirmedFile(home, 'nemia'));
   writeProposed(home, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL.replace('20', '30')), digest: null });
   assert.deepEqual(fs.readFileSync(confirmedFile(home, 'nemia')), before, "the person's list is no proposal's to write");
@@ -62,7 +66,7 @@ test("a proposal writes the agent's file alone; the person's list stays as it wa
 
 test('the first confirm seeds the list with the default beside the rule confirmed, marked by where each came from', () => {
   const home = proposed();
-  confirmRule(home, 'nemia', 'tries', NOW);
+  confirmRule(home, 'nemia', 'tries', TRIES, NOW);
   assert.deepEqual(readConfirmed(home, 'nemia'), {
     since: NOW.toISOString(),
     rules: [DEFAULT_AUTO, { id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 20, from: 'proposed' }],
@@ -77,22 +81,37 @@ test('a drop takes a rule out of force, the default among them, and the default 
   dropRule(home, 'nemia', 'default', NOW);
   assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [], 'nothing in force: every answer is asked');
   assert.equal(autoListOf(home, 'nemia').isDefault, false);
-  confirmRule(home, 'nemia', 'default', NOW);
+  confirmRule(home, 'nemia', 'default', DEFAULT, NOW);
   assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [DEFAULT_AUTO]);
 });
 
 test('REFUSED, writing nothing: a rule not proposed, one in force already, a drop of one not in force, a name that is no agent', () => {
   const home = proposed();
-  assert.equal(refusal(() => confirmRule(home, 'nemia', 'ghost', NOW)).kind, 'Missing');
+  assert.equal(refusal(() => confirmRule(home, 'nemia', 'ghost', TRIES, NOW)).kind, 'Missing');
   assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
-  assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', NOW)).kind, 'Conflict', 'the default is in force already');
+  assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', DEFAULT, NOW)).kind, 'Conflict', 'the default is in force already');
   assert.equal(refusal(() => dropRule(home, 'nemia', 'tries', NOW)).kind, 'Missing');
   assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
-  confirmRule(home, 'nemia', 'tries', NOW);
-  const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', NOW));
+  confirmRule(home, 'nemia', 'tries', TRIES, NOW);
+  const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
   assert.equal(kind, 'Conflict');
   assert.match(message, /^the rule tries is in force already for nemia: drop it first with nemia auto drop nemia tries/);
   assert.equal(refusal(() => confirmedFile(home, '../x')).kind, 'Invalid');
+});
+
+test('REFUSED (Conflict), writing nothing: a confirm of words the rule under its id no longer reads, proposed again since', () => {
+  const home = proposed();
+  writeProposed(home, 'nemia', {
+    at: NOW.toISOString(),
+    ...proposalOf(JSON.stringify({ rules: [{ id: 'tries', answer: 'approve', when: [] }], guidance: [] })),
+    digest: null,
+  });
+  const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
+  assert.equal(kind, 'Conflict');
+  assert.match(message, /^nemia's rule tries now reads "Approve any step unasked[\s\S]*nemia auto nemia/);
+  assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
+  assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', `${DEFAULT} `, NOW)).kind, 'Conflict', "the default's own words");
+  assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
 });
 
 test("REFUSED (Invalid): a person's list that does not read, naming its file and the fix", () => {

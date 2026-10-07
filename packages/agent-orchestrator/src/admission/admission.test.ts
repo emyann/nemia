@@ -167,7 +167,13 @@ test("REFUSED at auto: a try that raises a step's cap, whatever the rules allow"
 });
 
 test('REFUSED: a confirm or a drop of a rule is asked every time, at auto and with no list, alone or behind another command', () => {
-  for (const line of ['nemia auto confirm nemia tries', 'nemia auto drop nemia default', 'nemia show r && nemia auto confirm nemia tries'])
+  for (const line of [
+    'nemia auto confirm nemia tries',
+    "nemia auto confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
+    'nemia auto confirm nemia tries --words "Try again the step implement unasked."',
+    'nemia auto drop nemia default',
+    'nemia show r && nemia auto confirm nemia tries',
+  ])
     for (const auto of [undefined, atAuto([DEFAULT_AUTO, TRIES])]) assert.equal(decidedAt(line, auto), 'ask', line);
   assert.equal(decidedAt('nemia auto nemia', atAuto([DEFAULT_AUTO])), undefined, 'the read is no ask');
   assert.match(

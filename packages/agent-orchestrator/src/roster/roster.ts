@@ -86,7 +86,15 @@ export type AgentReading = {
   error: string | null;
   /** The file of a person's custom instructions for it, in the store read (`customInstructionsFile`); null when they wrote none. */
   custom: string | null;
+  /**
+   * Where an agent of yours was copied from (`nemia agents copy`): the file, the version it was at then, and whether it is that version
+   * now, has changed since or is gone. Null for an agent never copied, and for every agent of a repository.
+   */
+  copied: AgentCopiedFrom | null;
 };
+
+/** Where an agent of yours was copied from, the version it was at then, and how that file stands now. */
+export type AgentCopiedFrom = { source: string; version: string; now: 'same' | 'changed' | 'gone' };
 
 /** Every agent of both places, in the order the places come, and the places' folders, which `nemia agents` names when there is none. */
 export type AgentsRead = { agents: AgentReading[]; places: Array<{ from: AgentPlace; dir: string }> };
@@ -142,6 +150,7 @@ export const emptyReading = (
   usedBy,
   error: null,
   custom: null,
+  copied: null,
 });
 
 /**
@@ -191,6 +200,10 @@ export function unreadReading(
   };
 }
 
+/** The line of an agent copied in: the file and version it came from, and whether that file has changed since or is gone. */
+const copiedLine = ({ source, version, now }: AgentCopiedFrom): string =>
+  `   copied from ${source} at ${version}${now === 'changed' ? '; the source has changed since' : now === 'gone' ? '; the source is gone' : ''}`;
+
 /** One agent's lines on `nemia agents`: what it is for, what it says it can do, and the skills it is given; or why it does not read. */
 function agentLines(agent: AgentReading): string[] {
   const { name, from } = agent;
@@ -202,6 +215,7 @@ function agentLines(agent: AgentReading): string[] {
     ...(agent.skills ? [`   given the skills ${agent.skills}`] : []),
     ...(agent.harnessPrompt !== null && agent.harnessPrompt !== 'keep' ? [`   harness prompt: ${agent.harnessPrompt}`] : []),
     ...(agent.custom !== null ? [`   custom instructions: ${agent.custom}`] : []),
+    ...(agent.copied !== null ? [copiedLine(agent.copied)] : []),
   ];
 }
 

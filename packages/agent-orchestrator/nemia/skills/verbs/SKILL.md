@@ -76,6 +76,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                nothing else — every field the protocol marks REQUIRED but
                                supportedInterfaces, which is left out because nothing here serves an
                                agent over A2A. The card describes; it is not an address
+  nemia agents sources [--path <folder>]
+                               the agent files the store knows of, to copy into your library:
+                               each repository's, yours, and those of a --path <folder>
   nemia agents custom <name> [--file <path>|-] [--clear] [--repo .]
                                your custom instructions for that agent: words you add to it without
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told
@@ -254,6 +257,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia agents write yours [<name>] --file <name>.md [--version <v>]
                                an agent of yours written from its file: <name> is the agent it
                                changes or renames, at the --version it was read at; none, a new one
+  nemia agents copy <file> [--as <name>] [--keep <part>]...
+                               an agent file copied into your library, with its schema and skills;
+                               a part your library holds otherwise stops it: --as or --keep
   nemia agents remove yours <name> --version <v>
                                an agent of yours removed, at the --version it was read at
   nemia skills write yours [<name>] --file <SKILL.md> [--version <v>]

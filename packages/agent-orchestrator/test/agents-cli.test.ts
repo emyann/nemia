@@ -304,7 +304,7 @@ test('REFUSED at shipped defaults: nemia agents given a word that is none of its
   const refusals: Array<[string[], string]> = [
     [
       ['agents', 'nope'],
-      'nemia agents takes no argument but card <name>, custom <name>, or write, remove and try on yours: nemia agents, nemia agents card nope, or nemia agents custom nope.',
+      'nemia agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on yours: nemia agents, nemia agents card nope, or nemia agents custom nope.',
     ],
     [['agents', '--nope'], 'nemia agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.'],
   ];
@@ -354,7 +354,7 @@ test('REFUSED at shipped defaults: nemia agents with a flag left out, given twic
     '--nope',
   );
   await refused(
-    'nemia agents takes no argument but card <name>, custom <name>, or write, remove and try on yours: nemia agents, nemia agents card extra, or nemia agents custom extra.',
+    'nemia agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on yours: nemia agents, nemia agents card extra, or nemia agents custom extra.',
     'agents',
     'card',
     'scribe',

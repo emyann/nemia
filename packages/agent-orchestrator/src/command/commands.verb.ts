@@ -34,6 +34,7 @@ import { lsLines, type RunsListed } from '../list/list.ts';
 import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
+import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
@@ -57,12 +58,7 @@ import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { AUTO_ENTRIES } from '../auto/auto.verb.ts';
-
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
+import { writerText as textOf } from '../yours/yours.ts';
 
 /** The dollars under `key`, or undefined where none were given. */
 const amountIn = (args: Args, key: string): number | undefined => {
@@ -459,7 +455,7 @@ const agentsSpec = (positionals: CommandSpec['spec']['positionals']): CommandSpe
   unknown: (arg) =>
     arg.startsWith('-')
       ? `nemia agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-      : `nemia agents takes no argument but card <name>, custom <name>, or write, remove and try on yours: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
+      : `nemia agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on yours: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
   apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
 });
 
@@ -542,6 +538,7 @@ export const COMMANDS: readonly Command[] = [
   SERIES,
   AGENTS,
   AGENT_CARD,
+  AGENTS_SOURCES,
   AGENTS_CUSTOM,
   ...LIBRARY_ENTRIES,
   ...SKILL_ENTRIES,

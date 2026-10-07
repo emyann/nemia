@@ -41,7 +41,8 @@ fs.writeFileSync(path.join(ONE, 'work.md'), '---\nplace: git\nharness: codex\n--
 
 /**
  * The runtime over its own journal on disk, with a harness whose sessions work until `signAll` signs all but those of `keep`, take what
- * they are said, and are let go by being forgotten.
+ * they are said, and are let go by being forgotten. A statement is stamped a moment after its attempt began, as the journal says: the
+ * runtime drops one stamped no later, which a wall clock stepped back between the two would make.
  */
 const engine = () => {
   const sessions = new Map<string, Sighting>();
@@ -71,14 +72,19 @@ const engine = () => {
       defaultHarness: 'codex',
     }),
   );
-  const signAll = (keep: readonly Run[]) => {
+  const begun = async (name: string) => {
+    const [, task, attempt] = /^ae\/(.+)\/(\d+)$/.exec(name)!;
+    const { state } = await Effect.runPromise(e.view(task));
+    return Date.parse(state.attempts.find((a) => a.n === Number(attempt))?.startedAt ?? '');
+  };
+  const signAll = async (keep: readonly Run[]) => {
     for (const [name, s] of sessions)
       if (s.state === 'working' && !keep.some((r) => name.startsWith(`ae/${r.id}-`)))
         sessions.set(name, {
           ...s,
           state: 'completed',
           busy: false,
-          closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: Date.now() },
+          closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: (await begun(name)) + 1 },
         });
   };
   return { e, signAll, sessions };
@@ -120,7 +126,7 @@ const atRest = async (n: number) => {
   for (let k = 0; k < n; k++) await Effect.runPromise(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
   for (let k = 0; k < 12; k++) {
     await traced(true);
-    h.signAll(inFlight);
+    await h.signAll(inFlight);
     if ((await traced(false)).cost.rested === listRuns().length - inFlight.length) {
       await traced(false);
       await saidToInFlight();
@@ -164,7 +170,7 @@ test("a pass that lets a finished run's session go traces the release, with its 
   for (let k = 0; k < 12 && !released.length; k++) {
     const { spans } = await traced(true);
     released.push(...spans.filter((s) => s.name === 'releaseFinished').map((s) => String(s.attributes.get('task'))));
-    h.signAll(inFlight);
+    await h.signAll(inFlight);
   }
   const taskId = listRuns().find((r) => r.id === run.id)?.steps.work.taskId;
   assert.deepEqual(released, [taskId], "the release of the run's session is traced, on the pass that let it go");

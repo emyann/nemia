@@ -287,6 +287,18 @@ test('a copied scout from .claude/ brings its skill from the repository, and rea
   assert.doesNotMatch(fs.readFileSync(path.join(libraryOf(home).agents, 'scout.md'), 'utf8'), /^(name|color):/m);
 });
 
+test("an agent given the place skill Nemia ships copies without it: a start finds the package's own, and the library holds none", async () => {
+  const home = scratch('wf-agents-copy-home-');
+  const from = scratch('wf-agents-copy-place-');
+  fs.mkdirSync(path.join(from, 'agents'));
+  fs.writeFileSync(path.join(from, 'agents', 'hand.md'), '---\ndescription: Lends a hand.\nskills: git\n---\nHelp.\n');
+  const copied = await copy({ file: path.join(from, 'agents', 'hand.md') }, home);
+  assert.deepEqual(copied.copied, ['agents/hand.md']);
+  assert.deepEqual(copied.reused, []);
+  assert.equal(fs.existsSync(path.join(libraryOf(home).skills, 'git')), false, 'no copy of the place skill');
+  assert.match(fs.readFileSync(path.join(libraryOf(home).agents, 'hand.md'), 'utf8'), /^skills: git$/m);
+});
+
 test('the copy is classed a prompt write, served on its generated route', () => {
   const entry = TABLE.find((c) => c.name === 'agents copy');
   assert.equal(entry && 'nemia' in entry ? entry.nemia : undefined, 'prompts');

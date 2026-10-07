@@ -1,7 +1,7 @@
 /**
  * What a daemon's process says and where it sends it, as data: whether its environment asks for an OTLP export, and to where
- * (`otlpOf`), what a step's task says it is for (`stepLabels`), and a log as the line `nemia up` prints (`lineOf`). The layer that acts
- * on them is `telemetry.store.ts`'s.
+ * (`otlpOf`), what the sessions it starts export (`sessionTelemetryOf`, `toolDetailsRefusalOf`), what a step's task says it is for
+ * (`stepLabels`), and a log as the line `nemia up` prints (`lineOf`). The layer that acts on them is `telemetry.store.ts`'s.
  */
 
 /** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
@@ -18,6 +18,29 @@ export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp 
   const url = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim().replace(/\/+$/, '');
   if (!url) return undefined;
   return { url, serviceName: env.OTEL_SERVICE_NAME?.trim() || DEFAULT_SERVICE_NAME };
+}
+
+/** The variable that asks each session the daemon starts to export its tools' inputs too: `1` asks, unset, blank or `0` does not. */
+const TOOL_DETAILS = 'NEMIA_TOOL_DETAILS';
+
+/**
+ * Where the sessions the engine starts export, as the runtime takes it: the collector `env` names (`otlpOf`), and `toolDetails` when
+ * `NEMIA_TOOL_DETAILS` is `1`, for each session to export its tools' inputs too (a command's text, a file's path, an error's words).
+ * Answers undefined, no export, without a collector, whatever `NEMIA_TOOL_DETAILS` says; any value but `1` leaves the inputs off.
+ */
+export function sessionTelemetryOf(
+  env: Readonly<Record<string, string | undefined>>,
+): { endpoint: string; toolDetails?: true } | undefined {
+  const otlp = otlpOf(env);
+  if (!otlp) return undefined;
+  return env[TOOL_DETAILS]?.trim() === '1' ? { endpoint: otlp.url, toolDetails: true } : { endpoint: otlp.url };
+}
+
+/** Why `env`'s `NEMIA_TOOL_DETAILS` asks nothing, in a sentence that names the fix, or `undefined` when it is unset, blank, `0` or `1`. */
+export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  const value = env[TOOL_DETAILS];
+  if (value === undefined || ['', '0', '1'].includes(value.trim())) return undefined;
+  return `${TOOL_DETAILS} is ${JSON.stringify(value)}, which asks nothing: set it to 1 for each session to export its tools' inputs, or unset it. Their tools' details are left off.`;
 }
 
 /**

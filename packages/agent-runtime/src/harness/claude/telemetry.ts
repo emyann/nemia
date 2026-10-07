@@ -1,7 +1,8 @@
 /**
  * A session's telemetry as Claude Code reads it: its own switch, OpenTelemetry's exporter variables, its tools' details when asked, and
- * the W3C trace context (`claudeTelemetryEnv`), handed to a job in its environment and to a background session in its `--settings` (`telemeteredFlags`),
- * since a background session is run by Claude Code's own service and carries none of the environment it was asked from.
+ * the W3C trace context (`claudeTelemetryEnv`), handed to a job in its environment and to a background session in its `--settings`
+ * (`telemeteredFlags`), since a background session is run by Claude Code's own service and carries none of the environment it was
+ * asked from.
  */
 import type { SpawnRequest } from '../seam.ts';
 import { settingsObject, type ClaudeFlags } from './vocabulary.ts';

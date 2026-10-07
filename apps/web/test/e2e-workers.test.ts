@@ -124,8 +124,8 @@ test("a run fails on the earliest page's failure, kept whole with its picture, w
     "the earliest page first, a store gone before a page in that page's place, the worker that names no page last, and no passing worker",
   );
   assert.equal(ordered[0].failure, earliest, 'the failure the run says last keeps its page, its theme and its picture');
-  assert.match(ordered[0].failure!, /^the a page \(\/runs\) in the light theme: /);
-  assert.match(ordered[0].failure!, /\n  what it looked like: \/out\/a-light-failed\.png$/);
+  assert.match(ordered[0].failure, /^the a page \(\/runs\) in the light theme: /);
+  assert.match(ordered[0].failure, /\n  what it looked like: \/out\/a-light-failed\.png$/);
   assert.deepEqual(
     results.map((r) => r.worker),
     [0, 1, 2, 3, 4],

@@ -8,7 +8,7 @@ import { feedWords, type FeedLine } from '../feed/feed.ts';
 import type { Listing } from '../list/list.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Instant } from '../daemon/daemon.ts';
-import { DEFAULT_WAKE, digestDue, digestOf, messageOf, sortLine, subscribeRefusalOf } from './subscription.ts';
+import { DEFAULT_WAKE, digestDue, digestOf, messageOf, readDelivered, sortLine, subscribeRefusalOf } from './subscription.ts';
 
 const AT = '2026-10-05T12:00:00.000Z';
 
@@ -88,15 +88,15 @@ test("a subscriber's own wake words replace the default, matched on the word or 
   assert.equal(sortLine({ ...line, word: 'running', note: 'Waiting On You: review it' }, DEFAULT_WAKE), 'wake', "the note's lead folded");
 });
 
-test('a wake is told its line, then the digest riding it; a digest alone is told with its count', () => {
+test('a wake is told its lines, then the digest riding it; a digest alone is told with its count', () => {
   const wake: FeedLine = { at: AT, run: 'r-1', step: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' };
   const r1: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'running' };
   const r2: FeedLine = { at: '2026-10-05T11:59:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
   assert.equal(
-    messageOf(wake, []),
+    messageOf([wake], []),
     'The feed needs your judgement:\n  12:00:00  r-1  plan  awaiting approval  · approve it: nemia approve r-1 plan',
   );
-  const ridden = messageOf(wake, [r1, r2]).split('\n');
+  const ridden = messageOf([wake], [r1, r2]).split('\n');
   assert.deepEqual(ridden.slice(2), [
     '',
     'Since your last news:',
@@ -109,6 +109,59 @@ test('a wake is told its line, then the digest riding it; a digest alone is told
     '1 routine line of the feed:',
     '  11:58:00  r-2  build  running',
   ]);
+});
+
+/** A gate's two lines, as the tick writes them at one instant: the run's, then its step's. */
+const GATE: FeedLine[] = [
+  { at: AT, run: 'r-1', word: 'awaiting approval', note: 'waiting on you: approve land' },
+  { at: AT, run: 'r-1', step: 'land', word: 'awaiting approval', note: 'approve it: nemia approve r-1 land' },
+];
+
+test('the wake lines of one read are told in one message, each in the order given, the digest once under them', () => {
+  const r1: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'running' };
+  const told = (lines: FeedLine[]) => messageOf(lines, [r1]).split('\n');
+  assert.deepEqual(told(GATE), [
+    'The feed needs your judgement:',
+    '  12:00:00  r-1  —  awaiting approval  · waiting on you: approve land',
+    '  12:00:00  r-1  land  awaiting approval  · approve it: nemia approve r-1 land',
+    '',
+    'Since your last news:',
+    '1 routine line of the feed:',
+    '  11:58:00  r-2  build  running',
+  ]);
+  assert.deepEqual(told([...GATE].reverse()).slice(1, 3), told(GATE).slice(1, 3).reverse(), 'in the order given, never sorted');
+});
+
+test('a read with a wake comes to one message: every wake line, then the digest and every routine line of the read, emptied after', () => {
+  const now: Instant = { at: 2_000_000, mono: { boot: 'b', ms: 1 } };
+  const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
+  const folded: FeedLine = { at: '2026-10-05T11:50:00.000Z', run: 'r-2', step: 'build', word: 'running' };
+  const before: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
+  const after: FeedLine = { at: '2026-10-05T12:01:00.000Z', run: 'r-3', step: 'build', word: 'running' };
+  const read = readDelivered({ cursor: 10, digest: [folded], since }, [before, ...GATE, after], DEFAULT_WAKE, 99, now);
+  assert.equal(read.message, messageOf(GATE, [folded, before, after]));
+  assert.equal(read.wakes, 2);
+  assert.deepEqual(read.next, { cursor: 99, digest: [] });
+});
+
+test('a read with no wake is told nothing: its routine lines folded, the digest begun now where it was empty, the cursor moved', () => {
+  const now: Instant = { at: 2_000_000, mono: { boot: 'b', ms: 1 } };
+  const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
+  const r1: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'running' };
+  const r2: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'verified ✓' };
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [r1, r2], DEFAULT_WAKE, 50, now), {
+    wakes: 0,
+    next: { cursor: 50, digest: [r1, r2], since: now },
+  });
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [r2], DEFAULT_WAKE, 50, now), {
+    wakes: 0,
+    next: { cursor: 50, digest: [r1, r2], since },
+  });
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [], DEFAULT_WAKE, 50, now), {
+    wakes: 0,
+    next: { cursor: 50, digest: [r1], since },
+  });
+  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [], DEFAULT_WAKE, 50, now), { wakes: 0, next: { cursor: 50, digest: [] } });
 });
 
 test('a digest is due once its minutes have passed since its first line, and never while it is empty', () => {

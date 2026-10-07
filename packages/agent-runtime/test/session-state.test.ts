@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { decide, fold, nameFor, observe, type Action, type Sighting } from '../src/core/domain.ts';
 import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type SessionState } from '../src/core/session.ts';
 import { viewOfState } from '../src/core/engine/engine.ts';
-import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/bg.ts';
+import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/registry.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
 import { Engine } from '../src/index.ts';
 import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';

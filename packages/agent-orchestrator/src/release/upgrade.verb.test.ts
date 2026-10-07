@@ -93,13 +93,29 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
   return git(REPO, 'rev-parse', 'HEAD');
 }
 
-/** The fake machine's world: the lease, the unit's main process, and what a signal and a start change. */
-type World = { lease: DaemonStanding; unitPid: number | null; onSignal?: () => void; onStart?: () => void };
+/**
+ * The fake machine's world: the lease, the leases read after it in turn (`later`), the unit's main process, and what a signal and a start
+ * change.
+ */
+type World = {
+  lease: DaemonStanding;
+  later?: DaemonStanding[];
+  unitPid: number | null;
+  onSignal?: () => void;
+  onStart?: () => void;
+};
 
-/** A lease written by the api of `pid`, standing as `kind`, its pid confirmed. */
-const lease = (pid: number, kind: 'ticking' | 'stopped' = 'ticking'): DaemonStanding => ({
+/** A lease written by the api of `pid`, standing as `kind`, its pid confirmed, its first pass completed when `passed`. */
+const lease = (pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = false): DaemonStanding => ({
   kind,
-  file: { pid, by: 'api', startedAt: new Date().toISOString(), cwd: '/', every: 4000, passedAt: null },
+  file: {
+    pid,
+    by: 'api',
+    startedAt: new Date().toISOString(),
+    cwd: '/',
+    every: 4000,
+    passedAt: passed ? new Date().toISOString() : null,
+  },
   last: Date.now(),
   quiet: 0,
   identity: 'same',
@@ -123,7 +139,11 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
       return '';
     },
     linger: () => true,
-    lease: () => world.lease,
+    lease: () => {
+      const read = world.lease;
+      world.lease = world.later?.shift() ?? world.lease;
+      return read;
+    },
     signal: (pid) => {
       events.push(`signal ${pid}`);
       world.onSignal?.();
@@ -313,14 +333,38 @@ test('the service on releases/current is restarted: paused, landings waited, sig
   unitOn(path.join(ROOT, 'releases', 'current'));
   const world: World = { lease: lease(OLD), unitPid: OLD };
   world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-  world.onStart = () => ((world.lease = lease(NEW)), (world.unitPid = NEW));
+  world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
   const { host, events } = hostOf(world);
   const done = await run({ tag: 'v2', repo: REPO }, host);
-  assert.deepEqual(events, ['pause by nemia upgrade', 'landings 0', `signal ${OLD}`, 'systemctl --user start nemia.service', 'resume']);
+  assert.deepEqual(events, [
+    'pause by nemia upgrade',
+    'landings 0',
+    `signal ${OLD}`,
+    'systemctl --user start nemia.service',
+    `say pid ${NEW} ticks the store: waiting for its first pass`,
+    'resume',
+  ]);
   assert.equal(done.restart, 'service');
   assert.equal(done.pid, NEW);
   assert.equal(done.lines.at(-1), `restarted the daemon onto v2: the service ticks the store as pid ${NEW}`);
   assert.equal(currentRelease()?.tag, 'v2');
+});
+
+test('REFUSED: an upgrade whose new daemon ends before its first pass is a Conflict naming its log, and the store stays paused', async () => {
+  unitOn(path.join(ROOT, 'releases', 'current'));
+  const world: World = { lease: lease(OLD), unitPid: OLD };
+  world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+  world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'stopped')]), (world.unitPid = NEW));
+  const { host, events } = hostOf(world);
+  const err = await run({ tag: 'v1', repo: REPO }, host).then(
+    () => assert.fail('the upgrade answered'),
+    (e: Error) => e,
+  );
+  assert.equal(err.name, 'Conflict');
+  assert.match(err.message, new RegExp(`^nemia upgrade: the daemon started as pid ${NEW} ended before its first pass`));
+  assert.match(err.message, /journalctl --user -u nemia\.service/);
+  assert.match(err.message, /nemia resume/);
+  assert.ok(!events.includes('resume'), events.join('\n'));
 });
 
 test('a daemon started by hand is never signalled: it is named, left running, and the take-over line from the installed nemia said', async () => {

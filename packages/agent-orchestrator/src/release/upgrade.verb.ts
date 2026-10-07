@@ -125,7 +125,7 @@ const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHos
   if (plan.kind === 'none')
     return { restart: plan.kind, pid: null, lines: [`no daemon ticks the store: the next one started runs ${tag}`] };
   if (plan.kind === 'service' && service !== null) {
-    const taken = yield* takeOver(plan.pid, host, service.start, BY);
+    const taken = yield* takeOver(plan.pid, host, service, BY);
     return {
       restart: plan.kind,
       pid: taken.pid,

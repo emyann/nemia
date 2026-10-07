@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationFrames, END_GRACE_MS, follow, type Following, type StreamLike } from '../src/lib/following.ts';
+import { animationFrames, END_GRACE_MS, follow, unread, type Following, type StreamLike } from '../src/lib/following.ts';
 import type { TranscriptEvent } from '../src/lib/api.ts';
 
 /** An EventSource as far as `follow` uses it: its state, its events, and `close`. */
@@ -44,7 +44,7 @@ const endsResponse = (stream: Stream): void => {
 
 /** A live conversation followed on a fresh stream, and what the page holds of it after each event. */
 function followed() {
-  let state: Following = { events: [], live: true, loading: false, error: null };
+  let state: Following = { ...unread(false), live: true };
   const stream = new Stream();
   const stop = follow(
     stream,
@@ -130,7 +130,7 @@ test("REFUSED: the page's frames are the browser's own functions, called as the 
   };
   t.after(() => Object.assign(window, { requestAnimationFrame: request, cancelAnimationFrame: cancel }));
 
-  let state: Following = { events: [], live: true, loading: false, error: null };
+  let state: Following = { ...unread(false), live: true };
   const stream = new Stream();
   follow(
     stream,
@@ -186,4 +186,105 @@ test('REFUSED: a stream that said it is over is not closed while the rest of its
   left.stream.close = () => void again++;
   t.mock.timers.tick(END_GRACE_MS);
   assert.equal(again, 0, 'stopped by the page: its grace cleared');
+});
+
+/** A conversation followed on a fresh stream whose frames the test flushes (`flush`), as the browser's come: what the page holds now. */
+function batched() {
+  let state: Following = { ...unread(false), live: true };
+  const stream = new Stream();
+  let pending: (() => void) | undefined;
+  follow(
+    stream,
+    (change) => {
+      state = change(state);
+    },
+    {
+      request: (flush) => {
+        pending = flush;
+        return 1;
+      },
+      cancel: () => (pending = undefined),
+    },
+  );
+  const flush = () => {
+    const now = pending;
+    pending = undefined;
+    now?.();
+  };
+  return { stream, now: () => state, flush };
+}
+
+const piece = (key: string, delta: string, last = false) => ({ key, delta, last });
+
+test('a message being written is drawn as its pieces come, by its block, a frame at a time, and a block begun anew replaces it', () => {
+  const { stream, now, flush } = batched();
+  stream.send('following', { streamed: true });
+  assert.equal(now().streamed, true, 'the api says it pushes the session as it is written');
+  stream.send('partial', piece('m1:0', 'Hel'));
+  stream.send('partial', piece('m1:0', 'lo'));
+  assert.equal(now().partial, null, 'nothing drawn before the frame');
+  flush();
+  assert.deepEqual(now().partial, { key: 'm1:0', text: 'Hello' }, 'the pieces of one block added in order');
+  stream.send('partial', piece('m1:1', 'Next'));
+  flush();
+  assert.deepEqual(now().partial, { key: 'm1:1', text: 'Next' }, "another block's piece begins a message of its own");
+});
+
+test('the message being written is dropped at its last piece, and a piece of its block that comes after is ignored', () => {
+  const { stream, now, flush } = batched();
+  stream.send('partial', piece('m1:0', 'Hello'));
+  stream.send('partial', piece('m1:0', '', true));
+  flush();
+  assert.equal(now().partial, null, 'its block is whole');
+  stream.send('partial', piece('m1:0', ' late'));
+  flush();
+  assert.equal(now().partial, null, 'a stale piece of a closed block draws nothing');
+});
+
+test('the whole message replaces the one being written, in the frame they came in, and closes its block; a block begun after it is kept', () => {
+  const { stream, now, flush } = batched();
+  stream.send('partial', piece('m1:0', 'Hello there'));
+  flush();
+  stream.send('transcript', said('m1', 1, 'Hello there'));
+  stream.send('partial', piece('m2:0', 'And'));
+  flush();
+  assert.deepEqual(
+    now().events.map((e) => e.text),
+    ['Hello there'],
+    'the whole message is drawn',
+  );
+  assert.deepEqual(now().partial, { key: 'm2:0', text: 'And' }, 'the next message, begun after the whole one in the same frame, is kept');
+  stream.send('transcript', said('m2', 2, 'And so on'));
+  stream.send('partial', piece('m2:0', ' late'));
+  flush();
+  assert.equal(now().partial, null, 'a piece of the block the whole message closed is ignored');
+});
+
+test("moved empties the conversation and drops the message being written; the next attempt's history comes after it", () => {
+  const { stream, now, flush } = batched();
+  stream.send('transcript', said('e1', 1, 'First turn.'));
+  stream.send('partial', piece('m1:0', 'Half'));
+  stream.send('moved', { taskId: 't-2' });
+  stream.send('transcript', said('e1', 1, 'First turn.'));
+  stream.send('transcript', said('e3', 3, 'Next turn.'));
+  flush();
+  assert.deepEqual(
+    now().events.map((e) => e.id),
+    ['e1', 'e3'],
+    "the conversation as the next attempt's history gives it",
+  );
+  assert.equal(now().partial, null);
+});
+
+test('REFUSED: an event whose data is not of its shape is ignored — a piece with no key, a transcript event of no known kind', () => {
+  const { stream, now, flush } = batched();
+  stream.send('partial', { delta: 'Hello', last: false });
+  stream.send('partial', { key: 'm1:0', delta: 7, last: false });
+  stream.send('transcript', { ...said('e1', 1, 'x'), kind: 'shout' });
+  stream.send('following', { streamed: 'yes' });
+  flush();
+  assert.deepEqual([now().partial, now().events.length, now().streamed], [null, 0, false]);
+  stream.dispatchEvent(new MessageEvent('partial', { data: 'not json' }));
+  flush();
+  assert.equal(now().partial, null);
 });

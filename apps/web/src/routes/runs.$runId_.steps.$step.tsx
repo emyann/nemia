@@ -108,7 +108,11 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
           <h1 className="font-semibold">{step.name}</h1>
           <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
           {following.live && (
-            <span data-following className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              data-following
+              data-streamed={following.streamed || undefined}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
               <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-green-500" />
               following live
             </span>
@@ -138,14 +142,15 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
 const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
 
 /**
- * The session's conversation, `turns` folded off what `following` read: or why there is none — the step not filed, no session of its
+ * The session's conversation, `turns` folded off what `following` read, and the message being written after them: or why there is none — the step not filed, no session of its
  * task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can read.
  */
 function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
   if (!step.taskId) return quiet('Not filed yet, so there is no session to show.');
   if (!sessionToRead(step)) return quiet('No session of it has started yet, so there is no conversation to show.');
   if (following.loading) return quiet('Reading the conversation…');
-  if (turns.length) return <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />;
+  if (turns.length || following.partial)
+    return <Conversation turns={turns} live={following.live} partial={following.partial?.text ?? null} className="min-h-0 flex-1" />;
   if (following.error) return null;
   return quiet(
     following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.',

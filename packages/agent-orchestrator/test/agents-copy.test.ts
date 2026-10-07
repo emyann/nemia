@@ -1,9 +1,9 @@
 /**
  * `nemia agents copy`: an agent file copied into a person's library with its schema and skills, then hired into a step and frozen on a
  * run under its new name; a part the library holds as it is reused, and written again by none; a part it holds otherwise, a key the run
- * refuses and a file not there each refused before a byte is written; skills the copy wrote removed when a later write fails; the record
- * of the copy said on `nemia agents`, and whether its source has changed or gone. And `nemia agents sources`: the agent files the store
- * knows of, each repository's then the library's then a folder named, and no other.
+ * refuses, a file not there and a link where the schema would be each refused before a byte is written; skills the copy wrote removed when
+ * a later write fails; the record of the copy said on `nemia agents`, and whether its source has changed or gone. And `nemia agents
+ * sources`: the agent files the store knows of, each repository's then the library's then a folder named, and no other.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -61,8 +61,8 @@ function snapshot(dir: string): Record<string, string> {
 /** Every file a copy writes in the store `home` set back a minute, so a write the same millisecond as the copy still moves its time. */
 function backdated(home: string): void {
   const past = new Date(Date.now() - 60_000);
-  for (const dir of Object.values(libraryOf(home)))
-    for (const file of fs.readdirSync(dir, { recursive: true }) as string[]) fs.utimesSync(path.join(dir, file), past, past);
+  for (const dir of Object.values(libraryOf(home)).filter((d) => fs.existsSync(d)))
+    for (const file of fs.readdirSync(dir, { recursive: true }) as string[]) fs.lutimesSync(path.join(dir, file), past, past);
 }
 
 /** The library's own folder in the store `home`: its agents, its skills and the records of copies. */
@@ -219,18 +219,43 @@ test('REFUSED: a --keep naming no part of the copy, and nothing written', async 
   assert.deepEqual(written(home), { agents: {}, skills: {}, records: {} });
 });
 
-test('a write that fails after the skills are copied removes the skills this copy wrote, and no other', async () => {
+test('a write that fails after the skills are copied removes the skills this copy wrote, and no other', async (t) => {
   const home = scratch('wf-agents-copy-home-');
   const team = teamCopy();
   const { agents, skills } = libraryOf(home);
   fs.mkdirSync(path.join(skills, 'review-a-change'), { recursive: true });
   fs.cpSync(path.join(team, 'skills', 'review-a-change'), path.join(skills, 'review-a-change'), { recursive: true });
   fs.mkdirSync(agents, { recursive: true });
-  fs.symlinkSync(path.join(home, 'nowhere.json'), path.join(agents, 'review.schema.json'));
-  await assert.rejects(copy({ file: path.join(team, 'agents', 'reviewer.md') }, home), /is a link/);
+  fs.chmodSync(agents, 0o555);
+  t.after(() => fs.chmodSync(agents, 0o755));
+  await assert.rejects(copy({ file: path.join(team, 'agents', 'reviewer.md') }, home), /EACCES/);
   assert.deepEqual(fs.readdirSync(skills), ['review-a-change']);
-  assert.ok(!fs.existsSync(path.join(agents, 'reviewer.md')));
+  assert.deepEqual(fs.readdirSync(agents), []);
   assert.ok(!fs.existsSync(path.join(home, 'agent-sources')));
+});
+
+test('REFUSED: a link where the schema would be in the library, dangling or not, beside the agent it holds or none, and nothing written through it', async () => {
+  const home = scratch('wf-agents-copy-home-');
+  const team = teamCopy();
+  const file = path.join(team, 'agents', 'reviewer.md');
+  const { agents } = libraryOf(home);
+  const outside = scratch('wf-agents-copy-outside-');
+  fs.mkdirSync(agents, { recursive: true });
+  fs.symlinkSync(path.join(outside, 'x.json'), path.join(agents, 'review.schema.json'));
+  const before = written(home);
+  const link = new RegExp(`^${path.join(agents, 'review.schema.json')} is a link, and an agent's result schema is its own`);
+  await assert.rejects(copy({ file }, home), refusedWith('Invalid', link));
+  assert.deepEqual(written(home), before, 'no skill copied before the refusal');
+
+  fs.rmSync(path.join(agents, 'review.schema.json'));
+  await copy({ file }, home);
+  fs.rmSync(path.join(agents, 'review.schema.json'));
+  fs.symlinkSync(path.join(outside, 'x.json'), path.join(agents, 'review.schema.json'));
+  backdated(home);
+  const held = written(home);
+  await assert.rejects(copy({ file }, home), refusedWith('Invalid', link));
+  assert.deepEqual(written(home), held, 'the library as it was');
+  assert.deepEqual(fs.readdirSync(outside), [], 'nothing written through the link, outside the library');
 });
 
 test('nemia agents says where a copied agent came from, and whether its source has changed since or is gone', async () => {

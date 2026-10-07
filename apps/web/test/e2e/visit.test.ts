@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../scratch.ts';
+import { PHASES, type PageTiming } from './timing.ts';
 
 type Ended = { code: number | null; stdout: string; stderr: string; shots: string[] };
 
@@ -26,6 +27,18 @@ async function e2eOn(how: string, ...flags: string[]): Promise<Ended> {
   child.stderr.on('data', (chunk: Buffer) => (stderr += chunk));
   const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
   return { code, stdout, stderr, shots: fs.readdirSync(out).sort() };
+}
+
+/** What a visit that passed says each page took, from its `e2e: timings` line. */
+const timingsOf = (ended: Ended): PageTiming[] => JSON.parse(/^e2e: timings (.*)$/m.exec(ended.stdout)?.[1] ?? 'null') as PageTiming[];
+
+/** Each timing has every phase, and its phases add up to no more than its whole: an identity, never a bound on a time. */
+function phasesWithin(timings: readonly PageTiming[], said: string): void {
+  for (const t of timings) {
+    assert.deepEqual(Object.keys(t.phases), [...PHASES], said);
+    const sum = PHASES.reduce((total, phase) => total + t.phases[phase], 0);
+    assert.ok(sum > 0 && sum <= t.ms, `${t.theme}: the phases add up to ${sum} ms, the whole is ${t.ms} ms\n${said}`);
+  }
 }
 
 const said = (ended: Ended) => `exit ${ended.code}\n--- stdout\n${ended.stdout}\n--- stderr\n${ended.stderr}`;
@@ -153,6 +166,14 @@ test(
     assert.match(ended.stdout, /the none page \(\/none\) in the dark theme ✓/, said(ended));
     assert.doesNotMatch(ended.stdout, /in the light theme/, said(ended));
     assert.deepEqual(ended.shots, [], `neither the runner's picture nor the page's own\n${said(ended)}`);
+    assert.match(ended.stdout, /the none page \(\/none\) in the dark theme ✓ \d+\.\d s \(load \d+\.\d s, idle /, 'its line says its time');
+    const timings = timingsOf(ended);
+    assert.deepEqual(
+      timings.map((t) => `${t.name} ${t.theme} ${t.worker}`),
+      ['none dark 0'],
+      said(ended),
+    );
+    phasesWithin(timings, said(ended));
   },
 );
 
@@ -168,5 +189,12 @@ test(
       said(ended),
     );
     assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png', 'none-own-dark.png', 'none-own-light.png'], said(ended));
+    const timings = timingsOf(ended);
+    assert.deepEqual(
+      timings.map((t) => t.theme),
+      ['light', 'dark'],
+      'a timing for each theme visited',
+    );
+    phasesWithin(timings, said(ended));
   },
 );

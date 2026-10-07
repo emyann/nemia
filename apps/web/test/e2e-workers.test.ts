@@ -1,11 +1,12 @@
 /**
  * How the e2e splits its pages between workers (e2e/workers.ts): every page handed out once, in the pages' order, to whichever worker
  * asks, and none once a worker failed; how many workers a machine takes, each bound proven by a machine where it alone binds; and the
- * refusal of two workers that share a store, an api port or an app, made to refuse. No browser, so `npm test` runs it.
+ * refusal of two workers that share a store, an api port or an app, made to refuse; and the failure a run fails on, the earliest page's.
+ * No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { apart, PER_WORKER_BYTES, queueOf, workersFor, type PageQueue, type Seat } from './e2e/workers.ts';
+import { apart, failedInOrder, PER_WORKER_BYTES, queueOf, workersFor, type PageQueue, type Seat } from './e2e/workers.ts';
 
 const SEVEN = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
@@ -102,4 +103,32 @@ test('REFUSED: two workers that point at one api', () => {
 
 test('REFUSED: two workers that point at one app', () => {
   assert.throws(() => apart([TWO[0], { ...TWO[1], base: 'http://127.0.0.1:42001' }]), refusal('app', 'http://127.0.0.1:42001'));
+});
+
+test("a run fails on the earliest page's failure, kept whole with its picture, whichever worker said it first, and one naming no page last", () => {
+  const order = ['a', 'b', 'c', 'd'];
+  const failed = (worker: number, failure: string | null) => ({ worker, failure });
+  const later =
+    'the c page (/c) in the dark theme: no console error and no failed request — 1 seen:\n  what it looked like: /out/c-dark-failed.png';
+  const left =
+    'worker 1: a page left a write in the store it did not take back, changed runs/r1.json, and the next page in its place would read it';
+  const gone =
+    "before the b page (/b) in the dark theme: the e2e's store /tmp/s/store is gone, removed from outside while the pages were visited";
+  const earliest =
+    'the a page (/runs) in the light theme: could not be checked: locator.click: Timeout 2000ms exceeded.\n  what it looked like: /out/a-light-failed.png';
+  const results = [failed(0, later), failed(1, left), failed(2, null), failed(3, gone), failed(4, earliest)];
+  const ordered = failedInOrder(results, order);
+  assert.deepEqual(
+    ordered.map((r) => r.worker),
+    [4, 3, 0, 1],
+    "the earliest page first, a store gone before a page in that page's place, the worker that names no page last, and no passing worker",
+  );
+  assert.equal(ordered[0].failure, earliest, 'the failure the run says last keeps its page, its theme and its picture');
+  assert.match(ordered[0].failure!, /^the a page \(\/runs\) in the light theme: /);
+  assert.match(ordered[0].failure!, /\n  what it looked like: \/out\/a-light-failed\.png$/);
+  assert.deepEqual(
+    results.map((r) => r.worker),
+    [0, 1, 2, 3, 4],
+    'the results given are left as they were',
+  );
 });

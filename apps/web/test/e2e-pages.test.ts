@@ -77,6 +77,16 @@ test('the runner refuses two workers sharing a store, an api or an app, and a wo
   );
 });
 
+test('a worker that exits other than 0 stops the queue: no worker starts another page', () => {
+  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
+  assert.match(runner, /const queue = queueOf\(/, 'the runner hands its pages out of one queue');
+  assert.match(
+    runner,
+    /child\.on\('exit', \(code, signal\) => \{\s*if \(code !== 0\) queue\.stop\(\);/,
+    'a worker that failed, or was killed, stops the queue the moment it exits',
+  );
+});
+
 test('no page imports run.ts or worker.ts, which would start the whole e2e as the pages load', () => {
   for (const file of pageFiles())
     assert.doesNotMatch(fs.readFileSync(path.join(PAGES_DIR, file), 'utf8'), /from '\.\.\/(?:run|worker)\.ts'/, file);

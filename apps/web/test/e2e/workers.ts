@@ -1,8 +1,8 @@
 /**
  * How a run of the e2e splits its pages between workers, each a process of its own with its own seeded store, api, `vite preview` and
  * browser (worker.ts): how many (`workersFor`), the pages they draw one at a time (`queueOf`), and the refusal of two workers that share
- * a store, an api or an app (`apart`), where a write one page makes would reach another worker's pages. Pure: `e2e-workers.test.ts`
- * holds it.
+ * a store, an api or an app (`apart`), where a write one page makes would reach another worker's pages, and which failure a run fails on
+ * (`failedInOrder`). Pure: `e2e-workers.test.ts` holds it.
  */
 import path from 'node:path';
 
@@ -78,4 +78,20 @@ export function apart(seats: readonly Seat[]): void {
       by.set(value, seat.worker);
     }
   }
+}
+
+/** The page a failure names, by its place in `order`: a failure that names none goes last. */
+function placeOf(failure: string, order: readonly string[]): number {
+  const name = /^(?:worker \d+: )?(?:before )?the (\S+) page \(/.exec(failure)?.[1];
+  const at = name === undefined ? -1 : order.indexOf(name);
+  return at < 0 ? order.length : at;
+}
+
+/**
+ * The results of the workers that failed, by the place in the pages' `order` of the page each failure names, each failure kept whole: the
+ * first is the one a run fails on and says last, whichever worker finished first, and a failure that names no page comes after every
+ * one that does.
+ */
+export function failedInOrder<R extends { failure: string | null }>(results: readonly R[], order: readonly string[]): R[] {
+  return results.filter((r) => r.failure).sort((a, b) => placeOf(a.failure!, order) - placeOf(b.failure!, order));
 }

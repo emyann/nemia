@@ -30,7 +30,7 @@ import path from 'node:path';
 import { loadPages, planOf } from './pages.ts';
 import { overBound, rankLines, type PageTiming } from './timing.ts';
 import { exitOn } from './visit.ts';
-import { apart, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
+import { apart, failedInOrder, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
 import type { WorkerResult } from './worker.ts';
 import { fromNodeModules, plain, WEB } from './world.ts';
 
@@ -128,13 +128,6 @@ function build(): void {
   }
 }
 
-/** The page a failure names, by its place in `order`: a failure that names none goes last. */
-const placeOf = (failure: string, order: readonly string[]): number => {
-  const name = /^(?:worker \d+: )?(?:before )?the (\S+) page \(/.exec(failure)?.[1];
-  const at = name === undefined ? -1 : order.indexOf(name);
-  return at < 0 ? order.length : at;
-};
-
 /** The line saying what each worker took: its pages, its whole time and its setup. */
 const workerLine = (r: WorkerResult): string =>
   `worker ${r.worker}: ${new Set(r.timings.map((t) => t.name)).size} pages in ${Math.round(r.ms / 1000)} s ` +
@@ -164,7 +157,7 @@ async function main(): Promise<void> {
   results = await Promise.all(seats.map((seat) => runWorker(seat.worker, seat.store, flags, dir, queue)));
   apart(results);
   const order = plan.visit.map((p) => p.name);
-  const failures = results.flatMap((r) => (r.failure ? [r] : [])).sort((a, b) => placeOf(a.failure!, order) - placeOf(b.failure!, order));
+  const failures = failedInOrder(results, order);
   for (const failed of failures.slice(1).reverse())
     console.error(`\ne2e: worker ${failed.worker} FAILED — ${failed.failure}${failed.tails}`);
   first = failures[0];

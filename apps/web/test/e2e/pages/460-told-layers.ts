@@ -165,7 +165,8 @@ export default {
   expect: async (page) => {
     const records: string[] = [];
     try {
-      records.push(written(), unfrozen());
+      records.push(written());
+      records.push(unfrozen());
       await goto(page, `/runs/${LAYERED.id}`);
       const write = sectionOf(page, 'write');
       const fold = write.locator('details[data-told]');

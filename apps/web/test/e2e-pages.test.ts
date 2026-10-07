@@ -40,12 +40,17 @@ test('the runner and its workers visit what loadPages reads, and no list of thei
   const runner = read('run.ts');
   const worker = read('worker.ts');
   assert.match(runner, /const pages = await loadPages\(\);\s*const plan = planOf\(process\.argv\.slice\(2\), pages\);/);
-  assert.match(runner, /const shares = shard\(plan\.visit, n\);/, 'the runner splits its plan between the workers');
-  assert.match(worker, /const plan = planOf\(rest, await loadPages\(\)\);/, 'a worker visits the pages its share names');
+  assert.match(runner, /const queue = queueOf\(plan\.visit\.map\(\(p\) => p\.name\)\);/, 'the runner hands out the pages of its plan');
+  assert.match(worker, /const plan = planOf\(rest, await loadPages\(\)\);/, 'a worker knows the pages by what loadPages reads');
   assert.match(
     worker,
-    /visitAll\(browser, seat\.base, plan\.visit, OUT, \{\s*store: root,\s*themes: plan\.themes,\s*pictured: plan\.pictured,/,
-    'a worker visits its plan, and hands the store its api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
+    /for await \(const page of pagesOf\(plan\.visit, seat\.worker\)\)/,
+    'a worker visits the pages of its plan it is handed',
+  );
+  assert.match(
+    worker,
+    /visitAll\(browser, seat\.base, \[page\], OUT, \{\s*store: root,\s*themes: plan\.themes,\s*pictured: plan\.pictured,/,
+    'a worker visits each page, and hands the store its api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
   );
   for (const [file, text] of [
     ['run.ts', runner],

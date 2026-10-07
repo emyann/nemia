@@ -5,13 +5,12 @@
  *
  *  0. Reads its plan from its command line (`planOf`, pages.ts), refusing a flag or a page it does not know before anything else.
  *  1. Builds the web app, once.
- *  2. Splits the pages it visits between workers (`shard`, workers.ts): as many as `--workers` asks, else as many as the machine has
- *     room for (`workersFor`) — half its cores, as many as its free memory holds, no more than the pages.
+ *  2. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): as many workers as `--workers` asks, else
+ *     as many as the machine has room for (`workersFor`) — half its cores, as many as its free memory holds, no more than the pages.
  *  3. Makes an empty store for each, refusing two that are one (`apart`), and starts each worker (worker.ts), which seeds its store,
- *     serves it with an api and `vite preview` of its own, and visits its share in its own Chromium, in the order of their file names,
- *     in the dark theme: no console error, no failed request, the page in the theme asked for, and the elements the page must have. With
- *     `--pages`, only the pages named; with `--photos`, in a light and then a dark theme. Each worker's lines are said as it says them,
- *     after `[w<i>]`.
+ *     serves it with an api and `vite preview` of its own, and visits the pages it is handed in its own Chromium, in the dark theme: no
+ *     console error, no failed request, the page in the theme asked for, and the elements the page must have. With `--pages`, only the
+ *     pages named; with `--photos`, each in a light and then a dark theme. Each worker's lines are said as it says them, after `[w<i>]`.
  *  4. Takes no picture but a failing page's. With `--photos`, screenshots each page visited in each theme, with the pictures the page
  *     takes of itself, into $WF_ARTIFACTS when a run gives one — the step's files directory — and into `.e2e/` at the repository root
  *     otherwise.
@@ -31,7 +30,7 @@ import path from 'node:path';
 import { loadPages, planOf } from './pages.ts';
 import { overBound, rankLines, type PageTiming } from './timing.ts';
 import { exitOn } from './visit.ts';
-import { apart, shard, workersFor, type Seat } from './workers.ts';
+import { apart, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
 import type { WorkerResult } from './worker.ts';
 import { fromNodeModules, plain, WEB } from './world.ts';
 
@@ -81,18 +80,29 @@ function relay(from: NodeJS.ReadableStream, to: NodeJS.WritableStream, prefix: s
   });
 }
 
-/** Worker `i` started on `store` with `args`; resolves with what it wrote to its result, or a failure saying how it ended without one. */
-async function runWorker(i: number, store: string, args: readonly string[], dir: string): Promise<WorkerResult> {
+/**
+ * Worker `i` started on `store` with `args`, handed its pages from `queue` one at a time as it asks; resolves with what it wrote to its
+ * result, or a failure saying how it ended without one. A worker that fails stops the queue: no worker starts another page.
+ */
+async function runWorker(i: number, store: string, args: readonly string[], dir: string, queue: PageQueue<string>): Promise<WorkerResult> {
   const result = path.join(dir, `worker-${i}.json`);
   const worker = path.join(import.meta.dirname, 'worker.ts');
   const child = spawn(process.execPath, [worker, '--worker', String(i), '--store', store, '--result', result, ...args], {
     cwd: WEB,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
   children.push(child);
+  child.on('message', () => {
+    if (child.connected) child.send({ page: queue.next() });
+  });
   const kept: string[] = [];
-  const ended = new Promise<string>((resolve) => child.on('exit', (code, signal) => resolve(signal ?? `code ${code}`)));
-  await Promise.all([relay(child.stdout, process.stdout, `[w${i}] `, kept), relay(child.stderr, process.stderr, `[w${i}] `, kept)]);
+  const ended = new Promise<string>((resolve) =>
+    child.on('exit', (code, signal) => {
+      if (code !== 0) queue.stop();
+      resolve(signal ?? `code ${code}`);
+    }),
+  );
+  await Promise.all([relay(child.stdout!, process.stdout, `[w${i}] `, kept), relay(child.stderr!, process.stderr, `[w${i}] `, kept)]);
   const how = await ended;
   if (fs.existsSync(result)) return JSON.parse(fs.readFileSync(result, 'utf8')) as WorkerResult;
   return {
@@ -140,22 +150,18 @@ async function main(): Promise<void> {
   const plan = planOf(process.argv.slice(2), pages);
   build();
   const n = workersFor({ cores: os.availableParallelism(), freeBytes: os.freemem(), pages: plan.visit.length, asked: plan.workers });
-  const shares = shard(plan.visit, n);
+  const queue = queueOf(plan.visit.map((p) => p.name));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-run-'));
   stores.push(dir);
-  const seats: Seat[] = shares.map((_, worker) => {
+  const seats: Seat[] = Array.from({ length: n }, (_, worker) => {
     const store = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-'));
     stores.push(store);
     return { worker, store };
   });
   apart(seats);
-  console.log(
-    `e2e: ${plan.visit.length} pages over ${shares.length} worker${shares.length > 1 ? 's' : ''} (${Math.round(os.freemem() / 2 ** 20)} MB free)`,
-  );
+  console.log(`e2e: ${plan.visit.length} pages over ${n} worker${n > 1 ? 's' : ''} (${Math.round(os.freemem() / 2 ** 20)} MB free)`);
   const flags = plan.themes.length > 1 ? ['--photos'] : [];
-  results = await Promise.all(
-    shares.map((share, i) => runWorker(i, seats[i].store, ['--pages', share.map((p) => p.name).join(','), ...flags], dir)),
-  );
+  results = await Promise.all(seats.map((seat) => runWorker(seat.worker, seat.store, flags, dir, queue)));
   apart(results);
   const order = plan.visit.map((p) => p.name);
   const failures = results.flatMap((r) => (r.failure ? [r] : [])).sort((a, b) => placeOf(a.failure!, order) - placeOf(b.failure!, order));

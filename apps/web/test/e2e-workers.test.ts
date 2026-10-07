@@ -1,40 +1,45 @@
 /**
- * How the e2e splits its pages between workers (e2e/workers.ts): every page visited once, each worker's in the pages' order, never an
- * empty worker; how many workers a machine takes, each bound proven by a machine where it alone binds; and the refusal of two workers
- * that share a store, an api port or an app, made to refuse. No browser, so `npm test` runs it.
+ * How the e2e splits its pages between workers (e2e/workers.ts): every page handed out once, in the pages' order, to whichever worker
+ * asks, and none once a worker failed; how many workers a machine takes, each bound proven by a machine where it alone binds; and the
+ * refusal of two workers that share a store, an api port or an app, made to refuse. No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { apart, PER_WORKER_BYTES, shard, workersFor, type Seat } from './e2e/workers.ts';
+import { apart, PER_WORKER_BYTES, queueOf, workersFor, type PageQueue, type Seat } from './e2e/workers.ts';
 
 const SEVEN = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
-test('seven pages over three workers go round in turn, each worker keeping the order of the pages', () => {
-  assert.deepEqual(shard(SEVEN, 3), [
-    ['a', 'd', 'g'],
-    ['b', 'e'],
-    ['c', 'f'],
+/** What the workers `asks` names draw from `queue`, each ask in its turn: the worker, and the page it was handed or null. */
+function drawn<P>(queue: PageQueue<P>, asks: readonly number[]): Array<[number, P | null]> {
+  return asks.map((worker) => [worker, queue.next()]);
+}
+
+test('the pages are handed out once each, in their order, to whichever worker asks next, and then none', () => {
+  assert.deepEqual(drawn(queueOf(SEVEN), [0, 1, 2, 2, 2, 0, 1, 2, 0, 1]), [
+    [0, 'a'],
+    [1, 'b'],
+    [2, 'c'],
+    [2, 'd'],
+    [2, 'e'],
+    [0, 'f'],
+    [1, 'g'],
+    [2, null],
+    [0, null],
+    [1, null],
   ]);
 });
 
-test('every page is visited once, by one worker, whatever the number of workers', () => {
-  for (const n of [1, 2, 3, 6, 7]) {
-    const shards = shard(SEVEN, n);
-    assert.equal(shards.length, n);
-    assert.deepEqual(shards.flat().sort(), [...SEVEN], `${n} workers`);
-  }
+test("the pages are handed in the order given, which is the pages' order, not their names'", () => {
+  const queue = queueOf(['z', 'y', 'x']);
+  assert.deepEqual([queue.next(), queue.next(), queue.next()], ['z', 'y', 'x']);
 });
 
-test("a worker's pages keep the order they are given, which is the pages' order, not their names'", () => {
-  assert.deepEqual(shard(['z', 'y', 'x', 'w'], 2), [
-    ['z', 'x'],
-    ['y', 'w'],
-  ]);
-});
-
-test('no worker is empty: more workers than pages are cut to the pages, and no page still makes one worker', () => {
-  assert.deepEqual(shard(['a', 'b'], 5), [['a'], ['b']]);
-  assert.deepEqual(shard([], 3), [[]]);
+test('REFUSED: a page asked for after a worker failed, while pages remain', () => {
+  const queue = queueOf(SEVEN);
+  assert.equal(queue.next(), 'a');
+  queue.stop();
+  assert.equal(queue.next(), null, 'no worker starts another page once one failed');
+  assert.equal(queue.next(), null);
 });
 
 /** A machine where no bound but the one a test names binds. */

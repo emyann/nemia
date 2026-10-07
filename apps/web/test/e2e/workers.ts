@@ -1,7 +1,8 @@
 /**
  * How a run of the e2e splits its pages between workers, each a process of its own with its own seeded store, api, `vite preview` and
- * browser (worker.ts): how many (`workersFor`), which pages each visits (`shard`), and the refusal of two workers that share a store, an
- * api or an app (`apart`), where a write one page makes would reach another worker's pages. Pure: `e2e-workers.test.ts` holds it.
+ * browser (worker.ts): how many (`workersFor`), the pages they draw one at a time (`queueOf`), and the refusal of two workers that share
+ * a store, an api or an app (`apart`), where a write one page makes would reach another worker's pages. Pure: `e2e-workers.test.ts`
+ * holds it.
  */
 import path from 'node:path';
 
@@ -11,13 +12,23 @@ import path from 'node:path';
  */
 export const PER_WORKER_BYTES = 2_560 * 1024 * 1024;
 
+/** The pages of a run, handed to its workers one at a time (`queueOf`). */
+export type PageQueue<P> = { next(): P | null; stop(): void };
+
 /**
- * The pages each of `n` workers visits: page i goes to worker i mod n, so neighbours, which are often alike in cost, are spread; each
- * worker's in the order given, which is the order of the pages. Never an empty worker: `n` is cut to the number of pages.
+ * The pages a run hands its workers, one at a time, in the order given, which is the order of the pages: each worker asks for its next as
+ * it finishes its last, so a worker that drew the slow pages keeps no other waiting at the end. `next` answers null once every page is
+ * handed out, and from `stop` on: after a worker fails, no worker starts another page.
  */
-export function shard<P>(pages: readonly P[], n: number): P[][] {
-  const workers = Math.max(1, Math.min(n, pages.length));
-  return Array.from({ length: workers }, (_, w) => pages.filter((_, i) => i % workers === w));
+export function queueOf<P>(pages: readonly P[]): PageQueue<P> {
+  let at = 0;
+  let stopped = false;
+  return {
+    next: () => (stopped || at >= pages.length ? null : pages[at++]),
+    stop: () => {
+      stopped = true;
+    },
+  };
 }
 
 /**

@@ -36,7 +36,7 @@ export type AgentCopied = { name: string; copied: string[]; reused: string[]; re
  * file it refuses among them, naming the line and its fix (`Invalid`); a skill found nowhere (`Missing`); a link where the agent or its
  * schema would be in the library (`Invalid`); a `--keep` naming no part of the copy (`Invalid`); and every part the library holds
  * otherwise, all named in one `Conflict` with its fix — `--as` for the agent, `--keep` for a skill or the schema. A write that fails
- * removes the skills and the schema this copy wrote.
+ * removes the skills, the schema and the agent this copy wrote.
  */
 export function copyAgent({ file, as, keep = [], home = HOME }: { file: string; as?: string; keep?: readonly string[]; home?: string }) {
   const source = readSource(file, as);
@@ -59,7 +59,8 @@ export function copyAgent({ file, as, keep = [], home = HOME }: { file: string; 
 
 /**
  * The parts of a copy judged by `copyAgent` written, in order — the skills, the agent with its schema through the library's writers, a
- * schema alone beside an agent the library holds, the record — and those written removed if one fails. A part the library holds is not.
+ * schema alone beside an agent the library holds, the record — and every file this copy wrote removed if one fails, the record's
+ * write included. A part the library holds is not written, nor removed.
  */
 function writeCopy(source: Source, skills: readonly SourceSkill[], parts: readonly Part[], home: string): AgentCopied {
   const { name } = source.draft;
@@ -74,18 +75,19 @@ function writeCopy(source: Source, skills: readonly SourceSkill[], parts: readon
     }
     const schema = source.schema && !held(source.schema.file) ? source.schema : null;
     if (!held(`agents/${name}.md`)) {
-      writeAgent(yoursOf('agents', home), source.draft, { version: null, ...(schema && { schema }), anywhere: true });
+      const wrote = writeAgent(yoursOf('agents', home), source.draft, { version: null, ...(schema && { schema }), anywhere: true });
+      made.push(...wrote.written.map((f) => path.join(wrote.dir, f)));
       copied.push(...(schema ? [schema.file] : []), `agents/${name}.md`);
     } else if (schema) {
       made.push(writeCopySchema(home, schema));
       copied.push(schema.file);
     }
+    const record = writeCopyRecord(home, name, source.file);
+    return { name, copied, reused: parts.map((p) => p.part).filter((p) => !copied.includes(p)), record };
   } catch (err) {
     removeWritten(made);
     throw err;
   }
-  const record = writeCopyRecord(home, name, source.file);
-  return { name, copied, reused: parts.map((p) => p.part).filter((p) => !copied.includes(p)), record };
 }
 
 /** The words of a copy: what it wrote, what it reused, and how the agent is given to a step. */

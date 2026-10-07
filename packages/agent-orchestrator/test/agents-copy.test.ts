@@ -1,9 +1,9 @@
 /**
  * `nemia agents copy`: an agent file copied into a person's library with its schema and skills, then hired into a step and frozen on a
  * run under its new name; a part the library holds as it is reused, and written again by none; a part it holds otherwise, a key the run
- * refuses, a file not there and a link where the schema would be each refused before a byte is written; skills the copy wrote removed when
- * a later write fails; the record of the copy said on `nemia agents`, and whether its source has changed or gone. And `nemia agents
- * sources`: the agent files the store knows of, each repository's then the library's then a folder named, and no other.
+ * refuses, a file not there and a link where the schema would be each refused before a byte is written; what the copy wrote removed when
+ * a later write fails, the record's included; the record of the copy said on `nemia agents`, and whether its source has changed or gone.
+ * And `nemia agents sources`: the agent files the store knows of, each repository's then the library's then a folder named, and no other.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -232,6 +232,18 @@ test('a write that fails after the skills are copied removes the skills this cop
   assert.deepEqual(fs.readdirSync(skills), ['review-a-change']);
   assert.deepEqual(fs.readdirSync(agents), []);
   assert.ok(!fs.existsSync(path.join(home, 'agent-sources')));
+});
+
+test("a record that cannot be written removes the skills, the schema and the agent this copy wrote, and the library's own stay", async () => {
+  const home = scratch('wf-agents-copy-home-');
+  const team = teamCopy();
+  const { agents, skills } = libraryOf(home);
+  fs.mkdirSync(path.join(skills, 'review-a-change'), { recursive: true });
+  fs.cpSync(path.join(team, 'skills', 'review-a-change'), path.join(skills, 'review-a-change'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'agent-sources'), 'not a folder\n');
+  await assert.rejects(copy({ file: path.join(team, 'agents', 'reviewer.md') }, home), /EEXIST|ENOTDIR/);
+  assert.deepEqual(fs.readdirSync(skills), ['review-a-change'], "the library's own skill stays, the one this copy wrote goes");
+  assert.deepEqual(fs.readdirSync(agents), [], 'neither the agent nor its schema stays');
 });
 
 test('REFUSED: a link where the schema would be in the library, dangling or not, beside the agent it holds or none, and nothing written through it', async () => {

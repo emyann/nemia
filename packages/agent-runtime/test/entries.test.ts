@@ -20,6 +20,7 @@ const PINNED: Record<string, string[]> = {
     'EngineRefused',
     'FEED_LOCK_WAIT_MS',
     'FileRefused',
+    'FollowRefused',
     'ForgetRefused',
     'GRACE_MS',
     'HARNESS_ARGS',

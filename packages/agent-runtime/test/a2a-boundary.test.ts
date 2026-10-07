@@ -62,6 +62,7 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/card.ts',
     'src/a2a/client.ts',
     'src/a2a/entry.ts',
+    'src/a2a/follow.ts',
     'src/a2a/handler.ts',
     'src/a2a/map.ts',
     'src/a2a/remote.ts',

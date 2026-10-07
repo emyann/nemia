@@ -12,6 +12,7 @@ export { sdkRunner } from './sdk.ts';
 export { Runner, RunnerError, composite, testOps } from './seam.ts';
 export type {
   ExpectedSession,
+  Followed,
   HarnessQuota,
   McpServer,
   Observation,

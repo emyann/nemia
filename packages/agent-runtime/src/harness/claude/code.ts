@@ -17,14 +17,14 @@
  * `claude -p`, detached by the engine's worker rather than by the harness, whose output is one JSON object at its exit.
  * Both run with background tasks off (`CLAUDE_JOB_ENV`); a background session's environment is its own.
  */
-import { Effect } from 'effect';
+import { Effect, Stream } from 'effect';
 import os from 'node:os';
 import path from 'node:path';
 import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
 import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
-import { causeWords } from '../error.ts';
+import { causeWords, RunnerError } from '../error.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec, type StartEvent } from '../detached/detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 import {
@@ -40,7 +40,7 @@ import {
 } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
-import { claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
+import { claudePartials, claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
 
 /**
@@ -171,6 +171,8 @@ export const claudeDetached: HarnessSpec = {
  * - `input.closesOn`: its result, the line after which a `-p` session reads nothing more; Claude Code prints its `type` far
  *   down the line, so it is parsed, never matched at the line's start.
  * - `resumeCostCarried`: `claude -p --resume` prints its parent's cost and API time on in its own.
+ * - `streams` and `partials`: `--include-partial-messages` prints each text block in pieces as it is written, read from the stdout
+ *   the worker keeps whole, so the job is followed live (`follow`, `claudePartials`).
  */
 export const claudeJob: HarnessSpec = {
   name: 'claude',
@@ -183,6 +185,7 @@ export const claudeJob: HarnessSpec = {
       '--output-format',
       'stream-json',
       '--verbose',
+      '--include-partial-messages',
       '--permission-prompts',
       'none',
       ...claudePrintFlags(r, io),
@@ -196,6 +199,8 @@ export const claudeJob: HarnessSpec = {
   readOutput: claudeStreamOutput,
   start: CLAUDE_INIT_START,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
+  streams: true,
+  partials: claudePartials,
   prepare: claudePrepare,
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
@@ -215,6 +220,14 @@ const NOTHING_ASKED: Read<Observation> = { value: { seen: new Map<string, Sighti
 const unreadWhyIn = (names: ReadonlySet<string>, ...reads: (Observation | undefined)[]): Map<string, string> =>
   new Map(reads.flatMap((o) => [...(o?.unreadWhy ?? [])].filter(([name]) => names.has(name))));
 
+/** Why a background session is not followed live: its stdout is Claude Code's own, never kept. */
+const BG_UNFOLLOWED = new RunnerError({
+  verb: 'follow',
+  message:
+    'claude: a background session does not stream yet: its transcript is read again instead (`transcript`). A job (`claude -p`) streams.',
+  refused: true,
+});
+
 /** Whether a session id is a job's: the name the engine gave it, where a background session's is Claude Code's own. */
 export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undefined;
 
@@ -232,6 +245,7 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  *   let go of.
  * - `transcript` reads a job by its name while it runs, and by Claude Code's id — an ended job's, or a background
  *   session's — the same transcript file either way, which the background reader finds by that id.
+ * - `follow` follows a job live (`claudePartials`); a background session is refused (`BG_UNFOLLOWED`).
  * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
  *   Code's inbox.
  * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
@@ -299,6 +313,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
 
     transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
+    follow: (sessionId) => (isClaudeJob(sessionId) ? job.follow!(sessionId) : Stream.fail(BG_UNFOLLOWED)),
 
     say: (session, text) => of(session.sessionId).say!(session, text),
 

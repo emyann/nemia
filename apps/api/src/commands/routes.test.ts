@@ -211,6 +211,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'agents custom DELETE',
       'agents write POST',
       'agents write PUT',
+      'agents copy POST',
       'agents remove DELETE',
       'agents try POST',
       'skills write POST',
@@ -246,6 +247,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   assert.equal(fs.existsSync(path.join(root, 'nemia', 'level.json')), false, "no Nemia's level written");
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'agents')), false, 'no agent written');
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'skills')), false, 'no skill written');
+  assert.equal(fs.existsSync(path.join(root, 'agent-sources')), false, 'no copy recorded');
   assert.deepEqual(
     fs.readdirSync(path.join(root, 'runs')).filter((f) => !f.startsWith('r-')),
     [],

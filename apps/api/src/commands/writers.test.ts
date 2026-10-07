@@ -1,9 +1,10 @@
 /**
- * The library's writers on the api, held to the one spec the command line parses too: each route of `agents write`, `agents remove`,
- * `agents try`, `skills write`, `workflows write` and `workflows remove`, sent as the board sends it, hands its entry's handler only the
- * keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is answered as it would be.
- * The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken is refused in the one
- * sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the command line.
+ * The library's writers on the api, held to the one spec the command line parses too: each route of `agents write`, `agents copy`,
+ * `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows remove`, sent as the board sends it, hands its entry's
+ * handler only the keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is
+ * answered as it would be. The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken
+ * is refused in the one sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the
+ * command line.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
@@ -90,6 +91,11 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   );
   await heldToSpec(t, 'agents try', 201, () => sent('POST', '/api/agents/yours/scribe/try', { brief: 'Write the notes.' }));
   await heldToSpec(t, 'agents remove', 200, () => sent('DELETE', '/api/agents/yours/scribe', { version: versionOf(put, 'agent') }));
+  const elsewhere = scratch('nemia-api-writers-copy-');
+  fs.writeFileSync(path.join(elsewhere, 'clerk.md'), '---\ndescription: Use this when notes need filing.\n---\nFile them.\n');
+  await heldToSpec(t, 'agents copy', 200, () =>
+    sent('POST', '/api/agents/yours/copy', { file: path.join(elsewhere, 'clerk.md'), as: 'filing-clerk', keep: [] }),
+  );
 
   const skill = {
     name: 'tidy-notes',

@@ -4,11 +4,10 @@
  */
 import { Schema } from 'effect';
 import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
-import { agentNameRefusal } from 'agent-orchestrator/workflow';
 import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
+import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
-import { AUTO_CONFIRM, AUTO_DROP } from './auto.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
@@ -493,35 +492,6 @@ const INBOX_FROM: RouteWords = {
   strict: true,
 };
 
-const CUSTOM_PUT_SHAPE = '`{ "words": "<what the agent is told after its instructions>" }`';
-
-/** The route of the custom instructions `at` names, as a refusal says it: `PUT /api/custom-instructions/<name>`. */
-const customRoute = ({ method, name }: Named): string => `${method} /api/custom-instructions/${name}`;
-
-/**
- * A write or a clear of an agent's custom instructions, as the guard's refusals word it: a name that would leave the folder is refused in
- * the package's words, and the words that are not a string in the api's.
- */
-const AGENTS_CUSTOM: RouteWords = {
-  shape: CUSTOM_PUT_SHAPE,
-  guard: (at) => ({
-    route: customRoute(at),
-    does: "writes an agent's custom instructions",
-    forAnother: 'write them',
-    why: 'they are told to the agent in every run started after, in every step that names it',
-    reach: "write them on the agent's page on the board",
-    instead: "Write them on the agent's page on the board",
-    shape: at.method === 'DELETE' ? '`{}`' : CUSTOM_PUT_SHAPE,
-  }),
-  issue: (at) => (_issue, body) =>
-    `${customRoute(at)}: \`words\` are what the agent is told after its instructions, a string: ${CUSTOM_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
-  named: (at) => {
-    const wrong = agentNameRefusal(at.name);
-    return wrong === undefined ? null : `${customRoute(at)}: ${wrong}`;
-  },
-  notJson: (at) => `${customRoute(at)} takes a JSON body: ${CUSTOM_PUT_SHAPE}.`,
-};
-
 const INSTRUCTION_PUT_SHAPE = '`{ "path": "<path in the factory\'s first folder>" }` or `{ "store": true }`';
 
 const INSTRUCT_PUT_SHAPE = '`{ "words": "<what the factory\'s runs are told>" }`';
@@ -653,6 +623,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'inbox from': INBOX_FROM,
   'inbox rm': INBOX_RM,
   'agents custom': AGENTS_CUSTOM,
+  'agents copy': AGENTS_COPY,
   'factory instruction': FACTORY_INSTRUCTION,
   'factory instruct': FACTORY_INSTRUCT,
   'factory hire': FACTORY_HIRE,

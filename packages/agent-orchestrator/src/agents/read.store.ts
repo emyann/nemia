@@ -1,13 +1,15 @@
 /**
  * The agents read from disk, and a person's custom instructions for them: every agent a workflow's steps may name (`agentsFor`), the
- * agents of one folder (`loadAgents`), an agent's version, and where the file of a person's custom instructions is in their store, with
- * its words or the refusal of them. A store file one level above the bottom of the tree beneath the controllers: of the store it imports
+ * agents of one folder (`loadAgents`), an agent's version, where the file of a person's custom instructions is in their store, with
+ * its words or the refusal of them, and the record of an agent copied into their library (`readCopyRecord`) with where its source's
+ * skills are found (`sourceSkills`). A store file one level above the bottom of the tree beneath the controllers: of the store it imports
  * only the skills read (`skills/read.store.ts`, `test/boundary.test.ts`), so the workflow folder read (`folder/folder.store.ts`) and the
  * one writer of custom instructions (`custom.store.ts`) both read through it.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Result, Schema } from 'effect';
 import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal, stepFiles } from '../folder/folder.ts';
@@ -25,6 +27,58 @@ import { folderForVersion, lookupRoots, readForVersion, sameRepository, skillsFo
 /** The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`. */
 export const customInstructionsFile = (home: string, name: string): string =>
   path.join(path.resolve(home), CUSTOM_INSTRUCTIONS_FOLDER, `${name}.md`);
+
+/** The file of the record of the agent `name` copied into the library of the store `home`: `<home>/agent-sources/<name>.json`. */
+export const copyRecordFile = (home: string, name: string): string => path.join(path.resolve(home), 'agent-sources', `${name}.json`);
+
+/** What `copyRecordFile` holds: the agent file it was copied from, the version that file was at then (`agentVersion`), and when. */
+const CopyRecordSchema = Schema.Struct({ source: Schema.String, version: Schema.String, at: Schema.String });
+
+/** The record of an agent copied into the library (`copyRecordFile`). */
+export type CopyRecord = typeof CopyRecordSchema.Type;
+
+/**
+ * The record of the agent `name` copied into the library of the store `home`, or null for one never copied. A file that is not JSON or not
+ * a record is said on stderr, naming it, and read as none: it stops no listing.
+ */
+export function readCopyRecord(home: string, name: string): CopyRecord | null {
+  const file = copyRecordFile(home, name);
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    raw = undefined;
+  }
+  const decoded = Schema.decodeUnknownResult(CopyRecordSchema)(raw);
+  if (Result.isSuccess(decoded)) return decoded.success;
+  process.stderr.write(`${file} does not read as the record of a copy, { source, version, at }: read as none. Copy the agent again.\n`);
+  return null;
+}
+
+/**
+ * Where the skills of the agent file `file` are found, as a start beside it finds them (`skillsFor`): its folder's own root, then the
+ * repository it is in — the one whose places for agents (`lookupRoots`) its `agents/` is in — then the store `home`'s.
+ */
+export function sourceSkills(file: string, home: string): SkillsFound {
+  const holder = path.dirname(path.dirname(path.resolve(file)));
+  const repo = path.dirname(holder);
+  const inRepo = repositoryRoots(repo).includes(holder);
+  return skillsFor(path.join(holder, '_'), { ...(inRepo && { repo }), home });
+}
+
+/** The places of the repository `repo` that hold agents and skills, as a start on it looks (`lookupRoots`): its own, then its harness's. */
+export const repositoryRoots = (repo: string): string[] =>
+  lookupRoots(path.join(path.resolve(repo), 'workflows', '_'), { repo: path.resolve(repo) });
+
+/** The version of the agent file `file` now (`agentVersion`), its skills found as `sourceSkills` finds them; null for a file not there. */
+export const sourceVersion = (file: string, home: string): string | null =>
+  agentVersion(path.dirname(path.resolve(file)), path.basename(file, '.md'), sourceSkills(file, home));
 
 /** Why `file`, the custom instructions of the agent `name`, is refused when it is there but no file nor link, and the fix: the clear. */
 export const notAFileRefusal = (file: string, name: string): string =>

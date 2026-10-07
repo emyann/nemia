@@ -159,15 +159,37 @@ export function storeDenies(root: string = ROOT): string[] {
   ];
 }
 
+/** The person's custom words for her in the store `home`, or undefined where there are none (`readCustomInstructions`). */
+export const nemiaCustom = (home: string = ROOT): string | undefined => readCustomInstructions(home, 'nemia');
+
+/**
+ * The instruction her session is filed with, as `composePrompt` writes it, written nowhere: her shipped instruction `body`, then the
+ * person's custom words for her from the store `home`, where there are any.
+ */
+export function promptText(body: string, home: string = ROOT): string {
+  const custom = nemiaCustom(home);
+  return `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
+}
+
 /**
  * Writes the instruction her session is filed with (`promptFile`): her shipped instruction, then the person's custom words for her from
- * the store `home`, where there are any. Answers the file.
+ * the store `home`, where there are any (`promptText`). Answers the file.
  */
 export function composePrompt(body: string, home: string = ROOT): string {
-  const custom = readCustomInstructions(home, 'nemia');
+  const text = promptText(body, home);
   fs.mkdirSync(nemiaDir(), { recursive: true });
-  fs.writeFileSync(promptFile(), `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`);
+  fs.writeFileSync(promptFile(), text);
   return promptFile();
+}
+
+/** The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written. */
+export function filedPrompt(): string | undefined {
+  try {
+    return fs.readFileSync(promptFile(), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
 }
 
 /** A fact's name: a file of her memory, a letter or a digit first, and no folder. */

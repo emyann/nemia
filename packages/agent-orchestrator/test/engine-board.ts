@@ -1,11 +1,13 @@
 /**
  * An engine board a test settles by hand, as the runtime's `Engine` service in a layer (`layer`), which a test hands the client's
- * `engineOf` to get the engine the controllers take: what each task was filed with, every filing, each task stopped, and each task's own
- * session (`native-<id>`). A settled task carries the closeout it is given; `forget` takes settled tasks off the board, counted on
- * `forgets` call by call, and refuses one not settled as the runtime does. A verb the board does not keep dies naming itself.
+ * `engineOf` to get the engine the controllers take: what each task was filed with, every filing, each task stopped, each task's own
+ * session (`native-<id>`), and each word said to a task (`said`), the next `n` says refused as the runtime refuses a session not
+ * running once a test calls `refuseSay(n)`. A settled task carries the closeout it is given; `forget` takes settled tasks off the
+ * board, counted on `forgets` call by call, and refuses one not settled as the runtime does. A verb the board does not keep dies naming
+ * itself.
  */
 import { Effect, Layer } from 'effect';
-import { Engine, ForgetRefused, type TaskView } from 'agent-runtime';
+import { Engine, ForgetRefused, SayRefused, type Said, type TaskView } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 
 /** A task as it was filed: its id and brief, the closeout schema it asks for, its brief's parts, and every other field of its spec. */
@@ -45,6 +47,8 @@ export const board = () => {
   const specs: Filed[] = [];
   const stopped: string[] = [];
   const forgets: { taskIds: string[]; yes: boolean }[] = [];
+  const said: { taskId: string; text: string }[] = [];
+  const sayRefusals = { left: 0 };
   const layer = Layer.succeed(Engine)(
     Engine.of({
       file: (spec) =>
@@ -68,7 +72,15 @@ export const board = () => {
       transcript: unkept('transcript'),
       output: () => Effect.succeed(undefined),
       path: unkept('path'),
-      say: unkept('say'),
+      say: (taskId, text) =>
+        Effect.gen(function* () {
+          if (sayRefusals.left > 0) {
+            sayRefusals.left -= 1;
+            return yield* Effect.fail(new SayRefused({ message: `${taskId}'s attempt is not running yet: ask again` }));
+          }
+          said.push({ taskId, text });
+          return { at: new Date().toISOString(), attempt: 1, text } satisfies Said;
+        }),
       quota: unkept('quota'),
       answer: unkept('answer'),
       close: unkept('close'),
@@ -92,5 +104,8 @@ export const board = () => {
   );
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
-  return { layer, tasks, filings, specs, stopped, forgets, settle };
+  const refuseSay = (times: number) => {
+    sayRefusals.left = times;
+  };
+  return { layer, tasks, filings, specs, stopped, forgets, said, refuseSay, settle };
 };

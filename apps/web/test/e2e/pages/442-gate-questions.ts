@@ -84,6 +84,7 @@ export default {
         throw new Refused("the inspector's Approve waits for every answer too — it was enabled with none");
       if ((await approveThere.getAttribute('title')) !== unanswered)
         throw new Refused(`the inspector's Approve says what is not answered — it says ${await approveThere.getAttribute('title')}`);
+      await approveThere.scrollIntoViewIfNeeded();
       await settled(page);
       await photograph(inspector, path.join(OUT, `gate-questions-inspector-${theme}.png`));
       await inspector.getByRole('button', { name: 'Close', exact: true }).click();

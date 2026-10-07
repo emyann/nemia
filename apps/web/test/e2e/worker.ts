@@ -235,7 +235,7 @@ const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
   /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */
   HKB_QUOTA_KEEP_MS: '0',
-  /** Asked again at once after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts back. */
+  /** Asked again at once after an answer the usage service gave nothing for: the page that draws one reads the good answer it puts back. */
   HKB_QUOTA_BACKOFF_MS: '0',
   /** Each read waits for its own ask, however slow: at a keep of 0 no other ask answers it. */
   HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),

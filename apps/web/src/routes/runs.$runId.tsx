@@ -20,7 +20,7 @@ import { LiftHold } from '../components/LiftHold';
 import { HoldRun } from '../components/HoldRun';
 import { PruneRun } from '../components/PruneRun';
 import { loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
-import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
+import { answersOf, askedIn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
@@ -266,12 +266,10 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  * what its own approval filed and the terms it acts on.
  */
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
-  const runId = run.id;
   const { spec, closeout, gate } = step;
   const atGate = gateOffered(step, runCancelled);
   const ends = endsTheRun(step);
   const acts = atGate && ends && step.taskId === null;
-  const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
   const handedOn = closeout && (
     <div className="min-w-0 space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
       <Markdown>{closeout.summary}</Markdown>
@@ -331,24 +329,38 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         </div>
       )}
 
-      {atGate ? (
-        <>
-          <StepPolicy layers={step.layers} />
-          {acts ? (
-            <div className="grid items-start gap-4 lg:grid-cols-2">
-              <ActsOn run={run} step={step} />
-              <Gate runId={runId} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} />
-            </div>
-          ) : (
-            <Gate runId={runId} step={step.name} approveLine={step.commands.approve} back={back} closeout={closeout} />
-          )}
-        </>
-      ) : (
-        handedOn
-      )}
+      {atGate ? <AtGate run={run} step={step} acts={acts} /> : handedOn}
 
       {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
     </section>
+  );
+}
+
+/**
+ * A step at its gate, under its section: its policy drawn open, then the gate. An ending's (`acts`) beside the work it would act on, sending
+ * back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`), sending back the step.
+ */
+function AtGate({ run, step, acts }: { run: RunDetail; step: Step; acts: boolean }) {
+  const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
+  return (
+    <>
+      <StepPolicy layers={step.layers} />
+      {acts ? (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <ActsOn run={run} step={step} />
+          <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} />
+        </div>
+      ) : (
+        <Gate
+          runId={run.id}
+          step={step.name}
+          approveLine={step.commands.approve}
+          back={back}
+          closeout={step.closeout}
+          questions={askedIn(step.closeout)}
+        />
+      )}
+    </>
   );
 }
 

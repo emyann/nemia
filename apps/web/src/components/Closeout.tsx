@@ -203,14 +203,15 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
 
 /**
  * Each field a closeout declared, drawn by its shape (`FieldView`), then its replies and what it declared and did not give: the Output
- * tab's, and the gate's (`HandedOn`), which folds the long ones (`foldsAtGate`) and says what each holds on its fold.
+ * tab's, and the gate's (`HandedOn`), which folds the long ones (`foldsAtGate`) and says what each holds on its fold. `answered` leaves
+ * out each question field: the gate draws its questions to answer beside it.
  */
-function DeclaredFields({ closeout, fold = false }: { closeout: StepCloseout; fold?: boolean }) {
+function DeclaredFields({ closeout, fold = false, answered = false }: { closeout: StepCloseout; fold?: boolean; answered?: boolean }) {
   const images = imagePaths(closeout.artifacts);
   const asked = new Map(closeout.questions.map((a) => [a.field, a.questions]));
   const field = (name: string, value: unknown, first = false) => {
     const questions = asked.get(name);
-    if (questions) return <Questions key={name} field={name} questions={questions} />;
+    if (questions) return answered ? null : <Questions key={name} field={name} questions={questions} />;
     const folded = fold && foldsAtGate(value, first);
     const view = (
       <FieldView
@@ -266,13 +267,14 @@ function Fold({ name, count, children }: { name: string; count: number; children
  * What a step handed on, for the person deciding at its gate: what it needs, if it signed off blocked; its summary; each field it
  * declared — for a plan its approach, then its files, steps and risks, a long one folded; and the files it named. The Output tab's
  * drawing, without its outcome line and Raw switch: at a gate the step has signed off, and the statement whole is a tab away.
+ * `answeredBeside` where the gate draws the questions it asks to answer: they are then left out here, so each is drawn once.
  */
-export function HandedOn({ closeout }: { closeout: StepCloseout }) {
+export function HandedOn({ closeout, answeredBeside = false }: { closeout: StepCloseout; answeredBeside?: boolean }) {
   return (
     <div data-handed-on className="min-w-0 space-y-3">
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       <Markdown>{closeout.summary}</Markdown>
-      <DeclaredFields closeout={closeout} fold />
+      <DeclaredFields closeout={closeout} fold answered={answeredBeside} />
       {closeout.artifacts.length > 0 && (
         <div aria-label="Artifacts" className="text-xs text-neutral-500">
           Artifacts:

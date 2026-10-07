@@ -357,24 +357,16 @@
     {
       "files": ["apps/web/src/components/Decide.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 703, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 27 }],
-        "sonarjs/cognitive-complexity": ["error", 30]
+        "max-lines": ["error", { "max": 561, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 92, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 26 }],
+        "sonarjs/cognitive-complexity": ["error", 26]
       }
     },
     {
       "files": ["apps/web/src/components/FactoryCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["apps/web/src/components/Gate.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 160, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
@@ -528,12 +520,6 @@
       "rules": {
         "max-lines-per-function": ["error", { "max": 128, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 23 }]
-      }
-    },
-    {
-      "files": ["apps/web/src/routes/runs.$runId.tsx"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }]
       }
     },
     {

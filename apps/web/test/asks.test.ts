@@ -238,6 +238,28 @@ test("a step that signed off blocked asking questions as data is offered them to
   ]);
 });
 
+test("a raise of a step that signed off blocked asking questions as data carries them, every field's in the schema's order, as an answer does", () => {
+  const asking = (title: string) => ({
+    title,
+    body: 'Why it matters.',
+    options: [{ label: 'a', meaning: 'This.' }],
+    recommended: null,
+    multiple: false,
+  });
+  const closeout = {
+    questions: [
+      { field: 'open', questions: [asking('Which cut?')] },
+      { field: 'later', questions: [asking('When?')] },
+    ],
+  } as Step['closeout'];
+  const blocked = { by: 'retry' as const, above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'] as RetryMode[], own: 'blocked' };
+  const palette = step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Two questions.', closeout });
+  const offers = offersOf(run([palette], ['palette']));
+  assert.equal(offers.length, 1);
+  assert.equal(offers[0].kind, 'raise');
+  assert.deepEqual(offers[0].kind === 'raise' && offers[0].questions, [asking('Which cut?'), asking('When?')]);
+});
+
 test("a session the harness blocked is offered Continue, whether or not the api names it as waiting on you — and once asked, the note of its try, in the Decide section too; Continue itself is the banner's", () => {
   const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
   const implement = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
@@ -316,18 +338,27 @@ test("a step the api carries a raise for is offered it — with its try, or its 
   assert.deepEqual(
     offersOf(run(steps, ['tokens', 'review', 'lint', 'palette', 'types'])),
     [
-      { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', needs: null, unfinished: false, ...byTry },
-      { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', needs: null, unfinished: false, ...byRound },
-      { step: 'lint', kind: 'raise', status: 'budget exhausted $3.02 of $3', needs: null, unfinished: false, ...ended },
+      { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', needs: null, unfinished: false, questions: [], ...byTry },
+      {
+        step: 'review',
+        kind: 'raise',
+        status: 'over budget — implement $2.10 of $2',
+        needs: null,
+        unfinished: false,
+        questions: [],
+        ...byRound,
+      },
+      { step: 'lint', kind: 'raise', status: 'budget exhausted $3.02 of $3', needs: null, unfinished: false, questions: [], ...ended },
       {
         step: 'palette',
         kind: 'raise',
         status: 'over budget $1.50 of $1',
         needs: 'Warm colours, or cool ones?',
         unfinished: false,
+        questions: [],
         ...blocked,
       },
-      { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', needs: null, unfinished: true, ...unfinished },
+      { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', needs: null, unfinished: true, questions: [], ...unfinished },
     ],
     "palette, signed off blocked past its budget, keeps its word `over budget` and the closeout's question; types, whose check did not finish past its budget, keeps a check's word and a session refused without the raise all the same",
   );

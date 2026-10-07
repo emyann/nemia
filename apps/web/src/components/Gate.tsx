@@ -1,8 +1,10 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approveStep,
   decisionQuery,
+  type Question,
+  type QuestionAnswer,
   type RetryMode,
   type RunDetail,
   type StepApproval,
@@ -15,6 +17,7 @@ import { cn } from '../lib/utils';
 import { Artifacts, HandedOn } from './Closeout';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { Markdown } from './Markdown';
+import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from './Facts';
 
 /**
@@ -38,6 +41,11 @@ import { when } from './Facts';
  * thing a person must read before either: left of the answer where the page is wide, above it where it is not. The inspector's gate has
  * none: its Output tab is where the closeout is.
  *
+ * `questions` are what the step's closeout asks as data, each of its question fields in turn: answered by choosing, in the answer column
+ * above Approve (`GateQuestions`), and then left out of what it handed on, so each question is drawn once. Approve waits until every one
+ * has a choice or words, and sends the answers with its words as their note (`approvalBody`); Send back to the gated step carries them
+ * too, all or none (`sendBackBody`). The api checks them against what the step asks now and writes them in the package's words.
+ *
  * An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>. The words
  * of either answer go as they were typed, as `--message` takes them: none with an approval where nothing was written, and a send-back with
  * none is the package's to refuse. Where the ending waits on more than one step, one of them is enough to hold its gate again.
@@ -50,6 +58,7 @@ export function Gate({
   acts = false,
   framed = true,
   closeout = null,
+  questions = [],
 }: {
   runId: string;
   step: string;
@@ -60,17 +69,15 @@ export function Gate({
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
   framed?: boolean;
   closeout?: StepCloseout | null;
+  questions?: readonly Question[];
 }) {
-  const [words, setWords] = useState('');
-  const [objection, setObjection] = useState('');
-  const [mode, setMode] = useState<RetryMode>('nudge');
+  const [draft, setDraft] = useState<Draft>({});
   const [to, setTo] = useState(back[0] ?? step);
-  const [confirming, setConfirming] = useState(false);
   const field = useId();
-  const approval = useApprove(runId, step, () => setWords(''));
-  const sendBack = useAsk(runId, step, () => setObjection(''));
+  const approval = useApprove(runId, step, () => setDraft({}));
+  const sendBack = useAsk(runId, step, () => setDraft({}));
   const busy = approval.isPending || sendBack.isPending;
-  const backName = back.length === 1 ? back[0] : 'the work';
+  const answering = { questions, draft, left: unanswered(questions, draft) };
 
   const taken = approval.isSuccess
     ? takenOf({ approved: approval.data.try }, step, acts)
@@ -88,14 +95,7 @@ export function Gate({
         framed && 'rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30',
       )}
     >
-      {framed && (
-        <p className="break-words">
-          <strong>{step}</strong> waits at its gate:{' '}
-          {acts
-            ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName} back` : ''}.`
-            : 'nothing after it is filed until you approve what it handed on, or send it back.'}
-        </p>
-      )}
+      {framed && <GateSentence step={step} back={back} acts={acts} />}
 
       <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
         {closeout && (
@@ -106,108 +106,306 @@ export function Gate({
             <h3 className="text-xs font-medium text-neutral-500">
               What <span className="font-semibold text-neutral-700 dark:text-neutral-300">{step}</span> handed on, which you approve
             </h3>
-            <HandedOn closeout={closeout} />
+            <HandedOn closeout={closeout} answeredBeside={questions.length > 0} />
           </section>
         )}
         <div className="min-w-0 space-y-4">
-          <form
-            aria-label={`Approve ${step}`}
-            className="space-y-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (acts && !confirming) return setConfirming(true);
-              approval.mutate(words.trim() ? { message: words } : {});
-            }}
-          >
-            <label htmlFor={`${field}-words`} className="sr-only">
-              {`Words to approve ${step} with, if any`}
-            </label>
-            <textarea
-              id={`${field}-words`}
-              value={words}
-              onChange={(event) => setWords(event.target.value)}
-              rows={2}
-              placeholder={
-                acts
-                  ? 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.'
-                  : 'Your words (optional): every step after the gate is handed them, under “Approved”.'
-              }
-              className={TEXTAREA}
-            />
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <button type="submit" disabled={busy} className={BUTTON}>
-                {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
-              </button>
-              {confirming && !approval.isPending && (
-                <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
-                  Not yet
-                </button>
-              )}
-              <p className="text-xs">
-                as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
-              </p>
-            </div>
-            {confirming && (
-              <p data-confirm className="text-xs font-medium text-amber-900 dark:text-amber-200">
-                {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
-              </p>
-            )}
-            {approval.isError && <Refusal error={approval.error} not="Not approved" />}
-          </form>
-
+          {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
+          <ApproveForm step={step} acts={acts} approveLine={approveLine} field={field} approval={approval} busy={busy} {...answering} />
           {back.length > 0 && (
-            <form
-              aria-label={`Send ${backName} back`}
-              className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
-              onSubmit={(event) => {
-                event.preventDefault();
-                sendBack.mutate({ mode, message: objection, step: to });
-              }}
-            >
-              <label htmlFor={`${field}-objection`} className="sr-only">
-                {`What to change, sent back to ${backName}`}
-              </label>
-              <textarea
-                id={`${field}-objection`}
-                value={objection}
-                onChange={(event) => setObjection(event.target.value)}
-                rows={2}
-                placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
-                className={TEXTAREA}
-              />
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, SECONDARY)}>
-                  {sendBack.isPending ? 'Sending back…' : 'Send back'}
-                </button>
-                <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                  <legend className="sr-only">How to send {backName} back</legend>
-                  {(['nudge', 'fresh'] as const).map((m) => (
-                    <label key={m} className="flex cursor-pointer items-center gap-1.5">
-                      <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-                      {MODES[m]} <code className="text-neutral-500">--{m}</code>
-                    </label>
-                  ))}
-                </fieldset>
-              </div>
-              {back.length > 1 && (
-                <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                  <legend className="sr-only">Which step to send back</legend>
-                  {back.map((name) => (
-                    <label key={name} className="flex cursor-pointer items-center gap-1.5">
-                      <input type="radio" name={`${field}-to`} value={name} checked={to === name} onChange={() => setTo(name)} />
-                      {name}
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-              {sendBack.isError && <Refusal error={sendBack.error} />}
-            </form>
+            <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
           )}
         </div>
       </div>
     </section>
   );
 }
+
+/** What a gate asks of a person, said above it where nothing else says it. */
+function GateSentence({ step, back, acts }: { step: string; back: readonly string[]; acts: boolean }) {
+  const backName = back.length === 1 ? back[0] : 'the work';
+  return (
+    <p className="break-words">
+      <strong>{step}</strong> waits at its gate:{' '}
+      {acts
+        ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName} back` : ''}.`
+        : 'nothing after it is filed until you approve what it handed on, or send it back.'}
+    </p>
+  );
+}
+
+/** The questions a gated step asks, to answer before approving it: the fields `QuestionsForm` draws, and the recommended answers. */
+function GateQuestions({
+  step,
+  questions,
+  draft,
+  onDraft,
+}: {
+  step: string;
+  questions: readonly Question[];
+  draft: Draft;
+  onDraft: (next: Draft) => void;
+}) {
+  return (
+    <section aria-label={`What ${step} asks`} data-gate-questions className="space-y-2">
+      <p data-said>
+        <strong>{step}</strong> asks {questions.length === 1 ? 'a question' : `${questions.length} questions`}: answer before you approve.
+      </p>
+      <QuestionFields questions={questions} draft={draft} onDraft={onDraft} />
+      <RecommendButton questions={questions} draft={draft} onDraft={onDraft} />
+    </section>
+  );
+}
+
+/** What a gate's form is given of the questions: those asked, what the person has said of them, and those not answered yet. */
+type Answering = { questions: readonly Question[]; draft: Draft; left: readonly string[] };
+
+const notAnswered = (left: readonly string[]) => (left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined);
+
+/**
+ * Approve, with a box for the words — the note beside the answers where the step asks questions, and held until each has one. At an
+ * ending's gate (`acts`), a second press runs it.
+ */
+function ApproveForm({
+  step,
+  acts,
+  approveLine,
+  field,
+  approval,
+  busy,
+  questions,
+  draft,
+  left,
+}: Answering & {
+  step: string;
+  acts: boolean;
+  approveLine: string;
+  field: string;
+  approval: ReturnType<typeof useApprove>;
+  busy: boolean;
+}) {
+  const [words, setWords] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const handed = acts ? 'the step is handed them as the terms it acts on' : 'every step after the gate is handed them';
+  return (
+    <form
+      aria-label={`Approve ${step}`}
+      className="space-y-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (acts && !confirming) return setConfirming(true);
+        approval.mutate(approvalBody(questions, draft, words));
+      }}
+    >
+      <label htmlFor={`${field}-words`} className="sr-only">
+        {questions.length ? `A note beside the answers to ${step}, if any` : `Words to approve ${step} with, if any`}
+      </label>
+      <textarea
+        id={`${field}-words`}
+        value={words}
+        onChange={(event) => setWords(event.target.value)}
+        rows={2}
+        placeholder={
+          questions.length
+            ? `A note beside the answers (optional): ${handed} with them, under “Approved”.`
+            : `Your words (optional): ${handed}, under “Approved”.`
+        }
+        className={TEXTAREA}
+      />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button type="submit" disabled={busy || left.length > 0} title={notAnswered(left)} className={BUTTON}>
+          {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
+        </button>
+        {confirming && !approval.isPending && (
+          <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
+            Not yet
+          </button>
+        )}
+        <p className="text-xs">
+          as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
+        </p>
+      </div>
+      {confirming && (
+        <p data-confirm className="text-xs font-medium text-amber-900 dark:text-amber-200">
+          {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
+        </p>
+      )}
+      {approval.isError && <Refusal error={approval.error} not="Not approved" />}
+    </form>
+  );
+}
+
+/**
+ * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to one of `back`. Sent back to the
+ * gated step itself where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
+ */
+function SendBackForm({
+  step,
+  back,
+  to,
+  onTo,
+  field,
+  sendBack,
+  busy,
+  questions,
+  draft,
+}: Answering & {
+  step: string;
+  back: readonly string[];
+  to: string;
+  onTo: (name: string) => void;
+  field: string;
+  sendBack: ReturnType<typeof useAsk>;
+  busy: boolean;
+}) {
+  const [objection, setObjection] = useState('');
+  const [mode, setMode] = useState<RetryMode>('nudge');
+  const backName = back.length === 1 ? back[0] : 'the work';
+  const body = sendBackBody({ step, to, mode, objection, questions, draft });
+  const waits = sendBackWaits({ step, to, questions, draft });
+  return (
+    <form
+      aria-label={`Send ${backName} back`}
+      className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
+      onSubmit={(event) => {
+        event.preventDefault();
+        sendBack.mutate(body);
+      }}
+    >
+      <label htmlFor={`${field}-objection`} className="sr-only">
+        {`What to change, sent back to ${backName}`}
+      </label>
+      <textarea
+        id={`${field}-objection`}
+        value={objection}
+        onChange={(event) => setObjection(event.target.value)}
+        rows={2}
+        placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
+        className={TEXTAREA}
+      />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button
+          type="submit"
+          disabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}
+          title={notAnswered(waits)}
+          className={cn(BUTTON, SECONDARY)}
+        >
+          {sendBack.isPending ? 'Sending back…' : 'Send back'}
+        </button>
+        <Choice
+          legend={`How to send ${backName} back`}
+          name={`${field}-mode`}
+          options={RETRY_MODES}
+          value={mode}
+          onChange={setMode}
+          label={modeLabel}
+        />
+      </div>
+      {back.length > 1 && (
+        <Choice legend="Which step to send back" name={`${field}-to`} options={back} value={to} onChange={onTo} label={asIs} />
+      )}
+      {sendBack.isError && <Refusal error={sendBack.error} />}
+    </form>
+  );
+}
+
+const RETRY_MODES = ['nudge', 'fresh'] as const;
+
+/** A send-back's mode as its radio says it: what it does, and the CLI's flag for it. */
+const modeLabel = (m: RetryMode): ReactNode => (
+  <>
+    {MODES[m]} <code className="text-neutral-500">--{m}</code>
+  </>
+);
+
+/** A step's name, as its radio says it. */
+const asIs = (name: string): ReactNode => name;
+
+/** A row of radios, each option drawn by `label`: a retry's mode with its flag, or the step a send-back names. */
+function Choice<T extends string>({
+  legend,
+  name,
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  legend: string;
+  name: string;
+  options: readonly T[];
+  value: T;
+  onChange: (next: T) => void;
+  label: (option: T) => ReactNode;
+}) {
+  return (
+    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+      <legend className="sr-only">{legend}</legend>
+      {options.map((o) => (
+        <label key={o} className="flex cursor-pointer items-center gap-1.5">
+          <input type="radio" name={name} value={o} checked={value === o} onChange={() => onChange(o)} />
+          {label(o)}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/**
+ * What an approval sends: the answers to the questions the step asks, where it asks any, in the order asked; and the words, where any were
+ * written — beside answers, their note.
+ */
+export const approvalBody = (
+  questions: readonly Question[],
+  draft: Draft,
+  words: string,
+): { message?: string; answers?: QuestionAnswer[] } => ({
+  ...(questions.length ? { answers: answersFrom(questions, draft) } : {}),
+  ...(words.trim() ? { message: words } : {}),
+});
+
+/**
+ * The questions a send-back waits on, since the answers go all or none: those left unanswered once some are answered, where it goes to the
+ * gated step itself — none while nothing is answered, or everything, and none where it goes to another step.
+ */
+export const sendBackWaits = ({
+  step,
+  to,
+  questions,
+  draft,
+}: {
+  step: string;
+  to: string;
+  questions: readonly Question[];
+  draft: Draft;
+}): string[] => {
+  const left = unanswered(questions, draft);
+  return to === step && left.length < questions.length ? left : [];
+};
+
+/**
+ * What a send-back sends: the step it names and how, with the objection as its message. Sent to the gated step itself where it asks
+ * questions and every one is answered, it carries the answers too, the objection then their note and left out when empty; to another
+ * step, or with any question unanswered, no answers at all.
+ */
+export const sendBackBody = ({
+  step,
+  to,
+  mode,
+  objection,
+  questions,
+  draft,
+}: {
+  step: string;
+  to: string;
+  mode: RetryMode;
+  objection: string;
+  questions: readonly Question[];
+  draft: Draft;
+}): { mode: RetryMode; step: string; message?: string; answers?: QuestionAnswer[] } => {
+  const answered = to === step && questions.length > 0 && unanswered(questions, draft).length === 0;
+  if (!answered) return { mode, message: objection, step: to };
+  return { mode, step: to, answers: answersFrom(questions, draft), ...(objection.trim() ? { message: objection } : {}) };
+};
 
 /** A gate once a person's word is taken (`takenOf`): the step it was about, and what the next tick does with it. */
 function GateTaken({ step, taken }: { step: string; taken: { named: string; said: string } }) {
@@ -382,7 +580,7 @@ export const SECONDARY =
 export function useApprove(runId: string, step: string, onApproved: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (how: { message?: string }) => approveStep(runId, step, how),
+    mutationFn: (how: { message?: string; answers?: readonly QuestionAnswer[] }) => approveStep(runId, step, how),
     onSuccess: () => {
       onApproved();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });

@@ -7,13 +7,19 @@ import { Schema } from 'effect';
 import { send } from './read.ts';
 
 /**
- * Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, and to which
- * attempt of its task.
+ * Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, to which attempt
+ * of its task, and the last event of the session's transcript before they were handed over (`after`, by its `kind` and `id`), null where
+ * the transcript held none.
  */
-export type Said = { at: string; attempt: number; text: string };
+export type Said = { at: string; attempt: number; text: string; after: { kind: string; id: string } | null };
 
 /** Decodes a `Said`. */
-const SaidSchema = Schema.Struct({ at: Schema.String, attempt: Schema.Number, text: Schema.String }) satisfies Schema.Schema<Said>;
+const SaidSchema = Schema.Struct({
+  at: Schema.String,
+  attempt: Schema.Number,
+  text: Schema.String,
+  after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
+}) satisfies Schema.Schema<Said>;
 
 /**
  * Mirrors `Answer` in agent-orchestrator's question/question.ts: a person's answer to one question a step asks, by its title — the labels

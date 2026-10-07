@@ -237,6 +237,8 @@ export const SAYING = {
   line: 'Drafting the outline, one section at a time.',
   /** What the `say` page tells it. */
   words: 'Widen the draft to the api section too, and keep the outline short.',
+  /** The last event of its conversation as seeded, its call, which the engine journals the words `after`. */
+  mark: { kind: 'tool_use', id: 'toolu_draft_read' },
 } as const;
 
 /** Where in the store the stand-in for draft's inbox listens: a Unix socket run.ts opens before the api starts. */
@@ -1789,7 +1791,7 @@ function draftConversation(ago: (minutes: number) => string): object[] {
     said('user', 'draft-user-1', 2.4, SAYING.prompt),
     said('assistant', 'draft-assistant-1', 2.3, [{ type: 'text', text: SAYING.line }]),
     said('assistant', 'draft-assistant-2', 2.2, [
-      { type: 'tool_use', id: 'toolu_draft_read', name: 'Read', input: { file_path: '/code/hkb-v2/README.md' } },
+      { type: 'tool_use', id: SAYING.mark.id, name: 'Read', input: { file_path: '/code/hkb-v2/README.md' } },
     ]),
   ];
 }

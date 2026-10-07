@@ -23,6 +23,7 @@
  */
 
 import type { HarnessArgs } from '../harness/args.ts';
+import type { TranscriptMark } from '../harness/seam.ts';
 import {
   transition,
   VERBS,
@@ -300,6 +301,8 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  * - `stop-requested`: the operator asked for it to stop.
  * - `said`: a person's words, handed to the session of the attempt in flight through its harness (`say`). Written once
  *   the harness took them, so it means they were handed over — not that the session read them, or did what they asked.
+ *   `after` is the last event the session's transcript held just before they were handed over, read on the session's own
+ *   record, so whatever the session wrote of them stands after it in that order; null when it held none or could not be read.
  *   `decide` never reads it: what was said to a session is a fact for whoever reviews the work, not a judgement on it.
  * - `input`: a person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the
  *   words its next turn is told, continuing the session that signed, and what that turn's configuration gives for itself
@@ -408,8 +411,11 @@ export type Event =
   | { kind: 'admitted'; at: string }
   | { kind: 'settled'; at: string; outcome: Outcome; note?: string; nativeId?: string };
 
-/** Words said to a running attempt's session, and when the engine wrote them down. See the `said` event. */
-export type Said = { at: string; attempt: number; text: string };
+/**
+ * Words said to a running attempt's session, when the engine wrote them down, and where its transcript stood as they were handed over
+ * (`after`): a fold gives every entry one, null where the journal holds none. See the `said` event.
+ */
+export type Said = { at: string; attempt: number; text: string; after?: TranscriptMark | null };
 
 /**
  * A person's answer to a task held open, and what the turn it starts gives its configuration for itself when they gave any
@@ -644,7 +650,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.stopRequested = true;
         break;
       case 'said':
-        s.said.push({ at: e.at, attempt: e.attempt, text: e.text });
+        s.said.push({ at: e.at, attempt: e.attempt, text: e.text, after: e.after ?? null });
         break;
       case 'input':
         s.inputs.push({ at: e.at, text: e.text, ...(e.config ? { config: e.config } : {}) });

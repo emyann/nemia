@@ -90,7 +90,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   gate: { awaiting: false, approval: { try: 2, at: '2026-09-30T05:10:00.000Z', message: 'Go.' } },
   accepted: { try: 2, at: '2026-09-30T05:11:00.000Z', message: 'Good enough.' },
   lastLine: null,
-  said: [{ at: '2026-09-30T05:05:00.000Z', attempt: 1, text: 'Widen it.' }],
+  said: [{ at: '2026-09-30T05:05:00.000Z', attempt: 1, text: 'Widen it.', after: null }],
   asked: { try: 3, mode: 'recheck', model: null, message: null, stopFirst: false },
   closeout: {
     outcome: 'done',

@@ -22,5 +22,6 @@ export type {
   Transcript,
   TranscriptCursor,
   TranscriptEvent,
+  TranscriptMark,
 } from './seam.ts';
 export { isTranscriptCursor, noTranscript } from './transcript.ts';

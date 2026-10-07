@@ -179,35 +179,44 @@ const timeOf = (turn: Turn): number => {
 /** What was said to a session (`Said`), with when the session's own transcript shows its words reaching it — null until it does. */
 export type Heard = Said & { arrived: string | null };
 
-/** How long before its entry the transcript may show words said: the engine hands the words over first, and journals them after. */
-const ARRIVAL_SLACK_MS = 5_000;
-
 /**
  * Whether a transcript event is the session's own record of `said` reaching it: a system line whose text is the words, as a working session
  * writes them when it reads them between calls — or ends with them, after Claude Code's line saying another session sent them ("Another
- * Claude session sent a message:"), as an idle one starts its next turn with them — written no earlier than the words were handed over.
+ * Claude session sent a message:"), as an idle one starts its next turn with them. Where it stands is `heardIn`'s to judge, never its time.
  */
 const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
   if (!(event.kind === 'system' || (event.kind === 'text' && event.role === 'system'))) return false;
-  if (!(Date.parse(event.at) >= Date.parse(said.at) - ARRIVAL_SLACK_MS)) return false;
   const text = (event.text ?? '').trim();
   const words = said.text.trim();
   return text === words || text.endsWith(`\n${words}`);
 };
 
 /**
- * What was said to a session, each with the first of the session's events that shows its words reaching it (`arrived`), and the events
- * without those. The session's line for words it was handed is the same words, so a person reads them once, as what they said (`withSaid`),
- * where they reached the session. Matched in the order said, each thing said to one event at most: words said twice are two arrivals. Words
- * the transcript does not show — queued behind a prompt nobody answers, or set aside — have none, and every other line stays the session's.
- * Nothing said leaves the events as they were.
+ * The first of `events` that may show `said`'s words reaching the session: the one after its mark (`after`, the transcript's last event
+ * before the words were handed over), the first when it has none, and none — the length of `events` — while the mark is not among them.
+ */
+const firstAfter = (events: readonly TranscriptEvent[], said: Said): number => {
+  if (said.after === null) return 0;
+  const { kind, id } = said.after;
+  const mark = events.findIndex((event) => event.kind === kind && event.id === id);
+  return mark === -1 ? events.length : mark + 1;
+};
+
+/**
+ * What was said to a session, each with the first of the session's events after its mark (`firstAfter`) that shows its words reaching it
+ * (`arrived`), and the events without those. The session's line for words it was handed is the same words, so a person reads them once, as
+ * what they said (`withSaid`), where they reached the session. Judged by the transcript's order alone, since `at` is the api's clock and an
+ * event's the session's: a line before the mark was there before the words, whenever it is stamped. Matched in the order said, each thing
+ * said to one event at most: words said twice are two arrivals. Words the transcript does not show — queued behind a prompt nobody answers,
+ * or set aside — have none, and every other line stays the session's. Nothing said leaves the events as they were.
  */
 export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]): { events: TranscriptEvent[]; said: Heard[] } {
   const taken = new Set<number>();
   const heard = [...said]
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
     .map((s): Heard => {
-      const i = events.findIndex((event, j) => !taken.has(j) && arrivalOf(event, s));
+      const from = firstAfter(events, s);
+      const i = events.findIndex((event, j) => j >= from && !taken.has(j) && arrivalOf(event, s));
       if (i === -1) return { ...s, arrived: null };
       taken.add(i);
       return { ...s, arrived: events[i].at };
@@ -219,7 +228,8 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
  * The turns, with what a person said to the session laid in among them (off the engine's journal of the step's task, through `heardIn`):
  * each a turn of its own, "you said", placed where its words reached the session when its transcript shows that, and otherwise when they
  * were said — before the first turn that came after, and after a fold that began before, since a fold is one line. Words after everything
- * the transcript has are last. Nothing said leaves the turns as they were.
+ * the transcript has are last. Nothing said leaves the turns as they were. Placed by time, since a turn holds no mark to stand after: an
+ * arrival by the session's own clock, as its turns are, and only words not seen yet by the api's.
  */
 export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>): Turn[] {
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);

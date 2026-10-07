@@ -256,14 +256,18 @@ test("words the harness could not be given come back in the engine's words, 502 
   assert.deepEqual(written(), before, 'nothing written');
 });
 
-test("words as the board sends them are the package's `sayRun`: 202 with the engine's entry — `at`, `attempt`, `text` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `nemia ls` words it; nothing else written", async () => {
+test("words as the board sends them are the package's `sayRun`: 202 with the engine's entry — `at`, `attempt`, `text`, `after` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `nemia ls` words it; nothing else written", async () => {
   const records = Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir)));
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
   const res = await sayTo('implement', { text: words });
   assert.equal(res.status, 202, await res.clone().text());
   const said = (await res.json()) as Said;
-  assert.deepEqual(Object.keys(said).sort(), ['at', 'attempt', 'text']);
-  assert.deepEqual([said.attempt, said.text], [1, words]);
+  assert.deepEqual(Object.keys(said).sort(), ['after', 'at', 'attempt', 'text']);
+  assert.deepEqual(
+    [said.attempt, said.text, said.after],
+    [1, words, null],
+    'no transcript is seeded for the session: no event to stand after',
+  );
   assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
 
   assert.deepEqual(

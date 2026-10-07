@@ -195,16 +195,23 @@ const implementCheck = (): string => {
 };
 
 /**
- * Run the shipped check in `repo` as a check runs, its argv `checkArgv`'s, with `npm` a stub that exits 0 first on the path, and the run's
- * variables set; its exit and what it printed.
+ * Run the shipped check in `repo` as a check runs, its argv `checkArgv`'s, with `npm` a stub that exits 0 and `claude` one that lists no
+ * session first on the path, and the run's variables set; its exit and what it printed.
  */
 function shipped(repo: string, env: Record<string, string>): { status: number | null; out: string } {
   const bin = scratch('wf-pictures-bin-');
   fs.writeFileSync(path.join(bin, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "[]"\n', { mode: 0o755 });
   const [cmd, ...args] = checkArgv(implementCheck());
   const r = spawnSync(cmd, args, {
     cwd: repo,
-    env: { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`, HOME: repo, TMPDIR: scratch('wf-pictures-tmp-'), ...env },
+    env: {
+      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+      HOME: repo,
+      TMPDIR: scratch('wf-pictures-tmp-'),
+      WF_RUN: 'r-1',
+      ...env,
+    },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 120_000,
@@ -216,6 +223,7 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a page 
   const scripts = {
     'workflows/build/mutants.ts': fs.readFileSync(path.join(BUILD, 'mutants.ts'), 'utf8'),
     'workflows/build/pictures.ts': fs.readFileSync(SCRIPT, 'utf8'),
+    'workflows/build/probe.ts': fs.readFileSync(path.join(BUILD, 'probe.ts'), 'utf8'),
   };
   const { repo, base } = workOn(PAGE, scripts);
   const files = scratch('wf-pictures-files-');

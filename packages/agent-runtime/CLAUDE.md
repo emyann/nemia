@@ -162,6 +162,11 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   `auto` writes both with no allow (2.1.288, a trusted checkout and not; `claudeAllows`). `dontAsk` reads a file, a picture
   included, under a read-only added folder with no `Read` allow, and refuses it without the folder; a folder that is not
   there is no error (2.1.289).
+- **An `Edit(//**/<file>)` deny in an `auto` job refuses the Write tool, a Bash `>` and a `cp` to that file in any folder, by the rule**
+  (2.1.291, 2026-10-06); a `node -e` write of it is judged by the classifier alone, which refused it once and let it through unruled
+  once. Ada's and Otto's fences deny a harness's trust and local settings so (`agent-orchestrator/test/agent-fences.test.ts`).
+- **`Bash(claude *--bg*)`, `Bash(claude *--background*)` and `Bash(claude *remote-control*)` refuse an `auto` job's own session, a
+  `cd … &&` before it included, by the rule** (2.1.291, 2026-10-06): a step starts a probe through `workflows/build/probe.ts` alone.
 - **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.
@@ -169,6 +174,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
   kept per path in `.claude.json` (`trustedFolder`, `src/harness/claude/trust.ts`), read, never written. A `--bg` permission prompt
   under `--remote-control` lists `blocked`, `waitingFor: "permission prompt"`, and is answered from the claude.ai link (2026-10-05).
+- **A `--bg` session without `--remote-control`, blocked at a permission prompt, lists `blocked`, `waitingFor: "permission prompt"`**
+  (2.1.291, 2026-10-06, an `ask` rule in `--settings`): a step reads its probe with `claude agents --json`, reaching no phone.
 - **A `--bg --remote-control` session's link is `https://claude.ai/code/<bridgeSessionId>`**, the id `session_…` in its registration
   `<pid>.json`, never in `claude agents --json` (`claudeBridge`, `harness/claude/bridge.ts`): written ≤ 4.3 s after the start (2.1.291,
   2026-10-06). A SIGTERM sent to its pid ends it: `done` in `claude agents`, its file removed, no respawn within 45 s, and a later

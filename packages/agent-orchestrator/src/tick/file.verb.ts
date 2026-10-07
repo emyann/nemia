@@ -140,7 +140,7 @@ type Tried = { tried: string[]; rechecked: string[] };
  */
 export const fileTries = Effect.fn('fileTries')(function* (f: Filing, retry: readonly Retry[]) {
   const out: Tried = { tried: [], rechecked: [] };
-  for (const r of retry) yield* fileTry(f, r, out).pipe(forStep(f.run.id, r.step));
+  for (const r of retry) yield* fileTry(f, r, out).pipe(forStep(f.run, stepNamed(f, r.step)));
   return out;
 });
 
@@ -331,7 +331,7 @@ const trySpec = (
   cwd: record.workspace ?? f.run.workspace,
   harness: step.harness,
   priority: MOMENTUM,
-  labels: stepLabels(f.run.id, step.name),
+  labels: stepLabels(f.run, step),
   ...localFields(step, () => ({
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
@@ -355,7 +355,7 @@ export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: r
   const looped: string[] = [];
   for (const r of round) {
     if (!f.mayFile()) break;
-    yield* fileRound(f, r, looped).pipe(forStep(f.run.id, r.target));
+    yield* fileRound(f, r, looped).pipe(forStep(f.run, stepNamed(f, r.target)));
   }
   return looped;
 });
@@ -447,7 +447,7 @@ function roundSpec(
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
     priority: MOMENTUM,
-    labels: stepLabels(run.id, target.name),
+    labels: stepLabels(run, target),
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
@@ -473,7 +473,7 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
   const checked: string[] = [];
   for (const name of names) {
     if (!f.mayFile()) break;
-    yield* fileCheck(f, name).pipe(forStep(f.run.id, name));
+    yield* fileCheck(f, name).pipe(forStep(f.run, stepNamed(f, name)));
     checked.push(name);
   }
   return checked;
@@ -552,7 +552,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
       words: landing.words,
       say: landing.say,
     };
-    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
+    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run, step));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
@@ -616,7 +616,7 @@ function readySpec(
     cwd: place.workspace,
     harness: step.harness,
     priority: stepMomentum(step),
-    labels: stepLabels(run.id, step.name),
+    labels: stepLabels(run, step),
     deadlineSeconds: step.deadlineSeconds,
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {

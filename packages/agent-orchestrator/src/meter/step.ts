@@ -36,15 +36,23 @@ export function boundedAttributes(attributes: Readonly<Record<string, string>>):
   return { ...attributes };
 }
 
-/** The attributes of `step`'s metric in `run`, for `outcome`: its factory, its workflow's folder, the step, its agent or `none`. */
+/** The four labels a step is known by, beside a run or an outcome: the factory, the workflow, the step and its agent. */
+export type StepKeys = { factory: string; workflow: string; step: string; agent: string };
+
+/**
+ * The labels of `step` in `run`, the one source of both its metrics' attributes and its sessions' labels: the run's factory or the
+ * default, its workflow's folder, the step, and its agent or `none`.
+ */
+export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: Workflow): StepKeys => ({
+  factory: run.factory ?? DEFAULT_FACTORY,
+  workflow: path.basename(run.workflowDir),
+  step: step.name,
+  agent: step.agent?.name ?? 'none',
+});
+
+/** The attributes of `step`'s metric in `run`, for `outcome`: its labels (`stepKeys`) and the outcome. */
 export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: Workflow, outcome: string): Record<string, string> =>
-  boundedAttributes({
-    factory: run.factory ?? DEFAULT_FACTORY,
-    workflow: path.basename(run.workflowDir),
-    step: step.name,
-    agent: step.agent?.name ?? 'none',
-    outcome,
-  });
+  boundedAttributes({ ...stepKeys(run, step), outcome });
 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where

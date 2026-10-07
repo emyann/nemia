@@ -8,6 +8,7 @@ import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { daemonLine } from '../daemon/daemon.ts';
+import { readPause } from '../pause/pause.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { holderOfLease, takeOverLine } from './service.ts';
@@ -31,14 +32,19 @@ export type Restarted = {
 
 /**
  * Where the service and the lease leave a restart: the service's daemon ticking (`restart` its pid), nothing ticking (`start`), or
- * refused (`Missing`: no service installed; `Conflict`: a daemon that is not the service's holds the store, or one is stalled).
+ * refused (`Missing`: no service installed, naming the take-over where a daemon ticks the store; `Conflict`: a daemon that is not the
+ * service's holds the store, or one is stalled).
  */
 function planOf(service: ServiceAt, host: ServiceHost): { kind: 'restart'; pid: number } | { kind: 'start' } {
+  const lease = host.lease();
   if (!service.installed)
     throw new Missing({
-      message: `${BY}: no service ${service.name} is installed (no ${service.file}): nemia service install writes and starts it.`,
+      message: `${BY}: no service ${service.name} is installed (no ${service.file}): ${
+        lease.kind === 'ticking'
+          ? `pid ${lease.file.pid} holds the store: ${takeOverLine(lease.file.pid, service.name)} writes the service and hands the store to it.`
+          : 'nemia service install writes and starts it.'
+      }`,
     });
-  const lease = host.lease();
   if (lease.kind === 'stalled')
     throw new Conflict({
       message: `${BY}: ${daemonLine(lease, Date.now())}. Stop it, then ${SHAPE} starts the service.`,
@@ -57,9 +63,10 @@ const PAUSE_STOOD = 'the pause that stood is left as it was: nemia resume lifts 
 
 /**
  * Restarts the service's daemon (`takeOver`), or starts the service where nothing ticks the store (`startedPassed`), and answers once the
- * new daemon has completed its first pass. Refused before anything is done: no system or a name the store forbids (`Invalid`), no
- * service installed (`Missing`), a daemon not the service's or stalled holding the store (`Conflict`); and after, as the take-over refuses
- * (`Conflict`): a daemon that does not stop, a service that does not tick the store, or a first pass that fails — naming the log.
+ * new daemon has completed its first pass, saying whether a person's pause stands (`readPause`). Refused before anything is done: no
+ * system or a name the store forbids (`Invalid`), no service installed (`Missing`), a daemon not the service's or stalled holding the
+ * store (`Conflict`); and after, as the take-over refuses (`Conflict`): a daemon that does not stop, a service that does not tick the
+ * store, or a first pass that fails — naming the log.
  */
 export const restartService = Effect.fn('restartService')(function* (args: Args, host: ServiceHost = liveHost()) {
   const { service, plan } = yield* tried(() => {
@@ -67,9 +74,13 @@ export const restartService = Effect.fn('restartService')(function* (args: Args,
     return { service, plan: planOf(service, host) };
   });
   if (plan.kind === 'start') {
-    const pid = yield* startedPassed(host, service, BY, null, 'the store is as it was');
-    const lines = [`started ${service.unit}, which ticks the store${pid ? ` as pid ${pid}` : ''} and has completed its first pass`];
-    return { name: service.name, did: 'started', pid, paused: false, lines } satisfies Restarted;
+    const paused = yield* tried(() => readPause() !== null);
+    const pid = yield* startedPassed(host, service, BY, null, paused ? PAUSE_STOOD : 'the store is as it was');
+    const lines = [
+      `started ${service.unit}, which ticks the store${pid ? ` as pid ${pid}` : ''} and has completed its first pass`,
+      ...(paused ? [PAUSE_STOOD] : []),
+    ];
+    return { name: service.name, did: 'started', pid, paused, lines } satisfies Restarted;
   }
   const taken = yield* takeOver(plan.pid, host, service, BY);
   const lines = [

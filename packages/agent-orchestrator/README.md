@@ -2998,8 +2998,8 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   pause stands, lets each landing check finish, sends SIGTERM to the pid it confirmed, starts the unit, and resumes the store once the new
   daemon has completed its first pass — never on a daemon that only ticks. A new daemon that stops before that pass, or a lease that does
   not come back, is refused (exit 2) naming the service's log and `nemia service status`, the store left paused. A daemon started by hand
-  is not the service's to start again: it is named with `nemia service install --take-over <pid>`; where nothing ticks, the service is
-  started and waited for the same way.
+  is not the service's to start again: it is named with `nemia service install --take-over <pid>`, whether a service is installed or
+  not; where nothing ticks, the service is started and waited for the same way, and a person's pause is left standing and said.
 - **`wf tick` by hand is refused the same way while a daemon ticks**, with no force: the daemon runs the same pass within its interval,
   and every case a hand tick helps in — the daemon stopped, gone or stalled — already passes. A hand tick never writes the file.
 - **Two starts on an empty store cannot both win**: the file is claimed with a link, which fails when it appeared in between, and the

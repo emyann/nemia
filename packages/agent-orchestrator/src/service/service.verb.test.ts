@@ -426,13 +426,23 @@ test('REFUSED: a restart beside a daemon started by hand names nemia service ins
   assert.equal(readPause(), null);
 });
 
-test('REFUSED: a restart with no service installed is Missing, naming nemia service install', async () => {
-  const { host, events } = hostOf({ lease: lease(OLD), unitPid: OLD, landings: [] });
+test('REFUSED: a restart with no service installed is Missing, naming nemia service install, or its --take-over line beside a daemon', async () => {
+  const none = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null, landings: [] });
   await assert.rejects(
-    restart({}, host),
+    restart({}, none.host),
     refusedWith('Missing', /no service nemia is installed/, /nemia service install writes and starts it/),
   );
-  assert.deepEqual(events, []);
+  const byHand = hostOf({ lease: lease(OLD), unitPid: null, landings: [] });
+  await assert.rejects(
+    restart({}, byHand.host),
+    refusedWith(
+      'Missing',
+      /no service nemia is installed/,
+      new RegExp(`pid ${OLD} holds the store: nemia service install --take-over ${OLD} `),
+    ),
+  );
+  assert.deepEqual([...none.events, ...byHand.events], []);
+  assert.equal(readPause(), null);
 });
 
 test('REFUSED: a restart while the holder is stalled is Conflict, naming it, and signals nothing', async () => {
@@ -455,6 +465,23 @@ test('a restart where nothing ticks starts the unit and waits for its first pass
   ]);
   assert.equal(done.did, 'started');
   assert.equal(done.pid, NEW);
+});
+
+test('a pause a person put stands through a restart where nothing ticks: the unit started, the pause kept, and the answer says so', async () => {
+  await installed();
+  putPause({ by: 'ann', why: 'reading the night' });
+  const world: World = { lease: lease(OLD, 'stopped'), unitPid: null, landings: [] };
+  world.onStart = () => passing(world, NEW);
+  const { host, events } = hostOf(world);
+  const done = await restart({}, host);
+  assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
+  assert.equal(readPause()?.by, 'ann');
+  assert.equal(done.did, 'started');
+  assert.equal(done.paused, true);
+  assert.ok(
+    done.lines.some((l) => l.includes('the pause that stood is left as it was')),
+    done.lines.join('\n'),
+  );
 });
 
 test('a pause a person put stands through a restart: neither put again nor lifted, and the answer says so', async () => {

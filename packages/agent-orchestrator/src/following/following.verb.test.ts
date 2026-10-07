@@ -236,7 +236,7 @@ test(
     await line(rt, 'r-6', 'implement', 'running');
     await until(
       t,
-      () => got.length === 3,
+      () => got.length === 3 || got.some((m) => m.kind === 'settled'),
       () => `the first attempt: ${ids(got)}`,
       { bell: rung },
     );

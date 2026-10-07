@@ -35,7 +35,7 @@ import {
   type Unread,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { PLACE_SKILLS, skillVersion } from '../folder/folder.store.ts';
+import { PLACE_SKILLS, skillVersion } from '../skills/read.store.ts';
 import type { RepositoryRun } from '../record/record.ts';
 import { countSpawn, within } from '../meter/tally.store.ts';
 

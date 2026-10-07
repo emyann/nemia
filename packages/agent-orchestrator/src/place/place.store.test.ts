@@ -19,7 +19,7 @@ import {
   type PlaceVerb,
 } from './place.ts';
 import { SHIPPED_PLACE, openPlace, placeDirOf, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
-import { skillVersion } from '../folder/folder.store.ts';
+import { skillVersion } from '../skills/read.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { metered } from '../meter/tally.store.ts';
 import { running } from '../../test/running.ts';

@@ -1,7 +1,8 @@
 /**
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
- * the custom words she was last filed or told with (`told.json`, the keeper's record), and what ships with her in the package's `nemia/` folder: her definition (`nemia.md`) and her skills.
+ * the custom words she was last filed or told with (`told.json`, the keeper's record), and what ships with her in the package's `nemia/`
+ * folder: her definition (`nemia.md`) and her skills.
  *
  * Beneath the controllers, beside `subscription.store.ts`: it imports no store of runs.
  */
@@ -140,7 +141,8 @@ export function ownBin(root: string = PACKAGE): string | undefined {
 /**
  * The deny rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, the
  * rules for auto among them whether or not their folder is there yet (`AUTO_FOLDER`), and on her level, her instruction and the record
- * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the store gains is denied at the next.
+ * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the
+ * store gains is denied at the next.
  */
 export function storeDenies(root: string = ROOT): string[] {
   let names: string[];

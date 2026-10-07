@@ -3,8 +3,9 @@
  * and what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open
  * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
  * person's custom words told to her open task (`say`) once they are not those she was last filed or told with (`customChanged`), which
- * are recorded, and her instruction written, only after she was told: a change to her shipped instruction alone tells her nothing. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
- * A task stopped from outside is never filed again.
+ * are recorded, and her instruction written, only after she was told: a change to her shipped instruction alone tells her nothing.
+ * Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from outside is
+ * never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
  */

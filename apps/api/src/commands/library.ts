@@ -51,8 +51,8 @@ export const AGENTS_COPY: RouteWords = {
     does: 'copies an agent into your library',
     forAnother: 'copy one',
     why: 'the agent, its schema and its skills are written into your library, and a step hired to it runs on them',
-    reach: 'copy it from the Agents page on the board',
-    instead: 'Copy it from the Agents page on the board, or with `nemia agents copy <file>`',
+    reach: 'copy it with `nemia agents copy <file>`',
+    instead: 'Copy it with `nemia agents copy <file>`',
     shape: COPY_SHAPE,
   }),
   issue:

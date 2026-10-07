@@ -176,6 +176,28 @@ test('list and stop read and stop only the live probes of this run', () => {
   );
 });
 
+test('stop with a label stops only the live probe it names, and none for a label no live probe has', () => {
+  const at = placed({ rows: [row('r-1-probe-a', 'working', 'aaaa0001'), row('r-1-probe-b', 'blocked', 'bbbb0002')] });
+  const named = probe(at, ['stop', 'b']);
+  assert.equal(named.code, 0, named.err);
+  assert.deepEqual(
+    named.calls.map((call) => call.argv),
+    [
+      ['agents', '--all', '--json'],
+      ['stop', 'bbbb0002'],
+    ],
+  );
+  assert.deepEqual(named.out.trim().split('\n'), ['wf probe: stopped r-1-probe-b']);
+  fs.rmSync(at.log);
+  const none = probe(at, ['stop', 'c']);
+  assert.equal(none.code, 0, none.err);
+  assert.deepEqual(
+    none.calls.map((call) => call.argv),
+    [['agents', '--all', '--json']],
+  );
+  assert.deepEqual(none.out.trim().split('\n'), ['wf probe: no live probe of run r-1 named c']);
+});
+
 test("REFUSED: the check, while a probe of the run is live, naming stop; it passes when it is stopped or done, and on another run's", () => {
   const live = placed({ rows: [row('r-1-probe-a', 'blocked'), row('r-2-probe-a', 'working')] });
   const refused = probe(live, ['check'], { WF_RUN: 'r-1' });

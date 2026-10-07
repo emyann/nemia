@@ -154,7 +154,7 @@ const LEVEL_LINES: Record<Level, string> = {
   manual: 'Manual: no session of hers is kept unless a factory is above Manual. Above it, the keeper files her one at its next beat.',
   'semi-auto':
     'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. At Manual, her session stops at its next beat, unless a factory is still above Manual.',
-  auto: 'Auto: as Semi-auto, but an answer the rules you confirmed allow in the run’s state is given without asking you. It holds in a session of hers filed since the board offered Auto: one kept from before asks you every answer until it is filed again — set Manual, and once her session reads Off, Auto.',
+  auto: 'Auto: as Semi-auto, but an answer the rules you confirmed allow in the run’s state is given without asking you. It holds in a session of hers filed since the board offered Auto: one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back.',
 };
 
 /**

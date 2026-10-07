@@ -6839,7 +6839,7 @@ test('at Auto: her level and a factory by default picked at Auto in one control 
   assert.doesNotMatch(html, /data-slot="switch"/, 'no switch beside it');
   assert.match(
     html,
-    /one kept from before asks you every answer until it is filed again — set Manual, and once her session reads Off, Auto\./,
+    /one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back\./,
   );
 });
 

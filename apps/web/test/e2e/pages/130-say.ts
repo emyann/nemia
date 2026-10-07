@@ -25,7 +25,7 @@ export default {
     const taskId = `${SAYING.run}-${SAYING.step}`;
     const journal = path.join(store!, 'engine', 'tasks', `${taskId}.jsonl`);
     const engineFeed = path.join(store!, 'engine', 'feed.jsonl');
-    let feedBefore: string | undefined;
+    const feedBefore = fs.readFileSync(engineFeed, 'utf8');
     const seeded = fs.readFileSync(journal, 'utf8');
     const conversation = path.join(store!, DRAFT_TRANSCRIPT);
     const seededConversation = fs.readFileSync(conversation, 'utf8');
@@ -145,7 +145,6 @@ export default {
           { kind: 'settled', at: end, outcome: 'succeeded' },
         ];
         fs.appendFileSync(journal, ended.map((event) => `${JSON.stringify(event)}\n`).join(''));
-        feedBefore = fs.readFileSync(engineFeed, 'utf8');
         fs.appendFileSync(engineFeed, ended.map((event) => `${JSON.stringify({ taskId, event })}\n`).join(''));
         const journalled = fs.readFileSync(journal, 'utf8');
         const heardBefore = heard.length;
@@ -190,7 +189,7 @@ export default {
       );
     } finally {
       fs.writeFileSync(journal, seeded);
-      if (feedBefore !== undefined) fs.writeFileSync(engineFeed, feedBefore);
+      fs.writeFileSync(engineFeed, feedBefore);
       fs.writeFileSync(conversation, seededConversation);
       fed(SAYING.run, SAYING.step, 'running');
     }

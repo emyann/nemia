@@ -30,9 +30,10 @@ import type { Workflow } from '../step/step.ts';
  * The seconds a step's check may run before the engine stops it, where the check does not land the run. A hung suite must not hold a run
  * for ever.
  *
- * A guard against a hang, not a budget, so it is set well above the slowest such check that finishes: the suite on the step's branch, the
- * web build at most, and no e2e, which only the landing check runs (`LANDING_CHECK_DEADLINE_SECONDS`). A constant rather than a step key:
- * every shipped check is the same command family and none needs another number.
+ * A guard against a hang, not a budget, so it is set well above the slowest such check that finishes: the suite on the step's branch, and
+ * the web app's e2e where the change touches it, which its own runner fails past eight minutes; the landing check runs the suite on the
+ * merged tree (`LANDING_CHECK_DEADLINE_SECONDS`). A constant rather than a step key: every shipped check is the same command family and
+ * none needs another number.
  */
 export const CHECK_DEADLINE_SECONDS = 1200;
 
@@ -48,7 +49,7 @@ export const CHECK_DEADLINE_SECONDS = 1200;
  *
  * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
  * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check,
- * which runs no e2e, keeps the shorter bound on a hang.
+ * whose e2e its runner holds to eight minutes, keeps the shorter bound on a hang.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 

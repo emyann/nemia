@@ -1,8 +1,8 @@
 /**
- * Where the e2e's things are, and what the runner (run.ts) sets up for the pages to read: the store the api serves, the environment it
- * runs in, whether the page being visited is pictured, and what draft's stand-in inbox has heard. Set only by the runner, through
- * `setStore`, `setApiEnv` and `setPhotographing`; a page reads them when it is visited, never as it is imported, when the runner has set
- * up nothing yet.
+ * Where the e2e's things are, and what a worker (worker.ts) sets up for the pages it visits to read: the store its api serves, the
+ * environment it runs in, whether the page being visited is pictured, and what draft's stand-in inbox has heard. Each worker is a process
+ * of its own, so each has its own. Set only by the worker, through `setStore`, `setApiEnv` and `setPhotographing`; a page reads them when
+ * it is visited, never as it is imported, when the worker has set up nothing yet.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -12,6 +12,19 @@ export const WEB = path.resolve(import.meta.dirname, '..', '..');
 export const REPO = path.resolve(WEB, '..', '..');
 export const API = path.join(REPO, 'apps', 'api');
 export const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
+
+/** `text` without the colour codes a terminal reads. */
+// oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
+export const plain = (text: string): string => text.replace(/\x1b\[[0-9;]*m/g, '');
+
+/** A package's file, from the nearest node_modules above the web app — where a worktree's link leads. */
+export function fromNodeModules(file: string): string {
+  for (let dir = WEB; ; dir = path.dirname(dir)) {
+    const candidate = path.join(dir, 'node_modules', file);
+    if (fs.existsSync(candidate)) return candidate;
+    if (dir === path.dirname(dir)) throw new Error(`no node_modules/${file} above ${WEB}. Run \`npm install\` in the repository.`);
+  }
+}
 
 /** The seeded store, a temporary WF_ROOT, while the e2e runs. */
 export let store: string | undefined;

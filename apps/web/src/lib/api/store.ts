@@ -5,9 +5,9 @@ import { get } from './read.ts';
 
 /**
  * Mirrors `YourStore` in apps/api/src/workflows/yours.ts: the folders your workflows, agents and skills are written to, each absolute,
- * and `fileFactory`, the line that files a factory in your store.
+ * `fileFactory`, the line that files a factory in your store, and `turnOnNemia`, the line that turns Nemia on, as the board's switch does.
  */
-export type YourStore = { workflows: string; agents: string; skills: string; fileFactory: string };
+export type YourStore = { workflows: string; agents: string; skills: string; fileFactory: string; turnOnNemia: string };
 
 /** Decodes a `YourStore`. */
 const YourStoreSchema = Schema.Struct({
@@ -15,6 +15,7 @@ const YourStoreSchema = Schema.Struct({
   agents: Schema.String,
   skills: Schema.String,
   fileFactory: Schema.String,
+  turnOnNemia: Schema.String,
 }) satisfies Schema.Schema<YourStore>;
 
 /** Your store, read once a page: it moves only when the api restarts on another root. */

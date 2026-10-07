@@ -9,14 +9,17 @@ import { dollars } from './stats.ts';
 
 /**
  * Her session's state, as the board says it: off, none kept; leaving, no factory left above Manual with a session still reached, which
- * the keeper stops; not filed yet; filed and starting, not yet reachable; up, reached; and stopped from outside, not filed again.
+ * the keeper stops; waiting on the person to trust her folder, not filed until they do; not filed yet; filed and starting, not yet
+ * reachable; up, reached; and stopped from outside, not filed again.
  */
-export type SessionKind = 'off' | 'leaving' | 'not-filed' | 'starting' | 'up' | 'stopped';
+export type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
 
 /** What each state is said as, a sentence each. */
 const SESSION_WORDS: Record<SessionKind, string> = {
   off: 'Off: no session of hers runs.',
   leaving: 'Stopping: the keeper ends her session at its next beat.',
+  untrusted:
+    'Waiting on your trust: run the trust line once in a terminal and accept its prompt; the keeper files her session at its next beat.',
   'not-filed': 'Not filed yet: the keeper files her session at its next beat.',
   starting: 'Filed: her session is starting.',
   up: 'Up: her session runs.',
@@ -31,11 +34,11 @@ export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string
 
 /** The state alone, in the order `sessionOf` judges it. */
 function kindOf(nemia: NemiaLevel): SessionKind {
-  const { task, phase, reach, stopped } = nemia;
+  const { task, phase, reach, stopped, trust } = nemia;
   if (stopped) return 'stopped';
   if (task === null) return 'off';
   if (!anyAbove(nemia)) return reach.length ? 'leaving' : 'off';
-  if (phase === null) return 'not-filed';
+  if (phase === null) return trust === null ? 'not-filed' : 'untrusted';
   return reach.length ? 'up' : 'starting';
 }
 

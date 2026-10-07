@@ -27,7 +27,8 @@ export type FactoryLevel = { factory: string; level: Level; default: Level; own:
  * Mirrors the package's `NemiaLevel`: her `level`, the store's, and since when; each factory's level (`factories`); her task, its phase
  * and its session where one is filed; the lines that reach her session (`reach`), and her web link where her session is bridged
  * (`bridge`, null where not); whether it was stopped from outside (`stopped`); what her sessions cost (`spend`, null where none is
- * filed); and the allow rules a person gave her at a prompt (`allows`).
+ * filed); the allow rules a person gave her at a prompt (`allows`); and the line a person runs once in a terminal so her harness trusts
+ * her folder (`trust`), null where it does: until it does, her session waits.
  */
 export type NemiaLevel = {
   level: Level;
@@ -41,6 +42,7 @@ export type NemiaLevel = {
   spend: Spend | null;
   allows: readonly string[];
   factories: readonly FactoryLevel[];
+  trust: string | null;
 };
 
 /** Mirrors the package's `NemiaMemory`: the folder she keeps her facts in, their names, and the words of the one asked, if any. */
@@ -71,6 +73,7 @@ const NemiaLevelSchema = Schema.Struct({
   spend: Schema.NullOr(Schema.Struct({ usd: Schema.Number, measured: Schema.Number, unmeasured: Schema.Number })),
   allows: Schema.Array(Schema.String),
   factories: Schema.Array(FactoryLevelSchema),
+  trust: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<NemiaLevel>;
 
 /** Decodes a `NemiaMemory`. */
@@ -113,8 +116,8 @@ export type LevelAsk = { level?: Level; factory?: string; for?: string; end?: bo
 
 /**
  * Sets a level, as the package's level command does: some factory put above Manual files her a session at the keeper's next beat, none
- * left above it stops it. Resolves with where she is after the write; rejects with the api's refusal in full — her folder not trusted,
- * naming what trusts it, or a raise that raises nothing.
+ * left above it stops it, and her folder not trusted holds her session until it is (`trust`). Resolves with where she is after the
+ * write; rejects with the api's refusal in full, such as a raise that raises nothing.
  */
 export const putLevel = (ask: LevelAsk): Promise<NemiaLevel> =>
   send('PUT', '/api/level', NemiaLevelSchema, {

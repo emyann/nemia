@@ -359,7 +359,7 @@ export const healthOf = (lines: readonly RollupLine[]): Health => {
 
 const round = (v: number): string => (Math.abs(v) >= 100 ? `${Math.round(v)}` : v.toFixed(2));
 
-/** A label set as a person reads it: `phase=git`, nothing for none. */
+/** A label set as a person reads it: `phase=place`, nothing for none. */
 const labelWords = (l: Labels): string =>
   LABEL_KEYS.filter((k) => l[k] !== undefined)
     .map((k) => `${k}=${l[k]}`)

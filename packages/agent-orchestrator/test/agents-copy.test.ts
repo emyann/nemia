@@ -58,6 +58,13 @@ function snapshot(dir: string): Record<string, string> {
   );
 }
 
+/** Every file a copy writes in the store `home` set back a minute, so a write the same millisecond as the copy still moves its time. */
+function backdated(home: string): void {
+  const past = new Date(Date.now() - 60_000);
+  for (const dir of Object.values(libraryOf(home)))
+    for (const file of fs.readdirSync(dir, { recursive: true }) as string[]) fs.utimesSync(path.join(dir, file), past, past);
+}
+
 /** The library's own folder in the store `home`: its agents, its skills and the records of copies. */
 const libraryOf = (home: string) => ({
   agents: path.join(home, 'workflows', 'agents'),
@@ -113,11 +120,31 @@ test('a second copy of the same agent reuses every part, and writes nothing', as
   const team = teamCopy();
   const file = path.join(team, 'agents', 'reviewer.md');
   await copy({ file }, home);
+  backdated(home);
   const before = written(home);
   const again = await copy({ file }, home);
   assert.deepEqual(again.copied, []);
   assert.deepEqual(again.reused.sort(), ['agents/reviewer.md', 'ask-for-another-round', 'review-a-change', 'review.schema.json']);
   assert.deepEqual(written(home), before);
+});
+
+test("the same agent copied again once its source has changed moves the record to the source's version now", async () => {
+  const home = scratch('wf-agents-copy-home-');
+  const team = teamCopy();
+  const file = path.join(team, 'agents', 'reviewer.md');
+  await copy({ file }, home);
+  const record = path.join(libraryOf(home).records, 'reviewer.json');
+  const was = JSON.parse(fs.readFileSync(record, 'utf8'));
+  fs.appendFileSync(path.join(team, 'skills', 'review-a-change', 'SKILL.md'), 'Read the tests first.\n');
+  await assert.rejects(copy({ file }, home), refusedWith('Conflict', /--keep review-a-change/));
+  await copy({ file, keep: ['review-a-change'] }, home);
+  const now = JSON.parse(fs.readFileSync(record, 'utf8'));
+  assert.equal(now.source, file);
+  assert.notEqual(now.version, was.version, 'the version moved');
+  assert.deepEqual(
+    agentsLines(agentsRead({ repo: scratch('wf-agents-copy-none-'), home })).filter((l) => l.includes('copied from')),
+    [`   copied from ${file} at ${now.version}`],
+  );
 });
 
 test('REFUSED: a skill the library holds otherwise, naming --keep, and nothing written; kept, the library keeps its own', async () => {

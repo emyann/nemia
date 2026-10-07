@@ -12,7 +12,7 @@ import { Result, Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
-import { FeedLineSchema } from '../feed/feed.store.ts';
+import { DAEMON_STARTED } from '../feed/feed.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { KeptDelivery, Subscription } from './subscription.ts';
 import { LEVELS } from '../level/level.ts';
@@ -46,6 +46,23 @@ const SubscriptionSchema = Schema.StructWithRest(
   }),
   Rest,
 );
+
+/** A line of the feed as the deliverer folds it into a digest: a run's, or a daemon's. */
+const FeedLineSchema = Schema.Union([
+  Schema.Struct({
+    at: Schema.String,
+    run: Schema.String,
+    step: Schema.optionalKey(Schema.String),
+    word: Schema.String,
+    note: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({
+    at: Schema.String,
+    daemon: Schema.Finite,
+    word: Schema.Literal(DAEMON_STARTED),
+    note: Schema.optionalKey(Schema.String),
+  }),
+]);
 
 /** A moment as the deliverer stamps a digest's first line: the wall clock, and the boot's monotonic reading where the machine has one. */
 const InstantSchema = Schema.Struct({

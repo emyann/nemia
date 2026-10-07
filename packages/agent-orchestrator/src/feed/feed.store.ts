@@ -118,11 +118,8 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
   return undefined;
 }
 
-/**
- * A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, or a daemon's; read by the feed and by the
- * digest a subscription keeps (`subscription.store.ts`).
- */
-export const FeedLineSchema = Schema.Union([
+/** A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, or a daemon's. */
+const FeedLineSchema = Schema.Union([
   Schema.Struct({
     at: Schema.String,
     run: Schema.String,

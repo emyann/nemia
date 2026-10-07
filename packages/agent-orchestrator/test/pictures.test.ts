@@ -205,7 +205,13 @@ function shipped(repo: string, env: Record<string, string>): { status: number | 
   const [cmd, ...args] = checkArgv(implementCheck());
   const r = spawnSync(cmd, args, {
     cwd: repo,
-    env: { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`, HOME: repo, TMPDIR: scratch('wf-pictures-tmp-'), WF_RUN: 'r-1', ...env },
+    env: {
+      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+      HOME: repo,
+      TMPDIR: scratch('wf-pictures-tmp-'),
+      WF_RUN: 'r-1',
+      ...env,
+    },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 120_000,

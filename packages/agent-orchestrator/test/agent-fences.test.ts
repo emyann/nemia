@@ -132,7 +132,8 @@ function reaches(rule: string, call: Call): boolean {
   if (bash === undefined) {
     const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
     const pathed = call.path !== undefined && tool !== undefined;
-    if (pathed && (tool === call.tool || (call.tool === 'Write' && tool === 'Edit'))) return covers(rule.slice(tool.length + 1, -1), call.path!);
+    if (pathed && (tool === call.tool || (call.tool === 'Write' && tool === 'Edit')))
+      return covers(rule.slice(tool.length + 1, -1), call.path!);
     if (call.tool === 'Write' && (rule === 'Edit' || tool === 'Edit')) return true;
     if (tool !== undefined) return tool === call.tool && call.command === undefined;
     const server = rule.startsWith('mcp__') ? rule.replace(/__\*$/, '') : undefined;
@@ -167,7 +168,8 @@ const globbed = (words: string, open: boolean): RegExp =>
  */
 function covers(rulePath: string, file: string): boolean {
   const from = rulePath.startsWith('//') ? rulePath.slice(1) : rulePath.startsWith('~/') ? `${HOME}${rulePath.slice(1)}` : undefined;
-  if (from === undefined) throw new Error(`${rulePath}: a path from the project or the working folder is not modelled; say how it reads, here`);
+  if (from === undefined)
+    throw new Error(`${rulePath}: a path from the project or the working folder is not modelled; say how it reads, here`);
   const pattern = from
     .split(/(\*\*\/|\*\*|\*)/)
     .map((part) =>
@@ -245,10 +247,12 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
   const allows = [...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...SKILL_GRANTS];
   const unshipped = step.background === true || step.workspace === 'main';
   const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
-  return calls.filter((call) => {
-    if (partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
-    return !dontAsk || partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)));
-  }).map((call) => `${step.name}: ${shown(call)}`);
+  return calls
+    .filter((call) => {
+      if (partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
+      return !dontAsk || partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)));
+    })
+    .map((call) => `${step.name}: ${shown(call)}`);
 }
 
 /**

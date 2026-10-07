@@ -79,7 +79,7 @@ const isProbeOf = (run: string, name: string): boolean =>
 /** Run `claude` with `args`, bounded; its exit, streams, and whether no `claude` was found. */
 function claude(args: string[], cwd?: string): { status: number | null; out: string; err: string; missing: boolean } {
   const r = spawnSync('claude', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
-  const missing = (r.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
+  const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '') || (r.error?.message ?? ''), missing };
 }
 

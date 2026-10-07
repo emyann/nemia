@@ -40,9 +40,14 @@ const git = (dir: string, ...args: string[]): string =>
   });
 
 /** A place to probe from: a scratch repository on `branch`, a home, a store and a stub `claude` listing `rows`; trusted unless not. */
-function placed(
-  { branch = 'wf/r-1/implement', rows = [] as unknown[], trust = true } = {},
-): { repo: string; home: string; probes: string; log: string; rowsFile: string; bin: string } {
+function placed({ branch = 'wf/r-1/implement', rows = [] as unknown[], trust = true } = {}): {
+  repo: string;
+  home: string;
+  probes: string;
+  log: string;
+  rowsFile: string;
+  bin: string;
+} {
   const repo = scratch('wf-probe-repo-');
   git(repo, 'init', '-q', '-b', branch);
   const home = scratch('wf-probe-home-');
@@ -248,7 +253,10 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a live 
   fs.writeFileSync(at.rowsFile, JSON.stringify([row('r-1-probe-a', 'stopped')]));
   const passed = run({ WF_BASE_REF: base });
   assert.equal(passed.status, 0, passed.out);
-  const old = based({ 'workflows/build/mutants.ts': scripts['workflows/build/mutants.ts'], 'workflows/build/pictures.ts': scripts['workflows/build/pictures.ts'] });
+  const old = based({
+    'workflows/build/mutants.ts': scripts['workflows/build/mutants.ts'],
+    'workflows/build/pictures.ts': scripts['workflows/build/pictures.ts'],
+  });
   const r = spawnSync(checkArgv(implementCheck())[0], checkArgv(implementCheck()).slice(1), {
     cwd: old.repo,
     env: { ...envAt(at), TMPDIR: scratch('wf-probe-tmp-'), WF_RUN: 'r-1', WF_CLOSEOUT: closeout, WF_BASE_REF: old.base },

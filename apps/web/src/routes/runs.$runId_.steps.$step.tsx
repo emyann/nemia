@@ -142,8 +142,9 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
 const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
 
 /**
- * The session's conversation, `turns` folded off what `following` read, and the message being written after them: or why there is none — the step not filed, no session of its
- * task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can read.
+ * The session's conversation, `turns` folded off what `following` read, and the message being written after them: or why there is none —
+ * the step not filed, no session of its task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can
+ * read.
  */
 function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
   if (!step.taskId) return quiet('Not filed yet, so there is no session to show.');

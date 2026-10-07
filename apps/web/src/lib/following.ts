@@ -44,6 +44,13 @@ export function changed(s: Following, c: Change, closed: Set<string>): Following
   return { ...s, partial: { key: c.key, text: s.partial?.key === c.key ? s.partial.text + c.delta : c.delta } };
 }
 
+/**
+ * The cursor a step's conversation is followed from after its first read (`first`), or null where it is read that once: a task that is
+ * not live, unless the step waits on a person (`waiting`) and its next turn is to come; and a read that gave no cursor.
+ */
+export const followedFrom = (first: { live: boolean; cursor: string | null }, waiting: boolean): string | null =>
+  first.live || waiting ? first.cursor : null;
+
 /** The stream as `follow` uses it: an EventSource, or anything that dispatches the same events. */
 export type StreamLike = {
   readonly readyState: number;
@@ -76,10 +83,10 @@ export const END_GRACE_MS = 2_000;
  * What each of a step's stream events does to what a page holds of its conversation (`update`), apart from React, so it is tested without a
  * browser: `useStepTranscript` opens the stream and hands it here. Each event's data is decoded by its schema (`streamDataOf`), and one
  * that does not decode is ignored. `following` says whether the stream is pushed (`streamed`); each `transcript`, `partial` and `moved`
- * changes the conversation as `changed` says, in the order they came, a frame's worth at once; `settled` ends it; a read that failed and is tried again every second is said, and one that will not be is the end; `readable` clears the error,
- * and so does each connection made — the first, or one the EventSource made again after a drop — since a fresh server stream never sends
- * `readable`. A dropped connection is the EventSource's to resume; one it closes, because the api refused it, is the end. Returns what
- * stops following.
+ * changes the conversation as `changed` says, in the order they came, a frame's worth at once; `settled` ends it; a read that failed and is
+ * tried again every second is said, and one that will not be is the end; `readable` clears the error, and so does each connection made —
+ * the first, or one the EventSource made again after a drop — since a fresh server stream never sends `readable`. A dropped connection is
+ * the EventSource's to resume; one it closes, because the api refused it, is the end. Returns what stops following.
  *
  * A stream that said it is over is closed once the api has ended its response — the `error` an EventSource fires then, before it would
  * reconnect — or after `END_GRACE_MS`, and not the moment its last event arrives. Closed then, while the rest of the response is still on

@@ -64,10 +64,11 @@ class Unread extends Error {
 }
 
 /**
- * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, whether the task has
- * not settled (`open`), and whether it is live — pending or running as the run reads it (`phaseOfView`), while something of it runs or is to. A task held open
- * that signed and waits on a person's word, or was closed on it, is not live: nothing of it runs, for hours at a gate, though it is not
- * `settled` until closed. Answered, its next turn is live again under the same id, and the board reads the conversation again.
+ * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, whether the task has not
+ * settled (`open`), and whether it is live — pending or running as the run reads it (`phaseOfView`), while something of it runs or is to. A
+ * task held open that signed and waits on a person's word, or was closed on it, is not live: nothing of it runs, for hours at a gate,
+ * though it is not `settled` until closed. Answered, its next turn is live again under the same id, and the board reads the conversation
+ * again.
  *
  * Live is read first. A task that settles between the two reads reads as live once more, and its last lines are read on the
  * next pass; read the other way round, it could read as settled before them. A read costs an observation of every harness
@@ -267,8 +268,8 @@ async function followed(
  *   `delta`), `moved` with `taskId` when the step goes to another attempt or try, whose history follows from its start, and `settled` once
  *   its task has, and the stream closed; a held task's stream stays open while it waits on a person. An upstream that fails is an
  *   `unreadable` event with `retrying: false`, and ends it.
- *   A harness that does not push, and a task settled, are read again every second instead, after `following` with `streamed: false` for
- *   the first: each new event as `transcript`, then `settled` when the task is, or is held open and signed and so waits on a person. On that
+ *   A harness that does not push, and a task settled, are read again every second instead, after `following` with `streamed: false` for the
+ *   first: each new event as `transcript`, then `settled` when the task is, or is held open and signed and so waits on a person. On that
  *   beat, an answer about the conversation — its task gone from the engine's record — is an `unreadable` event with `retrying: false`, and
  *   ends it; any other failure is of that read: said once as `unreadable` with `retrying: true`, read again on the next beat from the same
  *   cursor, and cleared with `readable` by the first read that works. Either stops when nobody reads.

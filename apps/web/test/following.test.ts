@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationFrames, END_GRACE_MS, follow, unread, type Following, type StreamLike } from '../src/lib/following.ts';
+import { animationFrames, END_GRACE_MS, follow, followedFrom, unread, type Following, type StreamLike } from '../src/lib/following.ts';
 import type { TranscriptEvent } from '../src/lib/api.ts';
 
 /** An EventSource as far as `follow` uses it: its state, its events, and `close`. */
@@ -287,4 +287,11 @@ test('REFUSED: an event whose data is not of its shape is ignored — a piece wi
   stream.dispatchEvent(new MessageEvent('partial', { data: 'not json' }));
   flush();
   assert.equal(now().partial, null);
+});
+
+test('a step is followed from its first read while its task is live, and while it waits on a person; else, or with no cursor, read once', () => {
+  assert.equal(followedFrom({ live: true, cursor: '3' }, false), '3', 'a live task is followed');
+  assert.equal(followedFrom({ live: false, cursor: '3' }, true), '3', 'a step held on a person is followed, its next turn to come');
+  assert.equal(followedFrom({ live: false, cursor: '3' }, false), null, 'a finished step is read once');
+  assert.equal(followedFrom({ live: true, cursor: null }, true), null, 'a read with no cursor gives nothing to follow from');
 });

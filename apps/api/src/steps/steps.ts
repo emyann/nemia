@@ -2,15 +2,16 @@
  * A step's own reads: its session output, the files it wrote, its conversation, read once from a cursor or followed, and its task's path
  * through the runtime's lifecycle.
  */
-import type { Effect } from 'effect';
+import { Effect, Stream } from 'effect';
 import { Hono } from 'hono';
-import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
+import { type SSEMessage, type SSEStreamingApi, streamSSE } from 'hono/streaming';
 import { COMMANDS, LOGS, phaseOfView, type TaskView, runWith } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { refusedName, typeOf } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
 import { type LifecycleStep, pathToTurn, type StepPath, tryOfStep } from './path.ts';
-import { type ApiEnv, served } from '../layer.ts';
+import type { Followings, Relayed } from './following.ts';
+import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { engineRead, type Engine, taskOfStep } from '../store.ts';
 
 /**
@@ -50,7 +51,8 @@ export type StepTranscript = {
   live: boolean;
 };
 
-type Read = StepTranscript & { cursor: string };
+/** A read as the stream takes it: a cursor always, and whether the task has not settled, held open on a person's word among it (`open`). */
+type Read = StepTranscript & { cursor: string; open: boolean };
 
 /** Why a step's conversation was not read, with the status that says whose it is to fix. */
 class Unread extends Error {
@@ -62,10 +64,11 @@ class Unread extends Error {
 }
 
 /**
- * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, and whether
- * the task is live — pending or running as the run reads it (`phaseOfView`), while something of it runs or is to. A task held open
- * that signed and waits on a person's word, or was closed on it, is not live: nothing of it runs, for hours at a gate, though it is not
- * `settled` until closed. Answered, its next turn is live again under the same id, and the board reads the conversation again.
+ * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, whether the task has not
+ * settled (`open`), and whether it is live — pending or running as the run reads it (`phaseOfView`), while something of it runs or is to. A
+ * task held open that signed and waits on a person's word, or was closed on it, is not live: nothing of it runs, for hours at a gate,
+ * though it is not `settled` until closed. Answered, its next turn is live again under the same id, and the board reads the conversation
+ * again.
  *
  * Live is read first. A task that settles between the two reads reads as live once more, and its last lines are read on the
  * next pass; read the other way round, it could read as settled before them. A read costs an observation of every harness
@@ -97,7 +100,7 @@ async function readTranscript(e: Engine['Service'], id: string, step: string, ta
   }
   try {
     const { events, cursor } = await transcriptOf(e, id, step, taskId, after);
-    return { events, cursor, live: phase === 'running' || phase === 'pending' };
+    return { events, cursor, live: phase === 'running' || phase === 'pending', open: view.state.settled === null };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     if ((err as { exitCode?: unknown }).exitCode !== 2) {
@@ -144,6 +147,121 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
 }
 
 /**
+ * The stream read again every second while the task of the step `step` of the run `id` is live (`readTranscript`), from `read`, sent
+ * first: each new event as `transcript`, and `settled` once the task is not live. An answer about the conversation is `unreadable`
+ * with `retrying: false`, and ends it; any other failure is said once as `unreadable` with `retrying: true`, read again on the next beat
+ * from the same cursor, and cleared by `readable`.
+ */
+async function beat(stream: SSEStreamingApi, e: Engine['Service'], id: string, step: string, taskId: string, from: Read): Promise<void> {
+  let read = from;
+  await send(stream, read);
+  let failing = false;
+  while (read.live) {
+    await stream.sleep(STREAM_EVERY_MS);
+    if (stream.aborted) return;
+    try {
+      read = await readTranscript(e, id, step, taskId, read.cursor);
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      if (err instanceof Unread && err.status !== 502) {
+        await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
+        return;
+      }
+      if (!failing) await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
+      failing = true;
+      continue;
+    }
+    if (failing) await stream.writeSSE({ event: 'readable', data: '{}' });
+    failing = false;
+    await send(stream, read);
+  }
+  if (!stream.aborted) await stream.writeSSE({ event: 'settled', data: JSON.stringify({ cursor: read.cursor }), id: read.cursor });
+}
+
+/** An event as it is unique: by its `kind` and `id` together. */
+const markOf = (event: TranscriptEvent) => `${event.kind} ${event.id}`;
+
+/**
+ * What a follower is sent of one moment (`Relayed`), the events `sent` it holds by mark: whether the step's harness streams
+ * (`following`), each whole event not sent yet (`transcript`, the cursor the id of the last), a piece of the message being written
+ * (`partial`, its text the `delta` added under its block's `key`, `last` once the block is whole), the step's move to another task
+ * (`moved`, after which its events are sent again from the start), the step finished (`settled`), and an upstream that failed
+ * (`unreadable`, `retrying: false`). A state is sent nothing.
+ */
+function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }): SSEMessage[] {
+  if (m.kind === 'streamed') return [{ event: 'following', data: JSON.stringify({ streamed: m.yes }) }];
+  if (m.kind === 'partial') return [{ event: 'partial', data: JSON.stringify({ key: m.key, delta: m.text, last: m.last }) }];
+  if (m.kind === 'moved') {
+    sent.clear();
+    return [{ event: 'moved', data: JSON.stringify({ taskId: m.taskId }) }];
+  }
+  if (m.kind === 'settled') return [{ event: 'settled', data: JSON.stringify({ cursor: at.cursor }), id: at.cursor }];
+  if (m.kind === 'ended') return [{ event: 'unreadable', data: JSON.stringify({ error: m.error, retrying: false }) }];
+  if (m.kind !== 'events') return [];
+  at.cursor = m.cursor;
+  const fresh = m.events.filter((ev) => !sent.has(markOf(ev)));
+  for (const ev of fresh) sent.add(markOf(ev));
+  return fresh.map((ev, i) => ({ event: 'transcript', data: JSON.stringify(ev), ...(i === fresh.length - 1 ? { id: m.cursor } : {}) }));
+}
+
+/**
+ * The step `step` of the run `id` followed on the app's registry (`Followings`), relayed as `messagesOf` says, `read` sent after
+ * `following` and what the follower read since (`caught`) after it. Run on the app's `runtime`, interrupted as the reader goes. Answers
+ * the task to read on a beat when the step's harness does not push its session, having sent `following` false — `taskId`, or the one
+ * a `moved` before it went to — else `null`, the following ended.
+ */
+async function followed(
+  stream: SSEStreamingApi,
+  runtime: ApiRuntime,
+  followings: Followings['Service'],
+  e: Engine['Service'],
+  id: string,
+  step: string,
+  taskId: string,
+  read: Read,
+): Promise<string | null> {
+  const gone = new AbortController();
+  stream.onAbort(() => gone.abort());
+  if (stream.aborted) gone.abort();
+  const sent = new Set(read.events.map(markOf));
+  const at = { cursor: read.cursor };
+  let unstreamed = false;
+  let followedTask = taskId;
+  const caught = Effect.tryPromise(() => readTranscript(e, id, step, taskId, read.cursor)).pipe(
+    Effect.map((r): Relayed => ({ kind: 'events', events: r.events, cursor: r.cursor })),
+    Effect.orElseSucceed(() => undefined),
+  );
+  const relayed = followings.follow(e, id, step, caught).pipe(
+    Stream.runForEach((m) =>
+      Effect.promise(async () => {
+        for (const message of messagesOf(m, sent, at)) if (!stream.aborted) await stream.writeSSE(message);
+        if (m.kind === 'streamed' && m.yes) await send(stream, read);
+        if (m.kind === 'streamed') unstreamed = !m.yes;
+        if (m.kind === 'moved') followedTask = m.taskId;
+      }),
+    ),
+  );
+  await runtime.runPromiseExit(relayed, { signal: gone.signal });
+  return unstreamed && !stream.aborted ? followedTask : null;
+}
+
+/**
+ * The step `step` of the run `id` read on a beat once its following said it does not stream (`polled`): from `read` on the task `taskId`
+ * it was opened on, or from its start on the task a `moved` went to — `unreadable`, with `retrying: false`, when that does not read.
+ */
+async function beatOn(stream: SSEStreamingApi, e: Engine['Service'], id: string, step: string, taskId: string, read: Read, polled: string) {
+  if (polled === taskId) return beat(stream, e, id, step, taskId, read);
+  let fresh: Read;
+  try {
+    fresh = await readTranscript(e, id, step, polled, undefined);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    return stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
+  }
+  return beat(stream, e, id, step, polled, fresh);
+}
+
+/**
  * A step's own reads. Each answers 404 for a run or a step the run does not have.
  *
  * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `nemia logs`' entry
@@ -160,14 +278,21 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
  * - `GET /api/runs/:id/steps/:step/transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read
  *   from the start): the engine's events for the step's current task, and whether it is live, read through `step transcript`. A step
  *   not filed yet has nothing to read, and nothing of it moves until a tick files it. Refusals are `readTranscript`'s.
- * - `GET /api/runs/:id/steps/:step/transcript/stream` — the same conversation followed, as server-sent events: read again every second
- *   while the task is live, each new event sent as `transcript`, then `settled` when the task is, or is held open and signed and so waits
- *   on a person, and the stream closed. It starts after the Last-Event-ID an EventSource sends when it reconnects, else after `after`.
- *   The first read is made before the stream opens, so a refused cursor or a lost task is an answer with a status (`readTranscript`'s),
- *   not an event; a step not filed yet is 404. It stops asking the engine when nobody reads, since each read observes the harnesses. On
- *   the stream, an answer about the conversation — its task gone from the engine's record — is an `unreadable` event with `retrying:
- *   false`, and ends it. Any other failure is of that read, not the conversation: it is said once as `unreadable` with `retrying: true`,
- *   read again on the next beat from the same cursor, and cleared with `readable` by the first read that works.
+ * - `GET /api/runs/:id/steps/:step/transcript/stream` — the same conversation followed, as server-sent events. It starts after the
+ *   Last-Event-ID an EventSource sends when it reconnects, else after `after`. The first read is made before the stream opens, so a refused
+ *   cursor or a lost task is an answer with a status (`readTranscript`'s), not an event; a step not filed yet is 404.
+ *   A step whose task has not settled is followed live on the app's registry (`Followings`), one upstream a step whoever follows it: first
+ *   `following` with `streamed`, whether its harness pushes the session; then, pushed, the read's events and each new one as `transcript`,
+ *   the message being written as `partial` (`key`, `delta`, `last`: a follower who joins mid-message is handed the text so far as one
+ *   `delta`), `moved` with `taskId` when the step goes to another attempt or try, whose history follows from its start, and `settled` once
+ *   its task has, and the stream closed; a held task's stream stays open while it waits on a person. An upstream that fails is an
+ *   `unreadable` event with `retrying: false`, and ends it.
+ *   A harness that does not push, and a task settled, are read again every second instead, after `following` with `streamed: false` for the
+ *   first: each new event as `transcript`, then `settled` when the task is, or is held open and signed and so waits on a person; after a
+ *   `moved`, the task it went to, from its start. On that beat, an answer about the conversation — its task gone from the engine's record
+ *   — is an `unreadable` event with `retrying: false`, and ends it; any other failure is of that read: said once as `unreadable` with
+ *   `retrying: true`, read again on the next beat from the same cursor, and cleared with `readable` by the first read that works. Either
+ *   stops when nobody reads.
  * - `GET /api/runs/:id/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`,
  *   through `step path`), the current try's by default: each state its journal says, the entry that moved it and when, from the filing to
  *   now, replayed off the journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the
@@ -287,7 +412,8 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       if (!found.taskId) return c.json({ events: [], cursor: null, live: false } satisfies StepTranscript);
       try {
-        return c.json((await readTranscript(e, id, step, found.taskId, c.req.query('after') || undefined)) satisfies StepTranscript);
+        const { open: _open, ...read } = await readTranscript(e, id, step, found.taskId, c.req.query('after') || undefined);
+        return c.json(read satisfies StepTranscript);
       } catch (err) {
         if (err instanceof Unread) return c.json({ error: err.message }, err.status);
         throw err;
@@ -295,7 +421,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:id/steps/:step/transcript/stream', (c) =>
-    served(c, async ({ e, home }) => {
+    served(c, async ({ e, home, followings }) => {
       const id = c.req.param('id');
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
@@ -318,28 +444,9 @@ export const steps = new Hono<ApiEnv>()
         throw err;
       }
       return streamSSE(c, async (stream) => {
-        await send(stream, read);
-        let failing = false;
-        while (read.live) {
-          await stream.sleep(STREAM_EVERY_MS);
-          if (stream.aborted) return;
-          try {
-            read = await readTranscript(e, id, step, taskId, read.cursor);
-          } catch (err) {
-            const error = err instanceof Error ? err.message : String(err);
-            if (err instanceof Unread && err.status !== 502) {
-              await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
-              return;
-            }
-            if (!failing) await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
-            failing = true;
-            continue;
-          }
-          if (failing) await stream.writeSSE({ event: 'readable', data: '{}' });
-          failing = false;
-          await send(stream, read);
-        }
-        if (!stream.aborted) await stream.writeSSE({ event: 'settled', data: JSON.stringify({ cursor: read.cursor }), id: read.cursor });
+        if (!read.open) return beat(stream, e, id, step, taskId, read);
+        const polled = await followed(stream, c.var.runtime, followings, e, id, step, taskId, read);
+        if (polled !== null) await beatOn(stream, e, id, step, taskId, read, polled);
       });
     }),
   );

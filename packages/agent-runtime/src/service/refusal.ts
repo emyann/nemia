@@ -10,6 +10,7 @@ const REFUSALS = new Set([
   'ListRefused',
   'TranscriptRefused',
   'OutputRefused',
+  'FollowRefused',
   'SayRefused',
   'QuotaRefused',
   'EngineRefused',

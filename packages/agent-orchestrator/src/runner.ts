@@ -281,6 +281,8 @@ export type {
 } from './meter/index.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, watchFeed } from './feed/feed.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
+export { followStep } from './following/following.verb.ts';
+export type { StepMoment } from './following/following.ts';
 export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';

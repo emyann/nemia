@@ -3,6 +3,7 @@ export { Engine, EngineRefused, ListRefused, TranscriptRefused, QuotaRefused, li
 export { SayRefused, SayUnsent } from './say.ts';
 export type { EngineShape } from './engine.ts';
 export { OutputRefused } from './output.ts';
+export { FollowRefused } from './follow.ts';
 export { ForgetRefused } from './forget.ts';
 export type { ForgetReport } from './forget.ts';
 export { refusalWords } from './refusal.ts';

@@ -1656,9 +1656,10 @@ output: implement.schema.json   # screenshots, pages
 
 - **The e2e runs once, on the merged tree.** `WF_BASE_REF` is set in every check the run executes on a step, so
   a round's check builds and runs no e2e, and a gated ship, where it is not set, runs the line whole on the merged
-  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it against a seeded store,
-  visits every page in headless Chromium in a light and a dark theme, asserts what each page must have, and
-  screenshots each into `WF_ARTIFACTS`.
+  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it to workers in parallel,
+  each against a seeded store of its own, visits every page in headless Chromium in the dark theme, and asserts what
+  each page must have; with `--photos`, in a light and a dark theme, screenshots each into `WF_ARTIFACTS`. This
+  repository's own build workflow runs it in implement's round check too.
 - **`implement` declares `screenshots` and `pages`**, and `review` reads the diff, is handed those and nothing else
   of implement, and looks at the screenshots and the pages side by side. Its schema can say where a finding is as
   `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that names
@@ -2819,8 +2820,8 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
 
 What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
 for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
-board's Settings, though no place names her), read once, as her session is filed: an open session keeps
-the words it was filed with, so a change takes effect after `nemia level manual`, then `nemia level semi-auto`; a factory's rules are its
+board's Settings, though no place names her), read as her session is filed; a write or a clear while she is kept is told to her open
+session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
@@ -3489,6 +3490,8 @@ holding a concurrency slot forever.
 | `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`), `tick-recent.json` (the recent passes, `recordRecentPass` and `recentPasses`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `recordDaemonLine`, `readFeed`, `watchFeed`, `feedCursorRefusal`), its size and the ends of its lines from a cursor (`feedSize`, `readFeedEnds`) |
 | `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines and a daemon's start written once — appended, logged and published to the process's hub (`emitFeed`, `emitDaemonStarted`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
+| `src/following/following.ts` | one step's session followed live, pure: the moments a follower is handed (`StepMoment`), and where a following goes each time the step is read again — another attempt, a wait on the feed, or its end (`nextOf`) |
+| `src/following/following.verb.ts` | one step's session followed live across a person's answer, the next turn and a try, waking on the step's lines of the feed between them (`followStep`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`place: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `skills/read.store.ts`, and reads no git |
 | `src/workspace/worktree.store.ts` | git and a repository run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |

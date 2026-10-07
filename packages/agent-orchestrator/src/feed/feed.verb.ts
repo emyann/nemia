@@ -8,6 +8,7 @@
  * A controller: it reaches the store's file through the client's `tried`, and is run by the tick, `up` and the api's stream.
  */
 import { Context, Effect, Layer, Metric, PubSub, Stream, type Duration } from 'effect';
+import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { tried } from '../runtime-client.ts';
 import { isRefusal, type Refusal } from '../refusal/refusal.ts';
 import { feedSaidWords, isRunLine, publishedOf, type DaemonLine, type FeedLine, type FeedPublished, type FeedWords } from './feed.ts';
@@ -143,8 +144,20 @@ const wake = (at: Following, published: FeedPublished | undefined): Woken => {
 };
 
 /**
+ * One take of a reader at `at`: the items of the hub taken at once, or a beat, each woken in order (`wake`), what each hands on handed on
+ * together.
+ */
+const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | undefined>): Woken =>
+  Effect.reduce(
+    taken,
+    (): readonly [Following, Followed[]] => [at, []],
+    ([now, handed], published) => Effect.map(wake(now, published), ([next, more]) => [next, [...handed, ...more]] as const),
+  );
+
+/**
  * The feed from `from`, live: every line after the cursor, then each as it is written, once each and in order, each with the cursor just
- * after it — until the stream is closed.
+ * after it — until the stream is closed. The items of one take of the hub, as the lines of one pass published together, and the lines of
+ * one read of the file are handed on as one chunk.
  *
  * It subscribes to the process's hub (`FeedHub`) before it reads anything, so no line written after its first read is missed; reads the
  * file from the cursor (`readOn`); and only then is counted in `FEED_FOLLOWERS`, so a reader counted is one that will be handed every line
@@ -168,7 +181,7 @@ export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duratio
         Stream.drop(1),
         Stream.map(() => undefined),
       );
-      const live = Stream.merge(published, beats).pipe(Stream.mapAccumEffect((): Following => following, wake));
+      const live = Stream.merge(published, beats).pipe(Stream.mapAccumArrayEffect((): Following => following, wakeAll));
       return Stream.concat(Stream.fromIterable(caught), live);
     }),
   );

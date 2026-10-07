@@ -117,6 +117,7 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'inputFormat',
   'outputFormat',
   'verbose',
+  'includePartialMessages',
   'resume',
   'continue',
   'sessionId',

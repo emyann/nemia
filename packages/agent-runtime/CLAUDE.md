@@ -205,6 +205,10 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
   Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run
   there may export under the session's labels.
+- **`claude -p --include-partial-messages` prints each block as `stream_event` lines, its whole `assistant` line before the block's
+  `content_block_stop`** (2.1.292, 2026-10-07, Haiku, one short answer): 42 lines and 20 KB against 5 and 9 KB, 27 `text_delta`s; the
+  process's CPU and RSS the same within 10 %. `message_start`'s `message.id` is the `assistant` line's, whose `uuid` the transcript keeps
+  (`followOf`, `harness/detached/follow.ts`).
 - **Every child the runtime starts is spawned `withoutTelemetry`** (`harness/telemetry.ts`): a session exports only what its runner hands
   it, never as the engine's process; `test/telemetry.test.ts` sets the engine's own and reads what a stub `claude` and a command see.
 - **A Bash deny reaches each part of `&&`, `||`, `;`, `|`, `&`, a `$(…)`, and a part behind `timeout`, `nohup` or `VAR=`** (2.1.288),

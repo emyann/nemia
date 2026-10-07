@@ -4,7 +4,8 @@
  * digits on every file, then by the name — never in the order the directory lists them. So adding a page is adding a file: two runs that
  * each add one touch no line in common, and merge. Two that pick the same number merge too, and are visited by name.
  *
- * The order matters: the pages share one seeded store, and each takes back what it wrote before the next is visited. A new page's number
+ * A page reads only the seed and what it writes itself, and takes back what it wrote before it ends: each worker of a run seeds a store of
+ * its own and visits its share of the pages in this order (workers.ts), and a run of some pages visits those alone. A new page's number
  * says where it goes, and the numbers go in tens to leave room.
  *
  * Beside the pages, `pages/NAMES` says which pages there are, a name a line, in no order that matters. The directory alone cannot tell a
@@ -116,32 +117,46 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
 }
 
 /**
- * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; and
- * whether a page is `pictured`. With no flag, every page in the dark theme, pictured by none: the assertions alone. `--photos` visits
- * light, then dark, and pictures each page visited; `--pages <name,…>` visits every page up to the last one named, since a page reads
- * what the pages before it leave, and with `--photos` pictures only those named. Refuses a flag it does not know, a name that is no page
- * (listing the pages there are), and `--pages` with no name after it.
+ * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; whether a
+ * page is `pictured`; how many `workers` it asks for, if it does; and whether it is `whole` — every page, in the dark theme alone, the run
+ * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
+ * the assertions alone. `--photos` visits light, then dark, and pictures each page visited; `--pages <name,…>` visits only the pages
+ * named, in the order of the pages, and with `--photos` pictures them; `--workers <n>` sets how many workers visit them. Refuses a flag it
+ * does not know, a name that is no page (listing the pages there are), `--pages` with no name after it, and `--workers` with no whole
+ * number of one or more.
  */
 export function planOf<P extends { name: string }>(
   argv: readonly string[],
   pages: readonly P[],
-): { visit: P[]; themes: Theme[]; pictured: (name: string) => boolean } {
+): { visit: P[]; themes: Theme[]; pictured: (name: string) => boolean; workers?: number; whole: boolean } {
   let photos = false;
   let named: string[] | undefined;
+  let workers: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--photos') photos = true;
     else if (argv[i] === '--pages') named = namesAfter(argv[++i]);
-    else throw new Error(`the e2e takes --photos and --pages <name,…>, not ${argv[i]}: npm run e2e -- --photos --pages <name,…>`);
+    else if (argv[i] === '--workers') workers = workersAfter(argv[++i]);
+    else
+      throw new Error(
+        `the e2e takes --photos, --pages <name,…> and --workers <n>, not ${argv[i]}: npm run e2e -- --photos --pages <name,…>`,
+      );
   }
   const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
-  if (!named) return { visit: [...pages], themes, pictured: () => photos };
+  if (!named) return { visit: [...pages], themes, pictured: () => photos, workers, whole: !photos };
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
   if (unknown.length)
     throw new Error(`the e2e has no page ${unknown.join(', ')}: name pages there are, as pages/NAMES lists them: ${all.join(', ')}`);
   const chosen = new Set(named);
-  const last = Math.max(...named.map((name) => all.indexOf(name)));
-  return { visit: pages.slice(0, last + 1), themes, pictured: (name) => photos && chosen.has(name) };
+  return { visit: pages.filter((p) => chosen.has(p.name)), themes, pictured: (name) => photos && chosen.has(name), workers, whole: false };
+}
+
+/** The number `--workers` is given: a whole number, one or more; refuses anything else, and a flag in its place. */
+function workersAfter(arg: string | undefined): number {
+  const n = Number(arg);
+  if (!arg || !/^\d+$/.test(arg) || n < 1)
+    throw new Error(`--workers takes a whole number of workers, one or more (--workers 4), not ${arg ?? 'nothing'}`);
+  return n;
 }
 
 /** The page names `--pages` is given, comma-separated; refuses none, and a flag in their place. */

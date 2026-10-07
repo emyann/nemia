@@ -2,7 +2,7 @@
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
  * are Effects with typed errors.
  */
-import { Context, Effect, Exit, Fiber, Layer, Schema } from 'effect';
+import { Context, Effect, Exit, Fiber, Layer, Schema, type Stream } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
 import { fold, nameFor, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
@@ -14,6 +14,7 @@ import {
   noTranscript,
   composite,
   type ExpectedSession,
+  type Followed,
   type HarnessArgs,
   type Observation,
   type HarnessQuota,
@@ -57,6 +58,7 @@ import {
   BodyRefused,
 } from '../core/engine/index.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
+import { followVerbOf, type FollowRefused } from './follow.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
@@ -113,9 +115,9 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
- * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `SayRefused`,
- * `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and `removeBody`, and
- * `ForgetRefused` for `forget`.
+ * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `FollowRefused`,
+ * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and
+ * `removeBody`, and `ForgetRefused` for `forget`.
  * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
  * `refusalWords(verb)` words a refusal as `ae` says it.
  * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
@@ -243,6 +245,15 @@ export type EngineShape = {
     stream: 'stdout' | 'stderr',
     lastBytes?: number,
   ) => Effect.Effect<string | undefined, OutputRefused | JournalError | RunnerError>;
+  /**
+   * The session of the task's latest attempt followed live, as its harness says it: the session's state first, then each moment once
+   * and in order — a piece of the text being written (`partial`), the transcript's whole events with the cursor after them, a state
+   * changed — until the session is over. What was written before the follow is read by `transcript`. `undefined` before an attempt.
+   * Observes nothing; the stream fails as a `RunnerError` where the harness refuses this session (one ended, `refused`) or cannot
+   * read it. Refused — `FollowRefused` — for a task this engine has no record of, and a harness that does not stream (a `RunnerOps`
+   * without `follow`).
+   */
+  readonly follow: (taskId: string) => Effect.Effect<Stream.Stream<Followed, RunnerError> | undefined, FollowRefused | JournalError>;
   /**
    * Tell the task's session something while it runs — `kubectl attach` with its audit line. `text` is handed, as
    * given, to the session of the attempt in flight through the task's own harness, and then journalled as a
@@ -442,6 +453,14 @@ const startOf =
         },
       };
     });
+
+/** `logs` of the task `view` reads, asked of its own harness: `(no session yet)` before its harness names one. */
+const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, runners: Record<string, SeamOps>, harnessOf: (state: State) => string) =>
+  Effect.gen(function* () {
+    const v = yield* view;
+    if (!v.sessionId) return '(no session yet)';
+    return yield* runners[harnessOf(v.state)].logs(v.sessionId);
+  });
 
 /**
  * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or of `fallback`, the default
@@ -676,16 +695,10 @@ const make = (options: EngineOptions) =>
       path: (taskId) => read(taskId).pipe(Effect.map((events) => pathOf(taskId, events))),
       list: listVerb,
       stop: (taskId) => go(requestStop(taskId)),
-      logs: (taskId) =>
-        go(
-          Effect.gen(function* () {
-            const v = yield* viewOf(taskId);
-            if (!v.sessionId) return '(no session yet)';
-            return yield* runners[harnessOf(v.state)].logs(v.sessionId);
-          }),
-        ),
+      logs: (taskId) => go(logsOf(viewOf(taskId), runners, harnessOf)),
       transcript: transcriptVerb,
       output: outputVerbOf(read, runners, harnessOf),
+      follow: followVerbOf(read, runners, harnessOf),
       say: sayVerbOf(go, read, runners, harnesses, harnessOf),
       quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,

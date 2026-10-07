@@ -8,6 +8,7 @@ import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
 import {
   NEMIA_WAKE,
+  customChanged,
   levelRefusal,
   nemiaDiagram,
   nemiaDue,
@@ -15,6 +16,7 @@ import {
   nemiaSettings,
   nemiaState,
   nemiaTaskId,
+  toldCustom,
   type HerSubscription,
   type HerTask,
   type Keeping,
@@ -35,6 +37,39 @@ test('the keeper owes a filing, then a subscription, then nothing, while some fa
   assert.deepEqual(nemiaDue(SEMI, OPEN, HERS), []);
   assert.equal(nemiaState(SEMI, OPEN, HERS), 'kept');
   assert.deepEqual(nemiaDue(SEMI, OPEN, OLDER), ['drop', 'subscribe'], 'a subscription left for an older task is put again');
+});
+
+test('the keeper tells her a changed custom instruction while she is kept, and in no other state', () => {
+  const STALE: Keeping = { ...SEMI, stale: true };
+  assert.deepEqual(nemiaDue(STALE, OPEN, HERS), ['tell']);
+  assert.deepEqual(nemiaDue({ ...SEMI, stale: false }, OPEN, HERS), [], 'her filed words are the ones that compose now');
+  assert.deepEqual(nemiaDue(STALE, OPEN, undefined), ['subscribe'], 'filed: subscribed first, told on a later beat');
+  assert.deepEqual(nemiaDue(STALE, OPEN, OLDER), ['drop', 'subscribe']);
+  assert.deepEqual(nemiaDue(STALE, undefined, undefined), ['file'], 'due: filed with the words that compose now');
+  for (const task of [SETTLED, STOPPING]) assert.deepEqual(nemiaDue(STALE, task, HERS), ['drop'], 'stopped: nothing to tell');
+  assert.deepEqual(nemiaDue({ ...MANUAL, stale: true }, OPEN, HERS), ['stop', 'drop'], 'leaving: stopped, not told');
+});
+
+test('her custom words changed are those she was not last filed or told with; her shipped instruction is never compared', () => {
+  const FILED = 'Her shipped instruction.\n\nAnswer in French.\n';
+  assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in French.', 'Another instruction.\n'), false);
+  assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in Dutch.', FILED), true);
+  assert.equal(customChanged({ words: 'Answer in French.' }, undefined, FILED), true, 'removed: told');
+  assert.equal(customChanged({}, 'Answer in French.', FILED), true, 'added: told');
+  assert.equal(customChanged({}, undefined, 'Another instruction.\n\nOnce a paragraph of hers.\n'), false);
+  assert.equal(customChanged(undefined, 'Answer in French.', FILED), false, 'no record: her instruction ends with them');
+  assert.equal(customChanged(undefined, 'Answer in Dutch.', FILED), true, 'no record: it ends with others');
+  assert.equal(customChanged(undefined, 'Answer in Dutch.', undefined), true, 'no record and no instruction');
+  assert.equal(customChanged(undefined, undefined, FILED), false, 'no record: whether she had words is unknown, so no removal');
+});
+
+test("the words that tell her a change carry the person's new words whole, or say she has none", () => {
+  const told = toldCustom('Answer in French.\nTimes in Montreal.');
+  assert.ok(told.includes('Answer in French.\nTimes in Montreal.'), told);
+  assert.match(told, /replac/);
+  const cleared = toldCustom(undefined);
+  assert.match(cleared, /removed/);
+  assert.match(cleared, /none/);
 });
 
 test('REFUSED: a subscription of hers without her floor is no keeping; it is dropped and put again with it', () => {
@@ -79,8 +114,9 @@ test('her diagram draws every edge and each verb from every state it is taken fr
     for (const from of v.from) assert.ok(drawn.includes(`  ${from} --> ${v.to}: ${v.verb} [${v.guard}] (by ${v.by})`), v.verb);
   assert.deepEqual(
     graph.verbs.map((v) => v.verb),
-    ['level (a factory above manual)', 'level (none above manual)'],
+    ['level (a factory above manual)', 'level (none above manual)', 'agents custom nemia (set or clear)'],
   );
+  assert.ok(drawn.includes('  kept --> kept: CUSTOM_CHANGED / tell'));
 });
 
 test("a step's denied calls wake her, and only her: the default wake words leave them to the digest", () => {

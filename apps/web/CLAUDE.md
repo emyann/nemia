@@ -10,8 +10,11 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 ## Build and e2e
 
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
-- For every change here, run `npm run build` and `npm run e2e`, its assertions in the dark theme. A round's check runs no e2e — only the
-  ship's check does, on the merged tree — so your own run is the only one the change meets before it merges.
+- For every change here, run `npm run build` and `npm run e2e -- --pages <the pages the change touches>` (`--photos` too when pictures
+  are due), its assertions in the dark theme; never the whole suite in a session but to measure it. Implement's round check runs it
+  whole, and the landing's again on the merged tree. A whole run over `E2E_BOUND_MS` (`e2e/timing.ts`) fails, naming its slowest pages.
+- `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
+  `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`).
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
@@ -27,10 +30,13 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 ## Writing an e2e page
 
 - A page is a file of its own, `test/e2e/pages/NNN-<name>.ts`, default-exporting a `PageSpec` named `<name>`, plus the line `<name>` at the
-  end of `pages/NAMES`; touch nothing else. Pages run in file-name order (numbers in tens) and share one store: number a page after any
-  page whose leavings it reads. Shared helpers go in `board.ts` or `canvas.ts`, runner state in `world.ts`, the seed in `seed.ts`.
-- Every page is visited in dark; `--photos` visits light, then dark, in one store: a page that writes to the store takes its write back
-  before it ends, and a fixture a second page's close would show is taken back before the close.
+  end of `pages/NAMES`; touch nothing else. Pages are numbered in tens and handed out in file-name order. Shared helpers go in
+  `board.ts` or `canvas.ts`, runner state in `world.ts`, the seed in `seed.ts`.
+- Each worker seeds its own store; a page reads only the seed and what it writes itself, takes its write back, and passes alone
+  (`--pages <name>`) or after any other page. A worker whose store is not its seed at its end fails, naming the files (`leftOver`,
+  `e2e/print.ts`); a file the api writes as it serves goes in `UNPRINTED` there, with why.
+- Every page is visited in dark; `--photos` visits it in light, then dark, in one store: a fixture a second page's close would show is
+  taken back before the close.
 - A page's own pictures are taken only under `--photos` (`photograph` and `photographCard` do nothing otherwise, `photographing` in
   `world.ts`): a page asserts nothing through a picture, and leaves no state a picture's zoom would have reset.
 - The watch counts every 4xx against a page: a refusal made on purpose gets a page of its own whose watch expects exactly it.

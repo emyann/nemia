@@ -185,7 +185,7 @@ test(
     assert.equal(ended.code, 0, said(ended));
     assert.match(
       ended.stdout,
-      /the none page \(\/none\) in the light theme ✓\n(?:.*\n)*.*the none page \(\/none\) in the dark theme ✓/,
+      /the none page \(\/none\) in the light theme ✓ .*\n(?:.*\n)*.*the none page \(\/none\) in the dark theme ✓ /,
       said(ended),
     );
     assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png', 'none-own-dark.png', 'none-own-light.png'], said(ended));

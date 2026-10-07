@@ -256,6 +256,10 @@ test('REFUSED at shipped defaults: a workflow written where one is, at a version
     await refused(t, 'workflows', 'write', 'yours', 'review', '--folder', folder, '--version', '0000000000000000'),
     /0000000000000000/,
   );
+  assert.equal(
+    await refused(t, 'workflows', 'write', 'yours', 'gone', '--folder', folder, '--version', at),
+    `${path.join(YOURS, 'gone')} is not there: it was removed since it was read. Write it with no version to make it again.`,
+  );
   assert.match(
     await refused(t, 'workflows', 'write', 'yours', '../review', '--folder', folder),
     /^nemia workflows write: `\.\.\/review` is not a workflow's name/,

@@ -186,7 +186,8 @@ function ApproveForm({
 }) {
   const [words, setWords] = useState('');
   const [confirming, setConfirming] = useState(false);
-  const handed = acts ? 'the step is handed them as the terms it acts on' : 'every step after the gate is handed them';
+  const handed = (what: string) =>
+    acts ? `the step is handed ${what} as the terms it acts on` : `every step after the gate is handed ${what}`;
   return (
     <form
       aria-label={`Approve ${step}`}
@@ -207,8 +208,8 @@ function ApproveForm({
         rows={2}
         placeholder={
           questions.length
-            ? `A note beside the answers (optional): ${handed} with them, under “Approved”.`
-            : `Your words (optional): ${handed}, under “Approved”.`
+            ? `A note beside the answers (optional): ${handed('it with the answers')}, under “Approved”.`
+            : `Your words (optional): ${handed('them')}, under “Approved”.`
         }
         className={TEXTAREA}
       />

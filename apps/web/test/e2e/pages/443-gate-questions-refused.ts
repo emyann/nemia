@@ -69,7 +69,7 @@ export default {
       if (fs.existsSync(asks))
         throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
       await settled(refused);
-      await photograph(refused, path.join(OUT, `gate-questions-refused-${await themeOf(refused)}.png`), { fullPage: true });
+      await photograph(refused, path.join(OUT, `gate-questions-refused-shown-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 400: POST ${answered.url()}`;
       const seen = problems();

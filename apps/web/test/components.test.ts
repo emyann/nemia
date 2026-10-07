@@ -4532,7 +4532,10 @@ test('a gate whose step asks questions draws them in the answer column, after wh
     html,
     /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Approve<\/button>/,
   );
-  assert.match(html, /placeholder="A note beside the answers \(optional\)/);
+  assert.match(
+    html,
+    /placeholder="A note beside the answers \(optional\): every step after the gate is handed it with the answers, under “Approved”\."/,
+  );
   assert.match(html, /<button type="submit" disabled=""[^>]*>Send back<\/button>/, 'nothing to send back yet: no words, no answers');
   const plain = withClient(
     createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
@@ -4540,6 +4543,27 @@ test('a gate whose step asks questions draws them in the answer column, after wh
   assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
   assert.match(plain, /<button type="submit"[^>]*>Approve<\/button>/);
   assert.doesNotMatch(plain, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
+});
+
+test("the inspector's gate of a step that asks questions draws them too, its Approve waiting until each is answered — and a step that asks none, no fields", async () => {
+  const { Asked } = await import('../src/components/GateBrief.tsx');
+  const run = atGate({ closeout: askingCloseout });
+  const html = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
+  const asked = /<section aria-label="What review asks of you"[^]*$/.exec(html)?.[0] ?? '';
+  assert.match(asked, /<section [^>]*aria-label="What review asks"/, html);
+  assert.match(asked, /<fieldset data-question="How is the card cut\?"/);
+  assert.match(asked, /<fieldset data-question="Where do the answers go\?"/);
+  assert.match(asked, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
+  assert.match(
+    asked,
+    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Approve<\/button>/,
+  );
+  const plain = atGate({ closeout: planCloseout });
+  const none = await routedWith(createElement(Asked, { run: plain, step: plain.steps[0] }));
+  assert.match(none, /aria-label="What review asks of you"/);
+  assert.doesNotMatch(none, /data-question=|Not answered|data-recommend-all/);
+  assert.match(none, /<button type="submit"[^>]*>Approve<\/button>/);
+  assert.doesNotMatch(none, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
 });
 
 test("what a gate's approval sends: every answer in the order asked and the note beside them, left out when empty; a gate that asks nothing, its words alone", () => {

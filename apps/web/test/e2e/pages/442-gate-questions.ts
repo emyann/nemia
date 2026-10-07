@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, stepBar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -38,10 +38,11 @@ async function answer(page: Page, gate: Locator): Promise<void> {
 export default {
   /**
    * A gate whose step asks questions as data: they are drawn in its answer column, after what it handed on, which draws them no more,
-   * and before Approve, which waits — the button disabled, what is unanswered on hover — until each has a choice. `Choose the recommended
-   * answers` chooses the one recommended, a click the other; then the approval goes with its note, and the api writes the approval's
-   * words in the package's: whose questions they answer, each answer, the note. Taken back, the same answers go with a send-back to the
-   * gated step, the objection their note, written as the next try's words. Each write is taken back, and the run with them.
+   * and before Approve, which waits — the button disabled, what is unanswered on hover — until each has a choice, in the step's inspector
+   * too. `Choose the recommended answers` chooses the one recommended, a click the other; then the approval goes with its note, and the
+   * api writes the approval's words in the package's: whose questions they answer, each answer, the note. Taken back, the same answers go
+   * with a send-back to the gated step, the objection their note, written as the next try's words. Each write is taken back, and the run
+   * with them.
    */
   name: 'gate-questions',
   route: '/runs',
@@ -72,6 +73,21 @@ export default {
       if (await sendBack.isEnabled()) throw new Refused('Send back waits for words or answers — it was enabled with neither');
       await settled(page);
       await photograph(gate, path.join(OUT, `gate-questions-unanswered-${theme}.png`));
+
+      await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${gated}"]`).click();
+      const inspector = stepBar(page, id, gated);
+      await inspector.getByRole('tab', { name: 'Details' }).click();
+      const inspected = inspector.locator(`section[aria-label="What ${gated} asks of you"]`);
+      await expectCount(inspected.locator('fieldset[data-question]'), 2, `${gated}'s inspector asks its questions too, a field for each`);
+      const approveThere = inspected.getByRole('button', { name: 'Approve', exact: true });
+      if (await approveThere.isEnabled())
+        throw new Refused("the inspector's Approve waits for every answer too — it was enabled with none");
+      if ((await approveThere.getAttribute('title')) !== unanswered)
+        throw new Refused(`the inspector's Approve says what is not answered — it says ${await approveThere.getAttribute('title')}`);
+      await settled(page);
+      await photograph(inspector, path.join(OUT, `gate-questions-inspector-${theme}.png`));
+      await inspector.getByRole('button', { name: 'Close', exact: true }).click();
+      await expectCount(inspector, 0, 'closed, so the rest of the page reads one gate');
 
       await answer(page, gate);
       const note = gate.getByRole('textbox', { name: `A note beside the answers to ${gated}, if any` });

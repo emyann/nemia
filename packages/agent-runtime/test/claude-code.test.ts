@@ -117,13 +117,14 @@ test('a job is `claude -p` reading a stream and printing one, verbose, that no p
     resumeFrom: BG_ID,
     config: { tools: ['Read', 'Bash'], permissionMode: 'dontAsk', budgetUsd: 0.5 },
   }).args;
-  assert.deepEqual(args.slice(0, 8), [
+  assert.deepEqual(args.slice(0, 9), [
     '-p',
     '--input-format',
     'stream-json',
     '--output-format',
     'stream-json',
     '--verbose',
+    '--include-partial-messages',
     '--permission-prompts',
     'none',
   ]);
@@ -1683,6 +1684,7 @@ const PINNED_ARGV: Record<string, string[]> = {
     '--output-format',
     'stream-json',
     '--verbose',
+    '--include-partial-messages',
     '--permission-prompts',
     'none',
     '--tools',

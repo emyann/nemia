@@ -111,6 +111,7 @@ const VERBS = [
   'close',
   'feed',
   'file',
+  'follow',
   'forget',
   'io',
   'list',
@@ -336,6 +337,13 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
     ['close', 'InputRefused', () => effect((e) => e.close('one')), /`one`/],
     ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), /^`ghost` is not a task on this board\./],
     ['output', 'OutputRefused', () => effect((e) => e.output('ghost', 'stdout')), /^`ghost` is not a task on this board\./],
+    ['follow', 'FollowRefused', () => effect((e) => e.follow('ghost')), /^`ghost` is not a task on this board\./],
+    [
+      'follow',
+      'FollowRefused',
+      () => effect((e) => e.follow('one')),
+      /^the `fake` harness does not stream its sessions: read its transcript again \(`transcript`\) for what is new\.$/,
+    ],
     [
       'output',
       'OutputRefused',
@@ -442,4 +450,10 @@ test('output refuses a task whose harness keeps no whole streams, naming logs', 
     tagged.message,
     'the `claude` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
   );
+});
+
+test('follow of a task whose harness streams, before its first attempt, is nothing to follow, and no refusal', async () => {
+  const { effect, built } = engines();
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one', harness: 'claude', queued: true }));
+  assert.equal(await effect((e) => e.follow('one')), undefined);
 });

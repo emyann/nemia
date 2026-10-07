@@ -19,8 +19,8 @@
  * `RunnerError` is in `error.ts`, beneath this file and Claude Code's `--bg` runner (`claudeOps`, in `claude/bg.ts`):
  * `Runner.claude` needs that runner as a value, and the runner builds the error, so each would import the other.
  */
-import { Context, Effect, Layer } from 'effect';
-import type { Sighting, Usage } from '../core/index.ts';
+import { Context, Effect, Layer, type Stream } from 'effect';
+import type { SessionState, Sighting, Usage } from '../core/index.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { claudeOps, type ClaudeOptions } from './claude/bg.ts';
 import { causeWords, RunnerError } from './error.ts';
@@ -93,6 +93,16 @@ export type TranscriptCursor = string;
 
 /** A read of a session's conversation: the events from the cursor asked with, and the cursor to ask again with. */
 export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor };
+
+/**
+ * One moment of a session followed live (`RunnerOps.follow`): its state, the first moment and again at each change; whole events of
+ * its transcript as they are written, with the cursor after them; or a piece of the text block it is writing, under the block's
+ * `key`, added to what came before under that key (`append`) or the whole text so far, and `last` once the block is written whole.
+ */
+export type Followed =
+  | { kind: 'state'; state: SessionState }
+  | { kind: 'events'; events: TranscriptEvent[]; cursor: TranscriptCursor }
+  | { kind: 'partial'; key: string; text: string; append: boolean; last: boolean };
 
 /**
  * One limit of a harness's subscription, as the harness reported it: `key` is the harness's own name for it (Claude Code's `five_hour`,
@@ -211,6 +221,12 @@ export type RunnerOps = {
    * remembered between reads that the cursor does not carry.
    */
   readonly transcript?: (sessionId: string, after?: TranscriptCursor) => Effect.Effect<Transcript, RunnerError>;
+  /**
+   * The session followed live, from now on (`Followed`): its state first, then each moment once and in order, ending once the session
+   * is over and its last words read. Optional: a harness that cannot say what a session writes while it writes it has `transcript`,
+   * read again. Fails with a refusal (`refused`) where the session is not one this harness streams.
+   */
+  readonly follow?: (sessionId: string) => Stream.Stream<Followed, RunnerError>;
   /**
    * Hand `text` to a session that is running, as a person's words: optional, for a harness with a channel
    * into a live session. Given the session as the engine knows it — the name it chose, and the id `observe`

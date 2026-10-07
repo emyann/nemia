@@ -58,6 +58,7 @@ import {
   type TranscriptRequest,
 } from './handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './map.ts';
+import { followThrough } from './follow.ts';
 
 /**
  * A `Transport` that calls a request handler in this process. Each call gets a fresh server context, as a request that
@@ -224,8 +225,12 @@ const unreadOf = (
   return { unread: names, ...(why.length ? { why } : {}), ...(unreadWhy.size ? { unreadWhy } : {}) };
 };
 
-/** The verbs the card offers that ask the transport alone, each left off when the card does not list its method. */
-const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessTransport): Partial<RunnerOps> => ({
+/**
+ * The verbs the card offers that ask the transport alone, each left off when the card does not list its method; `follow` when it
+ * says the agent streams.
+ */
+const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessTransport, streaming: boolean): Partial<RunnerOps> => ({
+  ...(streaming ? { follow: followThrough((params) => transport.resubscribeTask(params)) } : {}),
   ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
   ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
   ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
@@ -400,7 +405,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     observe,
     stop,
     logs,
-    ...askedOfTransport(offered, transport),
+    ...askedOfTransport(offered, transport, card.capabilities?.streaming === true),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),

@@ -71,6 +71,7 @@ import {
   taskOfSighting,
   type SessionMethod,
 } from './map.ts';
+import { subscription } from './follow.ts';
 
 /**
  * What a harness said when a verb failed, carried out of the handler with its words unchanged. Anything else the handler
@@ -106,7 +107,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
   provider: undefined,
   version: '1',
   capabilities: {
-    streaming: false,
+    streaming: ops.follow !== undefined,
     pushNotifications: false,
     extendedAgentCard: false,
     extensions: [
@@ -548,9 +549,17 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     throw this.noPush();
   }
 
-  // oxlint-disable-next-line require-yield -- the SDK's handler types this as a stream, and this agent refuses to stream
-  async *resubscribe(_params: SubscribeToTaskRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
-    throw new UnsupportedOperationError('this agent does not stream: poll getTask.');
+  /** `SubscribeToTask`: the session followed live, where the driver follows it (`subscription`). */
+  async *resubscribe(params: SubscribeToTaskRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+    try {
+      yield* subscription(this.harness, this.ops, params);
+    } catch (cause) {
+      throw cause instanceof RunnerError
+        ? cause.refused
+          ? new UnsupportedOperationError(cause.message)
+          : new HarnessFailed(cause.message)
+        : cause;
+    }
   }
 
   private noPush() {

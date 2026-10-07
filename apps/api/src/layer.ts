@@ -1,9 +1,9 @@
 /**
  * What the api's handlers run on: the services every route may read, the runtime an app builds from their layer (`appOf` in app.ts), and
  * `served`, which runs a handler on the request's runtime over them. A test gives the api another environment, engine, root, asker or
- * memo by building an app over a layer of its own, and what the app keeps between requests is its own (`ReadMemo`, the askers). What the
- * package's own verbs read is not a service: the runs, the inbox and the daemon's file are under the package's `HOME`, fixed as it loads
- * (`StoreRoot`, store.ts).
+ * memo by building an app over a layer of its own, and what the app keeps between requests is its own (`ReadMemo`, the askers, the steps
+ * followed: `Followings`). What the package's own verbs read is not a service: the runs, the inbox and the daemon's file are under the
+ * package's `HOME`, fixed as it loads (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
 import type { Context as RequestContext } from 'hono';
@@ -24,6 +24,7 @@ import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
+import { Followings } from './steps/following.ts';
 import { Engine, StoreRoot } from './store.ts';
 
 /**
@@ -65,8 +66,8 @@ export class ReadMemo extends Context.Service<
   }));
 }
 
-/** Every service a handler may read: what an app's layer provides whole. */
-export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | ReadMemo;
+/** Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`). */
+export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | ReadMemo | Followings;
 
 /** The runtime an app runs its handlers on, built once from its layer. */
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
@@ -88,6 +89,7 @@ export type Served = {
   mcp: McpAsker['Service'];
   quota: QuotaAsker['Service'];
   memo: ReadMemo['Service'];
+  followings: Followings['Service'];
 };
 
 /** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
@@ -128,6 +130,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         mcp: yield* McpAsker,
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
+        followings: yield* Followings,
       };
       const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>

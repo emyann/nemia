@@ -1,8 +1,8 @@
 /**
  * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the
- * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`, `QuotaLimit`, `nameFor`,
- * `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
+ * runtime's types the controllers use (`Engine`, `TaskView`, `TranscriptEvent`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`,
+ * `QuotaLimit`, `nameFor`, `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
  *
  * It builds the runtime's `Engine` service (`agent-runtime`) once, changed in one verb: `file`, so that every task the orchestrator
  * files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. What the controllers do with the
@@ -38,7 +38,17 @@ import { otlpOf } from './telemetry/telemetry.ts';
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
-export type { ClaudeFlags, CodexArgs, Denial, HarnessQuota, QuotaLimit, RefusedMove, TaskView, Usage } from 'agent-runtime';
+export type {
+  ClaudeFlags,
+  CodexArgs,
+  Denial,
+  HarnessQuota,
+  QuotaLimit,
+  RefusedMove,
+  TaskView,
+  TranscriptEvent,
+  Usage,
+} from 'agent-runtime';
 /** What the engine's `forget` removed, or would, and its refusal by task (`engineForgetting`). */
 export { ForgetRefused, type ForgetReport } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */

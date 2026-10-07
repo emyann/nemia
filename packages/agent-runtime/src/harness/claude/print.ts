@@ -30,6 +30,22 @@ const ToolUseBlock = Schema.Struct({
   input: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 });
 
+/** A message begun, under `--include-partial-messages`: its id, the one its whole `assistant` lines carry. */
+const StartEvent = Schema.Struct({
+  type: Schema.Literal('message_start'),
+  message: Schema.Struct({ id: Schema.NonEmptyString }),
+});
+
+/** A piece of a block being written: the block's place in its message, and its text when it is text. */
+const DeltaEvent = Schema.Struct({
+  type: Schema.Literal('content_block_delta'),
+  index: Count,
+  delta: Schema.Union([Schema.Struct({ type: Schema.Literal('text_delta'), text: Schema.String }), otherThan(['text_delta'])]),
+});
+
+/** A block written whole, by its place in its message. */
+const StopEvent = Schema.Struct({ type: Schema.Literal('content_block_stop'), index: Count });
+
 /** A call Claude Code refused without asking: its tool, the id of its call, and the input it was called with. */
 const DenialSchema = Schema.Struct({
   tool_name: Schema.NonEmptyString,
@@ -69,6 +85,10 @@ export const PRINTED = {
     type: Schema.Literal('system'),
     subtype: Schema.Literal('init'),
     cwd: Schema.optional(Schema.NonEmptyString),
+  }),
+  stream_event: Schema.Struct({
+    type: Schema.Literal('stream_event'),
+    event: Schema.Union([StartEvent, DeltaEvent, StopEvent, otherThan(['message_start', 'content_block_delta', 'content_block_stop'])]),
   }),
   assistant: Schema.Struct({
     type: Schema.Literal('assistant'),

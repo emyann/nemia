@@ -39,6 +39,7 @@ export {
   ListRefused,
   TranscriptRefused,
   OutputRefused,
+  FollowRefused,
   SayRefused,
   SayUnsent,
   QuotaRefused,
@@ -77,6 +78,7 @@ export { Runner, RunnerError, testOps } from './harness/index.ts';
 export { claudeOps } from './harness/claude/index.ts';
 export type {
   ExpectedSession,
+  Followed,
   HarnessQuota,
   McpServer,
   Observation,

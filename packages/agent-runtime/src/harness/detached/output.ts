@@ -9,6 +9,7 @@ import path from 'node:path';
 import type { Denial, Usage } from '../../core/index.ts';
 import { printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
 import type { HarnessOutput } from './detached.ts';
+import type { PartialMark } from './follow.ts';
 
 /** The lines of `kinds` in `output`, decoded; throws an `Error` whose message is `printedLinesOf`'s `wrong` when one does not decode. */
 const decoded = (output: string, kinds: readonly PrintedKind[]): PrintedLine[] => {
@@ -177,7 +178,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
   } else if (printed.kind === 'system init') {
     facts.started = true;
     facts.cwd ??= printed.line.cwd;
-  } else gatherCalls(facts, printed.line);
+  } else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
 };
 
 /**
@@ -235,4 +236,24 @@ const fileIn = (cwd: string, tool: string, input: unknown): string | undefined =
 const touchedFiles = (cwd: string, { files, denied }: StreamFacts): string[] => {
   const touched = [...files].flatMap(([id, [tool, input]]) => (denied.has(id) ? [] : (fileIn(cwd, tool, input) ?? [])));
   return [...new Set(touched)];
+};
+
+/**
+ * What `claude -p --include-partial-messages` says of the text it is writing, in `output`'s whole lines after `before` lines: a
+ * message begun, a piece of a text block, a block written whole (`PartialMark`); every other line passes. Or why it is refused
+ * (`wrong`), naming the line as numbered in the whole output, when a `stream_event` line does not decode (`printedLinesOf`).
+ */
+export const claudePartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
+  const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);
+  if ('wrong' in read) return read;
+  return {
+    marks: read.lines.flatMap(({ line }): PartialMark[] => {
+      const { event } = line as Printed<'stream_event'>;
+      if (event.type === 'message_start' && 'message' in event) return [{ begun: event.message.id }];
+      if (event.type === 'content_block_stop' && 'index' in event) return [{ stopped: event.index }];
+      if (event.type === 'content_block_delta' && 'delta' in event && event.delta.type === 'text_delta' && 'text' in event.delta)
+        return [{ index: event.index, text: event.delta.text }];
+      return [];
+    }),
+  };
 };

@@ -1,8 +1,55 @@
-import type { TranscriptEvent } from './api.ts';
+import { streamDataOf, type StreamPartial, type TranscriptEvent } from './api/steps.ts';
 import { mergeEvents } from './transcript.ts';
 
-/** A step's conversation as a page holds it: the events so far, whether more may come, and why it could not be read, if it could not. */
-export type Following = { events: TranscriptEvent[]; live: boolean; loading: boolean; error: string | null };
+/**
+ * A step's conversation as a page holds it: the events so far, the message being written (`partial`: its text block's key and its text so
+ * far), whether more may come, whether the api pushes it as it is written (`streamed`), and why it could not be read, if it could not.
+ */
+export type Following = {
+  events: TranscriptEvent[];
+  partial: { key: string; text: string } | null;
+  live: boolean;
+  streamed: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+/** What a page holds of a conversation before it is read: nothing, being read when there is one (`loading`). */
+export const unread = (loading: boolean): Following => ({ events: [], partial: null, live: false, streamed: false, loading, error: null });
+
+/** What one event of the stream does to the conversation, in the order they came: whole events, a piece of a message, or a move. */
+type Change = { kind: 'events'; events: TranscriptEvent[] } | ({ kind: 'partial' } & StreamPartial) | { kind: 'moved' };
+
+/** A whole message of the session's own: what replaces the message being written. */
+const wholeText = (event: TranscriptEvent) => event.role === 'assistant' && event.kind === 'text';
+
+/**
+ * `s` after the change `c`, `closed` holding each text block written whole: whole events merged in, the message being written dropped, and
+ * its block closed, once one of them is the session's own text; a piece added to the message of its block, or begun anew for another
+ * block, and the message dropped and its block closed at its `last`; a piece of a closed block ignored; and a move to another attempt or
+ * task (`moved`) starts the conversation afresh, its history to come.
+ */
+export function changed(s: Following, c: Change, closed: Set<string>): Following {
+  if (c.kind === 'moved') return { ...s, events: [], partial: null };
+  if (c.kind === 'events') {
+    const whole = c.events.some(wholeText);
+    if (whole && s.partial) closed.add(s.partial.key);
+    return { ...s, events: mergeEvents(s.events, c.events), partial: whole ? null : s.partial };
+  }
+  if (closed.has(c.key)) return s;
+  if (c.last) {
+    closed.add(c.key);
+    return { ...s, partial: null };
+  }
+  return { ...s, partial: { key: c.key, text: s.partial?.key === c.key ? s.partial.text + c.delta : c.delta } };
+}
+
+/**
+ * The cursor a step's conversation is followed from after its first read (`first`), or null where it is read that once: a task that is
+ * not live, unless the step waits on a person (`waiting`) and its next turn is to come; and a read that gave no cursor.
+ */
+export const followedFrom = (first: { live: boolean; cursor: string | null }, waiting: boolean): string | null =>
+  first.live || waiting ? first.cursor : null;
 
 /** The stream as `follow` uses it: an EventSource, or anything that dispatches the same events. */
 export type StreamLike = {
@@ -34,11 +81,12 @@ export const END_GRACE_MS = 2_000;
 
 /**
  * What each of a step's stream events does to what a page holds of its conversation (`update`), apart from React, so it is tested without a
- * browser: `useStepTranscript` opens the stream and hands it here. Each `transcript` event is merged in, a frame's worth at once; `settled`
- * ends it; a read that failed and is tried again every second is said, and one that will not be is the end; `readable` clears the error,
- * and so does each connection made — the first, or one the EventSource made again after a drop — since a fresh server stream never sends
- * `readable`. A dropped connection is the EventSource's to resume; one it closes, because the api refused it, is the end. Returns what
- * stops following.
+ * browser: `useStepTranscript` opens the stream and hands it here. Each event's data is decoded by its schema (`streamDataOf`), and one
+ * that does not decode is ignored. `following` says whether the stream is pushed (`streamed`); each `transcript`, `partial` and `moved`
+ * changes the conversation as `changed` says, in the order they came, a frame's worth at once; `settled` ends it; a read that failed and is
+ * tried again every second is said, and one that will not be is the end; `readable` clears the error, and so does each connection made —
+ * the first, or one the EventSource made again after a drop — since a fresh server stream never sends `readable`. A dropped connection is
+ * the EventSource's to resume; one it closes, because the api refused it, is the end. Returns what stops following.
  *
  * A stream that said it is over is closed once the api has ended its response — the `error` an EventSource fires then, before it would
  * reconnect — or after `END_GRACE_MS`, and not the moment its last event arrives. Closed then, while the rest of the response is still on
@@ -46,7 +94,8 @@ export const END_GRACE_MS = 2_000;
  * The page stops following at once all the same.
  */
 export function follow(stream: StreamLike, update: (change: (s: Following) => Following) => void, frames: Frames): () => void {
-  let arrived: TranscriptEvent[] = [];
+  let arrived: Change[] = [];
+  const closed = new Set<string>();
   let frame = 0;
   let grace: ReturnType<typeof setTimeout> | undefined;
   const close = () => {
@@ -55,9 +104,9 @@ export function follow(stream: StreamLike, update: (change: (s: Following) => Fo
   };
   const flush = () => {
     frame = 0;
-    const merged = arrived;
+    const changes = arrived;
     arrived = [];
-    update((s) => ({ ...s, events: mergeEvents(s.events, merged) }));
+    update((s) => changes.reduce((at, c) => changed(at, c, closed), s));
   };
   const end = (error: string | null) => {
     grace ??= setTimeout(close, END_GRACE_MS);
@@ -65,18 +114,35 @@ export function follow(stream: StreamLike, update: (change: (s: Following) => Fo
       frames.cancel(frame);
       flush();
     }
-    update((s) => ({ ...s, live: false, error }));
+    update((s) => ({ ...s, live: false, partial: null, error }));
+  };
+  const arrive = (c: Change) => {
+    const last = arrived.at(-1);
+    if (c.kind === 'events' && last?.kind === 'events') last.events.push(...c.events);
+    else arrived.push(c);
+    frame ||= frames.request(flush);
   };
   stream.addEventListener('transcript', (message) => {
-    arrived.push(JSON.parse(message.data) as TranscriptEvent);
-    frame ||= frames.request(flush);
+    const event = streamDataOf('transcript', message.data);
+    if (event) arrive({ kind: 'events', events: [event] });
+  });
+  stream.addEventListener('partial', (message) => {
+    const piece = streamDataOf('partial', message.data);
+    if (piece) arrive({ kind: 'partial', ...piece });
+  });
+  stream.addEventListener('moved', (message) => {
+    if (streamDataOf('moved', message.data)) arrive({ kind: 'moved' });
+  });
+  stream.addEventListener('following', (message) => {
+    const said = streamDataOf('following', message.data);
+    if (said) update((s) => ({ ...s, streamed: said.streamed }));
   });
   stream.addEventListener('settled', () => end(null));
   stream.addEventListener('unreadable', (message) => {
-    const { error, retrying } = JSON.parse(message.data) as { error?: unknown; retrying?: unknown };
-    const said = typeof error === 'string' ? error : 'The conversation could not be read.';
-    if (retrying === true) update((s) => ({ ...s, error: `${said} Reading it again every second.` }));
-    else end(said);
+    const said = streamDataOf('unreadable', message.data);
+    const error = said?.error ?? 'The conversation could not be read.';
+    if (said?.retrying) update((s) => ({ ...s, error: `${error} Reading it again every second.` }));
+    else end(error);
   });
   stream.addEventListener('readable', () => update((s) => ({ ...s, error: null })));
   stream.addEventListener('open', () => update((s) => (s.error === null ? s : { ...s, error: null })));

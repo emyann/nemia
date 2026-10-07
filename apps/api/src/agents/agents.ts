@@ -73,6 +73,9 @@ const REMOVE = COMMANDS.find((c) => c.name === 'agents remove')!;
 const TRY = COMMANDS.find((c) => c.name === 'agents try')!;
 const READ = COMMANDS.find((c) => c.name === 'agents read')!;
 
+/** The package's listing of the agent files the store knows (`nemia agents sources`): on `GET /api/agents/sources`. */
+const SOURCES = COMMANDS.find((c) => c.name === 'agents sources')!;
+
 /** Where the agents of each place are: `<workflows>/agents`, the repository's then yours. */
 const agentPlaces = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> =>
   sourcesOf(repo, home).map(({ from, dir }) => ({ from, dir: path.join(dir, AGENTS_FOLDER) }));
@@ -249,6 +252,9 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  *   factories it fills a step in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents
  *   it hires into a step or its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `nemia
  *   agents`).
+ * - `GET /api/agents/sources` — the agent files the store knows (`{ sources: AgentSource[] }`, as `nemia agents sources` lists them):
+ *   each repository's a factory names, then your library, then the folder `?path=` names, a folder that is not there a 404. Each is a file
+ *   `POST /api/agents/yours/copy` takes.
  * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
  * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`), as `nemia agents card` prints it
  *   (`AGENT_CARD`). Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and
@@ -281,6 +287,12 @@ export const agents = new Hono<ApiEnv>()
         factory,
       );
       return c.json(answer);
+    }),
+  )
+  .get('/api/agents/sources', (c) =>
+    served(c, async ({ e, env, home }) => {
+      const at = c.req.query('path');
+      return c.json(await runWith(e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
     }),
   )
   .get('/api/agents/:from/:name', (c) =>

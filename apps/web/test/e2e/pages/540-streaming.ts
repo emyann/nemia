@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, sidebar, themeOf } from '../board.ts';
-import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { lines, NEIGHBOUR } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -126,8 +126,9 @@ export default {
    * A step whose session says its words in pieces is drawn as they come. The page writes STREAMING, a step at work in a `claude -p` job,
    * and opens its session: the header's `[data-following]` says the session is streamed (`data-streamed`). Each piece the job prints grows
    * the message being written, drawn last and marked `[data-partial]`; once the job prints the message whole, it takes the partial's place,
-   * drawn once. The session's stream never finishes: the page waits on what it reads, never on the network. Every file it writes is taken
-   * back and the engine's feed cut back, so each page after it, in either theme, reads the store as seeded.
+   * drawn once. The session's stream never finishes: the page waits on what it reads, never on the network. It leaves for the list before
+   * every file it writes is taken back and the engine's feed cut back, so no session is drawn losing its run, and each page after it, in
+   * either theme, reads the store as seeded.
    */
   name: 'streaming',
   route: '/runs',
@@ -159,9 +160,16 @@ export default {
       await expectCount(message, 1, 'and the whole message is drawn in its place, once');
       if ((await top.locator('[data-following][data-streamed]').count()) !== 1)
         throw new Refused('the session is still followed live after the message is read whole');
+      await settled(page);
+      await photograph(page, path.join(OUT, `streaming-whole-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
+      await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+      await idle(page);
       for (const file of [f.record, f.journal, f.run, f.stdout, f.log, f.transcript]) fs.rmSync(file, { force: true });
       fs.writeFileSync(f.feed, feed);
     }
+    await page.reload({ waitUntil: 'load' });
+    await idle(page);
+    await expectCount(page.locator(`a[href="/runs/${STREAMING.id}"]`), 0, 'taken back: the run is gone from the list');
   },
 } satisfies PageSpec;

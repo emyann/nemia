@@ -12,7 +12,8 @@ page sets one: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pa
 and visits no other. The `look` skill says how, and how to picture a state no page reaches.
 Name each picture in `artifacts` by its absolute path. `npm run e2e` without `--photos` takes no picture but a failing page's.
 The check refuses a change under `apps/web/src` whose `artifacts` names no picture that is there (`pictures.ts`); a change only under
-`apps/web/test` asks for none.
+`apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
+but to measure it: this step's check runs every page, in workers, outside your session.
 
 When you start a Claude Code session of your own to measure something, a probe, start it through `node workflows/build/probe.ts start
 <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you. It names the session for the run, runs it in the

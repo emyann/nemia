@@ -10,8 +10,9 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 ## Build and e2e
 
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
-- For every change here, run `npm run build` and `npm run e2e`, its assertions in the dark theme. Implement's round check runs it whole,
-  and the landing's again on the merged tree. A whole run over `E2E_BOUND_MS` (`e2e/timing.ts`) fails, naming its slowest pages.
+- For every change here, run `npm run build` and `npm run e2e -- --pages <the pages the change touches>` (`--photos` too when pictures
+  are due), its assertions in the dark theme; never the whole suite in a session but to measure it. Implement's round check runs it
+  whole, and the landing's again on the merged tree. A whole run over `E2E_BOUND_MS` (`e2e/timing.ts`) fails, naming its slowest pages.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
   `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`).
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install

@@ -29,8 +29,9 @@ holds what every change needs.
   `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
-- `npm run build`, then `npm run e2e`, when you touch `apps/web`: its assertions, in the dark theme, by workers in parallel, each with
-  its own store, api and app (`apps/web/CLAUDE.md`); `--pages <name,…>` visits only those. Implement's round check runs it whole.
+- `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
+  `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
+  A session never runs it whole but to measure it: implement's round check and the landing's run every page.
 - Run them before you commit. Green is the floor, not the bar: a change that makes the suite pass by weakening a test is a finding to
   report, not a fix.
 - Turbo does not see `workflows/`: after touching a workflow folder, run `npx turbo run test --force --continue`. The same goes for a

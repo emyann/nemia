@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Effect, Fiber, Stream } from 'effect';
 import { livenessWords, type DaemonFile, type DaemonStanding } from '../daemon/daemon.ts';
 import { startedLine, type FeedLine } from '../feed/feed.ts';
-import { wakeOf, watchedLine } from '../subscription/subscription.ts';
+import { wakeOf, watchedLine, type Watched } from '../subscription/subscription.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
 
@@ -144,28 +144,33 @@ test(
   async (t) => {
     fs.writeFileSync(FEED, '');
     const out: string[] = [];
+    const err: string[] = [];
     const printed = bell();
-    t.mock.method(console, 'log', (...a: unknown[]) => {
-      out.push(a.join(' '));
-      printed.ring();
-    });
-    t.mock.method(console, 'error', () => {});
-    const words = Effect.runFork(watching(0, { wake: ['failed'] }, () => ({ kind: 'none' })));
-    try {
-      await until(t, () => out.length === 2, 'the banner and the liveness', { bell: printed });
-      assert.equal(out[0], 'watching from 0, ^C to stop');
-      assert.match(out[1], /^\d\d:\d\d:\d\d {2}daemon down {2}· daemon: none has held this store/);
-    } finally {
-      await Effect.runPromise(Fiber.interrupt(words));
-    }
-    out.length = 0;
-    const json = Effect.runFork(watching(0, { json: true }, () => ({ kind: 'none' })));
-    try {
-      await until(t, () => out.length === 1, 'the liveness', { bell: printed });
-      assert.deepEqual(Object.keys(JSON.parse(out[0])), ['liveness', 'at', 'note']);
-      assert.equal(JSON.parse(out[0]).liveness, 'down');
-    } finally {
-      await Effect.runPromise(Fiber.interrupt(json));
-    }
+    for (const [method, to] of [
+      ['log', out],
+      ['error', err],
+    ] as const)
+      t.mock.method(console, method, (...a: unknown[]) => {
+        to.push(a.join(' '));
+        printed.ring();
+      });
+    const lines = async (how: Watched) => {
+      out.length = 0;
+      err.length = 0;
+      const fiber = Effect.runFork(watching(0, how, () => ({ kind: 'none' })));
+      try {
+        await until(t, () => out.length + err.length === 2, 'the banner and the liveness', { bell: printed });
+      } finally {
+        await Effect.runPromise(Fiber.interrupt(fiber));
+      }
+      return { out: [...out], err: [...err] };
+    };
+    const words = await lines({ wake: ['failed'] });
+    assert.equal(words.out[0], 'watching from 0, ^C to stop');
+    assert.match(words.out[1] ?? '', /^\d\d:\d\d:\d\d {2}daemon down {2}· daemon: none has held this store/);
+    const json = await lines({ json: true });
+    assert.deepEqual(json.err, ['watching from 0, ^C to stop']);
+    assert.deepEqual(Object.keys(JSON.parse(json.out[0] ?? '{}')), ['liveness', 'at', 'note']);
+    assert.equal(JSON.parse(json.out[0]).liveness, 'down');
   },
 );

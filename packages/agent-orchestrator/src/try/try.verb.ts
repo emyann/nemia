@@ -12,7 +12,7 @@ import { tryOf } from '../summary/reads.verb.ts';
 import { judgedNow } from '../summary/summary.verb.ts';
 import { startRun } from '../start/start.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { skillNamesIn } from '../folder/folder.store.ts';
+import { skillNamesIn } from '../agents/read.store.ts';
 import { agentRead, agentSkillsFound } from '../roster/roster.store.ts';
 import type { AgentReading } from '../roster/roster.ts';
 import { repoSkillsRefusal, untriedOf, yourAgentsDir } from './try.ts';

@@ -1,6 +1,6 @@
 /**
- * A git run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read back
- * only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
+ * A repository run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read
+ * back only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
@@ -25,20 +25,20 @@ import {
   type Provisioned,
 } from './workspace.ts';
 import { folderPlace } from '../record/places.store.ts';
-import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
-import { countSpawn, withinEffect } from '../meter/tally.store.ts';
+import { countSpawn } from '../meter/tally.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
 import { readPlaceJson } from '../place/place.store.ts';
 import type { PlaceRequests } from '../place/place.ts';
 
 /**
- * The real path of a git run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there to
- * resolve, so a filing that reads it goes on without it rather than stopping the pass.
+ * The real path of a repository run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there
+ * to resolve, so a filing that reads it goes on without it rather than stopping the pass.
  */
 export const realRepoOf = (run: Run): string | undefined => {
-  if (!isGitRun(run)) return undefined;
+  if (!isRepositoryRun(run)) return undefined;
   try {
     return fs.realpathSync(run.repo);
   } catch {
@@ -341,15 +341,14 @@ function madeAt(made: string, at: string): boolean {
  * none, in words for the run's log — its refusal, why it was not heard, a place `dirOf` will not name, or an answer that names a workspace
  * other than `at`, which is read as unread: a step is never filed where nobody cut it.
  */
-const madeBy = Effect.fn('madeBy')(function* (run: GitRun, dirOf: (run: GitRun) => string, request: PlaceRequests['make']) {
+const madeBy = Effect.fn('madeBy')(function* (run: RepositoryRun, dirOf: (run: RepositoryRun) => string, request: PlaceRequests['make']) {
   let dir: string;
   try {
     dir = dirOf(run);
   } catch (err) {
     return uncut((err as Error).message);
   }
-  countSpawn();
-  const outcome = yield* withinEffect('git', runPlaceVerbAsync(dir, 'make', request));
+  const outcome = yield* runPlaceVerbAsync(dir, 'make', request);
   if ('refused' in outcome) return uncut(`the place refused: ${outcome.refused}`);
   if ('unread' in outcome) return uncut(`the place's make was not heard: ${outcome.unread.said}; asked again on the next pass`);
   if (!madeAt(outcome.answer.workspace, request.at))
@@ -389,11 +388,11 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   run: Run,
   steps: readonly Workflow[],
   step: Workflow,
-  dirOf: (run: GitRun) => string,
+  dirOf: (run: RepositoryRun) => string,
 ) {
   const plan = workspacePlan(steps, step);
   const cut = (made: Cut): CutOutcome => ({ cut: made });
-  if (!isGitRun(run)) return cut(folderPlace(runsDir()).make(run, plan, step.name));
+  if (!isRepositoryRun(run)) return cut(folderPlace(runsDir()).make(run, plan, step.name));
   const of = (name: string) => {
     const s = run.steps[name];
     if (!s?.workspace || !s.branch) throw new Error(`${step.name}: ${name} has no workspace yet`);

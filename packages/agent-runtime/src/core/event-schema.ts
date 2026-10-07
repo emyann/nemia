@@ -185,7 +185,13 @@ export const StoredEventSchema = Schema.Union([
   event('gap', { attempt: Schema.Finite, mono: Schema.optional(MonotonicSchema) }),
   event('process', { attempt: Schema.Finite, pid: Schema.optional(Schema.Finite) }),
   event('stop-requested', {}),
-  event('said', { attempt: Schema.Finite, text: Schema.String }),
+  event('said', {
+    attempt: Schema.Finite,
+    text: Schema.String,
+    after: Schema.optional(
+      Schema.NullOr(Schema.Struct({ kind: Schema.Literals(['text', 'thinking', 'tool_use', 'tool_result', 'system']), id: Schema.String })),
+    ),
+  }),
   Input,
   event('closed', {}),
   event('admitted', {}),

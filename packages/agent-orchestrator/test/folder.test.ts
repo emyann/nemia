@@ -231,7 +231,7 @@ test("REFUSED: a folder team whose agent is given the git place's skill, which h
   assert.deepEqual(gitAsked(), []);
 });
 
-test('a git team is still a git run: from a directory that is no repository, it is refused by git', async () => {
+test('a git team is still a repository run: from a directory that is no repository, it is refused by git', async () => {
   const GIT_TEAM = path.join(ROOT, 'workflows', 'plain');
   fs.mkdirSync(GIT_TEAM, { recursive: true });
   fs.writeFileSync(path.join(GIT_TEAM, 'write.md'), '---\nplace: git\n---\nwrite the note\n');
@@ -262,7 +262,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(
     fs.readFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'write', 'note.md'), 'utf8'),
     '# Tides\n',
-    "collected at the hand-off, as on a git run, into the step's own files directory",
+    "collected at the hand-off, as on a repository run, into the step's own files directory",
   );
   assert.equal(tasks.get(`${run.id}-review`)!.spec.cwd, writeFolder, "a chain continues its parent's folder");
   assert.equal(readRun(run.id).steps.review?.branch, undefined);

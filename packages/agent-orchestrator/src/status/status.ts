@@ -602,8 +602,8 @@ export const MOMENTUM = 1;
 export const stepMomentum = (step: Pick<Workflow, 'after'>): number => (step.after.length ? MOMENTUM : 0);
 
 /**
- * What a person's try of a step over its budget, or ended at it, has to carry: a `--budget` above `above` — what its tries have cost, or
- * the cap its session was ended at, whichever is more — beside what they cost and the cap in force.
+ * The floor of a `--budget` on a step with a cap, and what a person's try of a step over its budget, or ended at it, has to carry: a
+ * `--budget` above `above` — what its tries have cost, or the cap in force, whichever is more — beside what they cost and the cap.
  */
 export type Raise = { above: number; spent: Spend; cap: number };
 

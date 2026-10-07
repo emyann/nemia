@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentCard, ownSkill, parseAgent, WorkflowError, type Agent } from '../src/workflow.ts';
-import { agentVersion, cardSkills, skillsFor } from '../src/folder/folder.store.ts';
+import { agentVersion } from '../src/agents/read.store.ts';
+import { cardSkills, skillsFor } from '../src/skills/read.store.ts';
 import { scratch } from './scratch.ts';
 
 /** Every field `AgentCard` marks REQUIRED, in the proto's order, spelled as the specification's sample card spells them in JSON. */

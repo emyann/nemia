@@ -39,8 +39,7 @@ const PLACE_AND_NAME: readonly Positional[] = [
 ];
 
 /** Why the board's agent writes are served by the api's own routes. */
-const WRITE_HAND =
-  "the board guards the write, decodes the agent's form in its own words, answers the package's refusal with the steps that still name it, and reads the agent back";
+const WRITE_HAND = "the board guards the write, decodes the agent's form in its own words, and reads the agent back";
 
 /** `--repo`, which the board hands for the repository whose skills an agent's version counts; the command line counts yours alone. */
 const REPO = apiKey('repo', "the board names the repository it lists an agent's skills from; the command line names none, and reads yours");
@@ -117,7 +116,7 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
     method: 'DELETE',
     path: '/api/agents/:from/:name',
     status: 200,
-    hand: "the board guards the removal, and answers the package's refusal with the steps that still name the agent",
+    hand: 'the board guards the removal, and reads the version the agent was read at before it is removed',
   },
   handler: (args, _env, home = HOME) =>
     tried(() => {

@@ -10,7 +10,8 @@ import { bell, until, WAITED } from './waits.ts';
 test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
   const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit }> = [];
-  let answer = () => new Response(JSON.stringify({ at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.' }), { status: 202 });
+  let answer = () =>
+    new Response(JSON.stringify({ at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.', after: null }), { status: 202 });
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     sent.push({ url, init });
     return answer();
@@ -18,7 +19,12 @@ test("saying something to a step posts the words as JSON and resolves with the e
   t.after(() => {
     globalThis.fetch = before;
   });
-  assert.deepEqual(await sayToStep('r 1', 'implement', 'Widen it.'), { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.' });
+  assert.deepEqual(await sayToStep('r 1', 'implement', 'Widen it.'), {
+    at: '2026-09-14T16:06:19.851Z',
+    attempt: 1,
+    text: 'Widen it.',
+    after: null,
+  });
   const [{ url, init }] = sent as [{ url: string; init: RequestInit }];
   assert.deepEqual(
     [url, init.method, (init.headers as Record<string, string>)['content-type'], init.body],

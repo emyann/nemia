@@ -86,6 +86,7 @@ export type {
   Transcript,
   TranscriptCursor,
   TranscriptEvent,
+  TranscriptMark,
 } from './harness/index.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
 export type { Admission, AdmissionAnswer, AdmissionCall, CodexArgs, HarnessArgs, Mount } from './harness/index.ts';

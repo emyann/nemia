@@ -260,8 +260,8 @@ test("a harness's observe is moved out of the runtime's pass into observe, and t
   assert.equal(
     cost.spawned,
     cost.phases.observe.spawned +
-      cost.phases.git.spawned +
-      PHASES.filter((p) => p !== 'observe' && p !== 'git').reduce((n, p) => n + cost.phases[p].spawned, 0),
+      cost.phases.place.spawned +
+      PHASES.filter((p) => p !== 'observe' && p !== 'place').reduce((n, p) => n + cost.phases[p].spawned, 0),
   );
 });
 

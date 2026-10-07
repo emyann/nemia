@@ -3679,7 +3679,7 @@ What was built, four commits:
 - **`to decide`**, the fifth reason a run waits on a person, in `assess` and `listing` (`toDecide`, `ToDecide`, `toDecideWords`): the run is
   at its result and a last step's gate has nobody's approval — `{ kind: 'approve', step, says }`, `says` being the first line of the step's
   prose for an ending that has not run and null for a gated step that has, whose closeout is what to read — or, where no step of the
-  workflow merges (`merges`), every step finished and a result branch is ahead of the base and not gone, `{ kind: 'git', branches }`. A
+  workflow merges (`merges`), every step finished and a result branch is ahead of the base and not gone, `{ kind: 'result', branches }`. A
   gate a run was started with, `--gate <the last step>`, is the second kind: approving accepts what that step did, and what becomes of the
   branch is still a person's, so the git commands are printed for it. Level-triggered: `branchStandings` asks git on the pass that asks and stores nothing, as `shipped` is asked
   and not stored, so a branch a person merged by hand stops being one to decide with nobody telling the run. `wf ls` says
@@ -3903,7 +3903,7 @@ What it leaves:
 What the board calls:
 
 - **`listing(...).toDecide` and `assess(...).toDecide`** (`ToDecide`): `{ kind: 'approve', step, says }` — `says` is the ending step's first
-  line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'git', branches }`. `assess` and `listing` take the
+  line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'result', branches }`. `assess` and `listing` take the
   branch standings last (`branchStandings(run, resultBranches(run))` in branches/branches.store.ts, which reads git); without them only the gate says a run
   is one to decide.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
@@ -4552,7 +4552,7 @@ folder`, the first of a family of kinds; the record freezes `place: { kind: 'fol
 the git words are not renamed. No change to `packages/agent-runtime`: a task's `cwd` was all a folder needed.
 
 - **The word** (`workflow/validate.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
-- **The run** (`record/record.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
+- **The run** (`record/record.ts`). `Run` is `RepositoryRun | FolderRun`; `placeOf`, `isRepositoryRun`. The git-only readers take a `RepositoryRun`, so every
   caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
 - **Start** (`start.verb.ts`, `cli/start.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
@@ -4791,7 +4791,7 @@ types). When P3's reach keys are built they want a name that is not `capabilitie
 **Superseded 2026-09-25 by agents card 2: the card is generated, and the `.skills.json` files are gone.** An agent's card lists one entry
 per skill its `skills:` composes, read off that skill's SKILL.md frontmatter — the folder's name as `id`, `title:` as `name` (else the
 frontmatter's `name`, else the id), `description` (required), `tags` (`[id]` when it gives none) and `examples` — and an agent with no
-skills gets one entry made from its own description (`cardSkills` in `folder.store.ts`). Nobody writes a card: a `card:` line, and a
+skills gets one entry made from its own description (`cardSkills` in `skills/read.store.ts`). Nobody writes a card: a `card:` line, and a
 `skills:` line naming a `.json`, are refused at load with a message saying what replaced them, and so is a board page that still sends
 the card's file (`card`, `cardText`, `skillsText`, a 400). An edit of a composed SKILL.md moves the agent's version, so a stale save is
 refused. The board shows the generated entries read-only where the form used to write the file, and says a card that does not read in

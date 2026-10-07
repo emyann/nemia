@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
-import type { GitRun, Run, TaskPhase } from '../src/run.ts';
+import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { Decided } from '../src/decide/decide.verb.ts';
 import type { Refusal } from '../src/refusal/refusal.ts';
@@ -35,7 +35,7 @@ const {
   changesOf,
   consumption,
   decideRun,
-  isGitRun,
+  isRepositoryRun,
   lessonLine,
   retryRun,
   startRun,
@@ -49,9 +49,9 @@ const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
 const { metered } = await import('../src/meter/tally.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
-/** A run this file started on a repository, as `changesOf` reads one: a git run. */
-const gitRun = (run: Run): GitRun => {
-  assert.ok(isGitRun(run), `${run.id} works on a repository`);
+/** A run this file started on a repository, as `changesOf` reads one: a repository run. */
+const repositoryRun = (run: Run): RepositoryRun => {
+  assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
 
@@ -412,7 +412,7 @@ test('`nemia decide --help` prints the lists the screen uses, from the one place
 
 test("what a branch touched is the place's report: a rename at both ends, a binary file, a file in no directory, today's lines — and a branch that is gone is not read as nothing", async () => {
   const repo = aRepo();
-  const run = gitRun(await Effect.runPromise(startRun({ brief: 'move the test', repo, workflowDir: folder(), isolate: false })));
+  const run = repositoryRun(await Effect.runPromise(startRun({ brief: 'move the test', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/moved', () => {
     fs.mkdirSync(path.join(repo, 'packages/x/spec'));
     git(repo, 'mv', 'packages/x/test/add.test.ts', 'packages/x/spec/add.test.ts');
@@ -453,7 +453,7 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
 
 test("a branch that touched a lint config lists it as check-affecting, with its whole diff from the place's diffs", async () => {
   const repo = aRepo();
-  const run = gitRun(await Effect.runPromise(startRun({ brief: 'quiet a rule', repo, workflowDir: folder(), isolate: false })));
+  const run = repositoryRun(await Effect.runPromise(startRun({ brief: 'quiet a rule', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/lint', () => {
     write(repo, '.oxlintrc.json', '{ "rules": { "no-console": "off" } }\n');
     write(repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b + 0;\n');
@@ -467,7 +467,7 @@ test("a branch that touched a lint config lists it as check-affecting, with its 
 
 test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
   const repo = aRepo();
-  const run = gitRun(await Effect.runPromise(startRun({ brief: 'document it', repo, workflowDir: folder(), isolate: false })));
+  const run = repositoryRun(await Effect.runPromise(startRun({ brief: 'document it', repo, workflowDir: folder(), isolate: false })));
   branchOff(repo, 'wf/source-docs', () => write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n'));
   branchOff(repo, 'wf/package-docs', () => {
     write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n');
@@ -911,7 +911,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   write(repo, 'CLAUDE.md', 'a lesson somebody else wrote\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'another run, merged');
-  const [{ radius: moved }] = changesOf(gitRun(readRun(run.id)), ['main']);
+  const [{ radius: moved }] = changesOf(repositoryRun(readRun(run.id)), ['main']);
   assert.ok(
     !('error' in moved) && moved.changes.length === 2,
     `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
@@ -972,7 +972,7 @@ test('`nemia ls` views each task once, and runs added in a repository it already
     viewed.clear();
     const log = t.mock.method(console, 'log', () => {});
     try {
-      return (await metered(() => main(['ls'], e))).tallies!.kinds.git.spawned;
+      return (await metered(() => main(['ls'], e))).tallies!.kinds.place.spawned;
     } finally {
       log.mock.restore();
     }
@@ -1072,7 +1072,7 @@ test("`nemia decide`'s program says in its type what it needs and what it refuse
  * `<root>`.
  */
 const whole = (t: TestContext, e: Engine, id: string, ...flags: string[]): Promise<string[]> => {
-  const run = gitRun(readRun(id));
+  const run = repositoryRun(readRun(id));
   return decideScreen(t, e, [id, ...flags], { '<id>': id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
 };
 

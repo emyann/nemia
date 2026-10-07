@@ -51,8 +51,9 @@ Bring it:
 
 Answer with the step's session continued and told their answer:
 `nemia retry <run> <step> --nudge --message "<their answers>"`. `--nudge` is the default; `--fresh` starts a new session on its branch
-instead, which the person may ask for. Where `nemia decide` says the step is also at its cap, the line it offers carries
-`--budget <amount>`: a cap is the person's to raise.
+instead, which the person may ask for. Where the step's question asks for budget, or its cap is near, the answer may raise it:
+`nemia retry <run> <step> --budget <amount> --message "<their answers>"`, the amount above its cap. Where `nemia decide` says the step is
+also at its cap, the line it offers carries `--budget <amount>`. A cap is the person's to raise.
 
 ## A loop out of rounds
 

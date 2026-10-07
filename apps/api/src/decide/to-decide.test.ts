@@ -438,7 +438,7 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   assert.equal(detail.status, 'succeeded');
   assert.deepEqual(detail.waitingOnYou, [], 'no step waits on you: the run finished');
   assert.deepEqual(detail.toDecide, {
-    kind: 'git',
+    kind: 'result',
     branches: [branch],
     said: `${branch} is ahead of main, and nothing has merged it — nemia decide ${id}`,
     command: `nemia decide ${id}`,
@@ -543,7 +543,7 @@ test("the list runs no `git`, however often it is polled: where a branch stands,
   await aPass();
   assert.equal(
     (await listedOf(id)).toDecide?.kind,
-    'git',
+    'result',
     'a try of a finished step commits to the branch: the answer kept against the work the run filed is read again off the pass',
   );
 
@@ -561,7 +561,7 @@ test("the list runs no `git`, however often it is polled: where a branch stands,
   await aPass();
   for (const poll of [1, 2]) {
     const before = gitCount();
-    assert.equal((await listedOf('r-memo-ahead')).toDecide?.kind, 'git', `poll ${poll} says the branch is there to decide`);
+    assert.equal((await listedOf('r-memo-ahead')).toDecide?.kind, 'result', `poll ${poll} says the branch is there to decide`);
     assert.equal(gitCount(), before, `poll ${poll} asks no git: the next pass reads it again`);
   }
 });
@@ -593,7 +593,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   signedOff('r-ahead-implement', repo);
   writeRun({ id: 'r-ahead', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-ahead-implement', branch: ahead } } });
   await aPass();
-  assert.equal((await detailOf('r-ahead')).toDecide?.kind, 'git');
+  assert.equal((await detailOf('r-ahead')).toDecide?.kind, 'result');
   assert.ok(gitCount() > before, "a pass reads a finished run's branch out of git, through the same PATH: the count counts");
 });
 

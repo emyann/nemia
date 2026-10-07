@@ -20,7 +20,8 @@ import {
   type Agent,
   type Agents,
 } from '../src/workflow.ts';
-import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
+import { loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
+import { loadAgents } from '../src/agents/read.store.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 

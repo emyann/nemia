@@ -9,7 +9,7 @@ import type { Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { skillsFor } from '../folder/folder.store.ts';
+import { skillsFor } from '../skills/read.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';

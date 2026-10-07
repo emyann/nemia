@@ -48,7 +48,7 @@ const {
 const PKG = path.join(import.meta.dirname, '..');
 const at = '2026-09-30T09:00:00.000Z';
 
-/** A git run's record as the tick writes one today, frozen steps and all. */
+/** A repository run's record as the tick writes one today, frozen steps and all. */
 const aRun = (id: string): Run => ({
   id,
   repo: '/repo',

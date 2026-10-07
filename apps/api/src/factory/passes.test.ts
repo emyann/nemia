@@ -27,7 +27,7 @@ const recent = (k: number, ms: number, runs: number): RecentPass => ({
   tasks: 1,
   queued: 0,
   admitted: 1,
-  phases: Object.fromEntries(PHASES.map((p) => [p, p === 'git' ? ms : 0])) as RecentPass['phases'],
+  phases: Object.fromEntries(PHASES.map((p) => [p, p === 'place' ? ms : 0])) as RecentPass['phases'],
 });
 
 const passes = async (query = ''): Promise<{ status: number; body: unknown }> => {
@@ -52,7 +52,7 @@ test('GET /api/passes answers the recent passes kept, oldest first, their histog
     { passes: 3, medianMs: 40, slowestMs: 300, runs: 7 },
   );
   assert.equal(read.histogram.length, read.bounds.length + 1);
-  assert.equal(read.parts[0].phase, 'git');
+  assert.equal(read.parts[0].phase, 'place');
   const last = (await passes('?last=1')).body as PassesRead;
   assert.deepEqual(
     last.recent.map((p) => p.runs),

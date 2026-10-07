@@ -12,7 +12,7 @@ import { EngineService, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import type { MergeState } from '../ending/ending.ts';
 import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
-import { filesPrunedWords, isGitRun, namesInOrder, type GitRun, type Pruned, type Run } from '../record/record.ts';
+import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import { decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, runWorktrees, type AskName } from '../forget/forget.ts';
@@ -34,7 +34,7 @@ import { Conflict, Invalid } from '../refusal/refusal.ts';
  * nothing is removed on a guess.
  */
 export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: StatusMemo): MergeState['merging'] {
-  if (!isGitRun(run)) return 'none';
+  if (!isRepositoryRun(run)) return 'none';
   const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
   const marked = stagedHere(run);
   if (!landings.length || marked === false) return 'none';
@@ -91,7 +91,7 @@ const pruning = Effect.fn('prune')(function* (
   const run = runStore.runs.read(id);
   const none = { worktrees: [], left: [] };
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
-  if (!isGitRun(run)) return { id, kind: 'refused', refusal: folder!, ...none } satisfies Pruning;
+  if (!isRepositoryRun(run)) return { id, kind: 'refused', refusal: folder!, ...none } satisfies Pruning;
 
   const within = resolved(path.join(HOME, 'worktrees', id));
   const steps = frozenSteps(run);
@@ -123,7 +123,7 @@ function frozenSteps(run: Run): Workflow[] | undefined {
 }
 
 /** The run's worktrees inside `within` as its place's inventory read them (`runWorktrees`), the record's paths read as git names them. */
-function placeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, within: string, place: RunPlaceRead) {
+function placeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefined, within: string, place: RunPlaceRead) {
   const recorded = {
     ...run,
     steps: Object.fromEntries(
@@ -137,7 +137,7 @@ function placeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, wit
  * Why a run with no worktree left — nor, under `--artifacts`, a files directory — has nothing to prune; with `yes` on a run pruned
  * before, the place's `remove` of nothing, which prunes git's list of worktrees whose directory is gone.
  */
-function nothingLeft(run: GitRun, place: RunPlaceRead, { yes, artifacts }: { yes: boolean; artifacts: boolean }): Pruning {
+function nothingLeft(run: RepositoryRun, place: RunPlaceRead, { yes, artifacts }: { yes: boolean; artifacts: boolean }): Pruning {
   const worktrees =
     run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts)
       ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (nemia prune)`
@@ -157,7 +157,7 @@ function nothingLeft(run: GitRun, place: RunPlaceRead, { yes, artifacts }: { yes
  */
 const judgedOf = Effect.fn('prune.judged')(function* (
   e: Engine,
-  run: GitRun,
+  run: RepositoryRun,
   steps: Workflow[] | undefined,
   flags: { unmerged: boolean; artifacts: boolean },
 ) {
@@ -206,7 +206,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
  * One worktree as `pruneRefusal` judges it, from what the place's inventory read: its hold (`heldWorktree`), each change it holds
  * uncommitted — and that its status did not read, where it is not locked — and the place's command for it (`say`).
  */
-function pruneFact(run: GitRun, place: RunPlaceRead, w: Held): PruneFacts['worktrees'][number] {
+function pruneFact(run: RepositoryRun, place: RunPlaceRead, w: Held): PruneFacts['worktrees'][number] {
   const hold = heldWorktree(w);
   const fix = !hold
     ? sayFilled(place.say.inspect, { path: w.path })
@@ -224,7 +224,7 @@ function pruneFact(run: GitRun, place: RunPlaceRead, w: Held): PruneFacts['workt
  * back when nothing did.
  */
 function removeAll(
-  run: GitRun,
+  run: RepositoryRun,
   place: RunPlaceRead,
   within: string,
   worktrees: ReadonlyArray<{ path: string; bytes: number }>,
@@ -265,7 +265,7 @@ function removeAll(
 }
 
 /** The place's `remove` of `worktrees`: those it removed, and those it left, in git's words, or every one, when it did not answer. */
-function removeWorktrees(run: GitRun, place: RunPlaceRead, worktrees: ReadonlyArray<{ path: string; bytes: number }>) {
+function removeWorktrees(run: RepositoryRun, place: RunPlaceRead, worktrees: ReadonlyArray<{ path: string; bytes: number }>) {
   const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: worktrees.map((w) => w.path), branches: [] });
   if (!('answer' in outcome)) {
     const said = unansweredWords(outcome);

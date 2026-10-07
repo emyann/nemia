@@ -830,7 +830,12 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 227, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 157, "skipBlankLines": true, "skipComments": true }]
+      }
+    },
+    {
+      "files": ["packages/agent-runtime/src/service/say.ts"],
+      "rules": {
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }

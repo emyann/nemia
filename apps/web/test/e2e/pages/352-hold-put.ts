@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
+import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -16,8 +17,8 @@ export default {
    * A hold put on the board, as `nemia hold <run> --until <run> --why <words>` puts it (`POST /api/runs/:id/hold`): Hold… in GATED's
    * header opens a form offering the runs of its repository that may still ship, HELD among them and GATED not; HELD ticked through its
    * label and a why given, Hold writes the hold's file with the api's user as `by`, and the page says it in its Held section, offering Lift
-   * and no Hold…. The hold is then lifted from the page, as the `lift` page lifts it. What the api refuses is the `hold-put-refused`
-   * page's, and its own tests' (`apps/api/test/hold.test.ts`).
+   * and no Hold…; GATED's card on the Factory says it whole too. The hold is then lifted from the page, as the `lift` page lifts it. What
+   * the api refuses is the `hold-put-refused` page's, and its own tests' (`apps/api/test/hold.test.ts`).
    */
   name: 'hold-put',
   route: `/runs/${GATED.id}`,
@@ -64,6 +65,17 @@ export default {
       await idle(page);
       await settled(page);
       await photograph(page, path.join(OUT, `hold-put-held-${theme}.png`), { fullPage: true });
+
+      await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
+      await idle(page);
+      await expectVisible(
+        cardOf(page, id)
+          .locator('[data-holding="on-runs"]')
+          .filter({ hasText: new RegExp(`^${literal(word)}$`) }),
+        `GATED's card on the Factory says ${word}`,
+      );
+      await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
+      await idle(page);
 
       await section.getByRole('button', { name: 'Lift…', exact: true }).click();
       await section.getByRole('button', { name: 'Lift', exact: true }).click();

@@ -8,7 +8,6 @@ import type { Closeout } from '../closeout/closeout.ts';
 import {
   aboveWord,
   approvalOf,
-  budgetOf,
   budgetRefusal,
   budgetWord,
   capOf,
@@ -17,11 +16,12 @@ import {
   landsOnCheck,
   loopOf,
   ownStatus,
+  raiseOf,
   raiseWords,
   sendBackTo,
   spentWord,
-  stepSpend,
   waitsAtGate,
+  type Raise,
   type SpendOf,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
@@ -53,7 +53,14 @@ type Asked = {
  * stopped on the base branch (`stoppedAt`), with the command that ships it again (`again`).
  */
 type Judged = Asked &
-  ReturnType<typeof retryable> & { step: Workflow; next: number; pending?: RetryAsk; stoppedAt?: Workflow; again: string };
+  ReturnType<typeof retryable> & {
+    step: Workflow;
+    next: number;
+    pending?: RetryAsk;
+    stoppedAt?: Workflow;
+    again: string;
+    floor?: Raise;
+  };
 
 /**
  * Why `nemia retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
@@ -79,9 +86,12 @@ type Judged = Asked &
  * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
  *
  * A budget: a `--budget` that is not an amount or rides on `--recheck` (`budgetRefusal`); a session of a step over its budget, or ended at
- * it, asked for without a `--budget` above what it has spent (`Raise`), or with one not above it — by name; `--budget` on any other step,
- * whose cap is not what stops it; and an ask already waiting that no tick will honour, for want of one. A step over its budget whose check
- * did not finish is offered the recheck first, which costs nothing and needs no `--budget`.
+ * it, asked for without a `--budget` (`Raise`); a `--budget` on a step with no `budget:`, which has no cap to raise, or one not above its
+ * floor (`raiseOf`: what its tries have cost, and the cap in force) — each by name; and an ask already waiting that no tick will honour,
+ * for want of a `--budget` or for one the step cannot take. A `--budget` above the floor is taken on any step a person may try, blocked
+ * or failed as much as over its budget. A step over its budget whose check did not finish is offered the recheck first, which costs nothing
+ * and needs no `--budget`. A step the run tries again itself is told so before any of these, so no refusal's fix is a `--budget` that
+ * would be refused next.
  *
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
  *   running, and refused.
@@ -122,8 +132,8 @@ export function retryRefusal(
     (c.modes.length ? undefined : nothingToTry(c)) ??
     modeRefusal(c) ??
     wordlessRefusal(c) ??
-    budgetAskRefusal(c) ??
     runTriesItself(c) ??
+    budgetAskRefusal(c) ??
     null
   );
 }
@@ -163,6 +173,7 @@ function askedStep(asked: Asked): string | Workflow {
 function judged(asked: Asked, step: Workflow): Judged {
   const { steps, run, name, phaseOf, closeoutOf, askedCloseout, asks, spendOf } = asked;
   const next = tryOf(run, name) + 1;
+  const floor = raiseOf(step, run, spendOf);
   const stoppedAt = steps.find((s) => endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
   const again = stoppedAt ? `nemia retry ${run.id} ${stoppedAt.name}` : '';
   return {
@@ -173,6 +184,7 @@ function judged(asked: Asked, step: Workflow): Judged {
     pending: asks.find((a) => a.step === name && a.try === next),
     stoppedAt,
     again,
+    ...(floor ? { floor } : {}),
   };
 }
 
@@ -198,10 +210,8 @@ function pauseAskRefusal(c: Judged): string | undefined {
 function pendingRefusal(c: Judged): string | undefined {
   const paused = pauseAskRefusal(c);
   if (paused !== undefined) return paused;
-  const { run, name, command, asks, next, pending, status, raise, sendsBack, back, stoppedAt } = c;
-  if (pending && !carries(pending, raise)) {
-    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
-  }
+  const { run, name, command, asks, next, pending, sendsBack, back, stoppedAt } = c;
+  if (pending && !carries(pending, c.raise, c.floor)) return uncarriedRefusal(c, pending);
   if (pending && !heard(pending, sendsBack)) {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${back ? `sends the work back from ${back.join(', ')}` : gateWords(run, name)}, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --message "<objection>".`;
   }
@@ -222,6 +232,20 @@ function pendingRefusal(c: Judged): string | undefined {
     }
   }
   return undefined;
+}
+
+/** An ask already waiting that no tick honours for its budget: one missing past the cap, or one the step cannot take. */
+function uncarriedRefusal(c: Judged, pending: RetryAsk): string {
+  const { name, command, next, status, raise, floor } = c;
+  const asked = `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at})`;
+  const again = `Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again`;
+  if (pending.budget === undefined) {
+    return `${asked} without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. ${again}: ${command} --budget <amount>.`;
+  }
+  if (!floor) {
+    return `${asked} with --budget ${pending.budget}, and ${name} has no \`budget:\`, so there is no cap to raise and no tick honours it. ${again}: ${command}.`;
+  }
+  return `${asked} with --budget ${pending.budget}, not above ${aboveWord(floor)}, so no tick honours it. ${again}: ${command} --budget <amount>.`;
 }
 
 /** Why a step with no way to be tried has none: an ending stopped on the base branch, an ending at its gate, or its status. */
@@ -340,25 +364,27 @@ function raiseMissing(c: Judged): string | undefined {
   return undefined;
 }
 
-/** A `--budget` not above what a step over its budget has spent, or one on a step whose cap is not what stops it. */
+/**
+ * A `--budget` a step cannot take: on a step with no `budget:`, which has no cap to raise; or not above its floor (`raiseOf`) — what its
+ * tries have cost, or the cap in force, whichever is more — since a `--budget` only ever raises the cap.
+ */
 function budgetMisgiven(c: Judged): string | undefined {
-  const { step, run, name, how, command, spendOf, status, raise } = c;
-  if (raise && how.budget !== undefined && how.budget <= raise.above) {
-    const what =
-      raise.above > raise.spent.usd
-        ? `the ${budgetWord(raise.cap)} budget ${name}'s session was ended at`
-        : `what ${name}'s tries have cost`;
-    return `--budget ${how.budget} is not above ${aboveWord(raise)}, ${what}: a try under it would read ${status === 'budget exhausted' ? status : 'over budget'} again as soon as it ended. Give more than ${aboveWord(raise)}: ${command} --budget <amount>.`;
+  const { name, how, command, status, raise, floor } = c;
+  if (how.budget === undefined) return undefined;
+  if (!floor) {
+    return `--budget raises a step's cap, and ${name} has no \`budget:\`, so there is no cap to raise. Try it without --budget: ${command}.`;
   }
-  if (!raise && how.budget !== undefined) {
-    const cap = budgetOf(step, run.steps[name]);
-    const spent =
-      cap === undefined
-        ? `, and has no \`budget:\` to raise`
-        : `: its tries have cost ${spentWord(stepSpend(run, name, spendOf))} of its ${budgetWord(cap)} budget, which is not what stops it`;
-    return `--budget raises the cap of a step over its budget, or ended at it, and ${name} is ${status}${spent}. Try it without --budget: ${command}.`;
-  }
-  return undefined;
+  if (how.budget > floor.above) return undefined;
+  const capped = floor.above > floor.spent.usd;
+  const what = !capped
+    ? `what ${name}'s tries have cost`
+    : raise
+      ? `the ${budgetWord(floor.cap)} budget ${name}'s session was ended at`
+      : `the ${budgetWord(floor.cap)} cap in force on ${name}, whose tries have cost ${spentWord(floor.spent)}`;
+  const why = raise
+    ? `a try under it would read ${status === 'budget exhausted' ? status : 'over budget'} again as soon as it ended`
+    : '--budget only ever raises the cap';
+  return `--budget ${how.budget} is not above ${aboveWord(floor)}, ${what}: ${why}. Give more than ${aboveWord(floor)}: ${command} --budget <amount>.`;
 }
 
 /** A step the run is about to try again itself: a nudge to sign off, or a try `retries:` still covers. */

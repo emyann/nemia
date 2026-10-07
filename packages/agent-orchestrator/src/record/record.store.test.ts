@@ -31,7 +31,7 @@ const {
 
 fs.mkdirSync(runsDir(), { recursive: true });
 
-/** A git run's record as the tick writes one today, frozen steps and all. */
+/** A repository run's record as the tick writes one today, frozen steps and all. */
 const aRecord = (id: string): Record<string, unknown> => ({
   id,
   repo: '/repo',
@@ -107,7 +107,7 @@ test('a frozen step with no name, a step record with no task, and a folder run w
   put('r-place', { ...folder, place: { kind: 'shelf' } });
   assert.ok(
     refusalOf('r-place').includes('its `place.kind` is "shelf", where nemia writes "folder"'),
-    'read against the folder run it says it is, not the git run it is not',
+    'read against the folder run it says it is, not the repository run it is not',
   );
 });
 

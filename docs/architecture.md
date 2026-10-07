@@ -206,13 +206,14 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
-  custom.store, custom-file.store, skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store,
-  config.store, series.store, subscription.store, level.store and a2a.store in the folders. They load as a tree. At the bottom
-  are record/places.store.ts, agents/custom-file.store.ts (the read of a person's custom instructions), meter/tally.store.ts
-  (the pass's meter) and config/config.store.ts, which import no store file. folder/folder.store.ts imports only
-  agents/custom-file.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
+  custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
+  places.store, config.store, series.store, subscription.store, level.store and a2a.store in the folders. They load as a tree. At
+  the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
+  meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file. agents/read.store.ts (the
+  agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
+  agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
   record/steps.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
-  imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.
+  imports only record.store.ts, the two reads and factory/factory.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
   each.
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick

@@ -33,7 +33,9 @@ import {
 } from './agents.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal, takenAt } from '../folder/folder.ts';
-import { agentUsers, agentVersion, preloads, readSkillRules, skillsFor, skillVersion } from '../folder/folder.store.ts';
+import { agentUsers } from '../folder/folder.store.ts';
+import { agentVersion } from './read.store.ts';
+import { preloads, readSkillRules, skillsFor, skillVersion } from '../skills/read.store.ts';
 import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';

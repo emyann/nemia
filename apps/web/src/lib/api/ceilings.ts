@@ -8,7 +8,7 @@ import { Schema } from 'effect';
 import { get } from './read.ts';
 
 /** The phases of a pass (`PHASES` in agent-orchestrator's meter.ts; `PASS_PHASES` in lib/pass.ts keeps their order). */
-export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' | 'git' | 'assess' | 'act';
+export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' | 'place' | 'assess' | 'act';
 
 /**
  * Mirrors the package's `PassCost`: what the last pass cost — its time, and each phase's time, calls, bytes read and processes started;
@@ -51,7 +51,7 @@ const PassCostSchema = Schema.Struct({
     journals: PhaseCostSchema,
     observe: PhaseCostSchema,
     runtime: PhaseCostSchema,
-    git: PhaseCostSchema,
+    place: PhaseCostSchema,
     assess: PhaseCostSchema,
     act: PhaseCostSchema,
   }),
@@ -129,7 +129,7 @@ export type PassesRead = {
   bounds: number[];
 };
 
-const PhaseSchema = Schema.Literals(['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act']);
+const PhaseSchema = Schema.Literals(['records', 'asks', 'journals', 'observe', 'runtime', 'place', 'assess', 'act']);
 
 const SeenFields = { runs: Schema.Number, tasks: Schema.Number, queued: Schema.Number, admitted: Schema.Number };
 
@@ -152,7 +152,7 @@ const PassesReadSchema = Schema.Struct({
           journals: Schema.Number,
           observe: Schema.Number,
           runtime: Schema.Number,
-          git: Schema.Number,
+          place: Schema.Number,
           assess: Schema.Number,
           act: Schema.Number,
         }),

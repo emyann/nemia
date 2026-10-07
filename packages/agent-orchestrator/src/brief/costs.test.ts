@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Workflow } from '../step/step.ts';
-import type { GitRun } from '../record/record.ts';
+import type { RepositoryRun } from '../record/record.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { composeBrief } from './index.ts';
 
@@ -14,7 +14,7 @@ const step = (name: string, after: string[] = []): Workflow => ({ name, after, b
 const STEPS = [step('design'), step('implement', ['design'])];
 
 /** A run with `design` done and approved at its gate, and `implement` not yet filed. */
-const RUN: GitRun = {
+const RUN: RepositoryRun = {
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',

@@ -10,7 +10,7 @@ import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import { HOME } from '../record/record.store.ts';
-import { skillVersion } from '../folder/folder.store.ts';
+import { skillVersion } from './read.store.ts';
 import {
   copySkill,
   skillRead,

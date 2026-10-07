@@ -12,7 +12,7 @@ import type { Workflow } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
 import { endingAsked, landedWords, landingDue, landingOpen } from './ending.ts';
-import { isGitRun, type CloseoutAsked, type GitRun, type Landed, type Run, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type CloseoutAsked, type RepositoryRun, type Landed, type Run, type TaskPhase } from '../record/record.ts';
 import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
@@ -71,7 +71,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
   for (const other of read.runs) {
-    if (other.id === run.id || !isGitRun(other) || path.resolve(other.repo) !== mine.repo) continue;
+    if (other.id === run.id || !isRepositoryRun(other) || path.resolve(other.repo) !== mine.repo) continue;
     const claim = yield* mainClaim(e, other, slotOf(other.id), read.parents, memo);
     if (claim) claims.push(claim);
   }
@@ -115,7 +115,7 @@ const mainClaim = Effect.fnUntraced(function* (
     return undefined;
   }
   const ending = steps.find((s) => s.workspace === 'main');
-  if (!ending || !isGitRun(run)) return undefined;
+  if (!ending || !isRepositoryRun(run)) return undefined;
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;
   const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';
@@ -185,7 +185,8 @@ export function landEnding(
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
-  if (!ending || !record?.taskId || record.landed || !isGitRun(run) || !runStore.runs.exists(run.id)) return { notes: [], landed: false };
+  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runStore.runs.exists(run.id))
+    return { notes: [], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;
   const due = landingDue(
@@ -230,7 +231,7 @@ export function landEnding(
  * Commit the merge staged in `run`'s checkout with `message` through its place (`landThrough`), and abort it where the place refuses the
  * commit: what to write on the step's record, with its note, or why the next pass tries again.
  */
-function committedThrough(run: GitRun, message: string, memo?: StatusMemo): { landed: Landed; note: string } | { again: string } {
+function committedThrough(run: RepositoryRun, message: string, memo?: StatusMemo): { landed: Landed; note: string } | { again: string } {
   const made = landThrough(run, { act: 'commit', message }, memo);
   if ('commit' in made) return { landed: made, note: `its check passed on the merge, and ${landedWords(run, made)}` };
   if ('aborted' in made) return { again: 'the place answered an abort where the run asked a commit of its merge' };
@@ -242,7 +243,7 @@ function committedThrough(run: GitRun, message: string, memo?: StatusMemo): { la
 }
 
 /** Abort the merge staged in `run`'s checkout through its place (`landThrough`): undefined once it has, else why not, in words. */
-function abortedThrough(run: GitRun, memo?: StatusMemo): string | undefined {
+function abortedThrough(run: RepositoryRun, memo?: StatusMemo): string | undefined {
   const taken = landThrough(run, { act: 'abort' }, memo);
   if ('aborted' in taken) return undefined;
   if ('commit' in taken) return 'the place answered a commit where the run asked an abort';

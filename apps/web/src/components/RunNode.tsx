@@ -166,13 +166,13 @@ export function RunNode({
           />
         ) : null}
 
-        {decide?.kind === 'git' && !cancelled && (
+        {decide?.kind === 'result' && !cancelled && (
           <p title={decide.said} className="line-clamp-2 px-3 text-[11px] break-words">
             <RouteLink
               to="/runs/$runId"
               params={{ runId: run.id }}
               hash="decide"
-              data-to-decide="git"
+              data-to-decide="result"
               className="nodrag text-emerald-800 hover:underline dark:text-emerald-300"
             >
               {decideLine(decide.branches)}

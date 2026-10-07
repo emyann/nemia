@@ -1,5 +1,5 @@
 /**
- * What is said of a git run's result branches once they are named: where each stands (`branchStandings`), whether one is on its base
+ * What is said of a repository run's result branches once they are named: where each stands (`branchStandings`), whether one is on its base
  * (`shippedOf`), and a run another waits on as its record and a reader say it (`parentRecord`) — each read through a `BranchReader`, which
  * answers off what the place's `standing` said (`standingReader`), never off a git process of its own. What a branch changed against the
  * run's base is the place's to say (`changes.store.ts`).
@@ -8,7 +8,7 @@
  * a controller, and `runner.ts` re-exports most of what it exports.
  */
 import { resultSteps } from './branches.ts';
-import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import type { ParentRun } from '../wait/wait.ts';
 import type { Shipped } from '../decide/decide.ts';
@@ -17,13 +17,13 @@ import { stepsOf } from '../record/record.store.ts';
 
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
 export const standingsOf = (run: Run, git: BranchReader): BranchStanding[] =>
-  isGitRun(run) ? branchStandings(run, resultBranches(run), git) : [];
+  isRepositoryRun(run) ? branchStandings(run, resultBranches(run), git) : [];
 
 /** Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about. */
 export const shippedOf =
   (run: Run, git: BranchReader) =>
   (branch: string): Shipped =>
-    isGitRun(run) ? git.shipped(run, branch) : false;
+    isRepositoryRun(run) ? git.shipped(run, branch) : false;
 
 /**
  * Where each of a run's result branches stands against the base branch it was cut from, as `git` says it (`BranchStanding`): unread, where
@@ -33,7 +33,7 @@ export const shippedOf =
  * Read on the pass that asks and never stored, for the reason `shipped` is asked rather than stored: a person merging by hand changes the
  * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
  */
-export function branchStandings(run: GitRun, branches: readonly string[], git: BranchReader): BranchStanding[] {
+export function branchStandings(run: RepositoryRun, branches: readonly string[], git: BranchReader): BranchStanding[] {
   return [...new Set(branches)].map((branch): BranchStanding => {
     const why = git.unread(run, branch);
     if (why !== undefined) return { branch, where: 'unread', why };
@@ -52,11 +52,11 @@ export type BranchReader = {
    * Whether the branch has landed on the run's base branch, and which yes it is (`Shipped`, `shippedOver`): a branch git no longer has is
    * asked by the tip the run recorded (`tipsSeen`). False where it was not read.
    */
-  shipped(run: GitRun, branch: string): Shipped;
+  shipped(run: RepositoryRun, branch: string): Shipped;
   /** Whether git has the branch; true where nothing of the repository was read, so a branch not read is never called gone. */
   has(repo: string, branch: string): boolean;
   /** The commits on the branch that the run's base branch does not have; none where git cannot count, or nothing was read. */
-  ahead(run: GitRun, branch: string): number;
+  ahead(run: RepositoryRun, branch: string): number;
   /**
    * Each branch of the repository and its commit, off the reading the answers come from — what a memo of those answers keys them by, so a
    * branch that moves between the answer and the key is read as moved. Empty where none was read.
@@ -66,7 +66,7 @@ export type BranchReader = {
    * Why where the run's result branches stand — or `branch`, where given — was not read: its repository, place and base branch were not
    * asked, the place refused or was not heard, or the branch was not asked of. Undefined where it was read.
    */
-  unread: (run: GitRun, branch?: string) => string | undefined;
+  unread: (run: RepositoryRun, branch?: string) => string | undefined;
 };
 
 /**
@@ -88,7 +88,7 @@ export function parentRecord(id: string, git: BranchReader): Pick<ParentRun, 're
   } catch {
     branches = [];
   }
-  const cut = isGitRun(record) ? record : undefined;
+  const cut = isRepositoryRun(record) ? record : undefined;
   const gone = cut ? branches.filter((b) => git.unread(cut, b) === undefined && !git.has(cut.repo, b) && !git.shipped(cut, b)) : [];
   return { record, ...(gone.length ? { gone } : {}) };
 }

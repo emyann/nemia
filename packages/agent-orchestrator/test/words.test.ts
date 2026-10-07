@@ -163,6 +163,7 @@ const HARNESS_WORDS: Baseline = {
   'apps/web/src/routes/capabilities.tsx': { count: 19, ...MOVES.reach },
   'packages/agent-orchestrator/src/agents/agents.store.ts': { count: 7, ...MOVES.render },
   'packages/agent-orchestrator/src/agents/agents.ts': { count: 35, ...MOVES.render },
+  'packages/agent-orchestrator/src/agents/read.store.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 2, card: 'slice-2' },
   'packages/agent-orchestrator/src/artifacts/artifacts.ts': { count: 3, card: 'slice-2' },
   'packages/agent-orchestrator/src/branches/branches.ts': { count: 5, ...MOVES.checkout },
@@ -172,7 +173,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/daemon/daemon.store.ts': { count: 1, card: 'slice-3' },
   'packages/agent-orchestrator/src/decide/decide.verb.ts': { count: 4, ...MOVES.wait },
   'packages/agent-orchestrator/src/ending/ending.ts': { count: 1, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 12, ...MOVES.checkout },
+  'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 2, ...MOVES.knobs },
   'packages/agent-orchestrator/src/folder/write.store.ts': { count: 4, ...MOVES.knobs },
   'packages/agent-orchestrator/src/former/former.ts': { count: 32, ...MOVES.knobs },
   'packages/agent-orchestrator/src/harness/harness.ts': { count: 9, ...MOVES.defaults },
@@ -189,6 +190,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/yours/yours.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
   'packages/agent-orchestrator/src/runtime-client.ts': { count: 7, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/skills/read.store.ts': { count: 9, ...MOVES.checkout },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
   'packages/agent-orchestrator/src/stats/discipline.ts': { count: 10, card: 'u42s' },
   'packages/agent-orchestrator/src/status/status.ts': { count: 11, card: 'u42s' },
@@ -229,7 +231,7 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/harness/mcp.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/index.ts': { count: 3, ...MOVES.reword },
-  'packages/agent-runtime/src/service/engine.ts': { count: 1, ...MOVES.reword },
+  'packages/agent-runtime/src/service/say.ts': { count: 1, ...MOVES.reword },
 };
 
 /** Each package file that names an agent of the team today, with its count and what removes them. */

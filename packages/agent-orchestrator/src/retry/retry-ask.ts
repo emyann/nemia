@@ -95,6 +95,8 @@ export type Retry = {
   model?: string;
   message?: string;
   budget?: number;
+  /** The try's `budget` raises a cap the step's tries had already cost, or been ended at (`Raise`): what its brief says. */
+  pastCap?: true;
   by: 'retries' | 'signoff' | 'ask' | 'pause';
   stopFirst?: true;
   runsOn?: true;

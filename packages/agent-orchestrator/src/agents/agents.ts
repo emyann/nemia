@@ -143,7 +143,7 @@ export function skillTurnCost(id: string, text: string): SkillCost {
 /**
  * Where the skills a workflow's agents name were found: each name, the folder it is (`<place>/skills/<name>`, holding `SKILL.md`) or why it
  * cannot be used — a name two places of one repository both have — and the places looked in, in order, for the refusal of a name none has.
- * `skillsFor` in `folder.store.ts` reads them.
+ * `skillsFor` in `skills/read.store.ts` reads them.
  */
 export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; looked: readonly string[] };
 
@@ -278,7 +278,7 @@ export const isCardFile = (value: string): boolean => !value.includes(',') && /\
 
 /**
  * The refusal of a card file an agent names — by `card:`, or by a `skills:` line that names one (`isCardFile`) — since an agent's card is
- * generated from its skills (`cardSkills` in `folder.store.ts`). Refused rather than read and dropped: a line the run
+ * generated from its skills (`cardSkills` in `skills/read.store.ts`). Refused rather than read and dropped: a line the run
  * reads and ignores is a constraint nobody enforces, and a person editing that file would see no change on the card.
  */
 export function cardRetired(file: string, key: 'card' | 'skills', named?: string): string {
@@ -440,7 +440,7 @@ export type AgentCardShape = {
  * every closeout is a JSON object. An agent's `output:` names a JSON Schema, and A2A describes an output's *media type*, never its schema —
  * there is no field for it, so it contributes the media type and nothing more.
  *
- * `skills` are the card's entries, generated from the skills the agent is given (`cardSkills` in `folder.store.ts`, which reads their
+ * `skills` are the card's entries, generated from the skills the agent is given (`cardSkills` in `skills/read.store.ts`, which reads their
  * SKILL.md files). Refused, rather than printed hollow: an agent with no `description:`, and a card with no entry, both of which the
  * protocol marks REQUIRED.
  */

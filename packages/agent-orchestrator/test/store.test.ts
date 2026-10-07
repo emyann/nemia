@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { nameFor, type Sighting, type TaskSpec, type TaskView, Engine as RuntimeEngine, StopRefused, ForgetRefused } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import type { GitRun, Run, TaskPhase } from '../src/run.ts';
+import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
 import type { Refusal } from '../src/refusal/refusal.ts';
@@ -36,7 +36,7 @@ import { verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { TEAM_DEV } from './team.ts';
 import { decideScreen } from './screens.ts';
-import { isGitRun, shownNote, shownStatus, SIGNOFF } from '../src/run.ts';
+import { isRepositoryRun, shownNote, shownStatus, SIGNOFF } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
@@ -506,15 +506,15 @@ const folder = (implementKeys = '') => {
   return dir;
 };
 
-/** A run this file started on a repository: a git run, whose repository and base branch are on its record. */
-const gitRunOf = (run: Run): GitRun => {
-  assert.ok(isGitRun(run), `${run.id} works on a repository`);
+/** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
+const repositoryRunOf = (run: Run): RepositoryRun => {
+  assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
 
 /** `nemia start`, for real, over a fresh repository, the steps working in the checkout itself. */
 const started = async (dir: string) =>
-  gitRunOf(await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
+  repositoryRunOf(await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
 
 test('no `check:` → the run never files a check task, from the first pass to the last', async () => {
   const run = await started(folder());
@@ -2508,7 +2508,7 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
   const real = aRepo();
   const link = path.join(scratch('wf-linked-'), 'repo');
   fs.symlinkSync(real, link);
-  const run = gitRunOf(
+  const run = repositoryRunOf(
     await Effect.runPromise(
       startRun({ brief: 'add a flag', repo: link, workflowDir: looped('', 'harness: codex\nretries: 1\n'), isolate: false }),
     ),
@@ -2537,7 +2537,7 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
   const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\nharness: codex\n---\nwrite the note\n');
   const inFolders = await Effect.runPromise(startRun({ brief: 'a note', repo: scratch('wf-not-a-repo-'), workflowDir: team }));
-  assert.equal(isGitRun(inFolders), false);
+  assert.equal(isRepositoryRun(inFolders), false);
   await runWith(b.e, advanceRun(readRun(inFolders.id)));
   const written = b.tasks.get(`${inFolders.id}-write`)!.spec;
   assert.equal(written.harness, 'codex');
@@ -2546,7 +2546,7 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
 
 test('a codex try of a run whose repository is gone is filed with no `codex.trustFrom`, rather than throwing out of the pass', async () => {
   const repo = aRepo();
-  const run = gitRunOf(
+  const run = repositoryRunOf(
     await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder('harness: codex\ncheck: npm test\nretries: 1') })),
   );
   const b = board();
@@ -3395,7 +3395,7 @@ const aParent = async (
     brief = 'the parent',
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
-  const run = gitRunOf(await Effect.runPromise(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
+  const run = repositoryRunOf(await Effect.runPromise(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   if (work) {
@@ -5494,6 +5494,41 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
   assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
 });
 
+test('a step blocked under its cap takes a `--budget` above it at shipped defaults: implement, blocked at $19.27 of its $20 asking for more, takes `--budget 40`, and its next try is filed with what is left of $40; `--budget 15` and `--budget 20` are REFUSED, naming the cap and what was spent', async () => {
+  const run = await started(folder('harness: claude-detached\nbudget: 20'));
+  const { e, tasks, settle } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
+  const implement = `${run.id}-implement`;
+  const asked = { outcome: 'blocked', summary: 'ran out of room', artifacts: [], needs: 'a try with a larger budget, about $15–25' };
+  settle(implement, 'succeeded', asked, undefined, undefined, { costUsd: 19.27 });
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, []);
+  const l = await runWith(e, list(e, readRun(run.id)));
+  assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['succeeded · BLOCKED', ['implement']]);
+  await assert.rejects(
+    runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 15 })),
+    refusedWith(
+      /^--budget 15 is not above \$20, the \$20 cap in force on implement, whose tries have cost \$19\.27: .*Give more than \$20: nemia retry \S+ implement --budget <amount>\.$/,
+    ),
+  );
+  await assert.rejects(
+    runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 20 })),
+    refusedWith(/^--budget 20 is not above \$20, the \$20 cap in force on implement/),
+  );
+  assert.deepEqual(asksOf(run.id), [], 'no ask written');
+
+  await runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 40 }));
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['implement']);
+  assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: implement, then: 'nudge', budget: 40 }]);
+  const spec = tasks.get(`${implement}-try2`)!.spec;
+  assert.deepEqual(
+    [spec.harness, spec.config?.budgetUsd],
+    ['claude-detached', 20.73],
+    'what is left of $40 after the $19.27 its tries cost',
+  );
+  assert.match(spec.brief, /A person asked for this try: `nemia retry --nudge --budget 40`, raising this step's budget to \$40\./);
+  assert.doesNotMatch(spec.brief, /had together cost its budget or more/);
+});
+
 test("REFUSED past a budget in a loop at shipped defaults: review's `again: true` files no round while implement is over its budget — `nemia round` is refused without `--budget`, and with one files the round, the cap on implement's record", async (t) => {
   const { main } = await import('../src/cli/main.ts');
   const run = await started(looped('', 'budget: 3\n'));
@@ -6897,13 +6932,13 @@ test("the views' programs say in their types what they need and what they refuse
  * `nemia decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and
  * `<root>`.
  */
-const whole = (t: TestContext, e: Engine, run: GitRun): Promise<string[]> =>
+const whole = (t: TestContext, e: Engine, run: RepositoryRun): Promise<string[]> =>
   decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
 
 test('the whole screen of a run from an inbox card, given a file, whose step its harness waits on and is told a word, and then denied a call', async (t) => {
   const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.txt');
   fs.writeFileSync(given, 'read me\n');
-  const run = gitRunOf(
+  const run = repositoryRunOf(
     await Effect.runPromise(
       startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(), isolate: false, from: { inbox: 'card-7' }, inputs: [given] }),
     ),
@@ -7156,14 +7191,14 @@ const rejected = async (fn: () => Promise<unknown>, what: string): Promise<unkno
   return assert.fail(`${what} resolved`);
 };
 
-test('the start program answers what its plain face answers on the same store: a git run with an input, a gate and a parent, and a folder run', async () => {
+test('the start program answers what its plain face answers on the same store: a repository run with an input, a gate and a parent, and a folder run', async () => {
   const s = await startProgram();
   const repo = aRepo();
   const parent = await Effect.runPromise(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
   const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
   fs.writeFileSync(input, 'the notes\n');
   const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
-    ['a git run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
+    ['a repository run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
     ['a folder run', { brief: 'the note', repo: ROOT, workflowDir: folderTeam(), inputs: [input] }],
   ];
   const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];

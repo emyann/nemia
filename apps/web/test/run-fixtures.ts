@@ -90,7 +90,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   gate: { awaiting: false, approval: { try: 2, at: '2026-09-30T05:10:00.000Z', message: 'Go.' } },
   accepted: { try: 2, at: '2026-09-30T05:11:00.000Z', message: 'Good enough.' },
   lastLine: null,
-  said: [{ at: '2026-09-30T05:05:00.000Z', attempt: 1, text: 'Widen it.' }],
+  said: [{ at: '2026-09-30T05:05:00.000Z', attempt: 1, text: 'Widen it.', after: null }],
   asked: { try: 3, mode: 'recheck', model: null, message: null, stopFirst: false },
   closeout: {
     outcome: 'done',
@@ -189,7 +189,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   brief: 'Decode the reads',
   decide: 'nemia decide r-1',
   repo: '/work/repo',
-  place: 'git',
+  place: 'repository',
   work: null,
   workflowDir: '/work/workflows/build',
   workflowPage: null,
@@ -232,7 +232,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   read: { said: 'read 21.4M', peak: 'cap', rebuilt: 1 },
   waitingOnYou: ['implement'],
   onYou: ['approve implement'],
-  toDecide: { kind: 'git', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
+  toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
   gates: ['implement'],
   warning: null,
   graph: {

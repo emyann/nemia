@@ -19,7 +19,7 @@ import { isFolderTeam, splitFrontmatter, stepPlace } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
-import { loadAgents } from '../src/folder/folder.store.ts';
+import { loadAgents } from '../src/agents/read.store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES } from '../src/workflow.ts';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {
@@ -1981,7 +1981,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
 
   assert.doesNotThrow(
     () => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' }]),
-    "a team that is not a folder team is not judged on this: a git run's steps work in a checkout a person opened, with its settings",
+    "a team that is not a folder team is not judged on this: a repository run's steps work in a checkout a person opened, with its settings",
   );
 
   assert.throws(

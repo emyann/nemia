@@ -25,7 +25,7 @@ import {
   inFullLines,
   inputsDir,
   inputsNote,
-  isGitRun,
+  isRepositoryRun,
   lessonLine,
   missingArtifacts,
   namesInOrder,
@@ -50,7 +50,7 @@ import {
   waitAdvice,
   waitWord,
 } from '../../runner.ts';
-import type { BranchChanges, CheckReport, DecideCommand, Decided, GitRun } from '../../runner.ts';
+import type { BranchChanges, CheckReport, DecideCommand, Decided, RepositoryRun } from '../../runner.ts';
 import { HELP, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
@@ -149,7 +149,7 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   console.log(`${head}\n`);
   printRefusals(run, decision);
   printStops(decided, decision, out.heldOut);
-  const git = isGitRun(run) ? run : undefined;
+  const git = isRepositoryRun(run) ? run : undefined;
   const changes = git ? changesRead(git, decision.branches, steps, sensitive) : undefined;
   if (changes) printTouched(changes.toRead, sensitive);
   for (const name of namesInOrder(run, steps)) printStep(decided, name, steps);
@@ -318,7 +318,7 @@ function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], 
  * check-affecting ones by default: the branches to read (`branchesToRead`) and the result branches.
  */
 function changesRead(
-  git: GitRun,
+  git: RepositoryRun,
   branches: string[],
   steps: Steps,
   sensitive: string[] | undefined,
@@ -442,7 +442,7 @@ function printNotes(branch: string, notes: readonly { file: string; text: string
 }
 
 /** Where the work is: a folder run's folders, a run that worked on its base branch itself, or where each branch stands against the base. */
-function printStanding({ run, standings }: Decided, decision: Awaiting, git: GitRun | undefined): void {
+function printStanding({ run, standings }: Decided, decision: Awaiting, git: RepositoryRun | undefined): void {
   if (!git) {
     console.log(`\n  worked in folders, with no git repository: ${run.workspace}, a folder per step; nothing to merge`);
   } else if (decision.direct) {

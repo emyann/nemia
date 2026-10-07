@@ -71,6 +71,8 @@ export type RetryBriefing = {
   message?: string;
   /** The cap the person who asked for this try raised the step's budget to (`nemia retry --budget`). */
   budget?: number;
+  /** The raise was past a cap the step's tries had already cost (`Retry.pastCap`), which is why nothing was filed until it. */
+  pastCap?: true;
   /**
    * What a person said to the last try's session while it ran (`nemia say`): the engine's `said` on its task, in the order said. Given
    * again to a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
@@ -185,7 +187,7 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
       "The last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below. When you sign off again, it waits there again.",
   };
   const pastBudget =
-    r.budget !== undefined && r.status !== 'budget exhausted'
+    r.pastCap && r.status !== 'budget exhausted'
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
       : [];
   if (r.by === 'signoff' && r.resumed) return ['', `## Try ${r.try}`, '', SIGNOFF, ...saidSection(r.said)].join('\n');

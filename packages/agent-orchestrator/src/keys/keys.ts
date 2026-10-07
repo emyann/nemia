@@ -197,8 +197,8 @@ export function gateOf(step: string, gate: string | undefined): true | undefined
 }
 
 /**
- * The words `workspace:` takes. `main`: a step of a git run works in the repository's checkout rather than where the workflow's shape puts
- * it. `folder` was its other word, and is now `place: folder` (`placeSpelled`).
+ * The words `workspace:` takes. `main`: a step of a repository run works in the repository's checkout rather than where the workflow's
+ * shape puts it. `folder` was its other word, and is now `place: folder` (`placeSpelled`).
  */
 export const WORKSPACES: readonly string[] = ['main'];
 

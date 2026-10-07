@@ -20,7 +20,8 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { stillNeeded, workflowStale, workflowTaken } from './folder.ts';
-import { loadWorkflows, type Places } from './folder.store.ts';
+import { loadWorkflows } from './folder.store.ts';
+import type { Places } from '../skills/read.store.ts';
 import { workflowVersion } from './version.store.ts';
 import { removeWorkflow, writeWorkflow, type WorkflowRemoved, type WorkflowWritten } from './write.store.ts';
 

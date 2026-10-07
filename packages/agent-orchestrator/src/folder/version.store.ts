@@ -8,7 +8,8 @@ import path from 'node:path';
 import { frontmatterKey } from '../former/former.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
 import type { SkillsFound } from '../agents/agents.ts';
-import { agentVersion, lookupRoots, skillsFor, skillVersion, type Places } from './folder.store.ts';
+import { agentVersion } from '../agents/read.store.ts';
+import { lookupRoots, skillsFor, skillVersion, type Places } from '../skills/read.store.ts';
 
 /**
  * The value a file's frontmatter gives `key`, as the parser reads it (`frontmatterKey`), so `  agent: coder` and `agent : coder` name the

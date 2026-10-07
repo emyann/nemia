@@ -27,23 +27,41 @@ export type CommandClass =
 /** The classes a command is given, as a refusal names them. */
 const CLASSES = "'read', 'hers', 'prompts', 'answers', 'out', or { bare: 'read', sets: 'prompts', setsBy }";
 
-/** An entry as `classBreaks` reads it: its name, whether it writes, its class and the flags its spec takes. */
+/** An entry as `classBreaks` reads it: its name, whether it writes, its class, whether it is asked every time and its spec's flags. */
 type Classed = {
   readonly name: string;
   readonly writes: boolean;
   readonly nemia?: CommandClass;
+  readonly asksAlways?: true;
   readonly spec?: { readonly flags: readonly { readonly flag: string; readonly only?: { readonly side: 'cli' | 'api' } }[] };
 };
 
 /** The class a rule on a command's name gives every command it extends: an ask or an allow on `<name>:*`. */
 const covers = (c: CommandClass | undefined): boolean => c === 'answers' || c === 'prompts';
 
+/** The command whose writes are the person's confirmed list for `auto`, which a prompt's allow must never reach. */
+const ALWAYS_ASKED_UNDER = 'auto';
+
+/**
+ * Where an entry's `asksAlways` breaks the rules: given a class other than `prompts`, where it asks nothing a prompt's allow could reach;
+ * left out of a `prompts` write under `nemia auto`, which writes the person's confirmed list.
+ */
+function askedBreaks(c: Classed): string[] {
+  if (c.asksAlways && c.nemia !== 'prompts')
+    return [`${c.name} asks always and is classed ${JSON.stringify(c.nemia)}: asksAlways is a prompt's, so class it 'prompts' or drop it`];
+  if (!c.asksAlways && c.nemia === 'prompts' && c.name.startsWith(`${ALWAYS_ASKED_UNDER} `))
+    return [`${c.name} writes the person's rules for auto and is not asked always: give it asksAlways, so no allow at a prompt reaches it`];
+  return [];
+}
+
 /**
  * Where one entry's class breaks the rules: none given, a read classed as a write, a write classed as a read, a flag a bare read leaves
- * out.
+ * out, and its `asksAlways` (`askedBreaks`).
  */
 function ownBreaks(c: Classed): string[] {
   if (c.nemia === undefined) return [`${c.name} has no class: say who answers for it when an agent calls it — ${CLASSES}`];
+  const asked = askedBreaks(c);
+  if (asked.length) return asked;
   if (!c.writes && c.nemia !== 'read') return [`${c.name} writes nothing and is classed ${JSON.stringify(c.nemia)}: class it 'read'`];
   if (c.writes && c.nemia === 'read') return [`${c.name} writes and is classed 'read': class it as the write it is`];
   if (typeof c.nemia !== 'object') return [];
@@ -56,8 +74,9 @@ function ownBreaks(c: Classed): string[] {
 /**
  * Where a table's classes break the rules, a sentence each: an entry with no class; a command that writes nothing classed other than a
  * read, and one that writes classed a read; a flag of a command that reads bare in neither its `setsBy` nor its `readsBy`, which would run
- * unasked whatever it does; and a name that extends an `answers` or a `prompts` name by a word (`approve now` under `approve`) in another
- * class, whose own class the rule on the shorter name would override.
+ * unasked whatever it does; an `asksAlways` on a class but `prompts`, or left out of a write of the person's rules for auto; and a name
+ * that extends an `answers` or a `prompts` name by a word (`approve now` under `approve`) in another class, whose own class the rule on
+ * the shorter name would override.
  */
 export function classBreaks(table: readonly Classed[]): string[] {
   const breaks = table.flatMap(ownBreaks);

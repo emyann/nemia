@@ -3862,6 +3862,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     own: 'failed (check)',
     needs: null,
     unfinished: false,
+    questions: [],
   };
   const html = offersMarkup([
     { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', ...checkRaise },
@@ -3876,6 +3877,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       own: 'blocked',
       needs: 'Warm colours, or cool ones?',
       unfinished: false,
+      questions: [],
     },
     { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
     {
@@ -3889,6 +3891,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       own: null,
       needs: null,
       unfinished: false,
+      questions: [],
     },
   ]);
   const rows = new Map(
@@ -4497,6 +4500,156 @@ test("the run page's gate draws what is being approved beside Approve and Send b
   assert.match(html, /lg:grid-cols-2/, 'beside the answer where the page is wide');
   const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', framed: false }));
   assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|lg:grid-cols-2/);
+});
+
+/** A design's closeout at its gate, asking two questions as data in its `open` field. */
+const askingCloseout: StepCloseout = {
+  ...planCloseout,
+  output: { approach: 'Cut it.', open: [cut, where] },
+  schema: { approach: { type: 'string' }, open: { type: 'array' } },
+  questions: [{ field: 'open', questions: [cut, where] }],
+};
+
+test('a gate whose step asks questions draws them in the answer column, after what it handed on, with the recommended answers offered — and Approve and Send back wait until each is answered', () => {
+  const html = withClient(
+    createElement(Gate, {
+      runId: 'r-1',
+      step: 'design',
+      approveLine: 'nemia approve r-1 design',
+      closeout: askingCloseout,
+      questions: [cut, where],
+    }),
+  );
+  const handed = html.indexOf('aria-label="What design handed on"');
+  const asked = html.indexOf('aria-label="What design asks"');
+  const approve = html.indexOf('aria-label="Approve design"');
+  assert.ok(handed >= 0 && handed < asked && asked < approve, html);
+  assert.doesNotMatch(html.slice(handed, asked), /data-questions=/, 'the questions are drawn once, as fields, not read-only beside');
+  assert.match(html, /<fieldset data-question="How is the card cut\?"/);
+  assert.match(html, /<fieldset data-question="Where do the answers go\?"/);
+  assert.match(html, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
+  assert.match(
+    html,
+    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Approve<\/button>/,
+  );
+  assert.match(
+    html,
+    /placeholder="A note beside the answers \(optional\): every step after the gate is handed it with the answers, under “Approved”\."/,
+  );
+  assert.match(html, /<button type="submit" disabled=""[^>]*>Send back<\/button>/, 'nothing to send back yet: no words, no answers');
+  const plain = withClient(
+    createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
+  );
+  assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
+  assert.match(plain, /<button type="submit"[^>]*>Approve<\/button>/);
+  assert.doesNotMatch(plain, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
+});
+
+test("the inspector's gate of a step that asks questions draws them too, its Approve waiting until each is answered — and a step that asks none, no fields", async () => {
+  const { Asked } = await import('../src/components/GateBrief.tsx');
+  const run = atGate({ closeout: askingCloseout });
+  const html = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
+  const asked = /<section aria-label="What review asks of you"[^]*$/.exec(html)?.[0] ?? '';
+  assert.match(asked, /<section [^>]*aria-label="What review asks"/, html);
+  assert.match(asked, /<fieldset data-question="How is the card cut\?"/);
+  assert.match(asked, /<fieldset data-question="Where do the answers go\?"/);
+  assert.match(asked, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
+  assert.match(
+    asked,
+    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Approve<\/button>/,
+  );
+  const plain = atGate({ closeout: planCloseout });
+  const none = await routedWith(createElement(Asked, { run: plain, step: plain.steps[0] }));
+  assert.match(none, /aria-label="What review asks of you"/);
+  assert.doesNotMatch(none, /data-question=|Not answered|data-recommend-all/);
+  assert.match(none, /<button type="submit"[^>]*>Approve<\/button>/);
+  assert.doesNotMatch(none, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
+});
+
+test("what a gate's approval sends: every answer in the order asked and the note beside them, left out when empty; a gate that asks nothing, its words alone", () => {
+  const draft = { [where.title]: { chose: ['gate'], own: '' }, [cut.title]: { chose: [], own: ' Three ways. ' } };
+  assert.deepEqual(Gates.approvalBody([cut, where], draft, ' Go. '), {
+    answers: [
+      { question: cut.title, chose: [], own: 'Three ways.' },
+      { question: where.title, chose: ['gate'] },
+    ],
+    message: ' Go. ',
+  });
+  assert.deepEqual(Gates.approvalBody([cut, where], draft, '  '), {
+    answers: [
+      { question: cut.title, chose: [], own: 'Three ways.' },
+      { question: where.title, chose: ['gate'] },
+    ],
+  });
+  assert.deepEqual(Gates.approvalBody([], {}, 'Fine.'), { message: 'Fine.' });
+  assert.deepEqual(Gates.approvalBody([], {}, ''), {});
+});
+
+test("a send-back carries the gate's answers all or none: every one answered goes with it, none goes without, some is held — and a send-back to another step carries none", () => {
+  const all = { [cut.title]: { chose: ['a'], own: '' }, [where.title]: { chose: ['retry'], own: '' } };
+  const some = { [cut.title]: { chose: ['a'], own: '' } };
+  const back = (to: string, draft: Record<string, { chose: string[]; own: string }>, objection: string) =>
+    Gates.sendBackBody({ step: 'design', to, mode: 'nudge', objection, questions: [cut, where], draft });
+  assert.deepEqual(back('design', all, ''), {
+    mode: 'nudge',
+    step: 'design',
+    answers: [
+      { question: cut.title, chose: ['a'] },
+      { question: where.title, chose: ['retry'] },
+    ],
+  });
+  assert.deepEqual(back('design', all, 'Smaller.'), { ...back('design', all, ''), message: 'Smaller.' });
+  assert.deepEqual(back('design', {}, 'Smaller.'), { mode: 'nudge', message: 'Smaller.', step: 'design' });
+  assert.deepEqual(back('plan', all, 'Redo it.'), { mode: 'nudge', message: 'Redo it.', step: 'plan' });
+  const waits = (to: string, draft: Record<string, { chose: string[]; own: string }>) =>
+    Gates.sendBackWaits({ step: 'design', to, questions: [cut, where], draft });
+  assert.deepEqual(waits('design', some), [where.title], 'some answered: held until the rest are');
+  assert.equal(waits('design', {}).length, 0, 'none answered: the words go alone');
+  assert.equal(waits('design', all).length, 0);
+  assert.equal(waits('plan', some).length, 0, 'to another step: the answers stay behind');
+});
+
+const { raiseBody } = await import('../src/components/Raise.tsx');
+
+test('a raise of a step that signed off blocked asking questions as data draws them to answer by choosing, with the recommended answers and a note beside them, its button waiting for each', () => {
+  const html = offersMarkup([
+    {
+      step: 'palette',
+      kind: 'raise',
+      status: 'over budget $1.50 of $1',
+      by: 'retry',
+      above: 1.5,
+      said: '$1.50',
+      modes: ['nudge', 'fresh'],
+      own: 'blocked',
+      needs: 'Two questions.',
+      unfinished: false,
+      questions: [cut, where],
+    },
+  ]);
+  assert.match(html, /<fieldset data-question="How is the card cut\?"/);
+  assert.match(html, /<fieldset data-question="Where do the answers go\?"/);
+  assert.match(html, /data-recommend-all[^>]*>Choose the recommended answers</);
+  assert.match(html, /class="sr-only">A note to palette beside the answers<\/label>/);
+  assert.doesNotMatch(html, /Your answer to palette/);
+  assert.match(
+    html,
+    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Raise the budget and answer<\/button>/,
+  );
+});
+
+test("what a raise's try sends: the budget typed, and for a step asking questions as data its answers in the order asked, the note left out when empty", () => {
+  const draft = { [where.title]: { chose: ['retry', 'gate'], own: '' }, [cut.title]: { chose: ['b'], own: '' } };
+  const asked = { mode: 'nudge' as const, amount: '3', asks: true, questions: [cut, where], draft };
+  const answers = [
+    { question: cut.title, chose: ['b'] },
+    { question: where.title, chose: ['retry', 'gate'] },
+  ];
+  assert.deepEqual(raiseBody({ ...asked, message: '' }), { mode: 'nudge', budget: 3, answers });
+  assert.deepEqual(raiseBody({ ...asked, message: 'Hurry.' }), { mode: 'nudge', budget: 3, answers, message: 'Hurry.' });
+  assert.deepEqual(raiseBody({ ...asked, amount: ' ', message: '' }), { mode: 'nudge', answers });
+  assert.deepEqual(raiseBody({ ...asked, questions: [], message: 'Warm.' }), { mode: 'nudge', budget: 3, message: 'Warm.' });
+  assert.deepEqual(raiseBody({ ...asked, asks: false, questions: [], message: '' }), { mode: 'nudge', budget: 3 });
 });
 
 test("an agent's form shows its card read-only, generated from its skills: an entry each, no field to edit it, and the package's refusal where none can be made", async () => {
@@ -6341,6 +6494,26 @@ test("an agent's custom instructions are anchored, so a step's page links to whe
   assert.match(await routedWith(createElement(CustomInstructions, { name: 'writer' })), /<section id="custom-instructions"/);
 });
 
+test("an agent's custom instructions say a run keeps the words it froze; the store's own agent's, beside her rules, that her next session takes them", async () => {
+  const { CustomInstructions } = await import('../src/components/CustomInstructions.tsx');
+  const { AutoRules } = await import('../src/components/AutoRules.tsx');
+  const hired = await routedWith(createElement(CustomInstructions, { name: 'writer' }));
+  assert.match(hired, /data-custom-frozen[^>]*>A run already started keeps the words it froze/, 'a hired agent: a run keeps what it froze');
+  assert.match(hired, /wherever it is hired/);
+  assert.doesNotMatch(hired, /data-custom-filed/);
+  const hers = await routedWith(createElement(AutoRules, { agent: 'nemia' }));
+  assert.match(hers, /<section id="custom-instructions"/, 'her rules sit beside her custom instruction');
+  assert.match(
+    hers,
+    /data-custom-filed[^>]*>Her open session keeps the words it was filed with: a save or a clear takes effect when her session is next filed/,
+  );
+  assert.doesNotMatch(
+    hers,
+    /data-custom-frozen|A run already started|wherever it is hired|runs started from now/,
+    'no run freezes her words',
+  );
+});
+
 /** `StepPolicy` drawn as a server draws it. */
 const policyMarkup = (layers: StepLayers): string => renderToStaticMarkup(createElement(StepPolicy, { layers }));
 
@@ -6599,6 +6772,10 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(NemiaSettings)));
 }
 
+/** The level the Select pressed at `mark` shows in `html`, or undefined where there is none. */
+const pickedAt = (html: string, mark: string): string | undefined =>
+  html.slice(html.indexOf(mark)).match(/data-slot="select-value"[^>]*><span[^>]*>([^<]*)</)?.[1];
+
 /** Her session up and reached, on Semi-auto. */
 const nemiaUp = {
   level: 'semi-auto',
@@ -6646,10 +6823,30 @@ test("REFUSED to offer: the default factory's own switch or raise, a raise over 
   assert.match(of('harbour'), /Semi-auto by default \(its own\)\./);
 });
 
-test('Nemia off: the Semi-auto switch unselected, her session off, no reach, and her memory empty with how to prune it', async () => {
+test('at Auto: her level and a factory by default picked at Auto in one control each, and a session kept from before named', async () => {
+  const html = await nemiaWith({
+    ...nemiaUp,
+    level: 'auto',
+    factories: [{ factory: 'quay', level: 'auto', default: 'auto', own: 'auto', raise: null }],
+  });
+  assert.equal(pickedAt(html, 'data-nemia-pick'), 'Auto');
+  assert.equal(pickedAt(html, 'data-factory-default'), 'Auto');
+  assert.equal(
+    html.split('data-slot="select-trigger"').length - 1,
+    2,
+    'one control for her level, one for the factory: no raise over Auto',
+  );
+  assert.doesNotMatch(html, /data-slot="switch"/, 'no switch beside it');
+  assert.match(
+    html,
+    /one kept from before asks you every answer until it is filed again — set Manual, and once her session reads Off, Auto\./,
+  );
+});
+
+test('Nemia off: her level picked at Manual, her session off, no reach, and her memory empty with how to prune it', async () => {
   const html = await nemiaWith({});
   assert.match(html, /data-nemia-level="manual"/);
-  assert.doesNotMatch(html, /data-slot="switch"[^>]*data-selected="true"/, 'the switch is not on');
+  assert.equal(pickedAt(html, 'data-nemia-pick'), 'Manual');
   assert.match(html, /data-nemia-session="true" data-state="off"/);
   assert.doesNotMatch(html, /data-nemia-reach/);
   assert.doesNotMatch(html, /data-nemia-restart/);
@@ -6657,12 +6854,12 @@ test('Nemia off: the Semi-auto switch unselected, her session off, no reach, and
   assert.match(html, /data-nemia-prune[^>]*>She keeps these facts herself[^<]*ask her to in her session\./);
 });
 
-test('Nemia up: the switch selected, her task and phase, the attach line as code to copy and the rest as words, her spend and allows', async () => {
+test('Nemia up: her level picked at Semi-auto, her task and phase, the attach line as code to copy and the rest as words, her spend and allows', async () => {
   const html = await nemiaWith({ ...nemiaUp, spend: { usd: 1.25, measured: 2, unmeasured: 0 }, allows: ['Bash(git status)'] }, [
     'owner',
     'style',
   ]);
-  assert.match(html, /data-slot="switch"[^>]*data-selected="true"/);
+  assert.equal(pickedAt(html, 'data-nemia-pick'), 'Semi-auto');
   assert.match(html, /data-state="up"/);
   assert.match(html, /data-nemia-task[^>]*>nemia-1</);
   assert.match(html, /data-nemia-phase[^>]*>running</);

@@ -6,7 +6,7 @@
  * engine's. The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for
  * them.
  */
-import type { Question, RunDetail, RunSummary, RunToDecide } from './api';
+import type { Question, RunDetail, RunSummary, RunToDecide, StepCloseout } from './api';
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
@@ -108,6 +108,10 @@ export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, r
 /** Where a step's section is on its run's page, as a URL's hash: what the banner's `approve plan` links to, where Approve is. */
 export const stepAnchor = (step: string): string => `step-${step}`;
 
+/** The questions a step's closeout asks as data, each of its question fields in turn, in the schema's order; none without a closeout. */
+export const askedIn = (closeout: Pick<StepCloseout, 'questions'> | null | undefined): Question[] =>
+  closeout?.questions.flatMap((a) => a.questions) ?? [];
+
 /**
  * What a run's page offers for a step, each the CLI's `retry` the api asks for (`askTry`):
  *
@@ -124,12 +128,15 @@ export const stepAnchor = (step: string): string => `step-${step}`;
  * nothing signed: a nudge, with something to say if you like, which the package takes              as the CLI's `retry` does — the tick
  * stops the session, then files the try. The banner offers it, beside what the session said last   asked      a person asked for its next
  * try, which the next tick files: the CLI `ls`'s note says so
+ *
+ * A raise carries `questions` as an answer does (`askedIn`): what its closeout asks as data, which a raise of a step that signed off
+ * blocked answers by choosing, beside the budget, rather than in words.
  */
 export type Offer =
   | { step: string; kind: 'answer'; needs: string | null; questions: Question[] }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
   | { step: string; kind: 'denied'; calls: string | null }
-  | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean } & NonNullable<
+  | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean; questions: Question[] } & NonNullable<
       RunDetail['steps'][number]['raise']
     >)
   | { step: string; kind: 'continue' }
@@ -156,12 +163,13 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
     if (step.blockedByHarness) return [{ step: step.name, kind: 'continue' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
     const unfinished = step.check?.verdict === 'unfinished';
-    if (step.raise) return [{ step: step.name, kind: 'raise', status: step.status, needs: step.needs, unfinished, ...step.raise }];
+    if (step.raise) {
+      const questions = askedIn(step.closeout);
+      return [{ step: step.name, kind: 'raise', status: step.status, needs: step.needs, unfinished, questions, ...step.raise }];
+    }
     const state = stepState(step.status, false, false);
     if (state === 'blocked') {
-      return [
-        { step: step.name, kind: 'answer', needs: step.needs, questions: step.closeout?.questions.flatMap((a) => a.questions) ?? [] },
-      ];
+      return [{ step: step.name, kind: 'answer', needs: step.needs, questions: askedIn(step.closeout) }];
     }
     if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished }];
     if (state === 'unsigned') return [{ step: step.name, kind: 'try-again', recheck: false, unfinished: false }];

@@ -47,6 +47,9 @@ factory-frame
 faces
 agent-cards
 questions
+gate-questions
+gate-questions-refused
+raise-questions
 factories
 inbox-factory
 stats
@@ -92,3 +95,4 @@ unread-session
 decide-unread
 hold-put
 hold-put-refused
+auto-rules

@@ -196,10 +196,14 @@ function oneAnswerRefusal(q: Question, a: Answer): string | null {
 }
 
 /**
- * Why `answers` do not answer `asked`, or null: an answer to a question not asked, two to one question, a label its question does not
- * offer, several labels where one is taken, and a question left with neither a choice nor words of the person's own.
+ * Why `answers` do not answer `asked`, or null: answers, even none, to a step that asks no questions now; an answer to a question not
+ * asked, two to one question, a label its question does not offer, several labels where one is taken, and a question left with neither
+ * a choice nor words of the person's own.
  */
 export function answerRefusal(asked: readonly Question[], answers: readonly Answer[]): string | null {
+  if (!asked.length) {
+    return 'The step asks no questions now, so there is nothing to answer. Read the step again, and say what you mean in words, without `answers`.';
+  }
   const seen = new Set<string>();
   for (const a of answers) {
     const q = asked.find((one) => one.title === a.question);
@@ -213,11 +217,8 @@ export function answerRefusal(asked: readonly Question[], answers: readonly Answ
   return left ? `"${left.title}" is not answered: choose an option, or answer it in your own words.` : null;
 }
 
-/**
- * The words a step's next try reads for `answers` to `asked`, which `answerRefusal` let through: each question in the order asked, what was
- * chosen with what it means, and the person's own words; then `note`, when there is one; and last, who answered.
- */
-export function answerText(asked: readonly Question[], answers: readonly Answer[], note?: string): string {
+/** Each question in the order asked, what was chosen with what it means, and the person's own words; then `note`; then who answered. */
+function answerBlocks(asked: readonly Question[], answers: readonly Answer[], note?: string): string[] {
   const blocks = asked.map((q, i) => {
     const a = answers.find((one) => one.question === q.title);
     const chose = (a?.chose ?? []).map((label) => `   Chose: ${label} — ${q.options.find((o) => o.label === label)?.meaning ?? ''}`);
@@ -225,5 +226,20 @@ export function answerText(asked: readonly Question[], answers: readonly Answer[
     return [`${i + 1}. ${q.title}`, ...chose, ...own].join('\n');
   });
   const noted = note?.trim() ? [`Note: ${note.trim()}`] : [];
-  return ['Answers to your questions:', ...blocks, ...noted, 'Answered by: person, on the board'].join('\n\n');
+  return [...blocks, ...noted, 'Answered by: person, on the board'];
 }
+
+/**
+ * The words a step's next try reads for `answers` to `asked`, which `answerRefusal` let through: each question in the order asked, what was
+ * chosen with what it means, and the person's own words; then `note`, when there is one; and last, who answered.
+ */
+export const answerText = (asked: readonly Question[], answers: readonly Answer[], note?: string): string =>
+  ['Answers to your questions:', ...answerBlocks(asked, answers, note)].join('\n\n');
+
+/**
+ * The words an approval carries for `answers` to the questions `step` asked at its gate, which `answerRefusal` let through: read under
+ * `## Approved` by the steps after the gate, so they open naming whose questions they answer; then each answer as `answerText` says it,
+ * `note`, and who answered.
+ */
+export const approvedAnswerText = (step: string, asked: readonly Question[], answers: readonly Answer[], note?: string): string =>
+  [`The person's answers to ${step}'s questions:`, ...answerBlocks(asked, answers, note)].join('\n\n');

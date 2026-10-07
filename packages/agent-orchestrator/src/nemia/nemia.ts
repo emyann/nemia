@@ -59,11 +59,9 @@ export function nemiaSettings(
 /** The usage the refusals of `nemia level` end on. */
 export const LEVEL_FORM = FACTORY_LEVEL_FORM;
 
-/** Why `word` is no level `nemia level` sets, or undefined where it is one. `auto` is a level to come, said so. Pure. */
+/** Why `word` is no level `nemia level` sets, or undefined where it is one. Pure. */
 export function levelRefusal(word: string): string | undefined {
   if ((LEVELS as readonly string[]).includes(word)) return undefined;
-  if (word === 'auto')
-    return `auto is not built yet: Nemia acting on her own word, under a cap, comes with slice 6. Today she is ${LEVELS.join(' or ')}: ${LEVEL_FORM}.`;
   return `${JSON.stringify(word)} is no level: ${LEVEL_FORM}.`;
 }
 

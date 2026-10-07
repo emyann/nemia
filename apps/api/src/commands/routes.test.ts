@@ -225,6 +225,8 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'subscribe POST',
       'unsubscribe DELETE',
       'level PUT',
+      'auto confirm PUT',
+      'auto drop DELETE',
       'workflows write POST',
       'workflows write PUT',
       'workflows remove DELETE',
@@ -268,16 +270,16 @@ test('a lift on its route reads no body: what its route fixes lifts the hold, wh
   }
 });
 
-test('REFUSED at shipped defaults: `answers` sent to an approval, which takes none on the api — 422 naming the key, nothing written', async () => {
-  gatedRun('r-foreign');
-  const res = await post('/api/runs/r-foreign/steps/plan/approve', {
-    message: 'Go.',
+test('REFUSED at shipped defaults: `answers` sent to a round, which takes none on the api — 422 naming the key and the routes that take it, nothing written', async () => {
+  loopingRun('r-foreign');
+  const res = await post('/api/runs/r-foreign/round', {
+    budget: 5,
     answers: [{ question: 'Which?', chose: ['A'] }],
   });
   assert.equal(res.status, 422);
   assert.equal(
     ((await res.json()) as { error: string }).error,
-    '`answers` is not a key POST …/approve takes — POST …/retry takes it — so it would go nowhere: `{ "message"?: "<words>" }`.',
+    '`answers` is not a key POST …/round takes — POST …/retry, POST …/approve take it — so it would go nowhere: `{ "step"?: "<looping step>", "budget"?: <amount> }`.',
   );
   assert.deepEqual(asked('r-foreign'), [], 'nothing written');
 });
@@ -308,8 +310,8 @@ test('REFUSED: a routed command the api has no words for, and a key taken on the
     'hush is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
   ]);
   assert.deepEqual(wordBreaks([{ name: 'sing' }]), [], 'a command served on the command line alone needs no words');
-  assert.deepEqual(extensionBreaks([{ name: 'approve', apiTakes: ['answers'] }]), [
-    'approve takes `answers` on the api, and extend.ts folds none: give approve an extension that takes it, or drop it',
+  assert.deepEqual(extensionBreaks([{ name: 'accept', apiTakes: ['answers'] }]), [
+    'accept takes `answers` on the api, and extend.ts folds none: give accept an extension that takes it, or drop it',
   ]);
   assert.deepEqual(extensionBreaks([{ name: 'retry', apiTakes: ['notes'] }]), [
     'retry takes `notes` on the api, and extend.ts folds none: give retry an extension that takes it, or drop it',

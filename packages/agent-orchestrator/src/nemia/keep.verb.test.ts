@@ -85,7 +85,8 @@ test('REFUSED: semi-auto while her folder is not trusted, naming the command tha
     assert.ok(said.includes(`mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`), said);
     assert.equal(readLevel(), undefined);
   }
-  assert.match(LEVEL.check?.({ level: 'auto' }) ?? '', /^auto is not built yet/);
+  assert.equal(LEVEL.check?.({ level: 'auto' }), null);
+  assert.match(LEVEL.check?.({ level: 'on' }) ?? '', /^"on" is no level/);
   assert.equal(LEVEL.check?.({ level: 'manual' }), null);
   assert.equal(await beat().then((owed) => owed.length), 0, 'no level set owes nothing');
 });
@@ -161,7 +162,7 @@ test("at semi-auto the keeper files her task long-lived in auto, the daemon's bi
   for (const rule of fence.allow) assert.ok((spec.config.allowedTools as string[]).includes(rule), `${rule} allowed`);
   assert.deepEqual(
     spec.config.callAdmission,
-    { command: [path.join(bin, 'nemia'), 'admit', '--at-least', 'semi-auto'], tools: ['Bash'] },
+    { command: [path.join(bin, 'nemia'), 'admit', '--at-least', 'semi-auto', '--auto', 'nemia'], tools: ['Bash'] },
     "her shell calls admitted by the daemon's own nemia",
   );
   assert.equal(own.appendSystemPromptFile, promptFile());

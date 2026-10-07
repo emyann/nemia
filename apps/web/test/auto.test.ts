@@ -1,0 +1,88 @@
+/**
+ * An agent's rules for Auto on the board: the mirror of what the api answers, which decodes the rules in force, the proposal and the
+ * custom instruction and refuses an answer it does not read, and the writes of a confirm, sending the words the person read, and a drop,
+ * with an empty body, each on its route.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { UnreadAnswer } from '../src/lib/api/read.ts';
+import { autoQuery, confirmRule, dropRule, type AutoList } from '../src/lib/api/auto.ts';
+
+/** The rule that ships, as the api words it. */
+const DEFAULT = {
+  id: 'default',
+  answer: 'approve',
+  when: ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'],
+  from: 'default',
+  words: 'Approve any step unasked when all agree.',
+} as const;
+
+/** Her rules, the default in force, one rule proposed and one word kept as guidance. */
+const LIST: AutoList = {
+  agent: 'nemia',
+  file: '/store/auto/nemia.json',
+  isDefault: true,
+  rules: [DEFAULT],
+  shipped: DEFAULT,
+  proposed: {
+    file: '/store/auto/nemia.proposed.json',
+    at: '2026-10-06T12:00:00.000Z',
+    rules: [{ id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 3, words: 'Try again.', confirmed: false }],
+    guidance: ['answer in French'],
+    stale: false,
+  },
+  instruction: 'Merge when all agree.',
+};
+
+/** Every call answering `body` as JSON, with `status`, for the length of the test; the calls made, by method and path. */
+function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200): { method: string; path: string; body: unknown }[] {
+  const before = globalThis.fetch;
+  const calls: { method: string; path: string; body: unknown }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      method: init?.method ?? 'GET',
+      path: String(input),
+      body: init?.body === undefined ? undefined : JSON.parse(String(init.body)),
+    });
+    return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  return calls;
+}
+
+const readAuto = autoQuery('nemia').queryFn as unknown as () => Promise<AutoList>;
+
+test('her rules read back what the api answered, a key it does not read dropped', async (t) => {
+  answering(t, { ...LIST, later: true });
+  assert.deepEqual(await readAuto(), LIST);
+  answering(t, { ...LIST, proposed: null, instruction: null });
+  assert.deepEqual(await readAuto(), { ...LIST, proposed: null, instruction: null });
+});
+
+test('REFUSED: an answer no rule gives, a condition the board has no word for, a rule with no words, and no proposal key', async (t) => {
+  answering(t, { ...LIST, rules: [{ ...DEFAULT, answer: 'accept' }] });
+  await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.answer/.test(err.message));
+  answering(t, { ...LIST, rules: [{ ...DEFAULT, when: ['cheap'] }] });
+  await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.when\[0\]/.test(err.message));
+  const { words: _words, ...unworded } = DEFAULT;
+  answering(t, { ...LIST, rules: [unworded] });
+  await assert.rejects(
+    readAuto(),
+    (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.words, the value is missing/.test(err.message),
+  );
+  const { proposed: _proposed, ...noProposal } = LIST;
+  answering(t, noProposal);
+  await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at proposed, the value is missing/.test(err.message));
+});
+
+test('a confirm is a PUT sending the words read and a drop a DELETE sending an empty body, each reading the rules back', async (t) => {
+  const calls = answering(t, LIST);
+  assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
+  assert.deepEqual(await dropRule('nemia', 'default'), LIST);
+  assert.deepEqual(calls, [
+    { method: 'PUT', path: '/api/auto/nemia/rules/tries', body: { words: 'Try again.' } },
+    { method: 'DELETE', path: '/api/auto/nemia/rules/default', body: {} },
+  ]);
+});

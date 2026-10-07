@@ -6,7 +6,7 @@ import { Schema } from 'effect';
 import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
 import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
-import { AGENTS_COPY, AGENTS_CUSTOM } from './library.ts';
+import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
 
 /**
@@ -52,7 +52,7 @@ const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
 const MERGE_SHAPE = '`{ "step"?: "<looping step>" }`';
 
 /** The body `POST …/approve` takes: `nemia approve`'s `--message`, as JSON. */
-const APPROVE_SHAPE = '`{ "message"?: "<words>" }`';
+const APPROVE_SHAPE = '`{ "message"?: "<words>", "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
 
 /**
  * The body `POST …/accept` takes: `nemia accept`'s `--message`, as JSON — required, as the command line requires it, in the package's words
@@ -167,10 +167,13 @@ const APPROVE: RouteWords = {
   }),
   issue:
     ({ runId, step }) =>
-    ({ path: [key], input }) =>
-      key === 'message'
-        ? `\`message\` is the words to approve with, which every step after the gate is handed, as \`nemia approve ${runId} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(input)}: ${APPROVE_SHAPE}.`
-        : `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.`,
+    ({ path: [key], input }) => {
+      if (key === 'message')
+        return `\`message\` is the words to approve with, which every step after the gate is handed, as \`nemia approve ${runId} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(input)}: ${APPROVE_SHAPE}.`;
+      if (key === 'answers')
+        return `\`answers\` are a person's answers to the questions the step asks at its gate: a list of { "question": its title, "chose": the labels chosen, "own"?: words of their own }, or left out. This request's was ${JSON.stringify(input)}: ${APPROVE_SHAPE}.`;
+      return `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.`;
+    },
   failed: ({ runId, step }, said) =>
     `Could not approve step '${step}': ${said}. \`nemia approve ${runId} ${step}\` approves the same way from the command line.`,
 };
@@ -612,6 +615,8 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   subscribe: SUBSCRIBE,
   unsubscribe: UNSUBSCRIBE,
   level: LEVEL,
+  'auto confirm': AUTO_CONFIRM,
+  'auto drop': AUTO_DROP,
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,

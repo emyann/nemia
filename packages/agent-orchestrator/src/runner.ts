@@ -416,6 +416,7 @@ export { FACTORY } from './factory/factory.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
+export { AUTO_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';

@@ -54,7 +54,7 @@ export const UNSUBSCRIBE: RouteWords = {
 };
 
 /** The body `PUT /api/level` takes: `nemia level`'s level, as JSON. */
-const LEVEL_SHAPE = '`{ "level": "manual" | "semi-auto" }`';
+const LEVEL_SHAPE = '`{ "level": "manual" | "semi-auto" | "auto" }`';
 
 /** Nemia's level set, as the guard's refusals word it, and its body; a level that is none is the package's 422. */
 export const LEVEL: RouteWords = {
@@ -63,13 +63,13 @@ export const LEVEL: RouteWords = {
     route: 'PUT /api/level',
     does: "sets Nemia's level",
     forAnother: 'set it',
-    why: "at semi-auto Nemia's session is kept, reading every factory's folders and told the feed's waits on a person; at manual it is stopped",
+    why: "at semi-auto Nemia's session is kept, reading every factory's folders and told the feed's waits on a person; at auto she also gives the answers the person's confirmed list allows; at manual it is stopped",
     reach: 'set it with `nemia level`',
-    instead: 'Set it with `nemia level semi-auto` or `nemia level manual`',
+    instead: 'Set it with `nemia level auto`, `nemia level semi-auto` or `nemia level manual`',
     shape: LEVEL_SHAPE,
   }),
   issue:
     () =>
     ({ input }) =>
-      `\`level\` is the level Nemia is set to, as \`nemia level <level>\` takes it: manual or semi-auto. This request's was ${JSON.stringify(input) ?? 'left out'}: ${LEVEL_SHAPE}.`,
+      `\`level\` is the level Nemia is set to, as \`nemia level <level>\` takes it: manual, semi-auto or auto. This request's was ${JSON.stringify(input) ?? 'left out'}: ${LEVEL_SHAPE}.`,
 };

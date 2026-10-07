@@ -43,3 +43,19 @@ test('REFUSED: a name that extends an answer or a prompt by a word in another cl
     ['approve now is classed "hers" under approve, classed "answers", whose rule covers it: rename it, or class it "answers"'],
   );
 });
+
+test("REFUSED: asksAlways on a class but prompts, and a write of the person's rules for auto not asked always", () => {
+  assert.deepEqual(
+    classBreaks([
+      { name: 'auto', writes: false, nemia: 'read' },
+      { name: 'auto propose', writes: true, nemia: 'hers' },
+      { name: 'auto confirm', writes: true, nemia: 'prompts', asksAlways: true },
+      { name: 'auto drop', writes: true, nemia: 'prompts' },
+      { name: 'cancel', writes: true, nemia: 'answers', asksAlways: true },
+    ]),
+    [
+      "auto drop writes the person's rules for auto and is not asked always: give it asksAlways, so no allow at a prompt reaches it",
+      "cancel asks always and is classed \"answers\": asksAlways is a prompt's, so class it 'prompts' or drop it",
+    ],
+  );
+});

@@ -8,6 +8,7 @@ import path from 'node:path';
 import {
   admitted,
   AGENTS_CUSTOM,
+  AUTO_PROPOSE,
   FACTORY_INSTRUCT,
   HOME,
   PRUNE,
@@ -225,11 +226,21 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
 }
 
 /**
+ * `nemia auto propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
+ */
+export async function autoProposeRun(args: Args, e: Engine): Promise<void> {
+  const asked = withWords(args, AUTO_PROPOSE.name);
+  const data = await runWith(e, AUTO_PROPOSE.handler(asked, undefined, HOME));
+  for (const line of AUTO_PROPOSE.print(data, asked)) console.log(line);
+}
+
+/**
  * `nemia admit`'s runner: the call read on stdin, decided against the table (`admitted`) under the floor `--at-least` gives, and the answer
  * printed as JSON, or nothing.
  */
 export async function admitRun(args: Args, e: Engine): Promise<void> {
   const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[2]) : undefined;
-  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor));
+  const auto = typeof args.auto === 'string' ? args.auto : undefined;
+  const answer = await runWith(e, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto));
   if (answer !== undefined) console.log(JSON.stringify(answer));
 }

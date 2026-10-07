@@ -1,15 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { photograph, railPlace, themeOf } from '../board.ts';
+import { photograph, pickLevel, railPlace, themeOf } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * The rail's Settings leads to the store's settings, where Nemia's Semi-auto switch is refused while her folder is not trusted: one 409,
-   * shown in the api's words, which name what trusts it; the switch stays off, and no level is written. Its one refusal is the point, so
-   * its page counts exactly it.
+   * The rail's Settings leads to the store's settings, where a pick of Semi-auto for Nemia is refused while her folder is not trusted: one
+   * 409, shown in the api's words, which name what trusts it; her level stays picked at Manual, and no level is written. Its one refusal
+   * is the point, so its page counts exactly it.
    */
   name: 'nemia-untrusted',
   route: '/settings',
@@ -30,7 +30,7 @@ export default {
         refused.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', {
           timeout: WAIT_MS,
         }),
-        section.locator('[data-nemia-switch]').click(),
+        pickLevel(refused, section.locator('[data-nemia-pick]'), 'Semi-auto'),
       ]);
       const { error } = (await answered.json()) as { error?: string };
       if (answered.status() !== 409 || !error?.includes('is not trusted'))
@@ -40,7 +40,8 @@ export default {
       if (!(await shown.textContent())?.includes(error))
         throw new Refused(`in the api's words — it says ${JSON.stringify(await shown.textContent())}`);
       await expectVisible(section.locator('[data-nemia-level="manual"]'), 'her level stays Manual');
-      if (await section.getByRole('switch', { name: 'Semi-auto', exact: true }).isChecked()) throw new Refused('the switch stays off');
+      const picked = section.locator('[data-nemia-pick] [data-slot="select-value"]');
+      if ((await picked.textContent()) !== 'Manual') throw new Refused(`the pick stays Manual — it reads ${await picked.textContent()}`);
       if (fs.existsSync(levelFile)) throw new Refused(`no level is written — ${levelFile} is there`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `nemia-untrusted-refused-${await themeOf(refused)}.png`));

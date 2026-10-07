@@ -6,7 +6,7 @@
 import { Schema } from 'effect';
 import { type Args, budgetRefusal, type CommandSpec, commandLine, type RetryHow, roundBudgetRefusal, tryOf } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
-import { answeredHow } from '../asks/answers.ts';
+import { answeredApproval, answeredHow } from '../asks/answers.ts';
 import type { Refusal } from '../guard.ts';
 import type { Engine } from '../store.ts';
 
@@ -67,6 +67,21 @@ const RETRY: Extension = {
   },
 };
 
+/**
+ * Approve's: the person's `answers` to the questions the gated step's current closeout asks, checked and written as the approval's words,
+ * the words it carried becoming their note (`answeredApproval`). An approval with no `answers` is the command's alone.
+ */
+const APPROVE: Extension = {
+  takes: { answers: ANSWERS },
+  async fold({ e, home, run }, _command, args, { answers }) {
+    if (!Schema.is(ANSWERS)(answers)) return { args };
+    const note = typeof args.message === 'string' ? args.message : undefined;
+    const answered = await answeredApproval(e, run, String(args.step), note, answers, home);
+    if ('status' in answered) return answered;
+    return { args: { ...args, message: answered.message } };
+  },
+};
+
 /** Round's: a budget not above zero is refused before the round is asked, 400, in the package's words (`roundBudgetRefusal`). */
 const ROUND: Extension = {
   takes: {},
@@ -92,7 +107,7 @@ const RM: Extension = {
 };
 
 /** The api's extension of each command that has one, by its name. */
-export const EXTENSIONS: Readonly<Record<string, Extension>> = { retry: RETRY, round: ROUND, rm: RM };
+export const EXTENSIONS: Readonly<Record<string, Extension>> = { retry: RETRY, approve: APPROVE, round: ROUND, rm: RM };
 
 /** Where a table asks the api for what it does not do, a sentence each: a key a command's `apiTakes` names that no extension takes. */
 export const extensionBreaks = (table: readonly Pick<CommandSpec, 'name' | 'apiTakes'>[]): string[] =>

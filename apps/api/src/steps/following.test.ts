@@ -20,31 +20,48 @@ import { bell, until, WAITED } from '../../test/waits.ts';
 type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Service']['follow']>>>>;
 
 const RUN = 'r-follow';
-const STEPS = ['implement', 'review', 'late', 'held'];
-fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${RUN}.json`),
-  JSON.stringify({
-    id: RUN,
-    repo: '/code/app',
-    workspace: '/code/app',
-    baseRef: 'abc123',
-    branch: 'main',
-    isolate: true,
-    brief: 'Follow it',
-    workflowDir: path.join(root, 'no-such-workflow'),
-    createdAt: '2026-10-07T12:00:00.000Z',
-    workflow: STEPS.map((name) => ({ name, after: [], body: `${name} it.` })),
-    steps: Object.fromEntries(STEPS.map((name) => [name, { taskId: `t-${name}` }])),
-  }),
-);
+const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried'];
+
+/** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
+function writeRun(moved: Record<string, string> = {}): void {
+  fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'runs', `${RUN}.json`),
+    JSON.stringify({
+      id: RUN,
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Follow it',
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: '2026-10-07T12:00:00.000Z',
+      workflow: STEPS.map((name) => ({ name, after: [], body: `${name} it.` })),
+      steps: Object.fromEntries(STEPS.map((name) => [name, { taskId: moved[name] ?? `t-${name}` }])),
+    }),
+  );
+}
+writeRun();
 
 const said = (id: string, text = id): TranscriptEvent => ({ id, at: '2026-10-07T12:00:00.000Z', role: 'assistant', kind: 'text', text });
 
-/** A task on the test's engine: its attempts' live moments, each a queue the test offers to, whether it settled, and its conversation. */
-type Task = { attempts: Queue.Queue<Followed, Cause.Done>[]; settled: string | null; history: TranscriptEvent[] };
+/**
+ * A task on the test's engine: its attempts' live moments, each a queue the test offers to, how many of them have ended, whether it
+ * settled, its conversation, and whether its harness streams.
+ */
+type Task = {
+  attempts: Queue.Queue<Followed, Cause.Done>[];
+  ended: number;
+  settled: string | null;
+  history: TranscriptEvent[];
+  unstreamed?: true;
+};
 
-/** An engine over `tasks`, the api's own but for `view`, `transcript` and `follow`, counting each follow and each follow let go. */
+/**
+ * An engine over `tasks`, the api's own but for `view`, `transcript` and `follow`, counting each follow and each follow let go. As the
+ * runtime does, its view gives each attempt that has ended its `endedAt`, and the stream of a last attempt that has ended fails refused.
+ */
 function engineOver(tasks: Map<string, Task>) {
   const follows: string[] = [];
   const closed: string[] = [];
@@ -56,7 +73,7 @@ function engineOver(tasks: Map<string, Task>) {
         id,
         phase: 'running',
         sessionId: 's',
-        state: { brief: 'b', settled: tasks.get(id)!.settled, said: [], attempts: tasks.get(id)!.attempts.map((_, i) => ({ n: i + 1 })) },
+        state: { brief: 'b', settled: tasks.get(id)!.settled, said: [], attempts: attemptsOf(tasks.get(id)!) },
       })),
     transcript: (id: string, after?: string) =>
       Effect.sync(() => {
@@ -64,14 +81,21 @@ function engineOver(tasks: Map<string, Task>) {
         return { events: history.slice(Number(after ?? 0)), cursor: String(history.length) };
       }),
     follow: (id: string) =>
-      Effect.sync(() => {
-        follows.push(id);
-        const live = tasks.get(id)!.attempts.at(-1);
-        return live ? Stream.fromQueue(live).pipe(Stream.ensuring(Effect.sync(() => closed.push(id)))) : undefined;
-      }),
+      tasks.get(id)!.unstreamed
+        ? Effect.fail({ _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' })
+        : Effect.sync(() => {
+            follows.push(id);
+            const t = tasks.get(id)!;
+            if (t.attempts.length === 0) return undefined;
+            if (t.ended === t.attempts.length) return Stream.fail({ _tag: 'RunnerError', refused: true, message: 'the attempt has ended' });
+            return Stream.fromQueue(t.attempts.at(-1)!).pipe(Stream.ensuring(Effect.sync(() => closed.push(id))));
+          }),
   } as unknown as ReturnType<typeof engine>;
   return { e, follows, closed };
 }
+
+/** The attempts of `t` as the runtime's view gives them: by number, each that has ended with its `endedAt`. */
+const attemptsOf = (t: Task) => t.attempts.map((_, i) => ({ n: i + 1, endedAt: i < t.ended ? '2026-10-07T12:00:01.000Z' : null }));
 
 /** A live attempt, which says first that it is working, as the runtime's subscription hands its task first. */
 const attempt = () => {
@@ -81,7 +105,7 @@ const attempt = () => {
 };
 
 /** A task with one attempt in flight, nothing said yet but `history`. */
-const working = (history: TranscriptEvent[] = []): Task => ({ attempts: [attempt()], settled: null, history });
+const working = (history: TranscriptEvent[] = []): Task => ({ attempts: [attempt()], ended: 0, settled: null, history });
 
 /** `m` said by the attempt `n` (from 1) of `task`. */
 const push = (task: Task, n: number, m: Followed) => Queue.offerUnsafe(task.attempts[n - 1], m);
@@ -233,6 +257,7 @@ test(
     push(held, 1, { kind: 'state', state: 'input-required' });
     Queue.endUnsafe(held.attempts[0]);
     await f.wait((s) => s.length >= 2, 'following, then the history');
+    held.ended = 1;
     held.history.push(said('u-2'), said('a-3'));
     held.attempts.push(attempt());
     await line(own, 'held', 'running');
@@ -251,6 +276,69 @@ test(
       'transcript a-3',
       'transcript a-4',
       'settled {"cursor":"4"}',
+    ]);
+  },
+);
+
+test(
+  "a held task's stream opened once its attempt has ended says following and its history, then moved and its next turn from the start",
+  WAITED,
+  async (t) => {
+    const opened = working([said('a-1')]);
+    Queue.endUnsafe(opened.attempts[0]);
+    opened.ended = 1;
+    const { e } = engineOver(new Map([['t-opened', opened]]));
+    const own = appOver(t, e);
+    const f = await follower(t, own.app, 'opened');
+    await f.wait((s) => s.length >= 2, 'following, then the history');
+    opened.history.push(said('u-2'));
+    opened.attempts.push(attempt());
+    await line(own, 'opened', 'running');
+    await f.wait((s) => kinds(s).includes('transcript u-2'), "the next turn's history");
+    Queue.endUnsafe(opened.attempts[1]);
+    opened.settled = 'succeeded';
+    await line(own, 'opened', 'verified');
+    assert.deepEqual(kinds(await f.ended()), [
+      'following {"streamed":true}',
+      'transcript a-1',
+      'moved {"taskId":"t-opened"}',
+      'transcript a-1',
+      'transcript u-2',
+      'settled {"cursor":"2"}',
+    ]);
+  },
+);
+
+test(
+  "a step moved to a try whose harness does not stream is read on a beat from the try's start, not the task it was opened on",
+  WAITED,
+  async (t) => {
+    const first = working([said('a-1')]);
+    const tried: Task = { ...working([said('b-1')]), unstreamed: true };
+    const { e } = engineOver(
+      new Map([
+        ['t-tried', first],
+        ['t-tried-try2', tried],
+      ]),
+    );
+    const own = appOver(t, e);
+    t.after(() => writeRun());
+    const f = await follower(t, own.app, 'tried');
+    await f.wait((s) => s.length >= 2, 'following, then the history');
+    Queue.endUnsafe(first.attempts[0]);
+    first.ended = 1;
+    first.settled = 'failed';
+    writeRun({ tried: 't-tried-try2' });
+    await line(own, 'tried', 'running');
+    await f.wait((s) => kinds(s).includes('following {"streamed":false}'), 'the try followed, refused');
+    tried.settled = 'failed';
+    assert.deepEqual(kinds(await f.ended()), [
+      'following {"streamed":true}',
+      'transcript a-1',
+      'moved {"taskId":"t-tried-try2"}',
+      'following {"streamed":false}',
+      'transcript b-1',
+      'settled {"cursor":"1"}',
     ]);
   },
 );

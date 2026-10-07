@@ -207,7 +207,8 @@ function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }): SSEM
 /**
  * The step `step` of the run `id` followed on the app's registry (`Followings`), relayed as `messagesOf` says, `read` sent after
  * `following` and what the follower read since (`caught`) after it. Run on the app's `runtime`, interrupted as the reader goes. Answers
- * `unstreamed` when the step's harness does not push its session, having sent `following` alone, else when the following ended.
+ * the task to read on a beat when the step's harness does not push its session, having sent `following` false — `taskId`, or the one
+ * a `moved` before it went to — else `null`, the following ended.
  */
 async function followed(
   stream: SSEStreamingApi,
@@ -218,13 +219,14 @@ async function followed(
   step: string,
   taskId: string,
   read: Read,
-): Promise<'unstreamed' | 'ended'> {
+): Promise<string | null> {
   const gone = new AbortController();
   stream.onAbort(() => gone.abort());
   if (stream.aborted) gone.abort();
   const sent = new Set(read.events.map(markOf));
   const at = { cursor: read.cursor };
   let unstreamed = false;
+  let followedTask = taskId;
   const caught = Effect.tryPromise(() => readTranscript(e, id, step, taskId, read.cursor)).pipe(
     Effect.map((r): Relayed => ({ kind: 'events', events: r.events, cursor: r.cursor })),
     Effect.orElseSucceed(() => undefined),
@@ -235,11 +237,28 @@ async function followed(
         for (const message of messagesOf(m, sent, at)) if (!stream.aborted) await stream.writeSSE(message);
         if (m.kind === 'streamed' && m.yes) await send(stream, read);
         if (m.kind === 'streamed') unstreamed = !m.yes;
+        if (m.kind === 'moved') followedTask = m.taskId;
       }),
     ),
   );
   await runtime.runPromiseExit(relayed, { signal: gone.signal });
-  return unstreamed && !stream.aborted ? 'unstreamed' : 'ended';
+  return unstreamed && !stream.aborted ? followedTask : null;
+}
+
+/**
+ * The step `step` of the run `id` read on a beat once its following said it does not stream (`polled`): from `read` on the task `taskId`
+ * it was opened on, or from its start on the task a `moved` went to — `unreadable`, with `retrying: false`, when that does not read.
+ */
+async function beatOn(stream: SSEStreamingApi, e: Engine['Service'], id: string, step: string, taskId: string, read: Read, polled: string) {
+  if (polled === taskId) return beat(stream, e, id, step, taskId, read);
+  let fresh: Read;
+  try {
+    fresh = await readTranscript(e, id, step, polled, undefined);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    return stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
+  }
+  return beat(stream, e, id, step, polled, fresh);
 }
 
 /**
@@ -269,10 +288,11 @@ async function followed(
  *   its task has, and the stream closed; a held task's stream stays open while it waits on a person. An upstream that fails is an
  *   `unreadable` event with `retrying: false`, and ends it.
  *   A harness that does not push, and a task settled, are read again every second instead, after `following` with `streamed: false` for the
- *   first: each new event as `transcript`, then `settled` when the task is, or is held open and signed and so waits on a person. On that
- *   beat, an answer about the conversation — its task gone from the engine's record — is an `unreadable` event with `retrying: false`, and
- *   ends it; any other failure is of that read: said once as `unreadable` with `retrying: true`, read again on the next beat from the same
- *   cursor, and cleared with `readable` by the first read that works. Either stops when nobody reads.
+ *   first: each new event as `transcript`, then `settled` when the task is, or is held open and signed and so waits on a person; after a
+ *   `moved`, the task it went to, from its start. On that beat, an answer about the conversation — its task gone from the engine's record
+ *   — is an `unreadable` event with `retrying: false`, and ends it; any other failure is of that read: said once as `unreadable` with
+ *   `retrying: true`, read again on the next beat from the same cursor, and cleared with `readable` by the first read that works. Either
+ *   stops when nobody reads.
  * - `GET /api/runs/:id/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`,
  *   through `step path`), the current try's by default: each state its journal says, the entry that moved it and when, from the filing to
  *   now, replayed off the journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the
@@ -425,8 +445,8 @@ export const steps = new Hono<ApiEnv>()
       }
       return streamSSE(c, async (stream) => {
         if (!read.open) return beat(stream, e, id, step, taskId, read);
-        if ((await followed(stream, c.var.runtime, followings, e, id, step, taskId, read)) === 'unstreamed')
-          await beat(stream, e, id, step, taskId, read);
+        const polled = await followed(stream, c.var.runtime, followings, e, id, step, taskId, read);
+        if (polled !== null) await beatOn(stream, e, id, step, taskId, read, polled);
       });
     }),
   );

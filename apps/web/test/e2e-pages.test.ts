@@ -61,6 +61,22 @@ test('the runner and its workers visit what loadPages reads, and no list of thei
   }
 });
 
+test('the runner refuses two workers sharing a store, an api or an app, and a worker refuses a store its pages left changed', () => {
+  const read = (file: string) => fs.readFileSync(path.join(import.meta.dirname, 'e2e', file), 'utf8');
+  const runner = read('run.ts');
+  const worker = read('worker.ts');
+  assert.match(
+    runner,
+    /apart\(seats\);\n(?:.*\n)*?\s*results = await Promise\.all\(seats\.map\([^\n]*\n\s*apart\(results\);/,
+    'the runner refuses two workers sharing a store before it starts them, and an api or an app once they report theirs',
+  );
+  assert.match(
+    worker,
+    /const before = fingerprint\(root\);\n(?:.*\n)*?\s*for await \(const page of pagesOf\([^\n]*\n(?:.*\n)*?\s*const left = leftOver\(before, fingerprint\(root\), visited\);\s*if \(left\) throw new Error\(/,
+    'a worker prints its store before its first page, and fails when its pages leave it other than it was (`leftOver`)',
+  );
+});
+
 test('no page imports run.ts or worker.ts, which would start the whole e2e as the pages load', () => {
   for (const file of pageFiles())
     assert.doesNotMatch(fs.readFileSync(path.join(PAGES_DIR, file), 'utf8'), /from '\.\.\/(?:run|worker)\.ts'/, file);

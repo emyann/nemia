@@ -101,9 +101,9 @@ async function visit(
  * The pages given, in each of `themes` in turn, each in a 1280 × 800 browser; a screenshot into `out` of each page `pictured` names, which
  * alone take their own pictures too (`setPhotographing`). Says each page passed with its time and its phases. Resolves with the
  * screenshots, and what each page took in each theme, stamped with `worker`, the worker that visited it. Rejects on the first page that
- * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place of the assertion
- * (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its requests counted from
- * its first, for `idle`.
+ * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place
+ * of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its
+ * requests counted from its first, for `idle`.
  */
 export async function visitAll(
   browser: Browser,

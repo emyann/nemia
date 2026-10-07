@@ -112,8 +112,8 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     'what you have to say to any step you try again; not with --recheck.',
     'The next argument is the answer, whatever it starts with; an answer',
     "that is only one of these flags' names goes as --message=<answer>;",
-    '--budget <amount>: for a step over budget or budget exhausted, its',
-    'cap raised to that many dollars, above what its tries have cost',
+    '--budget <amount>: for a step with a budget: that waits on you, its',
+    'cap raised to that many dollars, above its cap and what it has cost',
   ],
   spec: {
     positionals: RUN_STEP,

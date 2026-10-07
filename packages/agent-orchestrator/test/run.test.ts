@@ -5564,7 +5564,9 @@ test("a step over its budget is tried again only on a person's `--budget` above 
     );
   assert.deepEqual(due([askFor(3)]), [], 'without --budget, no tick honours it');
   assert.deepEqual(due([{ ...askFor(3), budget: 4.25 }]), [], 'nor with one that is not above what it spent');
-  assert.deepEqual(due([{ ...askFor(3, 'fresh'), budget: 10 }]), [{ step: 'implement', try: 3, mode: 'fresh', budget: 10, by: 'ask' }]);
+  assert.deepEqual(due([{ ...askFor(3, 'fresh'), budget: 10 }]), [
+    { step: 'implement', try: 3, mode: 'fresh', budget: 10, pastCap: true, by: 'ask' },
+  ]);
   assert.deepEqual(
     due([askFor(3, 'recheck')]),
     [{ step: 'implement', try: 3, mode: 'recheck', by: 'ask' }],
@@ -5589,7 +5591,7 @@ test("a step over its budget is tried again only on a person's `--budget` above 
   );
 });
 
-test('REFUSED by name: `nemia retry` of a step over its budget without `--budget`, or with one not above what it spent; `--budget` on a step that is not; on `--recheck`; and an ask left waiting without one', () => {
+test('REFUSED by name: `nemia retry` of a step over its budget without `--budget`, or with one not above what it spent; `--budget` not above the cap in force on a step under it, on a step with no `budget:`, on one the run tries itself, on `--recheck`; and an ask left waiting without one', () => {
   const r = refusedTwice();
   const p = phases(REFUSED_TWICE);
   const spent = spends({ t0: 1.75, t1: 2.5 });
@@ -5630,8 +5632,31 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
   assert.match(refusal({ mode: 'nudge', budget: 0 })!, /^--budget 0 is not an amount\./);
   assert.equal(
     refusal({ mode: 'nudge', budget: 10 }, [], spends({ t0: 1, t1: 1 })),
-    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed (check): its tries have cost $2.00 of its $3 budget, which is not what stops it. Try it without --budget: nemia retry r-1 implement.',
+    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
+    'under its cap with `retries:` left, the step is not waiting on a person',
   );
+  assert.equal(
+    refusal({ mode: 'nudge', budget: 3 }, [], spends({ t0: 1, t1: 1 })),
+    'the run tries implement again itself: its check refused, and `retries: 2` has 1 left, so the next tick files try 3. Wait for it: nemia ls r-1.',
+    'what the run does itself is said first, so the fix is never a --budget it would refuse next',
+  );
+  const spentOut: Workflow[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
+  const outOfRetries = (how: RetryHow) =>
+    retryRefusal(
+      spentOut,
+      r,
+      'implement',
+      how,
+      p,
+      signedDone,
+      asked,
+      () => 1,
+      [],
+      () => false,
+      spends({ t0: 1, t1: 1 }),
+    );
+  assert.equal(outOfRetries({ mode: 'nudge', budget: 10 }), null, '`retries:` spent, under its cap: a raise is taken');
+  assert.match(outOfRetries({ mode: 'nudge', budget: 2.5 })!, /^--budget 2\.5 is not above \$3, the \$3 cap in force on implement/);
   assert.equal(
     retryRefusal(
       STEPS,
@@ -5642,7 +5667,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
       signedDone,
       asked,
     ),
-    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed, and has no `budget:` to raise. Try it without --budget: nemia retry r-1 implement.',
+    "--budget raises a step's cap, and implement has no `budget:`, so there is no cap to raise. Try it without --budget: nemia retry r-1 implement.",
   );
   assert.match(
     refusal({ mode: 'nudge', budget: 10 }, [askFor(3)])!,
@@ -5652,6 +5677,64 @@ test('REFUSED by name: `nemia retry` of a step over its budget without `--budget
     refusal({ mode: 'nudge' }, [{ ...askFor(3), budget: 10 }])!,
     /^try 3 of implement is already asked for/,
     'an ask that carries enough is waited for',
+  );
+});
+
+test('a step blocked under its cap takes a `--budget` above it, and the tick files the try with it: not past its cap, so no `pastCap`; one not above the cap in force, or on a step with no `budget:`, is REFUSED by name, and an ask left with one is never due', () => {
+  const B20: Workflow[] = [{ ...step('implement'), budget: 20 }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'a try with a larger budget, about $15–25' });
+  const spent = spends({ t1: 19.27 });
+  const refusal = (how: RetryHow, asks: RetryAsk[] = []) =>
+    retryRefusal(
+      B20,
+      r,
+      'implement',
+      how,
+      p,
+      blocked,
+      asked,
+      () => undefined,
+      asks,
+      () => false,
+      spent,
+    );
+  const due = (asks: RetryAsk[]) =>
+    retriesDue(
+      B20,
+      r,
+      p,
+      blocked,
+      asked,
+      () => undefined,
+      asks,
+      () => false,
+      spent,
+    );
+  assert.equal(refusal({ mode: 'nudge', budget: 40 }), null);
+  assert.equal(refusal({ mode: 'nudge' }), null, 'nor is a try without one refused: the cap is not what stops it');
+  for (const low of [15, 20]) {
+    assert.equal(
+      refusal({ mode: 'nudge', budget: low }),
+      `--budget ${low} is not above $20, the $20 cap in force on implement, whose tries have cost $19.27: --budget only ever raises the cap. Give more than $20: nemia retry r-1 implement --budget <amount>.`,
+    );
+  }
+  assert.deepEqual(due([{ ...askFor(2), budget: 40 }]), [{ step: 'implement', try: 2, mode: 'nudge', budget: 40, by: 'ask' }]);
+  assert.deepEqual(due([{ ...askFor(2), budget: 20 }]), [], 'an ask not above the cap in force is never due');
+  assert.match(
+    refusal({ mode: 'nudge', budget: 40 }, [{ ...askFor(2), budget: 20 }])!,
+    /^try 2 of implement is asked for \(--nudge, at .*\) with --budget 20, not above \$20, so no tick honours it\. Delete that ask — retry-implement-2, in the run's \.asks directory — and ask again: nemia retry r-1 implement --budget <amount>\.$/,
+  );
+
+  const free = run({ implement: 't1', review: null });
+  const failed = phases({ t1: 'failed' });
+  const unbudgeted = (asks: RetryAsk[]) => retriesDue(STEPS, free, failed, signedDone, asked, () => undefined, asks);
+  assert.deepEqual(unbudgeted([{ ...askFor(2), budget: 10 }]), [], 'no `budget:`: an ask with a --budget is never due');
+  assert.deepEqual(unbudgeted([askFor(2)]), [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
+  assert.match(
+    retryRefusal(STEPS, free, 'implement', { mode: 'nudge' }, failed, signedDone, asked, () => undefined, [{ ...askFor(2), budget: 10 }])!,
+    /^try 2 of implement is asked for \(--nudge, at .*\) with --budget 10, and implement has no `budget:`, so there is no cap to raise and no tick honours it\. Delete that ask — retry-implement-2, in the run's \.asks directory — and ask again: nemia retry r-1 implement\.$/,
   );
 });
 
@@ -6888,7 +6971,7 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
 });
 
 test('a try past a budget is told why its last try ended on its own work — unsigned, failed, stopped, blocked, its check — and, beside it, that its budget was reached and raised; one ended at its budget is told that once', () => {
-  const brief = (status: StepStatus, budget?: number) =>
+  const brief = (status: StepStatus, budget?: number, pastCap: boolean = budget !== undefined) =>
     retrySection(step('implement'), {
       try: 2,
       by: 'ask',
@@ -6896,6 +6979,7 @@ test('a try past a budget is told why its last try ended on its own work — uns
       resumed: true,
       status,
       ...(budget !== undefined ? { budget } : {}),
+      ...(pastCap ? { pastCap: true as const } : {}),
     });
   assert.match(
     brief('unsigned', 10),
@@ -6914,6 +6998,9 @@ test('a try past a budget is told why its last try ended on its own work — uns
   assert.match(ended, /ended by its harness at this step's budget/);
   assert.doesNotMatch(ended, /had together cost its budget or more/, 'said once');
   assert.doesNotMatch(brief('unsigned'), /budget/, 'a try with no raise says nothing of a budget');
+  const under = brief('blocked', 40, false);
+  assert.match(under, /raising this step's budget to \$40\./);
+  assert.doesNotMatch(under, /had together cost/, 'a raise on a step under its cap is not said to be past it');
 
   const B: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });
@@ -9855,7 +9942,7 @@ test("`nemia retry`'s refusals, whole: a `--model` an `auto` step would drop, on
   const waiting = { t1: 'succeeded', c1: 'stopped' } as const;
   assert.equal(
     refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }),
-    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed (check), and has no `budget:` to raise. Try it without --budget: nemia retry r-1 implement.',
+    "--budget raises a step's cap, and implement has no `budget:`, so there is no cap to raise. Try it without --budget: nemia retry r-1 implement.",
   );
   assert.equal(
     refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]),

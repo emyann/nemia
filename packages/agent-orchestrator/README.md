@@ -799,8 +799,10 @@ loop asks for a round that would file it again.
   cap forbids. A looping step whose round would file a step over its budget reads `over budget` too, naming that step (`over budget —
   implement $4.20 of $3`), so what waits on the loop is not filed.
 - **A person raises the cap:** `wf retry <run> <step> --budget <amount>` for a try, `wf round <run> [<step>] --budget <amount>` for a
-  round. Each is refused by name without `--budget`, or with one not above what the step has cost. `--budget` on a step that is not over
-  its budget is refused, and so is `--budget` on `--recheck`, which files no session: a recheck costs nothing and needs none. The raise
+  round. Each is refused by name without `--budget`, or with one not above what the step has cost. A try takes `--budget` on any step
+  with a `budget:` that waits on a person — blocked, failed or stopped as much as over its budget — above its cap in force and what it
+  has cost: a raise only ever raises. `--budget` on a step with no `budget:` is refused, which has no cap to raise; so is one on a step
+  the run tries again itself, and on `--recheck`, which files no session: a recheck costs nothing and needs none. The raise
   rides on the ask, and the tick keeps it on the try the ask replaced (`EarlierTry.budget`). It is in force from that try on, and a try
   that passes the new cap is held again. Once a round is asked with a raise above what was spent, no step of its loop reads `over budget`
   on the passes before the tick files it: `wf ls` shows each step's own word and the round asked, and `wf decide` says still running.

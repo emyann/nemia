@@ -309,6 +309,7 @@ const tryTold = (
   ...(r.model ? { model: r.model } : {}),
   ...(r.message !== undefined ? { message: r.message } : {}),
   ...(r.budget !== undefined ? { budget: r.budget } : {}),
+  ...(r.pastCap ? { pastCap: true as const } : {}),
   resumed: Boolean(t.resumeFrom),
   ...(t.resumeFrom ? { said: saidIn(f.reads.views.get(record.taskId!)) } : {}),
   status: t.status,

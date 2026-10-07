@@ -115,6 +115,13 @@ admission carry her floor, `semi-auto`, so a factory at `manual` is left alone. 
 — her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
 repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control).
 
+**The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it
+was read at, and an agent of yours tried on a short brief, each one entry of the command table served on both sides
+(`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts`), its handler refusing a place but yours. The
+command line reads a person's file or draft folder into the form the board sends (`src/cli/writers.ts`); the api guards the write and
+words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
+`apps/api/src/commands/writers.test.ts`).
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in

@@ -309,6 +309,12 @@ test("REFUSED: a factory's raise or default above manual while her folder is not
   trust(true);
 });
 
+/** The person's custom words for her written, their folder made where no test before made it: a test of her tell runs alone too. */
+const writeCustom = (words: string) => {
+  fs.mkdirSync(path.dirname(customInstructionsFile(ROOT, 'nemia')), { recursive: true });
+  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), words);
+};
+
 /** Her task kept anew: any she has stopped at manual, then the store's level at semi-auto, a fresh task filed and subscribed. Its id. */
 const keptAnew = async (): Promise<string> => {
   withPipao();
@@ -325,7 +331,7 @@ const keptAnew = async (): Promise<string> => {
 test('a custom instruction written while she is kept is told to her open task, never by a filing or a stop', async () => {
   const task = await keptAnew();
   const [filings, stops, told] = [b.filings.length, b.stopped.length, b.said.length];
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Spanish.\n');
+  writeCustom('Answer in Spanish.\n');
   assert.deepEqual(await beat(), ['tell']);
   assert.deepEqual(
     b.said.slice(told).map((s) => s.taskId),
@@ -350,7 +356,7 @@ test('REFUSED: a tell the runtime refuses leaves her filed instruction and what 
   const filed = fs.readFileSync(promptFile(), 'utf8');
   const record = fs.readFileSync(toldFile(), 'utf8');
   const told = b.said.length;
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in German.\n');
+  writeCustom('Answer in German.\n');
   b.refuseSay(1);
   await assert.rejects(beat(), (err: Error) => {
     assert.match(err.message, /not running yet/);
@@ -373,7 +379,7 @@ test('REFUSED: custom words that do not read are told to no one while she is kep
   await keptAnew();
   const filed = fs.readFileSync(promptFile(), 'utf8');
   const told = b.said.length;
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), '---\ntools: Bash\n---\nUse Bash.\n');
+  writeCustom('---\ntools: Bash\n---\nUse Bash.\n');
   await assert.rejects(beat(), (err: Error) => {
     assert.ok(err.message.includes('nemia agents custom nemia --clear'), err.message);
     return true;
@@ -392,7 +398,7 @@ test('REFUSED: her shipped instruction changed while she is kept tells her nothi
   fs.writeFileSync(promptFile(), 'An older instruction of hers.\n');
   assert.deepEqual(await beat(), [], 'no custom words then or now: nothing to tell');
   assert.equal(b.said.length, told, 'never told she removed words she never had');
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Dutch.\n');
+  writeCustom('Answer in Dutch.\n');
   assert.deepEqual(await beat(), ['tell'], 'the words changed: told');
   fs.writeFileSync(promptFile(), 'An older instruction of hers.\n\nAnswer in Dutch.\n');
   assert.deepEqual(await beat(), [], 'the same words, under another instruction: nothing to tell');
@@ -401,12 +407,12 @@ test('REFUSED: her shipped instruction changed while she is kept tells her nothi
 });
 
 test('a session kept before the keeper recorded what she was told is judged by the words her instruction ends with, never told a removal', async () => {
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Italian.\n');
+  writeCustom('Answer in Italian.\n');
   await keptAnew();
   const told = b.said.length;
   fs.rmSync(toldFile());
   assert.deepEqual(await beat(), [], 'her instruction ends with the words as they read: nothing to tell');
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Greek.\n');
+  writeCustom('Answer in Greek.\n');
   assert.deepEqual(await beat(), ['tell'], 'other words than those she was filed with: told');
   assert.equal(fs.readFileSync(toldFile(), 'utf8'), '{"words":"Answer in Greek."}\n', 'and recorded');
   fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
@@ -418,7 +424,7 @@ test('a session kept before the keeper recorded what she was told is judged by t
 });
 
 test('her task filed with custom words records them, so their removal is told to her', async () => {
-  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Polish.\n');
+  writeCustom('Answer in Polish.\n');
   await keptAnew();
   assert.equal(fs.readFileSync(toldFile(), 'utf8'), '{"words":"Answer in Polish."}\n', 'filed with them');
   const told = b.said.length;

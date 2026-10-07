@@ -2,8 +2,8 @@
  * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store,
  * and what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open
  * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
- * person's custom words told to her open task (`say`) once they are not those her instruction was last written with, which is written
- * again only after she was told. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
+ * person's custom words told to her open task (`say`) once they are not those she was last filed or told with (`customChanged`), which
+ * are recorded, and her instruction written, only after she was told: a change to her shipped instruction alone tells her nothing. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
  * A task stopped from outside is never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
@@ -27,12 +27,13 @@ import {
   nemiaDir,
   ownBin,
   promptAllows,
-  promptText,
   readLevel,
   readNemia,
+  readTold,
   SHIPPED_NEMIA,
   storeDenies,
   writePrompt,
+  writeTold,
 } from './level.store.ts';
 import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
@@ -43,6 +44,7 @@ import {
   NEMIA_FLOOR,
   NEMIA_SUBSCRIPTION,
   NEMIA_WAKE,
+  customChanged,
   nemiaDue,
   nemiaPrompt,
   nemiaSettings,
@@ -150,13 +152,15 @@ const fileHer = (e: Engine, id: string) =>
 
 /**
  * Her open task `id` told the person's custom words as they read now (`toldCustom`), and only once the runtime took them, her instruction
- * written with them, so an attempt it starts again reads them too: words she was not told are never written as hers.
+ * written with them, so an attempt it starts again reads them too, and the words recorded as told: words she was not told are never
+ * written as hers.
  */
 const tellHer = (e: Engine, id: string) =>
   Effect.gen(function* () {
     const custom = nemiaCustom();
     yield* asked('say', e.say(id, toldCustom(custom)));
     writePrompt(nemiaPrompt(readNemia().body, custom));
+    writeTold(custom);
   });
 
 /** Each act the keeper owes on her task `id`: a stop or a drop already done by another is no failure. */
@@ -198,8 +202,8 @@ const herSubscription = (): HerSubscription | undefined => {
 };
 
 /**
- * One beat: the levels, her task and her subscription read, and, while she is kept, her instruction as it composes now against the one
- * last written; each act owed done in order. Answers the acts done.
+ * One beat: the levels, her task and her subscription read, and, while she is kept, the person's custom words against those she was last
+ * filed or told with (`customChanged`); each act owed done in order. Answers the acts done.
  */
 export const keepOnce = Effect.fn('keepOnce')(function* () {
   const e = yield* EngineService;
@@ -208,7 +212,7 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   const task = yield* herTask(e, id);
   const keeping = { above, ...(id === undefined ? {} : { task: id }) };
   const subscribed = herSubscription();
-  const stale = nemiaState(keeping, task, subscribed) === 'kept' && filedPrompt() !== promptText(readNemia().body);
+  const stale = nemiaState(keeping, task, subscribed) === 'kept' && customChanged(readTold(), nemiaCustom(), filedPrompt());
   const owed = nemiaDue({ ...keeping, stale }, task, subscribed);
   for (const one of owed) if (id !== undefined || one === 'drop') yield* act(e, id ?? '', one);
   return owed;

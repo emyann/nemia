@@ -122,6 +122,17 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
 export const nemiaPrompt = (body: string, custom: string | undefined): string =>
   `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
 
+/** The custom words her session was last filed or told with, as the keeper records them: `words` absent for none. */
+export type ToldCustom = { words?: string };
+
+/**
+ * Whether the person's custom words `now` differ from those her session has: those of the keeper's record `told`; where it kept none yet,
+ * for a session filed before it kept one, whether her filed instruction `filed` ends with them. Her shipped instruction is never compared,
+ * and with no record no removal is owed: whether she had words is unknown. Pure.
+ */
+export const customChanged = (told: ToldCustom | undefined, now: string | undefined, filed: string | undefined): boolean =>
+  told === undefined ? now !== undefined && !(filed ?? '').endsWith(`\n\n${now}\n`) : told.words !== now;
+
 /**
  * What her open task is told once the person's custom instruction for her changed: the words `custom` whole, which replace those she was
  * started with, or, where undefined, that they were removed and she has none. Pure.

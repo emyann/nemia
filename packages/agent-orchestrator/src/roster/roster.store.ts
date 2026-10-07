@@ -10,11 +10,19 @@ import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
 import { agentUsers } from '../folder/folder.store.ts';
 import { agentVersion, loadAgents } from '../agents/read.store.ts';
 import { cardSkills, skillsFor } from '../skills/read.store.ts';
-import { customInstructionsFile } from '../agents/read.store.ts';
+import { customInstructionsFile, readCopyRecord, sourceVersion } from '../agents/read.store.ts';
 import { HOME } from '../record/record.store.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { agentCard, type Agent, type SkillsFound } from '../agents/agents.ts';
-import { emptyReading, unreadReading, type AgentPlace, type AgentReading, type AgentsRead, type CardRead } from './roster.ts';
+import {
+  emptyReading,
+  unreadReading,
+  type AgentCopiedFrom,
+  type AgentPlace,
+  type AgentReading,
+  type AgentsRead,
+  type CardRead,
+} from './roster.ts';
 
 /** Where agents are read: the repository `repo`, and the store `home` that holds yours. */
 export type Readings = { repo: string; home?: string };
@@ -84,6 +92,14 @@ function customOf(home: string, name: string): string | null {
   return fs.lstatSync(file, { throwIfNoEntry: false }) ? file : null;
 }
 
+/** Where the agent `name` of yours in the store `home` was copied from, and how that file stands now; null for one never copied. */
+function copiedOf(home: string, name: string): AgentCopiedFrom | null {
+  const record = readCopyRecord(home, name);
+  if (record === null) return null;
+  const now = sourceVersion(record.source, home);
+  return { source: record.source, version: record.version, now: now === null ? 'gone' : now === record.version ? 'same' : 'changed' };
+}
+
 /**
  * One agent of `dir`, its skills found as a start on `repo` finds them, or null when `dir` has no file of that name. A file that is a link
  * is answered with the package's refusal only: read here it would be whatever it points at, outside the folder. A file that does not read
@@ -99,7 +115,11 @@ export function agentRead(from: AgentPlace, dir: string, name: string, { repo, h
     return { from, workflow, step };
   });
   const agent = loadAgents(dir).get(name);
-  const empty = { ...emptyReading(from, dir, file, name, version, usedBy), custom: customOf(home, name) };
+  const empty = {
+    ...emptyReading(from, dir, file, name, version, usedBy),
+    custom: customOf(home, name),
+    copied: from === 'yours' ? copiedOf(home, name) : null,
+  };
   if (linked(file)) return { ...empty, error: agent instanceof Error ? agent.message : `${AGENTS_FOLDER}/${name}.md is a link.` };
   let source: string;
   try {

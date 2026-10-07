@@ -181,7 +181,7 @@ function workflowPlaceRefusal(at: string, repo?: string): string | undefined {
 }
 
 /** The repositories the store knows, each resolved: every factory's `repos` that reads, and `repo` when the caller names one. */
-function knownRepos(repo?: string): Set<string> {
+export function knownRepos(repo?: string): Set<string> {
   const known = new Set(readFactories().flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
   return known;

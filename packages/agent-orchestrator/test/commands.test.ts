@@ -104,6 +104,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['series', { method: 'GET', path: '/api/series', status: 200 }],
       ['agents', { method: 'GET', path: '/api/agents', status: 200 }],
       ['agents card', { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 }],
+      ['agents sources', { method: 'GET', path: '/api/agents/sources', status: 200, hand: true }],
       [
         'agents custom',
         [
@@ -119,6 +120,7 @@ test('each command is served on the api where it was before the table, the lift 
           { method: 'PUT', path: '/api/agents/:from/:name', status: 200, hand: true },
         ],
       ],
+      ['agents copy', { method: 'POST', path: '/api/agents/yours/copy', status: 200 }],
       ['agents remove', { method: 'DELETE', path: '/api/agents/:from/:name', status: 200, hand: true }],
       ['agents try', { method: 'POST', path: '/api/agents/:from/:name/try', status: 201, hand: true }],
       ['agents read', { method: 'GET', path: '/api/agents/:from/:name', status: 200 }],
@@ -211,6 +213,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'series',
       'agents',
       'agents card',
+      'agents sources',
       'agents read',
       'skills list',
       'skills read',

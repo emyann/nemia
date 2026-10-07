@@ -1,5 +1,6 @@
 /**
- * The agent library as entries of the command table: an agent of yours written (`AGENTS_WRITE`, `writeAgent`), removed (`AGENTS_REMOVE`,
+ * The agent library as entries of the command table: an agent of yours written (`AGENTS_WRITE`, `writeAgent`), copied in from a file
+ * (`AGENTS_COPY`, `copyAgent`), removed (`AGENTS_REMOVE`,
  * `removeAgent`) and tried on a short brief (`AGENTS_TRY`, `tryAgent`), served on both sides — the command line reads the agent's file
  * (`cli/writers.ts`), the board sends its form — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api
  * guards each write and words the board's answer around what each entry answers.
@@ -15,6 +16,7 @@ import { TRY_BUDGET } from '../try/try.ts';
 import { tryAgent } from '../try/try.verb.ts';
 import type { AgentDraft } from './agents.ts';
 import { removeAgent, writeAgent, type AgentSidecar, type AgentWritten } from './agents.store.ts';
+import { AGENTS_COPY } from '../sources/copy.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -197,4 +199,10 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
 };
 
 /** The board's agent library entries, in the order the table lists them. */
-export const LIBRARY_ENTRIES: readonly Command[] = [AGENTS_WRITE, AGENTS_REMOVE, AGENTS_TRY, AGENTS_READ] as readonly Command[];
+export const LIBRARY_ENTRIES: readonly Command[] = [
+  AGENTS_WRITE,
+  AGENTS_COPY,
+  AGENTS_REMOVE,
+  AGENTS_TRY,
+  AGENTS_READ,
+] as readonly Command[];

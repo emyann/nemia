@@ -1,7 +1,7 @@
 /**
- * The daemon's deliverer of subscriptions: for each subscription on disk, the feed followed from where its deliverer was (`followFeed`), and
- * each read of it delivered as one: the wake lines it holds said to its task at once, in one message through the engine's `say`, with the
- * digest that rides them, and each routine line folded into the digest, said alone once `digestEvery` minutes have passed with no wake
+ * The daemon's deliverer of subscriptions: for each subscription on disk, the feed followed from where its deliverer was (`followFeed`),
+ * and each read of it delivered as one: the wake lines it holds said to its task at once, in one message through the engine's `say`, with
+ * the digest that rides them, and each routine line folded into the digest, said alone once `digestEvery` minutes have passed with no wake
  * (`readDelivered`, `messageOf`, `digestOf`, `digestDue`).
  *
  * A read is everything the feed's reader has handed on since the deliverer last took, at least one item: a pass's lines come together, and

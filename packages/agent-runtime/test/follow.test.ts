@@ -65,7 +65,7 @@ const follow = (ops: ReturnType<typeof detachedOps>, name: string, got: Followed
 const OPENED = line({ type: 'system', subtype: 'init', session_id: 'sid-1' }) + event({ type: 'message_start', message: { id: 'msg_1' } });
 
 test(
-  'a followed job says its state, the text so far, then each piece once and in order, each whole event once, and ends when it settles',
+  'a followed job says its state, the text so far, then each piece once and in order though its run file is rewritten between them, each whole event once, and ends when it settles',
   WAITED,
   async (t) => {
     const j = job('ae/f1/1', OPENED + event({ type: 'content_block_start', index: 0 }) + delta(0, 'Riv'));
@@ -74,15 +74,16 @@ test(
     const ended = follow(j.ops, 'ae/f1/1', got);
     await until(
       t,
-      () => got.length === 2,
+      () => got.length >= 2,
       () => `the state and the text so far: ${JSON.stringify(got)}`,
       { bell: rung },
     );
     j.stdout(delta(0, 'ers'));
+    j.setState('working');
     j.stdout(delta(0, ' run.') + event({ type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 's' } }));
     await until(
       t,
-      () => got.length === 4,
+      () => got.length >= 4,
       () => `each piece: ${JSON.stringify(got)}`,
       { bell: rung },
     );

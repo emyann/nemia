@@ -74,8 +74,8 @@ const SKILL_FOLDERS = [
 type Settings = { permissions?: { allow?: string[]; deny?: string[] } };
 const SETTINGS = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as Settings;
 
-/** A call a session makes: a shell command, or a tool by its name. */
-type Call = { tool: 'Bash'; command: string } | { tool: string; command?: undefined };
+/** A call a session makes: a shell command, or a tool by its name, an edit or a write with the absolute path it writes when one is said. */
+type Call = { tool: 'Bash'; command: string; path?: undefined } | { tool: string; command?: undefined; path?: string };
 
 /** What no shipped step may run, in the spellings a session types. */
 const FENCED: Call[] = [
@@ -92,6 +92,30 @@ const FENCED: Call[] = [
   { tool: 'mcp__playwright__browser_run_code_unsafe' },
 ];
 
+/**
+ * A session a step could start of its own by hand, its name no run's, in the spellings a session types: in the background, or reaching
+ * the person's phone through Remote Control. A step starts a probe through `workflows/build/probe.ts`, which names it for its run.
+ */
+const PROBES: Call[] = [
+  { tool: 'Bash', command: 'claude --bg --remote-control -n probe-A "x"' },
+  { tool: 'Bash', command: 'claude --bg -n x "p"' },
+  { tool: 'Bash', command: 'claude --background --name x "p"' },
+  { tool: 'Bash', command: 'claude -n x --bg "p"' },
+  { tool: 'Bash', command: 'claude remote-control' },
+  { tool: 'Bash', command: 'claude --remote-control probe' },
+  { tool: 'Bash', command: 'cd /tmp && claude --bg x' },
+  { tool: 'Bash', command: 'timeout 60 claude --bg x' },
+];
+
+/** The home folder `~` is in an edit rule, for the paths the calls below write. */
+const HOME = '/home/u';
+
+/** A file outside every worktree that a harness reads as its trust or its settings: no step of this team edits it to make a probe run. */
+const HARNESS_FILES = [`${HOME}/projects/.claude/settings.local.json`, `${HOME}/.claude.json`, `${HOME}/.claude/settings.json`];
+
+/** A file of a step's own worktree. */
+const OWN_FILE = `${HOME}/.agent-workflows/worktrees/r-1/design/src/a.ts`;
+
 /** A call as a rule would name it, for a message. */
 const shown = (call: Call): string => (call.command === undefined ? call.tool : `Bash(${call.command})`);
 
@@ -99,13 +123,16 @@ const shown = (call: Call): string => (call.command === undefined ? call.tool : 
  * Whether a permission rule reaches a call: a bare tool name is that tool, `mcp__<server>` or `mcp__<server>__*` every tool of the
  * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more; a `*`
  * inside a Bash rule is any run of characters, none included (`globbed`). Any other `Tool(x)` reaches some call of that tool, so it is
- * read as reaching every one; Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. Throws on a `*` in
- * a tool's name, which this matcher does not model.
+ * read as reaching every one, unless the call says the path it writes: then `Edit(//<glob>)` and `Edit(~/<glob>)` reach it when the glob
+ * covers it (`covers`). Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. Throws on a `*` in a
+ * tool's name, which this matcher does not model.
  */
 function reaches(rule: string, call: Call): boolean {
   const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
   if (bash === undefined) {
     const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
+    const pathed = call.path !== undefined && tool !== undefined;
+    if (pathed && (tool === call.tool || (call.tool === 'Write' && tool === 'Edit'))) return covers(rule.slice(tool.length + 1, -1), call.path!);
     if (call.tool === 'Write' && (rule === 'Edit' || tool === 'Edit')) return true;
     if (tool !== undefined) return tool === call.tool && call.command === undefined;
     const server = rule.startsWith('mcp__') ? rule.replace(/__\*$/, '') : undefined;
@@ -132,6 +159,23 @@ const globbed = (words: string, open: boolean): RegExp =>
       .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
       .join('[\\s\\S]*')}${open ? '(?: [\\s\\S]*)?' : ''}$`,
   );
+
+/**
+ * Whether the path of a file rule covers the absolute path `file`: `//<glob>` from the root, `~/<glob>` from `HOME`; in the glob `**\/`
+ * is any run of folders, none included, `**` any run of characters, and `*` any run within a folder's name. Throws on a path from the
+ * project or the working folder, which this matcher does not model.
+ */
+function covers(rulePath: string, file: string): boolean {
+  const from = rulePath.startsWith('//') ? rulePath.slice(1) : rulePath.startsWith('~/') ? `${HOME}${rulePath.slice(1)}` : undefined;
+  if (from === undefined) throw new Error(`${rulePath}: a path from the project or the working folder is not modelled; say how it reads, here`);
+  const pattern = from
+    .split(/(\*\*\/|\*\*|\*)/)
+    .map((part) =>
+      part === '**/' ? '(?:.*/)?' : part === '**' ? '.*' : part === '*' ? '[^/]*' : part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'),
+    )
+    .join('');
+  return new RegExp(`^${pattern}$`).test(file);
+}
 
 /** A wrapper Claude Code strips before it matches a part: a leading assignment, `timeout` with its duration, `nohup`. */
 const WRAPPER = /^(?:[A-Za-z_]\w*=\S*|timeout \d+(?:\.\d+)?[smhd]?|nohup)\s+/;
@@ -190,8 +234,8 @@ const SKILL_GRANTS = SKILL_FOLDERS.flatMap((dir) =>
 
 type Step = ReturnType<typeof loadWorkflows>[number];
 
-/** What of `FENCED` a step could run, each as `<step>: <call>`; empty for a step fenced from all of it. */
-function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
+/** What of `calls` (`FENCED` by default) a step could run, each as `<step>: <call>`; empty for a step fenced from all of it. */
+function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FENCED): string[] {
   const harness = step.harness ?? 'claude';
   if (harness === 'codex')
     return step.sandbox === 'read-only' ? [] : [`${step.name}: on codex in sandbox ${step.sandbox ?? 'workspace-write'}, not read-only`];
@@ -201,7 +245,7 @@ function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
   const allows = [...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...SKILL_GRANTS];
   const unshipped = step.background === true || step.workspace === 'main';
   const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
-  return FENCED.filter((call) => {
+  return calls.filter((call) => {
     if (partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
     return !dontAsk || partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)));
   }).map((call) => `${step.name}: ${shown(call)}`);
@@ -327,9 +371,9 @@ test("the tests' team is fenced as a shipped team must be: every step of its dev
   assert.ok(steps.some((step) => step.permissionMode === 'auto') && steps.some((step) => step.permissionMode === 'dontAsk'), 'both modes');
 });
 
-test('the settings deny none of them: the refusal is each worker’s own, and a person’s session may push', () => {
+test('the settings deny none of them: the refusal is each worker’s own, and a person’s session may push and start a probe', () => {
   const deny = SETTINGS.permissions?.deny ?? [];
-  for (const call of FENCED)
+  for (const call of [...FENCED, ...PROBES])
     assert.deepEqual(
       deny.filter((rule) => reaches(rule, call)),
       [],
@@ -491,6 +535,70 @@ test('REFUSED: a dontAsk step an allow of pkill reaches is open on each kill by 
   );
   assert.deepEqual(unfenced(reviewer), []);
 });
+
+test('the matcher reads an edit rule by the path it covers, from the root or the home folder, and throws on one it does not model', () => {
+  const local = 'Edit(//**/.claude/settings.local.json)';
+  assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/.claude/settings.local.json' }), true);
+  assert.equal(reaches(local, { tool: 'Write', path: '/.claude/settings.local.json' }), true, 'a write too, and **/ is no folder as well');
+  assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/.claude/settings.json' }), false);
+  assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/x.claude/settings.local.json' }), false, 'a folder whole');
+  assert.equal(reaches('Edit(~/.claude.json)', { tool: 'Write', path: '/home/u/.claude.json' }), true);
+  assert.equal(reaches('Edit(~/.claude.json)', { tool: 'Write', path: '/home/u/x/.claude.json' }), false);
+  assert.equal(reaches('Edit(//a/*/c)', { tool: 'Edit', path: '/a/b/c' }), true);
+  assert.equal(reaches('Edit(//a/*/c)', { tool: 'Edit', path: '/a/b/d/c' }), false, 'a * stays within a folder');
+  assert.equal(reaches('Read(//**)', { tool: 'Edit', path: '/a' }), false);
+  assert.equal(reaches('Edit', { tool: 'Write', path: '/a' }), true);
+  assert.throws(
+    () => reaches('Edit(src/**)', { tool: 'Edit', path: '/a/src/b' }),
+    (err: Error) => err.message.includes('a path from the project or the working folder is not modelled'),
+  );
+});
+
+test('every shipped step is refused a session of its own started by hand, in the background or through Remote Control: by its own deny in auto, by no allow in dontAsk', () => {
+  const open = shipped().flatMap(({ dir, step }) => unfenced(step, SETTINGS, PROBES).map((what) => `${path.relative(REPO, dir)}/${what}`));
+  assert.deepEqual(open, []);
+});
+
+/** The rules of Ada's and Otto's fence that refuse a session started by hand: a deny of `claude` with a flag or a subcommand. */
+const probeRule = (rule: string): boolean => rule.startsWith('Bash(claude ');
+
+for (const agent of ['ada', 'otto'])
+  test(`REFUSED: ${agent} without its deny of a background session and Remote Control, read from its file as a run reads it, is open on each`, () => {
+    const step = shippedStepOf(agent);
+    assert.equal(step.permissionMode, 'auto');
+    const line = step.disallowedTools!.filter((rule) => !probeRule(rule));
+    assert.ok(line.length < step.disallowedTools!.length, `${agent} denies a session started by hand`);
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
+    assert.deepEqual(
+      unfenced(bare, SETTINGS, PROBES),
+      PROBES.map((call) => `${bare.name}: ${shown(call)}`),
+    );
+  });
+
+/** Which of `files` a step's own deny refuses it to edit, by the Edit tool and by the Write tool alike. */
+const editsDenied = (step: Step, files: string[]): string[] =>
+  files.filter((file) =>
+    ['Edit', 'Write'].every((tool) => (step.disallowedTools ?? []).some((rule) => reaches(rule, { tool, path: file }))),
+  );
+
+test("Ada and Otto are refused an edit of a harness's trust or local settings anywhere, and not one in their own worktree", () => {
+  for (const agent of ['ada', 'otto']) {
+    const step = shippedStepOf(agent);
+    assert.deepEqual(editsDenied(step, HARNESS_FILES), HARNESS_FILES, agent);
+    assert.deepEqual(editsDenied(step, [OWN_FILE]), [], agent);
+  }
+});
+
+for (const agent of ['ada', 'otto'])
+  test(`REFUSED: ${agent} without its deny of a folder's local settings, read from its file as a run reads it, may edit the owner's`, () => {
+    const step = shippedStepOf(agent);
+    const line = step.disallowedTools!.filter((rule) => rule !== 'Edit(//**/.claude/settings.local.json)');
+    assert.equal(line.length, step.disallowedTools!.length - 1, `${agent} denies an edit of a folder's local settings`);
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
+    assert.deepEqual(editsDenied(bare, HARNESS_FILES), HARNESS_FILES.slice(1), 'the rule cut leaves the projects folder open');
+    const none = shippedWith(agent, 'build', 'disallowedTools', line.filter((rule) => !rule.startsWith('Edit(')).join(', '));
+    assert.deepEqual(editsDenied(none, HARNESS_FILES), [], 'and the trust and user settings with theirs');
+  });
 
 /** What a janitor must never do, in the spellings a session types: start, file, queue or drop a card, approve or retry a step, edit. */
 const ACTS: Call[] = [

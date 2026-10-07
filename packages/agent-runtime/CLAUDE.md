@@ -162,6 +162,11 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   `auto` writes both with no allow (2.1.288, a trusted checkout and not; `claudeAllows`). `dontAsk` reads a file, a picture
   included, under a read-only added folder with no `Read` allow, and refuses it without the folder; a folder that is not
   there is no error (2.1.289).
+- **An `Edit(//**/<file>)` deny in an `auto` job refuses the Write tool, a Bash `>` and a `cp` to that file in any folder, by the rule**
+  (2.1.291, 2026-10-06); a `node -e` write of it is judged by the classifier alone, which refused it once and let it through unruled
+  once. Ada's and Otto's fences deny a harness's trust and local settings so (`agent-orchestrator/test/agent-fences.test.ts`).
+- **`Bash(claude *--bg*)`, `Bash(claude *--background*)` and `Bash(claude *remote-control*)` refuse an `auto` job's own session, a
+  `cd … &&` before it included, by the rule** (2.1.291, 2026-10-06): a step starts a probe through `workflows/build/probe.ts` alone.
 - **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.

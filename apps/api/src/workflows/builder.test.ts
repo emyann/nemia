@@ -15,7 +15,7 @@ import { app } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
-import { engine, HARNESS_CHOICES, loadWorkflows, writeWorkflow } from 'agent-orchestrator';
+import { engine, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   HARNESSES,
@@ -1047,11 +1047,11 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   assert.equal(taken.status, 409);
   assert.equal(
     ((await taken.json()) as { error: string }).error,
-    `Yours already has a workflow named 'taken' (${path.join(STORE, 'taken')}). PUT /api/workflows/yours/taken changes it, or name the new one otherwise.`,
+    workflowTaken(path.join(STORE, 'taken'), versionOf(path.join(STORE, 'taken'))),
   );
   const file = await post({ name: 'NOTES.txt', step });
   assert.equal(file.status, 409);
-  assert.match(((await file.json()) as { error: string }).error, /^Yours has a file named 'NOTES\.txt'/);
+  assert.equal(((await file.json()) as { error: string }).error, workflowTaken(path.join(STORE, 'NOTES.txt'), null));
 
   for (const [first, named] of [
     [{ name: 'plan', spec: spec(), body: '' }, ['plan']],

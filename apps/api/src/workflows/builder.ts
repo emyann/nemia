@@ -25,7 +25,6 @@ import { Hono } from 'hono';
 import {
   agentsFor,
   COMMANDS,
-  foldersIn,
   HARNESS_CHOICES,
   loadAgents,
   remoteAgents,
@@ -568,8 +567,8 @@ async function write(
  * names (`write`), and anything else a 500.
  *
  * - `GET /api/workflows/keys` — what a step's form is drawn from: the package's keys, in its order, and what each may be set to.
- * - `POST /api/workflows/:from` — a new folder of yours with its first step: `writeWorkflow` on a folder that is not there yet. 409 for a
- *   name yours has already, a workflow or another file. 201 with the folder read back.
+ * - `POST /api/workflows/:from` — a new folder of yours with its first step: `writeWorkflow` on a folder that is not there yet. 409, the
+ *   package's refusal, for a name yours has already, a workflow or another file. 201 with the folder read back.
  * - `PUT /api/workflows/:from/:name` — a folder of yours put back from its steps: every step it is to have, as the listing has them, with
  *   the schemas pasted for them. 404 or 409 as `folderOf` says; 409 when the `version` the draft was read at is not what the folder holds
  *   now, since a step edited, added or removed since would be written over — nothing is written. 200 with the folder read back.
@@ -595,17 +594,6 @@ export const builder = new Hono<ApiEnv>()
       const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
       if ('status' in step) return c.json({ error: step.error }, step.status);
       const dir = path.join(home, 'workflows', name);
-      if (fs.lstatSync(dir, { throwIfNoEntry: false })) {
-        const folder = foldersIn(path.dirname(dir)).includes(name);
-        return c.json(
-          {
-            error: folder
-              ? `Yours already has a workflow named '${name}' (${dir}). PUT /api/workflows/yours/${name} changes it, or name the new one otherwise.`
-              : `Yours has a file named '${name}' in ${path.dirname(dir)}, which is not a workflow and is not the builder's to replace. Name the workflow otherwise.`,
-          },
-          409,
-        );
-      }
       const saved = await write({ e, name, dir, repo, home, changes: false }, [step], readme);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 201);

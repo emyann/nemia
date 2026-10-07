@@ -2,15 +2,18 @@
  * The library's writers on the api, held to the one spec the command line parses too: each route of `agents write`, `agents remove`,
  * `agents try`, `skills write`, `workflows write` and `workflows remove`, sent as the board sends it, hands its entry's handler only the
  * keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is answered as it would be.
- * The package's `test/writers-cli.test.ts` holds the command line to the same keys.
+ * The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken is refused in the one
+ * sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the command line.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
-import { COMMANDS } from 'agent-orchestrator';
+import { COMMANDS, workflowTaken } from 'agent-orchestrator';
 import { app } from '../app.ts';
 
 type Command = (typeof COMMANDS)[number];
@@ -116,4 +119,34 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   await heldToSpec(t, 'workflows remove', 200, () =>
     sent('DELETE', '/api/workflows/yours/dev', { version: versionOf(changed, 'workflow') }),
   );
+});
+
+test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the board's POST and by nemia", async () => {
+  fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'taken'), { recursive: true });
+  fs.writeFileSync(path.join(STORE, 'TAKEN.txt'), 'not a workflow\n');
+  const draft = path.join(scratch('nemia-api-taken-'), 'taken');
+  fs.cpSync(path.join(TEAM, 'dev'), draft, { recursive: true });
+  const listed = (await (await app.request('/api/workflows')).json()) as Array<{
+    name: string;
+    from: string;
+    steps: unknown[];
+    version: string;
+  }>;
+  const taken = listed.find((w) => w.name === 'taken' && w.from === 'yours')!;
+  const nemia = path.join(import.meta.dirname, '../../../../packages/agent-orchestrator/bin/nemia.ts');
+  for (const [name, version] of [
+    ['taken', taken.version],
+    ['TAKEN.txt', null],
+  ] as const) {
+    const res = await sent('POST', '/api/workflows/yours', { name, step: taken.steps[0] });
+    const board = ((await res.json()) as { error: string }).error;
+    assert.equal(res.status, 409, board);
+    const typed = spawnSync(process.execPath, [nemia, 'workflows', 'write', 'yours', name, '--folder', draft], {
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+    assert.equal(typed.status, 2, typed.stderr);
+    assert.equal(typed.stderr.trim(), board, name);
+    assert.equal(board, workflowTaken(path.join(STORE, name), version), name);
+  }
 });

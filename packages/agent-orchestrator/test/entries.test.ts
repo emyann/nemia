@@ -402,6 +402,7 @@ const PINNED: Record<string, string[]> = {
     'workflowFolder',
     'workflowReadme',
     'workflowStale',
+    'workflowTaken',
     'workflowVersion',
     'workflowsIn',
     'workflowsOf',

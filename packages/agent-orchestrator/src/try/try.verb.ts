@@ -13,11 +13,11 @@ import { judgedNow } from '../summary/summary.verb.ts';
 import { startRun } from '../start/start.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { skillNamesIn } from '../folder/folder.store.ts';
-import { agentRead, agentSkillsFound } from './roster.store.ts';
-import type { AgentReading } from './roster.ts';
+import { agentRead, agentSkillsFound } from '../roster/roster.store.ts';
+import type { AgentReading } from '../roster/roster.ts';
 import { repoSkillsRefusal, untriedOf, yourAgentsDir } from './try.ts';
 import { tryFolder } from './try.store.ts';
-import { yourSkillsDir, yoursOnlyRefusal } from './yours.ts';
+import { yourSkillsDir, yoursOnlyRefusal } from '../yours/yours.ts';
 
 /**
  * What a try is asked: who asks (the command), the agent's place and name, the brief, the repository a skill may be in (none from the

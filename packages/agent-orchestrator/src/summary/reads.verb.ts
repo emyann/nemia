@@ -12,7 +12,7 @@ import { loadWorkflows } from '../folder/folder.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
 import { unloadedOf } from '../record/steps.store.ts';
-import { triesDir } from '../roster/try.store.ts';
+import { triesDir } from '../try/try.store.ts';
 import type { Workflow } from '../step/step.ts';
 import { filingsRead } from '../views/views.verb.ts';
 

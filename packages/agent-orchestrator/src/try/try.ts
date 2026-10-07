@@ -9,7 +9,7 @@
 import path from 'node:path';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { directoryFence } from '../workflow/fence.ts';
+import { directoryFence } from '../workflow/index.ts';
 
 /** The cap on a try, in dollars: what its step's `budget:` says. */
 export const TRY_BUDGET = 1;

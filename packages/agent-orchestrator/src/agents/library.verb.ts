@@ -6,14 +6,13 @@
  */
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
-import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText } from '../command/writers.ts';
+import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { HOME } from '../record/record.store.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
 import { agentRead } from '../roster/roster.store.ts';
-import { TRY_BUDGET } from '../roster/try.ts';
-import { tryAgent } from '../roster/try.verb.ts';
-import { yoursOrRefused } from '../roster/yours.ts';
+import { TRY_BUDGET } from '../try/try.ts';
+import { tryAgent } from '../try/try.verb.ts';
 import type { AgentDraft } from './agents.ts';
 import { removeAgent, writeAgent, type AgentSidecar, type AgentWritten } from './agents.store.ts';
 

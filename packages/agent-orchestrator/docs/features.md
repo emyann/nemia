@@ -2503,13 +2503,13 @@ the caller runs it again with `--version`; a workflow's own schemas left to a fo
 
 - **The entries**: `AGENTS_WRITE`, `AGENTS_REMOVE` and `AGENTS_TRY` (`src/agents/library.verb.ts`), `SKILLS_WRITE`
   (`src/skills/skills.verb.ts`), `WORKFLOWS_WRITE` and `WORKFLOWS_REMOVE` (`src/folder/workflows.verb.ts`), their flags from
-  `src/command/writers.ts`: `--version` on both sides, a path the command line alone takes (`--file`, `--folder`) and the form the api
+  `src/yours/yours.ts`: `--version` on both sides, a path the command line alone takes (`--file`, `--folder`) and the form the api
   alone hands (`draft`, `schema`, `change`, `readme`). Each handler resolves yours from its store and refuses any other place
-  (`yoursOrRefused`, `src/roster/yours.ts`).
+  (`yoursOrRefused`, `src/yours/yours.ts`).
 - **The runners** (`src/cli/writers.ts`): an agent's file read into its draft with the result schema its `output:` names beside it, a
   SKILL.md into the skill's form, a draft folder's steps and README as a start reads them; then handed to the handler without the path.
   `agents remove`, `agents try` and `workflows remove` need none.
-- **The try** (`tryAgent`, `src/roster/try.verb.ts`) refuses, in order, the place, an empty brief, an agent not there or that does not
+- **The try** (`tryAgent`, `src/try/try.verb.ts`) refuses, in order, the place, an empty brief, an agent not there or that does not
   read, one a try cannot run, a skill only the repository has, and a try of it still moving; then writes its folder and starts a run with
   no repository, capped at `TRY_BUDGET`. It ticks: typed with no daemon, it starts one.
 - **Her skills**: the verbs skill lists the six by class (a write or a removal prompts the person, a try is hers), and

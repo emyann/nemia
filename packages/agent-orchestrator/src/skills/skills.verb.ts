@@ -8,9 +8,8 @@ import { tried } from '../runtime-client.ts';
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText } from '../command/writers.ts';
+import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import { HOME } from '../record/record.store.ts';
-import { yoursOrRefused } from '../roster/yours.ts';
 import { skillVersion } from '../folder/folder.store.ts';
 import {
   copySkill,

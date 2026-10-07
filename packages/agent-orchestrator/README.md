@@ -2446,9 +2446,10 @@ run 'wf tick' (or 'wf up') to start them
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
   card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
-  A file is a card only when every line of its frontmatter is `workflow:` or `after:` — or an inbox card's `repo:`, which a
-  plan's card refuses by name, since its repository is `--repo`. A brief with any other key, or one that opens with a `---`
-  it never closes, is taken whole, as before.
+  A file that opens with a closed frontmatter block whose every line is a key (`KEY_LINE`) is a plan's card, and a block of
+  keys is never taken into a brief: a key a plan's card lacks — an inbox card's `repo:` or `factory:`, a `title:` — is
+  refused by name, exit 2, naming `wf inbox add <file>`, whose cards read those keys. A file whose block has a line of
+  prose, is empty, or opens with a `---` it never closes is not a card, and is taken whole.
 
 ## An inbox: cards before they are started — `wf inbox`
 

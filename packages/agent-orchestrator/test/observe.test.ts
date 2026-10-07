@@ -36,6 +36,7 @@ const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { PASS_METRICS, STEP_METRICS } = await import('../src/meter/meter.verb.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
+const { PHASES } = await import('../src/meter/meter.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OBSERVE = path.join(REPO_ROOT, 'tools', 'observe');
@@ -489,6 +490,19 @@ test('the dashboards name only what the code emits', () => {
   for (const q of profiles) assert.deepEqual(profileLabelsOf(q.text), [['service_name', '$service']], q.text);
 });
 
+/** The values a dashboard's PromQL queries ask of the pass's `phase` label, each alternative of a regex its own. */
+const phasesAsked = (dashboard: Dashboard): string[] =>
+  queriesOf(dashboard)
+    .filter((q) => q.datasource === 'prometheus')
+    .flatMap((q) => [...q.text.matchAll(/\bphase\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].flatMap(([, v]) => v.split('|')));
+
+/** The phases a dashboard asks for that the meter has none of (`PHASES`). */
+const strangePhases = (dashboard: Dashboard): string[] => phasesAsked(dashboard).filter((p) => !(PHASES as readonly string[]).includes(p));
+
+test("the dashboards ask the pass's phase label only for a phase the meter has", () => {
+  for (const [file, d] of DASHBOARDS) assert.deepEqual(strangePhases(d), [], file);
+});
+
 /** The fields of a target that hold what it asks for. */
 const TARGET_FIELDS = ['expr', 'query', 'labelSelector', 'profileTypeId'] as const;
 
@@ -520,6 +534,11 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
   assert.ok(variable, 'A run picks its run');
   variable.query = { ...(variable.query as object), label: 'runid' };
   assert.deepEqual(unknownNames(run, KNOWN), ['runid'], 'A run: a variable reading the tag runid');
+});
+
+test("REFUSED: a dashboard asking for the pass's former git phase", () => {
+  const system = withQuery(dashboardTitled('System'), 'prometheus', 'pass_phase_duration_sum{', 'pass_phase_duration_sum{phase="git", ');
+  assert.deepEqual(strangePhases(system), ['git']);
 });
 
 test("a table of spans shows each span's own duration, and no query names a span two layers emit", () => {

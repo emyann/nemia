@@ -3,8 +3,9 @@
  * anything is written: a workflow the factory has not attached, first; then a step left unfilled, or filled twice — by its own `agent:` and
  * a hire. Started in the default factory, every workflow is offered, and a step that names no agent is a plain session, as it always was.
  *
- * And the factory on the run: its name frozen on the record, a factory with one repository giving the run its repository, and a git run on
- * a repository outside the factory refused, naming its list; a folder team works on none, and a run in the default factory records none.
+ * And the factory on the run: its name frozen on the record, a factory with one repository giving the run its repository, and a repository
+ * run on a repository outside the factory refused, naming its list; a folder team works on none, and a run in the default factory records
+ * none.
  *
  * And every run in a factory, as shipped (`asShipped` deletes `WF_DEFAULT_FACTORY_STARTS`, which `test/ambient.ts` sets): a start that
  * names none runs in the one factory whose repository holds its folder, and is refused where none or two do; a card names its own, never
@@ -272,7 +273,7 @@ test('a run started in a factory names it on its record, as written to disk', as
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8')).factory, 'pipao');
 });
 
-test("REFUSED: a git run on a repository outside its factory, naming the factory's list, with no run written", async () => {
+test("REFUSED: a repository run on a repository outside its factory, naming the factory's list, with no run written", async () => {
   const { repo, build } = fresh();
   hired();
   const other = aRepo();

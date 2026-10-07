@@ -23,7 +23,7 @@ import {
 } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/index.ts';
-import { isGitRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import type { Said } from '../say/say.ts';
 import { taskSpend, type SpendOf, type Consumed } from '../status/status.ts';
 import { waitedOn, type ParentRun } from '../wait/wait.ts';
@@ -586,7 +586,7 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   const branches = resultSteps(steps)
     .map((s) => record.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
-  const unread = isGitRun(record) ? (git.unread(record) ?? branches.map((b) => git.unread(record, b)).find(Boolean)) : undefined;
+  const unread = isRepositoryRun(record) ? (git.unread(record) ?? branches.map((b) => git.unread(record, b)).find(Boolean)) : undefined;
   if (unread !== undefined) return { ...known, shipped: false, unread } satisfies ParentRun;
   const onBase = yield* tried(() => branches.length > 0 && branches.every(shippedOf(record, git)));
   if (!onBase) return { ...known, shipped: false } satisfies ParentRun;

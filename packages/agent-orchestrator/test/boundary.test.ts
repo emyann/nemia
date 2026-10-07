@@ -103,8 +103,9 @@ const STORE_BOTTOM = [
  * custom instructions among it, then the folders on that read (`folder.store.ts`), a run's steps on the folders (`steps.store.ts`), the
  * run store on them and the store's pause on the bottom, the factories on the run store, and the run
  * store's files on them (`runStore`), the run's place on the folders (`place.store.ts`) and its verbs run off the event loop on it
- * (`place-async.store.ts`), then a step's workspace, cut by the place, a workflow folder written on the factories too, and where a run
- * looks and a place's workflow folders (`lookup.store.ts`) on both; what a branch changed, as the place says, on the place
+ * (`place-async.store.ts`), both counting on the pass's meter (`tally.store.ts`), then a step's workspace, cut by the place, a
+ * workflow folder written on the factories too, and where a run looks and a place's workflow folders (`lookup.store.ts`) on both;
+ * what a branch changed, as the place says, on the place
  * (`changes.store.ts`), and where the branches stood on the run store and the place (`standing.store.ts`), and a run's result branches
  * (`branches.store.ts`), which a landing reads beside its place (`landing.store.ts`). No other store file is imported by another, so the
  * tree has no cycle; outside the store, the client and the controllers beneath the CLI alone import them.
@@ -120,8 +121,8 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/pause/pause.store.ts': STORE_BOTTOM,
   'src/factory/factory.store.ts': ['src/record/record.store.ts'],
   'src/record/files.store.ts': ['src/record/record.store.ts', 'src/pause/pause.store.ts'],
-  'src/place/place.store.ts': ['src/folder/folder.store.ts'],
-  'src/place/place-async.store.ts': ['src/place/place.store.ts'],
+  'src/place/place.store.ts': ['src/folder/folder.store.ts', 'src/meter/tally.store.ts'],
+  'src/place/place-async.store.ts': ['src/place/place.store.ts', 'src/meter/tally.store.ts'],
   'src/workspace/worktree.store.ts': [
     'src/record/record.store.ts',
     'src/record/places.store.ts',
@@ -682,7 +683,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   ]);
   assert.ok('src/place/place.store.ts' in packageSources());
   assert.deepEqual(treeBreaks(adding('src/place/place.store.ts', 'src/branches/branches.store.ts')), [
-    'src/place/place.store.ts imports src/branches/branches.store.ts, which the tree does not let it: of the store it imports src/folder/folder.store.ts',
+    'src/place/place.store.ts imports src/branches/branches.store.ts, which the tree does not let it: of the store it imports src/folder/folder.store.ts, src/meter/tally.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/branches/branches.store.ts', 'src/place/place.store.ts')), [
     'src/branches/branches.store.ts imports src/place/place.store.ts, which the tree does not let it: of the store it imports src/meter/tally.store.ts, src/record/files.store.ts, src/record/record.store.ts, src/workspace/worktree.store.ts',

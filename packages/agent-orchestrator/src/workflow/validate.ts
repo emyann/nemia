@@ -110,10 +110,10 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
 /**
  * The one way a team cannot work in folders (`place: folder`): some of its steps do not say so.
  *
- * A run is of one kind — a git run, whose steps work on branches of one repository, or a folder run, which needs no repository — and the
- * kind is the run's, frozen on its record at start (`place`). A loaded step always says its place (`placeRequired`), and one frozen before
- * the key reads as git (`stepPlace`), so a team that says `place: folder` on some steps and not on others would be both. Refused, rather
- * than one of the two guessed.
+ * A run is of one kind — a repository run, whose steps work on branches of one repository, or a folder run, which needs no repository — and
+ * the kind is the run's, frozen on its record at start (`place`). A loaded step always says its place (`placeRequired`), and one frozen
+ * before the key reads as git (`stepPlace`), so a team that says `place: folder` on some steps and not on others would be both. Refused,
+ * rather than one of the two guessed.
  */
 function validateFolder(steps: readonly Workflow[]): void {
   const folder = steps.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
@@ -149,8 +149,8 @@ const backgroundReach = (harness: string = DEFAULT_HARNESS): FenceReach => {
  * the runtime's to say (`backgroundReach`): Codex has no permission mode to judge (`permissionMode:` is refused there), and `background:
  * true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
  *
- * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
- * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
+ * A repository run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there
+ * is nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
  * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allowedTools:` gives back, scoped
  * to the step's own folder (`Edit(**)`).
  */

@@ -206,7 +206,7 @@ export const passCost = (extra: Partial<PassCost> = {}): PassCost => ({
     journals: phase(20),
     observe: phase(40),
     runtime: phase(5),
-    git: phase(30),
+    place: phase(30),
     assess: phase(4),
     act: phase(10),
   },
@@ -219,7 +219,7 @@ export const passCost = (extra: Partial<PassCost> = {}): PassCost => ({
   ...extra,
 });
 
-/** One of the recent passes, of `ms`, all of it in `git` but a millisecond of `records`. */
+/** One of the recent passes, of `ms`, all of it in `place` but a millisecond of `records`. */
 export const recentPass = (ms: number, extra: Partial<RecentPass> = {}): RecentPass => ({
   at: '2026-09-30T05:00:00.000Z',
   ms,
@@ -230,7 +230,7 @@ export const recentPass = (ms: number, extra: Partial<RecentPass> = {}): RecentP
   tasks: 3,
   queued: 1,
   admitted: 2,
-  phases: { records: 1, asks: 0, journals: 0, observe: 0, runtime: 0, git: ms - 1, assess: 0, act: 0 },
+  phases: { records: 1, asks: 0, journals: 0, observe: 0, runtime: 0, place: ms - 1, assess: 0, act: 0 },
   ...extra,
 });
 
@@ -250,7 +250,7 @@ export const passesRead = (extra: Partial<PassesRead> = {}): PassesRead => ({
     { le: null, count: 1 },
   ],
   parts: [
-    { phase: 'git', ms: 2015, share: 6045 / 6048 },
+    { phase: 'place', ms: 2015, share: 6045 / 6048 },
     { phase: 'records', ms: 1, share: 3 / 6048 },
   ],
   summary: {

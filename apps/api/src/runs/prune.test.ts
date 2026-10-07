@@ -6,10 +6,10 @@
  * board.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run —
- * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, git runs of
- * one step; `p-failed-merged`, whose step failed and whose branch a person merged by hand all the same — on the base, however it got there,
- * so shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your decision all
- * the same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
+ * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, repository
+ * runs of one step; `p-failed-merged`, whose step failed and whose branch a person merged by hand all the same — on the base, however it
+ * got there, so shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your
+ * decision all the same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -66,11 +66,11 @@ const filesDir = (id: string) => path.join(root, 'runs', id, 'artifacts');
 const branchOf = (id: string) => `wf/${id}/implement`;
 
 /**
- * A git run of one step, `implement`, as `nemia start` and the tick leave it: a result branch off main with its work committed — merged
- * back with `--no-ff` when `merge` says so — checked out in the step's worktree under the store, a file in the run's files directory, and
- * the step's task signed off and handed off, or still working.
+ * A repository run of one step, `implement`, as `nemia start` and the tick leave it: a result branch off main with its work committed —
+ * merged back with `--no-ff` when `merge` says so — checked out in the step's worktree under the store, a file in the run's files
+ * directory, and the step's task signed off and handed off, or still working.
  */
-function gitRun(id: string, { merge, working: busy = false }: { merge: boolean; working?: boolean }): void {
+function repositoryRun(id: string, { merge, working: busy = false }: { merge: boolean; working?: boolean }): void {
   const branch = branchOf(id);
   git('checkout', '-q', '-b', branch);
   fs.writeFileSync(path.join(repo, `${id}.txt`), `${id}\n`);
@@ -101,11 +101,11 @@ function gitRun(id: string, { merge, working: busy = false }: { merge: boolean; 
   );
 }
 
-gitRun('p-merged', { merge: true });
-gitRun('p-unmerged', { merge: false });
-gitRun('p-running', { merge: false, working: true });
+repositoryRun('p-merged', { merge: true });
+repositoryRun('p-unmerged', { merge: false });
+repositoryRun('p-running', { merge: false, working: true });
 
-gitRun('p-failed-merged', { merge: true });
+repositoryRun('p-failed-merged', { merge: true });
 journal('p-failed-merged-implement', [
   filed,
   { kind: 'starting', at: at(1), attempt: 1 },
@@ -346,7 +346,7 @@ test('REFUSED at shipped defaults: a prune of a run the store has not — none b
 });
 
 test("REFUSED at shipped defaults: a body that is not `nemia prune`'s two switches is a 400, before the run is read, and nothing is touched", async () => {
-  gitRun('p-body', { merge: true });
+  repositoryRun('p-body', { merge: true });
   const cases: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/prune takes a JSON body: `\{ "artifacts"\?: boolean, "unmerged"\?: boolean \}`\.$/],
     [[], /^POST …\/prune takes a JSON object/],
@@ -373,7 +373,7 @@ test("REFUSED at shipped defaults: a body that is not `nemia prune`'s two switch
 });
 
 test('REFUSED at shipped defaults: a prune from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the run stands', async () => {
-  gitRun('p-guard', { merge: true });
+  repositoryRun('p-guard', { merge: true });
   const cases: Array<[Record<string, string>, number, RegExp]> = [
     [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
     [{ ...BOARD, 'sec-fetch-site': 'same-site' }, 403, /refuses a request made by a page on another site/],

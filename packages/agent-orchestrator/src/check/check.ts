@@ -23,7 +23,7 @@
  *
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 
 /**
@@ -90,7 +90,7 @@ export const checkEnvOf = (
 ): CheckEnv => ({
   WF_RUN: run.id,
   WF_STEP: step.name,
-  ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
+  ...(isRepositoryRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
   WF_WORKSPACE: t.workspace,
   WF_ARTIFACTS: t.files,
   ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),

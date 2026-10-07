@@ -21,7 +21,7 @@ import { formerModesWritten, isShippedPlace, loadWorkflows, skillsFor, type Plac
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
-import { isGitRun, type Mount, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Mount, type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
@@ -222,7 +222,10 @@ export type ConfigRefused = (
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
 export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });
 
-/** The place skill's directory a git run is opened with at start (`openPlace`): the package's own place, unless a layer gives another. */
+/**
+ * The place skill's directory a repository run is opened with at start (`openPlace`): the package's own place, unless a layer gives
+ * another.
+ */
 export const StartPlace = Context.Reference<string>('orchestrator/StartPlace', { defaultValue: () => SHIPPED_PLACE });
 
 /**
@@ -330,7 +333,7 @@ export function leftOutMounts(run: Run): string[] {
     return [];
   }
   const mounted = new Set((run.mounts ?? []).map((m) => m.path));
-  return factoryMounts(factory, isGitRun(run) ? run.repo : undefined)
+  return factoryMounts(factory, isRepositoryRun(run) ? run.repo : undefined)
     .map((m) => m.path)
     .filter((at) => !mounted.has(at) && !isDirectory(at));
 }
@@ -377,8 +380,9 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
 });
 
 /**
- * The verbs a git run's place must declare for this build to run `steps` through it: `make` and `handoff` when the run cuts worktrees
- * (`isolate`) and a step forks or merges (`workspacePlan`); `status` and `land` when an ending lands on its check (`landsOnCheck`).
+ * The verbs a repository run's place must declare for this build to run `steps` through it: `make` and `handoff` when the run cuts
+ * worktrees (`isolate`) and a step forks or merges (`workspacePlan`); `status` and `land` when an ending lands on its check
+ * (`landsOnCheck`).
  */
 export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gates'>, isolate: boolean): PlaceVerb[] {
   const cuts = isolate && steps.some((step) => ['fork', 'merge'].includes(workspacePlan(steps, step).kind));
@@ -387,11 +391,11 @@ export function placeVerbsNeeded(steps: readonly Workflow[], run: Pick<Run, 'gat
 }
 
 /**
- * A git run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked out
- * there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on stand
- * read now (`standingLiveOf`).
+ * A repository run's record on `repo`, as the place `StartPlace` names opens it (`openPlace`): the commit HEAD is at, the branch checked
+ * out there, and the place skill it ran. Fails with the place's refusal, or an `--after`'s (`afterRefusal`), where the runs it waits on
+ * stand read now (`standingLiveOf`).
  */
-const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
+const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const placeDir = yield* StartPlace;
   const needed = placeVerbsNeeded(told.workflow ?? [], told, isolate);
   const { opened, placeSkill } = yield* tried(() => openPlace(placeDir, repo, needed, isolate));
@@ -494,11 +498,11 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  *
  * `factory` names the factory the run is started in (`nemia start --factory`): its hires fill the workflow's steps (`stepsToStart`), read
  * as they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
- * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a git run, when
- * `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left out, or the
- * default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
+ * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a repository
+ * run, when `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left
+ * out, or the default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
  *
- * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
+ * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a repository run works on, each
  * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `nemia start`
  * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). A step's
  * `writable:` names the folders it alone is filed writable (`stepMounts`), each refused unless one folder of the factory has the name and
@@ -534,7 +538,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
-  const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
+  const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
   yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
   yield* tried(() => runStore.runs.create(run));

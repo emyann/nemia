@@ -46,7 +46,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   id: 'r-1',
   repo: '/code/app',
   factory: null,
-  place: 'git',
+  place: 'repository',
   work: null,
   brief: 'Do the thing',
   workflowDir: '/code/app/workflows/dev',
@@ -783,7 +783,7 @@ const approve = (id: string, step: string): RunSummary['toDecide'] => ({
   command: `wf approve ${id} ${step}`,
 });
 const merge = (id: string, branch: string): RunSummary['toDecide'] => ({
-  kind: 'git',
+  kind: 'result',
   branches: [branch],
   said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`,
   command: `wf decide ${id}`,

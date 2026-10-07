@@ -282,7 +282,7 @@ export function toDecide(
   }
   if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
-  return ahead.length ? { kind: 'git', branches: ahead } : undefined;
+  return ahead.length ? { kind: 'result', branches: ahead } : undefined;
 }
 
 /**
@@ -313,7 +313,7 @@ export const ownNote = (step: Pick<Workflow, 'body' | 'agent'>): string => (step
  * ships. `filed` is whether the step has run; `says` is the first line of its own note (`ownNote`), what it would do, and null for a step
  * that has already done it or has no note.
  */
-export type ToDecide = { kind: 'approve'; step: string; says: string | null; filed: boolean } | { kind: 'git'; branches: string[] };
+export type ToDecide = { kind: 'approve'; step: string; says: string | null; filed: boolean } | { kind: 'result'; branches: string[] };
 
 /** What `nemia ls` says after `→ to decide:`, and the board's banner: what is to be decided, and the command that decides it. Pure. */
 export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): string =>

@@ -23,7 +23,7 @@ export default {
     const work = article.locator('section [data-path]', { hasText: `/runs/${FOLDER.id}/work` }).first();
     await expectVisible(
       work,
-      `the run's facts say where its work is (runs/${FOLDER.id}/work), where a git run's say repo, base and branch`,
+      `the run's facts say where its work is (runs/${FOLDER.id}/work), where a repository run's say repo, base and branch`,
     );
     await expectCount(work.locator('button[data-copy]'), 1, 'and a button that copies the path');
 

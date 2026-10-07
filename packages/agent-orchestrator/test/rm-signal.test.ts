@@ -1,9 +1,9 @@
 /**
- * `nemia rm` removes a git run's worktrees through its place's `remove`, which runs in a process group of its own. A SIGINT to `nemia rm`
- * ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop halfway. Once
- * that group is gone, `nemia rm` again forgets the run: what the first left is read again by the place's inventory. The run is started in
- * this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone. `WF_ROOT` is set
- * before the import, since the module reads it as it loads.
+ * `nemia rm` removes a repository run's worktrees through its place's `remove`, which runs in a process group of its own. A SIGINT to
+ * `nemia rm` ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop
+ * halfway. Once that group is gone, `nemia rm` again forgets the run: what the first left is read again by the place's inventory. The run
+ * is started in this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone.
+ * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -173,7 +173,7 @@ export default {
       .map((l) => l.split(':')[0])
       .join(' ');
     if (
-      phasesSaid !== 'records asks journals observe runtime git assess act' ||
+      phasesSaid !== 'records asks journals observe runtime place assess act' ||
       passLines[4] !== 'observe: 120 ms, 1 call, 0 B read, 1 process started'
     ) {
       throw new Refused(
@@ -353,9 +353,10 @@ export default {
     const unmerged = cardOf(page, UNMERGED.id);
     await expectVisible(unmerged, `a finished run whose branch nobody merged keeps its card on the floor too (${UNMERGED.id})`);
     await expectVisible(
-      unmerged.locator('[data-to-decide="git"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
+      unmerged.locator('[data-to-decide="result"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
       'its card says the branch is ahead, a link to where it is decided',
     );
+    await expectCount(page.locator('[data-to-decide="git"]'), 0, 'and no card on the floor says its kind in the old word, git');
     await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
     await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
     await expectCount(

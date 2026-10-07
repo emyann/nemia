@@ -37,12 +37,12 @@ export type Awaiting = NonNullable<Decidable['awaiting']>;
 export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
 
 /**
- * Whether the run's page offers a prune at all: a git run (the package prunes git runs alone), with nothing moving, and with worktrees or
- * files left on disk (`onDisk`). What it offers waits on the decision (`pruneOffer`).
+ * Whether the run's page offers a prune at all: a repository run (the package prunes repository runs alone), with nothing moving, and
+ * with worktrees or files left on disk (`onDisk`). What it offers waits on the decision (`pruneOffer`).
  */
 export function prunable(run: Prunable): boolean {
   const { worktrees, files } = run.onDisk;
-  return run.place === 'git' && !run.moving && run.status !== 'running' && (worktrees || files);
+  return run.place === 'repository' && !run.moving && run.status !== 'running' && (worktrees || files);
 }
 
 /**

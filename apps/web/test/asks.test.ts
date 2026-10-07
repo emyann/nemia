@@ -137,7 +137,7 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
   const ahead = {
     ...run(steps, ['plan']),
     toDecide: {
-      kind: 'git',
+      kind: 'result',
       branches: ['wf/r/implement'],
       said: 'wf/r/implement is ahead of main, and nothing has merged it — wf decide r',
       command: 'wf decide r',

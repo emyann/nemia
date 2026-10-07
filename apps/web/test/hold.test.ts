@@ -4,10 +4,10 @@ import { holdable, holdCandidates } from '../src/lib/hold.ts';
 
 type Run = Parameters<typeof holdCandidates>[1][number] & Parameters<typeof holdable>[0];
 
-/** A git run of `/code/app` in flight, held by nobody: what the page offers a hold of, and what a hold may wait on. */
+/** A repository run of `/code/app` in flight, held by nobody: what the page offers a hold of, and what a hold may wait on. */
 const run = (extra: Partial<Run> = {}): Run => ({
   id: 'r-1',
-  place: 'git',
+  place: 'repository',
   repo: '/code/app',
   cancelledAt: null,
   pruned: null,
@@ -18,7 +18,7 @@ const run = (extra: Partial<Run> = {}): Run => ({
   ...extra,
 });
 
-test('a git run in flight, or stopped on something, held by nobody, is offered a hold', () => {
+test('a repository run in flight, or stopped on something, held by nobody, is offered a hold', () => {
   assert.equal(holdable(run()), true);
   assert.equal(holdable(run({ status: 'failed' })), true);
 });
@@ -27,7 +27,7 @@ test('REFUSED: a run that cannot be held by what it says of itself is offered no
   const holding = { at: 'now', runs: [], word: 'held until r-2 ships', advice: '', onYou: false };
   const cases: Array<[string, Partial<Run>]> = [
     ['a folder run', { place: 'folder', repo: null }],
-    ['a git run with no repository said', { repo: null }],
+    ['a repository run with no repository said', { repo: null }],
     ['called off', { cancelledAt: 'now', status: 'cancelled' }],
     ['called off, its status not yet said', { cancelledAt: 'now' }],
     ['pruned', { pruned: { said: 'pruned' } }],
@@ -44,7 +44,7 @@ test('a hold may wait on the other runs of its repository not called off, pruned
     run({ id: 'r-2' }),
     run(),
     run({ id: 'r-3', status: 'failed' }),
-    run({ id: 'r-4', status: 'succeeded', toDecide: { kind: 'git', branches: [], said: '', command: '' } }),
+    run({ id: 'r-4', status: 'succeeded', toDecide: { kind: 'result', branches: [], said: '', command: '' } }),
   ];
   assert.deepEqual(
     holdCandidates(run(), runs).map((r) => r.id),

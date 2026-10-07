@@ -4,7 +4,7 @@
  * again.
  */
 import { tried } from '../runtime-client.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import { runStore } from '../record/files.store.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
@@ -24,7 +24,7 @@ export const collisionsAt = (run: Run, ending: string, standings: readonly Branc
 
 function collisionsRead(run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader): Collisions | undefined {
   const ours = ahead(standings);
-  if (!isGitRun(run) || !run.isolate || !ours.length) return undefined;
+  if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
   const theirs: Theirs[] = othersInFlight(run, runStore.runs.list()).flatMap((other) =>
     ahead(standingsOf(other, git)).map((branch) => ({ run: other.id, branch })),
   );

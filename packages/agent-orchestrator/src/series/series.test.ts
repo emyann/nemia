@@ -95,7 +95,7 @@ test('a pass is sampled into each series it carries, a figure an older tick did 
 
 test('a label key outside the closed set is named, a run id among them', () => {
   assert.deepEqual(strangeLabels({ factory: 'f', run: 'r-1', step: 's' }), ['run']);
-  assert.deepEqual(strangeLabels({ factory: 'f', workflow: 'w', step: 's', agent: 'a', phase: 'git' }), []);
+  assert.deepEqual(strangeLabels({ factory: 'f', workflow: 'w', step: 's', agent: 'a', phase: 'place' }), []);
 });
 
 test('the hours due: none while the last minute kept is in the hour now; each whole hour after the last hour line once it is done', () => {

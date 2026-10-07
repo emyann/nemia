@@ -46,7 +46,7 @@ test('a run is read for its page by its id, and an id the store does not have, n
   assert.deepEqual(await runWith(NO_ENGINE, RUN.handler({ id: `../runs/${started.id}` })), { run: null });
 });
 
-test("a step's file is read off the run the store lists, never off a path made of its id; a git run's step has no folder", async () => {
+test("a step's file is read off the run the store lists, never off a path made of its id; a repository run's step has no folder", async () => {
   const started = await Effect.runPromise(startRun({ brief: 'files', repo: aRepo(), workflowDir: oneStep() }));
   const dir = path.join(ROOT, 'runs', started.id, 'artifacts', 'implement');
   fs.mkdirSync(dir, { recursive: true });

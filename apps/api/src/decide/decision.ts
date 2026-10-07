@@ -33,7 +33,16 @@ import {
   runStore,
   standingWhen,
 } from 'agent-orchestrator';
-import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitedOn, waitsOf } from 'agent-orchestrator/run';
+import {
+  type CheckoutHold,
+  type RepositoryRun,
+  holdsOf,
+  isRepositoryRun,
+  type Run,
+  type RunSlot,
+  waitedOn,
+  waitsOf,
+} from 'agent-orchestrator/run';
 import { type Engine } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
@@ -297,7 +306,7 @@ async function branchesOf(
         .filter((b): b is string => Boolean(b)),
     ),
   ];
-  if (!isGitRun(run)) return { read: [], standings: [] };
+  if (!isRepositoryRun(run)) return { read: [], standings: [] };
   const toRead = branchesToRead(
     awaiting ?? results,
     Object.values(run.steps).map((s) => s.branch),
@@ -326,7 +335,7 @@ const statOf = (radius: BranchChanges['radius']): string | null => ('error' in r
  * Whether each branch ahead of the base still merges onto it (`StandingMerge`), keyed by branch, as the table's merge check answers it
  * (`MERGES`, served on the api alone); none asked when no branch is ahead, which nothing would merge.
  */
-async function mergesOf(e: Engine['Service'], run: GitRun, standings: readonly BranchStanding[]) {
+async function mergesOf(e: Engine['Service'], run: RepositoryRun, standings: readonly BranchStanding[]) {
   const branches = standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
   if (!branches.length) return {};
   return (await runWith(e, MERGES.handler({ runId: run.id, branches }))) as Record<string, StandingMerge>;

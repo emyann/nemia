@@ -189,7 +189,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   brief: 'Decode the reads',
   decide: 'nemia decide r-1',
   repo: '/work/repo',
-  place: 'git',
+  place: 'repository',
   work: null,
   workflowDir: '/work/workflows/build',
   workflowPage: null,
@@ -232,7 +232,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   read: { said: 'read 21.4M', peak: 'cap', rebuilt: 1 },
   waitingOnYou: ['implement'],
   onYou: ['approve implement'],
-  toDecide: { kind: 'git', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
+  toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
   gates: ['implement'],
   warning: null,
   graph: {

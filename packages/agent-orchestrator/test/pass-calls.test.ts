@@ -2,7 +2,8 @@
  * What one pass asks of the engine (`advance`), pinned: every call it makes, in order, with the task it names, and the meter's count of
  * calls in each phase it touches (`meteredEngine`, `metered`) — on a step filed fresh, a check, a ready step after it, a try, a round, a
  * cancelled run, an ending, and a try and a round due on one pass. A pass that asks the engine once more, or once less, reads more
- * journals, files what it did not or files in another order, fails here, whatever else it still gets right.
+ * journals, files what it did not or files in another order, fails here, whatever else it still gets right. With them, the processes a
+ * pass over a repository run starts for its place's verbs, each counted once, in the `place` phase (`passStanding`, `advancePass`).
  *
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
@@ -28,6 +29,9 @@ const { advanceRun, approveRun, cancelRun, startRun, runWith } = await import('.
 const { readRun } = await import('../src/record/record.store.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { meteredEngine } = await import('../src/meter/meter.verb.ts');
+const { passStanding } = await import('../src/standing/standing.verb.ts');
+const { passRead } = await import('../src/cap/cap.verb.ts');
+const { advancePass } = await import('../src/tick/advance.verb.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const LOOPING = {
@@ -290,4 +294,34 @@ test('an approved ending is filed in the checkout, once the pass has read afresh
     "the pass's read, the checkout's claim read afresh (`checkoutHold`), and the filing",
   );
   assert.deepEqual(shipped.counted, { journals: 2, act: 5 });
+});
+
+test("each place verb a pass runs starts one process, counted once in its place phase: the standing, a worktree's make, a hand-off", async () => {
+  const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: main\ngate: true' }), true);
+  const b = board();
+  const placed = async () => {
+    const e = meteredEngine(b.e);
+    const program = Effect.gen(function* () {
+      const runs = [readRun(run.id)];
+      const read = passRead(e, runs, process.env, yield* passStanding(runs));
+      return (yield* advancePass(e, runs[0], undefined, read)).advanced;
+    });
+    const { value, tallies } = await metered(() => runWith(e, program));
+    const all = Object.values(tallies!.kinds).reduce((n, t) => n + t.spawned, 0);
+    return { advanced: value, counted: [tallies!.kinds.place.calls, tallies!.kinds.place.spawned, all] };
+  };
+
+  const filed = await placed();
+  assert.deepEqual(filed.advanced.filed, ['implement']);
+  assert.deepEqual(filed.counted, [2, 2, 2], "the standing, and the make of implement's worktree");
+
+  fs.writeFileSync(path.join(readRun(run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  const handed = await placed();
+  assert.equal(readRun(run.id).steps.implement.handedOff, `${run.id}-implement`, 'implement was handed off on this pass');
+  assert.deepEqual(
+    handed.counted,
+    [3, 3, 3],
+    'the standing, the hand-off of what implement left, and the heads read again since the hand-off moved its branch',
+  );
 });

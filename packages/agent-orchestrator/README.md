@@ -1951,7 +1951,7 @@ agent: note-writer
 - **A team is of one kind.** Every step says `place: folder`, or every step says `place: git`; a folder that mixes them is
   refused when it is loaded, since the kind is the run's, not the step's.
 - **The record says so.** `wf start` freezes `place: { kind: 'folder' }` on the run, with no `repo`, `baseRef`, `branch`
-  or `isolate`; a record without `place` is a git run, as every record before it was. Its workspace is
+  or `isolate`; a record without `place` is a repository run, as every record before it was. Its workspace is
   `runs/<id>/work`, in the store, and nothing reads the directory `wf start` was typed in.
 - **Refused at start**, exit 2, before anything is written: `--repo` named on the command line, on a brief or an inbox card
   (a card's own `repo:` is not looked at, as the directory typed in is not), `--no-worktree` (there is
@@ -1976,7 +1976,7 @@ agent: note-writer
 - **Deciding.** A finished folder run is awaiting with no branches: `wf decide` names its folders and offers `wf rm`,
   never a git command, and the board reads its repository, base and branch as null. `wf rm` removes `runs/<id>/` with
   the record, and runs no git.
-- **The folders live until `wf rm`**, as a git run's worktrees do, and not until the run ends. A run that ended on anything
+- **The folders live until `wf rm`**, as a repository run's worktrees do, and not until the run ends. A run that ended on anything
   but success is written again in them — a try, a round, an acceptance, a send-back from a gate — and a folder holds the only
   copy of what a step did not name in its closeout. (`docs/features.md`, *Decided: a folder lives as long as its run*.)
 
@@ -2538,7 +2538,7 @@ run 'wf tick' (or 'wf up') to start it
   - a start naming a card that is not there, with the cards that are: any path under the inbox, a file there that is not a
     card and one in a folder inside it included;
   - a start with no workflow from the card or the flag, and a card's workflow that does not load, behind the card;
-  - a start in a factory the store does not have, one that does not offer the workflow, or, for a git run, one the repository is
+  - a start in a factory the store does not have, one that does not offer the workflow, or, for a repository run, one the repository is
     not one of, as `wf start --factory` refuses each;
   - an empty `--brief`, and `--brief` on anything but an inbox card.
 
@@ -2635,7 +2635,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 
 ### A run names its factory and its repository
 
-- **A run started in a factory records it**: `"factory": "pipao"` on its record, frozen at `wf start` beside the `repo` a git run
+- **A run started in a factory records it**: `"factory": "pipao"` on its record, frozen at `wf start` beside the `repo` a repository run
   records, and `wf start` says it (`factory: pipao, on /home/me/code/pipao`). A run in the default factory records no `factory`,
   and a record that names none — every one written before — is the default factory's: read as it is, and never rewritten.
 - **A factory with one repository gives the run its repository**: `wf start "add a flag" --workflows build --factory pipao`
@@ -2643,7 +2643,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 - **With several, the one named**, else the directory `wf start` is typed in, when it is one of them.
 - **An inbox card starts in its factory**: its `factory:`, or `--factory` over it, on the repository its `repo:` names, else the
   factory's one repository, else the one it is started in (`repoFor`) — for a queued card, the one `wf up` runs in.
-- **Refused before anything is written**, exit 2 (`Invalid`, `outsideRefusal`): a git run on a repository that is not one of
+- **Refused before anything is written**, exit 2 (`Invalid`, `outsideRefusal`): a repository run on a repository that is not one of
   the factory's, naming them, the `--repo` that starts it in one, and the `wf factory add` that files a factory on it, since
   none adds a repository to a factory. Paths are compared as `path.resolve` spells them, so a
   symlink to a repository is not that repository. A team that says `place: folder` works on no repository: it records its
@@ -3001,12 +3001,12 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
   answers), `journals` (the runtime's journals, read through the engine), `observe` (asking each harness what runs), `runtime` (the
-  runtime's own pass, less its observe), `git` (every git command, whether it judged or acted — so it is a phase of its own rather than
-  part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`
+  runtime's own pass, less its observe), `place` (every place verb's script, `runPlaceVerb` or `runPlaceVerbAsync`, its process and
+  its time, whether it judged where a branch stands or acted — so it is a phase of its own rather than part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`
   (filing, admitting, stopping, collecting artifacts, and writing the record, the feed and the ceilings). A phase inside another counts as the inner one, so the phases add up to the pass's
   time, which is measured apart from them; `src/meter/tally.store.test.ts` holds the one against the other.
 - **Each phase says its time, its calls, the bytes read and the processes started.** The bytes are those read through the store's
-  readers and the runtime's (a thin wrapper each, not a syscall tracer), so what git reads is not in them. The runtime reports what it
+  readers and the runtime's (a thin wrapper each, not a syscall tracer), so what a place's script reads is not in them. The runtime reports what it
   read and started, and each harness's observes — how many, their time, what they listed, the processes they started (`Engine.io()`,
   `TickReport.observed`); the orchestrator puts them in their phases. A pass observes its harnesses at once, so its observe is the
   slowest's time, and the harnesses' own times overlap.
@@ -3417,7 +3417,7 @@ holding a concurrency slot forever.
 | `src/brief/brief-sections.ts` | the sections of a brief — pure: `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` (`fromSection`, `approvedSection`, `retrySection`, `roundSection`, `loopSection`), and the lines `wf decide` prints of a gate and an accepted loop (`gateLines`, `acceptedLines`) |
 | `src/brief/handed.ts` | what a run is handed of another — pure: its `## From run <id>` section, labelled waited on, or read as context shipped or not shipped, not judged (`handedSection`, `contextSection`), and a task split into its parts (`handedParts`) |
 | `src/brief/handed.verb.ts` | what a run's roots are handed of other runs, read off their records and the engine (`parentCloseouts`, `handedOf`) |
-| `src/record/record.ts` | a run's record, as data — pure: its shape (`Run`, `GitRun`, `FolderRun`, `placeOf`), the facts a person files beside it (`Hold`, `Approval`, `Acceptance`, `Pruned`), a step's status words and its own record (`StepStatus`, `StepRecord`, `refusedCheck`), the task ids a run files (`stepTaskId`, `checkTaskId`, `stepTasks`, `runTasks`), the try a step is on (`tryOf`), why a run is left unjudged (`unjudgedWords`), and the small words the run's judgement shares (`andList`, `fenced`, `oneLine`); `record.store.ts` reads and writes it |
+| `src/record/record.ts` | a run's record, as data — pure: its shape (`Run`, `RepositoryRun`, `FolderRun`, `placeOf`), the facts a person files beside it (`Hold`, `Approval`, `Acceptance`, `Pruned`), a step's status words and its own record (`StepStatus`, `StepRecord`, `refusedCheck`), the task ids a run files (`stepTaskId`, `checkTaskId`, `stepTasks`, `runTasks`), the try a step is on (`tryOf`), why a run is left unjudged (`unjudgedWords`), and the small words the run's judgement shares (`andList`, `fenced`, `oneLine`); `record.store.ts` reads and writes it |
 | `src/status/status.ts` | where one step stands — pure: **`stepStatus`** and `ownStatus`, a gate's facts (`hasGate`, `approvalOf`, `atGate`), an ending's (`landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), its momentum (`stepMomentum`), and a loop's (`roundOf`, `loopOf`, `owedFields`); and what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`, `durationWord`) |
 | `src/wait/wait.ts` | what a run waits on before its steps are filed — pure: **`runReady`**, whether a run's roots may be filed yet (`--after`, `waitsOf`), the holds a person put on it (`holdsOf`), their words and advice, and what they refuse (`holdRefusal`, `afterRefusal`) |
 | `src/artifacts/artifacts.ts` | the files a step leaves — pure: what its brief says of them (`artifactsContract`), where one it names is found (`artifactPlace`), and the lines that list them (`artifactLines`); `artifacts/artifacts.store.ts` copies them |
@@ -3443,11 +3443,11 @@ holding a concurrency slot forever.
 | `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines written once — appended, logged and published to the process's hub (`emitFeed`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`place: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |
-| `src/workspace/worktree.store.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
+| `src/workspace/worktree.store.ts` | git and a repository run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches/branches.store.ts` | where a run's result branches stand, read off a `BranchReader` over the place's `standing`: whether each landed and where it stands (`standingsOf`, `shippedOf`, `branchStandings`, `resultBranches`), a parent run as its record and the standing say it (`parentRecord`), and the tips of a run's branches (`resultTips`) |
 | `src/standing/standing.verb.ts` | where a pass's repositories stand, read once a pass (`passStanding`): one `standing` of the run's place for each repository, place and base branch, of the result branches of every run waited on there, within 15 s (`STANDING_DEADLINE_MS`); the reader the pass's `shippedBy`, `parentOf`, `runReady` and holds ask through (`standingReader`), and the heads its memo of runs at rest, its tips and a filed run's base are read from (`headsFor`), read afresh for a run that handed off on the pass. An unread `standing` reads as not shipped, and the waiting run says why |
 | `src/standing/standing.store.ts` | `standing.json`, what the last pass read of where the branches stand, written whole by the tick alone (`writeStanding`), and decoded by its schema, a file that does not decode refused (`Invalid`) naming it (`readStanding`) |
-| `src/branches/changes.store.ts` | what a git run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
+| `src/branches/changes.store.ts` | what a repository run's branches changed, as its place's `report` says on each read (`changesOf`), and what is at a path on a branch (`presentOn`): nothing kept between reads, and an answer the place does not give said as not known |
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |

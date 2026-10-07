@@ -78,7 +78,7 @@ const ROUND: Extension = {
 
 /**
  * Rm's: the board removes only a try, a run started from an agent's page (`tryOf`); any other run is a 409 naming `nemia rm`, which says
- * what it hands off and what it leaves, since a git run's worktrees and branches are a person's to read before they go.
+ * what it hands off and what it leaves, since a repository run's worktrees and branches are a person's to read before they go.
  */
 const RM: Extension = {
   takes: {},

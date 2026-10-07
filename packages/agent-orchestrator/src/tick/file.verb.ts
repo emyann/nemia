@@ -23,7 +23,7 @@ import { isRemoteHarness, type Workflow } from '../workflow.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import {
   checkTaskId,
-  isGitRun,
+  isRepositoryRun,
   stepTaskId,
   tryOf,
   type CloseoutAsked,
@@ -289,7 +289,7 @@ const endingSaid = (f: Filing, ending: Workflow): EndingStopped => {
     status: ownStatus(ending, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf),
     ...(said?.summary ? { summary: said.summary } : {}),
     ...(said?.needs ? { needs: said.needs } : {}),
-    onto: isGitRun(run) ? run.branch : 'the base branch',
+    onto: isRepositoryRun(run) ? run.branch : 'the base branch',
   };
 };
 
@@ -388,7 +388,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
     yield* asked('file', e.file(roundSpec(f, r, looping, target, taskId, said)));
   }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
-  if (r.merge && isGitRun(run)) run.baseRef = r.merge.sha;
+  if (r.merge && isRepositoryRun(run)) run.baseRef = r.merge.sha;
 });
 
 /**
@@ -492,7 +492,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
     fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const lands = isGitRun(run) && landsOnCheck(step, run);
+    const lands = isRepositoryRun(run) && landsOnCheck(step, run);
     const install = lands ? (checkoutParts(workspace) ?? undefined) : undefined;
     const closeout = f.reads.signedOff(name);
     if (install)
@@ -526,7 +526,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
  */
 export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean, git: BranchReader) {
   const { e, run } = f;
-  if (ready.length && starting && run.after?.length && isGitRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
+  if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
   const filed: string[] = [];
   const dirOf = yield* RunPlace;

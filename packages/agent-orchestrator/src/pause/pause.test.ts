@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../tick/assess.ts';
-import type { GitRun, TaskPhase } from '../record/record.ts';
+import type { RepositoryRun, TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import {
   finishingAmong,
@@ -24,7 +24,7 @@ import {
 
 const PAUSE: Pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
 const step = (name: string, after: string[] = [], more: Partial<Workflow> = {}): Workflow => ({ name, after, body: `do ${name}`, ...more });
-const run = (steps: GitRun['steps'], rest: Partial<GitRun> = {}): GitRun => ({
+const run = (steps: RepositoryRun['steps'], rest: Partial<RepositoryRun> = {}): RepositoryRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',

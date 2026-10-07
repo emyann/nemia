@@ -10,7 +10,7 @@
 import { outputFields, type Workflow } from '../step/step.ts';
 import {
   dataBlock,
-  isGitRun,
+  isRepositoryRun,
   satisfiesAfter,
   stopsFollowers,
   tryOf,
@@ -183,7 +183,7 @@ export function mergeAsk(
     );
   const before = prunedRefusal(run, 'a merge') ?? heldRefusal(run, 'a merge');
   if (before) return no(before);
-  if (!isGitRun(run))
+  if (!isRepositoryRun(run))
     return no(`${run.id} is a folder run: it has no base branch, and there is nothing to merge. See it: nemia ls ${run.id}.`);
   const looping = loopNamed(steps, run, name);
   if ('refusal' in looping) return looping;

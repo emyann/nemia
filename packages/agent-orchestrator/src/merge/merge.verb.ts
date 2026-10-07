@@ -7,7 +7,7 @@
  */
 import { Effect } from 'effect';
 import { asked, tried, type Engine } from '../runtime-client.ts';
-import { isGitRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import type { Args } from '../command/command.ts';
 import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
@@ -49,7 +49,7 @@ function mergeReads(
 const trialOf =
   (run: Run) =>
   (branch: string): Tried => {
-    if (!isGitRun(run)) return { trial: { error: 'no repository' }, base: null };
+    if (!isRepositoryRun(run)) return { trial: { error: 'no repository' }, base: null };
     const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], placeDirOf(run));
     return { trial: mergeWordOf(trials[0]), base: at[run.branch] ?? null };
   };
@@ -72,7 +72,7 @@ export function mergeOffers(
     spendOf: SpendOf,
   ]
 ): Offer[] {
-  if (d.kind !== 'awaiting' || !isGitRun(run)) return [];
+  if (d.kind !== 'awaiting' || !isRepositoryRun(run)) return [];
   const reads = mergeReads(steps, run, ...read);
   const at = new Date().toISOString();
   return steps

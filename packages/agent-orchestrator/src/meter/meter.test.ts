@@ -36,8 +36,8 @@ const COST: PassCost = passCost({
   at: '2026-09-25T10:00:00.000Z',
   ms: 212,
   phases: phases(
-    { records: 20, asks: 5, journals: 40, observe: 120, runtime: 8, git: 0, assess: 15, act: 3 },
-    { records: { bytes: 12_000, reads: 12 }, journals: { bytes: 800_000, reads: 30 }, observe: { spawned: 1 }, git: { calls: 0 } },
+    { records: 20, asks: 5, journals: 40, observe: 120, runtime: 8, place: 0, assess: 15, act: 3 },
+    { records: { bytes: 12_000, reads: 12 }, journals: { bytes: 800_000, reads: 30 }, observe: { spawned: 1 }, place: { calls: 0 } },
   ),
   harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0 } },
   records: 12,
@@ -62,7 +62,7 @@ test('the heaviest phases, longest first, three at most, none that took no time'
     { phase: 'journals', ms: 40 },
     { phase: 'records', ms: 20 },
   ]);
-  assert.deepEqual(heaviest(phases({ git: 2 })), [{ phase: 'git', ms: 2 }]);
+  assert.deepEqual(heaviest(phases({ place: 2 })), [{ phase: 'place', ms: 2 }]);
   assert.deepEqual(heaviest(phases({})), []);
 });
 
@@ -198,11 +198,15 @@ test('a pass falls in the first bucket whose bound it does not pass: 100 ms in â
 });
 
 test('the parts are each phase a pass on average, heaviest first, their shares adding up to no more than the whole', () => {
-  const passes = [recent(100, { git: 40, act: 10, records: 20 }), recent(50, { git: 10, act: 30 }), recent(30, { act: 20, records: 1 })];
+  const passes = [
+    recent(100, { place: 40, act: 10, records: 20 }),
+    recent(50, { place: 10, act: 30 }),
+    recent(30, { act: 20, records: 1 }),
+  ];
   const parts = passParts(passes);
   assert.deepEqual(
     parts.slice(0, 3).map((p) => p.phase),
-    ['act', 'git', 'records'],
+    ['act', 'place', 'records'],
   );
   assert.equal(parts[0].ms, 20);
   assert.ok(parts.reduce((n, p) => n + p.share, 0) <= 1);
@@ -220,9 +224,9 @@ test('the summary is the median and slowest pass, and what the latest saw; none 
 });
 
 test("`nemia passes`' lines: the summary, a row a bucket from the first with passes to the last, and the parts", () => {
-  const lines = passesLines(passesRead([recent(30, { act: 30 }), recent(80, { git: 80 })]));
+  const lines = passesLines(passesRead([recent(30, { act: 30 }), recent(80, { place: 80 })]));
   assert.match(lines[0], /^2 passes since .*: 55\.0 ms a pass \(median\), slowest 80\.0$/);
   assert.equal(lines.filter((l) => /^ +â‰¤ \d+ ms /.test(l)).length, 2, lines.join('\n'));
-  assert.ok(lines.includes('  git         40.0 ms  73%'), lines.join('\n'));
+  assert.ok(lines.includes('  place       40.0 ms  73%'), lines.join('\n'));
   assert.match(passesLines(passesRead([]))[0], /^no pass is kept yet/);
 });

@@ -175,10 +175,11 @@ test('REFUSED, the quota: a state the board has no word for, and a window used a
   await assert.rejects(readQuota(), unread('/api/quota', 'windows[0].usedPercentage', '"50%", where the board reads number'));
 });
 
-test('REFUSED, the ceilings: a pass that leaves a phase out, and runs in flight counted as a number', async (t) => {
+test("REFUSED, the ceilings: an older daemon's pass, its place phase still called git, and runs in flight counted as a number", async (t) => {
   const pass = passCost();
-  answering(t, ceilings({ pass: { ...pass, phases: without(pass.phases, 'git') } }));
-  await assert.rejects(readCeilings(), unread('/api/ceilings', 'pass.phases.git', 'is missing'));
+  const { place, ...rest } = pass.phases;
+  answering(t, ceilings({ pass: { ...pass, phases: { ...rest, git: place } as never } }));
+  await assert.rejects(readCeilings(), unread('/api/ceilings', 'pass.phases.place', 'is missing'));
 
   answering(t, ceilings({ inFlight: 3 as never }));
   await assert.rejects(readCeilings(), unread('/api/ceilings', 'inFlight', '3, where'));
@@ -286,12 +287,15 @@ test('the recent passes read back as the api answers them, none kept among them'
   }
 });
 
-test('REFUSED, the recent passes: an answer with no histogram, a part of a phase the board does not know, and a pass that saw no runs', async (t) => {
+test("REFUSED, the recent passes: an answer with no histogram, a part of a phase the board does not know or an older daemon's git, and a pass that saw no runs", async (t) => {
   answering(t, without(passesRead(), 'histogram'));
   await assert.rejects(readPasses(), unread('/api/passes', 'histogram', 'is missing'));
 
   answering(t, passesRead({ parts: [{ phase: 'lint' as never, ms: 1, share: 1 }] }));
   await assert.rejects(readPasses(), unread('/api/passes', 'parts[0].phase', '"lint", where'));
+
+  answering(t, passesRead({ parts: [{ phase: 'git' as never, ms: 1, share: 1 }] }));
+  await assert.rejects(readPasses(), unread('/api/passes', 'parts[0].phase', '"git", where'));
 
   const [first, ...rest] = passesRead().recent;
   answering(t, passesRead({ recent: [without(first, 'runs'), ...rest] }));

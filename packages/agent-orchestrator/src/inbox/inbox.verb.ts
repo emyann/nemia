@@ -24,7 +24,7 @@ import {
   type QueueTry,
 } from './inbox.ts';
 import { gateRefusal } from '../ending/ending.ts';
-import { isGitRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { inboxCards } from './inbox.store.ts';
@@ -173,7 +173,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     ...(gates.length ? { gates } : {}),
     ...(factory !== undefined ? { factory } : {}),
   });
-  const ignoredRepo = card.repo !== undefined && !isGitRun(run) ? { ignoredRepo: card.repo } : {};
+  const ignoredRepo = card.repo !== undefined && !isRepositoryRun(run) ? { ignoredRepo: card.repo } : {};
   try {
     runStore.inbox.drop(`${opts.name}.md`);
   } catch (err) {

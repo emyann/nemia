@@ -21,6 +21,7 @@ import {
 import { SHIPPED_PLACE, openPlace, placeDirOf, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
 import { skillVersion } from '../folder/folder.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { metered } from '../meter/tally.store.ts';
 import { running } from '../../test/running.ts';
 import { scratch } from '../../test/scratch.ts';
 
@@ -126,6 +127,20 @@ for (const verb of PLACE_VERBS) {
     }
   });
 }
+
+test('a verb run in a pass is counted in its place phase, its process and its time; a verb with no script starts nothing', async () => {
+  const { tallies } = await metered(async () => runPlaceVerb(planted('status', printing(ANSWERS.status)), 'status', REQUESTS.status));
+  assert.ok(tallies);
+  const { spawned, calls, ms } = tallies.kinds.place;
+  assert.deepEqual({ spawned, calls }, { spawned: 1, calls: 1 });
+  assert.ok(ms > 0, "its time is the place's");
+  const none = await metered(async () => runPlaceVerb(scratch('wf-place-none-'), 'status', REQUESTS.status));
+  assert.ok(none.tallies);
+  assert.deepEqual(
+    Object.values(none.tallies.kinds).map((k) => k.spawned),
+    Object.values(none.tallies.kinds).map(() => 0),
+  );
+});
 
 test('a field deep in an answer that does not read is named by its path', () => {
   const report = { ...ANSWERS.report, files: { 'wf/x/a': [{ path: 'a.ts', status: 'M', added: 'many', removed: 0 }] } };

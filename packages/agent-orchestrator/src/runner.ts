@@ -46,7 +46,7 @@ export {
   touchedLines,
 } from './branches/index.ts';
 export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
-export { isGitRun, placeOf } from './run.ts';
+export { isRepositoryRun, placeOf } from './run.ts';
 export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
@@ -132,7 +132,7 @@ export {
 export { outputLines } from './closeout/closeout.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
-export type { FolderRun, GitRun, PlaceKind } from './run.ts';
+export type { FolderRun, RepositoryRun, PlaceKind } from './run.ts';
 export type {
   Acceptance,
   Approval,

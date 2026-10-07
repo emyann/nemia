@@ -28,7 +28,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   id: 'r-1',
   repo: '/code/app',
   factory: null,
-  place: 'git',
+  place: 'repository',
   work: null,
   brief: 'Do the thing',
   workflowDir: '/code/app/workflows/dev',

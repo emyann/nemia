@@ -28,7 +28,7 @@ const PASS: PassCost = {
     journals: phase(40, { calls: 30, bytes: 800_000 }),
     observe: phase(120, { spawned: 1 }),
     runtime: phase(8),
-    git: phase(0, { calls: 0 }),
+    place: phase(0, { calls: 0 }),
     assess: phase(15, { calls: 0 }),
     act: phase(3),
   },

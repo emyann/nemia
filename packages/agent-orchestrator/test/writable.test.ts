@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
-import { loadAgents } from '../src/folder/folder.store.ts';
+import { loadAgents } from '../src/agents/read.store.ts';
 import { stepMounts } from '../src/factory/factory.ts';
 import { teamCopy } from './team.ts';
 

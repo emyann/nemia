@@ -19,7 +19,7 @@ const ROOT = scratch('wf-start-place-');
 process.env.WF_ROOT = ROOT;
 const { startRun, StartPlace } = await import('../src/start/start.verb.ts');
 const { SHIPPED_PLACE } = await import('../src/place/place.store.ts');
-const { skillVersion } = await import('../src/folder/folder.store.ts');
+const { skillVersion } = await import('../src/skills/read.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 

@@ -13,7 +13,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { linkRefusal } from '../folder/folder.ts';
 import { skillNameRefusal, skillTurnCost, type SkillCost, type SkillsFound } from '../agents/agents.ts';
 import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraft } from './skills.ts';
-import { skillVersion } from '../folder/folder.store.ts';
+import { skillVersion } from './read.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';

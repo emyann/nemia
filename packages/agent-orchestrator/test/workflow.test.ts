@@ -19,7 +19,7 @@ import { isFolderTeam, splitFrontmatter, stepPlace } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
-import { loadAgents } from '../src/folder/folder.store.ts';
+import { loadAgents } from '../src/agents/read.store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES } from '../src/workflow.ts';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {

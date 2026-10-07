@@ -4768,7 +4768,7 @@ types). When P3's reach keys are built they want a name that is not `capabilitie
 **Superseded 2026-09-25 by agents card 2: the card is generated, and the `.skills.json` files are gone.** An agent's card lists one entry
 per skill its `skills:` composes, read off that skill's SKILL.md frontmatter — the folder's name as `id`, `title:` as `name` (else the
 frontmatter's `name`, else the id), `description` (required), `tags` (`[id]` when it gives none) and `examples` — and an agent with no
-skills gets one entry made from its own description (`cardSkills` in `folder.store.ts`). Nobody writes a card: a `card:` line, and a
+skills gets one entry made from its own description (`cardSkills` in `skills/read.store.ts`). Nobody writes a card: a `card:` line, and a
 `skills:` line naming a `.json`, are refused at load with a message saying what replaced them, and so is a board page that still sends
 the card's file (`card`, `cardText`, `skillsText`, a 400). An edit of a composed SKILL.md moves the agent's version, so a stale save is
 refused. The board shows the generated entries read-only where the form used to write the file, and says a card that does not read in

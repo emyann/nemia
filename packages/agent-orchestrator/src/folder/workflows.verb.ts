@@ -16,7 +16,8 @@ import { isDirectory } from '../record/record.store.ts';
 import type { Workflow } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { stillNeeded } from './folder.ts';
-import { loadWorkflows, type Places } from './folder.store.ts';
+import { loadWorkflows } from './folder.store.ts';
+import type { Places } from '../skills/read.store.ts';
 import { removeWorkflow, writeWorkflow, type WorkflowRemoved, type WorkflowWritten } from './write.store.ts';
 
 /** The text under `key`, or undefined where none was given. */

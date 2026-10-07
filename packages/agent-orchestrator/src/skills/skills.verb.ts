@@ -8,7 +8,7 @@ import { tried } from '../runtime-client.ts';
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { skillVersion } from '../folder/folder.store.ts';
+import { skillVersion } from './read.store.ts';
 import {
   copySkill,
   skillRead,

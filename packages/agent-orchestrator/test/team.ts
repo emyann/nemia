@@ -5,7 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { workflowsIn, type Places } from '../src/folder/folder.store.ts';
+import { workflowsIn } from '../src/folder/folder.store.ts';
+import type { Places } from '../src/skills/read.store.ts';
 import { stepFiles } from '../src/folder/folder.ts';
 import { scratch } from './scratch.ts';
 

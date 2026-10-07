@@ -1031,8 +1031,8 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   assert.equal(told.length, 1, told.join('\n'));
   assert.match(
     told[0],
-    /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval(\n\nSince your last news:\n1 routine line of the feed:\n {2}\S+ {2}r-1 {2}— {2}removed)?$/,
-    "the wake alone, or with the tick's own line of r-1, which no run of the store names, riding it where the same read found both",
+    /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval(\n\nSince your last news:\n(1 routine line|2 routine lines) of the feed:(\n {2}\S+ {2}pid \d+ {2}daemon started {2}· first daemon on this store)?(\n {2}\S+ {2}r-1 {2}— {2}removed)?)?$/,
+    "the wake alone, or with the routine lines the same read found riding it: the daemon's started line, and the tick's own line of r-1, which no run of the store names",
   );
   dropSubscription('daemon');
   clear();

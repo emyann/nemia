@@ -17,23 +17,19 @@
  * Each is answered in the factory the request names (`served`, factories/place.ts): a factory offers only the workflows attached to it,
  * each step its hires fill read with the agent hired, and a run is started in it. The default factory offers every workflow, as it is.
  */
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentsFor,
-  agentVersion,
   cardSkills,
   COMMANDS,
   DEFAULT_FACTORY,
   fillsOf,
   foldersIn,
   inboxNameRefusal,
-  lookupRoots,
   skillsFor,
-  skillVersion,
   START as START_ENTRY,
   startFactory,
   unfilledRefusal,
@@ -45,14 +41,11 @@ import {
   runWith,
 } from 'agent-orchestrator';
 import {
-  AGENTS_FOLDER,
   contextText,
   isFolderTeam,
-  splitFrontmatter,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
   type AgentSkill,
-  type SkillsFound,
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
@@ -61,7 +54,7 @@ import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
-import { graphOf, type RunGraph } from 'agent-orchestrator';
+import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
 export type WorkflowSource = 'repo' | 'yours';
@@ -165,7 +158,7 @@ export type WorkflowListing = {
    */
   folderTeam: boolean;
   /**
-   * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder holds
+   * What the folder's files held when it was listed (`workflowVersion`): a builder's save carries it, and is refused when the folder holds
    * something else, rather than written over what changed.
    */
   version: string;
@@ -295,7 +288,7 @@ export function listed(
   const description = workflowDescription(dir);
   const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
-  const version = versionOf(dir, places);
+  const version = workflowVersion(dir, places);
   if ('error' in loaded) {
     return {
       name,
@@ -343,91 +336,6 @@ const listedStep =
     hired: hires.get(step.name) ?? null,
     layers: step.agent ? toldLayers(step, null) : null,
   });
-
-/**
- * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what
- * a save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and
- * `writeWorkflow` removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or
- * removed changes it, and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as
- * what it says, so it changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its
- * file, where the load finds it (`lookupRoots`), each file it names beside it — the schema of its `output:`, its `card:` — and each skill
- * folder its `skills:` gives: what the board shows a step with an agent is the agent's keys, words, declared fields and skills as much as
- * the step's, and an agent edited after the listing is a step the board does not show as it is. So does each skill a step's own `skills:`
- * adds to its agent's, its folder where the load finds it (`skillVersion`).
- */
-export function versionOf(dir: string, places: Places): string {
-  let names: string[];
-  try {
-    names = fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name))
-      .map((e) => e.name)
-      .sort();
-  } catch {
-    names = [];
-  }
-  const read = (file: string): string | { unreadable: string } => {
-    try {
-      return fs.readFileSync(file, 'utf8');
-    } catch (err) {
-      return { unreadable: err instanceof Error ? err.message : String(err) };
-    }
-  };
-  const files = names.map((name) => [name, read(path.join(dir, name))] as const);
-  const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
-  const added = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? addedSkillsIn(text) : [])))].sort();
-  const skills = named.length || added.length ? skillsFor(dir, places) : undefined;
-  const agents = named.map((agent) => {
-    const root = lookupRoots(dir, places).find((at) =>
-      fs.lstatSync(path.join(at, AGENTS_FOLDER, `${agent}.md`), { throwIfNoEntry: false }),
-    );
-    return [
-      agent,
-      root === undefined ? { missing: agent } : { at: root, version: agentVersion(path.join(root, AGENTS_FOLDER), agent, skills) },
-    ];
-  });
-  return createHash('sha256')
-    .update(JSON.stringify([...files, ...agents, ...added.map((skill) => addedSkillVersion(skill, skills!))]))
-    .digest('hex')
-    .slice(0, 16);
-}
-
-/**
- * The value a file's frontmatter gives `key`, read as the parser reads it — each line trimmed, the key trimmed before its colon — so
- * `  agent: coder` and `agent : coder` name the agent they load with. None for a file with no such line, or whose frontmatter never
- * closes (the load refuses it). A name with a slash names no file of agents/.
- */
-function frontmatterValue(text: string, key: 'agent' | 'skills'): string[] {
-  let block: string | null;
-  try {
-    block = splitFrontmatter('', text).block;
-  } catch {
-    return [];
-  }
-  for (const raw of (block ?? '').split('\n')) {
-    const line = raw.trim();
-    const i = line.indexOf(':');
-    if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
-    const value = line.slice(i + 1).trim();
-    return value && !/[\\/]/.test(value) ? [value] : [];
-  }
-  return [];
-}
-
-/** The skills a step file's own `skills:` line adds to its agent's, by name. None for a file with no such line. */
-const addedSkillsIn = (text: string): string[] =>
-  frontmatterValue(text, 'skills').flatMap((line) =>
-    line
-      .split(',')
-      .map((skill) => skill.trim())
-      .filter(Boolean),
-  );
-
-/** A skill a step adds, as a folder's version counts it: its folder's version where `found` has it (`skillVersion`), else missing. */
-function addedSkillVersion(skill: string, found: SkillsFound): [string, string | null | { missing: string }] {
-  const at = found.at.get(skill);
-  return [`skills/${skill}`, typeof at === 'string' ? skillVersion(at) : { missing: skill }];
-}
 
 /**
  * The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed.

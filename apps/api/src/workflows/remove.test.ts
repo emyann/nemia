@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { versionOf as versionIn } from './workflows.ts';
+import { workflowVersion as versionIn } from 'agent-orchestrator';
 const repo = scratch('nemia-api-remove-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });

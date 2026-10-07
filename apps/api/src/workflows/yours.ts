@@ -6,7 +6,7 @@ import path from 'node:path';
 import { Hono } from 'hono';
 import { COMMANDS, commandLine } from 'agent-orchestrator';
 import { librarySkills } from '../agents/skills.ts';
-import { yourAgentsDir } from '../agents/try.ts';
+import { yourAgentsDir } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
 
 const FACTORY_ADD = COMMANDS.find((c) => c.name === 'factory add')!;

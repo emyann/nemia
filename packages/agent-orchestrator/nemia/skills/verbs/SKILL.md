@@ -167,6 +167,9 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                engine journals the words on the step's task, nemia ls notes the step
                                said to, and nemia decide prints them under it. A try that continues
                                the session is handed them again, as ## Said to your session
+  nemia agents try yours <name> --brief <words>
+                               an agent of yours tried on a short brief, in a folder of its own,
+                               capped at $1
   nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
                                file nothing more of a run until other runs ship, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
@@ -234,6 +237,14 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                remove it with --clear
   nemia factory rm <name>
                                remove a factory's file, and the instruction the store keeps for it
+  nemia agents write yours [<name>] --file <name>.md [--version <v>]
+                               an agent of yours written from its file: <name> is the agent it
+                               changes or renames, at the --version it was read at; none, a new one
+  nemia agents remove yours <name> --version <v>
+                               an agent of yours removed, at the --version it was read at
+  nemia skills write yours [<name>] --file <SKILL.md> [--version <v>]
+                               a skill of yours written from its SKILL.md: <name> is the skill it
+                               changes, at the --version it was read at; none, a new one
   nemia cancel <runId>
                                stop what it has in flight; file nothing more
   nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
@@ -278,6 +289,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                switched to without a rebuild, so an older tag rolls back. --repo:
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia)
+  nemia workflows write yours <name> --folder <draft> [--version <v>]
+                               a workflow folder of yours written from the steps and README of a
+                               draft folder; one there already, at the --version it was read at
+  nemia workflows remove yours <name> --version <v>
+                               a workflow folder of yours removed, at the --version it was read at
 ```
 
 ## Answers what waits

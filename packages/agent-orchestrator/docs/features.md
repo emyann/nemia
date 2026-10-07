@@ -2487,14 +2487,37 @@ what prompts, prompts; the rest is hers, on her judgement, and said.
 - **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for each of what card A's admission counts as waiting on the
   person (`WAITS_ON_PERSON`) — a step at its gate, a step's question, a loop out of rounds and a step at its cap — each naming its read
   and its answering verbs; `commission-a-workflow` brings a proposal as a card to start, fold or drop;
-  `create-a-factory` makes a whole factory short of a run, drafting its workflows, agents and skills in her own folder for the person to
-  place; `write-a-card` writes a card with the person's words, today's facts, done-when, proof, a first measure, a size from measured
+  `create-a-factory` makes a whole factory short of a run, writing its workflows, agents and skills into yours (platform slice 7a);
+  `write-a-card` writes a card with the person's words, today's facts, done-when, proof, a first measure, a size from measured
   costs and where it goes. Her instruction's *Where you stand* says what waits, what prompts and what is hers.
 - **Held**: `test/nemia-shipped.test.ts` refuses "gate" in what ships but for a step's gate, and reads each of her skills as Claude Code
   would; `test/skills-rendered.test.ts` parses each frontmatter as YAML.
-- **Left to platform phase 7**: the writers of workflows, agents and skills and an agent's try on the CLI (`agents write`, `workflows
-  write`, `skills write`, `agents try`, served on the api alone). When they are served, the verbs skill lists them by itself, and
-  `create-a-factory` is rewritten to use them.
+- **Served on the CLI by platform slice 7a**: the writers of workflows, agents and skills and an agent's try, below.
+
+## Shipped: the library's writers at the command line (Nemia platform slice 7a)
+
+`nemia agents write`, `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows remove`, each one entry of the
+command table served on both sides: the same handler, refusals and help as its route on the api. Approved with the design: yours only;
+a write or a removal is checked against the version it was read at, and one without it is refused naming the version it is at now, so
+the caller runs it again with `--version`; a workflow's own schemas left to a follow-up card.
+
+- **The entries**: `AGENTS_WRITE`, `AGENTS_REMOVE` and `AGENTS_TRY` (`src/agents/library.verb.ts`), `SKILLS_WRITE`
+  (`src/skills/skills.verb.ts`), `WORKFLOWS_WRITE` and `WORKFLOWS_REMOVE` (`src/folder/workflows.verb.ts`), their flags from
+  `src/yours/yours.ts`: `--version` on both sides, a path the command line alone takes (`--file`, `--folder`) and the form the api
+  alone hands (`draft`, `schema`, `change`, `readme`). Each handler resolves yours from its store and refuses any other place
+  (`yoursOrRefused`, `src/yours/yours.ts`).
+- **The runners** (`src/cli/writers.ts`): an agent's file read into its draft with the result schema its `output:` names beside it, a
+  SKILL.md into the skill's form, a draft folder's steps and README as a start reads them; then handed to the handler without the path.
+  `agents remove`, `agents try` and `workflows remove` need none.
+- **The try** (`tryAgent`, `src/try/try.verb.ts`) refuses, in order, the place, an empty brief, an agent not there or that does not
+  read, one a try cannot run, a skill only the repository has, and a try of it still moving; then writes its folder and starts a run with
+  no repository, capped at `TRY_BUDGET`. It ticks: typed with no daemon, it starts one.
+- **Her skills**: the verbs skill lists the six by class (a write or a removal prompts the person, a try is hers), and
+  `create-a-factory` writes a factory's workflows, agents and skills itself, tries an agent with `nemia agents try`, and drafts only a
+  workflow's own `*.schema.json` and a skill's extra files for the person to place.
+- **Held**: `test/writers-cli.test.ts` (each write read back and each refusal, through `main`, and the keys the command line hands a
+  handler against its spec), `apps/api/src/commands/writers.test.ts` (the keys each route hands, against the same spec),
+  `test/verbs-skill.test.ts`, `test/demand-cli.test.ts` (the try starts a daemon) and `src/folder/workflows.verb.test.ts`.
 
 ## Shipped: freeing the space — `wf prune`
 

@@ -37,6 +37,7 @@ const TICKING: Record<string, string[]> = {
   merge: ['merge', 'no-run'],
   cancel: ['cancel', 'no-run'],
   resume: ['resume'],
+  'agents try': ['agents', 'try', 'yours', 'nobody', '--brief', 'Do it.'],
 };
 
 /** Reads, typed the same way. */
@@ -77,7 +78,7 @@ async function typed(t: TestContext, argv: string[], host: () => DemandHost): Pr
 /** Whatever a daemon would leave in the store: its log and its lease. */
 const leftInStore = () => ['daemon.log', 'daemon.json'].filter((name) => fs.existsSync(path.join(ROOT, name)));
 
-test('the commands typed here are the ten that tick', () => {
+test('the commands typed here are the eleven that tick', () => {
   assert.deepEqual(
     Object.keys(TICKING).sort(),
     TABLE.filter((c) => c.ticks === true)

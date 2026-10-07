@@ -16,6 +16,8 @@ process.env.WF_ROOT = ROOT;
 const { WORKFLOWS_LIST, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
 const { runWith, engine } = await import('../runner.ts');
 const { runStore } = await import('../record/files.store.ts');
+const { workflowVersion } = await import('./version.store.ts');
+const { removeWorkflow } = await import('./write.store.ts');
 const { queueInInbox } = await import('../inbox/inbox.store.ts');
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 
@@ -35,7 +37,7 @@ test('a folder written from its steps through the entry is the folder its list a
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
     { name: 'build', after: ['plan'], place: 'git', body: 'Build it.' },
   ]);
-  const done = await runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', dir, draft }, undefined, ROOT));
+  const done = await runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
   const listed = await runWith(e, WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT));
   const loaded = listed[dir];
@@ -73,15 +75,24 @@ test("REFUSED: a draft the writer refuses is thrown in the writer's words whole,
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
     { name: 'plan', after: [], place: 'git', body: 'Plan it again.' },
   ]);
-  await assert.rejects(runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', dir, draft }, undefined, ROOT)), (err: Error) => {
+  await assert.rejects(runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
     assert.equal(err.message, 'two steps are named plan, and a step is its file, plan.md. Rename one of them.');
     return true;
   });
   assert.equal(fs.existsSync(dir), false);
 });
 
-/** The folder `dir` removed through the entry, as the api hands it. */
-const remove = (dir: string) => runWith(e, WORKFLOWS_REMOVE.handler({ from: 'yours', name: path.basename(dir), dir }, undefined, ROOT));
+/** The version a remove of the folder `dir` is handed: the one it is at, where it is a folder; none where it is not. */
+function versionAt(dir: string): { version?: string } {
+  return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? { version: workflowVersion(dir, { home: ROOT }) } : {};
+}
+
+/** The folder of yours `dir` removed through the entry, by its name, at the version it is at, as the api hands it. */
+const remove = (dir: string) =>
+  runWith(
+    e,
+    WORKFLOWS_REMOVE.handler({ from: 'yours', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }, undefined, ROOT),
+  );
 
 /** That removing `dir` is refused as `kind`, in exactly `message`, and the folder is still on disk. */
 async function refused(dir: string, kind: new (...args: never[]) => Error, message: string): Promise<void> {
@@ -139,21 +150,29 @@ test('a folder of yours removed through the entry is gone, with every file it he
   assert.equal(fs.existsSync(dir), false);
 });
 
-test("REFUSED: a repository's workflow is not removed here, and the same folder in yours is", async () => {
+test("REFUSED: a repository's workflow is not removed here, nor a folder nested in yours, and the same folder in yours is", async () => {
   const repo = scratch('wf-remove-repo-');
   fs.mkdirSync(path.join(repo, '.git'));
   const theirs = path.join(repo, 'workflows', 'shared');
   fs.mkdirSync(theirs, { recursive: true });
   fs.writeFileSync(path.join(theirs, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   const yours = path.join(ROOT, 'workflows');
-  await refused(
-    theirs,
-    Invalid,
-    `${theirs} is not a workflow of yours (${path.join(yours, '<name>')}): only yours are removed here, and a repository's workflow is removed from its checkout, as a change to commit. Nothing was removed.`,
-  );
+  const fromRepo = WORKFLOWS_REMOVE.handler({ from: 'repo', name: 'shared', version: 'v1', repo }, undefined, ROOT);
+  await assert.rejects(runWith(e, fromRepo), (err: Error) => {
+    assert.ok(err instanceof Invalid, `${err.name}: ${err.message}`);
+    assert.equal(
+      err.message,
+      `nemia workflows remove refuses to write the repository's workflows (${path.join(repo, 'workflows')}): only yours is written, in ${yours}, and nothing into a checkout. Build the workflow in yours — \`cp -r ${theirs} ${yours}/\` starts from this one — then copy the folder into ${path.join(repo, 'workflows')} by hand, where git shows it as a change to commit.`,
+    );
+    return true;
+  });
+  assert.ok(fs.existsSync(theirs));
   const nested = folder(path.join('outer', 'inner'), { 'only.md': '---\nplace: git\n---\nDo it.\n' });
-  await assert.rejects(remove(nested), Invalid);
-  assert.ok(fs.existsSync(nested));
+  await refused(
+    nested,
+    Invalid,
+    "nemia workflows remove: `outer/inner` is not a workflow's name: a workflow is named by its folder, not hidden, with no slash — build, say.",
+  );
   fs.renameSync(theirs, path.join(yours, 'shared'));
   await remove(path.join(yours, 'shared'));
   assert.equal(fs.existsSync(path.join(yours, 'shared')), false);
@@ -162,13 +181,40 @@ test("REFUSED: a repository's workflow is not removed here, and the same folder 
 test('REFUSED: the folders of agents and of skills are no workflow, and both are kept', async () => {
   for (const name of ['agents', 'skills']) {
     const dir = folder(name, { 'one.md': 'An agent.\n' });
-    await assert.rejects(remove(dir), (err: Error) => {
-      assert.ok(err instanceof Invalid);
-      assert.match(err.message, new RegExp(`^${dir.replaceAll('/', '\\/')} is ${name}\\/, the folder of`));
-      return true;
-    });
+    await refused(
+      dir,
+      Invalid,
+      `nemia workflows remove: ${name}/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.`,
+    );
     assert.ok(fs.existsSync(path.join(dir, 'one.md')));
   }
+});
+
+test("REFUSED, by the remover itself: a folder outside yours, one nested in it and the agents' folder, each kept", () => {
+  const theirs = path.join(scratch('wf-remove-outside-'), 'workflows', 'shared');
+  fs.mkdirSync(theirs, { recursive: true });
+  const nested = folder(path.join('deep', 'inner'), { 'only.md': '---\nplace: git\n---\nDo it.\n' });
+  const yours = path.join(ROOT, 'workflows');
+  for (const dir of [theirs, nested]) {
+    assert.throws(
+      () => removeWorkflow(dir, { home: ROOT }),
+      (err: Error) => {
+        assert.ok(err instanceof Invalid);
+        assert.equal(
+          err.message,
+          `${dir} is not a workflow of yours (${path.join(yours, '<name>')}): only yours are removed here, and a repository's workflow is removed from its checkout, as a change to commit. Nothing was removed.`,
+        );
+        return true;
+      },
+    );
+    assert.ok(fs.existsSync(dir));
+  }
+  const agents = folder('agents', { 'one.md': 'An agent.\n' });
+  assert.throws(
+    () => removeWorkflow(agents, { home: ROOT }),
+    (err: Error) => err instanceof Invalid && new RegExp(`^${agents.replaceAll('/', '\\/')} is agents\\/, the folder of`).test(err.message),
+  );
+  assert.ok(fs.existsSync(path.join(agents, 'one.md')));
 });
 
 test('REFUSED: a folder that is a link is not removed, nor what it points at', async () => {

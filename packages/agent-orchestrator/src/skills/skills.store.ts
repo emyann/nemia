@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
-import { linkRefusal } from '../folder/folder.ts';
+import { linkRefusal, takenAt } from '../folder/folder.ts';
 import { skillNameRefusal, skillTurnCost, type SkillCost, type SkillsFound } from '../agents/agents.ts';
 import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraft } from './skills.ts';
 import { skillVersion } from './read.store.ts';
@@ -200,6 +200,10 @@ export type SkillChange = SkillDraft | { name: string; preload: boolean };
 /** What `writeSkill` did: the skill's folder, its version now (`skillVersion`), and the files it wrote there. */
 export type SkillWritten = { dir: string; name: string; version: string; written: string[] };
 
+/** The version of the skill whose folder is `dir`, or null where `dir` is no folder or holds no SKILL.md. */
+const versionThere = (dir: string): string | null =>
+  fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? skillVersion(dir) : null;
+
 /**
  * A skill of the folder of skills `to` written: made, with `{ version: null }`, or changed, with the version it was read at. What the
  * board's skill page does — a person writes a skill of their own in the store's library, where an agent of the store finds it. A skill's
@@ -244,7 +248,7 @@ export function writeSkill(
       );
     if (fs.lstatSync(target, { throwIfNoEntry: false })) {
       refuseSkill(
-        `${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it.`,
+        `${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it${takenAt(versionThere(target))}.`,
         Conflict,
       );
     }

@@ -52,7 +52,7 @@ test("REFUSED, nothing written through: a tries/, a try's folder or a step file 
   fs.writeFileSync(path.join(away, 'elsewhere.md'), 'Not a try.\n');
   fs.symlinkSync(path.join(away, 'elsewhere.md'), path.join(linkedFile, 'tries', 'scribe', 'try.md'));
   const said = (at: string): string =>
-    `${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`;
+    `${at} is a link, and a try's folder is written by the store: make it a folder of its own, or remove it.`;
   assert.equal(
     refusal(() => writeTryFolder('scribe', 'Try it.\n', linkedTries)),
     said(path.join(linkedTries, 'tries')),

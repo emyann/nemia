@@ -69,6 +69,30 @@ export const stillNeeded = {
     ].join(', then ')}.`,
 };
 
+/** What a refusal of a write over something there adds: the version it is at, which a write given it changes; nothing for none. */
+export const takenAt = (version: string | null): string =>
+  version === null ? '' : `: it is at version ${version}, and a write given that version changes it`;
+
+/**
+ * Why a write or a removal (`does`) of the workflow folder `dir` given the version `version` it was read at does nothing: the folder is at
+ * `now` since (`workflowVersion`), so a step, the README or a schema there changed, and what it holds would go unseen.
+ */
+export const workflowStale = {
+  write: (dir: string, version: string, now: string): string =>
+    `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
+  remove: (dir: string, version: string, now: string): string =>
+    `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and removing it now would remove what was not seen. Nothing was removed. Read the folder again (it is at version ${now}), and remove it as it is now.`,
+};
+
+/**
+ * Why a new workflow is not written to `dir`, which is there already: a workflow at version `version`, which a write given it changes, or
+ * a file that is no workflow (`version` null).
+ */
+export const workflowTaken = (dir: string, version: string | null): string =>
+  version === null
+    ? `${dir} is there, and is not a workflow: a workflow is a folder of steps. Name the workflow otherwise.`
+    : `${dir} is a workflow already, at version ${version}: a write given that version changes it. Give the new one another name, or write this one with that version.`;
+
 /** Why the workflow at `dir` is not removed while `users` need it (`stillNeeded`): each of them, and that nothing was removed. */
 export const workflowInUse = (dir: string, users: readonly string[]): string =>
   `${dir} is still needed: ${users.join(' ')} Nothing was removed.`;

@@ -26,18 +26,17 @@ import {
   type AgentSchema,
   type AgentWritten,
   type CardRead,
-  runStore,
-  tryOf,
-  judgedNow,
   runWith,
+  repoWriteRefusal,
+  untriedOf,
+  type Untried,
 } from 'agent-orchestrator';
 import { AGENTS_FOLDER, agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
-import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
-import { tryFolder, untriedOf, type Untried } from './try.ts';
+import { givenSkills, type GivenSkill } from './skills.ts';
 import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 export type { AgentUser } from 'agent-orchestrator';
@@ -197,15 +196,7 @@ const agentGuard = (route: string, shape: string): Guarded => ({
 /** Why a write is not to yours: 403 for the repository's, with the copy to make by hand; 400 for anywhere else. */
 function yoursOnly(route: string, from: string, name: string | null, repo: string, home: string): Refusal | null {
   if (from === 'yours') return null;
-  const yours = path.join(home, 'workflows', AGENTS_FOLDER);
-  const theirs = path.join(repo, 'workflows', AGENTS_FOLDER);
-  if (from === 'repo') {
-    const copy = name ? ` — \`cp ${path.join(theirs, `${name}.md`)} ${yours}/\` starts from this one —` : '';
-    return {
-      status: 403,
-      error: `${route} refuses to write the repository's agents (${theirs}): the board writes only yours, in ${yours}, and the api writes nothing into a checkout. Make the agent in yours${copy} then copy the file into ${theirs} by hand, where git shows it as a change to commit.`,
-    };
-  }
+  if (from === 'repo') return { status: 403, error: repoWriteRefusal(route, 'agents', name, repo, home) };
   return {
     status: 400,
     error: `${route}: an agent is read from \`repo\` or \`yours\`, as GET /api/agents lists each one's \`from\`, and the board writes yours, at /api/agents/yours/…. This request named ${JSON.stringify(from)}.`,
@@ -337,7 +328,7 @@ export const agents = new Hono<ApiEnv>()
       const place = placeOf(from, read.body.name, route, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
       const given = draftOf(read.body, read.body.name);
-      const answer = await saved(e, { from, dir: place.dir, repo, home }, given, 201);
+      const answer = await saved(e, { from, repo, home }, given, 201);
       return c.json(answer.body, answer.status);
     }),
   )
@@ -365,7 +356,7 @@ export const agents = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
       const given = draftOf(read.body, read.body.name ?? name);
-      const answer = await saved(e, { from, dir: place.dir, repo, home }, { ...given, version, name }, 200);
+      const answer = await saved(e, { from, repo, home }, { ...given, version, name }, 200);
       return c.json(answer.body, answer.status);
     }),
   )
@@ -398,41 +389,7 @@ export const agents = new Hono<ApiEnv>()
           `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['brief']))}.`,
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      const { brief } = read.body;
-      if (!brief.trim())
-        return c.json(
-          {
-            error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.`,
-          },
-          422,
-        );
-      const agent = listedAgent('yours', place.dir, name, repo, home);
-      if (!agent) return c.json({ error: noAgentWords('yours', name, place.dir) }, 404);
-      if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
-      if (agent.untried) return c.json({ error: agent.untried.why }, 422);
-      const theirs = agent.given.filter((skill) => skill.from === 'repo');
-      if (theirs.length) {
-        const copies = theirs
-          .map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills(home))}\``)
-          .join(', ');
-        return c.json(
-          {
-            error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`,
-          },
-          422,
-        );
-      }
-      const tries = runStore.runs.list().filter((run) => tryOf(run, home)?.agent === name);
-      const moving = (await runWith(e, judgedNow(e, home, tries))).find((run) => run.moving);
-      if (moving)
-        return c.json(
-          {
-            error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.`,
-          },
-          409,
-        );
-      const workflowDir = tryFolder(name, agent.version, agent.keys, home);
-      const run = (await runWith(e, TRY.handler({ from, name, dir: workflowDir, brief: brief.trim() }, undefined, home))) as AgentTried;
+      const run = (await runWith(e, TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home))) as AgentTried;
       return c.json({ id: run.id } satisfies AgentTried, 201);
     }),
   )
@@ -460,12 +417,12 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
-      return c.json(await runWith(e, REMOVE.handler({ from, name, dir: place.dir, version, repo }, undefined, home)));
+      return c.json(await runWith(e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
     }),
   );
 
-/** Where an agent is written: its place on the path (`from`), the agents folder resolved for it, and the repository and store it reads. */
-type AgentAt = { from: string; dir: string; repo: string; home: string };
+/** Where an agent is written: its place on the path (`from`), and the repository and store it reads. */
+type AgentAt = { from: string; repo: string; home: string };
 
 /**
  * `writeAgent`, through the table's `agents write` (`WRITE`), answered: the agent as it now reads, with its status. `version` is what the
@@ -474,13 +431,12 @@ type AgentAt = { from: string; dir: string; repo: string; home: string };
  */
 async function saved(
   e: Engine['Service'],
-  { from, dir, repo, home }: AgentAt,
+  { from, repo, home }: AgentAt,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
   ok: 200 | 201,
 ): Promise<{ body: AgentSaved; status: 200 | 201 }> {
   const args = {
     from,
-    dir,
     repo,
     draft: JSON.stringify(draft),
     schema: JSON.stringify(schema),

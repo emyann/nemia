@@ -2,9 +2,9 @@
  * A workflow of yours removed from the board: the folder whole, through the package's entry `workflows remove`, which refuses a folder a
  * run, a queued card or a factory still needs, naming each with the command that frees it (409, by its kind, `app.onError`).
  *
- * The removal carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder holds something else: a
- * step edited, added or removed by hand since the board read it would otherwise go unseen. Yours only, as every write of the builder's
- * (`yoursOnly`: 403 for the repository's); the guard (guard.ts) passes it before its body is read.
+ * The removal carries the `version` the folder was listed at (`workflowVersion`), and the entry refuses it (409) when the folder holds
+ * something else: a step edited, added or removed by hand since the board read it would otherwise go unseen. Yours only, as every write
+ * of the builder's (`yoursOnly`: 403 for the repository's); the guard (guard.ts) passes it before its body is read.
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
@@ -13,18 +13,14 @@ import { readBody, valueAt } from '../body.ts';
 import { refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { buildGuard, yoursOnly } from './builder.ts';
-import { folderOf, placesOf, versionOf } from './workflows.ts';
+import { folderOf } from './workflows.ts';
 
-/** The table's entry a folder of yours is removed through, served on the api alone. */
+/** The table's entry a folder of yours is removed through, which refuses a folder changed since it was read. */
 const REMOVE = COMMANDS.find((c) => c.name === 'workflows remove')!;
 
 const DELETE_SHAPE = '`{ "version": "<as GET /api/workflows lists it>" }`';
 
 const DELETE_BODY = Schema.Struct({ version: Schema.NonEmptyString });
-
-/** Why a removal of a folder read at `version`, and at `now` since, removes nothing (409). */
-const staleWords = (dir: string, version: string, now: string): string =>
-  `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and removing it now would remove what was not seen. Nothing was removed. Read the folder again (it is at version ${now}), and remove it as it is now.`;
 
 /**
  * The removal's route.
@@ -57,8 +53,6 @@ export const remover = new Hono<ApiEnv>().delete('/api/workflows/:from/:name', (
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const folder = folderOf(name, 'yours', repo, home);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-    const now = versionOf(folder.dir, placesOf(repo, home));
-    if (now !== read.body.version) return c.json({ error: staleWords(folder.dir, read.body.version, now) }, 409);
-    return c.json(await runWith(e, REMOVE.handler({ from, name, dir: folder.dir, repo }, undefined, home)));
+    return c.json(await runWith(e, REMOVE.handler({ from, name, version: read.body.version, repo }, undefined, home)));
   }),
 );

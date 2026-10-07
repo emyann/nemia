@@ -129,9 +129,8 @@ type Baseline = Readonly<Record<string, Entry>>;
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
-  'apps/api/src/agents/agents.ts': { count: 3, ...MOVES.prompt },
-  'apps/api/src/agents/skills.ts': { count: 9, ...MOVES.checkout },
-  'apps/api/src/agents/try.ts': { count: 15, ...MOVES.api },
+  'apps/api/src/agents/agents.ts': { count: 2, ...MOVES.prompt },
+  'apps/api/src/agents/skills.ts': { count: 7, ...MOVES.checkout },
   'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
   'apps/api/src/capabilities/capabilities.ts': { count: 27, ...MOVES.reach },
   'apps/api/src/capabilities/reach.ts': { count: 50, ...MOVES.reach },
@@ -186,6 +185,9 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/record/record.store.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, card: 'u42s' },
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/try/try.ts': { count: 16, ...MOVES.reach },
+  'packages/agent-orchestrator/src/try/try.verb.ts': { count: 1, ...MOVES.checkout },
+  'packages/agent-orchestrator/src/yours/yours.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
   'packages/agent-orchestrator/src/runtime-client.ts': { count: 7, ...MOVES.defaults },
   'packages/agent-orchestrator/src/skills/read.store.ts': { count: 9, ...MOVES.checkout },

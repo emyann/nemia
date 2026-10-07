@@ -344,7 +344,8 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
 /**
  * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, which the command
  * would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one side alone takes; and a
- * flag the api alone takes on an entry the table generates no route of, which nothing would ever hand it.
+ * flag the api alone takes on an entry with no route that hands it — one the table generates, or one served by hand — which nothing would
+ * ever hand it.
  */
 function sideBreaks(c: Entry): string[] {
   const breaks: string[] = [];
@@ -360,10 +361,8 @@ function sideBreaks(c: Entry): string[] {
   for (const f of c.spec?.flags ?? []) {
     if (f.only !== undefined && !f.only.why.trim())
       breaks.push(`${c.name}'s ${f.flag} is taken on the ${f.only.side} alone and says no why: say why`);
-    if (f.only?.side === 'api' && !routeList(c).some(generated))
-      breaks.push(
-        `${c.name}'s ${f.flag} is taken on the api alone, and the table generates no route of it: route it, or take the flag out`,
-      );
+    if (f.only?.side === 'api' && !routeList(c).some((r) => generated(r) || r.hand !== undefined))
+      breaks.push(`${c.name}'s ${f.flag} is taken on the api alone, and no route of the entry hands it: route it, or take the flag out`);
   }
   return breaks;
 }

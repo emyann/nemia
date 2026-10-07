@@ -287,6 +287,19 @@ test('a copied scout from .claude/ brings its skill from the repository, and rea
   assert.doesNotMatch(fs.readFileSync(path.join(libraryOf(home).agents, 'scout.md'), 'utf8'), /^(name|color):/m);
 });
 
+test("an agent of a repository's workflows/agents brings a skill only the repository's other place holds, as a start finds it", async () => {
+  const home = scratch('wf-agents-copy-home-');
+  const repo = scratch('wf-agents-copy-surveyor-');
+  fs.cpSync(FIXTURE, repo, { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, 'workflows', 'agents', 'surveyor.md'),
+    '---\ndescription: Surveys the ground.\nskills: scouting\n---\nSurvey it.\n',
+  );
+  const copied = await copy({ file: path.join(repo, 'workflows', 'agents', 'surveyor.md') }, home);
+  assert.deepEqual(copied.copied.sort(), ['agents/surveyor.md', 'scouting']);
+  assert.ok(fs.existsSync(path.join(libraryOf(home).skills, 'scouting', 'SKILL.md')));
+});
+
 test("an agent given the place skill Nemia ships copies without it: a start finds the package's own, and the library holds none", async () => {
   const home = scratch('wf-agents-copy-home-');
   const from = scratch('wf-agents-copy-place-');

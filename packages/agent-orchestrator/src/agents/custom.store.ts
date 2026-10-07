@@ -10,11 +10,16 @@ import { customInstructionsRefusal } from './agents.ts';
 import { agentsFor, customInstructionsFile, notAFileRefusal, readCustomInstructions } from './read.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 
+/** The store's own agent, Nemia, whom no place names: she ships in this package, and her custom instruction is the person's. */
+const STORE_AGENT = 'nemia';
+
 /**
  * Refuse, as `Missing`, an agent `name` a run on `repo` could not name: none of the repository's places for agents has it, nor yours in the
- * store `home` (`agentsFor`). The refusal lists the names there are. A name whose file does not read is one all the same.
+ * store `home` (`agentsFor`), and it is not the store's own agent (`STORE_AGENT`). The refusal lists the names there are. A name whose
+ * file does not read is one all the same.
  */
 function refuseNoAgent(home: string, name: string, repo: string): void {
+  if (name === STORE_AGENT) return;
   const at = path.resolve(repo);
   const names = [...agentsFor(path.join(at, 'workflows', '_'), { repo: at, home }).keys()].sort();
   if (names.includes(name)) return;

@@ -9,9 +9,10 @@
 
 /**
  * The levels a person sets, lowest first: `manual`, left alone; `semi-auto`, worked on, what waits on the person asked of them, and a
- * write that cannot be undone or changes their settings or a factory.
+ * write that cannot be undone or changes their settings or a factory; `auto`, as `semi-auto`, but an answer the person's confirmed list
+ * allows in the run's state is given unasked (`auto/`).
  */
-export const LEVELS = ['manual', 'semi-auto'] as const;
+export const LEVELS = ['manual', 'semi-auto', 'auto'] as const;
 
 /** A level a person sets. */
 export type Level = (typeof LEVELS)[number];

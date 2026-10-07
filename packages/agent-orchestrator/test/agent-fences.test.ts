@@ -1393,3 +1393,17 @@ test('REFUSED: an edit of the store outside her folder, of her level or of her i
   const open = { ...rules, deny: rules.deny.filter((rule) => !rule.includes(path.join(root, 'runs'))) };
   assert.equal(editVerdictOf(open, path.join(root, 'runs', 'r-1', 'run.json')), 'unmatched', 'without the deny, her mode decides');
 });
+
+test("REFUSED: a confirm or a drop of the person's rules for auto is asked over every allow, and an edit of their files is denied her", () => {
+  const root = herStore();
+  for (const local of [[], ['Bash(nemia:*)', 'Bash(nemia auto:*)', 'Bash(nemia auto confirm:*)', 'Bash(nemia auto drop:*)']]) {
+    const rules = herRules(root, local);
+    for (const command of ['nemia auto confirm nemia tries', 'nemia auto drop nemia default'])
+      assert.equal(verdictOf(rules, command), 'ask', `${command}, local allows ${local.join(', ')}`);
+    assert.equal(verdictOf(rules, 'nemia auto nemia'), 'allow', 'the read is hers');
+    assert.equal(verdictOf(rules, 'nemia auto propose nemia --file -'), 'allow', 'so is her proposal');
+  }
+  assert.equal(fs.existsSync(path.join(root, 'auto')), false, 'denied before the folder is there');
+  for (const file of ['nemia.json', 'nemia.proposed.json'])
+    assert.equal(editVerdictOf(herRules(root), path.join(root, 'auto', file)), 'deny', file);
+});

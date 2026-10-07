@@ -103,7 +103,9 @@ export type Route =
  * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
  * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
  * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one; `ticks`, that what it files waits on
- * the daemon's next pass, so the command line starts the daemon where none ticks the store (`ensureDaemon`).
+ * the daemon's next pass, so the command line starts the daemon where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's
+ * call of it is asked of the person every time, whatever its session was allowed at a prompt or by a rule (`admissionOf`), on a command
+ * classed `prompts` alone (`classBreaks`).
  */
 export type CommandSpec = {
   readonly name: string;
@@ -118,6 +120,7 @@ export type CommandSpec = {
   readonly apiTakes?: readonly string[];
   readonly manual?: string;
   readonly ticks?: true;
+  readonly asksAlways?: true;
 };
 
 /** Every route the api serves a command on: none, its one, or each of its many. */

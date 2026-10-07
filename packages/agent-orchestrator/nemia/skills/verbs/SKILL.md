@@ -83,19 +83,27 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                stdin); --clear removes them. Words only: a frontmatter block is
                                refused. A run keeps the words it was started with
                                reads bare; prompts the person given --file, --clear
-  nemia level [manual|semi-auto] [--factory <name> [--for <duration> | --end]]
+  nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]
                                Nemia, the store's own agent: bare, where she is, each factory's level and
                                how to reach her; a level sets the store's, which every factory follows
                                unless it has its own; --factory sets that factory's, --for raises it for
                                a stretch (90m, 2h, 1d; up to 7d) and --end ends the raise. semi-auto keeps
                                her session: what waits on you (a gate, a step's question, a loop out of
                                rounds, a cap) is asked of you, and a write that cannot be undone or
-                               changes your settings or a factory; the rest is hers; a factory at manual
-                               is left alone, and her session stops once none is above manual
-                               reads bare; prompts the person given manual, semi-auto, --factory, --for, --end
+                               changes your settings or a factory; the rest is hers. auto is semi-auto,
+                               but an answer your confirmed list allows in the run's state is given
+                               unasked (nemia auto <agent>), in a session of hers filed since auto came:
+                               one kept from before asks every answer until filed again (manual, then
+                               auto once it is off). A factory at manual is left alone, and her session
+                               stops once none is above manual
+                               reads bare; prompts the person given manual, semi-auto, auto, --factory, --for, --end
   nemia memory [<fact>]
                                what Nemia keeps of the store: bare, her facts' names; given one, its
                                words. Read only: her session alone writes them
+  nemia auto <agent>
+                               the agent's rules at auto: the answers it may give unasked, in force once
+                               you confirm them, and what it proposed from your custom instruction,
+                               with the words the machinery cannot hold, kept as guidance
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
@@ -105,10 +113,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                daemon runs, from its lease. --json: the whole answer
   nemia watch [cursor]
                                nemia feed's lines, followed as the tick writes them, until ^C
-  nemia admit [--at-least <level>]
+  nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
-                               --at-least: deny a call acting on a run or a factory below the level
+                               --at-least: deny a call acting on a run or a factory below the level;
+                               --auto: let through, for a run of a factory at auto, an answer the agent's
+                               rules you confirmed allow in the run as it stands (nemia auto <agent>)
   nemia decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (nemia decide --help)
 ```
@@ -209,9 +219,13 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --wake: a word that wakes it, once for each (default: the feed's words
                                for a wait on a person). Refused for a task not long-lived.
                                --at-least: only the lines of runs whose factory's level is at least
-                               this (manual, semi-auto), read as each line is delivered.
+                               this (manual, semi-auto, auto), read as each line is delivered.
   nemia unsubscribe <name>
                                take the subscription <name> away: its task is told nothing more of the feed
+  nemia auto propose <agent> --file <path>|-
+                               the agent's proposal: rules from your custom instruction, as JSON,
+                               with the words the machinery cannot hold kept as guidance; none is in
+                               force until you confirm it (nemia auto confirm)
 ```
 
 ## Prompts the person
@@ -270,6 +284,14 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                a worktree locked, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
+  nemia auto confirm <agent> <id> --words '<words>'
+                               put in force a rule the agent proposed, or the default again, as its
+                               words read: from then on, at auto, the answer it names is given unasked
+                               where it holds. Refused once the rule reads otherwise. Your first confirm
+                               keeps the default beside it. Asked of you every time
+  nemia auto drop <agent> <id>
+                               take a rule out of force, the default among them: what it allowed is
+                               asked of you again. Asked of you every time
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this

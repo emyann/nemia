@@ -46,8 +46,11 @@ export const anyAbove = ({ level, factories }: Pick<NemiaLevel, 'level' | 'facto
 /** The stretches a person raises a factory for, as the api takes them, the first offered first. */
 export const RAISE_STRETCHES = ['2h', '8h', '1d', '7d'] as const;
 
+/** Each level as the board says it. */
+const LEVEL_WORDS: Record<Level, string> = { manual: 'Manual', 'semi-auto': 'Semi-auto', auto: 'Auto' };
+
 /** A level as the board says it. */
-export const levelWord = (level: Level): string => (level === 'semi-auto' ? 'Semi-auto' : 'Manual');
+export const levelWord = (level: Level): string => LEVEL_WORDS[level];
 
 /**
  * A factory's level in words at `now`, named the store's own when it is the default factory (`byDefault`): a raise with its end, said as
@@ -59,8 +62,15 @@ export function factoryWords(row: FactoryLevel, byDefault: boolean, now: Date): 
   return `${levelWord(row.default)} by default (${whose}).`;
 }
 
-/** The level a person's switch writes, from where she is: Manual from Semi-auto, Semi-auto from Manual. */
-export const offeredLevel = ({ level }: Pick<NemiaLevel, 'level'>): Level => (level === 'semi-auto' ? 'manual' : 'semi-auto');
+/** The levels a person picks among, lowest first. */
+export const LEVELS: readonly Level[] = ['manual', 'semi-auto', 'auto'];
+
+/** The level a fresh session is asked at, from `level`, hers: that level where above Manual, else Semi-auto. */
+export const freshLevel = (level: Level): Level => (level === 'manual' ? 'semi-auto' : level);
+
+/** The levels a factory is raised to over its default `level`, lowest first: none over Auto. */
+export const raisesOver = (level: Level): readonly Level[] =>
+  level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : [];
 
 /** What her sessions cost, as her level's own line says it: each counted as it ends, her open one not yet. */
 export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>

@@ -1,7 +1,7 @@
 /**
  * Nemia on the board: her session's state judged from the orchestrator's facts (`sessionOf`), kept while any factory is above Manual, the
- * level the switch writes, a factory's level in words, her spend in words, and the mirror of what the api answers of her, which decodes
- * her level and memory and refuses an answer it does not read.
+ * levels picked among and the one a fresh session is asked at, a factory's level in words, her spend in words, and the mirror of what
+ * the api answers of her, which decodes her level and memory and refuses an answer it does not read.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +15,7 @@ import {
   type NemiaMemory,
 } from '../src/lib/api/nemia.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import { factoryWords, offeredLevel, PRUNE_WORDS, RAISE_STRETCHES, sessionOf, spendWords } from '../src/lib/nemia.ts';
+import { factoryWords, freshLevel, LEVELS, PRUNE_WORDS, RAISE_STRETCHES, raisesOver, sessionOf, spendWords } from '../src/lib/nemia.ts';
 
 /** Where she is, as the api answers it: off, never set, unless `over` says otherwise. */
 const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
@@ -102,9 +102,17 @@ test('the phase is never read: any word there judges the same', () => {
   for (const phase of ['running', 'settled', 'whatever']) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
 });
 
-test('the switch offers Manual from Semi-auto, and Semi-auto from Manual', () => {
-  assert.equal(offeredLevel({ level: 'semi-auto' }), 'manual');
-  assert.equal(offeredLevel({ level: 'manual' }), 'semi-auto');
+test('the levels are picked among lowest first, and a fresh session keeps her level above Manual, Semi-auto from Manual', () => {
+  assert.deepEqual([...LEVELS], ['manual', 'semi-auto', 'auto']);
+  assert.equal(freshLevel('auto'), 'auto', 'a fresh session at Auto stays at Auto');
+  assert.equal(freshLevel('semi-auto'), 'semi-auto');
+  assert.equal(freshLevel('manual'), 'semi-auto');
+});
+
+test('a factory is raised to each level over its default, lowest first, and to none over Auto', () => {
+  assert.deepEqual([...raisesOver('manual')], ['semi-auto', 'auto']);
+  assert.deepEqual([...raisesOver('semi-auto')], ['auto']);
+  assert.equal(raisesOver('auto').length, 0);
 });
 
 test('her spend says one session or several, and names the unmeasured ones only when there are some', () => {
@@ -141,7 +149,7 @@ test('her level reads back what the api answered, a key it does not read dropped
 test("each factory's level reads back; REFUSED: a factory at a level the board has no word for, and a row with no raise", async (t) => {
   answering(t, { ...up, factories: [raised] });
   assert.deepEqual((await readLevel()).factories, [raised]);
-  answering(t, { ...up, factories: [{ ...raised, level: 'auto' }] });
+  answering(t, { ...up, factories: [{ ...raised, level: 'on' }] });
   await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.level/.test(err.message));
   const { raise: _raise, ...noRaise } = raised;
   answering(t, { ...up, factories: [noRaise] });
@@ -152,7 +160,7 @@ test("each factory's level reads back; REFUSED: a factory at a level the board h
 });
 
 test('REFUSED: a level the board has no word for, and an answer with no reach', async (t) => {
-  answering(t, { ...up, level: 'auto' });
+  answering(t, { ...up, level: 'on' });
   await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at level/.test(err.message));
   const { reach: _reach, ...noReach } = up;
   answering(t, noReach);

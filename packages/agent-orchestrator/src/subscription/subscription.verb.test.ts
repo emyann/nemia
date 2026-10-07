@@ -82,7 +82,7 @@ test('a subscription given a floor is scoped by it; REFUSED: a floor that is no 
   await typed(SUBSCRIBE, ['floored', 'nemia', '--at-least', 'semi-auto']);
   assert.deepEqual(listSubscriptions().find((s) => s.name === 'floored')?.subscription.scope, { atLeast: 'semi-auto' });
   await typed(UNSUBSCRIBE, ['floored']);
-  assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '--at-least', 'auto'])), /^--at-least takes a level/);
+  assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '--at-least', 'on'])), /^--at-least takes a level/);
   assert.deepEqual(listSubscriptions(), [], 'nothing put');
 });
 

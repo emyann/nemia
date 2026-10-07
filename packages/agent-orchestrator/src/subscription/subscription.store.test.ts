@@ -126,7 +126,7 @@ test("a deliverer's file that does not read is said and read as not begun, so th
 test('REFUSED: a scope whose floor is no level leaves the subscription out, said; a floor that is one round-trips', () => {
   putSubscription('floored', { ...SUB, scope: { atLeast: 'semi-auto' } });
   assert.deepEqual(listSubscriptions(), [{ name: 'floored', subscription: { ...SUB, scope: { atLeast: 'semi-auto' } } }]);
-  fs.writeFileSync(subscriptionFile('unfloored'), JSON.stringify({ ...SUB, scope: { atLeast: 'auto' } }));
+  fs.writeFileSync(subscriptionFile('unfloored'), JSON.stringify({ ...SUB, scope: { atLeast: 'on' } }));
   const { said, say } = saying();
   assert.deepEqual(
     listSubscriptions(say).map((s) => s.name),

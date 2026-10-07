@@ -54,9 +54,9 @@ test('REFUSED: semi-auto while her folder is not trusted is a 409 naming the com
   assert.equal(untrusted.status, 409);
   assert.match(String(untrusted.body.error), /is not trusted, and her session would be refused at its start/);
   assert.ok(String(untrusted.body.error).includes(`mkdir -p ${NEMIA} && cd ${NEMIA}`), String(untrusted.body.error));
-  const auto = await asked('PUT', '/api/level', { level: 'auto' });
-  assert.equal(auto.status, 422);
-  assert.match(String(auto.body.error), /^auto is not built yet/);
+  const none = await asked('PUT', '/api/level', { level: 'on' });
+  assert.equal(none.status, 422);
+  assert.match(String(none.body.error), /^"on" is no level/);
   assert.equal(fs.existsSync(LEVEL_FILE), false, 'nothing written');
 });
 

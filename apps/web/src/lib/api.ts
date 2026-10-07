@@ -50,3 +50,4 @@ export type * from './api/stats.ts';
 export { factoryDaysQuery, statsKeysQuery, statsQuery } from './api/stats.ts';
 export * from './api/pause.ts';
 export * from './api/nemia.ts';
+export * from './api/auto.ts';

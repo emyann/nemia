@@ -1,11 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { NemiaSettings } from '@/components/NemiaSettings';
-import { levelQuery, nemiaMemoryQuery } from '@/lib/api';
+import { autoQuery, levelQuery, nemiaMemoryQuery } from '@/lib/api';
 
-/** The frame's Settings, at /settings: what is set for the whole store, across factories. Its loader reads Nemia's level and memory. */
+/**
+ * The frame's Settings, at /settings: what is set for the whole store, across factories. Its loader reads Nemia's level, her rules at
+ * Auto and her memory.
+ */
 export const Route = createFileRoute('/settings')({
   loader: async ({ context }) => {
-    await Promise.all([context.queryClient.prefetchQuery(levelQuery), context.queryClient.prefetchQuery(nemiaMemoryQuery)]);
+    await Promise.all([
+      context.queryClient.prefetchQuery(levelQuery),
+      context.queryClient.prefetchQuery(autoQuery('nemia')),
+      context.queryClient.prefetchQuery(nemiaMemoryQuery),
+    ]);
   },
   component: SettingsPage,
 });

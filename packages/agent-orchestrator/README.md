@@ -2777,11 +2777,28 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   a "don't ask again" never widens what waits. The harness must trust her folder first, once, by hand: the
   refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
+- **`nemia level auto`**, or a factory set or raised to it (`--factory <name> auto`), is Semi-auto with one difference: an answer the
+  person's confirmed list allows in the run's current state is given unasked; anything else asks, as at Semi-auto. A rule names the
+  answer (`approve`, `retry`, `accept`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its
+  conditions over the run's state: `recommends` (the step signed `done`, and each question it asks carries a recommendation),
+  `checked` (its check exited 0: a step with no check does not meet it), `accepted` (no loop asks for another round, and none was
+  accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
+  closeout needs, and no other step waiting on a person). The rule that
+  ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
+  seeded with it, marked Default. **`nemia auto <agent>`** reads the list in force, the agent's proposal and the custom instruction;
+  **`nemia auto propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
+  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id> --words
+  '<words>'`** and **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
+  calls them. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
+  under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
+  does not read allows nothing. Auto holds in a session of hers filed since it shipped (`--auto` on her admission): one kept from before
+  asks every answer until it is filed again.
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
   her.
 
 What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
-for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`), read once, as her session is filed: an open session keeps
+for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
+board's Settings, though no place names her), read once, as her session is filed: an open session keeps
 the words it was filed with, so a change takes effect after `nemia level manual`, then `nemia level semi-auto`; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 

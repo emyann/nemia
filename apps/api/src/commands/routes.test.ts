@@ -224,6 +224,8 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'subscribe POST',
       'unsubscribe DELETE',
       'level PUT',
+      'auto confirm PUT',
+      'auto drop DELETE',
       'workflows write POST',
       'workflows write PUT',
       'workflows remove DELETE',

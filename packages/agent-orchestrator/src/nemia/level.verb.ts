@@ -1,9 +1,9 @@
 /**
  * `nemia level`: the person's switch for Nemia, an entry of the command table. Bare, where she is: the store's level and each factory's,
- * her session's phase, how to reach it, and what a person allowed her at a prompt beyond what ships. Given `semi-auto` or `manual`, the
- * store's level, or with `--factory` a factory's default, a raise of it for a stretch (`--for`) or the raise ended (`--end`), written for
- * the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the write on the route the table generates, and the read by a
- * route of its own, which calls the same handler.
+ * her session's phase, how to reach it, and what a person allowed her at a prompt beyond what ships. Given `auto`, `semi-auto` or
+ * `manual`, the store's level, or with `--factory` a factory's default, a raise of it for a stretch (`--for`) or the raise ended
+ * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the write on the route the table
+ * generates, and the read by a route of its own, which calls the same handler.
  */
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
@@ -215,15 +215,15 @@ function factoryArgsRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia level`: bare, where Nemia is; `semi-auto` or `manual`, the store's level, or with `--factory` a factory's default, raised for a
- * stretch with `--for`, its raise ended with `--end`: the levels the keeper acts on. Refused: a word that is no level, `auto` named as to
- * come, arguments that ask no write (`Invalid`); no such factory (`Missing`); a raise that raises nothing over the factory's default
+ * `nemia level`: bare, where Nemia is; `auto`, `semi-auto` or `manual`, the store's level, or with `--factory` a factory's default, raised
+ * for a stretch with `--for`, its raise ended with `--end`: the levels the keeper acts on. Refused: a word that is no level, arguments that
+ * ask no write (`Invalid`); no such factory (`Missing`); a raise that raises nothing over the factory's default
  * (`Invalid`); an end with no raise in force, or a fresh session while her folder is untrusted (`Conflict`); a level file that does not
  * read (`Invalid`).
  */
 export const LEVEL: Command<NemiaLevel> = {
   name: 'level',
-  usage: '[manual|semi-auto] [--factory <name> [--for <duration> | --end]]',
+  usage: '[manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]',
   help: [
     "Nemia, the store's own agent: bare, where she is, each factory's level and",
     "how to reach her; a level sets the store's, which every factory follows",
@@ -231,8 +231,12 @@ export const LEVEL: Command<NemiaLevel> = {
     'a stretch (90m, 2h, 1d; up to 7d) and --end ends the raise. semi-auto keeps',
     "her session: what waits on you (a gate, a step's question, a loop out of",
     'rounds, a cap) is asked of you, and a write that cannot be undone or',
-    'changes your settings or a factory; the rest is hers; a factory at manual',
-    'is left alone, and her session stops once none is above manual',
+    'changes your settings or a factory; the rest is hers. auto is semi-auto,',
+    "but an answer your confirmed list allows in the run's state is given",
+    'unasked (nemia auto <agent>), in a session of hers filed since auto came:',
+    'one kept from before asks every answer until filed again (manual, then',
+    'auto once it is off). A factory at manual is left alone, and her session',
+    'stops once none is above manual',
   ],
   spec: {
     positionals: [{ key: 'level', takes: 'optional', kind: 'name' }],

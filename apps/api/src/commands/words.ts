@@ -8,6 +8,7 @@ import { agentNameRefusal } from 'agent-orchestrator/workflow';
 import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
+import { AUTO_CONFIRM, AUTO_DROP } from './auto.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
@@ -644,6 +645,8 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   subscribe: SUBSCRIBE,
   unsubscribe: UNSUBSCRIBE,
   level: LEVEL,
+  'auto confirm': AUTO_CONFIRM,
+  'auto drop': AUTO_DROP,
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,

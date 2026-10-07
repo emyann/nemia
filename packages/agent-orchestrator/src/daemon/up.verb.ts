@@ -13,6 +13,8 @@ import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
+import { DAEMON_STARTED, startedLine } from '../feed/feed.ts';
+import { emitDaemonStarted } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
 import { leaseRelease } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
@@ -169,8 +171,18 @@ export const logPass = Effect.fn('logPass')(function* (pass: Pass, was: UpSaid) 
 });
 
 /**
+ * The feed's line that this daemon has taken the store, saying how the one before it ended (`startedLine`); a line it could not write is
+ * a warning, never a failed start.
+ */
+const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
+  emitDaemonStarted(startedLine(held.pid, replaced, new Date().toISOString(), Date.now())).pipe(
+    Effect.catchCause((cause) => Effect.logWarning(`the feed's ${DAEMON_STARTED} line was not written: ${Cause.pretty(cause)}`)),
+  );
+
+/**
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
- * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; `onTaken`; then a pass on `e` every
+ * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; its line in the feed (`saidStarted`);
+ * `onTaken`; then a pass on `e` every
  * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
  * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
@@ -195,6 +207,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
     );
     yield* Effect.forkScoped(over(e)(deliver()));
     yield* Effect.forkScoped(over(e)(keep()));
+    yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {

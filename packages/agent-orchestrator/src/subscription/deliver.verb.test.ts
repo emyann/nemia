@@ -276,3 +276,27 @@ test(
     dropSubscription('everything');
   },
 );
+
+test(
+  'a daemon’s line is carried by every subscription, scoped or not: routine in a digest kept on disk, a wake where it names daemon',
+  WAITED,
+  async (t) => {
+    const from = feedSize();
+    putSubscription('scoped-d', { task: 't-scoped-d', wake: [...DEFAULT_WAKE], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
+    putSubscription('woken-d', { task: 't-woken-d', wake: ['daemon'], digestEvery: 60, from });
+    const stop = running(t);
+    const started = { at: new Date().toISOString(), daemon: 5151, word: 'daemon started', note: 'first daemon on this store' };
+    appended(started);
+    await held(t, () => toldTo('t-woken-d').length === 1, 'the subscriber that names daemon woken');
+    assert.match(
+      toldTo('t-woken-d')[0],
+      /^The feed needs your judgement:\n {2}\S+ {2}pid 5151 {2}daemon started {2}· first daemon on this store$/,
+    );
+    await held(t, () => readDelivery('scoped-d')?.cursor === feedSize(), "the scoped one's cursor past the line");
+    assert.deepEqual(readDelivery('scoped-d')?.digest, [started], 'folded into its digest, and read back off its file');
+    assert.equal(toldTo('t-scoped-d').length, 0, 'routine by the default words');
+    await stop();
+    dropSubscription('scoped-d');
+    dropSubscription('woken-d');
+  },
+);

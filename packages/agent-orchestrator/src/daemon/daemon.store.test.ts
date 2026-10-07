@@ -27,7 +27,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../runner.ts');
+const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
 const { parseDaemonFile, parsePassCost, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
   await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
@@ -392,7 +392,7 @@ test('a daemon silent past its window on the monotonic clock is taken over, thou
   const { printed, threw } = await typed(t, ['up'], up);
   assert.equal(threw, STOP);
   assert.equal(during!.pid, process.pid, 'the store taken');
-  const took = printed.filter((l) => l.includes(' took '));
+  const took = printed.filter((l) => l.startsWith('   took '));
   assert.ok(took.length === 1 && saysStale(took[0], LIVE, '16m00s'), printed.join('\n'));
   clear();
 });
@@ -435,7 +435,7 @@ test('a holder stale, gone or stopped is taken over by `nemia up` — and not re
     assert.equal(during!.pid, process.pid, c.name);
     assert.equal(during!.startedAt, at(0), `${c.name}: a start of its own`);
     assert.equal(during!.stoppedAt, undefined, c.name);
-    const took = printed.filter((l) => l.includes(' took '));
+    const took = printed.filter((l) => l.startsWith('   took '));
     if (c.took) assert.ok(took.length === 1 && c.took(took[0]), `${c.name}:\n${printed.join('\n')}`);
     else assert.deepEqual(took, [], `${c.name}: a clean stop is nothing to report`);
     if (c.name === 'stale') stale = took[0];
@@ -882,6 +882,34 @@ test('`up` as the api takes the store as the api, writes where it serves once it
   assert.ok(stopped.stoppedAt, 'let go as its scope closed');
   assert.equal(holdUrl('http://127.0.0.1:9999'), false, 'a lease let go takes no url');
   assert.equal(read().url, 'http://127.0.0.1:8787');
+  clear();
+});
+
+test('`up` writes the feed a daemon started line once it holds the store, before it serves: the first, then one saying when the last stopped', async () => {
+  clear();
+  fs.rmSync(path.join(ROOT, 'feed.jsonl'), { force: true });
+  const { up } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const daemonLines = () => readFeed(0).lines.filter((l) => 'daemon' in l);
+  const started: Array<ReturnType<typeof daemonLines>[number] | undefined> = [];
+  const serving = Effect.sync(() => started.push(daemonLines().at(-1)));
+  const once = () =>
+    Effect.runPromise(Effect.scoped(up(engineOf(), { every: 10, repo: ROOT, holder: 'api', onTaken: () => serving }))).then(
+      () => assert.fail('the daemon returned'),
+      (err: unknown) => assert.equal(err, STOP),
+    );
+  await once();
+  const stoppedAt = read().stoppedAt;
+  await once();
+  assert.deepEqual(
+    started.map((l) => [l && 'daemon' in l ? l.daemon : undefined, l?.word, l?.note]),
+    [
+      [process.pid, 'daemon started', 'first daemon on this store'],
+      [process.pid, 'daemon started', `last stopped at ${stoppedAt}`],
+    ],
+    'each line written before onTaken, as the daemon serves',
+  );
+  assert.equal(daemonLines().length, 2);
   clear();
 });
 

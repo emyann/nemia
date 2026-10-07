@@ -141,7 +141,7 @@ test('a run whose task journal holds an entry no runtime wrote is left out of th
   );
   assert.equal(pass.unreadable?.filter((w) => w.includes(entry)).length, 1, `said once, by the run: ${JSON.stringify(pass.unreadable)}`);
   assert.deepEqual(
-    readFeed().lines.filter((l) => l.run === bad.id && l.word === REMOVED),
+    readFeed().lines.filter((l) => 'run' in l && l.run === bad.id && l.word === REMOVED),
     [],
     'the feed does not say the run was removed',
   );

@@ -1,13 +1,14 @@
 /**
- * The workflow layer's feed: one line for each change in what the tick judged of a run or of a step, appended to `$WF_ROOT/feed.jsonl`.
+ * The workflow layer's feed: one line for each change in what the tick judged of a run or of a step, and one from each daemon once it
+ * has taken the store (`startedLine`), appended to `$WF_ROOT/feed.jsonl`.
  *
  * The engine keeps a feed of what happened to its tasks (`engine/feed.jsonl`: filed, started, ended, settled). What the workflow layer
  * decides on top of it — a step at its gate, one that signed off blocked, a loop out of rounds, a run waiting on another, a person's
  * approval — is a pass's judgement, gone with the pass. This is where it is written down, as it changes, so a watcher reads it here
  * rather than asking again.
  *
- * **A report, never an input.** The tick is its one writer and nothing reads it to decide: every pass judges from the world
- * (`assess`), and a feed deleted by hand costs the history, not a decision.
+ * **A report, never an input.** The daemon is its one writer — its tick, and `up` once it holds the store — and nothing reads it to
+ * decide: every pass judges from the world (`assess`), and a feed deleted by hand costs the history, not a decision.
  *
  * **What a pass compares against is the feed itself**, folded (`foldFeed`): not a copy of the last words kept in memory, which a
  * restarted daemon would not have, and not the run's record, which `nemia show` prints and the tick would then rewrite on every change. A
@@ -29,11 +30,40 @@ import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { holdWord } from '../wait/wait.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
+import { takeoverLine, type DaemonStanding } from '../daemon/daemon.ts';
 
 /**
- * One line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside it.
+ * A run's line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside
+ * it.
  */
-export type FeedLine = { at: string; run: string; step?: string; word: string; note?: string };
+export type RunLine = { at: string; run: string; step?: string; word: string; note?: string };
+
+/** The word of the line a daemon writes once it has taken the store (`startedLine`). */
+export const DAEMON_STARTED = 'daemon started';
+
+/** A daemon's line of the feed: when, its pid, that it started, and how the daemon before it ended. */
+export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_STARTED; note?: string };
+
+/** One line of the feed: a run's (`RunLine`), or a daemon's (`DaemonLine`). */
+export type FeedLine = RunLine | DaemonLine;
+
+/** Whether `line` is a run's line, which the fold, a subscription's scope and the board's events read by its run. */
+export const isRunLine = (line: FeedLine): line is RunLine => !('daemon' in line);
+
+/**
+ * The line a daemon of pid `pid` writes once it has taken the store, at `at`, saying how the holder it `replaced` ended: stopped (when),
+ * gone without a stop (`takeoverLine`'s words, `now` the clock they measure by), or none before it. Pure.
+ */
+export function startedLine(pid: number, replaced: DaemonStanding, at: string, now: number): DaemonLine {
+  const gone = takeoverLine(replaced, 'the store', now);
+  const note =
+    replaced.kind === 'none'
+      ? 'first daemon on this store'
+      : replaced.kind === 'stopped'
+        ? `last stopped at ${replaced.file.stoppedAt}`
+        : gone && `last gone without a stop: ${gone}`;
+  return { at, daemon: pid, word: DAEMON_STARTED, ...(note ? { note } : {}) };
+}
 
 /** The word a run's line says once its record is gone from the store (`nemia rm`): the fold forgets the run on reading it. */
 export const REMOVED = 'removed';
@@ -50,9 +80,12 @@ export type FeedMemo = { cursor: number; ino?: number; fold: FeedFold };
 /** A fold of nothing: what a process that has read no feed starts from. */
 export const freshMemo = (): FeedMemo => ({ cursor: 0, fold: new Map() });
 
-/** Each line folded onto what came before: the last word said of each run and step wins, and `removed` forgets a run. Pure. */
+/**
+ * Each run's line folded onto what came before: the last word said of each run and step wins, and `removed` forgets a run; a daemon's line
+ * is no run's. Pure.
+ */
 export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
-  for (const l of lines) {
+  for (const l of lines.filter(isRunLine)) {
     if (l.step === undefined && l.word === REMOVED) {
       fold.delete(l.run);
       continue;
@@ -88,15 +121,15 @@ export function feedChanges(
   now: ReadonlyMap<string, FeedWords>,
   at: string,
   unjudged: ReadonlySet<string> = new Set(),
-): FeedLine[] {
-  const line = (run: string, step: string | undefined, said: FeedSaid): FeedLine => ({
+): RunLine[] {
+  const line = (run: string, step: string | undefined, said: FeedSaid): RunLine => ({
     at,
     run,
     ...(step !== undefined ? { step } : {}),
     word: said.word,
     ...(said.note !== undefined ? { note: said.note } : {}),
   });
-  const out: FeedLine[] = [];
+  const out: RunLine[] = [];
   for (const [id, words] of now) {
     const before = fold.get(id);
     const atRest = words.atRest === true;
@@ -107,8 +140,12 @@ export function feedChanges(
   return out;
 }
 
-/** What one line of the feed says, without its time: `r-1  plan  awaiting approval  · approve it: …`, the message `emitFeed` logs. */
-export const feedSaidWords = (l: FeedLine): string => `${l.run}  ${l.step ?? '—'}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
+/**
+ * What one line of the feed says, without its time: `r-1  plan  awaiting approval  · approve it: …`, or a daemon's `pid 4242  daemon
+ * started  · …`; the message `emitFeed` logs.
+ */
+export const feedSaidWords = (l: FeedLine): string =>
+  `${isRunLine(l) ? `${l.run}  ${l.step ?? '—'}` : `pid ${l.daemon}`}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
 
 /**
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `nemia feed` and `nemia watch`.

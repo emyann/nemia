@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { feedWords, type FeedLine } from '../feed/feed.ts';
+import { feedWords, type FeedLine, type RunLine } from '../feed/feed.ts';
 import type { Listing } from '../list/list.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Instant } from '../daemon/daemon.ts';
@@ -25,7 +25,7 @@ const linesOf = (
   l: Listing,
   status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled'; stoppedOn?: 'awaiting approval' | 'blocked' },
   closeout?: Closeout,
-): FeedLine[] => {
+): RunLine[] => {
   const words = feedWords(l, {}, status, () => closeout);
   return [{ at: AT, run: 'r-1', ...words.run }, ...words.steps.map(({ name, ...said }) => ({ at: AT, run: 'r-1', step: name, ...said }))];
 };

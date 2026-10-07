@@ -16,7 +16,7 @@ import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
-import { deniedNote, feedChanges, feedPhase, feedWords, foldFeed, publishedOf, type FeedLine } from './feed.ts';
+import { deniedNote, feedChanges, feedPhase, feedWords, foldFeed, isRunLine, publishedOf, type FeedLine, type RunLine } from './feed.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
@@ -137,7 +137,7 @@ const started = async (brief: string): Promise<Run> =>
   await Effect.runPromise(startRun({ brief, repo: aRepo(), workflowDir: gated, isolate: false }));
 
 /** Every line in the feed, read off the file as a reader with cursor 0 would. */
-const lines = (): FeedLine[] => readFeed(0).lines;
+const lines = (): RunLine[] => readFeed(0).lines.filter(isRunLine);
 const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 /** The lines about one run, or one step of it, and their words in order. */
 const words = (run: string, step?: string): string[] =>
@@ -941,7 +941,7 @@ test('`nemia watch` interrupted in the process, as a signal interrupts it, leave
     from,
     intervalMs: 20,
     onLine: (l) => {
-      got.push(l.run);
+      if (isRunLine(l)) got.push(l.run);
       arrived();
     },
   });

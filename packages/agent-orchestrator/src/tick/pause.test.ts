@@ -9,17 +9,18 @@
  * the runtime's: a task filed waits until a pass admits it, and none is admitted while the pause stands. A store of its own, since
  * `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Sighting } from 'agent-runtime';
+import { nameFor, type Sighting } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
+import { until, WAITED } from '../../test/waits.ts';
 import { Effect } from 'effect';
 
 const ROOT = scratch('wf-pause-');
@@ -80,7 +81,7 @@ const memoryJournal = (tasks: Tasks, starts: Map<string, number>): AsyncJournal 
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
       feed.push({ taskId, event });
-      if (event.kind === 'starting') starts.set(`ae/${taskId}-${event.attempt}`, Date.parse(event.at));
+      if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
     },
     async read(taskId) {
       return [...(tasks.get(taskId) ?? [])];
@@ -102,7 +103,8 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
 
 /**
  * The runtime, with a harness whose sessions work until `signAll` ends them, and the sessions it was asked to start, by name. `signAll`
- * signs every session at work but those of the runs `keep` names, with `BLOCKED` for those of the runs `blocking` names.
+ * signs every session at work but those of the runs `keep` names, with `BLOCKED` for those of the runs `blocking` names, each closeout
+ * stamped a millisecond after its attempt's journalled start, so a wall clock stepped back between the start and the signing drops none.
  */
 const engine = () => {
   const sessions = new Map<string, Sighting>();
@@ -138,7 +140,9 @@ const engine = () => {
     for (const [name, s] of sessions) {
       if (s.state !== 'working' || of(name, keep)) continue;
       const payload = of(name, blocking) ? BLOCKED : SIGNED;
-      sessions.set(name, { ...s, state: 'completed', busy: false, closeout: { payload, at: (starts.get(name) ?? Date.now()) + 1 } });
+      const started = starts.get(name);
+      assert.ok(started !== undefined, `${name} has its start journalled, to stamp its closeout from`);
+      sessions.set(name, { ...s, state: 'completed', busy: false, closeout: { payload, at: started + 1 } });
     }
   };
   return { e, spawned, signAll, tasks };
@@ -158,6 +162,22 @@ const rowOf = async (run: Run, step: string) => {
   const row = listed.steps.find((s) => s.name === step);
   assert.ok(row, `${run.id} lists ${step}`);
   return row as { status: string; note?: string };
+};
+
+/** Passes until `step` of `run` waits at its gate, as `nemia ls` lists it: the state an approval asks before it is taken. */
+const atGate = async (t: TestContext, run: Run, step: string) => {
+  let seen = 'not read yet';
+  await until(
+    t,
+    async () => {
+      seen = (await rowOf(run, step)).status;
+      if (seen === 'awaiting approval') return true;
+      await pass();
+      return false;
+    },
+    () => `${run.id}'s ${step} at its gate; it lists ${seen}`,
+    { everyMs: 50 },
+  );
 };
 
 const TWO = folder(['plan', 'work']);
@@ -184,7 +204,7 @@ const staged = (repo: string) => {
   git(repo, 'merge', '-q', '--no-ff', '--no-commit', 'side');
 };
 
-test('while the store is paused nothing new starts and what runs finishes; the pass after the lift files what waits', async () => {
+test('while the store is paused nothing new starts and what runs finishes; the pass after the lift files what waits', WAITED, async (t) => {
   const running = await begun(TWO);
   const checked = await begun(CHECKED);
   const refused = await begun(ONE);
@@ -195,6 +215,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
     if (k === 0) worked(LANDS, readRun(landing.id).steps.work.branch!);
     h.signAll([running, checked], [refused]);
   }
+  await atGate(t, landing, 'ship');
   await runWith(h.e, approveRun(landing.id, 'ship'));
   for (let k = 0; k < 3; k++) await pass();
   assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
@@ -331,90 +352,94 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');
 });
 
-test('a pause at once stops each session and check at work but a landing, and the resume continues each; one that ended first is not tried', async () => {
-  for (let k = 0; k < 6; k++) {
-    h.signAll();
+test(
+  'a pause at once stops each session and check at work but a landing, and the resume continues each; one that ended first is not tried',
+  WAITED,
+  async (t) => {
+    for (let k = 0; k < 6; k++) {
+      h.signAll();
+      await pass();
+    }
+    const lands = aRepo();
+    const session = await begun(ONE);
+    const checking = await begun(CHECKED);
+    const ended = await begun(ONE);
+    const landing = await begun(SHIP, { repo: lands, isolate: true });
     await pass();
-  }
-  const lands = aRepo();
-  const session = await begun(ONE);
-  const checking = await begun(CHECKED);
-  const ended = await begun(ONE);
-  const landing = await begun(SHIP, { repo: lands, isolate: true });
-  await pass();
-  worked(lands, readRun(landing.id).steps.work.branch!);
-  await pass();
-  await pass();
-  h.signAll([session, ended]);
-  for (let k = 0; k < 3; k++) await pass();
-  await runWith(h.e, approveRun(landing.id, 'ship'));
-  for (let k = 0; k < 3; k++) await pass();
-  const sessionTask = taskOf(session, 'work')!;
-  const checkTask = readRun(checking.id).steps.work?.check?.taskId;
-  assert.ok(
-    checkTask && (await Effect.runPromise(h.e.view(checkTask))).phase.startsWith('running'),
-    "checking's check runs as the pause is put",
-  );
-  assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
-  const before = h.spawned.length;
+    worked(lands, readRun(landing.id).steps.work.branch!);
+    await pass();
+    await pass();
+    h.signAll([session, ended]);
+    await atGate(t, landing, 'ship');
+    await runWith(h.e, approveRun(landing.id, 'ship'));
+    for (let k = 0; k < 3; k++) await pass();
+    const sessionTask = taskOf(session, 'work')!;
+    const checkTask = readRun(checking.id).steps.work?.check?.taskId;
+    assert.ok(
+      checkTask && (await Effect.runPromise(h.e.view(checkTask))).phase.startsWith('running'),
+      "checking's check runs as the pause is put",
+    );
+    assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
+    const before = h.spawned.length;
 
-  const endedTask = taskOf(ended, 'work')!;
-  const racing = new Proxy(h.e, {
-    get: (target, key) =>
-      key === 'stop'
-        ? (taskId: string) =>
-            Effect.gen(function* () {
-              if (taskId === endedTask) {
-                h.signAll([session, checking, landing]);
-                yield* Effect.promise(() => pass());
-              }
-              return yield* target.stop(taskId);
-            })
-        : Reflect.get(target, key),
-  });
-  const now = await runWith(racing, pauseNow({ why: 'the bill', by: 'ann' }));
-  const mine = (i: { run: string }) => [session.id, checking.id, ended.id, landing.id].includes(i.run);
-  assert.deepEqual(
-    now.interrupted
-      .filter(mine)
-      .map((i) => `${i.run} ${i.step} ${i.kind}`)
-      .sort(),
-    [`${checking.id} work check`, `${ended.id} work session`, `${session.id} work session`].sort(),
-    'the landing is left to finish',
-  );
-  for (let k = 0; k < 3; k++) await pass();
-  assert.equal((await Effect.runPromise(h.e.view(sessionTask))).phase, 'stopped');
-  assert.equal((await Effect.runPromise(h.e.view(checkTask))).phase, 'stopped');
-  assert.equal((await Effect.runPromise(h.e.view(endedTask))).phase, 'succeeded', 'a session that ended before its stop was taken');
-  assert.notEqual((await Effect.runPromise(h.e.view(taskOf(landing, 'ship')!))).phase, 'stopped', 'the landing finishes');
-  assert.deepEqual(
-    fs.readdirSync(asksDir(landing.id)).filter((f) => f.startsWith('retry-')),
-    [],
-    'and is asked no try',
-  );
-  assert.deepEqual(
-    fs.readdirSync(asksDir(ended.id)).filter((f) => f !== 'done'),
-    [],
-    'its ask set aside',
-  );
-  assert.deepEqual(fs.readdirSync(path.join(asksDir(ended.id), 'done')), ['retry-work-2']);
-  await pass(freshRestMemo());
-  assert.deepEqual(h.spawned.slice(before), [], 'a restarted daemon files nothing while paused');
-  assert.equal(taskOf(session, 'work'), sessionTask);
+    const endedTask = taskOf(ended, 'work')!;
+    const racing = new Proxy(h.e, {
+      get: (target, key) =>
+        key === 'stop'
+          ? (taskId: string) =>
+              Effect.gen(function* () {
+                if (taskId === endedTask) {
+                  h.signAll([session, checking, landing]);
+                  yield* Effect.promise(() => pass());
+                }
+                return yield* target.stop(taskId);
+              })
+          : Reflect.get(target, key),
+    });
+    const now = await runWith(racing, pauseNow({ why: 'the bill', by: 'ann' }));
+    const mine = (i: { run: string }) => [session.id, checking.id, ended.id, landing.id].includes(i.run);
+    assert.deepEqual(
+      now.interrupted
+        .filter(mine)
+        .map((i) => `${i.run} ${i.step} ${i.kind}`)
+        .sort(),
+      [`${checking.id} work check`, `${ended.id} work session`, `${session.id} work session`].sort(),
+      'the landing is left to finish',
+    );
+    for (let k = 0; k < 3; k++) await pass();
+    assert.equal((await Effect.runPromise(h.e.view(sessionTask))).phase, 'stopped');
+    assert.equal((await Effect.runPromise(h.e.view(checkTask))).phase, 'stopped');
+    assert.equal((await Effect.runPromise(h.e.view(endedTask))).phase, 'succeeded', 'a session that ended before its stop was taken');
+    assert.notEqual((await Effect.runPromise(h.e.view(taskOf(landing, 'ship')!))).phase, 'stopped', 'the landing finishes');
+    assert.deepEqual(
+      fs.readdirSync(asksDir(landing.id)).filter((f) => f.startsWith('retry-')),
+      [],
+      'and is asked no try',
+    );
+    assert.deepEqual(
+      fs.readdirSync(asksDir(ended.id)).filter((f) => f !== 'done'),
+      [],
+      'its ask set aside',
+    );
+    assert.deepEqual(fs.readdirSync(path.join(asksDir(ended.id), 'done')), ['retry-work-2']);
+    await pass(freshRestMemo());
+    assert.deepEqual(h.spawned.slice(before), [], 'a restarted daemon files nothing while paused');
+    assert.equal(taskOf(session, 'work'), sessionTask);
 
-  resumePause();
-  await pass();
-  const resumed = readRun(session.id).steps.work;
-  assert.notEqual(resumed.taskId, sessionTask, "session's try 2 filed");
-  assert.deepEqual(resumed.tries, [{ taskId: sessionTask, then: 'nudge', paused: true }]);
-  const stoppedAttempt = (await Effect.runPromise(h.e.view(sessionTask))).state.attempts.at(-1)!;
-  assert.equal(
-    (await Effect.runPromise(h.e.view(resumed.taskId!))).state.resumeFrom,
-    stoppedAttempt.nativeId,
-    'continuing the session it stopped',
-  );
-  const rechecked = readRun(checking.id).steps.work;
-  assert.notEqual(rechecked.check?.taskId, checkTask, "checking's check filed again");
-  assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checkTask }, then: 'recheck', paused: true });
-  assert.equal(readRun(ended.id).steps.work?.tries, undefined, 'the run whose session ended first is not tried');
-});
+    resumePause();
+    await pass();
+    const resumed = readRun(session.id).steps.work;
+    assert.notEqual(resumed.taskId, sessionTask, "session's try 2 filed");
+    assert.deepEqual(resumed.tries, [{ taskId: sessionTask, then: 'nudge', paused: true }]);
+    const stoppedAttempt = (await Effect.runPromise(h.e.view(sessionTask))).state.attempts.at(-1)!;
+    assert.equal(
+      (await Effect.runPromise(h.e.view(resumed.taskId!))).state.resumeFrom,
+      stoppedAttempt.nativeId,
+      'continuing the session it stopped',
+    );
+    const rechecked = readRun(checking.id).steps.work;
+    assert.notEqual(rechecked.check?.taskId, checkTask, "checking's check filed again");
+    assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checkTask }, then: 'recheck', paused: true });
+    assert.equal(readRun(ended.id).steps.work?.tries, undefined, 'the run whose session ended first is not tried');
+  },
+);

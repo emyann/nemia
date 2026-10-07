@@ -337,8 +337,9 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 }
 
 /**
- * A step at its gate, under its section: its policy drawn open, then the gate. An ending's (`acts`) beside the work it would act on, sending
- * back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`), sending back the step.
+ * A step at its gate, under its section: its policy drawn open, then the gate. An ending's (`acts`) beside the work it would act on,
+ * sending back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`), sending back the
+ * step.
  */
 function AtGate({ run, step, acts }: { run: RunDetail; step: Step; acts: boolean }) {
   const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];

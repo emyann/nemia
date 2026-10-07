@@ -147,7 +147,7 @@ test('REFUSED: answers that do not fit the questions the step asks now, and answ
   );
   assert.match(
     await refused(await ask('plain', { mode: 'nudge', answers: [{ question: 'Postgres or MySQL?', chose: [] }] })),
-    /The step does not ask "Postgres or MySQL\?" now/,
+    /The step asks no questions now, so there is nothing to answer/,
     'a step that asks in free text asks no question answers can name',
   );
   assert.match(
@@ -160,7 +160,7 @@ test('REFUSED: answers that do not fit the questions the step asks now, and answ
         ],
       }),
     ),
-    /The step does not ask "How is the card cut\?" now/,
+    /The step asks no questions now, so there is nothing to answer/,
     'nor one whose fields ask one title twice',
   );
   assert.match(

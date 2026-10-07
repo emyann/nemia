@@ -6,10 +6,10 @@
 import path from 'node:path';
 
 /**
- * The memory one worker takes at its peak, with room: Chromium, the api and `vite preview`, sampled with `ps` over a whole run at four
- * workers, the largest worker's tree at about 1.5 times its peak.
+ * The memory one worker takes at its peak, with room: the resident memory of its whole tree — the worker, its api, its `vite preview` and
+ * its Chromium — summed at the largest worker's peak over a whole run at four workers, 1.7 GB, and half again.
  */
-export const PER_WORKER_BYTES = 1_200 * 1024 * 1024;
+export const PER_WORKER_BYTES = 2_560 * 1024 * 1024;
 
 /**
  * The pages each of `n` workers visits: page i goes to worker i mod n, so neighbours, which are often alike in cost, are spread; each

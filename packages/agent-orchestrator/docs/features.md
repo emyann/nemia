@@ -5821,3 +5821,23 @@ place, live, when a decision is read (`docs/design-2026-09-29-git-out.md`, open 
 A decision read costs two node processes and a `git diff` per check-affecting path: 150 to 450 ms on this repository's branches, where
 the git calls it replaced took 20 to 120, the radii equal. Tested in `test/report.test.ts`, `test/radius.test.ts`, `test/decide.test.ts`
 and `test/store.test.ts` (a report not heard), `test/ship.test.ts` (a trial that read no base) and the api's `decide/decision.test.ts`.
+
+## Shipped: one read of the feed, one message to a subscriber (2026-10-07)
+
+A gate writes two wake lines at one instant, its run's and its step's, and each `say` is a turn of the subscriber's session, which reads
+its whole conversation again: one gate cost two turns. The deliverer now says what one read of the feed finds in one message.
+
+- **A read** is what the feed's reader handed on since the deliverer last took, at least one item (`Stream.buffer` and
+  `Stream.runForEachArray` in `src/subscription/deliver.verb.ts`). `followFeed` hands the items of one take of the hub, as a pass's lines
+  published together, as one chunk (`Stream.mapAccumArrayEffect`), and a read of the file was one already. Lines that come while a `say`
+  is in flight, or waits on its backoff, make the next message. No window waits for more: the first line of a wake is said at once.
+- **One message a read** (`readDelivered`, `src/subscription/subscription.ts`): every wake line in feed order under the heading, each as
+  the feed says it, its step and the verb that answers it in its note; then the digest with every routine line of the read. A gate's run
+  line and step line stay two lines of it. One wake line reads as before. `subscription.wakes` still counts wake lines.
+- **The guarantees hold per message**: the cursor is written once its `say` resolved; a failed `say` is said again whole; a deliverer
+  stopped between a `say` and its cursor says the message again on restart, at least once.
+
+Tested in `src/subscription/subscription.test.ts` (the message of several lines in the order given; a read with a wake, and with none),
+`src/feed/feed.verb.test.ts` (one emission reaches a reader as one chunk) and `src/subscription/deliver.verb.test.ts` (one gate one say;
+three gates in one read, the digest once; a gate over the hub; a failed `say` said again whole; a restart between a `say` and its
+cursor).

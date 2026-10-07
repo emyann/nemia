@@ -1743,6 +1743,13 @@ worker, a `claude` verb, an admission command, the quota's ask — is started wi
 `harness/telemetry.ts`): OpenTelemetry's variables, the trace context and Claude Code's switches. So a `command` or Codex session
 exports nothing, and a Claude Code session exports only as its runner tells it.
 
+A session's tools' inputs — a command's text, a file's path, an error's words — stay off unless the collector asks for them:
+`Engine.layer({ telemetry: { endpoint, toolDetails: true } })` (any `toolDetails` but `true` is refused). Claude Code is then handed
+`OTEL_LOG_TOOL_DETAILS=1` beside the rest, in a job's environment and in a background session's `--settings`' `env`. Measured on 2.1.293:
+it adds `full_command` (Bash) and `file_path` (Read) to each `claude_code.tool` span, an error's text to `claude_code.tool.execution`'s
+`error` (its class otherwise), and `tool_parameters`, `tool_input` and `error` to the `tool_decision` and `tool_result` events; without
+it no command, path or error text leaves the session.
+
 ## A harness's quota: `quota`
 
 A subscription has limits of its own — Claude Code's plan, five hours and a week — that no session's spend says. `quota(harness?)`
@@ -2117,7 +2124,7 @@ of pure code sits beside it.
 | `src/harness/claude/bridge.ts` | a `--bg` session's Remote Control link, off its registration's `bridgeSessionId` (`claudeBridge`), or why there is none |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`, `admissionHook`), which `bin/ae.ts` loads alone, before any engine |
-| `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, in a job's environment (`claudeTelemetryEnv`) and in a background session's `--settings` (`telemeteredFlags`) |
+| `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, its tools' details only when asked, in a job's environment (`claudeTelemetryEnv`) and in a background session's `--settings` (`telemeteredFlags`) |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |

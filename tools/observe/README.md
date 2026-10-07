@@ -31,6 +31,9 @@ It then exports its spans, its logs and its metrics there, filed under the servi
 dashboards' `Service` variable picks it. The packages' README says what the daemon exports (`packages/agent-orchestrator/README.md`,
 *What the daemon says*).
 
+Add `NEMIA_TOOL_DETAILS=1` beside it for each session's tool spans to say their inputs too — a Bash call's command, a file's path, an
+error's words — which then stay in this machine's Tempo and Loki.
+
 ## Profile the daemon
 
 The daemon sends no profiles by itself. A preload in `profile/` profiles it into the stack's Pyroscope, its CPU and its heap, when it is

@@ -118,13 +118,17 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   return keeping.stale === true ? ['tell'] : [];
 }
 
+/** The instruction her session is filed with: her shipped instruction `body`, then the person's `custom` words where there are any. Pure. */
+export const nemiaPrompt = (body: string, custom: string | undefined): string =>
+  `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
+
 /**
  * What her open task is told once the person's custom instruction for her changed: the words `custom` whole, which replace those she was
  * started with, or, where undefined, that they were removed and she has none. Pure.
  */
 export const toldCustom = (custom: string | undefined): string =>
   custom === undefined
-    ? "The person removed their custom instruction for you: you now have none, and the one you were started with no longer holds."
+    ? 'The person removed their custom instruction for you: you now have none, and the one you were started with no longer holds.'
     : `The person's custom instruction for you changed. It now reads as below, and replaces the one you were started with:\n\n${custom}`;
 
 /** One edge of her machine: from a state, on what the keeper reads, to a state, by what it does. */

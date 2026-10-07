@@ -308,3 +308,61 @@ test("REFUSED: a factory's raise or default above manual while her folder is not
   }
   trust(true);
 });
+
+/** Her task kept anew: any she has stopped at manual, then the store's level at semi-auto, a fresh task filed and subscribed. Its id. */
+const keptAnew = async (): Promise<string> => {
+  withPipao();
+  await runWith(e, LEVEL.handler({ level: 'manual' }));
+  await beat();
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  const { task } = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string };
+  assert.deepEqual(await beat(), ['file']);
+  assert.deepEqual(await beat(), ['subscribe']);
+  assert.deepEqual(await beat(), []);
+  return task;
+};
+
+test('a custom instruction written while she is kept is told to her open task, never by a filing or a stop', async () => {
+  const task = await keptAnew();
+  const [filings, stops, told] = [b.filings.length, b.stopped.length, b.said.length];
+  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in Spanish.\n');
+  assert.deepEqual(await beat(), ['tell']);
+  assert.deepEqual(
+    b.said.slice(told).map((s) => s.taskId),
+    [task],
+    'told once, to her open task',
+  );
+  assert.ok(b.said.at(-1)!.text.includes('Answer in Spanish.'), b.said.at(-1)!.text);
+  assert.equal(b.filings.length, filings, 'never filed again');
+  assert.equal(b.stopped.length, stops, 'never stopped');
+  assert.ok(fs.readFileSync(promptFile(), 'utf8').trimEnd().endsWith('Answer in Spanish.'), 'her filed instruction now holds them');
+  assert.deepEqual(await beat(), [], 'told once: level-triggered off her filed instruction');
+  fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
+  assert.deepEqual(await beat(), ['tell']);
+  assert.match(b.said.at(-1)!.text, /removed their custom instruction/);
+  assert.equal(fs.readFileSync(promptFile(), 'utf8'), `${readNemia().body.trim()}\n`, 'her shipped instruction alone');
+  assert.deepEqual(await beat(), []);
+  assert.equal(b.said.length, told + 2);
+});
+
+test('REFUSED: a tell the runtime refuses leaves her filed instruction as it was, and is owed again on the next beat', async () => {
+  const task = await keptAnew();
+  const filed = fs.readFileSync(promptFile(), 'utf8');
+  const told = b.said.length;
+  fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in German.\n');
+  b.refuseSay(1);
+  await assert.rejects(beat(), (err: Error) => {
+    assert.match(err.message, /not running yet/);
+    return true;
+  });
+  assert.equal(fs.readFileSync(promptFile(), 'utf8'), filed, 'nothing recorded of words she was not told');
+  assert.equal(b.said.length, told);
+  assert.deepEqual(await beat(), ['tell'], 'owed again');
+  assert.deepEqual(
+    b.said.slice(told).map((s) => s.taskId),
+    [task],
+  );
+  assert.ok(fs.readFileSync(promptFile(), 'utf8').trimEnd().endsWith('Answer in German.'));
+  assert.deepEqual(await beat(), []);
+  fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
+});

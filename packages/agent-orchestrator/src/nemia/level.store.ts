@@ -17,7 +17,7 @@ import type { Workflow } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { AUTO_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { LEVELS, type LevelFile } from './nemia.ts';
+import { LEVELS, nemiaPrompt, type LevelFile } from './nemia.ts';
 
 /** The store she is kept in, read once as the package loads, as `subscription.store.ts` reads its `ROOT`. */
 const ROOT = wfRoot();
@@ -164,23 +164,22 @@ export const nemiaCustom = (home: string = ROOT): string | undefined => readCust
 
 /**
  * The instruction her session is filed with, as `composePrompt` writes it, written nowhere: her shipped instruction `body`, then the
- * person's custom words for her from the store `home`, where there are any.
+ * person's custom words for her from the store `home`, where there are any (`nemiaPrompt`).
  */
-export function promptText(body: string, home: string = ROOT): string {
-  const custom = nemiaCustom(home);
-  return `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
+export const promptText = (body: string, home: string = ROOT): string => nemiaPrompt(body, nemiaCustom(home));
+
+/** Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file. */
+export function writePrompt(text: string): string {
+  fs.mkdirSync(nemiaDir(), { recursive: true });
+  fs.writeFileSync(promptFile(), text);
+  return promptFile();
 }
 
 /**
  * Writes the instruction her session is filed with (`promptFile`): her shipped instruction, then the person's custom words for her from
  * the store `home`, where there are any (`promptText`). Answers the file.
  */
-export function composePrompt(body: string, home: string = ROOT): string {
-  const text = promptText(body, home);
-  fs.mkdirSync(nemiaDir(), { recursive: true });
-  fs.writeFileSync(promptFile(), text);
-  return promptFile();
-}
+export const composePrompt = (body: string, home: string = ROOT): string => writePrompt(promptText(body, home));
 
 /** The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written. */
 export function filedPrompt(): string | undefined {

@@ -1,8 +1,10 @@
 /**
  * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store,
  * and what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open
- * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so. Level-triggered: it
- * carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.
+ * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
+ * person's custom words told to her open task (`say`) once they are not those her instruction was last written with, which is written
+ * again only after she was told. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
+ * A task stopped from outside is never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
  */
@@ -19,14 +21,18 @@ import { dropSubscription, listSubscriptions, putSubscription } from '../subscri
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
 import {
   composePrompt,
+  filedPrompt,
   memoryDir,
+  nemiaCustom,
   nemiaDir,
   ownBin,
   promptAllows,
+  promptText,
   readLevel,
   readNemia,
   SHIPPED_NEMIA,
   storeDenies,
+  writePrompt,
 } from './level.store.ts';
 import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
@@ -38,7 +44,10 @@ import {
   NEMIA_SUBSCRIPTION,
   NEMIA_WAKE,
   nemiaDue,
+  nemiaPrompt,
   nemiaSettings,
+  nemiaState,
+  toldCustom,
   type HerSubscription,
   type HerTask,
   type NemiaAct,
@@ -46,7 +55,7 @@ import {
 
 /** What the keeper did, each act counted once done. */
 export const NEMIA_ACTS = Metric.counter('nemia.acts', {
-  description: "the keeper's acts on Nemia's session: filed, subscribed, stopped, dropped",
+  description: "the keeper's acts on Nemia's session: filed, subscribed, stopped, dropped, told",
 });
 
 /** How often the keeper reads the level, her task and her subscription again. */
@@ -131,24 +140,48 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   };
 }
 
-/** One act owed on her task `id`: a stop or a drop already done by another is no failure. */
-const act = (e: Engine, id: string, owed: NemiaAct) =>
+/** Her task `id` filed, warned of where no nemia of the daemon's is first on her path. */
+const fileHer = (e: Engine, id: string) =>
   Effect.gen(function* () {
-    if (owed === 'file' && ownBin() === undefined)
+    if (ownBin() === undefined)
       yield* Effect.logWarning(`Nemia is filed with no nemia of the daemon's first on her path: none links ${SHIPPED_NEMIA}/../bin.`);
-    if (owed === 'file') yield* asked('file', e.file(nemiaSpec(id)));
-    if (owed === 'stop') yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
-    if (owed === 'subscribe')
+    yield* asked('file', e.file(nemiaSpec(id)));
+  });
+
+/**
+ * Her open task `id` told the person's custom words as they read now (`toldCustom`), and only once the runtime took them, her instruction
+ * written with them, so an attempt it starts again reads them too: words she was not told are never written as hers.
+ */
+const tellHer = (e: Engine, id: string) =>
+  Effect.gen(function* () {
+    const custom = nemiaCustom();
+    yield* asked('say', e.say(id, toldCustom(custom)));
+    writePrompt(nemiaPrompt(readNemia().body, custom));
+  });
+
+/** Each act the keeper owes on her task `id`: a stop or a drop already done by another is no failure. */
+const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void>> = {
+  file: fileHer,
+  stop: (e, id) => asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void))),
+  subscribe: (_e, id) =>
+    Effect.sync(() =>
       putSubscription(NEMIA_SUBSCRIPTION, {
         task: id,
         wake: [...NEMIA_WAKE],
         digestEvery: NEMIA_DIGEST_EVERY,
         from: feedSize(),
         scope: { atLeast: NEMIA_FLOOR },
-      });
-    if (owed === 'drop' && listSubscriptions().some((s) => s.name === NEMIA_SUBSCRIPTION)) dropSubscription(NEMIA_SUBSCRIPTION);
-    yield* Metric.update(NEMIA_ACTS, 1);
-  });
+      }),
+    ),
+  drop: () =>
+    Effect.sync(() => {
+      if (listSubscriptions().some((s) => s.name === NEMIA_SUBSCRIPTION)) dropSubscription(NEMIA_SUBSCRIPTION);
+    }),
+  tell: tellHer,
+};
+
+/** One act owed on her task `id`, counted once done. */
+const act = (e: Engine, id: string, owed: NemiaAct) => ACTS[owed](e, id).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
 
 /** Her task's record off the engine, or undefined where none is filed under `id`. */
 const herTask = (e: Engine, id: string | undefined) =>
@@ -164,13 +197,19 @@ const herSubscription = (): HerSubscription | undefined => {
   return sub === undefined ? undefined : { task: sub.task, scoped: sub.scope?.atLeast === NEMIA_FLOOR };
 };
 
-/** One beat: the levels, her task and her subscription read, and each act owed done in order. Answers the acts done. */
+/**
+ * One beat: the levels, her task and her subscription read, and, while she is kept, her instruction as it composes now against the one
+ * last written; each act owed done in order. Answers the acts done.
+ */
 export const keepOnce = Effect.fn('keepOnce')(function* () {
   const e = yield* EngineService;
   const id = readLevel()?.task;
   const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
   const task = yield* herTask(e, id);
-  const owed = nemiaDue({ above, ...(id === undefined ? {} : { task: id }) }, task, herSubscription());
+  const keeping = { above, ...(id === undefined ? {} : { task: id }) };
+  const subscribed = herSubscription();
+  const stale = nemiaState(keeping, task, subscribed) === 'kept' && filedPrompt() !== promptText(readNemia().body);
+  const owed = nemiaDue({ ...keeping, stale }, task, subscribed);
   for (const one of owed) if (id !== undefined || one === 'drop') yield* act(e, id ?? '', one);
   return owed;
 });

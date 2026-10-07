@@ -2785,14 +2785,18 @@ recommendation, recaps what moved, and carries their answer back as a `nemia` ve
   ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
   seeded with it, marked Default. **`nemia auto <agent>`** reads the list in force, the agent's proposal and the custom instruction;
   **`nemia auto propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
-  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id>`** and
-  **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent calls them. A rule
-  nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that does not read allows nothing.
+  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id> --words
+  '<words>'`** and **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
+  calls them. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
+  under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
+  does not read allows nothing. Auto holds in a session of hers filed since it shipped (`--auto` on her admission): one kept from before
+  asks every answer until it is filed again.
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
   her.
 
 What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
-for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`), read once, as her session is filed: an open session keeps
+for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
+board's Settings, though no place names her), read once, as her session is filed: an open session keeps
 the words it was filed with, so a change takes effect after `nemia level manual`, then `nemia level semi-auto`; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 

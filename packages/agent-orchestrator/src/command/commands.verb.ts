@@ -53,8 +53,7 @@ import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 import { LEVEL } from '../nemia/level.verb.ts';
 import { MEMORY } from '../nemia/memory.verb.ts';
-import { SERVICES } from '../service/service.verb.ts';
-import { RESTARTS } from '../service/restart.verb.ts';
+import { SERVICE_COMMANDS } from '../service/restart.verb.ts';
 import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
@@ -556,8 +555,7 @@ export const COMMANDS: readonly Command[] = [
   LEVEL,
   MEMORY,
   ...AUTO_ENTRIES,
-  ...SERVICES,
-  ...RESTARTS,
+  ...SERVICE_COMMANDS,
   ...RELEASES,
   ...VERSIONS,
   ...WORKFLOW_ENTRIES,

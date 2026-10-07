@@ -11,7 +11,7 @@ import { daemonLine } from '../daemon/daemon.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { holderOfLease, takeOverLine } from './service.ts';
-import { liveHost, NAME_FLAG, serviceAt, type ServiceAt, type ServiceHost } from './service.verb.ts';
+import { liveHost, NAME_FLAG, serviceAt, SERVICES, type ServiceAt, type ServiceHost } from './service.verb.ts';
 import { startedPassed, takeOver } from './takeover.verb.ts';
 
 /** The command a restart's pause and lines name. */
@@ -98,5 +98,8 @@ const RESTART: Command<Restarted> = {
   print: (data) => data.lines,
 };
 
-/** The restart's command, listed after the service's others. */
+/** The restart's command. */
 export const RESTARTS: readonly Command[] = [RESTART];
+
+/** Every command of the login service, as the command table lists them: install, uninstall, status, then restart. */
+export const SERVICE_COMMANDS: readonly Command[] = [...SERVICES, ...RESTARTS];

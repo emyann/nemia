@@ -44,8 +44,8 @@ export const SESSION: Reach = {
   takes: {
     mark: 'filed',
     words:
-      'Her open session keeps the words it was filed with: a save or a clear takes effect when her session is next filed. Set Manual, and ' +
-      'once her session reads Off, her level again.',
+      'Her open session keeps the words it was filed with: a save or a clear takes effect when her session is next filed. To file it again, ' +
+      'set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back.',
   },
   saved: 'Saved: her session is told these words once it is next filed.',
   cleared: 'Cleared: her session is told none once it is next filed.',

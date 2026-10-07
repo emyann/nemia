@@ -100,21 +100,23 @@ test('REFUSED at shipped defaults: a file that is not there is a 404 naming `nem
 });
 
 test('the agent files the store knows are read on GET /api/agents/sources: yours, then the folder `path` names; a folder not there is a 404', async () => {
-  source('pathfinder', ['description: Finds the path.']);
-  const res = await app.request(`/api/agents/sources?path=${encodeURIComponent(path.join(from, 'agents'))}`);
+  fs.mkdirSync(AGENTS, { recursive: true });
+  fs.writeFileSync(path.join(AGENTS, 'keeper.md'), '---\ndescription: Keeps the notes.\n---\nKeep them.\n');
+  const folder = scratch('nemia-api-copy-sources-');
+  fs.writeFileSync(path.join(folder, 'pathfinder.md'), '---\ndescription: Finds the path.\n---\nFind it.\n');
+  fs.writeFileSync(path.join(folder, 'counted.md'), '---\ndescription: Counts.\nmaxTurns: 5\n---\nCount.\n');
+  const res = await app.request(`/api/agents/sources?path=${encodeURIComponent(folder)}`);
   const { sources } = (await res.json()) as { sources: AgentSource[] };
   assert.equal(res.status, 200);
   const listed = sources.map((s) => `${s.place} ${s.name}`);
+  assert.ok(listed.includes('library keeper'), listed.join(', '));
+  assert.deepEqual(listed.slice(-2), ['path counted', 'path pathfinder'], 'the folder named comes last, sorted');
   assert.deepEqual(
-    listed.filter((l) => l.startsWith('library ')),
-    ['library outrider', 'library scout'],
-  );
-  assert.deepEqual(
-    listed.filter((l) => l.startsWith('path ')),
-    ['path counted', 'path pathfinder', 'path scout'],
+    sources.filter((s) => s.place === 'path').map((s) => s.file),
+    [path.join(folder, 'counted.md'), path.join(folder, 'pathfinder.md')],
   );
   assert.equal(sources.find((s) => s.name === 'counted')?.error?.includes('maxTurns'), true, 'one that does not read says why');
-  const missing = await app.request(`/api/agents/sources?path=${encodeURIComponent(path.join(from, 'nowhere'))}`);
+  const missing = await app.request(`/api/agents/sources?path=${encodeURIComponent(path.join(folder, 'nowhere'))}`);
   assert.equal(missing.status, 404);
   assert.match(((await missing.json()) as { error: string }).error, /is not a folder/);
 });

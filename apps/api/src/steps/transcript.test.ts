@@ -186,7 +186,7 @@ test("a step's transcript is the engine's read of its task's session — its eve
   assert.deepEqual(await again.json(), { events: [], cursor: body.cursor, live: false }, 'read again from the cursor it gave: nothing new');
 });
 
-test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — nor followed, its stream settled at once', async () => {
+test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — and its stream, followed for its next turn, sends it and stays open', async () => {
   assert.equal((await Effect.runPromise(engine().view('t-held'))).phase, 'input-required', "the seed is the engine's held task, waiting");
   assert.equal(
     (await Effect.runPromise(engine().view('t-closed'))).phase,
@@ -197,9 +197,12 @@ test('a held step that signed waits on a person, and nothing of it runs: its con
     const engines = await Effect.runPromise(engine().transcript(`t-${step}`));
     assert.equal(engines.events.length, 8, step);
     assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false }, step);
-    const said = blocks(await (await app.request(streamUrl(step))).text());
+    const reader = (await app.request(streamUrl(step))).body!.getReader();
+    const said = await readUntil(reader, { value: '' }, (got) => eventsIn(got).length >= engines.events.length);
+    assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: true }) }, `${step}: its harness streams a turn`);
     assert.deepEqual(eventsIn(said), engines.events, step);
-    assert.deepEqual(said.at(-1), { event: 'settled', data: JSON.stringify({ cursor: engines.cursor }), id: engines.cursor }, step);
+    assert.ok(!said.some((b) => b.event === 'settled'), `${step}: not settled, the stream open for the next turn`);
+    await reader.cancel();
   }
 });
 

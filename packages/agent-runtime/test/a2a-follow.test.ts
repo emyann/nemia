@@ -96,7 +96,7 @@ test('REFUSED: a subscription to a Task that has ended, in the words that say to
 });
 
 test("REFUSED: a driver's refusal reaches the follower as a refusal, and its failure as a failure, in its words", async () => {
-  const refused = new RunnerError({ verb: 'follow', message: 'fake: a background session does not stream yet.', refused: true });
+  const refused = new RunnerError({ verb: 'follow', message: 'fake: this session does not stream.', refused: true });
   const failed = new RunnerError({ verb: 'follow', message: 'fake: the output cannot be read.' });
   const one = await followed(
     a2aOps('fake', driver(Stream.fail(refused)).ops, async () => []),
@@ -110,7 +110,7 @@ test("REFUSED: a driver's refusal reaches the follower as a refusal, and its fai
     const e = Cause.squash((exit as Exit.Failure<void, RunnerError>).cause) as RunnerError;
     return [e.message, e.refused === true];
   };
-  assert.deepEqual(words(one.exit), ['fake: a background session does not stream yet.', true]);
+  assert.deepEqual(words(one.exit), ['fake: this session does not stream.', true]);
   assert.deepEqual(words(two.exit), ['fake: the output cannot be read.', false]);
   assert.deepEqual(two.got, [{ kind: 'state', state: 'working' }]);
 });

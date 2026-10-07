@@ -654,8 +654,8 @@ What `codex exec` cannot do, said and not faked:
 - **Never `INPUT_REQUIRED` mid-run.** The worker writes no `blocked`: a sandboxed command is refused and the turn goes on,
   so only a held task's signed attempt, between turns, waits on a person.
 - **No spend cap.** A budget is refused at `file` and at `answer`.
-- **No live stream.** `SubscribeToTask` is refused for every harness, by the owner's decision at stage 2's plan gate; a
-  transcript is read from a cursor.
+- **No live stream.** `SubscribeToTask` is refused for Codex, whose runner has no `follow`; a transcript is read from a cursor.
+  Claude Code's sessions are followed: a job (`claude -p`) to the text it is writing, a background one (`--bg`) at message level.
 
 And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
 attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/core/engine/engine.ts`), and Codex writes

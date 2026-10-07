@@ -2105,12 +2105,13 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/bg-follow.ts` | a `--bg` session followed live at message level (`bgFollowOf`): its transcript read on from a byte offset, each whole line once, its state from `claude agents`, read once a second for every follower (`sharedListing`), across its turns and Claude Code's respawns |
 | `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/trust.ts` | whether Claude Code trusts a folder (`claudeTrusts`), read, never written, off its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set) |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
-| `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
+| `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused; a row's state in A2A's names (`claudeStateOf`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/print.ts` | the lines of `claude -p`'s output the runtime reads (`PRINTED`), decoded, and why an output is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration, read under its guards (`claudeRegistration`) and found by name |
@@ -2186,6 +2187,7 @@ of pure code sits beside it.
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/hold-open.test.ts` | a task held open, through the engine and the Effect layers: it waits with its session let go, an answer after a restart resumes it, a close settles it, and every refusal of `answer` and `close` |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
+| `test/follow-bg.test.ts` | a `--bg` session followed live, a fake `claude` on PATH and transcripts the test grows: each line once and every byte read once, the cursor a read gives, turns, a respawn's gap, a `--resume` copy not said again, a listing not read, the end, each refusal, and through A2A |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
 | `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |

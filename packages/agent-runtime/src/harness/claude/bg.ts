@@ -40,6 +40,7 @@ import type { Monotonic } from '../../core/clock.ts';
 import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError, refusedOsError } from '../error.ts';
 import { forgetFiles } from '../forget.ts';
+import { bgFollowOf, sharedListing } from './bg-follow.ts';
 import { claudeStateOf, registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
@@ -327,6 +328,7 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  *     start (`countsFrom`), so its spend is counted across every process Claude Code respawned it in; kept by every look
  *     told nothing of the session, so a view's look between the pass's and its release leaves it as the pass set it.
  * - What an attempt said and consumed (`Kept`), which only saves reads.
+ * - What `claude agents` listed for its followers (`follow`), read at most once a second however many follow (`sharedListing`).
  *
  * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
  * its own, and a wrong count is worse than none.
@@ -354,6 +356,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     release: releaseFrom(registry, options.usageFrom ?? transcriptUsageSince),
     logs: sessionLogs,
     transcript: sessionTranscript,
+    follow: bgFollowOf(sharedListing(sh('claude', ['agents', '--all', '--json'], { verb: 'follow' }))),
     say: sayThrough(sessionsDir, registry.pids),
     quota: claudeQuota(),
     forget: forgetUnder(root),

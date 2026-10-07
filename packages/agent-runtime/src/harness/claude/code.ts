@@ -24,7 +24,7 @@ import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
 import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
-import { causeWords, RunnerError } from '../error.ts';
+import { causeWords } from '../error.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec, type StartEvent } from '../detached/detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 import {
@@ -220,14 +220,6 @@ const NOTHING_ASKED: Read<Observation> = { value: { seen: new Map<string, Sighti
 const unreadWhyIn = (names: ReadonlySet<string>, ...reads: (Observation | undefined)[]): Map<string, string> =>
   new Map(reads.flatMap((o) => [...(o?.unreadWhy ?? [])].filter(([name]) => names.has(name))));
 
-/** Why a background session is not followed live: its stdout is Claude Code's own, never kept. */
-const BG_UNFOLLOWED = new RunnerError({
-  verb: 'follow',
-  message:
-    'claude: a background session does not stream yet: its transcript is read again instead (`transcript`). A job (`claude -p`) streams.',
-  refused: true,
-});
-
 /** Whether a session id is a job's: the name the engine gave it, where a background session's is Claude Code's own. */
 export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undefined;
 
@@ -245,8 +237,8 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  *   let go of.
  * - `transcript` reads a job by its name while it runs, and by Claude Code's id — an ended job's, or a background
  *   session's — the same transcript file either way, which the background reader finds by that id.
- * - `follow` follows a job live (`claudePartials`); a background session is refused (`BG_UNFOLLOWED`), and so is a name no job's run
- *   file answers, as `find` reads it: a session filed under the engine's name and run `--bg`.
+ * - `follow` follows a job live (`claudePartials`), and a background session, a name no job's run file answers as `find` reads it,
+ *   from its transcript and `claude agents`, at message level (`bgFollowOf`).
  * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
  *   Code's inbox.
  * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
@@ -318,11 +310,11 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
       isClaudeJob(sessionId)
         ? Stream.unwrap(
             findJob(sessionId).pipe(
-              Effect.map((found) => (found ? job.follow!(sessionId) : Stream.fail(BG_UNFOLLOWED))),
+              Effect.map((found) => (found ? job.follow!(sessionId) : bg.follow!(sessionId))),
               Effect.catchCause(() => Effect.succeed(job.follow!(sessionId))),
             ),
           )
-        : Stream.fail(BG_UNFOLLOWED),
+        : bg.follow!(sessionId),
 
     say: (session, text) => of(session.sessionId).say!(session, text),
 

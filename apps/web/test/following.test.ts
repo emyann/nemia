@@ -262,18 +262,20 @@ test('the whole message replaces the one being written, in the frame they came i
 
 test("moved empties the conversation and drops the message being written; the next attempt's history comes after it", () => {
   const { stream, now, flush } = batched();
-  stream.send('transcript', said('e1', 1, 'First turn.'));
+  stream.send('transcript', said('e1', 1, 'First try.'));
   stream.send('partial', piece('m1:0', 'Half'));
+  flush();
   stream.send('moved', { taskId: 't-2' });
-  stream.send('transcript', said('e1', 1, 'First turn.'));
-  stream.send('transcript', said('e3', 3, 'Next turn.'));
+  flush();
+  assert.equal(now().events.length, 0, 'the conversation of the attempt left behind is gone');
+  assert.equal(now().partial, null, 'and so is the message it was writing');
+  stream.send('transcript', said('f1', 1, 'Second try.'));
   flush();
   assert.deepEqual(
     now().events.map((e) => e.id),
-    ['e1', 'e3'],
+    ['f1'],
     "the conversation as the next attempt's history gives it",
   );
-  assert.equal(now().partial, null);
 });
 
 test('REFUSED: an event whose data is not of its shape is ignored — a piece with no key, a transcript event of no known kind', () => {

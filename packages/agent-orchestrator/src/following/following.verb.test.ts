@@ -213,6 +213,40 @@ test("a step followed goes on to its try's task, saying moved, once the step's l
   ]);
 });
 
+test(
+  "a step whose task is filed with no attempt yet waits for the step's next line of the feed, then follows its first attempt to its end",
+  WAITED,
+  async (t) => {
+    writeRun('r-6', 'r-6-implement');
+    const task: Task = { attempts: [], settled: null, history: [] };
+    const { e, views } = engineOver(new Map([['r-6-implement', task]]));
+    const rt = runtimeOf(t, e);
+    const got: StepMoment<Event>[] = [];
+    const { ended, rung } = follow(rt, 'r-6', got);
+    await until(
+      t,
+      () => views.length === 1,
+      () => `the step read once, its feed's cursor taken: ${views}`,
+      { everyMs: 10 },
+    );
+    task.attempts.push([
+      { kind: 'state', state: 'working' },
+      { kind: 'events', events: [said('a-1')], cursor: 'c1' },
+    ]);
+    await line(rt, 'r-6', 'implement', 'running');
+    await until(
+      t,
+      () => got.length === 3,
+      () => `the first attempt: ${ids(got)}`,
+      { bell: rung },
+    );
+    task.settled = 'succeeded';
+    await line(rt, 'r-6', 'implement', 'verified');
+    assert.ok(Exit.isSuccess(await ended));
+    assert.deepEqual(ids(got), ['streamed true', 'state working', 'events a-1', 'settled']);
+  },
+);
+
 test('a step whose harness does not stream is said not streamed, and the following ends there', async (t) => {
   writeRun('r-4', 'r-4-implement');
   const { e } = engineOver(new Map([['r-4-implement', { attempts: [[]], settled: null, history: [] }]]), ['r-4-implement']);

@@ -148,7 +148,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   the person's.
 - **Claude Code respawns a `--bg` process that died, on the same session, ~10 s later; a `--resume` given flags forks a new
   session.** Never resume a session it is respawning: a long-lived restart waits for the old one's end and release
-  (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`).
+  (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`). Whether the fork's
+  copies of its parent's lines keep their uuids is unmeasured (2026-10-07: no probe resumes); nothing reads either way on it: a follow
+  starts at the transcript's end (`bgFollowOf`), and a `moved` starts the board's conversation afresh.
 - **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
   the modes that ask nobody are this package's answer (`unasking` in `fenceReach`, `src/harness/reach.ts`), and the orchestrator's
   `validateFolderMode` refuses a `background: true` step of a folder team in any other.

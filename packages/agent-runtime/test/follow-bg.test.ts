@@ -189,14 +189,13 @@ test(
 );
 
 test(
-  "an attempt resumed with `--resume` under a new session id is followed from its transcript's end: the lines it carries of its parent are not said again, only those it writes",
+  "an attempt resumed with `--resume` under a new session id is followed from its transcript's end: the lines it carries of its parent, under their uuids or new ones, are not said again, only those it writes",
   WAITED,
   async (t) => {
     const parent = session('ae/b4/1');
-    const carried = said('c-1', 'Asked.') + said('c-2', 'Answered.');
-    parent.append(carried);
+    parent.append(said('c-1', 'Asked.') + said('c-2', 'Answered.'));
     const child = session('ae/b4/2');
-    child.append(carried);
+    child.append(said('c-1', 'Asked.') + said(randomUUID(), 'Answered.'));
     list([parent.row('stopped'), child.row('working', PID)]);
     const got: Followed[] = [];
     const ended = follow(ops(), 'ae/b4/2', got);

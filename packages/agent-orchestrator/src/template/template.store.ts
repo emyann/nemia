@@ -84,6 +84,20 @@ function readTemplateFolder(dir: string, name: string): { folder: ReadFolder; pa
   return { folder: { name, files, documents }, parsed, problems };
 }
 
+/**
+ * The template folder `dir` as its documents read (`folder`, named `name`), and the text of one of its files by its path in it (`text`),
+ * for a factory made from it. Refused: a file `text` is asked for that is no file of the folder (Invalid), so a `{path}` cannot reach out.
+ */
+export function templateAt(dir: string, name: string): { folder: ReadFolder; text: (file: string) => string } {
+  const { folder } = readTemplateFolder(dir, name);
+  const text = (file: string): string => {
+    if (!folder.files.includes(file))
+      throw new Invalid({ message: `${file} is no file of the template ${dir}: name a file of the folder, by its path in it.` });
+    return fs.readFileSync(path.join(dir, file), 'utf8');
+  };
+  return { folder, text };
+}
+
 /** The names of the place skills nemia ships, each present to a template that names it. */
 const placeSkillNames = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => fs.existsSync(path.join(PLACE_SKILLS, name, 'SKILL.md')));
 
@@ -199,7 +213,7 @@ function factorySource(ask: FactoryAsk, from: string, refusals: string[]): { sou
 }
 
 /** A copy of the file or folder `from` at `to`, each file with its mode; a link refused by name. */
-function copyTree(from: string, to: string): void {
+export function copyTree(from: string, to: string): void {
   const stat = fs.lstatSync(from);
   if (stat.isSymbolicLink())
     throw new Invalid({ message: `${from} is a link, and a template's files are its own: copy what it points at there.` });

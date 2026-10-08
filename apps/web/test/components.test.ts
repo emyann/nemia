@@ -5903,10 +5903,12 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
   workflows: ['build'],
   hires: {},
   error: null,
+  schedules: [],
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,
     add: `nemia factory add ${name} --repo <path>`,
+    schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
   },
   ...extra,
 });

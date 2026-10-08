@@ -1,16 +1,48 @@
 /**
  * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts), a factory's instruction (`GET`, `PUT` and `DELETE` on
  * `/api/factories/<name>/instruction`, apps/api/src/factories/instruction.ts and the routes the api generates beside it), and its hires
- * (`PUT` and `DELETE` on `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates).
+ * (`PUT` and `DELETE` on `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates), and its schedules, read-only.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { get, send } from './read.ts';
 
 /**
+ * Mirrors `ScheduleAnswer` in apps/api/src/factories/factories.ts: the workflow a factory schedules, its cron and the time zone it is read
+ * in (null: the daemon's), what each run is asked, the repository its runs work on (null: the factory's), its next fire (null: its cron
+ * gives none), its last scheduled run and when it was made, why its latest fire was refused (null: it was not), and the line that takes
+ * it back.
+ */
+export type FactorySchedule = {
+  workflow: string;
+  cron: string;
+  tz: string | null;
+  brief: string;
+  repo: string | null;
+  next: string | null;
+  last: { run: string; at: string } | null;
+  refused: string | null;
+  commands: { unschedule: string };
+};
+
+/** Decodes a `FactorySchedule`. */
+const FactoryScheduleSchema = Schema.Struct({
+  workflow: Schema.String,
+  cron: Schema.String,
+  tz: Schema.NullOr(Schema.String),
+  brief: Schema.String,
+  repo: Schema.NullOr(Schema.String),
+  next: Schema.NullOr(Schema.String),
+  last: Schema.NullOr(Schema.Struct({ run: Schema.String, at: Schema.String })),
+  refused: Schema.NullOr(Schema.String),
+  commands: Schema.Struct({ unschedule: Schema.String }),
+}) satisfies Schema.Schema<FactorySchedule>;
+
+/**
  * Mirrors `FactoryAnswer` in apps/api/src/factories/factories.ts: a factory's name, whether it is the default factory, the repositories it
- * works on, the workflows it offers — null for the default factory, which offers every workflow found — and its hires, `<workflow>/<step>`
- * to an agent's name. A factory whose file does not read has none of them, and `error` says why, naming the file; null for every other.
+ * works on, the workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>`
+ * to an agent's name, and its schedules, none for the default factory. A factory whose file does not read has none of them, and `error`
+ * says why, naming the file; null for every other.
  */
 export type Factory = {
   name: string;
@@ -19,8 +51,9 @@ export type Factory = {
   workflows: string[] | null;
   hires: Record<string, string>;
   error: string | null;
-  /** The lines a person types for it: a workflow attached to it, its file removed, and filed again. */
-  commands: { attach: string; rm: string; add: string };
+  schedules: FactorySchedule[];
+  /** The lines a person types for it: a workflow attached to it, its file removed, filed again, and a workflow scheduled. */
+  commands: { attach: string; rm: string; add: string; schedule: string };
 };
 
 /** Decodes a `Factory`. */
@@ -31,7 +64,8 @@ const FactorySchema = Schema.Struct({
   workflows: Schema.NullOr(Schema.mutable(Schema.Array(Schema.String))),
   hires: Schema.Record(Schema.String, Schema.String),
   error: Schema.NullOr(Schema.String),
-  commands: Schema.Struct({ attach: Schema.String, rm: Schema.String, add: Schema.String }),
+  schedules: Schema.mutable(Schema.Array(FactoryScheduleSchema)),
+  commands: Schema.Struct({ attach: Schema.String, rm: Schema.String, add: Schema.String, schedule: Schema.String }),
 }) satisfies Schema.Schema<Factory>;
 
 /**

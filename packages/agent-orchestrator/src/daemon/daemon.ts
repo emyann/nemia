@@ -310,3 +310,17 @@ export function daemonLine(standing: DaemonStanding, now: number): string {
 
 /** The file's text, as `nemia up` writes it. */
 export const daemonText = (file: DaemonFile): string => `${JSON.stringify(file, null, 2)}\n`;
+
+/** Whether a daemon ticks the store, read off its lease at `at`, with its line (`daemonLine`): what `nemia watch` says when it changes. */
+export type Liveness = { state: 'up' | 'down'; at: string; text: string };
+
+/** The store's liveness at `now`: `up` while a daemon is ticking it, `down` while none is — stopped, gone, stalled, unreadable or none. */
+export const livenessLine = (standing: DaemonStanding, now: number): Liveness => ({
+  state: standing.kind === 'ticking' ? 'up' : 'down',
+  at: new Date(now).toISOString(),
+  text: daemonLine(standing, now),
+});
+
+/** A liveness line as `nemia watch` prints it: `12:00:00  daemon down  · <its daemon line>`, or one JSON object, which no cursor has. */
+export const livenessWords = (l: Liveness, json = false): string =>
+  json ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text }) : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`;

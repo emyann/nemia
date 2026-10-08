@@ -336,12 +336,12 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
 
   signedOffRun(api.root);
   let said = '';
-  while (!/\nid: \d+/.test(said)) {
+  while (!/r-hub/.test(said)) {
     const { value, done } = await reader.read();
-    if (done) assert.fail(`the stream ended before a line:\n${said}\n${api.output()}`);
+    if (done) assert.fail(`the stream ended before the run's line:\n${said}\n${api.output()}`);
     said += new TextDecoder().decode(value);
   }
-  assert.match(said, /r-hub/, 'the line the pass wrote of the run');
+  assert.match(said, /^event: daemon\n/, "the stream opens on the daemon's started line, written before the api listened");
   assert.equal(
     (await metricOf(url, 'feed.follow.reads'))?.count,
     reads,

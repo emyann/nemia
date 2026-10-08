@@ -1,17 +1,18 @@
 /**
- * The feed's one verb and its live readers: `emitFeed` writes a pass's lines once — appended to the feed, logged, and published to the
- * readers in its process (`FeedHub`) — and `followFeed` reads them as they come, from the hub where it can and from the file where it
- * must. The file stays the record: the hub is in memory, in one process, keeps nothing for a reader that comes late, and drops what a
- * slow reader has not taken, so a reader reads the file for every line no item of the hub brought it.
+ * The feed's verbs and its live readers: `emitFeed` writes a pass's lines once — appended to the feed, logged, and published to the
+ * readers in its process (`FeedHub`) — as `emitDaemonStarted` writes a daemon's, and `followFeed` reads them as they come, from the hub
+ * where it can and from the file where it must. The file stays the record: the hub is in memory, in one process, keeps nothing for a
+ * reader that comes late, and drops what a slow reader has not taken, so a reader reads the file for every line no item of the hub
+ * brought it.
  *
- * A controller: it reaches the store's file through the client's `tried`, and is run by the tick and by the api's stream.
+ * A controller: it reaches the store's file through the client's `tried`, and is run by the tick, `up` and the api's stream.
  */
 import { Context, Effect, Layer, Metric, PubSub, Stream, type Duration } from 'effect';
 import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { tried } from '../runtime-client.ts';
 import { isRefusal, type Refusal } from '../refusal/refusal.ts';
-import { feedSaidWords, publishedOf, type FeedLine, type FeedPublished, type FeedWords } from './feed.ts';
-import { feedSize, readFeedEnds, recordFeed } from './feed.store.ts';
+import { feedSaidWords, isRunLine, publishedOf, type DaemonLine, type FeedLine, type FeedPublished, type FeedWords } from './feed.ts';
+import { feedSize, readFeedEnds, recordDaemonLine, recordFeed } from './feed.store.ts';
 
 /**
  * The live readers' hub in this process: a sliding `PubSub` of the lines `emitFeed` wrote, or none. None by default: a process that
@@ -46,10 +47,13 @@ export const FEED_FOLLOW_READS = Metric.counter('feed.follow.reads', {
   incremental: true,
 });
 
-/** Logs one line of the feed at Info, annotated with its run, its step when it names one, and its word. */
+/** Logs one line of the feed at Info, annotated with its run and its step when it names one, or its daemon's pid, and its word. */
 const logged = (line: FeedLine): Effect.Effect<void> =>
   Effect.logInfo(feedSaidWords(line)).pipe(
-    Effect.annotateLogs({ run: line.run, ...(line.step !== undefined ? { step: line.step } : {}), word: line.word }),
+    Effect.annotateLogs({
+      ...(isRunLine(line) ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) } : { daemon: line.daemon }),
+      word: line.word,
+    }),
   );
 
 /**
@@ -63,6 +67,17 @@ export const emitFeed = Effect.fn('emitFeed')(function* (now: ReadonlyMap<string
   const hub = yield* FeedHub;
   if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
   return appended.lines;
+});
+
+/**
+ * A daemon's line written to the feed (`recordDaemonLine`), logged, and published to the process's hub where it has one, as `emitFeed`
+ * does a pass's. Fails with a refusal of the store, and dies of anything else it threw.
+ */
+export const emitDaemonStarted = Effect.fn('emitDaemonStarted')(function* (line: DaemonLine) {
+  const appended = yield* tried(() => recordDaemonLine(line));
+  yield* logged(line);
+  const hub = yield* FeedHub;
+  if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
 });
 
 /**

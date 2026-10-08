@@ -10,10 +10,20 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
-import { feedChanges, foldFeed, freshMemo, type FeedAppended, type FeedLine, type FeedMemo, type FeedWords } from './feed.ts';
+import {
+  DAEMON_STARTED,
+  feedChanges,
+  foldFeed,
+  freshMemo,
+  type DaemonLine,
+  type FeedAppended,
+  type FeedLine,
+  type FeedMemo,
+  type FeedWords,
+} from './feed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
-/** The workflow layer's feed (`feed.ts`): beside `runs/`, one for the store, written by the tick alone. */
+/** The workflow layer's feed (`feed.ts`): beside `runs/`, one for the store, written by the daemon alone: its tick, and `up`'s start. */
 export const feedFile = (): string => path.join(HOME, 'feed.jsonl');
 
 /** This process's fold of the feed, as far as it has read it: a restarted daemon starts from none, and reads the feed once. */
@@ -33,6 +43,21 @@ export const recordFeed = (
     unjudged = new Set<string>(),
   }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string> } = {},
 ): FeedAppended => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged));
+
+/**
+ * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; the
+ * fold is not moved, since a daemon's line is no run's. Answers where its bytes went (`FeedAppended`).
+ */
+export const recordDaemonLine = (line: DaemonLine): FeedAppended => within('act', () => appendDaemonLine(feedFile(), line));
+
+/** `recordDaemonLine` over `file`. */
+function appendDaemonLine(file: string, line: DaemonLine): FeedAppended {
+  const before = statOf(file)?.size ?? 0;
+  const leading = before > 0 && byteAt(file, before - 1) !== 0x0a ? '\n' : '';
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.appendFileSync(file, `${leading}${JSON.stringify(line)}\n`);
+  return { lines: [line], before, after: statOf(file)?.size ?? 0, leading };
+}
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -93,8 +118,8 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
   return undefined;
 }
 
-/** A line of the feed as `recordFeed` writes one (`FeedLine`); a key it does not name is kept, as a newer `nemia` may write one. */
-const isFeedLine = Schema.is(
+/** A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, or a daemon's. */
+const FeedLineSchema = Schema.Union([
   Schema.Struct({
     at: Schema.String,
     run: Schema.String,
@@ -102,7 +127,16 @@ const isFeedLine = Schema.is(
     word: Schema.String,
     note: Schema.optionalKey(Schema.String),
   }),
-);
+  Schema.Struct({
+    at: Schema.String,
+    daemon: Schema.Finite,
+    word: Schema.Literal(DAEMON_STARTED),
+    note: Schema.optionalKey(Schema.String),
+  }),
+]);
+
+/** Whether a value read off the feed is one of its lines; a key the line does not name is kept, as a newer `nemia` may write one. */
+const isFeedLine = Schema.is(FeedLineSchema);
 
 /** A line of the feed as it was written, or nothing for one that is not: a line a writer died in the middle of, ended by the next one. */
 function parseLine(text: string): FeedLine[] {

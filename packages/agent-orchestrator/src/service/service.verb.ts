@@ -3,7 +3,6 @@
  * table the CLI serves alone, since they change the person's machine. Each reaches the machine through its host (`ServiceHost`): the live
  * one at the command line, a fake in the tests, so no test starts a service.
  */
-import path from 'node:path';
 import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import type { Args, Flag } from '../command/command.ts';
@@ -20,7 +19,9 @@ import {
   envRefusal,
   holderOfLease,
   landingsOf,
+  launchdLogs,
   launchdState,
+  logsLine,
   nameRefusal,
   plistRead,
   plistText,
@@ -53,7 +54,7 @@ import {
   userOf,
   writeUnit,
 } from './service.store.ts';
-import { takeOver, takeOverConfirmed, type TakeoverHost } from './takeover.verb.ts';
+import { takeOver, takeOverConfirmed, type Started, type TakeoverHost } from './takeover.verb.ts';
 
 /**
  * What the service's verbs reach of the machine: what it is, where files go, which store and its default, the daemon the checkout runs
@@ -157,6 +158,12 @@ const stateOf = (at: Placed, host: ServiceHost): UnitState | null => {
   }
 };
 
+/** The service as a take-over starts it: its start, and how its log is read. */
+const startedOf = (at: Placed, host: ServiceHost): Started => ({
+  start: () => ops(at, host).start(),
+  logs: logsLine(at.system, at.name, host.dirs().home),
+});
+
 /** A pid as `--take-over` gives it: digits, above zero; else refused (`Invalid`). */
 function pidOf(text: unknown): number | undefined {
   if (text === undefined) return undefined;
@@ -178,7 +185,7 @@ function specOf(at: Placed, args: Args, host: ServiceHost): ServiceSpec {
     node: host.node,
     ...daemon,
     env: [['WF_ROOT', host.roots().root], ['PATH', host.path], ...envPairs(given)],
-    logs: path.join(host.dirs().home, 'Library', 'Logs', `${at.name}.log`),
+    logs: launchdLogs(host.dirs().home, at.name),
   };
   const bad = specRefusal(spec);
   if (bad !== null) throw new Invalid({ message: bad });
@@ -256,14 +263,11 @@ export const installService = Effect.fn('installService')(function* (args: Args,
   const done =
     pid === undefined
       ? yield* tried(() => startedBeside(at, host))
-      : yield* Effect.map(
-          takeOver(pid, host, () => ops(at, host).start()),
-          (taken) => ({
-            did: 'taken' as const,
-            holder: pid,
-            lines: [`took the store over from pid ${pid}: ${at.unit} ticks it${taken.pid ? ` as pid ${taken.pid}` : ''}`],
-          }),
-        );
+      : yield* Effect.map(takeOver(pid, host, startedOf(at, host)), (taken) => ({
+          did: 'taken' as const,
+          holder: pid,
+          lines: [`took the store over from pid ${pid}: ${at.unit} ticks it${taken.pid ? ` as pid ${taken.pid}` : ''}`],
+        }));
   const lines = [wrote, ...done.lines, ...lingerLines(at, host)];
   return { name: at.name, system: at.system, file: at.file, checkout: spec.checkout, ...done, lines } satisfies Installed;
 });
@@ -303,8 +307,8 @@ const installedRead = (at: Placed): ServiceRead['unit'] => {
   return { ...read, ...(checkout !== undefined ? { checkout } : {}) };
 };
 
-/** What an upgrade asks of the store's service: the system's word on it, the entry its file runs, and its start. */
-export type ServiceForUpgrade = { readonly state: UnitState | null; readonly entry: string | undefined; readonly start: () => void };
+/** What an upgrade asks of the store's service: the system's word on it, the entry its file runs, its start and its log. */
+export type ServiceForUpgrade = Started & { readonly state: UnitState | null; readonly entry: string | undefined };
 
 /** The service `--name` names on this machine, as installed, or null where the machine, the store or the name has none to ask. */
 export function serviceForUpgrade(args: Args, host: ServiceHost): ServiceForUpgrade | null {
@@ -316,7 +320,26 @@ export function serviceForUpgrade(args: Args, host: ServiceHost): ServiceForUpgr
   }
   const unit = installedRead(at);
   if (unit === null) return null;
-  return { state: stateOf(at, host), entry: unit.entry, start: () => ops(at, host).start() };
+  return { state: stateOf(at, host), entry: unit.entry, ...startedOf(at, host) };
+}
+
+/**
+ * What a restart asks of the service `--name` names: its name, unit and file, whether it is installed, the system's word on it, its start
+ * and log.
+ */
+export type ServiceAt = Started & {
+  readonly name: string;
+  readonly unit: string;
+  readonly file: string;
+  readonly installed: boolean;
+  readonly state: UnitState | null;
+};
+
+/** The service `--name` names on this machine; refused (`Invalid`) where there is no system to run one, or a name the store forbids. */
+export function serviceAt(args: Args, host: ServiceHost): ServiceAt {
+  const at = placed(args, host);
+  const installed = readUnit(at.file) !== null;
+  return { name: at.name, unit: at.unit, file: at.file, installed, state: installed ? stateOf(at, host) : null, ...startedOf(at, host) };
 }
 
 /** Reads the service and the lease, and names both: whether the service is installed and runs, what it runs, and who holds the store. */

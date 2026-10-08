@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, References, Stream, type Duration } from 'effect';
-import type { FeedWords } from './feed.ts';
+import { isRunLine, type FeedWords } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
 
@@ -238,7 +238,9 @@ test('REFUSED: the lines of one emission reach a reader as one chunk, a run and 
   await rt.runPromise(emitFeed(judged('awaiting approval', 'land')));
   await until(t, () => chunks.flat().length >= 2, 'both lines handed', { bell: pushed });
   assert.deepEqual(
-    chunks.map((c) => c.map((f) => (f.kind === 'line' ? `${f.line.step ?? '—'} ${f.line.word}` : f.kind))),
+    chunks.map((c) =>
+      c.map((f) => (f.kind === 'line' ? `${(isRunLine(f.line) ? f.line.step : undefined) ?? '—'} ${f.line.word}` : f.kind)),
+    ),
     [['— awaiting approval', 'land awaiting approval']],
     'one chunk of two lines, the run first',
   );

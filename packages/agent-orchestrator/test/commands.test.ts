@@ -170,6 +170,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['service install', 'cli'],
       ['service uninstall', 'cli'],
       ['service status', 'cli'],
+      ['service restart', 'cli'],
       ['upgrade', 'cli'],
       ['version', 'cli'],
       [

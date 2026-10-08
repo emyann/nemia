@@ -140,7 +140,7 @@ test('a run whose unfrozen folder says no place: is left out of the pass and sai
   assert.match(said[0], new RegExp(`or nemia rm ${bad.id}\\.$`));
   assert.equal(readRun(bad.id).steps.work?.taskId ?? null, null, 'nothing of it filed');
   assert.deepEqual(
-    readFeed().lines.filter((l) => l.run === bad.id && l.word === REMOVED),
+    readFeed().lines.filter((l) => 'run' in l && l.run === bad.id && l.word === REMOVED),
     [],
     'the feed does not say the run was removed',
   );

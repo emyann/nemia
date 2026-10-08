@@ -7,6 +7,7 @@ import { Effect, Stream } from 'effect';
 import { EngineService, asked, tried, type Engine, type TranscriptEvent } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import { Missing, type Refusal } from '../refusal/refusal.ts';
+import { isRunLine } from '../feed/feed.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { followFeed } from '../feed/feed.verb.ts';
 import { nextOf, type FollowedAttempt, type StepMoment, type StepNow } from './following.ts';
@@ -108,11 +109,12 @@ const unseen = (m: Extract<Moment, { kind: 'events' }>, seen: Set<string>): Mome
 
 /**
  * `then` from the cursor after the feed's next line naming the step `step` of the run `runId`, read from `cursor` on: the step's next
- * word, which the tick writes once it has judged what the step does next. Every other line, of another run or another step, is passed.
+ * word, which the tick writes once it has judged what the step does next. Every other line, of another run or step or a daemon's, is
+ * passed.
  */
 const wokenBy = (runId: string, step: string, cursor: number, then: (cursor: number) => Stream.Stream<Moment, Refusal>) =>
   followFeed(cursor).pipe(
-    Stream.filter((f) => f.kind === 'line' && f.line.run === runId && f.line.step === step),
+    Stream.filter((f) => f.kind === 'line' && isRunLine(f.line) && f.line.run === runId && f.line.step === step),
     Stream.take(1),
     Stream.flatMap((f) => then(f.kind === 'line' ? f.cursor : cursor)),
   );

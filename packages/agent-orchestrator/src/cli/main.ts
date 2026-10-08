@@ -3,7 +3,7 @@
  * others beside.
  */
 import path from 'node:path';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Stream, type Duration } from 'effect';
 import {
   breakdownLines,
   ceilingLines,
@@ -14,7 +14,14 @@ import {
   everyOf,
   feedCursorRefusal,
   feedHubLayer,
-  feedLineWords,
+  daemonStanding,
+  livenessLine,
+  livenessWords,
+  wakeOf,
+  watchedLine,
+  type DaemonStanding,
+  type Liveness,
+  type Watched,
   HOME,
   lastPassCost,
   queueLine,
@@ -48,32 +55,70 @@ import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, pruneVer
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
+/** How often `nemia watch` reads the lease for its liveness. */
+export const LIVENESS_EVERY: Duration.Input = '2 seconds';
+
+/** What a watch that has read nothing yet takes the store to be: up, so a store already down is said at once, and one up is not. */
+const ASSUMED: Liveness = { state: 'up', at: '', text: '' };
+
 /**
- * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch
- * is said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
+ * The store's liveness as it changes: `lease` read at once and every `every`, judged (`livenessLine`), and each reading said only when its
+ * state is not the last one's — `down` at once when the store is already down, then a line for each fall and each recovery. Read again on
+ * every poll, never carried: a watch started again reads the same. Its lines are the watch's own, never the feed's. Never ends.
+ */
+export const livenessLines = (
+  lease: () => DaemonStanding,
+  every: Duration.Input = LIVENESS_EVERY,
+  now: () => number = Date.now,
+): Stream.Stream<Liveness> =>
+  Stream.tick(every).pipe(
+    Stream.map(() => livenessLine(lease(), now())),
+    Stream.prepend([ASSUMED]),
+    Stream.changesWith((a, b) => a.state === b.state),
+    Stream.drop(1),
+  );
+
+/**
+ * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()` — as `how` prints them
+ * (`watchedLine`), in words or as JSON, every line or the wake lines alone; a feed cut under the watch is said once on stderr, and followed
+ * from the start of the feed there is now (`watchFeed`). In JSON the banner goes to stderr too, so stdout holds nothing but JSON.
  *
  * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it
  * — finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
  */
-export function watchPrinted(from: number): { stop(): void } {
+export function watchPrinted(from: number, how: Watched = {}): { stop(): void } {
   const watch = watchFeed({
     from,
-    onLine: (line) => console.log(feedLineWords(line)),
+    onLine: (line, cursor) => {
+      const printed = watchedLine(line, cursor, how);
+      if (printed !== undefined) console.log(printed);
+    },
     onCut: (said) => console.error(`nemia watch: ${said}`),
     onError: (err) => console.error(`nemia watch: ${(err as Error).message ?? String(err)}`),
   });
-  console.log(`watching from ${from}, ^C to stop`);
+  (how.json === true ? console.error : console.log)(`watching from ${from}, ^C to stop`);
   return watch;
 }
 
 /**
- * `nemia watch` as an Effect: `watchPrinted(from)` held in its scope until it is interrupted, and stopped as that scope closes, so an
- * interrupted watch leaves no watcher and no timer behind. It never ends of itself; a cursor it cannot read from fails it.
+ * `nemia watch` as an Effect: `watchPrinted(from, how)` held in its scope until it is interrupted, and stopped as that scope closes, so an
+ * interrupted watch leaves no watcher and no timer behind; beside it, the store's liveness read off `lease` and printed as it changes
+ * (`livenessLines`), whatever the wake words. It never ends of itself; a cursor it cannot read from fails it.
  */
-export const watching = (from: number): Effect.Effect<never, unknown> =>
-  Effect.acquireRelease(Effect.try({ try: () => watchPrinted(from), catch: (err) => err }), (watch) =>
+export const watching = (
+  from: number,
+  how: Watched = {},
+  lease: () => DaemonStanding = () => daemonStanding(),
+): Effect.Effect<never, unknown> =>
+  Effect.acquireRelease(Effect.try({ try: () => watchPrinted(from, how), catch: (err) => err }), (watch) =>
     Effect.sync(() => watch.stop()),
-  ).pipe(Effect.andThen(Effect.never), Effect.scoped);
+  ).pipe(
+    Effect.andThen(
+      Effect.forkScoped(Stream.runForEach(livenessLines(lease), (l) => Effect.sync(() => console.log(livenessWords(l, how.json))))),
+    ),
+    Effect.andThen(Effect.never),
+    Effect.scoped,
+  );
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
 type Pass = Effect.Success<ReturnType<typeof tickRun>>;
@@ -162,12 +207,12 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   return runMain(daemon.pipe(Effect.scoped, Effect.provide(Layer.merge(telemetryLayer(process.env), feedHubLayer()))));
 }
 
-/** `nemia watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */
+/** `nemia watch`: the feed's lines as they come, from a cursor, and the store's liveness, until it is stopped (`watching`). */
 function watchVerb(args: Args): void | Promise<void> {
   const from = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
   const refusal = feedCursorRefusal(from);
   if (refusal) usage(refusal);
-  return runMain(watching(from));
+  return runMain(watching(from, { json: args.json === true, wake: wakeOf(args) }));
 }
 
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */

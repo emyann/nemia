@@ -16,6 +16,7 @@ import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub,
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
+import { isRunLine } from '../feed/feed.ts';
 
 const ROOT = scratch('wf-deliver-');
 process.env.WF_ROOT = ROOT;
@@ -167,7 +168,11 @@ test("a gate published to the process's hub is one say, as the daemon delivers i
     run: { word: 'awaiting approval', note: 'waiting on you: approve land' },
     steps: [{ name: 'land', word: 'awaiting approval' }],
   };
-  const others = new Set(readFeed().lines.map((l) => l.run));
+  const others = new Set(
+    readFeed()
+      .lines.filter(isRunLine)
+      .map((l) => l.run),
+  );
   await rt.runPromise(emitFeed(new Map([['r-25', judged]]), { unjudged: others }));
   await held(t, () => readDelivery('hub')?.cursor === feedSize(), 'the cursor at the end of the feed');
   assert.equal(toldTo('t-hub').length, 1, 'one say for the pass');
@@ -196,7 +201,15 @@ test(
     const awaiting = { run: { word: 'awaiting approval', note: 'waiting on you: approve land' }, steps: [] };
     const takenAll = () => rt.runSync(Effect.map(FeedHub, (hub) => (hub ? PubSub.sizeUnsafe(hub) : 1))) === 0;
     const published = (run: string) =>
-      rt.runPromise(emitFeed(new Map([[run, awaiting]]), { unjudged: new Set(readFeed().lines.map((l) => l.run)) }));
+      rt.runPromise(
+        emitFeed(new Map([[run, awaiting]]), {
+          unjudged: new Set(
+            readFeed()
+              .lines.filter(isRunLine)
+              .map((l) => l.run),
+          ),
+        }),
+      );
     await published('r-40');
     await held(t, () => (asked.get('t-busy') ?? []).length >= 1, 'the first message asked, its say failing');
     await published('r-41');
@@ -421,5 +434,29 @@ test(
     await stop();
     dropSubscription('floored');
     dropSubscription('everything');
+  },
+);
+
+test(
+  'a daemon’s line is carried by every subscription, scoped or not: routine in a digest kept on disk, a wake where it names daemon',
+  WAITED,
+  async (t) => {
+    const from = feedSize();
+    putSubscription('scoped-d', { task: 't-scoped-d', wake: [...DEFAULT_WAKE], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
+    putSubscription('woken-d', { task: 't-woken-d', wake: ['daemon'], digestEvery: 60, from });
+    const stop = running(t);
+    const started = { at: new Date().toISOString(), daemon: 5151, word: 'daemon started', note: 'first daemon on this store' };
+    appended(started);
+    await held(t, () => toldTo('t-woken-d').length === 1, 'the subscriber that names daemon woken');
+    assert.match(
+      toldTo('t-woken-d')[0],
+      /^The feed needs your judgement:\n {2}\S+ {2}pid 5151 {2}daemon started {2}· first daemon on this store$/,
+    );
+    await held(t, () => readDelivery('scoped-d')?.cursor === feedSize(), "the scoped one's cursor past the line");
+    assert.deepEqual(readDelivery('scoped-d')?.digest, [started], 'folded into its digest, and read back off its file');
+    assert.equal(toldTo('t-scoped-d').length, 0, 'routine by the default words');
+    await stop();
+    dropSubscription('scoped-d');
+    dropSubscription('woken-d');
   },
 );

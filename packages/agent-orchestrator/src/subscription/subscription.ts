@@ -3,11 +3,13 @@
  * and as one digest for routine news, said with the next wake or once `digestEvery` minutes have passed with none. The wake lines of one
  * read of the feed are told in one message.
  *
- * Pure: what a line means for a subscriber (`sortLine`), what one read of the feed comes to (`readDelivered`), the words it is told
- * (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a subscription asked for (`subscribeRefusalOf`).
+ * Pure: what a line means for a subscriber (`sortLine`) and for `nemia watch` (`wakeOf`, `watchedLine`), what one read of the feed comes
+ * to (`readDelivered`), the words it is told (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a
+ * subscription asked for (`subscribeRefusalOf`).
  * The person's file and the deliverer's are `subscription.store.ts`'s, the deliverer is `deliver.verb.ts`, and the commands are
  * `subscription.verb.ts`.
  */
+import type { Args } from '../command/command.ts';
 import { feedLineWords, type FeedLine } from '../feed/feed.ts';
 import { elapsedMs, type Instant } from '../daemon/daemon.ts';
 import { LEVELS, type Level } from '../level/level.ts';
@@ -65,6 +67,27 @@ export function sortLine(line: FeedLine, wake: readonly string[]): 'wake' | 'rou
   const notes = (line.note ?? '').split(' · ').map((part) => part.trim().toLowerCase());
   const woken = wake.map((w) => w.toLowerCase()).some((w) => word.includes(w) || notes.some((part) => part.startsWith(w)));
   return woken ? 'wake' : 'routine';
+}
+
+/** How `nemia watch` prints the feed: as JSON (`--json`), and only the lines a wake word in `wake` finds (`--wake`, `--wake-word`). */
+export type Watched = { json?: boolean; wake?: readonly string[] };
+
+/**
+ * The wake words of `nemia watch`'s arguments: `DEFAULT_WAKE` for `--wake`, and each `--wake-word` beside them — or undefined for
+ * neither, where every line is printed.
+ */
+export function wakeOf(args: Args): readonly string[] | undefined {
+  const words = [...(args.wake === true ? DEFAULT_WAKE : []), ...((args.wakeWord as readonly string[] | undefined) ?? [])];
+  return words.length > 0 ? words : undefined;
+}
+
+/**
+ * A line of the feed as `nemia watch` prints it, `cursor` the byte just after it: in words (`feedLineWords`), or one JSON object, the line
+ * whole with its cursor — or undefined where the watch keeps the wake lines and a wake word finds none in it (`sortLine`). Pure.
+ */
+export function watchedLine(line: FeedLine, cursor: number, how: Watched): string | undefined {
+  if (how.wake !== undefined && sortLine(line, how.wake) !== 'wake') return undefined;
+  return how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
 }
 
 /** The routine lines said under a heading, one a line with its time, and how many there are. */

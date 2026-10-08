@@ -130,8 +130,9 @@ is counted once, as its Agent tool.
 - **The command head** (`otelcol.yaml`, a transform the collector runs before its batch) gives each Bash `claude_code.tool` span that
   carries its command a `command_head`: past a leading `cd <dir> &&`, `NAME=value` words and the wrappers `timeout` (its flags and
   duration), `nohup`, `time` and `npx`, the first word, a second after a command of subcommands (`npm`, `git`, `turbo`, `docker`…), and
-  a third after its `run`; a flag, path, quote, `$`, `=` or the next line ends it. `npx turbo run test --force` is `turbo run test`,
-  `git commit -m "…"` is `git commit`, and a command it does not read, `./run.sh`, is `other`. No argument gets in, so it is a label.
+  a third after the `run` of a package runner (`npm`, `pnpm`, `yarn`, `turbo`) alone; a flag, path, quote, `$`, `=` or the next line
+  ends it. `npx turbo run test --force` is `turbo run test`, `docker run postgres:16-alpine` is `docker run`, `git commit -m "…"` is
+  `git commit`, and a command it does not read, `./run.sh`, is `other`. No argument gets in, so it is a label.
 - **Span metrics** (Tempo's generator) keep span time by factory, workflow, step, agent, span type, `tool_name`, `bash_command_class` and
   `command_head`, never by a run or a task, and leave a subagent's spans out (`agent_id`). They are written as
   `traces_spanmetrics_latency_{bucket,count,sum}` (seconds), `traces_spanmetrics_calls_total` and `traces_spanmetrics_size_total`, each

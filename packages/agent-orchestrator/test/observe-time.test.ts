@@ -45,8 +45,8 @@ function headOf(config: Collector, command: string): string {
 }
 
 /**
- * Commands and their heads: a command of subcommands keeps its subcommand and a `run`'s script, wrappers and a leading `cd` are
- * skipped, and a flag, path, quote, `$`, `=` or the next line ends the head, so no argument gets in.
+ * Commands and their heads: a command of subcommands keeps its subcommand, a package runner (npm, pnpm, yarn, turbo) a `run`'s script
+ * too, wrappers and a leading `cd` are skipped, and a flag, path, quote, `$`, `=` or the next line ends the head, so no argument gets in.
  */
 const HEADS: [string, string][] = [
   ['npm test', 'npm test'],
@@ -58,6 +58,11 @@ const HEADS: [string, string][] = [
   ['timeout 580 bash -c "while kill -0 12; do sleep 5; done"', 'bash'],
   ['timeout --foreground 60 node --test test/a.test.ts', 'node'],
   ['nohup docker compose up -d', 'docker compose'],
+  ['docker run postgres:16-alpine', 'docker run'],
+  ['go run main.go', 'go run'],
+  ['cargo run --release', 'cargo run'],
+  ['pnpm run build', 'pnpm run build'],
+  ['yarn run lint', 'yarn run lint'],
   ['git commit -m "a secret said in a message"', 'git commit'],
   ['git -C /repo log --oneline', 'git'],
   ['git log;rm -rf /', 'git log'],
@@ -183,7 +188,7 @@ test('a Bash tool span gets the plain words of its command, before the batch, an
   for (const [command, head] of HEADS) assert.equal(headOf(COLLECTOR, command), head, command);
 });
 
-test('REFUSED: the head after the batch, on every span, by two patterns, or with an argument in it', () => {
+test("REFUSED: the head after the batch, on every span, by two patterns, or with an argument in it, a script's or an image's", () => {
   const changed = (edit: (c: Collector) => void): string[] => {
     const config = structuredClone(COLLECTOR);
     edit(config);
@@ -222,6 +227,13 @@ test('REFUSED: the head after the batch, on every span, by two patterns, or with
       '"git commit -m \\"a secret said in a message\\"" has the head git commit -m "a secret said in a message", not git commit',
     ),
     wide.join('\n'),
+  );
+  assert.deepEqual(
+    changed((c) => {
+      const statements = groupOf(c)!.statements!;
+      statements[1] = statements[1].replaceAll('(?:npm|pnpm|yarn|turbo)(', '(?:npm|pnpm|yarn|turbo|docker)(');
+    }),
+    ['"docker run postgres:16-alpine" has the head docker run postgres:16-alpine, not docker run'],
   );
 });
 

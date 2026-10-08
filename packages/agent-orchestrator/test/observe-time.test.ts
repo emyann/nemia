@@ -53,7 +53,7 @@ const HEADS: [string, string][] = [
   ['npm run typecheck', 'npm run typecheck'],
   ['npm run build:web -- --pages time', 'npm run build:web'],
   ['npx turbo run test --force --continue', 'turbo run test'],
-  ['cd /home/someone/repo && npm run lint', 'npm run lint'],
+  ['cd ~/repo && npm run lint', 'npm run lint'],
   ['FOO=1 BAR=/x npm test', 'npm test'],
   ['timeout 580 bash -c "while kill -0 12; do sleep 5; done"', 'bash'],
   ['timeout --foreground 60 node --test test/a.test.ts', 'node'],

@@ -1,9 +1,10 @@
 /**
- * A step's task is filed with its run and its step as labels (`stepLabels`), which the runtime hands each of its sessions beside the task's
- * id: a ready step, a try and a round alike, walked through the runtime itself over an in-memory journal and a harness that keeps what it
- * was asked to spawn. And the client's `engine()` hands the runtime the collector the process exports to (`otlpOf`), and none when it
- * exports nowhere; and asks its sessions for their tools' inputs only when `NEMIA_TOOL_DETAILS` is `1` (`sessionTelemetryOf`), which a
- * stub harness on PATH reads back. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
+ * A step's task is filed with its run, its factory, its workflow, the step and its agent as labels (`stepLabels`), which the runtime hands
+ * each of its sessions beside the task's id, by the same keys as its metrics (`stepAttributes`): a ready step, a try and a round alike,
+ * walked through the runtime itself over an in-memory journal and a harness that keeps what it was asked to spawn. And the client's
+ * `engine()` hands the runtime the collector the process exports to (`otlpOf`), and none when it exports nowhere; and asks its sessions
+ * for their tools' inputs only when `NEMIA_TOOL_DETAILS` is `1` (`sessionTelemetryOf`), which a stub harness on PATH reads back.
+ * `WF_ROOT` is set before the runner is imported: it is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,9 +23,10 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { engine: clientEngine } = await import('../src/runtime-client.ts');
+const { stepAttributes } = await import('../src/meter/step.ts');
 
 type Event = Parameters<AsyncJournal['append']>[1];
 
@@ -126,27 +128,56 @@ fs.writeFileSync(
   JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),
 );
 
-test("a ready step's, a round's and a try's sessions are each handed their run and their step beside their own task", async () => {
+/** The labels a session of `step` in `run` is handed, beside its own `task`: the run's, the default factory's and no agent's. */
+const labelled = (run: string, step: string, task: string) =>
+  ({ run, factory: 'default', workflow: path.basename(LOOPED), step, agent: 'none', task }) as const;
+
+test("a ready step's, a round's and a try's sessions are each handed their run, factory, workflow, step and agent beside their own task", async () => {
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }));
   const first = `${run.id}-implement`;
   assert.deepEqual((await pass(run.id)).filed, ['implement']);
-  assert.deepEqual((await started(run.id, first)).resource, { run: run.id, step: 'implement', task: first }, 'a ready step');
+  assert.deepEqual((await started(run.id, first)).resource, labelled(run.id, 'implement', first), 'a ready step');
   sign(first);
   assert.deepEqual((await pass(run.id)).filed, ['review']);
   const review = `${run.id}-review`;
-  assert.deepEqual((await started(run.id, review)).resource, { run: run.id, step: 'review', task: review });
+  assert.deepEqual((await started(run.id, review)).resource, labelled(run.id, 'review', review));
   sign(review, { again: true });
   await pass(run.id);
   const round = readRun(run.id).steps.implement.taskId!;
   assert.notEqual(round, first, 'the round is filed');
-  assert.deepEqual((await started(run.id, round)).resource, { run: run.id, step: 'implement', task: round }, 'a round');
+  assert.deepEqual((await started(run.id, round)).resource, labelled(run.id, 'implement', round), 'a round');
   fail(round);
   await pass(run.id);
   await runWith(engine, retryRun(run.id, 'implement', { mode: 'fresh' }));
   await pass(run.id);
   const retried = readRun(run.id).steps.implement.taskId!;
   assert.notEqual(retried, round, 'the try is filed');
-  assert.deepEqual((await started(run.id, retried)).resource, { run: run.id, step: 'implement', task: retried }, 'a try');
+  assert.deepEqual((await started(run.id, retried)).resource, labelled(run.id, 'implement', retried), 'a try');
+});
+
+test("a session of a step in a factory, worked by an agent it hired, is handed that factory and that agent's name", async () => {
+  const repo = aRepo();
+  const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
+  fs.mkdirSync(path.join(team, 'agents'));
+  fs.writeFileSync(path.join(team, 'agents', 'worker.md'), '---\nname: worker\n---\nDo the work.\n');
+  fs.mkdirSync(path.join(team, 'hired'));
+  fs.writeFileSync(path.join(team, 'hired', 'work.md'), '---\nplace: git\n---\nWork it.\n');
+  addFactory({ name: 'labelled', repos: [repo] });
+  attachWorkflow({ factory: 'labelled', workflow: 'hired' });
+  hireAgent({ factory: 'labelled', agent: 'worker', step: 'hired/work' });
+  const workflowDir = path.join(team, 'hired');
+  const run = await Effect.runPromise(startRun({ brief: 'work it', repo, workflowDir, isolate: false, factory: 'labelled' }));
+  const task = `${run.id}-work`;
+  assert.deepEqual((await pass(run.id)).filed, ['work']);
+  const { resource } = await started(run.id, task);
+  assert.deepEqual(resource, { run: run.id, factory: 'labelled', workflow: 'hired', step: 'work', agent: 'worker', task });
+  const { outcome, ...keys } = stepAttributes(
+    run,
+    readRun(run.id).workflow!.find((s) => s.name === 'work')!,
+    'done',
+  );
+  assert.equal(outcome, 'done');
+  assert.deepEqual({ run: run.id, ...keys, task }, resource, 'the keys its metrics are kept by, the same');
 });
 
 /** Sets each of `vars` in this process's environment for the rest of test `t`, and deletes each given `undefined`. */

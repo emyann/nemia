@@ -1250,6 +1250,219 @@
       }
     },
     {
+      "id": 32,
+      "type": "bargauge",
+      "title": "Queue wait, p50 and p95",
+      "description": "step.queue.duration: a session's wait from filing to its first spawn.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le, workflow, step) (increase(step_queue_duration_bucket{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])))",
+          "legendFormat": "{{workflow}} / {{step}} p50",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, workflow, step) (increase(step_queue_duration_bucket{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])))",
+          "legendFormat": "{{workflow}} / {{step}} p95",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 33,
+      "type": "bargauge",
+      "title": "Check time, p50 and p95",
+      "description": "step.check.duration: a check's time from its spawn to its end.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 53,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le, workflow, step) (increase(step_check_duration_bucket{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])))",
+          "legendFormat": "{{workflow}} / {{step}} p50",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, workflow, step) (increase(step_check_duration_bucket{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])))",
+          "legendFormat": "{{workflow}} / {{step}} p95",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 34,
+      "type": "bargauge",
+      "title": "Gate wait, p50 and p95",
+      "description": "step.gate.wait: a gate's wait from its step's end to its approval.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 53,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le, workflow, step) (increase(step_gate_wait_bucket{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])))",
+          "legendFormat": "{{workflow}} / {{step}} p50",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, workflow, step) (increase(step_gate_wait_bucket{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])))",
+          "legendFormat": "{{workflow}} / {{step}} p95",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
       "id": 22,
       "type": "row",
       "title": "Feed, subscriptions and Nemia",
@@ -1258,7 +1471,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 62
       },
       "panels": []
     },
@@ -1273,7 +1486,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 54,
+        "y": 63,
         "w": 6,
         "h": 7
       },
@@ -1325,7 +1538,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 54,
+        "y": 63,
         "w": 6,
         "h": 7
       },
@@ -1386,7 +1599,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 54,
+        "y": 63,
         "w": 6,
         "h": 7
       },
@@ -1465,7 +1678,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 54,
+        "y": 63,
         "w": 6,
         "h": 7
       },
@@ -1515,7 +1728,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 70
       },
       "panels": []
     },
@@ -1525,7 +1738,7 @@
       "title": "",
       "gridPos": {
         "x": 0,
-        "y": 62,
+        "y": 71,
         "w": 24,
         "h": 2
       },
@@ -1545,7 +1758,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 73,
         "w": 12,
         "h": 16
       },
@@ -1574,7 +1787,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 64,
+        "y": 73,
         "w": 12,
         "h": 16
       },

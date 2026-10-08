@@ -75,6 +75,7 @@ const runBase = {
   factory: Schema.optional(Schema.String),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
   slotHeldAt: Schema.optional(Schema.String),
+  gatesTimed: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number })))),
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
   steps: Schema.Record(Schema.String, StepRecordSchema),
@@ -417,10 +418,7 @@ const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
 const ApprovalFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Schema.optionalKey(Said) }), Rest);
 const AcceptanceFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Said }), Rest);
-const RoundAskFileSchema = Schema.StructWithRest(
-  Schema.Struct({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) }),
-  Rest,
-);
+const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
 const RetryAskFileSchema = Kept({
   mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
   model: Schema.optionalKey(Schema.NonEmptyString),

@@ -28,5 +28,5 @@ export type {
   Reading,
   RecentPass,
 } from './meter.ts';
-export { roundsGranted, settledFacts } from './step.ts';
-export type { StepFact } from './step.ts';
+export { checkWait, gateWaits, queueWait, roundsGranted, settledFacts, settledWaits, stepKeys } from './step.ts';
+export type { StepFact, StepKeys, Wait, WaitFact, Waited } from './step.ts';

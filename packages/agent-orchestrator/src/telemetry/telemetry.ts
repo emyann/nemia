@@ -3,6 +3,9 @@
  * (`otlpOf`), what the sessions it starts export (`sessionTelemetryOf`, `toolDetailsRefusalOf`), what a step's task says it is for
  * (`stepLabels`), and a log as the line `nemia up` prints (`lineOf`). The layer that acts on them is `telemetry.store.ts`'s.
  */
+import type { Run } from '../record/record.ts';
+import type { Workflow } from '../step/step.ts';
+import { stepKeys, type StepKeys } from '../meter/index.ts';
 
 /** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
 export type Otlp = { url: string; serviceName: string };
@@ -44,10 +47,16 @@ export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undef
 }
 
 /**
- * The labels a step's task is filed with and its spans and logs say: the run `run` and the step `step`, which its sessions' telemetry
- * says beside the runtime's own task.
+ * The labels a step's task is filed with and its spans and logs say: the run `run`, and the step's own (`stepKeys`): its factory, its
+ * workflow, the step and its agent, the same its metrics are kept by. Its sessions' telemetry says them beside the runtime's own task.
  */
-export const stepLabels = (run: string, step: string): { run: string; step: string } => ({ run, step });
+export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: Workflow): StepLabels => ({
+  run: run.id,
+  ...stepKeys(run, step),
+});
+
+/** What `stepLabels` answers: a run's id beside the step's own labels. */
+export type StepLabels = StepKeys & { run: string };
 
 /** Where an OTLP collector at `otlp` takes traces. */
 export const tracesUrl = (otlp: Otlp): string => `${otlp.url}/v1/traces`;

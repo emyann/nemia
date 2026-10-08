@@ -1,12 +1,14 @@
 /**
- * What a run took: its time at work and the tokens its sessions used, off the engine's views of its tasks.
+ * What a run took: its time at work and the tokens its sessions used, off the engine's views of its tasks; and how long a person took to
+ * approve a try at a gate (`gateWaitOf`), off its timeline.
  *
  * Pure, as `timeline.ts` is: a run and the views in, the figures and their words out. The api hands them to the board beside the run's
  * cost, and the board adds the time since a task still running started, which only it can count second by second.
  */
 import { runTasks, type Run } from '../record/record.ts';
 import { count, sessionTasks, type Consumed } from '../status/status.ts';
-import { signedAndHeld, taskUsage, type AttemptClock, type TaskClock } from './timeline.ts';
+import type { Workflow } from '../step/step.ts';
+import { signedAndHeld, taskUsage, type AttemptClock, type TaskClock, type Timeline, type TimelineTry } from './timeline.ts';
 
 /**
  * A run's time at work: how long any session or check of it was running, two at once counted once, and a wait at a gate, a hold, a slot
@@ -135,4 +137,34 @@ export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, Ta
     said: `${unmeasured ? '≥' : ''}${count(input + output)} tokens`,
     split: `${[...parts, `${count(output)} out`].join(' · ')}${missing}`,
   };
+}
+
+/** When a try ended: its check's end, or its session's where it has no check; null while either is in flight. */
+export const tryEndOf = (t: TimelineTry): string | null => (t.check ? t.check.endedAt : (t.session?.endedAt ?? null));
+
+/** The ms from `from` to `to`, never negative; null with no `from`. */
+const msBetween = (from: string | null, to: string): number | null => (from ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
+
+/**
+ * How long a person took to approve try `t` of `step` in `run`, off the run's timeline `tl`: from the try's end to the approval of that
+ * step and that try, or, for a step approved before it is filed (an ending in the checkout at a gate), from the latest end of the steps
+ * it waits on before the approval. Null with no approval. The one rule of a gate's wait: `nemia stats` and the tick's metric
+ * (`gateWaits`) both read it.
+ */
+export function gateWaitOf(
+  run: Pick<Run, 'approvals'>,
+  tl: Timeline,
+  step: Pick<Workflow, 'name' | 'after'>,
+  t: TimelineTry,
+): number | null {
+  const approval = run.approvals?.find((a) => a.step === step.name && a.try === t.try);
+  if (!approval) return null;
+  const end = tryEndOf(t);
+  if (end && end <= approval.at) return msBetween(end, approval.at);
+  const before = step.after
+    .flatMap((name) => (tl.steps[name] ?? []).map(tryEndOf))
+    .filter((at): at is string => at !== null && at <= approval.at)
+    .sort()
+    .at(-1);
+  return msBetween(before ?? null, approval.at);
 }

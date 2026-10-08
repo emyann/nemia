@@ -1,0 +1,106 @@
+---
+title: Nemia
+description: The store's own agent - her levels, the keeper that runs her, her subscription to the feed, what she brings you and what she never does.
+---
+
+Nemia is the name of the whole system, of its command `nemia`, and of the store's own agent. This page is about the agent.
+
+She watches every factory of the store for you. She is a long-lived session, woken by the feed. She brings you what waits on you, with a
+recommendation; she recaps what moved; she carries your answer back as a `nemia` verb; and she does the rest on her own judgement,
+within the level you set. She is not one of the workers: she never writes in a factory's repositories, and never does a step's work.
+
+**She owns** her session, her memory, and the store's work you have handed her: watching runs, starting cards, holding a run, telling a
+step something.
+
+**She never touches** what is yours to decide: a gate, a step's question to you, a loop out of rounds, a step at its budget, and your
+levels.
+
+**She is reached through** chat with her session, from a terminal, the board, or a phone once her bridge is up. `nemia level` says where
+she is and how to reach her.
+
+## Her levels
+
+A level is how much you hand over. There are three (`LEVELS`, in `packages/agent-orchestrator/src/level/level.ts`), set on the store
+and, if you like, on each factory:
+
+- **`manual`**: she is off. Nothing runs her.
+- **`semi-auto`**: she is on. Only what waits on you prompts you: an answer to a gate, a question, a loop or a cap is asked of you, and
+  so is a write that cannot be undone or changes your settings or a factory. The rest is hers.
+- **`auto`**: as `semi-auto`, with one difference: an answer your confirmed list allows, in the run's current state, she gives without
+  asking. The rule that ships, "decide when all agree", approves only when five conditions all hold: the step signed `done` with a
+  recommendation for each question (`recommends`), its check exited 0 (`checked`), no loop asks for another round (`accepted`), no
+  step is past its budget (`withinBudget`), and nothing else waits on you (`nothingOpen`). Anything else still asks you.
+
+```bash
+nemia level                        # where she is: her level, her session, how to reach her
+nemia level semi-auto              # put her on
+nemia level --factory pipao auto   # one factory at auto
+nemia level manual                 # put her off
+```
+
+A factory's level can also be raised for a stretch of time, and falls back to its own default after it (`Raise`).
+
+## What she is allowed to do
+
+Her fence is enforced, not written as advice. Before each of her shell calls, a hook asks her admission, `nemia admit`: a call's
+admission, run by the runtime as the session's `callAdmission`. It looks up the command's class
+(`packages/agent-orchestrator/src/admission/class.ts`) and decides whether the call runs, or prompts you first. A "don't ask again"
+never widens what waits on you.
+
+On top of that, her agent file (`packages/agent-orchestrator/nemia/nemia.md`) denies outright, whatever the level:
+
+- pushing, merging or deleting a branch, or resetting one by force;
+- opening, merging or closing a pull request, or making a release;
+- stopping a process by its name;
+- running the older `wf` or the runtime's `ae` commands, around her own verbs.
+
+And her instructions say what she never does: answer a gate on her own judgement beyond your confirmed list, scan the disk for
+repositories, raise a level, or edit a run's record, a journal or a factory's files by hand. When the machinery is wrong, she says so
+and proposes the fix.
+
+Before she acts in a factory, she reads its [instruction](/factories/#its-instruction).
+
+## The keeper
+
+Nobody starts Nemia by hand. The daemon's keeper does (`packages/agent-orchestrator/src/nemia/keep.verb.ts`). On each beat it reads
+the levels again, reads her task off the runtime and her subscription off the store, and does what is owed (`nemiaDue`):
+
+- While any factory is above `manual`, her task is filed as a long-lived session, and once it is open she is subscribed to the feed.
+- Once none is, her session is stopped and her subscription dropped.
+- When your custom instruction for her changes, her open session is told the new words through the runtime's `say`, with no restart.
+- A session stopped from outside is never filed again: setting a level above `manual` again starts a fresh one.
+
+The keeper is level-triggered like the tick: it carries nothing between beats, so after a restart it owes exactly what the files and
+the runtime say. Its machine is drawn from its code:
+
+```mermaid diagram=nemia
+
+```
+
+Read it this way: she is `off` until a factory is above `manual`, then `due` to be filed. If the harness does not yet trust her folder,
+she waits `untrusted` until it does. Once `filed`, she is subscribed and `kept`. A session that settles from outside leaves her
+`stopped`. When no factory is above `manual`, she is `leaving` until her session is stopped and her subscription dropped, then `off`.
+
+## Her subscription
+
+Nemia is woken by the feed, the line of everything the daemon writes. Her subscription to it is named `nemia`
+(`NEMIA_SUBSCRIPTION`, in `packages/agent-orchestrator/src/nemia/nemia.ts`), and is hers alone. When a feed line matches its wake words,
+she is told, and looks.
+
+This is the orchestrator's subscription to the store's feed. It is not A2A's subscription to a session's Task, which the board uses to
+follow a step live (see [A2A](/a2a/#a-subscription)).
+
+## Her memory, and your words for her
+
+- **Her memory** is one fact a file, in `~/.agent-workflows/nemia/memory/` (`WF_ROOT`). `nemia memory` reads it. She alone writes it.
+- **Your custom instruction for her** is `~/.agent-workflows/custom-instructions/nemia.md`, written on the board's Settings or with
+  `nemia agents custom nemia`: your language, your time zone, when you want her to answer for you. It is one of her
+  [instruction layers](/agents/#what-an-agent-is-told-four-layers).
+
+## Sources
+
+This page is written from `packages/agent-orchestrator/README.md` (_Nemia, the store's own agent_),
+`packages/agent-orchestrator/docs/features.md` (the Nemia sections, weighed against the code), and from
+`packages/agent-orchestrator/nemia/nemia.md`, `packages/agent-orchestrator/src/nemia/nemia.ts`,
+`packages/agent-orchestrator/src/nemia/keep.verb.ts`, `packages/agent-orchestrator/src/level/level.ts` and
+`packages/agent-orchestrator/src/admission/class.ts`.

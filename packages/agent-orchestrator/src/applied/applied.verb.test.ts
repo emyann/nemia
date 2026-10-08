@@ -303,7 +303,7 @@ test("a templated factory's due schedule starts its tree's workflow, as a person
   const review = path.join(treeDir('scheduled'), 'workflows', 'dev', 'review.md');
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
   await main(['factory', 'schedule', 'scheduled', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views'], NO_ENGINE);
-  const started = await runWith(NO_ENGINE, startDue(repo, [], Date.now() + 120_000));
+  const started = await runWith(NO_ENGINE, startDue(repo, [], Date.parse('2100-01-01T00:00:00Z')));
   assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
   const run = readRun(started.run);
   assert.equal(run.workflowDir, path.join(treeDir('scheduled'), 'workflows', 'dev'));

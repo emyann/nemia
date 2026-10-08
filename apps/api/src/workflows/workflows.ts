@@ -255,7 +255,8 @@ export const loadedOf = async (e: Engine['Service'], dirs: readonly string[], re
 
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
- * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a factory, which steps its hires leave unfilled.
+ * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
+ * factory, which steps its hires leave unfilled.
  */
 export async function listWorkflows(e: Engine['Service'], repo: string, home: string, factory?: Factory): Promise<WorkflowListing[]> {
   const folders = unshadowed(

@@ -199,7 +199,9 @@ export const remoteFollowOf =
       }),
     );
 
-/** The conversation of the session `e`, which goes by `sessionId`, from `after` on: `remoteTranscriptOf`'s and `remoteTranscriptByName`'s. */
+/**
+ * The conversation of the session `e`, which goes by `sessionId`, from `after` on: `remoteTranscriptOf`'s and `remoteTranscriptByName`'s.
+ */
 const transcriptOfEntry = async (d: FollowDeps, e: Entry | undefined, sessionId: string, after?: TranscriptCursor): Promise<Transcript> => {
   const none: Transcript = { events: [], cursor: after ?? remoteCursorOf('', 0) };
   if (e?.reply !== undefined) {

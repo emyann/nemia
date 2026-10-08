@@ -222,7 +222,7 @@ test('a plan stopped part-way says which card refused and why, names the runs th
   );
 });
 
-test("`cardToStart`: a card file starts its body, with its `workflow:` and `after:` — a file whose frontmatter is not a card's, or that has none, is not a card and is taken whole; a card naming `after:` with no --after is refused, naming the ids to give", () => {
+test('`cardToStart`: a card file starts its body, with its `workflow:` and `after:` — a file with no frontmatter of keys is not a card and is taken whole; a card naming `after:` with no --after is refused, naming the ids to give', () => {
   assert.deepEqual(cardToStart('plans/q3/c.md', '---\nworkflow: ui\nafter: a\n---\nStore the flag.\n\nIn the settings file.\n', ['r-a']), {
     file: 'plans/q3/c.md',
     workflow: 'ui',
@@ -243,8 +243,8 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
 
   for (const text of [
     'Parse the flag.\n',
-    '---\ntitle: the flag\nworkflow: dev\n---\nParse it.\n',
     '---\nSome prose between two rules\n---\nParse it.\n',
+    '---\nIn short: parse it\n---\nParse it.\n',
     '---\nA brief that opens with a rule, and never closes one.\n',
     '---\n---\nParse it.\n',
     '---\n\n# only a comment\n---\nParse it.\n',
@@ -284,5 +284,32 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
   assert.throws(
     () => cardToStart('idea.md', '---\nrepo: /home/me/code/app\n---\nx\n', []),
     refusedWith(/^idea\.md: `repo` is not a key a plan's card has:/),
+  );
+});
+
+test("`cardToStart`: a file that opens with a frontmatter block of keys is never started with the block as its brief: a key a plan's card lacks is refused by name, naming nemia inbox add <file>", () => {
+  const inboxAdd = (file: string, key: string) =>
+    refusedWith(
+      new RegExp(
+        `^${file.replace('.', '\\.')}: \`${key}\` is not a key a plan's card has: [^]*nemia inbox add ${file.replace('.', '\\.')}[ ,;.)]`,
+      ),
+    );
+  assert.throws(
+    () => cardToStart('card.md', '---\nworkflow: build\nrepo: /home/me/code/app\nfactory: nemia\n---\nShip the thing.\n', []),
+    inboxAdd('card.md', 'repo'),
+    "an inbox card's frontmatter written outside the inbox: refused at its first key a plan's card lacks, never started as its brief",
+  );
+  assert.throws(() => cardToStart('card.md', '---\nworkflow: build\nfactory: nemia\n---\nShip it.\n', []), inboxAdd('card.md', 'factory'));
+  assert.throws(() => cardToStart('card.md', '---\nfactory: nemia\n---\nx\n', []), inboxAdd('card.md', 'factory'));
+  assert.throws(() => cardToStart('card.md', '---\ngate: plan\n---\nx\n', []), inboxAdd('card.md', 'gate'));
+  assert.throws(
+    () => cardToStart('brief.md', '---\ntitle: the flag\nworkflow: dev\n---\nParse it.\n', []),
+    inboxAdd('brief.md', 'title'),
+    "a document's own frontmatter is refused too, naming its key: nemia start takes no block into a brief",
+  );
+  assert.throws(
+    () => cardToStart('brief.md', '---\nTitle-2 : the flag\n---\nParse it.\n', []),
+    inboxAdd('brief.md', 'Title-2'),
+    'a key is a word of letters, digits, _ and -, before a colon',
   );
 });

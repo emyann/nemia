@@ -59,8 +59,8 @@ function cardArgs(card: string, args: Args): Args {
 }
 
 /**
- * A brief's arguments: a file that is not a plan's card (`cardToStart`) is the whole brief, frontmatter and all, and a card's own
- * `workflow:` is found from its plan folder.
+ * A brief's arguments: a file that opens with a frontmatter block of keys is a plan's card, or refused by the key a plan's card lacks
+ * (`cardToStart`); any other file is the whole brief; and a card's own `workflow:` is found from its plan folder.
  */
 function briefArgs(arg: string, args: Args): Args {
   if (args.instead !== undefined)

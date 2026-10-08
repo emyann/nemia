@@ -37,9 +37,9 @@ function aRepo(): string {
 const runsWritten = (): string[] =>
   fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')) : [];
 
-/** `startRun` of `workflowDir` in a repository of its own: the run's id, or the refusal it failed with. */
-function started(workflowDir: string): string {
-  const exit = Effect.runSyncExit(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir }));
+/** `startRun` of `workflowDir` in a repository of its own, given `inputs`: the run's id, or the refusal it failed with. */
+function started(workflowDir: string, inputs?: string[]): string {
+  const exit = Effect.runSyncExit(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, ...(inputs ? { inputs } : {}) }));
   if (exit._tag === 'Success') return exit.value.id;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }
@@ -82,4 +82,15 @@ test("REFUSED at `nemia start`: a step in the checkout after another is refused 
 test('a step filed no rule naming a path under the store starts in the same root: the refusal is asked of the steps, not of the root alone', () => {
   const id = started(PLAIN);
   assert.ok(runsWritten().includes(`${id}.json`));
+});
+
+test("REFUSED at `nemia start --input`: the same lone step, filed its run's inputs folder read-only, is refused in the store's words, and no run is written", () => {
+  const given = path.join(ROOT, 'notes.md');
+  fs.writeFileSync(given, 'notes\n');
+  const before = runsWritten();
+  assert.throws(
+    () => started(PLAIN, [given]),
+    (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message === storeWords('implement', "the run's inputs folder"),
+  );
+  assert.deepEqual(runsWritten(), before);
 });

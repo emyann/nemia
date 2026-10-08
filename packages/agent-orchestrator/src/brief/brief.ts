@@ -118,13 +118,12 @@ const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly 
  *   (`--from`): what each concluded (`handedSection`), the runs waited on first, gathered by file.verb.ts. Given to no other step: a run
  *   with neither, and every step after a root, is composed without it.
  * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with
- * `run.inputs`,
- *   under what was asked for.
+ *   `run.inputs`, under what was asked for, as mounted where `folders` holds it (`inputsLine`).
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
  * @param folders The folders the step is filed with beyond its factory's, each read-only (`filedFolders` in filed.ts): the artifacts
- *   folders of the steps before it and the store's its `reads:` names, named under what was asked for (`mountsLine`). Absent, and
- *   nothing is said of them.
+ *   folders of the steps before it and the store's its `reads:` names, named under what was asked for (`mountsLine`), and the run's
+ *   inputs folder, named so on the inputs line (`inputsLine`). Absent, and nothing is said of them.
  * @param costs For a step whose `reads:` names `costs`: what recent finished runs of its workflow in its factory cost (`costsRead`), read
  *   by file.verb.ts and said among what the step is handed (`costsSection`). Absent, and nothing is said of costs.
  * @param place What the run's place says (`BriefPlace`): for an ending that lands on its check, how it stages the merge and what it
@@ -171,7 +170,7 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const inputs = inputsLine(inputsDir, run.inputs, inFolder);
+  const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders);
   const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, folders)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];

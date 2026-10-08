@@ -47,3 +47,17 @@ test('a step whose filing names nothing under the store in a rule is let through
   assert.equal(refusal('/srv/wf*', [{ ...LONE_SHIP, harness: 'codex' }]), undefined);
   assert.equal(refusal('/srv/wf*', [IMPLEMENT, { ...SHIP, harness: 'codex' }, { ...TRIAGE, harness: 'a2a:x' }]), undefined);
 });
+
+test("REFUSED: a `(` in the root, for a lone step of a run given inputs, names the run's inputs folder; given none, the same step starts", () => {
+  const root = '/srv/my wf (old)';
+  const t = { runArtifacts: path.join(root, 'runs', 'r', 'artifacts'), inbox: path.join(root, 'inbox') };
+  assert.match(
+    storeRootRefusal(root, [IMPLEMENT], { ...t, inputs: path.join(root, 'runs', 'r', 'inputs') }) ?? '',
+    /^implement: its harness would be given the run's inputs folder by a permission rule naming a path under the store, WF_ROOT=\/srv\/my wf \(old\)/,
+  );
+  assert.equal(storeRootRefusal(root, [IMPLEMENT], t), undefined);
+  assert.equal(
+    storeRootRefusal(root, [{ ...IMPLEMENT, harness: 'codex' }], { ...t, inputs: path.join(root, 'runs', 'r', 'inputs') }),
+    undefined,
+  );
+});

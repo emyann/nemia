@@ -4611,6 +4611,28 @@ test('a run given inputs names them once, under what was asked for, on every bri
   );
 });
 
+test("a step filed its run's inputs folder is told it there, to read and never write; a step filed none, a folder run's copy and the board's preview as before", () => {
+  const DIR = '/wf/runs/r-1/inputs';
+  const inputs = ['mock.png', 'brief notes.md'];
+  const mounted = { handed: [], store: [], inputs: [{ path: DIR, readOnly: true }] };
+  const said =
+    'Files given with it (`nemia start --input`), which you may read and must not write, in `/wf/runs/r-1/inputs`: `mock.png`, `brief notes.md`. The folder is mounted read-only; read them with Read, Grep and Glob.';
+  assert.equal(inputsLine(DIR, inputs, false, mounted), said);
+  assert.equal(inputsLine(DIR, inputs, false, { inputs: [] }), inputsLine(DIR, inputs), 'a step filed none, as codex is: named on disk');
+  assert.equal(inputsLine(DIR, [], false, mounted), undefined, 'a run given none');
+  assert.equal(
+    inputsLine(DIR, inputs, true, mounted),
+    'Files given with it (`nemia start --input`), copied into `given/inputs` in this folder: `mock.png`, `brief notes.md`.',
+    "a folder run's step reads its copy",
+  );
+  const r = run({ implement: null, review: null }, { inputs });
+  const brief = (folders?: typeof mounted) =>
+    composeBrief(step('implement'), r, STEPS, undefined, undefined, undefined, undefined, undefined, undefined, DIR, undefined, folders);
+  assert.equal(brief(mounted).split(said).length, 2, brief(mounted));
+  assert.equal(brief(mounted).replace(said, inputsLine(DIR, inputs)!), brief(), 'the line alone differs');
+  assert.doesNotMatch(brief({ ...mounted, inputs: [] }), /mounted read-only/, 'a step filed none is told none');
+});
+
 test("`nemia decide` names a run's inputs under its line, and a run given none says nothing of them", () => {
   assert.equal(
     inputsNote('/wf/runs/r-1/inputs', ['mock.png', 'brief notes.md']),

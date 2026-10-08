@@ -1586,6 +1586,13 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
   A brief that continues a session is not told again, as it is not told the request again: a step that `resume:`s
   another, a nudge, a round that continues its target. A run given none composes exactly as before.
 
+  The directory is outside the workspace, so the run files it read-only on each step of a repository run on a harness fenced
+  by a permission mode, its first filing, a try and a round (`inputsMounts`, in `filedFolders`), and the line names it so:
+  ``Files given with it (`wf start --input`), which you may read and must not write, in `<dir>`: … The folder is mounted
+  read-only; read them with Read, Grep and Glob.`` Codex reads the disk in its sandbox and is filed none; a remote agent is
+  filed no local field, and its brief says the files are not sent to it. A run given none mounts nothing. A store whose path no
+  permission rule can name refuses `wf start --input` of such a step, in the store's words, before anything is written.
+
   On a folder run the directory is outside the step's fence, so the run copies the files into each folder it makes and
   the line names the copy: ``Files given with it (`wf start --input`), copied into `given/inputs` in this folder: …``
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.

@@ -51,11 +51,24 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
  * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow/validate.ts): the run's own
  * `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say
  * so. The run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
+ *
+ * `folders`, the folders the step is filed with (`filedFolders` in filed.ts): where they hold the run's inputs folder, mounted read-only
+ * (`inputsMounts`), the line names it by the mount's path, to read and never write. Without it, the folder is named as it is on disk: a
+ * harness fenced by a sandbox reads it there, and the board's preview composes without folders.
  */
-export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined, inFolder = false): string | undefined =>
-  dir && names?.length
-    ? `Files given with it (\`nemia start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${names.map((n) => `\`${n}\``).join(', ')}.`
-    : undefined;
+export const inputsLine = (
+  dir: string | undefined,
+  names: readonly string[] | undefined,
+  inFolder = false,
+  folders?: Pick<FiledFolders, 'inputs'>,
+): string | undefined => {
+  if (!dir || !names?.length) return undefined;
+  const files = names.map((n) => `\`${n}\``).join(', ');
+  const mounted = inFolder ? undefined : folders?.inputs[0];
+  if (mounted)
+    return `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${mounted.path}\`: ${files}. The folder is mounted read-only; read them with Read, Grep and Glob.`;
+  return `Files given with it (\`nemia start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${files}.`;
+};
 
 /** Folders by their absolute paths, each in backticks. */
 const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.path}\``).join(', ');
@@ -77,7 +90,7 @@ const handedLine = (handed: readonly Mount[]): string =>
 export const mountsLine = (
   step: Pick<Workflow, 'harness' | 'writable'>,
   run: Pick<Run, 'mounts'>,
-  folders: FiledFolders = { handed: [], store: [] },
+  folders: FiledFolders = { handed: [], store: [], inputs: [] },
 ): string[] => {
   const local = !isRemoteHarness(step.harness);
   const mounts = local ? stepMounts(step, run.mounts) : undefined;

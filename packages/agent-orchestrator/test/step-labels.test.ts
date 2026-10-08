@@ -1,8 +1,9 @@
 /**
  * A step's task is filed with its run, its factory, its workflow, the step and its agent as labels (`stepLabels`), which the runtime hands
- * each of its sessions beside the task's id: a ready step, a try and a round alike, walked through the runtime itself over an in-memory
- * journal and a harness that keeps what it was asked to spawn. And the client's `engine()` hands the runtime the collector the process
- * exports to (`otlpOf`), and none when it exports nowhere. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
+ * each of its sessions beside the task's id, by the same keys as its metrics (`stepAttributes`): a ready step, a try and a round alike,
+ * walked through the runtime itself over an in-memory journal and a harness that keeps what it was asked to spawn. And the client's
+ * `engine()` hands the runtime the collector the process exports to (`otlpOf`), and none when it exports nowhere. `WF_ROOT` is set
+ * before the runner is imported: it is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,6 +24,7 @@ delete process.env.WF_MAX_RUNS;
 const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { engine: clientEngine } = await import('../src/runtime-client.ts');
+const { stepAttributes } = await import('../src/meter/step.ts');
 
 type Event = Parameters<AsyncJournal['append']>[1];
 
@@ -165,14 +167,15 @@ test("a session of a step in a factory, worked by an agent it hired, is handed t
   const run = await Effect.runPromise(startRun({ brief: 'work it', repo, workflowDir, isolate: false, factory: 'labelled' }));
   const task = `${run.id}-work`;
   assert.deepEqual((await pass(run.id)).filed, ['work']);
-  assert.deepEqual((await started(run.id, task)).resource, {
-    run: run.id,
-    factory: 'labelled',
-    workflow: 'hired',
-    step: 'work',
-    agent: 'worker',
-    task,
-  });
+  const { resource } = await started(run.id, task);
+  assert.deepEqual(resource, { run: run.id, factory: 'labelled', workflow: 'hired', step: 'work', agent: 'worker', task });
+  const { outcome, ...keys } = stepAttributes(
+    run,
+    readRun(run.id).workflow!.find((s) => s.name === 'work')!,
+    'done',
+  );
+  assert.equal(outcome, 'done');
+  assert.deepEqual({ run: run.id, ...keys, task }, resource, 'the keys its metrics are kept by, the same');
 });
 
 /** Sets `OTEL_EXPORTER_OTLP_ENDPOINT` to `endpoint` for the rest of test `t`. */

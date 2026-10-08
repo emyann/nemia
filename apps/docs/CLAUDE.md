@@ -24,5 +24,7 @@ text at build, by path from its root. A page holds landed material only; a term 
   dark (the theme select, or `localStorage['starlight-theme']`).
 - `node --test test/<file>.test.ts` from here runs one test file. `test/build.test.ts` builds the site twice, the real one and its own
   configuration pointed at scratch pages with a broken link (`srcDir`); each build is a child process near 1.2 GB that test-costs does
-  not count, since it measures the test's own process.
+  not count, since it measures the test's own process. That is the toolchain's native floor, not the site's: search off, the mermaid
+  plugin off or a heap cap leaves it over 1 GB. The builds run one after the other, so the second adds seconds, not a peak, and the
+  links validator has no entry to call outside a build.
 - Both builds write this folder's `.astro/`, ignored: a test build and a `npm run dev` at once overwrite each other's types.

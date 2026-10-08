@@ -1,12 +1,19 @@
 # Merged over the image's own collector config (/otel-lgtm/otelcol-config.yaml) by OTELCOL_EXTRA_ARGS in compose.yaml: a map merges
 # key by key, a list replaces the image's. A Claude Code Bash tool span that carries its command (full_command, sent only under
-# NEMIA_TOOL_DETAILS=1) gains command_head, its first plain words, before Tempo stores it and keeps span time by it.
+# NEMIA_TOOL_DETAILS=1) gains command_head, its first plain words, and test_scope, before Tempo stores it and keeps span time by them.
 #
 # The rule: past a leading `cd <dir> &&`, `NAME=value` words and the wrappers timeout (with its duration), nohup, time and npx, keep the
 # first word of [a-z][a-z0-9_:.-]*; a second only after a command of subcommands (npm, git, docker…), a third only after the `run` of a
 # package runner (npm, pnpm, yarn, turbo), never of docker, go or cargo, whose third word is an argument; a word stops at a flag, path,
-# quote, `=` or `$`, so no argument gets in. A command it does not read is `other`.
-# Both statements carry the same pattern. `$` is written `$$` (the collector's own expansion); `\\` is one backslash in OTTL's string.
+# quote, `=` or `$`, so no argument gets in. A command it does not read is `other`. Both statements carry the same pattern.
+#
+# Then, on the same spans, test_scope says what a test command ran: suite (`turbo run test`, or `npm test` from the root), package
+# (with --filter, -F, -w or --workspace, or after a `cd` into packages/<name> or apps/<name>), files (`node --test`), `e2e: all` (`npm
+# run e2e`) or `e2e: pages` (with --pages). It is read at any command of the line, past the same words and wrappers, a flag only in its
+# own command; the statements run in order and the last that matches wins. Each sets a literal, so no name gets in; any other command
+# has none.
+#
+# In every pattern, `$` is written `$$` (the collector's own expansion), and `\\` is one backslash in OTTL's string.
 
 processors:
   transform/command_head:
@@ -19,7 +26,22 @@ processors:
           - 'set(attributes["command_head"], "other")'
           - 'set(attributes["command_head"], ExtractPatterns(attributes["full_command"], "^\\s*(?:cd\\s+\\S+\\s*&&\\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?<head>(?:npm|pnpm|yarn|turbo)(?:[ \\t]+run(?:[ \\t]+[a-z][a-z0-9_:.-]*)?|[ \\t]+[a-z][a-z0-9_:.-]*)?|(?:git|docker|gh|cargo|go|nemia|wf|claude)(?:[ \\t]+[a-z][a-z0-9_:.-]*)?|[a-z][a-z0-9_:.-]*)(?:[\\s;|&)]|$$)")["head"]) where IsMatch(attributes["full_command"], "^\\s*(?:cd\\s+\\S+\\s*&&\\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?<head>(?:npm|pnpm|yarn|turbo)(?:[ \\t]+run(?:[ \\t]+[a-z][a-z0-9_:.-]*)?|[ \\t]+[a-z][a-z0-9_:.-]*)?|(?:git|docker|gh|cargo|go|nemia|wf|claude)(?:[ \\t]+[a-z][a-z0-9_:.-]*)?|[a-z][a-z0-9_:.-]*)(?:[\\s;|&)]|$$)")'
 
+  transform/test_scope:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        conditions:
+          - 'name == "claude_code.tool" and attributes["tool_name"] == "Bash" and attributes["full_command"] != nil'
+        statements:
+          - 'set(attributes["test_scope"], "suite") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?:turbo\\s+run\\s+test|npm\\s+(?:run\\s+)?test)(?:[\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "package") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?:turbo\\s+run\\s+test|npm\\s+(?:run\\s+)?test)\\s(?:[^;&|\\n]*\\s)?(?:--filter|-F|-w|--workspace)(?:[=\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "package") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+(?:-w|--workspace)(?:=|\\s+)\\S+\\s+(?:run\\s+)?test(?:[\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "package") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*cd\\s+\\S*(?:packages|apps)/[^/\\s;&|]+/?\\s*&&\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+(?:run\\s+)?test(?:[\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "files") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*node\\s+(?:[^;&|\\n]*\\s)?--test(?:[\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "e2e: all") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+run\\s+e2e(?:[\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "e2e: pages") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+run\\s+e2e\\s(?:[^;&|\\n]*\\s)?--pages(?:[=\\s;&|)]|$$)")'
+
 service:
   pipelines:
     traces:
-      processors: [transform/command_head, batch]
+      processors: [transform/command_head, transform/test_scope, batch]

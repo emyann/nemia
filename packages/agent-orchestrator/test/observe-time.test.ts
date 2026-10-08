@@ -28,14 +28,20 @@ type Collector = {
 /** The overlay's processor that writes `command_head`. */
 const TRANSFORM = 'transform/command_head';
 
+/** The overlay's processor that writes `test_scope`, after the head and before the batch. */
+const SCOPE = 'transform/test_scope';
+
 /** The OTTL string literals a statement matches the command against, to extract the head and to test it, each as the regex Go reads. */
 const patternsOf = (statement: string): string[] =>
   [...statement.matchAll(/(?:ExtractPatterns|IsMatch)\(attributes\["full_command"\],\s*("(?:[^"\\]|\\.)*")\)/g)].map(([, literal]) =>
     (JSON.parse(literal) as string).replaceAll('$$', '$'),
   );
 
-/** The transform's one group of statements, or undefined. */
-const groupOf = (config: Collector) => config.processors?.[TRANSFORM]?.trace_statements?.[0];
+/** The one group of statements of `processor`, the head's by default, or undefined. */
+const groupOf = (config: Collector, processor = TRANSFORM) => config.processors?.[processor]?.trace_statements?.[0];
+
+/** The condition every transform of the overlay reads: a Bash tool span that carries its command. */
+const BASH_SPAN = 'name == "claude_code.tool" and attributes["tool_name"] == "Bash" and ';
 
 /** The command head `config` gives `command`: the pattern's `head` where it matches, else `other`, as the two statements set it. */
 function headOf(config: Collector, command: string): string {
@@ -86,7 +92,7 @@ function collectorFaults(config: Collector): string[] {
     faults.push(`the traces pipeline runs ${order.join(', ')}, not ${TRANSFORM} before batch`);
   const group = groupOf(config);
   const condition = (group?.conditions ?? []).join(' or ');
-  if (group?.context !== 'span' || !condition.startsWith('name == "claude_code.tool" and attributes["tool_name"] == "Bash" and '))
+  if (group?.context !== 'span' || !condition.startsWith(BASH_SPAN))
     faults.push(`the transform reads ${condition || 'every span'}, not a Bash tool span alone`);
   const [first, second, ...rest] = group?.statements ?? [];
   if (first !== 'set(attributes["command_head"], "other")' || !second || rest.length)
@@ -96,6 +102,98 @@ function collectorFaults(config: Collector): string[] {
   if (patterns.length === 2)
     for (const [command, head] of HEADS)
       if (headOf(config, command) !== head) faults.push(`${JSON.stringify(command)} has the head ${headOf(config, command)}, not ${head}`);
+  return faults;
+}
+
+/** The values `test_scope` takes: a literal each, so no package, file or page name gets in. */
+const SCOPES = ['suite', 'package', 'files', 'e2e: all', 'e2e: pages'];
+
+/** A statement of the scope's transform: `test_scope` set to a literal where the command matches one pattern. */
+const SCOPE_STATEMENT = /^set\(attributes\["test_scope"\], ("(?:[^"\\]|\\.)*")\) where IsMatch\(attributes\["full_command"\], "(?:[^"\\]|\\.)*"\)$/;
+
+/** The scope a statement sets and the pattern it matches the command against, or undefined when it is not of that form. */
+function scopeStatementOf(statement: string): { scope: string; pattern: string } | undefined {
+  const literal = SCOPE_STATEMENT.exec(statement)?.[1];
+  const [pattern, ...more] = patternsOf(statement);
+  if (literal === undefined || pattern === undefined || more.length) return undefined;
+  return { scope: JSON.parse(literal) as string, pattern };
+}
+
+/** The scope `config` gives `command`: the last statement whose pattern matches sets it, as the collector runs them in order. */
+function scopeOf(config: Collector, command: string): string | undefined {
+  let scope: string | undefined;
+  for (const statement of groupOf(config, SCOPE)?.statements ?? []) {
+    const read = scopeStatementOf(statement);
+    if (read && new RegExp(read.pattern).test(command)) scope = read.scope;
+  }
+  return scope;
+}
+
+/**
+ * Commands and their scopes, undefined where none is set: the whole suite from the root, one package by a filter, a workspace or a
+ * `cd` into it, some files by `node --test`, and e2e on every page or some; read at any command of the line, past its wrappers, the
+ * last match winning, and never inside a quote, a script's longer name or another flag.
+ */
+const SCOPE_ROWS: [string, string | undefined][] = [
+  ['npx turbo run test --force --continue', 'suite'],
+  ['npm test', 'suite'],
+  ['npm run test', 'suite'],
+  ['cd ~/repo && npm test', 'suite'],
+  ['timeout 900 npx turbo run test --force --continue 2>&1 | tail -40', 'suite'],
+  ['npx turbo run test --filter=agent-orchestrator --force', 'package'],
+  ['npx turbo run test -F web', 'package'],
+  ['turbo run test --force --filter agent-runtime', 'package'],
+  ['npm test -w packages/agent-runtime', 'package'],
+  ['npm test --workspace=apps/api', 'package'],
+  ['npm -w apps/web run test', 'package'],
+  ['cd packages/agent-orchestrator && npm test', 'package'],
+  ['cd /home/u/wt/apps/api && npm test 2>&1 | tail', 'package'],
+  ['node --test test/a.test.ts', 'files'],
+  ['timeout --foreground 60 node --test test/a.test.ts', 'files'],
+  ['cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts', 'files'],
+  ['npm run e2e', 'e2e: all'],
+  ['npm run build && npm run e2e -- --photos', 'e2e: all'],
+  ['npm run e2e -- --pages time,runs', 'e2e: pages'],
+  ['npm run build && npm run e2e -- --pages time', 'e2e: pages'],
+  ['npx turbo run test --filter=web && npm run e2e -- --pages time', 'e2e: pages'],
+  ['npm run typecheck', undefined],
+  ['npx turbo run typecheck --force', undefined],
+  ['npm run lint', undefined],
+  ['npm run test:e2e', undefined],
+  ['npm run testing', undefined],
+  ['node workflows/build/probe.ts list', undefined],
+  ['node --test-reporter=spec x.ts', undefined],
+  ['grep -rn "npm test" docs/', undefined],
+  ['git commit -m "Run npm test first"', undefined],
+  ['docker run postgres:16-alpine', undefined],
+];
+
+/** What is wrong with where the scope's transform runs, what it reads and what it may set, each said in a line. */
+function scopeShapeFaults(config: Collector): string[] {
+  const faults: string[] = [];
+  const order = config.service?.pipelines?.traces?.processors ?? [];
+  const batch = order.indexOf('batch');
+  if (![TRANSFORM, SCOPE].every((p) => order.indexOf(p) >= 0 && order.indexOf(p) < batch))
+    faults.push(`the traces pipeline runs ${order.join(', ')}, not ${TRANSFORM} and ${SCOPE} before batch`);
+  const group = groupOf(config, SCOPE);
+  const condition = (group?.conditions ?? []).join(' or ');
+  if (group?.context !== 'span' || !condition.startsWith(BASH_SPAN))
+    faults.push(`the scope reads ${condition || 'every span'}, not a Bash tool span alone`);
+  const set = (group?.statements ?? []).map((statement) => scopeStatementOf(statement)?.scope);
+  for (const [i, scope] of set.entries())
+    if (scope === undefined || !SCOPES.includes(scope))
+      faults.push(`statement ${i + 1} sets ${scope === undefined ? 'no literal' : scope}, not one of ${SCOPES.join(', ')}`);
+  for (const scope of SCOPES.filter((scope) => !set.includes(scope))) faults.push(`no statement sets the scope ${scope}`);
+  return faults;
+}
+
+/** What is wrong with the scope's transform `config`, each said in a line: its shape, then each row it reads otherwise. */
+function scopeFaults(config: Collector): string[] {
+  const faults = scopeShapeFaults(config);
+  for (const [command, scope] of SCOPE_ROWS) {
+    const read = scopeOf(config, command);
+    if (read !== scope) faults.push(`${JSON.stringify(command)} has the scope ${read ?? 'none'}, not ${scope ?? 'none'}`);
+  }
   return faults;
 }
 
@@ -128,6 +226,7 @@ const DIMENSIONS = [
   'tool_name',
   'bash_command_class',
   'command_head',
+  'test_scope',
 ];
 
 /** Attributes a span carries that span time is never kept by: each value would be a series of its own, never ended. */
@@ -237,11 +336,85 @@ test("REFUSED: the head after the batch, on every span, by two patterns, or with
   );
 });
 
+test('a Bash tool span gets the scope of its test command, one of five values, and no name', () => {
+  assert.deepEqual(scopeFaults(COLLECTOR), []);
+  for (const [command, scope] of SCOPE_ROWS) assert.equal(scopeOf(COLLECTOR, command), scope, command);
+});
+
+test('REFUSED: the scope after the batch, on every span, copied from the command, unfiltered, out of order, or read in a quote', () => {
+  const changed = (edit: (statements: string[], c: Collector) => void): string[] => {
+    const config = structuredClone(COLLECTOR);
+    edit(groupOf(config, SCOPE)!.statements!, config);
+    return scopeFaults(config);
+  };
+  const statementOf = (statements: string[], scope: string, more = '') =>
+    statements.findIndex((s) => s.startsWith(`set(attributes["test_scope"], "${scope}")`) && s.includes(more));
+  assert.deepEqual(
+    changed((_, c) => {
+      c.service!.pipelines!.traces!.processors = [TRANSFORM, 'batch', SCOPE];
+    }),
+    [`the traces pipeline runs ${TRANSFORM}, batch, ${SCOPE}, not ${TRANSFORM} and ${SCOPE} before batch`],
+  );
+  assert.deepEqual(
+    changed((_, c) => {
+      groupOf(c, SCOPE)!.conditions = ['attributes["full_command"] != nil'];
+    }),
+    ['the scope reads attributes["full_command"] != nil, not a Bash tool span alone'],
+  );
+  const copied = 'set(attributes["test_scope"], attributes["full_command"])';
+  assert.deepEqual(
+    changed((statements) => statements.push(copied)),
+    [`statement 8 sets no literal, not one of ${SCOPES.join(', ')}`],
+  );
+  assert.deepEqual(
+    changed((statements) => {
+      const files = statementOf(statements, 'files');
+      statements[files] = statements[files].replace('"files"', '"files: test/a.test.ts"');
+    }),
+    [
+      `statement 5 sets files: test/a.test.ts, not one of ${SCOPES.join(', ')}`,
+      'no statement sets the scope files',
+      '"node --test test/a.test.ts" has the scope files: test/a.test.ts, not files',
+      '"timeout --foreground 60 node --test test/a.test.ts" has the scope files: test/a.test.ts, not files',
+      '"cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts" has the scope files: test/a.test.ts, not files',
+    ],
+  );
+  assert.deepEqual(
+    changed((statements) => statements.splice(statementOf(statements, 'package', '--filter'), 1)),
+    [
+      '"npx turbo run test --filter=agent-orchestrator --force" has the scope suite, not package',
+      '"npx turbo run test -F web" has the scope suite, not package',
+      '"turbo run test --force --filter agent-runtime" has the scope suite, not package',
+      '"npm test -w packages/agent-runtime" has the scope suite, not package',
+      '"npm test --workspace=apps/api" has the scope suite, not package',
+    ],
+  );
+  assert.deepEqual(
+    changed((statements) => {
+      const all = statementOf(statements, 'e2e: all');
+      const pages = statementOf(statements, 'e2e: pages');
+      [statements[all], statements[pages]] = [statements[pages], statements[all]];
+    }),
+    [
+      '"npm run e2e -- --pages time,runs" has the scope e2e: all, not e2e: pages',
+      '"npm run build && npm run e2e -- --pages time" has the scope e2e: all, not e2e: pages',
+      '"npx turbo run test --filter=web && npm run e2e -- --pages time" has the scope e2e: all, not e2e: pages',
+    ],
+  );
+  assert.deepEqual(
+    changed((statements) => {
+      const suite = statementOf(statements, 'suite');
+      statements[suite] = statements[suite].replace('"(?:^|[;&|(\\\\n])\\\\s*', '"');
+    }),
+    ['"git commit -m \\"Run npm test first\\"" has the scope suite, not none'],
+  );
+});
+
 test("Tempo keeps span time by a step's and a tool's names, never a run's, and traces two weeks", () => {
   assert.deepEqual(tempoFaults(TEMPO), []);
 });
 
-test("REFUSED: span time by run or task, without the command head, with a subagent's spans, and a shorter reach or retention", () => {
+test("REFUSED: span time by run or task, without the command head or the test scope, with a subagent's spans, and a shorter reach or retention", () => {
   const changed = (edit: (t: Tempo) => void): string[] => {
     const config = structuredClone(TEMPO);
     edit(config);
@@ -257,6 +430,12 @@ test("REFUSED: span time by run or task, without the command head, with a subage
       spanMetrics(t).dimensions = spanMetrics(t).dimensions!.filter((d) => d !== 'command_head');
     }),
     ['span time is not kept by command_head'],
+  );
+  assert.deepEqual(
+    changed((t) => {
+      spanMetrics(t).dimensions = spanMetrics(t).dimensions!.filter((d) => d !== 'test_scope');
+    }),
+    ['span time is not kept by test_scope'],
   );
   assert.deepEqual(
     changed((t) => {

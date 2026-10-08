@@ -1,0 +1,89 @@
+# Mounted over the image's own Tempo config (/otel-lgtm/tempo-config.yaml), of which it is a copy read out of the pinned image, changed
+# where it says so: span time kept by a step's names, a subagent's spans left out of it, the trace retention written out, and the
+# reach of a TraceQL metrics query, back in time and over a long span.
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9096
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "127.0.0.1:4417"
+        http:
+          endpoint: "127.0.0.1:4418"
+
+memberlist:
+  bind_addr: [127.0.0.1]
+  bind_port: 7947
+
+querier:
+  frontend_worker:
+    frontend_address: 127.0.0.1:9096
+
+# Changed: a one-run drill-down reaches 7 days back (the default is 24h), as far as a search does.
+query_frontend:
+  metrics:
+    max_duration: 168h
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /data/tempo/wal
+    local:
+      path: /data/tempo/blocks
+
+# Changed: traces are kept 14 days, Tempo's default, written out so the file says it; the scheduler plans retention, the worker runs it.
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: 336h
+
+backend_worker:
+  compaction:
+    block_retention: 336h
+
+metrics_generator:
+  processor:
+    span_metrics:
+      # Changed: the image's three, then a step's names (resource attributes of a session) and a tool's (span attributes). Never a run
+      # or a task: a series for each would never end.
+      dimensions:
+        - service_name
+        - operation
+        - status_code
+        - factory
+        - workflow
+        - step
+        - agent
+        - tool_name
+        - bash_command_class
+        - command_head
+      # Changed: a subagent's own spans (agent_id, measured) are left out: its time is counted once, as its Agent tool's span.
+      filter_policies:
+        - exclude:
+            match_type: regex
+            attributes:
+              - key: span.agent_id
+                value: ".+"
+  # Changed: span time is kept for a span that ended up to 2m before it arrived (the default is 30s, measured to drop one 45s late).
+  metrics_ingestion_time_range_slack: 2m
+  storage:
+    path: /data/tempo/generator/wal
+    remote_write:
+      - url: http://127.0.0.1:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+
+# Changed: a TraceQL metrics query counts a recent span only when it began within this of its arrival (the default is 2m, measured to
+# leave out a turn of five minutes, sent when it ends); a day holds a step's turn.
+live_store:
+  wal:
+    ingestion_time_range_slack: 24h

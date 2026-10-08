@@ -1,0 +1,24 @@
+# Merged over the image's own collector config (/otel-lgtm/otelcol-config.yaml) by OTELCOL_EXTRA_ARGS in compose.yaml: a map merges
+# key by key, a list replaces the image's. A Claude Code Bash tool span that carries its command (full_command, sent only under
+# NEMIA_TOOL_DETAILS=1) gains command_head, its first plain words, before Tempo stores it and keeps span time by it.
+#
+# The rule: past a leading `cd <dir> &&`, `NAME=value` words and the wrappers timeout (with its duration), nohup, time and npx, keep the
+# first word of [a-z][a-z0-9_:.-]*; a second only after a command of subcommands (npm, git, turbo…), a third only after its `run`; a
+# word stops at a flag, path, quote, `=` or `$`, so no argument gets in. A command it does not read is `other`.
+# Both statements carry the same pattern. `$` is written `$$` (the collector's own expansion); `\\` is one backslash in OTTL's string.
+
+processors:
+  transform/command_head:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        conditions:
+          - 'name == "claude_code.tool" and attributes["tool_name"] == "Bash" and attributes["full_command"] != nil'
+        statements:
+          - 'set(attributes["command_head"], "other")'
+          - 'set(attributes["command_head"], ExtractPatterns(attributes["full_command"], "^\\s*(?:cd\\s+\\S+\\s*&&\\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?<head>(?:npm|pnpm|yarn|git|turbo|docker|gh|cargo|go|nemia|wf|claude)(?:[ \\t]+run(?:[ \\t]+[a-z][a-z0-9_:.-]*)?|[ \\t]+[a-z][a-z0-9_:.-]*)?|[a-z][a-z0-9_:.-]*)(?:[\\s;|&)]|$$)")["head"]) where IsMatch(attributes["full_command"], "^\\s*(?:cd\\s+\\S+\\s*&&\\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?<head>(?:npm|pnpm|yarn|git|turbo|docker|gh|cargo|go|nemia|wf|claude)(?:[ \\t]+run(?:[ \\t]+[a-z][a-z0-9_:.-]*)?|[ \\t]+[a-z][a-z0-9_:.-]*)?|[a-z][a-z0-9_:.-]*)(?:[\\s;|&)]|$$)")'
+
+service:
+  pipelines:
+    traces:
+      processors: [transform/command_head, batch]

@@ -1,0 +1,1012 @@
+{
+  "uid": "nemia-time",
+  "title": "Time",
+  "description": "Where a step's time goes: its busy time as the sum of its leaves, beside its wall time, and the waits outside its session; one run's step from Tempo, a step across runs from Prometheus.",
+  "tags": [
+    "nemia"
+  ],
+  "editable": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "custom",
+        "query": "nemia",
+        "current": {
+          "text": "nemia",
+          "value": "nemia"
+        },
+        "options": [
+          {
+            "text": "nemia",
+            "value": "nemia",
+            "selected": true
+          }
+        ],
+        "hide": 0,
+        "description": "The service the daemon files under: OTEL_SERVICE_NAME, else nemia."
+      },
+      {
+        "name": "factory",
+        "label": "Factory",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(step_tries_total{service_name=\"$service\"}, factory)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\"}, factory)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "hide": 0
+      },
+      {
+        "name": "workflow",
+        "label": "Workflow",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(step_tries_total{service_name=\"$service\"}, workflow)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\"}, workflow)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "hide": 0
+      },
+      {
+        "name": "step",
+        "label": "Step",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(step_tries_total{service_name=\"$service\"}, step)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\"}, step)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "hide": 0
+      },
+      {
+        "name": "agent",
+        "label": "Agent",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(step_tries_total{service_name=\"$service\"}, agent)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\"}, agent)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "hide": 0
+      },
+      {
+        "name": "run",
+        "label": "Run",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "tempo"
+        },
+        "query": {
+          "type": 1,
+          "label": "run",
+          "refId": "TempoDatasourceVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0,
+        "description": "The run whose step One run's step reads."
+      },
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "tempo"
+        },
+        "query": {
+          "type": 1,
+          "label": "task",
+          "refId": "TempoDatasourceVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0,
+        "description": "One session of the step, by the runtime's task: a try, or a round.",
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": [
+        "nemia"
+      ],
+      "asDropdown": false,
+      "title": "Nemia",
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "How a step's time is read",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "A Claude Code step's **wall** time is its turns (`claude_code.interaction`); its **busy** time is the sum of its leaves: the model (`claude_code.llm_request`), each tool by name (`claude_code.tool`), Bash by its command head. A subagent counts once, as its `Agent` tool. **Other** is wall less busy, so the bars add up. Permission wait is *of which* tool time. Queue, check and gate are outside the session. A Codex step sends no spans: it is **unmeasured**, its session time alone below. One run's step reads Tempo, 7 days back at most; a step across runs reads the span metrics in Prometheus."
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "One run's step",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Where its time went",
+      "description": "The run's step over the range: the model, each tool, Bash by its command head, and Other, its turns less these. From Tempo's TraceQL metrics: the leaves are its turns' own children, so a subagent's spans, under its Agent tool, are left out.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=\"claude_code.llm_request\"} | sum_over_time(span:duration) by (name)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "B",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=\"claude_code.tool\" && span.tool_name!=\"Bash\"} | sum_over_time(span:duration) by (span.tool_name)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "C",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=\"claude_code.tool\" && span.tool_name=\"Bash\"} | sum_over_time(span:duration) by (span.command_head, span.tool_name)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "W",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} | sum_over_time(span:duration)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "L",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=~\"claude_code.llm_request|claude_code.tool\"} | sum_over_time(span:duration)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "WN",
+          "type": "reduce",
+          "expression": "W",
+          "reducer": "last",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "LN",
+          "type": "reduce",
+          "expression": "L",
+          "reducer": "last",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "O",
+          "type": "math",
+          "expression": "($WN - $LN) * (($WN - $LN) > 0)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^claude_code\\.llm_request$",
+            "renamePattern": "model"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^\\{span\\.command_head=\"(.*)\", span\\.tool_name=\"Bash\"\\}$",
+            "renamePattern": "Bash: $1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^Bash$",
+            "renamePattern": "Bash: (no command)"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^O( .*)?$",
+            "renamePattern": "Other"
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Wall and busy",
+      "description": "Its turns, the sum of their leaves, and of the tools' time, the part spent waiting on a permission.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "W",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} | sum_over_time(span:duration) by (name)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "L",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=~\"claude_code.llm_request|claude_code.tool\"} | sum_over_time(span:duration) by (resource.service.name)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "P",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=\"claude_code.tool\"} > {name=\"claude_code.tool.blocked_on_user\"} | sum_over_time(span:duration) by (name)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^claude_code\\.interaction$",
+            "renamePattern": "wall: turns"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^claude-code$",
+            "renamePattern": "busy: leaves"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^claude_code\\.tool\\.blocked_on_user$",
+            "renamePattern": "of which waiting on a permission"
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Outside the session",
+      "description": "The run's queue, check and gate spans from the daemon, each with its outcome and try, longest first.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && span.run=\"$run\" && span.step=~\"$step\" && name=~\"step.queue|step.check|step.gate\"} | select(span.step, span.outcome, span.try)",
+          "limit": 50,
+          "spss": 50,
+          "tableType": "spans"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Duration",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Trace Service": true,
+              "Trace Name": true,
+              "traceIdHidden": true
+            },
+            "indexByName": {
+              "Name": 0,
+              "step": 1,
+              "outcome": 2,
+              "try": 3,
+              "Duration": 4,
+              "Start time": 5,
+              "Span ID": 6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "A step across runs",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Where its time went",
+      "description": "Every run of the chosen steps over the range, from Tempo's span metrics: the model, each tool, Bash by its command head, and Other, the turns less these.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.llm_request\"}[$__range]))",
+          "legendFormat": "model",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "sum by (tool_name) (increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.tool\", tool_name!=\"Bash\"}[$__range]))",
+          "legendFormat": "{{tool_name}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "expr": "label_replace(sum by (command_head) (increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.tool\", tool_name=\"Bash\"}[$__range])), \"command_head\", \"(no command)\", \"command_head\", \"\")",
+          "legendFormat": "Bash: {{command_head}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "O",
+          "expr": "clamp_min(sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.interaction\"}[$__range])) - sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=~\"claude_code.llm_request|claude_code.tool\"}[$__range])), 0)",
+          "legendFormat": "Other",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Wall and busy",
+      "description": "The sessions of the measured steps (the daemon's step.duration), their turns, the sum of their leaves, and of the tools' time, the part spent waiting on a permission.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "S",
+          "expr": "sum(increase(step_duration_sum{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range]) and on (factory, workflow, step, agent) group by (factory, workflow, step, agent) (increase(traces_spanmetrics_calls_total{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range]))) / 1000",
+          "legendFormat": "wall: sessions",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "W",
+          "expr": "sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.interaction\"}[$__range]))",
+          "legendFormat": "wall: turns",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "L",
+          "expr": "sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=~\"claude_code.llm_request|claude_code.tool\"}[$__range]))",
+          "legendFormat": "busy: leaves",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "P",
+          "expr": "sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.tool.blocked_on_user\"}[$__range]))",
+          "legendFormat": "of which waiting on a permission",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "bargauge",
+      "title": "Outside the session",
+      "description": "The chosen steps' queue, check by its verdict, and gate, from the daemon's histograms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "Q",
+          "expr": "sum(increase(step_queue_duration_sum{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])) / 1000",
+          "legendFormat": "queue",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "expr": "sum by (outcome) (increase(step_check_duration_sum{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])) / 1000",
+          "legendFormat": "check: {{outcome}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "G",
+          "expr": "sum(increase(step_gate_wait_sum{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])) / 1000",
+          "legendFormat": "gate",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Busy time, over time",
+      "description": "The chosen steps' leaves in each interval, stacked: the model, each tool, Bash by its command head.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 16,
+        "h": 9
+      },
+      "interval": "5m",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum(increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.llm_request\"}[$__interval]))",
+          "legendFormat": "model",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "sum by (tool_name) (increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.tool\", tool_name!=\"Bash\"}[$__interval]))",
+          "legendFormat": "{{tool_name}}",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "expr": "label_replace(sum by (command_head) (increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.tool\", tool_name=\"Bash\"}[$__interval])), \"command_head\", \"(no command)\", \"command_head\", \"\")",
+          "legendFormat": "Bash: {{command_head}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Unmeasured",
+      "description": "Steps with a session but no Claude Code span over the range, a Codex step's among them: their session time alone.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 30,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "expr": "sum by (factory, workflow, step, agent) (increase(step_duration_sum{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range])) / 1000 unless on (factory, workflow, step, agent) group by (factory, workflow, step, agent) (increase(traces_spanmetrics_calls_total{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "session"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "factory": 0,
+              "workflow": 1,
+              "step": 2,
+              "agent": 3,
+              "Value": 4
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

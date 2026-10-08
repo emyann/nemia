@@ -7,7 +7,9 @@
  * gets `_bucket`, `_count` and `_sum`, a gauge `_ratio`, a counter that only grows `_total` and any other counter nothing. The spans,
  * their attributes and the logs' annotations come from a pass of the tick traced over the runtime's engine as the client builds it
  * (`engineOf`), the orchestrator's own `Effect.fn` names, and the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`)
- * and their step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives.
+ * and their step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives. What a
+ * step's Claude Code session sends, and what Tempo's span metrics write, are no code of ours: they are listed as measured, dated, and
+ * the span metrics' dimensions and the collector's `command_head` are read from `tempo.yaml` and `otelcol.yaml`.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -54,6 +56,43 @@ const RESOURCE_ATTRIBUTES = ['service.name'];
 /** The datasources the image provisions, by uid. */
 const DATASOURCES = ['prometheus', 'tempo', 'loki', 'pyroscope'];
 
+/** Grafana's server-side expressions, which read a panel's other queries by their refId and are sent to no datasource of the image. */
+const EXPRESSIONS = '__expr__';
+
+/**
+ * The spans a step's Claude Code session sends (as measured, `tools/observe/README.md`): a turn of a `-p` job, a model request, a tool
+ * call, and a tool call's wait on a permission and its run.
+ */
+const CLAUDE_SPANS = [
+  'claude_code.interaction',
+  'claude_code.llm_request',
+  'claude_code.tool',
+  'claude_code.tool.blocked_on_user',
+  'claude_code.tool.execution',
+];
+
+/**
+ * The attributes of those spans a dashboard reads beside a step's own, as measured: a tool call's name, and the task a
+ * session runs as, one of the labels it is started with and copies onto its spans. `command_head` is the collector's
+ * (`tools/observe/otelcol.yaml`).
+ */
+const CLAUDE_SPAN_ATTRIBUTES = ['tool_name', 'task'];
+
+/** The series Tempo's span metrics write to Prometheus, as measured: latency in seconds. */
+const SPAN_METRICS = [
+  'traces_spanmetrics_calls_total',
+  'traces_spanmetrics_latency_bucket',
+  'traces_spanmetrics_latency_count',
+  'traces_spanmetrics_latency_sum',
+  'traces_spanmetrics_size_total',
+];
+
+/** The labels Tempo gives every span-metric series, as measured, beside the dimensions `tools/observe/tempo.yaml` keeps. */
+const SPAN_METRIC_LABELS = ['service', 'span_name', 'span_kind', 'status_code'];
+
+/** The dimensions the image's own Tempo config keeps, which no span of ours carries: `tempo.yaml` keeps them as the image has them. */
+const IMAGE_DIMENSIONS = ['service_name', 'operation', 'status_code'];
+
 /** The label Pyroscope files a profile under, as measured: the service, the profiler's `appName`. */
 const PROFILE_LABELS = ['service_name'];
 
@@ -86,10 +125,13 @@ type Query = { datasource: string; text: string; profileType?: string };
 
 /**
  * A panel's query, as far as the checker reads it: PromQL in `expr`, TraceQL or LogQL in `query`, Pyroscope's in `labelSelector` and
- * `profileTypeId`, and the rows a Tempo table shows in `tableType`: a row per span, or per trace when it is `traces` or missing.
+ * `profileTypeId`, the rows a Tempo table shows in `tableType`: a row per span, or per trace when it is `traces` or missing; and a
+ * server-side expression's `expression`, which reads the panel's other queries by their `refId`.
  */
 type Target = {
   datasource?: { uid?: string };
+  refId?: string;
+  expression?: string;
   expr?: string;
   query?: string;
   labelSelector?: string;
@@ -240,15 +282,42 @@ async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<strin
 
 const TRACED = await tracedPass();
 
+/** The dimensions Tempo keeps span time by (`tools/observe/tempo.yaml`), each a label of the span metrics. */
+const TEMPO_DIMENSIONS: string[] = (
+  yaml.load(fs.readFileSync(path.join(OBSERVE, 'tempo.yaml'), 'utf8')) as {
+    metrics_generator: { processor: { span_metrics: { dimensions: string[] } } };
+  }
+).metrics_generator.processor.span_metrics.dimensions;
+
+/** The attribute the collector's transform writes (`tools/observe/otelcol.yaml`), read from its statements. */
+const COLLECTOR_ATTRIBUTES: string[] = [
+  ...new Set(
+    [...fs.readFileSync(path.join(OBSERVE, 'otelcol.yaml'), 'utf8').matchAll(/set\(attributes\["(\w+)"\]/g)].map(([, key]) => key),
+  ),
+];
+
 const KNOWN: Known = {
-  metrics: new Set([...METRICS.values()].flat()),
-  labels: new Set([...STEP_ATTRIBUTE_KEYS, ...attributeKeys(SOURCE_TEXT), ...EXPORTER_LABELS]),
+  metrics: new Set([...METRICS.values()].flat().concat(SPAN_METRICS)),
+  labels: new Set([
+    ...STEP_ATTRIBUTE_KEYS,
+    ...attributeKeys(SOURCE_TEXT),
+    ...EXPORTER_LABELS,
+    ...SPAN_METRIC_LABELS,
+    ...TEMPO_DIMENSIONS.filter((d) => !IMAGE_DIMENSIONS.includes(d)),
+  ]),
   spans: new Set([
     ...TRACED.spans,
     ...Object.values(WAIT_SPANS),
     ...[...SOURCE_TEXT.matchAll(/Effect\.fn\(\s*'([^']+)'/g)].map(([, name]) => name),
+    ...CLAUDE_SPANS,
   ]),
-  attributes: new Set([...TRACED.attributes, ...WAIT_SPAN_KEYS, ...STEP_ATTRIBUTE_KEYS]),
+  attributes: new Set([
+    ...TRACED.attributes,
+    ...WAIT_SPAN_KEYS,
+    ...STEP_ATTRIBUTE_KEYS,
+    ...CLAUDE_SPAN_ATTRIBUTES,
+    ...COLLECTOR_ATTRIBUTES,
+  ]),
   resources: new Set(RESOURCE_ATTRIBUTES),
   logFields: new Set([...TRACED.annotations, ...LOKI_FIELDS]),
   profileLabels: new Set(PROFILE_LABELS),
@@ -257,7 +326,12 @@ const KNOWN: Known = {
 
 /** PromQL's own words, which are not metrics: its functions, aggregations and keywords as the dashboards use them. */
 const PROMQL_WORDS = new Set(
-  'sum avg max min count topk by without on ignoring and or unless rate increase delta histogram_quantile vector label_values'.split(' '),
+  [
+    'sum avg max min count group topk by without on ignoring and or unless rate increase delta histogram_quantile vector',
+    'label_values label_replace clamp_min',
+  ]
+    .join(' ')
+    .split(' '),
 );
 
 /** The metric and label names a PromQL expression (or a `label_values` variable query) names. */
@@ -356,6 +430,18 @@ function unknownNames(dashboard: Dashboard, known: Known): string[] {
   return [...unknown];
 }
 
+/** Each `refId` a panel's server-side expressions read that is none of the panel's queries, said with its panel's title. */
+function strayRefs(dashboard: Dashboard): string[] {
+  return allPanels(dashboard.panels).flatMap((p) => {
+    const refs = new Set((p.targets ?? []).map((t) => t.refId));
+    return (p.targets ?? [])
+      .filter((t) => t.datasource?.uid === EXPRESSIONS)
+      .flatMap((t) => [...(t.expression ?? '').matchAll(/^\s*(\w+)\s*$|\$(\w+)/g)].map(([, bare, ref]) => bare ?? ref))
+      .filter((ref) => !refs.has(ref))
+      .map((ref) => `${p.title}: ${ref}`);
+  });
+}
+
 /** Each span name in `shared` that `dashboard`'s Tempo queries name, each once. */
 const sharedSpansOf = (dashboard: Dashboard, shared: Set<string>): string[] => [
   ...new Set(queriesOf(dashboard).flatMap((q) => (q.datasource === 'tempo' ? traceNames(q.text).spans.filter((n) => shared.has(n)) : []))),
@@ -449,7 +535,7 @@ test('REFUSED: an image by tag, a short digest, and a port the daemon exports to
 });
 
 test("each dashboard parses, has its own uid, and points at the image's datasources", () => {
-  assert.deepEqual([...DASHBOARDS.values()].map((d) => d.title).sort(), ['A run', 'Passes', 'Steps', 'System']);
+  assert.deepEqual([...DASHBOARDS.values()].map((d) => d.title).sort(), ['A run', 'Passes', 'Steps', 'System', 'Time']);
   assert.equal(new Set([...DASHBOARDS.values()].map((d) => d.uid)).size, DASHBOARDS.size);
   for (const [file, d] of DASHBOARDS) {
     assert.equal(
@@ -459,8 +545,20 @@ test("each dashboard parses, has its own uid, and points at the image's datasour
     );
     for (const p of allPanels(d.panels).filter((p) => p.type !== 'text' && p.type !== 'row'))
       assert.ok(DATASOURCES.includes(p.datasource?.uid ?? ''), `${file}: ${p.title} reads ${p.datasource?.uid}`);
-    for (const q of queriesOf(d)) assert.ok(DATASOURCES.includes(q.datasource), `${file}: a query sent to ${q.datasource}`);
+    for (const q of queriesOf(d))
+      assert.ok([...DATASOURCES, EXPRESSIONS].includes(q.datasource), `${file}: a query sent to ${q.datasource}`);
+    assert.deepEqual(strayRefs(d), [], `${file}: an expression reading a query its panel has not`);
   }
+});
+
+test('REFUSED: an expression reading a query its panel has not', () => {
+  const time = dashboardTitled('Time');
+  const other = allPanels(time.panels)
+    .flatMap((p) => p.targets ?? [])
+    .find((t) => t.datasource?.uid === EXPRESSIONS && (t.expression ?? '').includes('$WN'));
+  assert.ok(other, "Time's Other is an expression over WN");
+  other.expression = other.expression!.replace('$WN', '$WX');
+  assert.deepEqual(strayRefs(time), ['Where its time went: WX']);
 });
 
 test("the scan reads the code's metrics, and the traced pass the spans the dashboards query", () => {
@@ -530,6 +628,10 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
     ['A run', 'loki', '| run=', '| runid=', 'runid'],
     ['System', 'pyroscope', 'wall:cpu:nanoseconds', 'process_cpu:cpu:nanoseconds', 'process_cpu:cpu:nanoseconds:wall:nanoseconds'],
     ['System', 'pyroscope', 'service_name=', 'service=', 'service'],
+    ['Time', 'tempo', 'name="claude_code.llm_request"', 'name="claude_code.llm_call"', 'claude_code.llm_call'],
+    ['Time', 'tempo', 'span.command_head', 'span.bash_head', 'bash_head'],
+    ['Time', 'prometheus', 'sum by (command_head)', 'sum by (run)', 'run'],
+    ['Time', 'prometheus', 'traces_spanmetrics_latency_sum', 'traces_spanmetrics_duration_sum', 'traces_spanmetrics_duration_sum'],
   ];
   for (const [title, datasource, from, to, named] of cases)
     assert.deepEqual(unknownNames(withQuery(dashboardTitled(title), datasource, from, to), KNOWN), [named], `${title}: ${to}`);
@@ -587,7 +689,18 @@ test('System charts every metric the code exports', () => {
   assert.deepEqual(unchartedMetrics(system), ['step.denied']);
 });
 
-test('Steps says what its turns and tool calls wait on', () => {
+/** A dashboard's links, as far as the checker reads them. */
+type Link = { type: string; url?: string; title?: string };
+
+test('Steps and A run link to Time, with their own choices', () => {
   const texts = allPanels(dashboardTitled('Steps').panels).filter((p) => p.type === 'text');
-  assert.ok(texts.some((p) => (p.options?.content ?? '').includes('a-step-s-session-exports-its-0cqv')));
+  const steps = texts.map((p) => p.options?.content ?? '').find((c) => c.includes('/d/nemia-time?'));
+  assert.ok(steps, "Steps' note links to Time");
+  for (const name of ['factory', 'workflow', 'step', 'agent']) assert.ok(steps.includes(`\${${name}:queryparam}`), name);
+  assert.ok(steps.includes('${__url_time_range}'), "Steps' range");
+  const links = (dashboardTitled('A run') as Dashboard & { links?: Link[] }).links ?? [];
+  assert.ok(
+    links.some((l) => l.type === 'link' && (l.url ?? '').startsWith('/d/nemia-time?') && (l.url ?? '').includes('var-run=${run}')),
+    'A run links to Time for its run',
+  );
 });

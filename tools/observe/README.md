@@ -1,7 +1,7 @@
 # tools/observe — the side Grafana
 
 A Grafana to watch how Nemia runs while we build it: one `grafana/otel-lgtm` container holding the OpenTelemetry collector, Tempo, Loki,
-Prometheus, Pyroscope and Grafana, with four dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
+Prometheus, Pyroscope and Grafana, with five dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
 package, `bin` or workflow refers to it. The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this
 machine alone (`127.0.0.1`).
 
@@ -16,6 +16,9 @@ docker compose -f tools/observe/compose.yaml down -v    # down, and drop what it
 ```
 
 What it stores (traces, logs, metrics, profiles, Grafana's own database) lives in the volume `nemia-observe_data`, mounted on `/data`.
+Traces are kept 14 days (`336h`, written out in `tempo.yaml`) and metrics 90 (`PROMETHEUS_EXTRA_ARGS` in `compose.yaml`). A stack made
+before a change to `compose.yaml`, `tempo.yaml` or `otelcol.yaml` takes it with `docker compose -f tools/observe/compose.yaml up -d`,
+which recreates the container and keeps the volume.
 
 Open Grafana at <http://localhost:3000>: it lets anyone on this machine in as an admin, with no login. It lands on **System**.
 
@@ -32,7 +35,8 @@ dashboards' `Service` variable picks it. The packages' README says what the daem
 *What the daemon says*).
 
 Add `NEMIA_TOOL_DETAILS=1` beside it for each session's tool spans to say their inputs too — a Bash call's command, a file's path, an
-error's words — which then stay in this machine's Tempo and Loki.
+error's words — which then stay in this machine's Tempo and Loki. **Time** reads Bash by its command's head only then: without it, a
+Bash call is `Bash: (no command)`.
 
 ## Profile the daemon
 
@@ -92,16 +96,54 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 - **A run** — pick a run: its filings (the runtime's `file` spans, one for each session a step filed), the runtime's appends to its
   journals with their task and kind, and its logs, by step. The orchestrator's `fileReady`, `fileTries`, `fileRounds` and `fileChecks`
   spans carry no run: they are a pass's phases, under its `advancePass`.
-- **Steps** — tokens and denied calls by step and agent. Turns and tool calls wait on the card that has a step's session export its
-  telemetry (`a-step-s-session-exports-its-1tan`).
+- **Steps** — tokens and denied calls by step and agent. Its note links to **Time** for the steps and the range it shows.
+- **Time** — where a step's time goes. **One run's step**, from Tempo: pick a run (and a session, `task`), and its turns' time is the
+  sum of their leaves — the model (`claude_code.llm_request`), each tool by name, Bash by its command's head — beside the turns' own
+  length, with **Other** the turns' time no leaf covers, so the bars add up to the turns; the time waiting on a permission is shown as
+  part of the tools'; and the run's queue, checks (by verdict) and gates, as span tables. **A step across runs**, from Prometheus: the
+  same over the range, by factory, workflow, step and agent, from Tempo's span metrics, beside the daemon's step time (`step_duration`),
+  its queue, checks and gates, a trend of the leaves, and **Unmeasured**: the steps with time but no session spans, a Codex step today.
+  **A run** links to it for its run.
 
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log
 field the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler
-does not send, a Tempo table naming a span that would show its trace's duration, and a span name both layers emit. `agent-orchestrator/test/profile.test.ts` holds the preload: with no endpoint, nothing loaded and nothing opened.
+does not send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, and a server-side
+expression reading a query its panel has not. What a session sends and what the span metrics write are no code of ours: the test lists
+them as measured below. `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head over a table of commands,
+the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with
+no endpoint, nothing loaded and nothing opened.
+
+## Timing a step
+
+A step's Claude Code session exports its own spans (`packages/agent-orchestrator/README.md`): a turn, `claude_code.interaction`, holds
+its model requests (`claude_code.llm_request`) and tool calls (`claude_code.tool`); a tool call holds its wait on a permission
+(`claude_code.tool.blocked_on_user`) and its run (`claude_code.tool.execution`); a subagent's own spans sit under its Agent tool's
+`tool.execution` and carry `agent_id`. The leaves of a turn are its model requests and tool calls: **Time** sums those, and a subagent
+is counted once, as its Agent tool.
+
+- **Tools are timed on `claude_code.tool`.** Its `tool.execution` and `tool.blocked_on_user` children carry no `tool_name` (measured
+  2026-10-07), so a tool's time is its call's, the permission wait shown as the part of it spent waiting.
+- **`claude_code.interaction` is sent by a `-p` job alone**, a step; a long-lived session (`--bg`) sends none, and has no turn to sum.
+- **The main thread's leaves are read structurally**: `{… name="claude_code.interaction"} > {name="claude_code.llm_request"}` keeps a
+  turn's own children, and a subagent's, a level further down, out. `span.agent_id = nil` beside a `name` returned no series or the wrong
+  count on Tempo 3.0.3 (2026-10-07). Prometheus' permission wait is the span metrics', and so a subagent's is in it.
+- **The command head** (`otelcol.yaml`, a transform the collector runs before its batch) gives each Bash `claude_code.tool` span that
+  carries its command a `command_head`: past a leading `cd <dir> &&`, `NAME=value` words and the wrappers `timeout` (its flags and
+  duration), `nohup`, `time` and `npx`, the first word, a second after a command of subcommands (`npm`, `git`, `turbo`, `docker`…), and
+  a third after its `run`; a flag, path, quote, `$`, `=` or the next line ends it. `npx turbo run test --force` is `turbo run test`,
+  `git commit -m "…"` is `git commit`, and a command it does not read, `./run.sh`, is `other`. No argument gets in, so it is a label.
+- **Span metrics** (Tempo's generator) keep span time by factory, workflow, step, agent, span type, `tool_name`, `bash_command_class` and
+  `command_head`, never by a run or a task, and leave a subagent's spans out (`agent_id`). They are written as
+  `traces_spanmetrics_latency_{bucket,count,sum}` (seconds), `traces_spanmetrics_calls_total` and `traces_spanmetrics_size_total`, each
+  labelled `service`, `span_name`, `span_kind` and `status_code` beside the dimensions.
+- **A session sends a span when it ends**, so a turn arrives minutes after it began. Tempo's generator keeps span time for a span that
+  ended up to 2 minutes before it arrived (its default, 30 s, was measured to drop one 45 s late), and a TraceQL metrics query counts a
+  span that began up to a day before it arrived (`live_store.wal`; its default, 2 minutes, left a turn of five minutes out though a
+  search found it). A drill-down reaches 7 days back (`max_duration`).
 
 ## The names, as measured
 
-Read off a daemon exporting to this stack (2026-10-06):
+Read off a daemon exporting to this stack (2026-10-06), and a step's session (2026-10-07):
 
 - **Prometheus**: a metric's dots become underscores. A histogram has `_bucket`, `_count` and `_sum` (`pass_duration_bucket`); a gauge
   takes `_ratio`, from the unit `1` the exporter gives it (`machine_load_ratio`); a counter that only grows (`incremental: true`) takes
@@ -110,7 +152,10 @@ Read off a daemon exporting to this stack (2026-10-06):
   phases `phase`, and the api's reads `route`. A run's id is never a label.
 - **Tempo**: the resource attribute `service.name`; the span attributes `run`, `step`, `task`, `kind` and `attempt`, as `span.run` and so
   on. An `append` made outside a filing (a session's end) carries its task and kind but no run. Two spans are named `tick`: the
-  orchestrator's tick and the runtime engine's tick inside it, so a query on `name="tick"` mixes them. Read a pass from `pass`.
+  orchestrator's tick and the runtime engine's tick inside it, so a query on `name="tick"` mixes them. Read a pass from `pass`. A step's
+  waits are spans of their own, `step.queue`, `step.check` and `step.gate`, with `run`, `try` and the step's attributes. A session's
+  spans carry `tool_name`, `full_command` (with `NEMIA_TOOL_DETAILS=1`), `bash_command_class`, `agent_id`, and the labels it was started
+  with: `run`, `step`, `task`, `factory`, `workflow` and `agent`.
 - **Loki**: one stream label, `service_name`; the logs' annotations (`run`, `step`, `word`) and the collector's fields (`trace_id`,
   `span_id`, `severity_text`, `detected_level`) are structured metadata, filtered as `| run="…"`. The daemon exports what it logs at
   `Info`.

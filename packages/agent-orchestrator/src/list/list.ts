@@ -46,6 +46,7 @@ import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
 import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
+import { fireWord, scheduleLines, type ScheduleListed } from '../schedule/schedule.ts';
 
 export type Listing = {
   /**
@@ -102,13 +103,15 @@ export type Unjudged = { said: string; steps: Array<{ name: string; status: stri
 /**
  * `nemia ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
  * (`resultBranches`); whether a nemia up ticks the store; when the tick's last pass read where the branches stand (`standing.json`), or
- * that none has; and, while the store is paused, the pause and the checks it holds.
+ * that none has; while the store is paused, the pause and the checks it holds; and the factories' schedules.
  */
 export type RunsListed = {
   runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>;
   daemon: DaemonStanding;
   standing: ListedStanding;
   paused?: Paused;
+  /** The factories' schedules (`schedulesListed`), each with its next fire and last scheduled run; none listed where none is declared. */
+  schedules?: ScheduleListed[];
 };
 
 /** When the tick's last pass read where the branches stand, as `standing.json` says (`at`), or that no pass has (`none`). */
@@ -565,9 +568,10 @@ function runLines({ run, listed, result }: RunsListed['runs'][number]): string[]
 
 /**
  * Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, how old what it shows of where the branches
- * stand is (`standingLine`), and last whether a nemia up ticks the store.
+ * stand is (`standingLine`), the factories' schedules (`scheduleLines`), and last whether a nemia up ticks the store.
  */
-export const lsLines = ({ runs, daemon, standing }: RunsListed, now: number): string[] => {
+export const lsLines = ({ runs, daemon, standing, schedules }: RunsListed, now: number): string[] => {
   const stood = standingLine(standing, daemon, now);
-  return [...(runs.length ? runs.flatMap(runLines) : ['no runs']), ...(stood ? [stood] : []), daemonLine(daemon, now)];
+  const scheduled = scheduleLines(schedules ?? [], (iso) => fireWord(iso, now));
+  return [...(runs.length ? runs.flatMap(runLines) : ['no runs']), ...(stood ? [stood] : []), ...scheduled, daemonLine(daemon, now)];
 };

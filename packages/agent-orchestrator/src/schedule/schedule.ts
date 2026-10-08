@@ -2,6 +2,7 @@
  * When a factory's schedule of a workflow is due, and the words its starts and its listing say: pure, over instants in milliseconds the
  * caller read off the cron (`schedule.store.ts`), the factory's file, the run records and the tick's kept try.
  */
+import { durationWord } from '../status/status.ts';
 
 /**
  * What the tick keeps of a schedule's last try (`schedules/<factory>/<workflow>.json`): the fire it was for (`due`), when (`at`), and the
@@ -55,6 +56,12 @@ export type ScheduleListed = {
   last: { run: string; at: string } | null;
   refused: string | null;
 };
+
+/** An instant `iso` as `nemia ls` says a schedule's fire or run at `now`: the instant, and how far off it is (`in 3d23h`, `2h05m ago`). */
+export function fireWord(iso: string, now: number): string {
+  const ms = Date.parse(iso) - now;
+  return `${iso}, ${ms >= 0 ? `in ${durationWord(ms)}` : `${durationWord(-ms)} ago`}`;
+}
 
 /**
  * The lines `nemia ls` prints after the runs, one per schedule and a second for a kept refusal; none without a schedule. `clock` words an

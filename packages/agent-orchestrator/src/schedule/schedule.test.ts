@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleDue, scheduleLine, scheduleLines, settledFire, type ScheduleListed } from './schedule.ts';
+import { fireWord, scheduleDue, scheduleLine, scheduleLines, settledFire, type ScheduleListed } from './schedule.ts';
 
 const HOUR = 3_600_000;
 const fire = (n: number): number => Date.parse('2026-10-05T13:00:00Z') + n * HOUR;
@@ -77,4 +77,30 @@ test('nemia ls lists each schedule with its next fire and last run, and a kept r
     '  refused: janitor is not attached',
   ]);
   assert.deepEqual(scheduleLines([], clock), []);
+});
+
+test("nemia ls says each fire and run as the instant and how far off it is, and lists the schedules after the runs", async () => {
+  const { lsLines } = await import('../list/list.ts');
+  const now = Date.parse('2026-10-08T12:00:00Z');
+  assert.equal(fireWord('2026-10-12T13:00:00.000Z', now), '2026-10-12T13:00:00.000Z, in 4d01h');
+  assert.equal(fireWord('2026-10-05T13:00:00.000Z', now), '2026-10-05T13:00:00.000Z, 2d23h ago');
+  const listed = { runs: [], daemon: { kind: 'none' as const }, standing: { none: true as const } };
+  const without = lsLines(listed, now);
+  const row: ScheduleListed = {
+    factory: 'nemia',
+    workflow: 'janitor',
+    cron: '0 9 * * 1',
+    tz: null,
+    brief: 'Read the stats',
+    repo: null,
+    next: '2026-10-12T13:00:00.000Z',
+    last: null,
+    refused: 'janitor is not attached',
+  };
+  assert.deepEqual(lsLines({ ...listed, schedules: [row] }, now), [
+    ...without.slice(0, -1),
+    'scheduled  nemia/janitor  0 9 * * 1  next 2026-10-12T13:00:00.000Z, in 4d01h  last none',
+    '  refused: janitor is not attached',
+    ...without.slice(-1),
+  ]);
 });

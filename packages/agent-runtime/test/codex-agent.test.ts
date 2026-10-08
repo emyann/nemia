@@ -19,7 +19,8 @@
  * What `codex exec` cannot do, each pinned here rather than faked: it takes no words while it runs (its card says `say:
  * false`, and a follow-up is refused with nothing written to it), and it is never `INPUT_REQUIRED` while it runs — the worker
  * writes no `blocked` — only as a held task between turns, with no process. What it does stream: its card says so, and a
- * subscription to a working session is answered, from its stdout and its rollout (`test/codex-follow.test.ts`). What a live
+ * subscription to a working session is answered, and read to its end once the session completes, from its stdout and its rollout
+ * (`test/codex-follow.test.ts`). What a live
  * Codex does with a resume is M13 (`live.test.ts`); here the fake prints the thread it was given by construction, so this
  * proves the plumbing, not Codex.
  */
@@ -445,7 +446,6 @@ test(
     );
     const subscribed = client.resubscribeTask({ tenant: '', id: 'ae/c-say/1' });
     const first = await subscribed.next();
-    await subscribed.return(undefined);
     const opened = first.value?.payload?.$case === 'task' ? first.value.payload.value : undefined;
     assert.equal(
       opened?.status?.state,
@@ -473,6 +473,11 @@ test(
     const run = JSON.parse(fs.readFileSync(path.join(root, 'runs', 'codex', 'ae_c_say_1.json'), 'utf8')) as Record<string, unknown>;
     assert.equal('input' in run, false, 'and the worker holds no way in: its stdin is not open');
     fs.writeFileSync(path.join(cwd, 'go'), '');
+    const states: TaskState[] = [];
+    for await (const r of subscribed) {
+      if (r.payload?.$case === 'task' || r.payload?.$case === 'statusUpdate') states.push(r.payload.value.status!.state);
+    }
+    assert.equal(states.at(-1), TaskState.TASK_STATE_COMPLETED, 'the subscription read to its end: the session completed');
     await holds(t, () => stateIs(client, 'ae/c-say/1', TaskState.TASK_STATE_COMPLETED), 'completed');
 
     const context = (await get(client, 'ae/c-say/1')).contextId;

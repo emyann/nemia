@@ -18,18 +18,20 @@ const storeOn = async (on: typeof app): Promise<YourStore> => {
   return (await res.json()) as YourStore;
 };
 
-test("GET /api/store answers your folders under the app's store root, each absolute, and the table's line that files a factory", async () => {
+test("GET /api/store answers your folders under the app's store root, each absolute, and the table's lines that file a factory and turn Nemia on", async () => {
   const fileFactory = commandLine(
     COMMANDS.find((c) => c.name === 'factory add')!,
     {},
     { repos: '<path>' },
   );
   assert.equal(fileFactory, 'nemia factory add <name> --repo <path>');
+  const turnOnNemia = 'nemia level semi-auto';
   assert.deepEqual(await storeOn(app), {
     workflows: path.join(root, 'workflows'),
     agents: path.join(root, 'workflows', 'agents'),
     skills: path.join(root, 'workflows', 'skills'),
     fileFactory,
+    turnOnNemia,
   });
   const home = scratch('nemia-api-yours-home-');
   const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
@@ -40,6 +42,7 @@ test("GET /api/store answers your folders under the app's store root, each absol
       agents: path.join(home, 'workflows', 'agents'),
       skills: path.join(home, 'workflows', 'skills'),
       fileFactory,
+      turnOnNemia,
     },
     "an app over another root answers that root, not the package's HOME",
   );

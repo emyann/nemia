@@ -1,10 +1,10 @@
 /**
  * Nemia on the api, through the entries of the package's command table and the package's refusals (`REFUSAL_STATUS`): `GET /api/level`
- * says where she is, `manual` where no level was ever set; `PUT /api/level` refuses `semi-auto` with a 409 while her folder is not
- * trusted, naming the command that trusts it, a word that is no level with a 422, each before anything is written, and sets it once the
- * folder is trusted; it raises a factory for a stretch and ends the raise, and refuses `for` with no factory with a 422; `GET
- * /api/level` lists each factory's level, the default factory first; `GET /api/nemia/memory` lists her facts, and `/:fact` prints one, a
- * fact she does not keep its 404.
+ * says where she is, `manual` where no level was ever set; `PUT /api/level` sets `semi-auto` while her folder is not trusted, the one act
+ * `nemia level semi-auto` takes, both answering the command that trusts it (`trust`), null once it is; refuses a word that is no level
+ * with a 422, before anything is written; it raises a factory for a stretch and ends the raise, and refuses `for` with no factory with a
+ * 422; `GET /api/level` lists each factory's level, the default factory first; `GET /api/nemia/memory` lists her facts, and `/:fact`
+ * prints one, a fact she does not keep its 404.
  *
  * At shipped defaults, over the harness's scratch store (`root`) and its Claude Code folder (`config`), and an engine of the test's on
  * which no task is filed.
@@ -15,21 +15,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { addFactory, engine } from 'agent-orchestrator';
+import { COMMANDS, addFactory, engine, runWith } from 'agent-orchestrator';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
-const app = appOf(
-  Layer.merge(
-    liveOf(),
-    Layer.succeed(Engine)({
-      ...engine(),
-      view: (id: string) => Effect.succeed({ id, phase: 'pending', state: { settled: null, attempts: [] } }),
-    } as never),
-  ),
-).app;
+/** An engine on which no task is filed, the app's and the command line's. */
+const e = {
+  ...engine(),
+  view: (id: string) => Effect.succeed({ id, phase: 'pending', state: { settled: null, attempts: [] } }),
+} as never;
+
+const app = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e))).app;
+
+/** `nemia level`'s entry of the package's table, the command line's door. */
+const LEVEL = COMMANDS.find((c) => c.name === 'level')!;
 
 /** Her folder in the store, and the file her level is kept in. */
 const NEMIA = path.join(root, 'nemia');
@@ -49,24 +50,36 @@ test('where Nemia is: manual, no task and no spend, where no level was ever set'
   assert.equal(read.body.spend, null);
 });
 
-test('REFUSED: semi-auto while her folder is not trusted is a 409 naming the command that trusts it; no level a 422; nothing written', async () => {
-  const untrusted = await asked('PUT', '/api/level', { level: 'semi-auto' });
-  assert.equal(untrusted.status, 409);
-  assert.match(String(untrusted.body.error), /is not trusted, and her session would be refused at its start/);
-  assert.ok(String(untrusted.body.error).includes(`mkdir -p ${NEMIA} && cd ${NEMIA}`), String(untrusted.body.error));
+test('REFUSED: a word that is no level is a 422, and nothing is written', async () => {
   const none = await asked('PUT', '/api/level', { level: 'on' });
   assert.equal(none.status, 422);
   assert.match(String(none.body.error), /^"on" is no level/);
   assert.equal(fs.existsSync(LEVEL_FILE), false, 'nothing written');
 });
 
-test('once her folder is trusted, semi-auto is set, and read back with the task the keeper is to file', async () => {
+test("one act: the board's PUT and nemia level semi-auto each set her level while her folder is not trusted, and answer the same command that trusts it", async () => {
+  const words = `mkdir -p ${NEMIA} && cd ${NEMIA} && claude`;
+  const level = () => JSON.parse(fs.readFileSync(LEVEL_FILE, 'utf8')) as { level: string; since: string; task: string };
+  const before = await asked('GET', '/api/level');
+  assert.equal(before.body.trust, words, 'the command is answered before she is turned on, so the person can trust first');
+  const board = await asked('PUT', '/api/level', { level: 'semi-auto' });
+  assert.equal(board.status, 200, String(board.body.error));
+  assert.equal(board.body.level, 'semi-auto');
+  assert.equal(board.body.trust, words);
+  const byBoard = level();
+  assert.equal(byBoard.task, board.body.task);
+  assert.equal((await asked('GET', '/api/level')).body.trust, words);
+  assert.equal((await asked('PUT', '/api/level', { level: 'manual' })).status, 200);
+  fs.rmSync(LEVEL_FILE);
+  const cli = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { level: string; task: string; trust: string | null };
+  assert.equal(cli.level, 'semi-auto');
+  assert.equal(cli.trust, words, 'the same words at the command line');
+  const byCli = level();
+  assert.equal(byCli.task, cli.task);
+  assert.deepEqual(Object.keys(byCli).sort(), Object.keys(byBoard).sort(), 'the same file, written by the same act');
+  assert.equal(byCli.level, byBoard.level);
   fs.writeFileSync(path.join(config, '.claude.json'), JSON.stringify({ projects: { [NEMIA]: { hasTrustDialogAccepted: true } } }));
-  const set = await asked('PUT', '/api/level', { level: 'semi-auto' });
-  assert.equal(set.status, 200);
-  assert.equal(set.body.level, 'semi-auto');
-  assert.match(String(set.body.task), /^nemia-\d+$/);
-  assert.equal(JSON.parse(fs.readFileSync(LEVEL_FILE, 'utf8')).level, 'semi-auto');
+  assert.equal((await asked('GET', '/api/level')).body.trust, null, 'trusted: no command to run');
   assert.equal((await asked('PUT', '/api/level', { level: 'manual' })).status, 200);
 });
 

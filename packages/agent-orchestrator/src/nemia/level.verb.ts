@@ -35,7 +35,8 @@ import { LEVEL_FORM, LEVELS, levelRefusal, nemiaTaskId, type Level, type LevelFi
  * first; her task, its phase and its session where one is filed; how a person reaches her session (`reach`), and her session's web link
  * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task was stopped
  * from outside (`stopped`); what her sessions cost (`spend`, counted as each ends, as a step's; null where none is filed); and the allow
- * rules a person gave her at a prompt (`allows`).
+ * rules a person gave her at a prompt (`allows`); and the command a person runs once to trust her folder (`trust`, `trustCommand`), null
+ * where her harness trusts it or keeps no trust: while it is not, her session waits for it.
  */
 export type NemiaLevel = {
   level: Level;
@@ -49,9 +50,13 @@ export type NemiaLevel = {
   spend: Spend | null;
   allows: string[];
   factories: FactoryLevel[];
+  trust: string | null;
 };
 
-/** The command a person runs once to trust her folder, which her session's harness refuses to start in until they do. */
+/**
+ * The command a person runs once to trust her folder, which her session's harness refuses to start in until they do: accepted at its
+ * prompt and exited, it is the one approval her harness asks; it offers no program a way to give it.
+ */
 export const trustCommand = (): string => `mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`;
 
 /**
@@ -94,27 +99,21 @@ const levelNow = (e: Engine) =>
       spend: filed ? spendOf(view) : null,
       allows: yield* tried(promptAllows),
       factories,
+      trust: trustedFolder(DEFAULT_HARNESS, nemiaDir()) === false ? trustCommand() : null,
     } satisfies NemiaLevel;
-  });
-
-/** The refusal of a folder not trusted, which her session's harness would refuse to start in, naming the command that trusts it. */
-const untrusted = (): Conflict =>
-  new Conflict({
-    message: `Nemia's folder ${nemiaDir()} is not trusted, and her session would be refused at its start. Trust it once: ${trustCommand()}, accept the prompt and exit; then set the level again.`,
   });
 
 /**
  * The store's level file once the store's level is `level` (the same where only a factory changes, `storeSet` false) and some factory is
  * above `manual` or none (`above`), after `now`; undefined where nothing of it changes. Above `manual`, her task is kept where it is open
- * or not yet filed and some factory already was, and a fresh one named otherwise; at none, the task stays named, so the keeper stops it.
- * Refused (`Conflict`): a fresh task while her folder is not trusted, naming the command that trusts it.
+ * or not yet filed and some factory already was, and a fresh one named otherwise, whatever her folder's trust, which the keeper reads; at
+ * none, the task stays named, so the keeper stops it.
  */
 function storeAsked(level: Level, storeSet: boolean, above: boolean, now: NemiaLevel, at: string): LevelFile | undefined {
   const since = storeSet && level !== now.level ? at : (now.since ?? at);
   if (!above) return storeSet ? { level, since: at, ...(now.task === null ? {} : { task: now.task }) } : undefined;
   const wasAbove = now.factories.some((row) => row.level !== 'manual');
   if (wasAbove && now.task !== null && !now.stopped) return storeSet ? { level, since, task: now.task } : undefined;
-  if (trustedFolder(DEFAULT_HARNESS, nemiaDir()) === false) throw untrusted();
   return { level, since, task: nemiaTaskId(at) };
 }
 
@@ -173,6 +172,10 @@ const levelBy = (args: Args) =>
 const spendLine = ({ usd, measured, unmeasured }: Spend): string =>
   `spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends`;
 
+/** What `nemia level` prints of her folder not trusted: the command `trust` to run once, and what then follows. */
+const trustLine = (trust: string): string =>
+  `her folder is not trusted yet, and her session starts only once it is: run once in a terminal ${trust}, accept the prompt, then /exit; the keeper files her at its next beat`;
+
 /** What `nemia level` prints of where she is. */
 function levelLines(data: NemiaLevel): string[] {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
@@ -184,15 +187,18 @@ function levelLines(data: NemiaLevel): string[] {
     data.task === null
       ? []
       : data.phase === null
-        ? [`her session ${data.task}: not filed yet, the keeper files it at its next beat (nemia up, or the api, keeps her)`]
+        ? [
+            `her session ${data.task}: not filed yet, ${data.trust === null ? 'the keeper files it at its next beat (nemia up, or the api, keeps her)' : 'it waits for her folder to be trusted'}`,
+          ]
         : [`her session ${data.task}: ${data.phase}`];
   const spent = data.spend === null ? [] : [spendLine(data.spend)];
   const stopped = data.stopped ? ['it was stopped from outside and is not filed again: a level set above manual starts a fresh one'] : [];
+  const trust = data.trust === null ? [] : [trustLine(data.trust)];
   const reach = data.reach.length ? ['reach her:', ...data.reach.map((line) => `  ${line}`)] : [];
   const allows = data.allows.length
     ? ['allowed at a prompt, beyond what ships (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]
     : [];
-  return [head, ...factories, ...session, ...spent, ...stopped, ...reach, ...allows];
+  return [head, ...factories, ...session, ...trust, ...spent, ...stopped, ...reach, ...allows];
 }
 
 /**
@@ -218,8 +224,8 @@ function factoryArgsRefusal(args: Args): string | null {
  * `nemia level`: bare, where Nemia is; `auto`, `semi-auto` or `manual`, the store's level, or with `--factory` a factory's default, raised
  * for a stretch with `--for`, its raise ended with `--end`: the levels the keeper acts on. Refused: a word that is no level, arguments that
  * ask no write (`Invalid`); no such factory (`Missing`); a raise that raises nothing over the factory's default
- * (`Invalid`); an end with no raise in force, or a fresh session while her folder is untrusted (`Conflict`); a level file that does not
- * read (`Invalid`).
+ * (`Invalid`); an end with no raise in force (`Conflict`); a level file that does not read (`Invalid`). Never refused for her folder's
+ * trust: her session waits for it, and `trust` names the command that gives it.
  */
 export const LEVEL: Command<NemiaLevel> = {
   name: 'level',

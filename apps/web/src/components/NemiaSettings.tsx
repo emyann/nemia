@@ -22,6 +22,7 @@ import { useNow } from '../lib/useNow';
 import { AutoRules } from './AutoRules';
 import { CopyButton } from './CopyButton';
 import { BridgeWords } from './Facts';
+import { TrustLine } from './NemiaTrust';
 
 /**
  * Nemia, the store's own agent, on the Settings page: the store's level and where it is picked, each factory's level with its default and a
@@ -132,7 +133,10 @@ function LevelSelect({
   );
 }
 
-/** Her level, picked among the three, what it means, and since when she is there. */
+/**
+ * Her level, picked among the three, what it means, and since when she is there; while her folder is not trusted, beside the switch, that
+ * no session of hers is filed until it is, and the line that trusts it.
+ */
 function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: boolean; onAsk: (level: Level) => void }) {
   const now = useNow(60_000);
   return (
@@ -145,6 +149,7 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
         {LEVEL_LINES[nemia.level]}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>
+      <TrustLine trust={nemia.trust} />
     </Part>
   );
 }

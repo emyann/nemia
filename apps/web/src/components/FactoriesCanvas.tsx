@@ -1,16 +1,19 @@
 import { useEffect, useEffectEvent, useMemo, useRef, type RefObject } from 'react';
 import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow, useStoreApi } from '@xyflow/react';
 import { useNavigate } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { storeQuery } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { levelQuery, putLevel, storeQuery } from '@/lib/api';
 import type { Bar } from '@/lib/bar';
 import type { FactoryBlock } from '@/lib/factories';
 import { revealView, sizeOf } from '@/lib/frame';
 import { useBarOver } from '@/lib/useBarOver';
 import { useCanvasPress } from '@/lib/useCanvasPress';
+import { anyAbove, sessionOf } from '@/lib/nemia';
 import { useContent } from '@/lib/useContent';
 import { BLOCK_SIZE, FactoryBlockNode, type FactoryFlowNode } from './FactoryBlock';
+import { TrustLine } from './NemiaTrust';
 
 /** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { factory: FactoryBlockNode };
@@ -139,7 +142,10 @@ function useKeepClear(frame: RefObject<HTMLDivElement | null>, inspected: string
   }, [frame]);
 }
 
-/** No factory, and no run in the default one: say how to make one, with the line the api answers (`fileFactory`). */
+/**
+ * No factory, and no run in the default one: say how to make one, with the line the api answers (`fileFactory`), and offer to turn Nemia
+ * on (`TurnOn`).
+ */
 function NoFactory() {
   const { data: store } = useQuery(storeQuery);
   return (
@@ -158,7 +164,57 @@ function NoFactory() {
             . A run started in none is the default factory&apos;s, which shows here while it holds one and no factory is made.
           </CardDescription>
         </CardHeader>
+        <TurnOn line={store?.turnOnNemia ?? null} />
       </Card>
     </div>
+  );
+}
+
+/**
+ * Nemia off, the store's own agent: a button that sets her level to Semi-auto, one approval, beside `line`, the same act from the command
+ * line as the api answers it. Once she is above Manual, her session's state in the board's words and the line that trusts her folder while
+ * it is not. A refusal is shown in the api's words; nothing while her level is not read.
+ */
+function TurnOn({ line }: { line: string | null }) {
+  const queryClient = useQueryClient();
+  const { data: nemia } = useQuery(levelQuery);
+  const turnOn = useMutation({
+    mutationFn: () => putLevel({ level: 'semi-auto' }),
+    onSuccess: (now) => {
+      queryClient.setQueryData(levelQuery.queryKey, now);
+      void queryClient.invalidateQueries({ queryKey: levelQuery.queryKey, exact: true });
+    },
+  });
+  if (!nemia) return null;
+  if (anyAbove(nemia)) {
+    const { kind, words } = sessionOf(nemia);
+    return (
+      <CardContent data-nemia-on data-state={kind} className="flex flex-col gap-2 border-t pt-4">
+        <p className="text-sm">Nemia is on. {words}</p>
+        <TrustLine trust={nemia.trust} />
+      </CardContent>
+    );
+  }
+  return (
+    <CardContent data-nemia-off className="flex flex-col gap-2 border-t pt-4">
+      <p className="text-sm text-muted-foreground">
+        Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
+          Turn Nemia on
+        </Button>
+        {line !== null && (
+          <span className="text-xs text-muted-foreground">
+            or <code className="font-mono">{line}</code>
+          </span>
+        )}
+      </div>
+      {turnOn.error && (
+        <p data-nemia-refused className="font-mono text-xs break-words whitespace-pre-wrap text-destructive">
+          {turnOn.error.message}
+        </p>
+      )}
+    </CardContent>
   );
 }

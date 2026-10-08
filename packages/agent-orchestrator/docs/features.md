@@ -2351,8 +2351,10 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   `$WF_ROOT/nemia/level.json` (`{ level, since, task }`), its one writer. Bare, it says her level, her task's phase, how to reach her
   session (`claude attach <8 characters>`, measured, or the web link the session shows) and any allow rule a person gave her at a prompt,
   read from her folder's local settings. `auto` is refused as to come (slice 6), as is a word that is no level (`Invalid`). `semi-auto`
-  is refused while her folder is not trusted by the harness (`Conflict`), naming the command that trusts it once, by hand: the store
-  never writes the harness's config (`trustedFolder`, the runtime's, read-only).
+  is accepted while her folder is not trusted by the harness: her session waits in `untrusted`, and `nemia level` and `GET /api/level`
+  answer the command that trusts it once, by hand (`trust`), which the board shows beside the switch and in its empty state; the keeper
+  reads the trust each beat and files her once it is given. The store never writes the harness's config (`trustedFolder`, the
+  runtime's, read-only): Claude Code offers no program a door to trust a folder.
 - **The keeper** (`keep`, `src/nemia/keep.verb.ts`), forked by `up` beside the deliverer, beats every 5 s and acts on what her
   machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
@@ -2380,6 +2382,8 @@ Her machine, drawn by its code:
 stateDiagram-v2
   [*] --> off
   due --> filed: NO_TASK / file
+  due --> untrusted: FOLDER_UNTRUSTED / nothing
+  untrusted --> due: FOLDER_TRUSTED / nothing
   filed --> kept: NOT_SUBSCRIBED / subscribe
   filed --> stopped: SETTLED_OUTSIDE / nothing
   kept --> stopped: SETTLED_OUTSIDE / nothing
@@ -2387,12 +2391,15 @@ stateDiagram-v2
   stopped --> stopped: SUBSCRIBED / drop
   leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
   due --> off: RAISE_ENDED / nothing
+  untrusted --> off: RAISE_ENDED / nothing
   filed --> leaving: RAISE_ENDED / nothing
   kept --> leaving: RAISE_ENDED / nothing
-  off --> due: level (a factory above manual) [trusted] (by person)
-  stopped --> due: level (a factory above manual) [trusted] (by person)
-  leaving --> due: level (a factory above manual) [trusted] (by person)
+  off --> due: level (a factory above manual) [always] (by person)
+  untrusted --> due: level (a factory above manual) [always] (by person)
+  stopped --> due: level (a factory above manual) [always] (by person)
+  leaving --> due: level (a factory above manual) [always] (by person)
   due --> leaving: level (none above manual) [always] (by person)
+  untrusted --> leaving: level (none above manual) [always] (by person)
   filed --> leaving: level (none above manual) [always] (by person)
   kept --> leaving: level (none above manual) [always] (by person)
   stopped --> leaving: level (none above manual) [always] (by person)
@@ -2420,7 +2427,7 @@ stateDiagram-v2
 instruction` is not on her allow list, since its write flags share its prefix.
 
 Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
-`denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted refusal, the filing and its fields, the quota allow, her spend,
+`denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted wait, the filing and its fields, the quota allow, her spend,
 a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, a tick that says it once, and a running step's calls said as they come),
 `src/stats/discipline.test.ts` (the calls so far beside the ended ones the stats count),
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
@@ -2485,7 +2492,7 @@ A factory at Manual is left alone; one at Semi-auto is hers to work. The level i
   (`Scope`, `src/admission/admission.ts`). Nemia's keeper puts both at `semi-auto` (`NEMIA_FLOOR`).
 - **Her session follows the levels**: kept while any factory, the default included, is above `manual`, and stopped at the keeper's next
   beat once none is (`Keeping`, `nemiaDue`); a subscription of hers without her floor is put again with it. The verb that puts a factory
-  above `manual` names a fresh task where none is open, asking first whether her folder is trusted.
+  above `manual` names a fresh task where none is open, whatever her folder's trust: the keeper files it once the folder is trusted.
 - **`nemia level`** says each factory's level, its default and whose it is, and a raise with its end; `GET /api/level` answers them as
   `factories`, and `PUT /api/level` takes `factory`, `for` and `end`. The board's Settings page shows them, one row per factory, and sets
   a default, raises a factory for a stretch and ends a raise.

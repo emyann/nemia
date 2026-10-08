@@ -19,7 +19,7 @@ import type { Mount } from '../record/record.ts';
 import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
-import { EngineService, asked, type Engine } from '../runtime-client.ts';
+import { EngineService, asked, trustedFolder, type Engine } from '../runtime-client.ts';
 import {
   composePrompt,
   filedPrompt,
@@ -203,7 +203,8 @@ const herSubscription = (): HerSubscription | undefined => {
 };
 
 /**
- * One beat: the levels, her task and her subscription read, and, while she is kept, the person's custom words against those she was last
+ * One beat: the levels, her task, her subscription and her folder's trust read (`trustedFolder`, so no task is filed where her harness
+ * would refuse its start), and, while she is kept, the person's custom words against those she was last
  * filed or told with (`customChanged`); each act owed done in order. Answers the acts done.
  */
 export const keepOnce = Effect.fn('keepOnce')(function* () {
@@ -211,7 +212,8 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   const id = readLevel()?.task;
   const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
   const task = yield* herTask(e, id);
-  const keeping = { above, ...(id === undefined ? {} : { task: id }) };
+  const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir());
+  const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
   const subscribed = herSubscription();
   const stale = nemiaState(keeping, task, subscribed) === 'kept' && customChanged(readTold(), nemiaCustom(), filedPrompt());
   const owed = nemiaDue({ ...keeping, stale }, task, subscribed);

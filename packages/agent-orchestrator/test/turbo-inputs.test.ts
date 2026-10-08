@@ -7,7 +7,7 @@
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
  * repository's team from `workflows/agents/` (`words.test.ts`). Every package's test script loads the test-cost probe and reporter from
  * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
- * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/`.
+ * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -51,6 +51,7 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/packages/**',
     '!$TURBO_ROOT$/packages/*/.turbo/**',
     '$TURBO_ROOT$/docs/**',
+    '$TURBO_ROOT$/workflows/**',
     '$TURBO_ROOT$/README.md',
     '$TURBO_ROOT$/CLAUDE.md',
   ],

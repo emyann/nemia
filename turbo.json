@@ -61,6 +61,7 @@
         "$TURBO_ROOT$/packages/**",
         "!$TURBO_ROOT$/packages/*/.turbo/**",
         "$TURBO_ROOT$/docs/**",
+        "$TURBO_ROOT$/workflows/**",
         "$TURBO_ROOT$/README.md",
         "$TURBO_ROOT$/CLAUDE.md"
       ]

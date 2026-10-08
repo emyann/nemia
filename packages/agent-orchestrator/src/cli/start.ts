@@ -33,14 +33,20 @@ const textOf = (args: Args, key: string): string | undefined => {
 /**
  * Where a start of a workflow typed here is made (`startFactory`): the factory `--factory` names, else the one whose repository holds
  * `--repo`, else the directory it is typed in; and its repository — the one that holds the folder, when the factory was found from it,
- * else `--repo`, else the factory's one repository, else here (`repoFor`). Refused as `startFactory` and `repoFor` refuse.
+ * else `--repo`, else the factory's one repository, else here (`repoFor`); and its tree, where it is made from a template. Refused as
+ * `startFactory` and `repoFor` refuse.
  */
-function placeOfStart(args: Args): { factory?: string; repo: string } {
+function placeOfStart(args: Args): { factory?: string; repo: string; tree?: string } {
   const given = textOf(args, 'repo');
   const named = given === undefined ? undefined : path.resolve(given);
   const found = startFactory(textOf(args, 'factory'), named ?? path.resolve('.'), '--factory <name>');
   const factory = found.factory?.name;
-  return { ...(factory !== undefined ? { factory } : {}), repo: found.repo ?? repoFor(factory, named, path.resolve('.')) };
+  const tree = found.factory?.tree;
+  return {
+    ...(factory !== undefined ? { factory } : {}),
+    repo: found.repo ?? repoFor(factory, named, path.resolve('.')),
+    ...(tree !== undefined ? { tree } : {}),
+  };
 }
 
 /** `nemia start` of the inbox's card `card`: its body, or `--brief` in its place — a file's text, or the words. */
@@ -71,7 +77,7 @@ function briefArgs(arg: string, args: Args): Args {
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, after);
   const workflows = textOf(args, 'workflows');
-  const { factory, repo } = placeOfStart(args);
+  const { factory, repo, tree } = placeOfStart(args);
   return {
     ...args,
     brief: card ? card.body : (text?.trim() ?? arg),
@@ -79,8 +85,8 @@ function briefArgs(arg: string, args: Args): Args {
     repoNamed: args.repo !== undefined,
     workflows:
       workflows === undefined && card?.workflow !== undefined
-        ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo)
-        : workflowFolder(workflows ?? './workflows', process.cwd(), repo),
+        ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo, tree)
+        : workflowFolder(workflows ?? './workflows', process.cwd(), repo, tree),
     factory,
   };
 }

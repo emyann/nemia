@@ -31,7 +31,7 @@ import { inboxCards } from './inbox.store.ts';
 import { repoFor, startRun } from '../start/start.verb.ts';
 import { contextRefusal } from '../start/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { defaultStartsAllowed, factoryNames, readFactories } from '../factory/factory.store.ts';
+import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
 import { DEFAULT_FACTORY, defaultStartRefusal, type Factory } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
@@ -83,14 +83,15 @@ export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run
 };
 
 /**
- * The workflow folder a card is started on, found in `repo`: `opts.workflow`, from `opts.from`, else the card's `workflow:`, from the
- * inbox. Refused by name: a card's workflow that does not load, in the card's words, and none from either, naming the repository's.
+ * The workflow folder a card is started on, found in the factory's `tree` where it has one, then in `repo`: `opts.workflow`, from
+ * `opts.from`, else the card's `workflow:`, from the inbox. Refused by name: a card's workflow that does not load, in the card's words,
+ * and none from either, naming the repository's.
  */
-function cardWorkflow(opts: Pick<InboxStart, 'workflow' | 'from'>, card: InboxCard, file: string, repo: string): string {
-  if (opts.workflow !== undefined) return workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo);
+function cardWorkflow(opts: Pick<InboxStart, 'workflow' | 'from'>, card: InboxCard, file: string, repo: string, tree?: string): string {
+  if (opts.workflow !== undefined) return workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo, tree);
   if (card.workflow === undefined) throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
   try {
-    return workflowFolder(card.workflow, inboxDir(), repo);
+    return workflowFolder(card.workflow, inboxDir(), repo, tree);
   } catch (err) {
     throw new WorkflowError(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`);
   }
@@ -151,7 +152,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
 
   const factory = cardFactory(opts, card.factory, file);
   const repo = repoFor(factory, opts.repo ?? card.repo, opts.callerRepo);
-  const workflowDir = cardWorkflow(opts, card, file, repo);
+  const workflowDir = cardWorkflow(opts, card, file, repo, treeOf(factory));
   if (opts.brief !== undefined && !opts.brief.trim()) {
     throw new WorkflowError(
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,

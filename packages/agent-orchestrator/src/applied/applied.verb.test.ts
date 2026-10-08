@@ -5,6 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
@@ -20,6 +21,7 @@ const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactory } = aw
 const { main } = await import('../cli/main.ts');
 const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
+const { readRun } = await import('../record/record.store.ts');
 const { Effect } = await import('effect');
 
 /** No verb here asks the engine anything. */
@@ -29,10 +31,15 @@ const NO_ENGINE = promised({});
 const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
   err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
 
-/** A repository holding the tests' team as its `workflows/`. */
+/** A repository holding the tests' team as its `workflows/`, in one commit, so a start has a base to record. */
 function repoWithTeam(): string {
   const repo = scratch('wf-applied-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '-q');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
   return repo;
 }
 
@@ -222,4 +229,19 @@ test("a templated factory's instruction is its tree's NEMIA.md, written by instr
     filed().filter((f) => f.startsWith('told')),
     [],
   );
+});
+
+test("a bare workflow name started in a templated factory is its tree's, and the tree's step is what the run is told", async (t) => {
+  const { dir, repo } = template();
+  await apply('started', dir, repo, '--set', 'budget=7');
+  reconcileFactory(templated('started'));
+  const review = path.join(treeDir('started'), 'workflows', 'dev', 'review.md');
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
+  await main(['start', 'Cache the views', '--factory', 'started', '--workflows', 'dev'], NO_ENGINE);
+  const run = readRun(printed[0].split(' ')[0]);
+  assert.equal(run.workflowDir, path.join(treeDir('started'), 'workflows', 'dev'));
+  assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9, "the tree's step, as the person changed it");
+  assert.equal(run.factory, 'started');
 });

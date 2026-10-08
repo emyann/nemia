@@ -249,6 +249,16 @@ export function readFactory(name: string, notDone = 'Nothing was started.'): Fac
 }
 
 /**
+ * The tree the factory `name` runs from, where it is made from a template (`treeDir`): where a bare workflow name is looked for first.
+ * None for no name, an untemplated factory, and one that is not there or does not read: what is wrong with it is the start's to say.
+ */
+export function treeOf(name: string | undefined): string | undefined {
+  if (name === undefined || factoryNameRefusal(name)) return undefined;
+  const read = factoryFile(name);
+  return 'error' in read || read.content.template === undefined ? undefined : treeDir(name);
+}
+
+/**
  * Whether a start may go to the default factory when it names none and no factory holds its folder, or when it starts a card that names
  * none: only with `WF_DEFAULT_FACTORY_STARTS=1`, which the package's and the api's tests set for the starts they make in scratch folders.
  * Unset, as shipped, every such start is refused.

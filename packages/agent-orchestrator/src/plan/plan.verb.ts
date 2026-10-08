@@ -46,7 +46,7 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
   let onRepo = false;
   for (const card of cards) {
     try {
-      const folder = workflowFolder(card.workflow, opts.dir, opts.repo);
+      const folder = workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);
       const steps = stepsToStart(folder, true, placesOf(opts.repo), factory);
       onRepo = onRepo || !isFolderTeam(steps);
       folders.set(card.name, folder);

@@ -890,6 +890,7 @@ test('REFUSED: a cycle between two controllers, a longer one, and one through th
   ]);
   assert.deepEqual(cycles(adding('src/start/start.verb.ts', 'src/tick/tick.verb.ts')), [
     'a cycle: src/inbox/inbox.verb.ts → src/start/start.verb.ts → src/tick/tick.verb.ts → src/inbox/inbox.verb.ts',
+    'a cycle: src/schedule/schedule.verb.ts → src/start/start.verb.ts → src/tick/tick.verb.ts → src/schedule/schedule.verb.ts',
   ]);
   assert.deepEqual(cycles(adding(CLIENT, 'src/views/views.verb.ts')), [
     'a cycle: src/runtime-client.ts → src/views/views.verb.ts → src/runtime-client.ts',

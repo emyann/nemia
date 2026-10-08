@@ -113,3 +113,20 @@ test('a forgetting line is said once while its words stand, and again once they 
     'said again once they change',
   );
 });
+
+test("a scheduled start is said about its run, a refusal and a failure as a warning; REFUSED: a failure the schedule's try already held", () => {
+  const at = { factory: 'nemia', workflow: 'janitor', due: '2026-10-05T13:00:00.000Z' };
+  const said = (scheduled: Pass['scheduled']) => passSaid({ runs: [], scheduled }, NOTHING_SAID, Date.parse('2026-10-05T13:00:01Z')).lines;
+  assert.deepEqual(said({ ...at, run: 'read-the-stats-ab12' }), [
+    { text: 'started nemia/janitor as read-the-stats-ab12, for its fire at 2026-10-05T13:00:00.000Z', run: 'read-the-stats-ab12' },
+  ]);
+  assert.deepEqual(
+    said({ ...at, refused: 'no' }).map((l) => l.warn),
+    [true],
+  );
+  assert.deepEqual(
+    said({ ...at, failed: 'EIO', again: false }).map((l) => l.warn),
+    [true],
+  );
+  assert.deepEqual(said({ ...at, failed: 'EIO', again: true }), []);
+});

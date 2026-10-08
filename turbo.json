@@ -50,6 +50,26 @@
       "dependsOn": ["^transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tools/**"]
     },
+    "docs#test": {
+      "dependsOn": ["^transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tools/**",
+        "$TURBO_ROOT$/lint/**",
+        "$TURBO_ROOT$/apps/*/src/**",
+        "$TURBO_ROOT$/apps/*/test/**",
+        "$TURBO_ROOT$/packages/**",
+        "!$TURBO_ROOT$/packages/*/.turbo/**",
+        "$TURBO_ROOT$/docs/**",
+        "$TURBO_ROOT$/README.md",
+        "$TURBO_ROOT$/CLAUDE.md"
+      ]
+    },
+    "docs#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/*/README.md", "$TURBO_ROOT$/packages/*/docs/**"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]

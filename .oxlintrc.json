@@ -147,6 +147,19 @@
       }
     },
     {
+      "files": ["apps/docs/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
       "files": ["apps/web/**"],
       "rules": {
         "comments/no-code-comments": "error",

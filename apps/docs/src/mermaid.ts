@@ -76,14 +76,14 @@ const drawn = (root: string, page: string, code: Code): Html => {
   const name = NAMED.exec(code.meta ?? '')?.[1];
   const what = name ? `the diagram ${name}` : 'a mermaid fence';
   if (name && code.value.trim()) throw new Error(`${page}: ${what} is read from its markers: leave its fence empty`);
-  const source = name ? diagramFrom(root, name) : code.value;
-  const header = source.trim().split('\n')[0].trim();
+  const header = code.value.trim().split('\n')[0].trim();
   if (!name && !DRAWN.test(header))
     throw new Error(
       `${page}: ${what} opens with ${header}: a diagram drawn on a page is a flowchart or a sequence; ` +
         "a state machine's diagram is its code's, a fence ```mermaid diagram=<name>",
     );
   try {
+    const source = name ? diagramFrom(root, name) : code.value;
     const unread = unreadLines(source);
     if (unread.length > 0) throw new Error(`these lines are read as nothing, and left out: ${unread.join(' | ')}`);
     return { type: 'html', value: `<figure class="diagram">${renderMermaidSVG(source, COLOURS)}</figure>` };

@@ -1,6 +1,6 @@
 # Mounted over the image's own Tempo config (/otel-lgtm/tempo-config.yaml), of which it is a copy read out of the pinned image, changed
 # where it says so: span time kept by a step's names, a subagent's spans left out of it, the trace retention written out, and the
-# reach of a TraceQL metrics query.
+# reach of a TraceQL metrics query, back in time and over a long span.
 server:
   http_listen_port: 3200
   grpc_listen_port: 9096
@@ -81,3 +81,9 @@ overrides:
   defaults:
     metrics_generator:
       processors: [service-graphs, span-metrics]
+
+# Changed: a TraceQL metrics query counts a recent span only when it began within this of its arrival (the default is 2m, measured to
+# leave out a turn of five minutes, sent when it ends); a day holds a step's turn.
+live_store:
+  wal:
+    ingestion_time_range_slack: 24h

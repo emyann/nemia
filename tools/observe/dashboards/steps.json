@@ -1,7 +1,7 @@
 {
   "uid": "nemia-steps",
   "title": "Steps",
-  "description": "Each step's tokens and denied calls; its turns and tool calls once its session exports them.",
+  "description": "Each step's tokens and denied calls, from what the daemon records when a step settles; where its time goes is on Time.",
   "tags": [
     "nemia"
   ],
@@ -158,7 +158,7 @@
     {
       "id": 1,
       "type": "text",
-      "title": "Turns and tool calls",
+      "title": "Where a step's time goes",
       "gridPos": {
         "x": 0,
         "y": 0,
@@ -167,7 +167,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Turns and tool calls by step wait on card `a-step-s-session-exports-its-1tan`, built by the run `a-step-s-session-exports-its-0cqv`: they chart here once a step's session exports its telemetry. Until then, this page charts what the daemon records when a step settles."
+        "content": "Where a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
       }
     },
     {

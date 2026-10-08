@@ -260,6 +260,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                hire an agent into a workflow's step: one a step, a second replaces it
   nemia factory fire <factory> --step <workflow>/<step>
                                take a step's hire back
+  nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
+                               start a run of an attached workflow at each fire of a cron, by the
+                               daemon, at every level; a second replaces the first
+  nemia factory unschedule <factory> <workflow>
+                               take a workflow's schedule back: the daemon starts it no more
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), or
                                remove it with --clear

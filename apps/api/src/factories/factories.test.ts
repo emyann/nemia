@@ -20,6 +20,7 @@ import {
   addFactory,
   addToInbox,
   attachWorkflow,
+  clearSchedule,
   factoryNameRefusal,
   hireAgent,
   loadWorkflows,
@@ -27,6 +28,7 @@ import {
   readInbox,
   removeFactory,
   runStore,
+  setSchedule,
   hireRefusalOf,
   unattachedRefusal,
   unfilledRefusal,
@@ -408,6 +410,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
       attach: `nemia factory attach ${name} <workflow>`,
       rm: `nemia factory rm ${name}`,
       add: `nemia factory add ${name} --repo <path>`,
+      schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     });
     assert.deepEqual(body[0], {
       name: 'default',
@@ -416,6 +419,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
       workflows: null,
       hires: {},
       error: null,
+      schedules: [],
       template: null,
       commands: commandsOf('default'),
     });
@@ -426,6 +430,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
       workflows: ['alpha'],
       hires: { 'alpha/implement': 'ada' },
       error: null,
+      schedules: [],
       template: null,
       commands: commandsOf('hired'),
     });
@@ -433,7 +438,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
     assert.deepEqual(body[3].repos, [repoR, repoS]);
     assert.equal(body[1].default, false);
     assert.match(body[1].error ?? '', /is not JSON/);
-    assert.deepEqual([body[1].repos, body[1].workflows, body[1].hires, body[1].template], [[], [], {}, null]);
+    assert.deepEqual([body[1].repos, body[1].workflows, body[1].hires, body[1].schedules, body[1].template], [[], [], {}, [], null]);
   } finally {
     fs.rmSync(path.join(root, 'factories', 'broken.json'));
   }
@@ -460,4 +465,91 @@ test("GET /api/factories serves a templated factory's template: not applied befo
   } finally {
     removeFactory('shaped');
   }
+});
+
+test("GET /api/factories answers a factory's schedules with their next fire and last scheduled run, as the package lists them, and the line that takes each back", async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-08T12:00:00Z') });
+  setSchedule({ factory: 'solo', workflow: 'alpha', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
+  const record = path.join(root, 'runs', 'r-scheduled.json');
+  write(
+    record,
+    JSON.stringify({
+      id: 'r-scheduled',
+      repo: repoR,
+      baseRef: 'main',
+      workspace: repoR,
+      branch: 'main',
+      isolate: true,
+      brief: 'Read the stats',
+      createdAt: '2026-10-05T13:00:02.000Z',
+      workflowDir: path.join(repoR, 'workflows', 'alpha'),
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+      steps: {},
+      factory: 'solo',
+      scheduled: { factory: 'solo', workflow: 'alpha', due: '2026-10-05T13:00:00.000Z' },
+    }),
+  );
+  try {
+    const { status, body } = await get<FactoryAnswer[]>('/api/factories');
+    assert.equal(status, 200);
+    const solo = body.find((f) => f.name === 'solo');
+    assert.deepEqual(solo?.schedules, [
+      {
+        workflow: 'alpha',
+        cron: '0 9 * * 1',
+        tz: 'America/Montreal',
+        brief: 'Read the stats',
+        repo: null,
+        next: '2026-10-12T13:00:00.000Z',
+        last: { run: 'r-scheduled', at: '2026-10-05T13:00:02.000Z' },
+        refused: null,
+        commands: { unschedule: 'nemia factory unschedule solo alpha' },
+      },
+    ]);
+    assert.deepEqual(
+      body.filter((f) => f.name !== 'solo').map((f) => f.schedules),
+      body.filter((f) => f.name !== 'solo').map(() => []),
+      'the default factory, and every factory with none, answers no schedule',
+    );
+  } finally {
+    clearSchedule({ factory: 'solo', workflow: 'alpha' });
+    fs.rmSync(record);
+  }
+});
+
+test("REFUSED at shipped defaults: a schedule's PUT with a cron Effect's Cron does not read is a 422 in the package's words, and nothing is scheduled", async () => {
+  const res = await app.request('/api/factories/solo/schedules/alpha', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ cron: 'not a cron', brief: 'Read the stats' }),
+  });
+  assert.equal(res.status, 422);
+  assert.match(said(await res.json()), /not a cron/);
+  const { body } = await get<FactoryAnswer[]>('/api/factories');
+  assert.deepEqual(body.find((f) => f.name === 'solo')?.schedules, []);
+});
+
+test("a schedule PUT on the factory's route is listed on GET /api/factories and taken back by its DELETE; REFUSED: a cron that is no string is a 400 naming it", async () => {
+  const route = '/api/factories/solo/schedules/alpha';
+  const json = { 'content-type': 'application/json' };
+  const wrong = await app.request(route, { method: 'PUT', headers: json, body: JSON.stringify({ cron: 9, brief: 'Read the stats' }) });
+  assert.equal(wrong.status, 400);
+  assert.match(
+    said(await wrong.json()),
+    /^PUT \/api\/factories\/solo\/schedules\/alpha: `cron` is the cron its runs start at.* This request's was 9\.$/,
+  );
+  const put = await app.request(route, {
+    method: 'PUT',
+    headers: json,
+    body: JSON.stringify({ cron: '0 9 * * 1', brief: 'Read the stats' }),
+  });
+  assert.equal(put.status, 200, said(await put.clone().json()));
+  const listed = (await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === 'solo')?.schedules;
+  assert.deepEqual(
+    listed?.map((s) => [s.workflow, s.cron, s.brief, s.commands.unschedule]),
+    [['alpha', '0 9 * * 1', 'Read the stats', 'nemia factory unschedule solo alpha']],
+  );
+  const del = await app.request(route, { method: 'DELETE', headers: json, body: '{}' });
+  assert.equal(del.status, 200);
+  assert.deepEqual((await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === 'solo')?.schedules, []);
 });

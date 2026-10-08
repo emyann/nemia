@@ -29,7 +29,9 @@ import {
   type FactoryTemplate,
   type FactoryWrite,
   type InstructionAt,
+  type Schedule,
 } from './factory.ts';
+import { firesOf } from '../schedule/schedule.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
@@ -38,17 +40,30 @@ import { readStatus, readTreeWiring, treeDir, writeTreeWiring } from '../applied
 /** Where the factories are: `$WF_ROOT/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDir = (): string => path.join(HOME, 'factories');
 
+/** A schedule as a factory's file holds it (`Schedule`), a key a later `nemia` writes beside its own kept. */
+const ScheduleSchema = Schema.StructWithRest(
+  Schema.Struct({
+    cron: Schema.String,
+    brief: Schema.String,
+    repo: Schema.optionalKey(Schema.String),
+    tz: Schema.optionalKey(Schema.String),
+    since: Schema.String,
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
 /**
  * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a
- * step's `<workflow>/<step>` to an agent's name, when it has any, and where its instruction is kept, a path or the store, when it says;
- * and the template it was made from, when it was (`nemia factory apply`): its folder, its version and the parameters given. A key a later
- * `nemia` writes beside them is kept, not refused.
+ * step's `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path
+ * or the store, when it says; and the template it was made from, when it was (`nemia factory apply`): its folder, its version and the
+ * parameters given. A key a later `nemia` writes beside them is kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
     repos: Schema.NonEmptyArray(Schema.String),
     workflows: Schema.optionalKey(Schema.Array(Schema.String)),
     hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    schedules: Schema.optionalKey(Schema.Record(Schema.String, ScheduleSchema)),
     instruction: Schema.optionalKey(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -104,8 +119,9 @@ function treeWiringOf(name: string): Pick<Factory, 'workflows' | 'hires'> | { er
 }
 
 /**
- * The factory `name` its file's `content` says: none attached and none hired when the file names none, and where its instruction is kept
- * only when the file says. A factory made from a template reads its workflows and hires from its tree (`tree`), or why they do not read.
+ * The factory `name` its file's `content` says: none attached, hired or scheduled when the file names none, and where its instruction is
+ * kept only when the file says. A factory made from a template reads its workflows and hires from its tree (`tree`), or why they do not
+ * read; its schedules, from its file.
  */
 function factoryOf(name: string, content: FactoryFile): Factory | { error: string } {
   const template = content.template;
@@ -115,6 +131,7 @@ function factoryOf(name: string, content: FactoryFile): Factory | { error: strin
     name,
     repos: content.repos,
     ...wiring,
+    schedules: content.schedules ?? {},
     ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
     ...(template === undefined ? {} : { template, tree: treeDir(name) }),
   };
@@ -204,7 +221,7 @@ export function addFactory(opts: { name: string; repos: readonly string[]; templ
     fs.rmSync(hidden, { force: true });
   }
   const made = template === undefined ? {} : { template, tree: treeDir(opts.name) };
-  return { factory: { name: opts.name, repos, workflows: [], hires: {}, ...made }, file };
+  return { factory: { name: opts.name, repos, workflows: [], hires: {}, schedules: {}, ...made }, file };
 }
 
 /** That the store has no factory `name`, naming those it has: `Missing`, with what was not done. */
@@ -335,6 +352,8 @@ const DONE = {
   fire: 'fired',
   instruction: 'changed',
   instruct: 'written',
+  schedule: 'scheduled',
+  unschedule: 'unscheduled',
 } as const;
 
 /**
@@ -362,13 +381,14 @@ function writeWhole(file: string, content: FactoryFile): void {
 }
 
 /**
- * What a verb reads of a factory's wiring and how it writes it back: its file's, or, made from a template, its tree's; and the folders
- * whose `workflows/<workflow>/` a start reads a step's own file from (`rootsOf`).
+ * What a verb reads of a factory's wiring and how it writes it back: its file's, or, made from a template, its tree's; the folders
+ * whose `workflows/<workflow>/` a start reads a step's own file from (`rootsOf`); and its schedules, its file's either way.
  */
 type WiringChange = {
   file: string;
   rootsOf: (workflow: string) => readonly string[];
   wiring: Pick<Factory, 'workflows' | 'hires'>;
+  schedules: Factory['schedules'];
   write: (wiring: Partial<Pick<Factory, 'workflows' | 'hires'>>) => void;
 };
 
@@ -383,7 +403,7 @@ function wiringToChange(name: string, verb: 'attach' | 'detach' | 'hire' | 'fire
   if (content.template === undefined) {
     const wiring = { workflows: content.workflows ?? [], hires: content.hires ?? {} };
     const roots = [...content.repos, home];
-    return { file, rootsOf: () => roots, wiring, write: (w) => writeWhole(file, { ...content, ...w }) };
+    return { file, rootsOf: () => roots, wiring, schedules: content.schedules ?? {}, write: (w) => writeWhole(file, { ...content, ...w }) };
   }
   const read = readTreeWiring(name);
   const tree = treeDir(name);
@@ -397,7 +417,7 @@ function wiringToChange(name: string, verb: 'attach' | 'detach' | 'hire' | 'fire
     const holder = [tree, ...content.repos, home].find((root) => fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)));
     return holder === undefined ? [] : [holder];
   };
-  return { file: path.join(tree, 'factory.json'), rootsOf, wiring: read.wiring, write };
+  return { file: path.join(tree, 'factory.json'), rootsOf, wiring: read.wiring, schedules: content.schedules ?? {}, write };
 }
 
 /**
@@ -463,7 +483,7 @@ export function fireAgent(opts: { factory: string; step: string }): { file: stri
 }
 
 /** The workflow name `workflow` a verb is given, refused (`Invalid`) when it cannot name one (`workflowNameRefusal`). */
-function refuseWorkflowName(workflow: string, verb: 'attach' | 'detach'): void {
+function refuseWorkflowName(workflow: string, verb: 'attach' | 'detach' | 'schedule' | 'unschedule'): void {
   const bad = workflowNameRefusal(workflow);
   if (bad) throw new Invalid({ message: `${bad} Nothing was ${DONE[verb]}.` });
 }
@@ -486,11 +506,12 @@ export function attachWorkflow(opts: { factory: string; workflow: string }): { f
 /**
  * `nemia factory detach`: the workflow `workflow` taken from the factory `factory`, which then offers it no more; every other key kept.
  * Refused before anything is written: the name (`Invalid`), the factory (`fileToChange`), a workflow it has not attached (`Missing`, naming
- * those it has), and one it still hires into (`Invalid`, naming the fire of each hire), so no hire outlives its workflow in the file.
+ * those it has), one it still hires into (`Invalid`, naming the fire of each hire), and one it schedules (`Invalid`, naming the
+ * unschedule), so no hire nor schedule outlives its workflow in the file.
  */
 export function detachWorkflow(opts: { factory: string; workflow: string }): { file: string } {
   refuseWorkflowName(opts.workflow, 'detach');
-  const { file, wiring, write } = wiringToChange(opts.factory, 'detach', HOME);
+  const { file, wiring, schedules, write } = wiringToChange(opts.factory, 'detach', HOME);
   const workflows = wiring.workflows;
   if (!workflows.includes(opts.workflow))
     throw new Missing({
@@ -502,6 +523,10 @@ export function detachWorkflow(opts: { factory: string; workflow: string }): { f
   if (hired.length)
     throw new Invalid({
       message: `${opts.factory} hires into ${opts.workflow}'s steps: ${hired.join(', ')}. Fire each first — ${hired.map((step) => `nemia factory fire ${opts.factory} --step ${step}`).join('; ')} — then detach it. Nothing was detached.`,
+    });
+  if (schedules[opts.workflow])
+    throw new Invalid({
+      message: `${opts.factory} schedules ${opts.workflow}: unschedule it first — nemia factory unschedule ${opts.factory} ${opts.workflow} — then detach it. Nothing was detached.`,
     });
   write({ workflows: workflows.filter((w) => w !== opts.workflow) });
   return { file };
@@ -528,4 +553,72 @@ export function setInstruction(opts: { factory: string; at: InstructionAt | unde
   const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
   writeWhole(file, kept === undefined ? rest : { ...rest, instruction: kept });
   return { file };
+}
+
+/**
+ * Why the schedule `opts` cannot be written into `factory`, or undefined: a workflow it has not attached, naming the attach; a cron or zone
+ * `Cron` does not read, or a cron that never fires, quoting it (`firesOf`); an empty brief; a repository that is not one of the factory's;
+ * and none named in a factory of two or more, where a scheduled start would not know which.
+ */
+function scheduleRefusal(
+  factory: Factory,
+  opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
+): string | undefined {
+  if (!factory.workflows.includes(opts.workflow))
+    return `${factory.name} does not offer the workflow ${opts.workflow}, so it schedules none of its runs. Attach it first — nemia factory attach ${factory.name} ${opts.workflow} — then schedule it.`;
+  const fires = firesOf(opts, Date.now());
+  if ('error' in fires) return `--cron ${JSON.stringify(opts.cron)}${opts.tz ? ` --tz ${opts.tz}` : ''}: ${fires.error}.`;
+  if (!opts.brief.trim()) return 'A scheduled run is asked what --brief says, and it is empty: give the brief its runs start with.';
+  const repos = factory.repos.map((r) => path.resolve(r)).sort();
+  if (opts.repo === undefined ? repos.length > 1 : !repos.includes(path.resolve(opts.repo)))
+    return `${opts.repo === undefined ? '' : `${opts.repo}: `}${factory.name} works on ${repos.join(', ')}: name the one its scheduled runs work on with --repo.`;
+  return undefined;
+}
+
+/**
+ * `nemia factory schedule`: the schedule of the workflow `workflow` written into the factory `factory`'s file, stamped with when it was
+ * written (`since`), so it starts nothing until its next fire; one already there is replaced (`replaced`), and every other key kept.
+ * Refused before anything is written: the name (`workflowNameRefusal`, `Invalid`), the factory (`fileToChange`), a templated one whose
+ * tree's wiring does not read (`Invalid`), and what `scheduleRefusal` refuses (`Invalid`).
+ */
+export function setSchedule(opts: { factory: string; workflow: string; cron: string; brief: string; repo?: string; tz?: string }): {
+  file: string;
+  schedule: Schedule;
+  replaced?: Schedule;
+} {
+  refuseWorkflowName(opts.workflow, 'schedule');
+  const { file, content } = fileToChange(opts.factory, 'schedule');
+  const factory = factoryOf(opts.factory, content);
+  if ('error' in factory) throw new Invalid({ message: `the factory ${opts.factory}: ${factory.error} Nothing was scheduled.` });
+  const bad = scheduleRefusal(factory, opts);
+  if (bad) throw new Invalid({ message: `${bad} Nothing was scheduled.` });
+  const schedule: Schedule = {
+    cron: opts.cron,
+    brief: opts.brief,
+    ...(opts.repo === undefined ? {} : { repo: path.resolve(opts.repo) }),
+    ...(opts.tz === undefined ? {} : { tz: opts.tz }),
+    since: new Date().toISOString(),
+  };
+  const replaced = content.schedules?.[opts.workflow];
+  writeWhole(file, { ...content, schedules: { ...content.schedules, [opts.workflow]: schedule } });
+  return { file, schedule, ...(replaced ? { replaced } : {}) };
+}
+
+/**
+ * `nemia factory unschedule`: the schedule of the workflow `workflow` taken from the factory `factory`'s file, every other key kept.
+ * Refused before anything is written: the name (`Invalid`), the factory (`fileToChange`), and a workflow it does not schedule (`Missing`,
+ * naming those it does).
+ */
+export function clearSchedule(opts: { factory: string; workflow: string }): { file: string; cleared: Schedule } {
+  refuseWorkflowName(opts.workflow, 'unschedule');
+  const { file, content } = fileToChange(opts.factory, 'unschedule');
+  const { [opts.workflow]: cleared, ...schedules } = content.schedules ?? {};
+  if (!cleared) {
+    const names = Object.keys(schedules).sort();
+    throw new Missing({
+      message: `${opts.factory} does not schedule ${opts.workflow}. ${names.length ? `It schedules: ${names.join(', ')}.` : 'It schedules none.'} Nothing was unscheduled.`,
+    });
+  }
+  writeWhole(file, { ...content, schedules });
+  return { file, cleared };
 }

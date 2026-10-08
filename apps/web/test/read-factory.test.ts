@@ -213,10 +213,12 @@ const factories = (): Factory[] => [
     workflows: null,
     hires: {},
     error: null,
+    schedules: [],
     commands: {
       attach: 'nemia factory attach default <workflow>',
       rm: 'nemia factory rm default',
       add: 'nemia factory add default --repo <path>',
+      schedule: 'nemia factory schedule default <workflow> --cron <expr> --brief <text>',
     },
     template: null,
   },
@@ -227,10 +229,35 @@ const factories = (): Factory[] => [
     workflows: ['build'],
     hires: { 'build/implement': 'ada' },
     error: null,
+    schedules: [
+      {
+        workflow: 'janitor',
+        cron: '0 9 * * 1',
+        tz: 'America/Montreal',
+        brief: 'Read the stats',
+        repo: null,
+        next: '2026-10-12T13:00:00.000Z',
+        last: { run: 'read-the-stats-k2xq', at: '2026-10-05T13:00:02.000Z' },
+        refused: null,
+        commands: { unschedule: 'nemia factory unschedule nemia janitor' },
+      },
+      {
+        workflow: 'build',
+        cron: '*/5 * * * *',
+        tz: null,
+        brief: 'Build it',
+        repo: '/work/repo',
+        next: null,
+        last: null,
+        refused: 'build is not attached to nemia',
+        commands: { unschedule: 'nemia factory unschedule nemia build' },
+      },
+    ],
     commands: {
       attach: 'nemia factory attach nemia <workflow>',
       rm: 'nemia factory rm nemia',
       add: 'nemia factory add nemia --repo <path>',
+      schedule: 'nemia factory schedule nemia <workflow> --cron <expr> --brief <text>',
     },
     template: null,
   },
@@ -241,10 +268,12 @@ const factories = (): Factory[] => [
     workflows: [],
     hires: {},
     error: '/wf/factories/broken.json is not JSON',
+    schedules: [],
     commands: {
       attach: 'nemia factory attach broken <workflow>',
       rm: 'nemia factory rm broken',
       add: 'nemia factory add broken --repo <path>',
+      schedule: 'nemia factory schedule broken <workflow> --cron <expr> --brief <text>',
     },
     template: null,
   },
@@ -289,12 +318,15 @@ test("REFUSED, a factory's template: one without it, and a condition whose state
   await assert.rejects(readFactories(), unread('/api/factories', '[0].template.conditions[0].status', '"Unknown", where'));
 });
 
-test('REFUSED, the factories: one without its error, and the default offering its workflows as a word', async (t) => {
+test('REFUSED, the factories: one without its error, the default offering its workflows as a word, and a schedule without its refusal', async (t) => {
   answering(t, [without(factories()[1], 'error')]);
   await assert.rejects(readFactories(), unread('/api/factories', '[0].error', 'is missing'));
 
   answering(t, [{ ...factories()[0], workflows: 'all' }]);
   await assert.rejects(readFactories(), unread('/api/factories', '[0].workflows', '"all", where'));
+
+  answering(t, [{ ...factories()[1], schedules: [without(factories()[1].schedules[0], 'refused')] }]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].schedules[0].refused', 'is missing'));
 });
 
 test("the inbox keeps each card's factory, null for the default factory's; REFUSED: an entry without it", async (t) => {

@@ -36,6 +36,8 @@ import { freshStandingMemo, headsFor, passStanding, standingReader, type Standin
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
+import { startDue } from '../schedule/schedule.verb.ts';
+import type { ScheduleStarted } from '../schedule/schedule.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
 import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass } from '../meter/index.ts';
 import { keepSeries } from '../series/series.store.ts';
@@ -45,12 +47,14 @@ import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.
 import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics, talliedIn } from '../meter/meter.verb.ts';
 
 /**
- * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything
- * (`startQueued`).
+ * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards and with the factories'
+ * schedules, when it did anything (`startQueued`, `startDue`).
  */
 export type Pass = {
   runs: Advanced[];
   queue?: QueueStarted;
+  /** What the pass did with the factories' schedules, when one was due and the queue started no run (`startDue`). */
+  scheduled?: ScheduleStarted;
   /**
    * Why the feed could not be written on this pass (`emitFeed`), when it could not: the pass itself went on, since nothing reads the feed
    * to decide.
@@ -150,8 +154,9 @@ export type TickOptions = { repo?: string; memo?: RestMemo; verifyRest?: boolean
  * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is
  * done is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far
  * — and counted, once it filed, for the next (`runAdmitted`). Then, while a slot is still free (`slotFree`) — always, with no cap — one
- * queued card is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started.
- * Nothing is carried between passes: the next one counts again.
+ * queued card is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started;
+ * when the queue started no run, one due schedule's run, as a person's `nemia start --factory` is (`startDue`). Nothing is carried
+ * between passes: the next one counts again.
  *
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
@@ -212,7 +217,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of
  *   their own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
- *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again.
+ *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again; else, on the same
+ *   terms, one schedule's due fire (`startDue`).
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
@@ -246,10 +252,15 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
+  const scheduled =
+    !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
+      ? yield* withinEffect('act', startDue(repo, runs))
+      : undefined;
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
     ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging)),
+    ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
       ? {

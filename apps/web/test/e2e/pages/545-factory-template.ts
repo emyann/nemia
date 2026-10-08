@@ -9,7 +9,7 @@ import { OUT, store } from '../world.ts';
 
 /** The factory the page files, made from a template, and takes back at its end. */
 const SHAPED = 'shaped';
-/** The template it is made from, as `nemia factory apply` writes it into the factory's file: a newer version than its tree was applied at. */
+/** The template it is made from, as `nemia factory apply` writes it into its file: a newer version than its tree was applied at. */
 const TEMPLATE = { source: '/drafts/team', version: 'v2', params: { reviewers: 2, gated: true, branch: 'main' } };
 /** What the daemon last wrote of it: its tree applied at v1, and the drift that leaves it not Applied. */
 const STATUS = {

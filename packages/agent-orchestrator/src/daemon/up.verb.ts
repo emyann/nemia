@@ -7,6 +7,7 @@ import { Cause, Effect, Exit, Fiber, type Scope } from 'effect';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/inbox.ts';
+import { scheduleLine } from '../schedule/schedule.ts';
 import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/index.ts';
 import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
@@ -97,6 +98,15 @@ function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined):
 }
 
 /**
+ * The scheduled start's line, about its run when it started one; none for a failure the schedule's try already held (`again`), which
+ * was said when it was first kept.
+ */
+const scheduleSaid = (scheduled: Pass['scheduled']): PassLine[] =>
+  !scheduled || ('failed' in scheduled && scheduled.again)
+    ? []
+    : [{ text: scheduleLine(scheduled), ...('run' in scheduled ? { run: scheduled.run } : { warn: true as const }) }];
+
+/**
  * What a pass did to each run, about that run: its notes, then the steps it filed, tried again, rounded again and is checking, a line for
  * each step, annotated with it.
  */
@@ -132,8 +142,8 @@ const warnedOnce = (whys: readonly string[] | undefined, said: ReadonlySet<strin
 
 /**
  * One pass's lines, going by what the daemon has said (`was`), not by the store, at `now`: the pause, the summary when one is due, the
- * feed's failure, the moves refused, the journals left out and the harnesses not read each once, the queued card, and what it did to
- * each run. Answers with them and what has been said once they are.
+ * feed's failure, the moves refused, the journals left out and the harnesses not read each once, the queued card, the scheduled start,
+ * and what it did to each run. Answers with them and what has been said once they are.
  */
 export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLine[]; said: UpSaid } {
   const { runs: advanced, queue, feedError, cost, refused, unreadable, unobserved, forgetting } = pass;
@@ -152,7 +162,7 @@ export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLin
   lines.push(...warnedOnce(unobserved, was.unobservedSaid, (why) => `a harness could not be read: ${why}`));
   for (const line of forgetting ?? []) if (!was.forgettingSaid.has(line.text)) lines.push(line);
   const queued = queue ? queueSaid(queue, was.said) : { lines: [], said: was.said };
-  lines.push(...queued.lines, ...advancedLines(advanced));
+  lines.push(...queued.lines, ...scheduleSaid(pass.scheduled), ...advancedLines(advanced));
   const said = { said: queued.said, pauseSaid: paused.said, feedSaid: feedError, refusedSaid: stalled.said, interval };
   const failures = { unreadableSaid: new Set(unreadable), unobservedSaid: new Set(unobserved) };
   return { lines, said: { ...said, ...failures, forgettingSaid: new Set(forgetting?.map((l) => l.text)) } };

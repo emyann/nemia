@@ -9,6 +9,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
+import { fireWord, type ScheduleListed } from '../schedule/schedule.ts';
 
 /** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -31,16 +32,24 @@ export const DEFAULT_INSTRUCTION = 'NEMIA.md';
 export type InstructionAt = { path: string } | { store: true };
 
 /**
+ * A schedule of a workflow a factory has attached: when the daemon starts a run of it, a cron expression of five or six fields (`cron`),
+ * read in the IANA zone `tz`, the machine's when none; what the run is asked (`brief`); the repository it works on (`repo`), the factory's
+ * one when none; and when the schedule was written (`since`), before which no fire counts.
+ */
+export type Schedule = { cron: string; brief: string; repo?: string; tz?: string; since: string };
+
+/**
  * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
- * attached to it, each by its folder's name, and its hires; none of either when the file names none. `instruction`: where its instruction
- * is kept, when the file says (`instructionAt`). `template` and `tree`: the template it was made from, and the folder it runs from, its
- * workflows, agents, skills, wiring and instruction, when it was made from one.
+ * attached to it, each by its folder's name, its hires and its schedules, by workflow; none of each when the file names none.
+ * `instruction`: where its instruction is kept, when the file says (`instructionAt`). `template` and `tree`: the template it was made
+ * from, and the folder it runs from, its workflows, agents, skills, wiring and instruction, when it was made from one.
  */
 export type Factory = {
   name: string;
   repos: readonly string[];
   workflows: readonly string[];
   hires: Hires;
+  schedules: Readonly<Record<string, Schedule>>;
   instruction?: InstructionAt;
   template?: FactoryTemplate;
   tree?: string;
@@ -104,7 +113,7 @@ export function factoryNameRefusal(name: string): string | undefined {
 }
 
 /** A verb of `nemia factory` that writes a factory's file. */
-export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire' | 'instruction' | 'instruct';
+export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire' | 'instruction' | 'instruct' | 'schedule' | 'unschedule';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -116,6 +125,8 @@ const INSTEAD: Record<FactoryWrite, string> = {
   fire: 'It hires no one: fire in a factory nemia factory ls lists.',
   instruction: 'It keeps no instruction: give one to a factory nemia factory ls lists.',
   instruct: 'It keeps no instruction: write one for a factory nemia factory ls lists.',
+  schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
+  unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
 };
 
 /** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
@@ -435,8 +446,38 @@ function templateLines(template: FactoryTemplate | undefined, status: TemplateSt
   ];
 }
 
-/** What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
-export function factoryLines(listing: readonly FactoryListing[]): string[] {
+/** A schedule's next fire and last run as `nemia ls` words them at `now` (`fireWord`), and the refusal kept of its latest fire. */
+const whenLines = (s: ScheduleListed, indent: string, now: number): string[] => [
+  `${indent}next ${s.next ? fireWord(s.next, now) : 'never'}  last ${s.last ? `${s.last.run} (${fireWord(s.last.at, now)})` : 'none'}`,
+  ...(s.refused ? [`${indent}refused: ${s.refused}`] : []),
+];
+
+/**
+ * A factory's schedules as `nemia factory ls` lists them under its line, by workflow: `schedule janitor  0 9 * * 1  "Read the stats"`,
+ * then its next fire and last run from `listed`, the schedules as `schedulesListed` read them at `now`, where it lists the schedule.
+ */
+const scheduleLines = (factory: Factory, listed: readonly ScheduleListed[], width: number, now: number): string[] =>
+  Object.keys(factory.schedules)
+    .sort()
+    .flatMap((workflow) => {
+      const s = factory.schedules[workflow];
+      const where = `${s.tz ? ` (${s.tz})` : ''}${s.repo ? ` on ${s.repo}` : ''}`;
+      const read = listed.find((l) => l.factory === factory.name && l.workflow === workflow);
+      return [
+        `${' '.repeat(width)}  schedule ${workflow}  ${s.cron}${where}  ${JSON.stringify(s.brief.split('\n')[0])}`,
+        ...(read ? whenLines(read, `${' '.repeat(width)}    `, now) : []),
+      ];
+    });
+
+/**
+ * What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read;
+ * each schedule with its next fire and last run as `listed` reads them at `now`.
+ */
+export function factoryLines(
+  listing: readonly FactoryListing[],
+  listed: readonly ScheduleListed[] = [],
+  now: number = Date.now(),
+): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
   const width = Math.max(DEFAULT_FACTORY.length, ...sorted.map((l) => l.name.length));
   return [
@@ -449,6 +490,7 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
             ...templateLines(l.template, l.status, width),
             ...workflowLine(l.workflows, width),
             ...hireLines(l.hires, width),
+            ...scheduleLines(l, listed, width, now),
             ...instructionLine(l.instruction, width),
           ]),
     ]),

@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryInstruction } from '@/components/FactoryInstruction';
+import { FactorySchedules } from '@/components/FactorySchedules';
 import { routeLink } from '@/components/routeLink';
 import { LinkButton } from '@/components/ui/button';
 import { factoriesQuery, factoryInstructionQuery } from '@/lib/api';
@@ -26,8 +27,9 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * What a person sets of one factory: its instruction (`FactoryInstruction`). The default factory, and a name no factory has, have no
- * settings to keep, and say so: the instruction is not read for them.
+ * What a person sets of one factory: its instruction (`FactoryInstruction`), then its schedules, shown as the factories' read answers them
+ * (`FactorySchedules`). The default factory, and a name no factory has, have no settings to keep, and say so: the instruction is not read
+ * for them.
  */
 function SettingsPage() {
   const { factory: name } = Route.useParams();
@@ -55,7 +57,10 @@ function SettingsPage() {
           The default factory has no file, so it keeps no settings: they are kept by the factories a person makes.
         </p>
       ) : (
-        <FactoryInstruction name={name} />
+        <>
+          <FactoryInstruction name={name} />
+          <FactorySchedules factory={factory} />
+        </>
       )}
     </article>
   );

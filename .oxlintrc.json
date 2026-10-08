@@ -332,12 +332,6 @@
       }
     },
     {
-      "files": ["apps/api/src/steps/steps.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 22 }]

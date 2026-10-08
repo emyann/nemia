@@ -2,7 +2,8 @@
  * A step followed live over HTTP (`GET …/transcript/stream`) on the app's registry (`Followings`): over the api's own engine with its
  * `view`, `transcript` and `follow` the test's, whose attempts' moments the test pushes as they come, and the feed's lines written on
  * the app's runtime, which wake the following between attempts. What it proves: followers of one step share one upstream, a late
- * joiner is handed the message so far, and a held task's next turn is followed on the same stream.
+ * joiner is handed the message so far, a held task's next turn is followed on the same stream, and a try whose session is not pushed
+ * ends it.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
@@ -310,7 +311,7 @@ test(
 );
 
 test(
-  "a step moved to a try whose harness does not stream is read on a beat from the try's start, not the task it was opened on",
+  'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable`: nothing is read again',
   WAITED,
   async (t) => {
     const first = working([said('a-1')]);
@@ -330,15 +331,18 @@ test(
     first.settled = 'failed';
     writeRun({ tried: 't-tried-try2' });
     await line(own, 'tried', 'running');
-    await f.wait((s) => kinds(s).includes('following {"streamed":false}'), 'the try followed, refused');
-    tried.settled = 'failed';
-    assert.deepEqual(kinds(await f.ended()), [
+    const sent = await f.ended();
+    assert.deepEqual(kinds(sent).slice(0, -1), [
       'following {"streamed":true}',
       'transcript a-1',
       'moved {"taskId":"t-tried-try2"}',
       'following {"streamed":false}',
       'transcript b-1',
-      'settled {"cursor":"1"}',
     ]);
+    assert.equal(sent.at(-1)?.event, 'unreadable', 'the stream ends of itself, the try still live: one read again would time the test out');
+    assert.deepEqual(JSON.parse(sent.at(-1)!.data!), {
+      error: `Step 'tried' of run '${RUN}' runs a session that is not pushed as it is written: what it said so far is sent. GET /api/runs/${RUN}/steps/tried/transcript?after=<the last id> gives what it says next.`,
+      retrying: false,
+    });
   },
 );

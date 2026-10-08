@@ -1,8 +1,8 @@
 /**
  * A step on a remote A2A agent followed live (`followStep`), as the api's follower reads it, over the engine `nemia up` makes and the
  * SDK's own server (`a2a-server.ts`): an agent whose card says it streams has each event of its Task relayed, in order, from the
- * subscription the runtime holds, to the step's end; one whose card does not is said `streamed: false`, its transcript read again
- * instead. The ticks run on the follower's runtime, so the feed's lines they write wake it. `WF_ROOT` is set before the import, since
+ * subscription the runtime holds, to the step's end; one whose card does not is followed as the runtime reads its Task whole, every
+ * second, to the step's end. The ticks run on the follower's runtime, so the feed's lines they write wake it. `WF_ROOT` is set before the import, since
  * the module reads it as it loads.
  */
 import { test, type TestContext } from 'node:test';
@@ -148,7 +148,7 @@ test(
 );
 
 test(
-  'REFUSED: a step on an agent whose card does not say it streams is said unstreamed, and nothing more is followed',
+  "a step on an agent whose card does not say it streams is followed from the runtime's reads of its Task: each event once, to the step's end",
   WAITED,
   async (t) => {
     let go = () => {};
@@ -158,8 +158,32 @@ test(
       go();
       return server.close();
     });
-    const { got, ended } = await following(t, 'quiet', server.url);
+    const { got, rung, ended, tick } = await following(t, 'quiet', server.url);
+    await until(
+      t,
+      () => got.length >= 2,
+      () => `the follow open: ${shown(got)}`,
+      { bell: rung },
+    );
+    go();
+    await until(
+      t,
+      async () => {
+        await tick();
+        return got.at(-1)?.kind === 'settled';
+      },
+      () => `the step settled: ${shown(got)}`,
+      { everyMs: 50 },
+    );
     assert.ok(Exit.isSuccess(await ended));
-    assert.deepEqual(shown(got), ['streamed false']);
+    assert.deepEqual(
+      shown(got).filter((line) => !line.startsWith('events')),
+      ['streamed true', 'state working', 'state completed', 'settled'],
+    );
+    assert.deepEqual(
+      got.flatMap((m) => (m.kind === 'events' ? m.events.map((ev) => `${ev.role} ${ev.text}`) : [])),
+      ['assistant reading the note', 'assistant It is right.'],
+      'each event once and in order, however the reads fell',
+    );
   },
 );

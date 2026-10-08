@@ -54,7 +54,15 @@ import { forgetEntryOf, readEntry, registryOf, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { turnOver } from './remote-events.ts';
 import type { SeamOps } from './client.ts';
-import { QUIET_MS, remoteFollowOf, remoteTranscriptByName, remoteTranscriptOf, RESUBSCRIBE_MS, type FollowDeps } from './remote-follow.ts';
+import {
+  QUIET_MS,
+  READ_EVERY_MS,
+  remoteFollowOf,
+  remoteTranscriptByName,
+  remoteTranscriptOf,
+  RESUBSCRIBE_MS,
+  type FollowDeps,
+} from './remote-follow.ts';
 import { authOf, connectionOf, type Credentials, type MissingCredential, type RemoteAgent } from './remote-client.ts';
 import { alive, sendHeld } from './sending.ts';
 import { Doubt, late, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
@@ -92,13 +100,15 @@ export type RemoteOptions = {
   missingCredential?: MissingCredential;
   quietMs?: number;
   resubscribeMs?: number;
+  readEveryMs?: number;
 };
 
 /**
  * A remote A2A agent's `SeamOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
  * schemes; absent, only an agent that asks for no authentication is reached. `requestMs` bounds each request but the send,
  * which `sendMs` bounds; `spawnWaitMs` is how long a spawn waits in the pass for its answer; `quietMs` how long a subscription may
- * say nothing, and `resubscribeMs` the first wait before a dropped one is made again (`a2a/remote-follow.ts`).
+ * say nothing, `resubscribeMs` the first wait before a dropped one is made again, and `readEveryMs` how often a Task not subscribed
+ * to is read (`a2a/remote-follow.ts`).
  *
  * What the client knows of the agent — its card, the interface chosen and the SDK's client — is a view (`connectionOf`):
  * `ask` drops it at any failure, and the next call reads the card again. A refusal of the auth was said before the send.
@@ -430,6 +440,7 @@ export const remoteOps = (
     connection,
     quietMs: o.quietMs ?? QUIET_MS,
     resubscribeMs: o.resubscribeMs ?? RESUBSCRIBE_MS,
+    readEveryMs: o.readEveryMs ?? READ_EVERY_MS,
   };
   const read = remoteTranscriptOf(followed);
   const transcript = (sessionId: string, after?: TranscriptCursor) =>

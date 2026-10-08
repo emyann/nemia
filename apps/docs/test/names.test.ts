@@ -145,13 +145,25 @@ test('the code’s names are read: an identifier, a string’s word and a hyphen
 test('every page cites only paths that exist and names the code has', () => {
   const pages = (fs.readdirSync(PAGES, { recursive: true }) as string[]).filter((f) => /\.mdx?$/.test(f)).sort();
   assert.deepEqual(
-    ['index.mdx', 'map.mdx', 'glossary.mdx'].filter((p) => !pages.includes(p)),
+    [
+      'index.mdx',
+      'map.mdx',
+      'runtime.mdx',
+      'a2a.mdx',
+      'workflows.mdx',
+      'agents.mdx',
+      'factories.mdx',
+      'how-a-run-lives.mdx',
+      'nemia.mdx',
+      'glossary.mdx',
+      'getting-started.mdx',
+    ].filter((p) => !pages.includes(p)),
     [],
     `the scan read ${pages.join(', ')}`,
   );
   const repo = knownOfRepo();
   const cited = pages.flatMap((p) => citedIn(fs.readFileSync(path.join(PAGES, p), 'utf8')));
-  assert.ok(cited.length > 30, `the pages cite ${cited.length} spans, far fewer than they hold`);
+  assert.ok(cited.length > 200, `the pages cite ${cited.length} spans, far fewer than they hold`);
   assert.deepEqual(
     pages.flatMap((p) => staleCitations(path.join('src/content/docs', p), fs.readFileSync(path.join(PAGES, p), 'utf8'), repo)),
     [],

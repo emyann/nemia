@@ -31,22 +31,31 @@ const build = (root: string, outDir: string, config?: string): { status: number 
 /** The SVGs of a built page. */
 const svgsOf = (html: string): string[] => html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
 
-test('the site builds, with its three pages and both code-drawn diagrams on the map', () => {
+/** The site's pages, in the sidebar's order: each built as its own `index.html`. */
+const PAGES = ['', 'map', 'runtime', 'a2a', 'workflows', 'agents', 'factories', 'how-a-run-lives', 'nemia', 'glossary', 'getting-started'];
+
+test('the site builds, with its eleven pages, the lifecycle on the runtime page and Nemia’s machine on hers', () => {
   const out = scratch('docs-build-');
   const { status, said } = build(APP, out);
   assert.equal(status, 0, said);
-  for (const page of ['index.html', 'map/index.html', 'glossary/index.html']) assert.ok(fs.existsSync(path.join(out, page)), page);
-  const html = fs.readFileSync(path.join(out, 'map', 'index.html'), 'utf8');
-  assert.doesNotMatch(html, /set:html/, 'no figure prints its style as an attribute');
-  const map = svgsOf(html);
+  const built = PAGES.map((page) => path.join(out, page, 'index.html'));
+  assert.deepEqual(
+    built.filter((page) => !fs.existsSync(page)),
+    [],
+    'every page is built',
+  );
+  for (const page of built)
+    assert.doesNotMatch(fs.readFileSync(page, 'utf8'), /set:html/, `no figure of ${page} prints its style as an attribute`);
+  const figures = (page: string) => svgsOf(fs.readFileSync(path.join(out, page, 'index.html'), 'utf8'));
   assert.ok(
-    map.some((svg) => svg.includes('input-required')),
-    'the map draws the lifecycle',
+    figures('runtime').some((svg) => svg.includes('input-required')),
+    'the runtime page draws the lifecycle',
   );
   assert.ok(
-    map.some((svg) => svg.includes('untrusted')),
-    "the map draws Nemia's machine",
+    figures('nemia').some((svg) => svg.includes('untrusted')),
+    "Nemia's page draws her machine",
   );
+  assert.ok(figures('how-a-run-lives').length > 0, 'how a run lives draws its sequence');
 });
 
 test('REFUSED: a page with a broken internal link fails the build', () => {

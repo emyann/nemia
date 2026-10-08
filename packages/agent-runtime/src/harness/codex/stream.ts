@@ -13,6 +13,7 @@
 import { Result, Schema } from 'effect';
 import { firstRefusal, type Usage } from '../../core/index.ts';
 import type { HarnessOutput, StartEvent } from '../detached/detached.ts';
+import type { PartialMark } from '../detached/follow.ts';
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -99,6 +100,16 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
     };
   }
   return { events };
+};
+
+/**
+ * What `codex exec --json` says of the text it is writing, in `output`'s whole lines after `before` lines: nothing, as Codex prints
+ * each message whole, in its `item.completed`, and its rollout gives it. Or why it is refused (`wrong`, as `codexEventsOf` words it,
+ * the line numbered in the whole output), when a line of a type the runtime reads does not decode.
+ */
+export const codexPartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
+  const read = codexEventsOf('\n'.repeat(before) + output);
+  return 'wrong' in read ? read : { marks: [] };
 };
 
 /**

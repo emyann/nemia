@@ -332,12 +332,6 @@
       }
     },
     {
-      "files": ["apps/api/src/steps/steps.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 22 }]
@@ -734,7 +728,7 @@
     {
       "files": ["packages/agent-runtime/src/a2a/remote.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 302, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 301, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 19]
       }
     },

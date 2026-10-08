@@ -1,7 +1,8 @@
 /**
- * A factory template's folder on disk: read, each YAML document parsed with the line every value stands on, and checked
- * (`checkTemplateAt`); and written from a repository's workflows, agents and skills, and a factory's hires and instruction
- * (`exportTemplate`), read through the loader's own readers, staged beside the folder, checked, and only then put in place.
+ * A factory template on disk, a folder or an archive of one: read through one reader (`readTemplate`), each YAML document parsed with
+ * the line every value stands on, and checked (`checkTemplateAt`); written from a repository's workflows, agents and skills, and a
+ * factory's hires and instruction (`exportTemplate`), read through the loader's own readers, staged beside the folder, checked, and only
+ * then put in place; packed into an archive (`packTemplate`) and unpacked from one (`unpackTemplate`), each staged and renamed into place.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,21 @@ import { SKILL_NAME } from '../keys/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { entriesOf, isShippedPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
 import { splitFrontmatter } from '../step/step.ts';
-import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
+import {
+  ARCHIVE_LIMIT,
+  checkTemplate,
+  contentDigest,
+  documentFile,
+  draftOf,
+  packArchive,
+  pathRefusals,
+  unpackArchive,
+  type Draft,
+  type ReadFolder,
+  type Source,
+  type StepSource,
+  type TreeFile,
+} from './index.ts';
 
 /** A problem of a template on disk: its file, the line and column it stands on where it is in a document, and the words. */
 export type Problem = { file: string; line?: number; col?: number; message: string };
@@ -25,7 +40,10 @@ export type Problem = { file: string; line?: number; col?: number; message: stri
 /** A document as parsed, with what turns its offsets into lines. */
 type Parsed = { doc: Document.Parsed | undefined; lines: LineCounter };
 
-/** The files under `dir`, by path from it with `/` between parts, sorted; each link refused by name, never followed. */
+/**
+ * The files under `dir`, by path from it with `/` between parts, sorted; each link refused by name, never followed, and each entry that
+ * is neither a file nor a folder (a pipe, a socket, a device), never read.
+ */
 function walk(dir: string, problems: Problem[], under = ''): string[] {
   return fs
     .readdirSync(path.join(dir, under), { withFileTypes: true })
@@ -36,8 +54,19 @@ function walk(dir: string, problems: Problem[], under = ''): string[] {
         problems.push({ file, message: `${file} is a link, and a template's files are its own: copy what it points at here.` });
         return [];
       }
-      return entry.isDirectory() ? walk(dir, problems, file) : [file];
+      if (entry.isDirectory()) return walk(dir, problems, file);
+      if (entry.isFile()) return [file];
+      problems.push({ file, message: `${file} is neither a file nor a folder, and a template holds files: remove it.` });
+      return [];
     });
+}
+
+/** The tree of the folder `dir`: each file's path, permission bits and bytes, as `walk` finds them. */
+function readTree(dir: string, problems: Problem[]): TreeFile[] {
+  return walk(dir, problems).map((file) => {
+    const at = path.join(dir, file);
+    return { path: file, mode: fs.statSync(at).mode & 0o777, bytes: fs.readFileSync(at) };
+  });
 }
 
 /** The document `file` holds, parsed, or the problems of it: one that does not parse, at its line, or a second document, the first kept. */
@@ -70,18 +99,42 @@ function lineOf(parsed: Parsed, at: ReadonlyArray<string | number>): { line?: nu
   return {};
 }
 
-/** The template folder `dir`, read: its files, each document parsed, and what stops a file being read, at its line. */
-function readTemplateFolder(dir: string, name: string): { folder: ReadFolder; parsed: Map<string, Parsed>; problems: Problem[] } {
-  const problems: Problem[] = [];
-  const files = walk(dir, problems);
+/** The template `name` of the tree `files`, read: its files, each document parsed, and what stops one being read, at its line. */
+function readTemplateFolder(
+  name: string,
+  files: readonly TreeFile[],
+  problems: Problem[],
+): { folder: ReadFolder; parsed: Map<string, Parsed> } {
   const parsed = new Map<string, Parsed>();
   for (const file of files) {
-    if (!documentFile(file, name)) continue;
-    const doc = parseDocument(file, fs.readFileSync(path.join(dir, file), 'utf8'), problems);
-    if (doc) parsed.set(file, doc);
+    if (!documentFile(file.path, name)) continue;
+    const doc = parseDocument(file.path, Buffer.from(file.bytes).toString('utf8'), problems);
+    if (doc) parsed.set(file.path, doc);
   }
   const documents = new Map([...parsed].map(([file, { doc }]) => [file, doc === undefined ? null : (doc.toJS() as unknown)]));
-  return { folder: { name, files, documents }, parsed, problems };
+  return { folder: { name, files: files.map((f) => f.path), documents }, parsed };
+}
+
+/** A template as read: its name, its tree, the digest of its content (none where a path is longer than an archive holds), its problems. */
+export type ReadTemplate = { name: string; files: TreeFile[]; digest: string | undefined; problems: Problem[] };
+
+/**
+ * The template at `source`, the one reader of a template: a folder, named `name` (by default its base name), its files read, each link
+ * and each path longer than an archive holds a problem; or an archive file, named by its top folder, unpacked in memory. Refused: a
+ * `source` that is neither (Missing), and an archive `unpackArchive` refuses (Invalid).
+ */
+export function readTemplate(source: string, name = path.basename(path.resolve(source))): ReadTemplate {
+  const stat = fs.statSync(source, { throwIfNoEntry: false });
+  if (stat?.isFile()) return { ...unpackArchive(fs.readFileSync(source), ARCHIVE_LIMIT, source), problems: [] };
+  if (!stat?.isDirectory())
+    throw new Missing({
+      message: `${source} is neither a folder nor a file: name a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote.`,
+    });
+  const problems: Problem[] = [];
+  const files = readTree(source, problems);
+  const long = pathRefusals(name, files);
+  problems.push(...long);
+  return { name, files, digest: long.length ? undefined : contentDigest(name, files), problems };
 }
 
 /** The names of the place skills nemia ships, each present to a template that names it. */
@@ -90,21 +143,28 @@ const placeSkillNames = (): string[] => entriesOf(PLACE_SKILLS).filter((name) =>
 /** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
 export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
 
+/** A template as read and checked: every problem, sorted, and the version its manifest gives. */
+export type CheckedTemplate = ReadTemplate & { version: unknown };
+
 /**
- * Every problem of the template folder `dir`, at once, sorted by file then line: a link, a document that does not parse, and each that
- * `checkTemplate` refuses, at the line its value stands on. Its name is its folder's (`name`, by default `dir`'s base name). Refused: a
- * `dir` that is no folder (Missing).
+ * The template at `source`, read by `readTemplate` and checked: every problem at once, sorted by file then line — a link, a document
+ * that does not parse, and each that `checkTemplate` refuses, at the line its value stands on. Refused as `readTemplate` refuses.
  */
-export function checkTemplateAt(dir: string, name = path.basename(path.resolve(dir))): Problem[] {
-  if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory())
-    throw new Missing({ message: `${dir} is no folder: name a template's folder, the one that holds its nemia.yaml.` });
-  const { folder, parsed, problems } = readTemplateFolder(dir, name);
+export function checkedTemplate(source: string, name?: string): CheckedTemplate {
+  const read = readTemplate(source, name);
+  const { problems } = read;
+  const { folder, parsed } = readTemplateFolder(read.name, read.files, problems);
   for (const refusal of checkTemplate(folder, placeSkillNames())) {
     const doc = parsed.get(refusal.file);
     problems.push({ file: refusal.file, ...(doc ? lineOf(doc, refusal.at) : {}), message: refusal.message });
   }
-  return problems.sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0) || (a.col ?? 0) - (b.col ?? 0));
+  problems.sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0) || (a.col ?? 0) - (b.col ?? 0));
+  const manifest = folder.documents.get('nemia.yaml') as { spec?: { version?: unknown } } | null | undefined;
+  return { ...read, version: manifest?.spec?.version };
 }
+
+/** Every problem of the template at `source`, a folder (named `name`, by default its base name) or an archive, as `checkedTemplate` finds. */
+export const checkTemplateAt = (source: string, name?: string): Problem[] => checkedTemplate(source, name).problems;
 
 /** The files of the workflow folder `dir` but its steps, by path from it; a link refused by name. */
 function othersOf(dir: string, refusals: string[]): string[] {
@@ -226,14 +286,19 @@ function writeDraft(dir: string, draft: Draft): void {
   }
 }
 
-/** Why `dir` is not written to: it is there and holds something. */
-function placeRefusal(dir: string, name: string): void {
+/** Why `verb` does not write the folder `dir`: its name is no name, or it is there and is no folder, or holds something. */
+function placeRefusal(dir: string, name: string, verb: 'export' | 'unpack'): void {
   if (!SKILL_NAME.test(name))
     throw new Invalid({
       message: `${dir}: a template is named by its folder, and ${name} is not a name: lowercase words joined by dashes. Name another folder.`,
     });
+  const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
+  if (stat && !stat.isDirectory())
+    throw new Conflict({ message: `${dir} is there, and is no folder: ${verb} writes a new folder. Move it away, or name another.` });
   if (entriesOf(dir).length)
-    throw new Conflict({ message: `${dir} holds files already, and export writes a new folder: name one that is not there, or is empty.` });
+    throw new Conflict({
+      message: `${dir} holds files already, and ${verb} writes a new folder: name one that is not there, or is empty.`,
+    });
 }
 
 /** A factory's instruction as read where it is kept: its words, or null where there are none, why it does not read, and its file. */
@@ -256,7 +321,7 @@ export function exportTemplate(ask: ExportAsk): { dir: string; from: Draft['from
   const dir = path.resolve(ask.dir);
   const from = path.resolve(ask.from);
   const name = path.basename(dir);
-  placeRefusal(dir, name);
+  placeRefusal(dir, name, 'export');
   const root = path.join(from, 'workflows');
   if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory())
     throw new Missing({ message: `${from} holds no workflows/, the folder export reads: name the repository that does, with --from.` });
@@ -281,4 +346,69 @@ export function exportTemplate(ask: ExportAsk): { dir: string; from: Draft['from
     fs.rmSync(staged, { recursive: true, force: true });
   }
   return { dir, from: draft.from };
+}
+
+/** What `nemia template pack` asks: the template's folder, the archive to write (by default `<name>-<version>.tgz`), and where from. */
+export type PackAsk = { dir: string; out?: string; cwd: string };
+
+/**
+ * The archive of the template folder `ask.dir`, written at `ask.out` (resolved from `ask.cwd`), staged beside it and renamed into place;
+ * answers the archive and the digest of its content. Refused, nothing written: a `dir` that is no folder (Missing), one that does not pass
+ * its check, every problem at its line, or that `packArchive` refuses (Invalid), and an `out` that is there already (Conflict).
+ */
+export function packTemplate(ask: PackAsk): { out: string; digest: string } {
+  if (!fs.statSync(ask.dir, { throwIfNoEntry: false })?.isDirectory())
+    throw new Missing({ message: `${ask.dir} is no folder: name a template's folder, the one that holds its nemia.yaml.` });
+  const read = checkedTemplate(ask.dir);
+  if (read.problems.length)
+    throw new Invalid({
+      message: `${ask.dir} was not packed, since it does not pass:\n${read.problems.map((p) => `  ${problemLine(p)}`).join('\n')}`,
+    });
+  const out = path.resolve(ask.cwd, ask.out ?? `${read.name}-${String(read.version)}.tgz`);
+  if (fs.lstatSync(out, { throwIfNoEntry: false }))
+    throw new Conflict({ message: `${out} is there already, and pack writes a new file: name another with --out, or remove it.` });
+  const { archive, digest } = packArchive(read.name, read.files);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  const staged = path.join(path.dirname(out), `.${path.basename(out)}.pack-${process.pid}`);
+  try {
+    fs.writeFileSync(staged, archive);
+    fs.renameSync(staged, out);
+  } finally {
+    fs.rmSync(staged, { force: true });
+  }
+  return { out, digest };
+}
+
+/** What `nemia template unpack` asks: the archive to read, and the folder the template's own folder is written in. */
+export type UnpackAsk = { archive: string; dir: string };
+
+/**
+ * The template inside the archive `ask.archive`, written at `<ask.dir>/<name>`, its name the archive's top folder, checked a name before
+ * any path is joined; each file with its bytes and mode, staged beside it and renamed into place. Answers the folder and the digest of
+ * its content. Refused, nothing written: an archive that is no file (Missing), one `unpackArchive` refuses (Invalid), and a
+ * `<dir>/<name>` that is no folder or holds files (Conflict).
+ */
+export function unpackTemplate(ask: UnpackAsk): { dir: string; digest: string } {
+  if (!fs.statSync(ask.archive, { throwIfNoEntry: false })?.isFile())
+    throw new Missing({ message: `${ask.archive} is no file: name an archive nemia template pack wrote.` });
+  const { name, files, digest } = unpackArchive(fs.readFileSync(ask.archive), ARCHIVE_LIMIT, ask.archive);
+  const parent = path.resolve(ask.dir);
+  const dir = path.join(parent, name);
+  placeRefusal(dir, name, 'unpack');
+  const staged = path.join(parent, `.${name}.unpack-${process.pid}`);
+  fs.rmSync(staged, { recursive: true, force: true });
+  try {
+    fs.mkdirSync(staged, { recursive: true });
+    for (const file of files) {
+      const at = path.join(staged, file.path);
+      fs.mkdirSync(path.dirname(at), { recursive: true });
+      fs.writeFileSync(at, file.bytes, { flag: 'wx' });
+      fs.chmodSync(at, file.mode);
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.renameSync(staged, dir);
+  } finally {
+    fs.rmSync(staged, { recursive: true, force: true });
+  }
+  return { dir, digest };
 }

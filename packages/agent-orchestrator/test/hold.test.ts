@@ -9,7 +9,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from '../src/runtime-client.ts';
+import type { Engine, EngineService } from '../src/runtime-client.ts';
+import type { Refusal } from '../src/refusal/refusal.ts';
+import type { Holding } from '../src/wait/wait.verb.ts';
+import type { Effect as EffectOf } from 'effect/Effect';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
@@ -1225,4 +1228,86 @@ test("nemia ls, nemia decide and the feed say a hold's why and who put it beside
   assert.equal((await typed(t, b.e, 'hold', olderQuiet.id, '--until', target.id)).error, undefined);
   asOlder(olderQuiet.id);
   assert.equal((await runWith(b.e, advanceRun(readRun(olderQuiet.id)))).feed.run.note, `held until ${target.id} ships`);
+});
+
+test("`nemia hold`'s and `--off`'s programs say in their type what they need and what they refuse", () => {
+  const held: EffectOf<Holding, Refusal, EngineService> = hold('x', []);
+  // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+  const heldInfallible: EffectOf<Holding, never, EngineService> = hold('x', []);
+  const lifted: EffectOf<Holding, Refusal> = unhold('x');
+  // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+  const liftedInfallible: EffectOf<Holding, never> = unhold('x');
+  const unprovided = () =>
+    // @ts-expect-error -- hold requires EngineService, and runPromise takes no requirement
+    Effect.runPromise(hold('x', []));
+  assert.deepEqual(
+    [typeof held, typeof heldInfallible, typeof lifted, typeof liftedInfallible, typeof unprovided],
+    ['object', 'object', 'object', 'object', 'function'],
+  );
+});
+
+test('REFUSED as a typed failure: each refusal of `hold` and `unhold` is its program\'s failure, recovered by its tag in the words `runWith` rejects with', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const called = await aRunning(b, repo);
+  assert.equal((await typed(t, b.e, 'cancel', called.id)).error, undefined);
+  const already = await aRunning(b, repo);
+  await runWith(b.e, hold(already.id, [target.id]));
+  const free = await aRunning(b, repo);
+  const recovered = (program: EffectOf<Holding, Refusal, EngineService>, tag: Refusal['_tag']) =>
+    runWith(
+      b.e,
+      program.pipe(
+        Effect.map(() => 'answered'),
+        Effect.catchTag(tag, (r) => Effect.succeed(r.message)),
+      ),
+    );
+  const refusals: Array<[string, () => EffectOf<Holding, Refusal, EngineService>, Refusal['_tag']]> = [
+    ['hold of no id', () => hold('Not An Id', [target.id]), 'Invalid'],
+    ['hold --until no id', () => hold(free.id, ['Not An Id']), 'Invalid'],
+    ['hold of a run not there', () => hold('r-nope', [target.id]), 'Missing'],
+    ['hold of a cancelled run', () => hold(called.id, [target.id]), 'Conflict'],
+    ['hold of a run already held', () => hold(already.id, [target.id]), 'Conflict'],
+    ['--off of no id', () => unhold('Not An Id'), 'Invalid'],
+    ['--off of a run not there', () => unhold('r-nope'), 'Missing'],
+    ['--off of a run nobody holds', () => unhold(free.id), 'Conflict'],
+  ];
+  const before = fs.readFileSync(holdFileOf(already.id), 'utf8');
+  for (const [what, program, tag] of refusals) {
+    const err = await runWith(b.e, program()).then(
+      () => assert.fail(`${what}: refused`),
+      (x: unknown) => x,
+    );
+    assert.ok(err instanceof Error && (err as Refusal)._tag === tag, `${what}: a ${tag}, not ${String(err)}`);
+    assert.equal(await recovered(program(), tag), err.message, what);
+  }
+  for (const r of [called, free]) assert.ok(!fs.existsSync(holdFileOf(r.id)), `no hold written on ${r.id}`);
+  assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before, 'the first hold stands as it was');
+});
+
+test('a defect is no refusal: `hold` and `unhold` die of what the engine or the filesystem throws, which no `Effect.catch` recovers, and `runWith` rejects with it as it was thrown', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const run = await aRunning(b, repo);
+  const caught = <A, R>(program: EffectOf<A, Refusal, R>) => program.pipe(Effect.catch(() => Effect.succeed('caught')));
+
+  const boom = new Error('journal');
+  const broken = { ...b.e, view: () => Effect.die(boom) };
+  await assert.rejects(runWith(broken, caught(hold(run.id, [target.id]))), (err) => err === boom);
+  await assert.rejects(runWith(broken, hold(run.id, [target.id])), (err) => err === boom);
+  assert.ok(!fs.existsSync(holdFileOf(run.id)), 'no hold written');
+
+  await runWith(b.e, hold(run.id, [target.id]));
+  const denied = Object.assign(new Error(`EACCES: permission denied, unlink '${holdFileOf(run.id)}'`), { code: 'EACCES' });
+  const rm = fs.rmSync;
+  t.mock.method(fs, 'rmSync', function (this: unknown, ...args: Parameters<typeof fs.rmSync>) {
+    if (args[0] === holdFileOf(run.id)) throw denied;
+    return rm.apply(this, args);
+  });
+  await assert.rejects(Effect.runPromise(caught(unhold(run.id))), (err) => err === denied);
+  await assert.rejects(runWith(b.e, unhold(run.id)), (err) => err === denied);
+  t.mock.restoreAll();
+  assert.ok(fs.existsSync(holdFileOf(run.id)), 'the hold stands');
 });

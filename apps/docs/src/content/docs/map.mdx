@@ -51,14 +51,8 @@ above. No workflow word (a workflow, a step, a gate, a factory, a closeout, Nemi
 remote agent at an address. A session is an A2A Task, starting one is a message, and stopping one is a cancel. Only
 `packages/agent-runtime/src/a2a/` imports the A2A library (`packages/agent-runtime/test/a2a-boundary.test.ts`).
 
-### The lifecycle of a task
-
-A task moves along this statechart. It is drawn from `packages/agent-runtime/src/core/lifecycle.ts`, as the runtime's own README
-holds it.
-
-```mermaid diagram=lifecycle
-
-```
+A task's whole life, from queued to an end, is a statechart drawn from its code: see [the lifecycle of a task](/runtime/#the-lifecycle-of-a-task)
+on the runtime's page, and [A2A](/a2a/) for how it reaches each harness.
 
 ## The orchestrator
 
@@ -78,14 +72,11 @@ in; and `agent-orchestrator/workflow` (`packages/agent-orchestrator/src/workflow
 
 **Inside it,** every file is one of four kinds: pure, store, controller, or the client (`packages/agent-orchestrator/test/boundary.test.ts`).
 
-### Nemia, the store's own agent
+How a run moves through it, pass by pass, is [How a run lives](/how-a-run-lives/); what a workflow, an agent and a factory are is on
+their own pages: [Workflows](/workflows/), [Agents](/agents/), [Factories](/factories/).
 
-Nemia is a long-lived session that the daemon's keeper files while any factory is above `manual`, and stops once none is. This
-statechart is drawn from the keeper's code, as `packages/agent-orchestrator/docs/features.md` holds it.
-
-```mermaid diagram=nemia
-
-```
+**Nemia, the store's own agent,** is a long-lived session that the daemon's keeper files while any factory is above `manual`, and
+stops once none is. Her levels, her machine and what she may do are on [her page](/nemia/).
 
 ## The api
 

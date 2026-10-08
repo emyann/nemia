@@ -6,6 +6,7 @@
  * `npm test && npm run typecheck` in place of the forced pair passes it, which proves the fixture really meets turbo's cache. A merge that
  * touches the web app runs the e2e, which builds the app itself, and no build before it: the fixture's `build` and `e2e` each leave a mark.
  * Implement's check does the same in a round, where `WF_BASE_REF` names the base the work began on: the e2e runs there, before review.
+ * Implement's round check runs the tests forced too, the round's one run of the whole suite: a round's doc that breaks a test is refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -235,4 +236,27 @@ test("implement's round check, given its base, runs the e2e on a change to the w
   const skipped = sh(elsewhere.dir, checkOf('implement'), elsewhere.env);
   assert.equal(skipped.status, 0, skipped.out);
   assert.ok(!fs.existsSync(path.join(elsewhere.dir, E2E_RAN)), `no e2e for a change outside the web app and the api:\n${skipped.out}`);
+});
+
+/** Implement's check, whose tests turbo runs forced, with them run through the root's script, which lets turbo replay a cached pass. */
+const IMPLEMENT_FORCED = 'npm test -- --force && npm run typecheck && npm run lint';
+
+test("implement's round check runs the tests forced: a round's doc that breaks a test is refused, though turbo holds the last round's pass", () => {
+  const check = checkOf('implement');
+  assert.ok(check.includes(IMPLEMENT_FORCED), check);
+  const { dir, env } = round('docs/other.md');
+  const warm = sh(dir, 'npm test && npm run typecheck', env);
+  assert.equal(warm.status, 0, `the last round passes:\n${warm.out}`);
+  fs.writeFileSync(path.join(dir, 'docs', 'name.md'), 'Formerly\n');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'rename');
+  const control = sh(dir, check.replace(IMPLEMENT_FORCED, 'npm test && npm run typecheck && npm run lint'), env);
+  assert.equal(
+    control.status,
+    0,
+    `turbo replays the last round's pass after a change to a doc it does not hash; if it hashes the doc now, the fixture needs another file:\n${control.out}`,
+  );
+  const shipped = sh(dir, check, env);
+  assert.notEqual(shipped.status, 0, `implement's check passed a round that breaks a test:\n${shipped.out}`);
+  assert.match(shipped.out, /Failed:\s+p#test/);
 });

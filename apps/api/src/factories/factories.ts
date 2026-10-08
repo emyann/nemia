@@ -11,9 +11,7 @@ import {
   FACTORY,
   type FactoryListing,
   type Hires,
-  runStore,
   runWith,
-  schedulesListed,
   type ScheduleListed,
 } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
@@ -103,12 +101,11 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[]): F
  *   then each factory in the store, by name (`FactoryAnswer`), a file that does not read listed with why, so it hides no other. A request
  *   is answered in one of them, on one of their repositories, by naming it: `?factory=<name>` and `?repo=<path>` on any route
  *   (factories/place.ts). Each factory's schedules are the package's listing of them (`schedulesListed`), read off the runs the store
- *   has. Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
+ *   has, in the entry's one answer. Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
   served(c, async ({ e, env, running }) => {
     const listed = await runWith(e, FACTORY.handler({}));
-    const schedules = schedulesListed(runStore.runs.list());
     return c.json([
       {
         name: DEFAULT_FACTORY,
@@ -120,7 +117,7 @@ export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
         schedules: [],
         commands: commandsOf(DEFAULT_FACTORY),
       },
-      ...listed.factories.map((listing) => answerOf(listing, schedules)),
+      ...listed.factories.map((listing) => answerOf(listing, listed.schedules)),
     ] satisfies FactoryAnswer[]);
   }),
 );

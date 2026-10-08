@@ -348,7 +348,6 @@ export {
   setSchedule,
   startFactory,
 } from './factory/factory.store.ts';
-export { schedulesListed } from './schedule/listed.store.ts';
 export type { ScheduleListed } from './schedule/schedule.ts';
 export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';

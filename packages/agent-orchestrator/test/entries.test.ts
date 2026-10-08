@@ -320,7 +320,6 @@ const PINNED: Record<string, string[]> = {
     'runsSummarized',
     'saidCount',
     'saidLines',
-    'schedulesListed',
     'seenBy',
     'sendBackTo',
     'seriesMemo',

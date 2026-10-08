@@ -69,13 +69,13 @@ test('a Conflict carries the steps that hold what is asked of, when that is why,
   assert.equal(Object.hasOwn(bare, 'users'), false, 'no key for none, so its answer is `{ error }` alone');
 });
 
-test('REFUSED: a verb throws the kind of what it refuses, with its words', () => {
-  assert.throws(
-    () => unhold('Not An Id'),
+test('REFUSED: a verb throws the kind of what it refuses, with its words', async () => {
+  await assert.rejects(
+    Effect.runPromise(unhold('Not An Id')),
     (err: unknown) => err instanceof Invalid && err.message.startsWith('"Not An Id" is not a run\'s id'),
   );
-  assert.throws(
-    () => unhold('r-nope'),
+  await assert.rejects(
+    Effect.runPromise(unhold('r-nope')),
     (err: unknown) =>
       err instanceof Missing &&
       err.message === 'no such run: r-nope. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --off.',

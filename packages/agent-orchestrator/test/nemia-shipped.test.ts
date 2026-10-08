@@ -41,7 +41,7 @@ const OURS = [...TEAM, 'playbook-operator', 'architecture.md', 'CLAUDE.md', 'fea
 /** Where `files` say one of `OURS`, whole and in any case: a line each, `<file>: <word>`. */
 const oursIn = (files: Map<string, string>): string[] =>
   [...files].flatMap(([file, text]) =>
-    OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[.*+?^${}()|[\]\\\-]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
+    OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
       (word) => `${file}: ${word}`,
     ),
   );

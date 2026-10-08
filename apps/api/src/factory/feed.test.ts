@@ -18,6 +18,7 @@ import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { Effect, Logger, Metric } from 'effect';
 import { app, runtime } from '../app.ts';
+import { OPENED } from './feed.ts';
 import { emitFeed, FEED_FOLLOWERS, feedFile, freshFeedMemo, readFeed } from 'agent-orchestrator';
 
 type FeedWords = import('agent-orchestrator').FeedWords;
@@ -45,10 +46,16 @@ const planAt = (word: string, note?: string): FeedWords => ({
 const end = () => readFeed(0).cursor;
 
 type Block = { event?: string; data?: string; id?: string };
-/** Server-sent events as a reader gets them: the fields of each block. */
+/** Server-sent events as a reader gets them: the fields of each block, a comment line read as nothing, as an EventSource reads it. */
 const blocks = (text: string): Block[] =>
   text
     .split('\n\n')
+    .map((block) =>
+      block
+        .split('\n')
+        .filter((line) => !line.startsWith(':'))
+        .join('\n'),
+    )
     .filter((block) => block.trim())
     .map((block) =>
       Object.fromEntries(
@@ -134,6 +141,23 @@ test(
       said = await readUntil(t, reader, text, (s) => s.length >= 3);
       assert.deepEqual(said[2], { event: 'removed', data: JSON.stringify(removed), id: String(end()) });
       assert.equal(JSON.parse(said[2].data).word, 'removed');
+    } finally {
+      await reader.cancel();
+    }
+  },
+);
+
+test(
+  'a stream says it is open before its first line, as a comment: a feed with no line yet still answers, through a proxy that sends a head with its first bytes',
+  WAITED,
+  async (t) => {
+    const pass = emptyFeed();
+    const { reader, text } = await open();
+    try {
+      const [first] = await pass({ 'r-1': planAt('running') });
+      const said = await readUntil(t, reader, text, (s) => s.length >= 1);
+      assert.ok(text.value.startsWith(OPENED), `the stream's first bytes are its comment, before any line: ${text.value}`);
+      assert.equal(said[0].data, JSON.stringify(first), 'then the first line, the comment read as nothing');
     } finally {
       await reader.cancel();
     }

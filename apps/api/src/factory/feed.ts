@@ -42,6 +42,13 @@ const messageOf = (f: Followed): SSEMessage =>
       : { event: 'readable', data: '{}' };
 
 /**
+ * What the stream sends the moment it opens, before any line: a comment, which an EventSource reads as nothing. A proxy that sends a
+ * response's head with its first bytes (Vite's, before the board) holds the stream's answer until then, and a feed with no line yet to send
+ * would leave the board saying it is still connecting.
+ */
+export const OPENED = ': open\n\n';
+
+/**
  * The feed from `from` as the stream's events (`messageOf`), read by the package's live reader (`followFeed`) on the runtime it runs on:
  * a line an event, and a failed read said once as `unreadable` and cleared by `readable`. The reader is held in the stream's scope and let
  * go as it closes, however the stream ends — its reader gone, or the feed refused. It fails with the refusal (exit 2) of a feed truncated
@@ -52,11 +59,12 @@ export const feedEvents = (from: number) => followFeed(from).pipe(Stream.map(mes
 /**
  * `GET /api/feed/stream` — the workflow feed followed, as server-sent events: every line from the cursor, then each as the tick writes it,
  * handed on by the package's live reader (`followFeed`): from the lines the daemon in this process publishes as it writes them, and from
- * the file for every line none brought, on the reader's beat — another process's (`--no-tick`, `nemia tick`). One event a line, named
- * by what the line is about (`feedEventOf`), its data the line as written and its id the cursor just after it. It starts after the
- * Last-Event-ID an EventSource sends when it reconnects, else after `after`, so a reconnect resumes after the last line it was sent. The
- * api relays and decides nothing: the tick has judged it all before it is written. The engine's feed is not in it: a step's filing, its
- * start and its settling reach this one as the step's word, and the engine's is keyed by task.
+ * the file for every line none brought, on the reader's beat — another process's (`--no-tick`, `nemia tick`). It opens with a comment
+ * (`OPENED`), before any line. One event a line, named by what the line is about (`feedEventOf`), its data the line as written and its id
+ * the cursor just after it. It starts after the Last-Event-ID an EventSource sends when it reconnects, else after `after`, so a reconnect
+ * resumes after the last line it was sent. The api relays and decides nothing: the tick has judged it all before it is written. The
+ * engine's feed is not in it: a step's filing, its start and its settling reach this one as the step's word, and the engine's is keyed
+ * by task.
  *
  * A cursor the feed never gave is refused with 400 before the stream opens, an answer with a status, not an event. On the stream, a
  * refusal (exit 2) — the feed truncated or replaced under the cursor, including between the check and the reader's first read — is an
@@ -74,6 +82,7 @@ export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
     const gone = new AbortController();
     stream.onAbort(() => gone.abort());
     if (stream.aborted) gone.abort();
+    await stream.write(OPENED);
     const relayed = feedEvents(from).pipe(
       Stream.runForEach((message) => Effect.promise(() => stream.writeSSE(message))),
       Effect.catch((err) => Effect.promise(() => stream.writeSSE(unreadable(err, false)))),

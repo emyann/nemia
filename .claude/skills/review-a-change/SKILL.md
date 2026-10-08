@@ -1,6 +1,6 @@
 ---
 name: review-a-change
-description: "Review a change in this repository as a second engineer would: against its intent and spec, by reading the diff and running the suite, with findings that name the file, the line and what goes wrong. For a read-only step that decides whether the work goes round again."
+description: "Review a change in this repository as a second engineer would: against its intent and spec, by reading the diff and the suite's verdict, with findings that name the file, the line and what goes wrong. For a read-only step that decides whether the work goes round again."
 ---
 
 # Review a change
@@ -16,9 +16,13 @@ description: "Review a change in this repository as a second engineer would: aga
    paths from its root, and each folder your brief says you may read — those the steps before you handed over — under its own path;
    never the run's artifacts folder above them, another run's folder, the store (`~/.agent-workflows`), `~/.claude`, `~/.cache` or a
    system path: your fence refuses them without asking. What your brief quotes from outside them is all you have of it.
-3. **Run the suite yourself**, each check bare and one command per call: `npx turbo run test --force --continue`,
-   `npx turbo run typecheck --force`, `npm run lint`. Never wrap one in `timeout` or `( … )`, pipe it or redirect it; paths from the
-   workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. A claim you did not run is not a finding.
+3. **Read the suite's verdict; run the cheap checks yourself**. Implement's check ran the whole test suite on this round's tree,
+   forced, and your brief hands you its exit and the end of its output under `## What implement's check said`. That run is the floor,
+   and a run of yours on the same tree would only say it again; a check that did not pass is a finding. Run the typecheck and the lint
+   yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`. Run a package's tests,
+   `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on. Never wrap one in
+   `timeout` or `( … )`, pipe it or redirect it; paths from the workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence
+   refuses them. A claim you did not run or read in the check's output is not a finding.
 4. **Judge the mutants, do not run them**: implement's check applied each mutant the engineer's closeout names and refused the step if
    one survived; your brief hands you what it said under `## What implement's check said`, each `wf mutants:` line whole in `reported`.
    Judge whether the list covers every rule the change adds, and whether each mutant breaks the rule rather than the file's syntax: a

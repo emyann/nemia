@@ -1,6 +1,6 @@
 ---
 name: implement-a-change
-description: "Build a change from its spec in this repository: tests first where a rule is claimed, small commits, the suite green for the right reason, and each review finding answered in the next round. For a step that writes the code."
+description: "Build a change from its spec in this repository: tests first where a rule is claimed, small commits, the tests of what changed green for the right reason, and each review finding answered in the next round. For a step that writes the code."
 ---
 
 # Implement a change
@@ -15,10 +15,13 @@ description: "Build a change from its spec in this repository: tests first where
    runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
    change that adds no rule, saying why in `noMutants`.
 4. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
-5. **Check as the run will**: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`; and when `apps/web` changes,
-   `npm run build` and `npm run e2e -- --pages <the pages the change touches>`, with `--photos` when pictures are due, which visits
-   only those; never the whole suite but to measure it: implement's round check and the landing's run every page, in workers, outside
-   your session. Green is the floor, not the bar.
+5. **Check what you changed**: its test files, the tests that read a doc, skill or workflow file you touched, and the packages you
+   touched where a file alone does not say enough, each as the repository's instructions say how; then `npm run typecheck` and
+   `npm run lint`, whole. Never the whole test suite but to measure it: implement's round check runs it, outside your session, and a
+   failing test you did not run comes back as its refusal, answered in the next try. When `apps/web` changes, `npm run build` and
+   `npm run e2e -- --pages <the pages the change touches>`, with `--photos` when pictures are due, which visits only those; never every
+   page but to measure it: implement's round check and the landing's run every page, in workers, outside your session. Green is the
+   floor, not the bar.
    You run as a job, and a turn you end is your last: run each long command in the foreground, where one call may take 10 minutes
    (`run_in_background` runs it there too), or start it with a shell `&` and wait on it with a blocking call
    (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).

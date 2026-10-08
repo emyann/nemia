@@ -25,6 +25,16 @@ holds what every change needs.
   chosen to keep a suite near 2 GB; `suite.test.ts` holds them equal). Not bare `node --test` from the root, nor a higher bound by
   hand. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
   first: a file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
+- **A step's session runs the tests of what it changed; the run's checks run the whole suite.** The test files about each file it
+  changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
+  the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
+  in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
+  `packages/agent-runtime` and `apps/web`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
+  (`agent-orchestrator`, `agent-runtime`, `api`, `web`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+  whole suite forced (`workflows/build/implement.md`), and the landing's again on the merged tree; a session runs it only to measure
+  it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
+  follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);
   `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
@@ -32,10 +42,11 @@ holds what every change needs.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   A session never runs it whole but to measure it: implement's round check and the landing's run every page.
-- Run them before you commit. Green is the floor, not the bar: a change that makes the suite pass by weakening a test is a finding to
-  report, not a fix.
-- Turbo does not see `workflows/`: after touching a workflow folder, run `npx turbo run test --force --continue`. The same goes for a
-  change only to a doc: some tests read docs.
+- Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
+  weakening a test is a finding to report, not a fix.
+- Turbo does not see `workflows/`, nor a doc, though some tests read docs: a step's session runs the tests that read the doc or workflow
+  file it touched, and the round's check runs them all forced; outside a run, type `npx turbo run test --force --continue` after
+  touching one.
 - A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 

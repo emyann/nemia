@@ -207,7 +207,7 @@ const HARNESS_WORDS: Baseline = {
 /** Each file of the runtime that says a workflow's word today, with its count and what removes them. */
 const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/a2a/map.ts': { count: 12, ...MOVES.closeout },
-  'packages/agent-runtime/src/a2a/remote.ts': { count: 4, ...MOVES.reword },
+  'packages/agent-runtime/src/a2a/remote.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/domain.ts': { count: 14, ...MOVES.closeout },
   'packages/agent-runtime/src/core/engine/engine.ts': { count: 26, ...MOVES.step },
   'packages/agent-runtime/src/core/engine/filing.ts': { count: 6, ...MOVES.reword },

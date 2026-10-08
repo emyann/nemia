@@ -644,14 +644,24 @@ another HTTP scheme, or a secret `credentials` does not give refuses the spawn b
 redirect, which is never followed: a key in a header of its own would go with it to any origin. A secret is held by
 the caller's function alone: it is on no filing, journal, registry entry or feed line, which a test reads byte for byte.
 
+**Following a remote session.** An agent whose card says `capabilities.streaming: true` is followed through its Task's own
+stream (`SubscribeToTask`): `follow` relays each answer as the moments a `--bg` session's follow gives — the state, each message once,
+an artifact's chunks as they come and the artifact whole at its last — and `transcriptOf` reads the Task (GetTask) from a cursor,
+each event under the id the follow gave it. A card that does not say it streams refuses the follow, saying so, and its reader reads
+the transcript again every second. A subscription that drops before the turn is over is read whole, which gives what the drop
+missed, and subscribed to again; five drops in a row that give nothing new refuse the follow the same way, and one silent for 60 s
+is read whole and subscribed to again without counting; a Task the agent no longer has ends the follow. The subscription's headers
+are bounded as any request is; its body is not. A session followed while its message is still being sent is `submitted` until the
+agent answers: then its reply, under the transcript's id, and its state; a refusal, as `rejected`; or its Task, followed
+(`a2a/remote-follow.ts`, `test/remote-follow.test.ts`).
+
 **What a pass costs.** One GetTask per open remote session, in parallel, and none for a settled one: the pass's meter
 reads one observe of the harness per pass, `listed` the open sessions (`test/remote-agent.test.ts` prints what it
 measured).
 
 **A workflow step on a remote agent** is agent-orchestrator's (part 2): its README's *A remote A2A agent as a step*.
 
-**Not done yet.** The gRPC binding (part 3); streaming and SubscribeToTask, relayed to the transcript and the feed, and a
-restarted runtime resubscribing (part 4). Later: the runtime's own adapters mounted over HTTP.
+**Not done yet.** The gRPC binding (part 3). Later: the runtime's own adapters mounted over HTTP.
 
 ## What a task may say, and what is refused
 
@@ -2145,6 +2155,9 @@ of pure code sits beside it.
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's methods (`SESSION_METHODS`), `forgetSession` among them, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
+| `src/a2a/remote-client.ts` | a remote agent's connection: its card read and held to its origin, the interface chosen, auth as the card asks it, and a `fetch` that bounds each request (a subscription's headers alone) and follows no redirect |
+| `src/a2a/remote-events.ts` | a remote agent's Task as a transcript (`transcriptOfTask`), and a subscription's answers as the moments a follow gives (`followedOfRemote`), each event once |
+| `src/a2a/remote-follow.ts` | a remote agent's session followed through its Task's own stream, a dropped subscription read whole and made again, and its conversation read by id or by name |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
 | `src/a2a/entry.ts` | the remote harness's registry entry: its shape, an older one read in today's words, its file under `remote/`, and the remote `forget`, which removes the entry and names the Task the agent keeps (`forgetEntryOf`) |
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |

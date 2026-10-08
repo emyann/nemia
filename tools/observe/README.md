@@ -17,8 +17,11 @@ docker compose -f tools/observe/compose.yaml down -v    # down, and drop what it
 
 What it stores (traces, logs, metrics, profiles, Grafana's own database) lives in the volume `nemia-observe_data`, mounted on `/data`.
 Traces are kept 14 days (`336h`, written out in `tempo.yaml`) and metrics 90 (`PROMETHEUS_EXTRA_ARGS` in `compose.yaml`). A stack made
-before a change to `compose.yaml`, `tempo.yaml` or `otelcol.yaml` takes it with `docker compose -f tools/observe/compose.yaml up -d`,
-which recreates the container and keeps the volume.
+before a change to `compose.yaml` takes it with `docker compose -f tools/observe/compose.yaml up -d`, which recreates the container and
+keeps the volume. A change to `tempo.yaml` or `otelcol.yaml`, which are bind-mounted, is taken only with `docker compose -f
+tools/observe/compose.yaml up -d --force-recreate`: compose's config hash does not see a mounted file's contents, so `up -d` alone says
+the container is running and recreates nothing. `docker compose restart` fails on WSL, where Docker Desktop's bind mount of a file is
+not found again, and leaves the stack stopped; `up -d --force-recreate` brings it back.
 
 Open Grafana at <http://localhost:3000>: it lets anyone on this machine in as an admin, with no login. It lands on **System**.
 
@@ -138,8 +141,10 @@ is counted once, as its Agent tool.
   `packages/<name>` or `apps/<name>`), `files` (`node --test`), `e2e: all` (`npm run e2e`) or `e2e: pages` (with `--pages`). It is read
   at any command of the line, not only the head, so `npm run build && npm run e2e -- --pages time` is `e2e: pages`; a flag counts only
   in its own command, and the last statement that matches wins. Each value is a literal, so no package, file or page name gets in; a
-  command that runs no tests has none. It reads the text, not the shell: a bare `npm test` in a package's folder after an earlier `cd` is
-  `suite`.
+  command that runs no tests has none. A `cd` counts only when the test command comes right after it, joined by `&&` or `;`: `cd
+  packages/agent-runtime; npm test` and `cd packages/agent-orchestrator && npx turbo run test --force` are `package`, and `cd apps/web
+  && cd ../.. && npx turbo run test` is `suite`. It reads the text, not the shell: a bare `npm test` in a package's folder after an
+  earlier `cd` is `suite`.
 - **Span metrics** (Tempo's generator) keep span time by factory, workflow, step, agent, span type, `tool_name`, `bash_command_class`,
   `command_head` and `test_scope`, never by a run or a task, and leave a subagent's spans out (`agent_id`). They are written as
   `traces_spanmetrics_latency_{bucket,count,sum}` (seconds), `traces_spanmetrics_calls_total` and `traces_spanmetrics_size_total`, each

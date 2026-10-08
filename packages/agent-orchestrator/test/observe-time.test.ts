@@ -1,6 +1,7 @@
 /**
  * What the side Grafana (`tools/observe/`) changes in its image to time a step: the collector overlay's command head and test scope,
- * Tempo's span metrics, its retention and the reach of its queries, and the compose file that mounts both and keeps metrics 90 days.
+ * Tempo's span metrics, its retention and the reach of its queries, the compose file that mounts both and keeps metrics 90 days, and
+ * the README's word on how a change to a mounted file is taken.
  *
  * The command head is read as the collector runs it: the pattern is taken out of `otelcol.yaml`'s OTTL string (`\\` one backslash,
  * `$$` the collector's `$`) and run over a table of commands, a match setting the head and any other command left `other`. The test
@@ -151,6 +152,11 @@ const SCOPE_ROWS: [string, string | undefined][] = [
   ['npm -w apps/web run test', 'package'],
   ['cd packages/agent-orchestrator && npm test', 'package'],
   ['cd /home/u/wt/apps/api && npm test 2>&1 | tail', 'package'],
+  ['cd packages/agent-orchestrator && npx turbo run test --force', 'package'],
+  ['cd packages/agent-runtime; npm test', 'package'],
+  ['cd apps/web; npx turbo run test --force --continue', 'package'],
+  ['cd ~/repo; npm test', 'suite'],
+  ['cd apps/web && cd ../.. && npx turbo run test --force --continue', 'suite'],
   ['node --test test/a.test.ts', 'files'],
   ['timeout --foreground 60 node --test test/a.test.ts', 'files'],
   ['cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts', 'files'],
@@ -281,8 +287,22 @@ function composeFaults(service: Service): string[] {
   return faults;
 }
 
+/**
+ * What is wrong with how the README `text` says a change to the mounted files is taken, each said in a line: `up -d` recreates nothing
+ * for a bind-mounted file's contents, so it says `up -d --force-recreate`, and that `docker compose restart` fails on WSL.
+ */
+function recreateFaults(text: string): string[] {
+  const faults: string[] = [];
+  if (!/`tempo\.yaml`\s+or\s+`otelcol\.yaml`[^.]*?compose\.yaml\s+up\s+-d\s+--force-recreate`/.test(text))
+    faults.push('the README does not say a change to tempo.yaml or otelcol.yaml is taken by up -d --force-recreate');
+  if (!/`docker\s+compose\s+restart`\s+fails\s+on\s+WSL/.test(text))
+    faults.push('the README does not say docker compose restart fails on WSL');
+  return faults;
+}
+
 const COLLECTOR = read('otelcol.yaml') as Collector;
 const TEMPO = read('tempo.yaml') as Tempo;
+const README = fs.readFileSync(path.join(OBSERVE, 'README.md'), 'utf8');
 const SERVICE = Object.values((read('compose.yaml') as { services: Record<string, Service> }).services)[0];
 
 test('a Bash tool span gets the plain words of its command, before the batch, and no argument', () => {
@@ -344,7 +364,7 @@ test('a Bash tool span gets the scope of its test command, one of five values, a
   for (const [command, scope] of SCOPE_ROWS) assert.equal(scopeOf(COLLECTOR, command), scope, command);
 });
 
-test('REFUSED: the scope after the batch, on every span, copied from the command, unfiltered, out of order, or read in a quote', () => {
+test('REFUSED: the scope after the batch, on every span, copied from the command, unfiltered, a cd into a package read as the suite, out of order, or read in a quote', () => {
   const changed = (edit: (statements: string[], c: Collector) => void): string[] => {
     const config = structuredClone(COLLECTOR);
     edit(groupOf(config, SCOPE)!.statements!, config);
@@ -390,6 +410,19 @@ test('REFUSED: the scope after the batch, on every span, copied from the command
       '"turbo run test --force --filter agent-runtime" has the scope suite, not package',
       '"npm test -w packages/agent-runtime" has the scope suite, not package',
       '"npm test --workspace=apps/api" has the scope suite, not package',
+    ],
+  );
+  assert.deepEqual(
+    changed((statements) => {
+      const cd = statementOf(statements, 'package', 'cd\\\\s+');
+      statements[cd] = statements[cd]
+        .replace('(?:&&|;)', '&&')
+        .replace('(?:turbo\\\\s+run\\\\s+test|npm\\\\s+(?:run\\\\s+)?test)', 'npm\\\\s+(?:run\\\\s+)?test');
+    }),
+    [
+      '"cd packages/agent-orchestrator && npx turbo run test --force" has the scope suite, not package',
+      '"cd packages/agent-runtime; npm test" has the scope suite, not package',
+      '"cd apps/web; npx turbo run test --force --continue" has the scope suite, not package',
     ],
   );
   assert.deepEqual(
@@ -489,4 +522,17 @@ test("REFUSED: an overlay the collector is not told of, Tempo's config mounted e
   ]);
   const { PROMETHEUS_EXTRA_ARGS: _, ...rest } = SERVICE.environment ?? {};
   assert.deepEqual(changed({ environment: rest }), [`Prometheus is not given ${RETENTION}`]);
+});
+
+test('the README says a change to the mounted files is taken by up -d --force-recreate, and that restart fails on WSL', () => {
+  assert.deepEqual(recreateFaults(README), []);
+});
+
+test('REFUSED: a README that takes a mounted file by up -d alone, or says nothing of restart on WSL', () => {
+  assert.deepEqual(recreateFaults(README.replace('compose.yaml up -d --force-recreate`', 'compose.yaml up -d`')), [
+    'the README does not say a change to tempo.yaml or otelcol.yaml is taken by up -d --force-recreate',
+  ]);
+  assert.deepEqual(recreateFaults(README.replace(/`docker\s+compose\s+restart`\s+fails\s+on\s+WSL/, '`docker compose restart` works')), [
+    'the README does not say docker compose restart fails on WSL',
+  ]);
 });

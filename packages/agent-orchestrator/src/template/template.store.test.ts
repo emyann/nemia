@@ -208,6 +208,8 @@ test('a problem of a folder stands at its file and line, every one at once, sort
   const lines = fs.readFileSync(agent, 'utf8').split('\n');
   const effort = lines.findIndex((line) => line.trim() === 'effort: high');
   lines[effort] = lines[effort].replace('high', 'extreme');
+  const skill = lines.findIndex((line) => line.trim() === '- ask-for-another-round');
+  lines[skill] = lines[skill].replace('ask-for-another-round', 'no-such-skill');
   fs.writeFileSync(agent, lines.join('\n'));
   fs.writeFileSync(
     path.join(dir, 'skills', 'review-a-change', 'skill.yaml'),
@@ -218,14 +220,17 @@ test('a problem of a folder stands at its file and line, every one at once, sort
   assert.deepEqual(
     problems.map((p) => [p.file, p.line]),
     [
+      ['agents/reviewer/agent.yaml', skill + 1],
       ['agents/reviewer/agent.yaml', effort + 1],
       ['skills/review-a-change/skill.yaml', 3],
       ['workflows/dev/notes.yaml', undefined],
     ],
   );
-  assert.match(problemLine(problems[0]), new RegExp(`^agents/reviewer/agent\\.yaml:${effort + 1}:\\d+: .*no effort`));
-  assert.match(problems[1].message, /does not parse/);
-  assert.match(problems[2].message, /outside the template's layout/);
+  assert.ok(skill < effort, 'the skill stands above the effort, so the order is the lines and not the checks');
+  assert.match(problems[0].message, /skill no-such-skill is not in skills/);
+  assert.match(problemLine(problems[1]), new RegExp(`^agents/reviewer/agent\\.yaml:${effort + 1}:\\d+: .*no effort`));
+  assert.match(problems[2].message, /does not parse/);
+  assert.match(problems[3].message, /outside the template's layout/);
 });
 
 test('a link in a folder is refused by name, and so is a file of two documents, at the second', () => {

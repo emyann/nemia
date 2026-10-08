@@ -191,6 +191,45 @@ test('a template moved to another version is drift: the base and tree are left a
   assert.equal(reconcileFactory(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
 });
 
+test("parameters changed in the factory's file, or the template's files changed at its version, are said by Applied; base and tree kept", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('moved', dir, repo, '--set', 'budget=7');
+  const first = reconcileFactory(templated('moved'));
+  const file = path.join(FACTORIES, 'moved.json');
+  const filedAs = fs.readFileSync(file, 'utf8');
+  const content = JSON.parse(filedAs);
+  content.template.params.budget = 9;
+  fs.writeFileSync(file, JSON.stringify(content));
+  const review = (folder: string) => fs.readFileSync(path.join(folder, 'workflows/dev/review.md'), 'utf8');
+  const changed = reconcileFactory(templated('moved'));
+  assert.deepEqual(changed.conditions[0], {
+    type: 'Applied',
+    status: 'False',
+    reason: 'ParamsChanged',
+    message:
+      "The parameters in moved's file differ from those its base was rendered with: its base and tree are left as they are until upgrades come.",
+  });
+  assert.deepEqual([changed.digest, changed.params], [first.digest, first.params]);
+  assert.match(review(appliedDir('moved')), /^budget: 7$/m);
+  assert.match(review(treeDir('moved')), /^budget: 7$/m);
+  fs.writeFileSync(file, filedAs);
+  assert.equal(reconcileFactory(templated('moved')).conditions[0].reason, 'Rendered', 'the parameters put back, the base is as rendered');
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[1].rounds = 5;
+  });
+  const edited = reconcileFactory(templated('moved'));
+  assert.deepEqual(edited.conditions[0], {
+    type: 'Applied',
+    status: 'False',
+    reason: 'ContentChanged',
+    message: "The template's files changed under version 0.1.0: give the template a new version for the change, or put its files back.",
+  });
+  assert.equal(edited.digest, first.digest);
+  assert.doesNotMatch(review(appliedDir('moved')), /^rounds: 5$/m);
+  assert.doesNotMatch(review(treeDir('moved')), /^rounds: 5$/m);
+});
+
 test("a templated factory reads its tree's wiring, and attach, hire, fire and detach write the tree; none while it is not rendered", async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();

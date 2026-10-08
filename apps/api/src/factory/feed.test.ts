@@ -156,7 +156,7 @@ test(
     await first.reader.cancel();
     assert.deepEqual(
       all.map((b) => [b.event, b.data]),
-      lines.map((l) => [l.step ? 'step' : 'run', JSON.stringify(l)]),
+      lines.map((l) => ['step' in l && l.step ? 'step' : 'run', JSON.stringify(l)]),
     );
     assert.equal(all[2].id, String(end()));
     for (const [i, b] of all.entries())
@@ -193,6 +193,23 @@ test(
     assert.equal(whole[0].id, all[0].id, 'an empty `after` is none: from the start');
   },
 );
+
+test('a daemon’s line, as up writes it once it holds the store, is sent as a daemon event, its data the line whole', WAITED, async (t) => {
+  const pass = emptyFeed();
+  await pass({ 'r-1': planAt('running') });
+  const daemon = { at: '2026-10-07T12:00:00.000Z', daemon: 4242, word: 'daemon started', note: 'first daemon on this store' };
+  fs.appendFileSync(feedFile(), `${JSON.stringify(daemon)}\n`);
+  const lines = readFeed(0).lines;
+  assert.deepEqual(lines.at(-1), daemon, 'the package reads the line back');
+  const opened = await open();
+  const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
+  await opened.reader.cancel();
+  assert.deepEqual(
+    all.map((b) => b.event),
+    ['run', 'step', 'daemon'],
+  );
+  assert.equal(all[2].data, JSON.stringify(daemon));
+});
 
 test('REFUSED: a cursor the feed never gave is a 400 that names it and says what to pass — inside a line, past the end, not a number; by address and by Last-Event-ID — and one it gave is taken', async () => {
   const pass = emptyFeed();

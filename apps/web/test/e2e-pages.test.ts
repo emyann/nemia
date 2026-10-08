@@ -86,6 +86,20 @@ test('a worker that exits other than 0 stops the queue: no worker starts another
   );
 });
 
+test('a whole run over the bound fails: the runner throws what overBound says', () => {
+  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
+  assert.match(
+    runner,
+    /async function main\(\): Promise<void> \{\s*const started = performance\.now\(\);/,
+    'the runner starts its clock first, so the bound covers the whole run',
+  );
+  assert.match(
+    runner,
+    /const totalMs = performance\.now\(\) - started;\s*const late = overBound\(totalMs, timings, plan\.whole\);\s*if \(late\) throw new Error\(late\);/,
+    'the runner holds a whole run to its bound, and fails with what overBound says',
+  );
+});
+
 test('no page imports run.ts or worker.ts, which would start the whole e2e as the pages load', () => {
   for (const file of pageFiles())
     assert.doesNotMatch(fs.readFileSync(path.join(PAGES_DIR, file), 'utf8'), /from '\.\.\/(?:run|worker)\.ts'/, file);

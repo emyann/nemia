@@ -115,8 +115,11 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the
                                daemon runs, from its lease. --json: the whole answer
-  nemia watch [cursor]
-                               nemia feed's lines, followed as the tick writes them, until ^C
+  nemia watch [cursor] [--json] [--wake] [--wake-word <word>]...
+                               nemia feed's lines, followed as the tick writes them, until ^C, and a
+                               daemon down line when nothing ticks the store, daemon up when it does
+                               again. --json: one JSON object a line, a feed line with its cursor;
+                               --wake: only the lines that wait on a person; --wake-word: these words
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
@@ -146,6 +149,8 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
                                a card of a plan (nemia plan --help) starts its body: --workflows is its
                                workflow: unless given, and its after: needs an --after for each
+                               a frontmatter block of keys a plan's card lacks is refused by its key,
+                               never taken as the brief: file an inbox card with nemia inbox add <file>
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
                                --factory <name>: the workflow must be attached to the factory, whose
@@ -310,6 +315,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia service uninstall [--name <name>]
                                stop the login service, disable it and remove its file; a daemon
                                started by hand is left alone
+  nemia service restart [--name <name>]
+                               restart the service's daemon on the code it runs: pause the store, wait
+                               for landing checks, stop it, start the service, and resume once the new
+                               daemon has completed its first pass; refused, naming the log, when that
+                               pass fails. A pause a person put stands. Starts the service where
+                               nothing ticks; a daemon started by hand is named with --take-over's line
   nemia upgrade <tag> [--repo <path>] [--name <name>]
                                build the tag from a clean export into the store's releases/<tag>:
                                npm ci, npm run build and npm run release:check there, on a trial

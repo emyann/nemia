@@ -6371,7 +6371,7 @@ const hireOn = async (
   const { StepHire } = await import('../src/components/StepHire.tsx');
   const { stepQuery } = await import('../src/lib/api/workflows.ts');
   const read = await hiredPage(page ?? {});
-  const store = { workflows: '/store/workflows', agents: '/store/agents', skills: '/store/skills', fileFactory: '' };
+  const store = { workflows: '/store/workflows', agents: '/store/agents', skills: '/store/skills', fileFactory: '', turnOnNemia: '' };
   return routedWith(createElement(StepHire, { from: read.from, workflow: 'w', step: 'review', place, where }), [
     ...(page === null ? [] : [[stepQuery(read.from, 'w', 'review', place).queryKey, read] as [readonly unknown[], unknown]]),
     [['store'], store],
@@ -6764,6 +6764,7 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
     spend: null,
     allows: [],
     factories: [],
+    trust: null,
     ...level,
   });
   client.setQueryData(['nemia', 'memory'], { dir: '/store/nemia/memory', facts, fact: null });
@@ -6892,6 +6893,86 @@ test('Nemia asked bridged and not up: why, in place of her link; not asked: her 
   const unasked = await nemiaWith({ ...nemiaUp, reach: ['attach 01234567'], bridge: null });
   assert.match(unasked, /data-nemia-attach[^>]*>attach 01234567</);
   assert.doesNotMatch(unasked, /data-nemia-bridge|data-bridge-why/, 'not asked: nothing of a bridge');
+});
+
+/** The line that trusts her folder, as the api answers it. */
+const TRUST = "cd '/store/nemia' && claude";
+
+/** Where the line that trusts her folder sits in Nemia's section `html`: inside her level's part, under its switch, or elsewhere. */
+const trustAt = (html: string): 'level' | 'elsewhere' | 'none' => {
+  const at = html.indexOf('data-nemia-trust');
+  if (at < 0) return 'none';
+  return at > html.indexOf('data-nemia-pick') && at < html.indexOf('>Factories</h3>') ? 'level' : 'elsewhere';
+};
+
+test('Nemia waiting on her folder trusted: under the switch, that no session is filed until it is, and the line to copy, said once; her session untrusted; trusted: no such line', async () => {
+  const html = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', trust: TRUST });
+  assert.equal(trustAt(html), 'level', 'the wait is plain beside the switch that reads Semi-auto');
+  assert.match(
+    html,
+    /data-nemia-trust[\s\S]*>No session of hers is filed until her folder is trusted: run this once in a terminal[^<]*<\/p>/,
+  );
+  assert.match(html, /data-nemia-trust[\s\S]*<code[^>]*>cd &#x27;\/store\/nemia&#x27; &amp;&amp; claude<\/code><button[^>]*data-copy/);
+  assert.equal(html.split('data-nemia-trust').length, 2, 'the line is drawn once');
+  assert.equal(html.split('in a terminal').length, 2, 'how to trust it is said once');
+  assert.match(html, /data-nemia-session="true" data-state="untrusted"[\s\S]*>Waiting on your trust: the keeper files her session/);
+  assert.equal(trustAt(await nemiaWith({ trust: TRUST })), 'level', 'off, the line is shown before she is turned on');
+  assert.doesNotMatch(await nemiaWith({ ...nemiaUp }), /data-nemia-trust/, 'a trusted folder: no trust line');
+});
+
+/** The Factories with no factory, drawn over a cache holding the store's lines and Nemia's `level`, or none read yet. */
+async function noFactoryWith(level: Record<string, unknown> | null): Promise<string> {
+  const { FactoriesCanvas } = await import('../src/components/FactoriesCanvas.tsx');
+  const client = new QueryClient();
+  client.setQueryData(['store'], {
+    workflows: '/store/workflows',
+    agents: '/store/agents',
+    skills: '/store/skills',
+    fileFactory: 'nemia factory new <name>',
+    turnOnNemia: 'nemia level semi-auto',
+  });
+  if (level !== null)
+    client.setQueryData(['nemia', 'level'], {
+      level: 'manual',
+      since: null,
+      task: null,
+      phase: null,
+      sessionId: null,
+      reach: [],
+      bridge: null,
+      stopped: false,
+      spend: null,
+      allows: [],
+      factories: [],
+      trust: null,
+      ...level,
+    });
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(FactoriesCanvas, { blocks: [] })));
+}
+
+test('no factory and Nemia off: Turn Nemia on, beside the line that does it from the command line; on: her session in words', async () => {
+  const off = await noFactoryWith({});
+  assert.match(off, /No factory yet[\s\S]*<code>nemia factory new &lt;name&gt;<\/code>/);
+  assert.match(
+    off,
+    /data-nemia-off[\s\S]*<button[^>]*data-nemia-turn-on[^>]*>Turn Nemia on<\/button>[\s\S]*<code[^>]*>nemia level semi-auto<\/code>/,
+  );
+  assert.doesNotMatch(off, /data-nemia-on=/);
+
+  const raised = await noFactoryWith({ factories: [{ factory: 'mill', level: 'semi-auto', default: 'manual', own: null, raise: null }] });
+  assert.doesNotMatch(raised, /data-nemia-turn-on/, 'a factory above Manual keeps her: she is on');
+
+  const waiting = await noFactoryWith({ level: 'semi-auto', task: 'nemia-1', trust: TRUST });
+  assert.doesNotMatch(waiting, /data-nemia-turn-on/);
+  assert.match(waiting, /data-nemia-on="true" data-state="untrusted"[\s\S]*Nemia is on\. Waiting on your trust/);
+  assert.match(waiting, /data-nemia-trust[\s\S]*<code[^>]*>cd &#x27;\/store\/nemia&#x27; &amp;&amp; claude<\/code>/);
+  assert.equal(waiting.split('in a terminal').length, 2, 'how to trust it is said once');
+
+  const up = await noFactoryWith({ ...nemiaUp });
+  assert.match(up, /data-nemia-on="true" data-state="up"[\s\S]*Nemia is on\. Up: her session runs\./);
+  assert.doesNotMatch(up, /data-nemia-trust/);
+
+  assert.doesNotMatch(await noFactoryWith(null), /data-nemia-o(n|ff)=/, 'nothing offered while her level is not read');
 });
 
 test('Nemia stopped from outside: said so, with a way to a fresh session', async () => {

@@ -30,6 +30,7 @@ const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
   spend: null,
   allows: [],
   factories: [],
+  trust: null,
   ...over,
 });
 
@@ -59,6 +60,21 @@ test('her session reads off with no task, not filed with no phase, starting whil
   assert.equal(sessionOf({ ...up, reach: [], sessionId: null }).kind, 'starting');
   assert.equal(sessionOf(up).kind, 'up');
   assert.match(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).words, /^Not filed yet: the keeper files her session/);
+});
+
+test('her session not filed while her folder is not trusted reads untrusted, waiting on a person to trust it, and off whatever her trust', () => {
+  const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', trust: "cd '/store/nemia' && claude" });
+  assert.equal(sessionOf(waiting).kind, 'untrusted');
+  assert.match(
+    sessionOf(waiting).words,
+    /^Waiting on your trust: the keeper files her session at its next beat once her folder is trusted\.$/,
+  );
+  assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'off');
+  assert.equal(
+    sessionOf({ ...up, trust: "cd '/store/nemia' && claude" }).kind,
+    'up',
+    'a phase read is a session filed, whatever the trust',
+  );
 });
 
 test('Manual asked of a session still reached reads leaving, and off once nothing reaches it', () => {
@@ -157,6 +173,14 @@ test("each factory's level reads back; REFUSED: a factory at a level the board h
     readLevel(),
     (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.raise, the value is missing/.test(err.message),
   );
+});
+
+test('the line that trusts her folder reads back; REFUSED: an answer with no trust', async (t) => {
+  answering(t, { ...up, trust: "cd '/store/nemia' && claude" });
+  assert.equal((await readLevel()).trust, "cd '/store/nemia' && claude");
+  const { trust: _trust, ...noTrust } = up;
+  answering(t, noTrust);
+  await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at trust, the value is missing/.test(err.message));
 });
 
 test('REFUSED: a level the board has no word for, and an answer with no reach', async (t) => {

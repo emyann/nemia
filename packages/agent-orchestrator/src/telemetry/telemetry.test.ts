@@ -1,5 +1,6 @@
 /**
- * The daemon's telemetry: whether the environment asks for an OTLP export (`otlpOf`), a log as `nemia up` prints it (`lineOf`), and the
+ * The daemon's telemetry: whether the environment asks for an OTLP export (`otlpOf`), what its sessions export (`sessionTelemetryOf`,
+ * `toolDetailsRefusalOf`), a log as `nemia up` prints it (`lineOf`), and the
  * layer (`telemetryLayer`), which exports spans, logs and metrics to a collector only when one is named — proven against a scratch
  * collector that counts what it is posted, and refused with none named by what the layer puts in the context and posts.
  */
@@ -8,7 +9,16 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Effect, Logger, Metric } from 'effect';
-import { DEFAULT_SERVICE_NAME, lineOf, logsUrl, metricsUrl, otlpOf, tracesUrl } from './telemetry.ts';
+import {
+  DEFAULT_SERVICE_NAME,
+  lineOf,
+  logsUrl,
+  metricsUrl,
+  otlpOf,
+  sessionTelemetryOf,
+  toolDetailsRefusalOf,
+  tracesUrl,
+} from './telemetry.ts';
 import { PASS_METRICS } from '../meter/meter.verb.ts';
 import { lineLogger, telemetryLayer } from './telemetry.store.ts';
 
@@ -27,6 +37,31 @@ test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, 
   assert.equal(tracesUrl(named), 'http://collector:4318/v1/traces');
   assert.equal(logsUrl(named), 'http://collector:4318/v1/logs');
   assert.equal(metricsUrl(named), 'http://collector:4318/v1/metrics');
+});
+
+test("sessionTelemetryOf: no export without an endpoint; the endpoint alone by default; the tools' details only when asked by 1", () => {
+  const endpoint = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318/' };
+  assert.equal(sessionTelemetryOf({}), undefined);
+  assert.equal(sessionTelemetryOf({ NEMIA_TOOL_DETAILS: '1' }), undefined, "the tools' details alone ask for no export");
+  assert.deepEqual(sessionTelemetryOf(endpoint), { endpoint: 'http://localhost:4318' });
+  for (const asked of ['1', ' 1 '])
+    assert.deepEqual(sessionTelemetryOf({ ...endpoint, NEMIA_TOOL_DETAILS: asked }), {
+      endpoint: 'http://localhost:4318',
+      toolDetails: true,
+    });
+  for (const not of ['0', '', 'true'])
+    assert.deepEqual(sessionTelemetryOf({ ...endpoint, NEMIA_TOOL_DETAILS: not }), { endpoint: 'http://localhost:4318' }, not);
+});
+
+test('REFUSED: a NEMIA_TOOL_DETAILS that is neither unset, blank, 0 nor 1, in words that name the fix', () => {
+  for (const fine of [undefined, '', ' ', '0', '1', ' 1 '])
+    assert.equal(toolDetailsRefusalOf({ NEMIA_TOOL_DETAILS: fine }), undefined, fine);
+  assert.equal(toolDetailsRefusalOf({}), undefined);
+  for (const wrong of ['true', 'yes'])
+    assert.equal(
+      toolDetailsRefusalOf({ NEMIA_TOOL_DETAILS: wrong }),
+      `NEMIA_TOOL_DETAILS is ${JSON.stringify(wrong)}, which asks nothing: set it to 1 for each session to export its tools' inputs, or unset it. Their tools' details are left off.`,
+    );
 });
 
 test('lineOf: the time in UTC, two spaces, then the message, its parts joined by a space', () => {

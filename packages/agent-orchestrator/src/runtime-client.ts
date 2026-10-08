@@ -34,7 +34,7 @@ import { maxConcurrent } from './config/config.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
-import { otlpOf } from './telemetry/telemetry.ts';
+import { sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
@@ -121,14 +121,17 @@ export const quotaHarnesses = (): string[] =>
  * work on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  *
  * When the process exports its own telemetry (`otlpOf`), the engine is handed the same collector, and each session it starts exports
- * there too, tagged with the labels its task was filed with (`stepLabels`).
+ * there too, tagged with the labels its task was filed with (`stepLabels`); with its tools' inputs only when `NEMIA_TOOL_DETAILS` is
+ * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`).
  */
 export const engine = (): Engine => {
   const read = readRemote();
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`nemia: ${why} ${LEFT_OUT}`);
   const harnesses = { ...HARNESSES, ...remote };
-  const otlp = otlpOf(process.env);
+  const why = toolDetailsRefusalOf(process.env);
+  if (why) console.error(`nemia: ${why}`);
+  const telemetry = sessionTelemetryOf(process.env);
   return engineOf(
     RuntimeEngine.layer({
       root: path.join(HOME, 'engine'),
@@ -136,7 +139,7 @@ export const engine = (): Engine => {
       credentials,
       missingCredential,
       ...storeAdmission(),
-      ...(otlp ? { telemetry: { endpoint: otlp.url } } : {}),
+      ...(telemetry ? { telemetry } : {}),
     }),
   );
 };

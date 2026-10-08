@@ -17,12 +17,13 @@ const AUTO = COMMANDS.find((c) => c.name === 'auto')!;
 
 /**
  * - `GET /api/level` — where Nemia is, as `nemia level --json` prints it:
- *   `{ level, since, task, phase, sessionId, reach, bridge, stopped, spend, allows, factories }`, the store's level `manual` where none
- *   was ever set, `reach` the command that attaches to her session once it runs, then her web link or why it is not up, `bridge` that
- *   link as `{ url, why }` (null where her session is not bridged), `spend` what her ended sessions cost, `allows` what a person
- *   allowed her at a prompt beyond what ships, and `factories` each factory's level, the default factory first:
- *   `{ factory, level, default, own, raise }`, `raise` `{ level, until }` while one is in force. 422 for a level file that does not
- *   read, naming it. Its write, `PUT /api/level`, takes `{ level?, factory?, for?, end? }`.
+ *   `{ level, since, task, phase, sessionId, reach, bridge, stopped, spend, allows, factories, trust }`, the store's level `manual`
+ *   where none was ever set, `reach` the command that attaches to her session once it runs, then her web link or why it is not up,
+ *   `bridge` that link as `{ url, why }` (null where her session is not bridged), `spend` what her ended sessions cost, `allows` what a
+ *   person allowed her at a prompt beyond what ships, and `factories` each factory's level, the default factory first:
+ *   `{ factory, level, default, own, raise }`, `raise` `{ level, until }` while one is in force; `trust` the command a person runs once
+ *   to trust her folder, her session waiting for it, null where it is trusted. 422 for a level file that does not read, naming it. Its
+ *   write, `PUT /api/level`, takes `{ level?, factory?, for?, end? }`, and is never refused for her folder's trust.
  * - `GET /api/nemia/memory` — the facts she keeps, `{ dir, facts, fact: null }`, by name.
  * - `GET /api/nemia/memory/:fact` — one fact's words, `{ dir, facts, fact: { name, text } }`; 404 for a fact she does not keep, naming
  *   those she does.

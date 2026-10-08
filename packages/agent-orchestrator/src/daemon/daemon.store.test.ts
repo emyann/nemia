@@ -27,7 +27,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../runner.ts');
+const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
 const { parseDaemonFile, parsePassCost, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
   await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
@@ -392,7 +392,7 @@ test('a daemon silent past its window on the monotonic clock is taken over, thou
   const { printed, threw } = await typed(t, ['up'], up);
   assert.equal(threw, STOP);
   assert.equal(during!.pid, process.pid, 'the store taken');
-  const took = printed.filter((l) => l.includes(' took '));
+  const took = printed.filter((l) => l.startsWith('   took '));
   assert.ok(took.length === 1 && saysStale(took[0], LIVE, '16m00s'), printed.join('\n'));
   clear();
 });
@@ -435,7 +435,7 @@ test('a holder stale, gone or stopped is taken over by `nemia up` — and not re
     assert.equal(during!.pid, process.pid, c.name);
     assert.equal(during!.startedAt, at(0), `${c.name}: a start of its own`);
     assert.equal(during!.stoppedAt, undefined, c.name);
-    const took = printed.filter((l) => l.includes(' took '));
+    const took = printed.filter((l) => l.startsWith('   took '));
     if (c.took) assert.ok(took.length === 1 && c.took(took[0]), `${c.name}:\n${printed.join('\n')}`);
     else assert.deepEqual(took, [], `${c.name}: a clean stop is nothing to report`);
     if (c.name === 'stale') stale = took[0];
@@ -885,6 +885,34 @@ test('`up` as the api takes the store as the api, writes where it serves once it
   clear();
 });
 
+test('`up` writes the feed a daemon started line once it holds the store, before it serves: the first, then one saying when the last stopped', async () => {
+  clear();
+  fs.rmSync(path.join(ROOT, 'feed.jsonl'), { force: true });
+  const { up } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const daemonLines = () => readFeed(0).lines.filter((l) => 'daemon' in l);
+  const started: Array<ReturnType<typeof daemonLines>[number] | undefined> = [];
+  const serving = Effect.sync(() => started.push(daemonLines().at(-1)));
+  const once = () =>
+    Effect.runPromise(Effect.scoped(up(engineOf(), { every: 10, repo: ROOT, holder: 'api', onTaken: () => serving }))).then(
+      () => assert.fail('the daemon returned'),
+      (err: unknown) => assert.equal(err, STOP),
+    );
+  await once();
+  const stoppedAt = read().stoppedAt;
+  await once();
+  assert.deepEqual(
+    started.map((l) => [l && 'daemon' in l ? l.daemon : undefined, l?.word, l?.note]),
+    [
+      [process.pid, 'daemon started', 'first daemon on this store'],
+      [process.pid, 'daemon started', `last stopped at ${stoppedAt}`],
+    ],
+    'each line written before onTaken, as the daemon serves',
+  );
+  assert.equal(daemonLines().length, 2);
+  clear();
+});
+
 test('REFUSED at shipped defaults, both ways round: an api holding the store refuses a `nemia up` and a `nemia tick`, and a `nemia up` holding it refuses an api', async (t) => {
   seeded(t);
   const { up } = await import('./up.verb.ts');
@@ -1003,8 +1031,8 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   assert.equal(told.length, 1, told.join('\n'));
   assert.match(
     told[0],
-    /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval(\n\nSince your last news:\n1 routine line of the feed:\n {2}\S+ {2}r-1 {2}— {2}removed)?$/,
-    "the wake alone, or with the tick's own line of r-1, which no run of the store names, riding it where the same read found both",
+    /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval(\n\nSince your last news:\n(1 routine line|2 routine lines) of the feed:(\n {2}\S+ {2}pid \d+ {2}daemon started {2}· first daemon on this store)?(\n {2}\S+ {2}r-1 {2}— {2}removed)?)?$/,
+    "the wake alone, or with the routine lines the same read found riding it: the daemon's started line, and the tick's own line of r-1, which no run of the store names",
   );
   dropSubscription('daemon');
   clear();

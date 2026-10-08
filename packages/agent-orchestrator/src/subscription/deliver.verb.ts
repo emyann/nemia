@@ -24,7 +24,7 @@
 import { Cause, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
 import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { instantNow } from '../daemon/daemon.store.ts';
-import type { FeedLine } from '../feed/feed.ts';
+import { isRunLine, type FeedLine } from '../feed/feed.ts';
 import { followFeed, type Followed } from '../feed/feed.verb.ts';
 import { EngineService } from '../runtime-client.ts';
 import { atLeast } from '../level/level.ts';
@@ -123,13 +123,13 @@ const carries = (d: Delivering, run: string): Effect.Effect<boolean> => {
 };
 
 /**
- * One read of the feed, its lines ending at `cursor`, delivered: a line the subscription does not carry passed; where a carried line
- * wakes, the message said, then the cursor kept; else the routine lines folded into the digest.
+ * One read of the feed, its lines ending at `cursor`, delivered: a run's line the subscription does not carry passed, a daemon's carried
+ * by every one; where a carried line wakes, the message said, then the cursor kept; else the routine lines folded into the digest.
  */
 const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, never, EngineService> =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
-    const carried = yield* Effect.filter(lines, (line) => carries(d, line.run));
+    const carried = yield* Effect.filter(lines, (line) => (isRunLine(line) ? carries(d, line.run) : Effect.succeed(true)));
     const read = readDelivered(at, carried, d.sub.wake, cursor, instantNow());
     if (read.message !== undefined) {
       yield* told(d.name, d.sub, read.message, d.o);

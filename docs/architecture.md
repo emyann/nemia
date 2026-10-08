@@ -73,10 +73,13 @@ read off the run by a controller (`seenOf`, `src/admission/seen.verb.ts`), and a
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
-next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come. A person may run it as a login
-service (`nemia service install`, `src/service/`), which runs the same daemon and hands the lease over only when told: from the checkout,
-or, run from an install, from `releases/current`. A release is a tag built and checked under the store (`src/release/`): `nemia upgrade
-<tag>` exports it clean, builds it into `$WF_ROOT/releases/<tag>` on a trial store, switches the pointer `releases/current` by a rename
+next pass. A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
+lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
+(`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
+`nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands, each landing check let
+finish, SIGTERM, the unit started, and the store resumed once the new daemon has completed its first pass — refused, naming its log,
+when it does not; a daemon started by hand is named with the take-over that hands it to the service. A release is a tag built and
+checked under the store (`src/release/`): `nemia upgrade <tag>` exports it clean, builds it into `$WF_ROOT/releases/<tag>` on a trial store, switches the pointer `releases/current` by a rename
 and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
 A checkout is refused a store whose pointer names an install, but for `version` and a help, unless `NEMIA_ON_INSTALLED=1`
 (`trialRefusal`, in the CLI's `main` and the api's). Where nothing ticks the store, a command whose work waits on the next pass (`ticks`
@@ -97,15 +100,20 @@ counts as attributes on the span that skipped them (`rested` on `pass`, `kept` o
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set — its traces, its logs and every metric in its registry, the pass's and the steps' (`STEP_METRICS`,
 recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone). A session exports to the same
-collector: the orchestrator hands the runtime the endpoint (`engine()`) and files a step's task with its run and step as labels
+collector: the orchestrator hands the runtime the endpoint (`engine()`), with `toolDetails` when the daemon's `NEMIA_TOOL_DETAILS` is
+`1`, which the runtime says to a harness that can export its tools' inputs, and files a step's task with its run and step as labels
 (`stepLabels`); the runtime, which alone knows how a harness is told, hands each session it starts the collector, those labels and its
 `task`, and the filing's trace context, and a command none (`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`).
 
-**The feed** is the orchestrator's, written once: `emitFeed` (`src/feed/feed.verb.ts`) appends each line to `feed.jsonl`, the record,
+**The feed** is the orchestrator's, written once, by the daemon alone: `emitFeed` (`src/feed/feed.verb.ts`) appends a run's line to
+`feed.jsonl`, and `up`, once it holds the store, a daemon's (`emitDaemonStarted`: `{at, daemon, word: 'daemon started', note}`, the note
+saying how the one before it ended); each is the record,
 logs it at Info with its run, step and word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,
 `feedHubLayer`). A live reader in that process, `followFeed`, takes the hub's items and reads from the file what none brought — a line
 the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon
-publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`).
+publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`), and reads the lease at a pace beside it,
+printing `daemon down` and `daemon up` as the store's liveness changes (`livenessLines`, `src/cli/main.ts`): its own output, never a
+line of the feed. `--json` prints each line whole with its cursor; `--wake` and `--wake-word` keep the lines a wake word finds.
 
 **Subscriptions** are the feed said to a long-lived task: `nemia subscribe <name> <task>` (`src/subscription/subscription.verb.ts`, also
 `POST /api/subscriptions/:name`) puts a file under `$WF_ROOT/subscriptions/`, the person's, and the daemon's deliverer (`deliver` in

@@ -4,8 +4,8 @@
  * on the store but her folder;
  * subscribed once it is open, with her floor; nothing filed again on the next beat, nor after a stop from outside; stopped and unsubscribed
  * at manual, and once a factory's raise passes its end, with no write.
- * And `nemia level`'s refusals: a folder not trusted, naming the command that trusts it. A store of its own, since `WF_ROOT` is read as
- * the module loads.
+ * And her folder not trusted: the level written all the same, with the command that trusts it, and her session filed only once it is.
+ * A store of its own, since `WF_ROOT` is read as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -77,18 +77,37 @@ const refusal = async (f: () => Promise<unknown>): Promise<string> => {
   assert.fail('no refusal');
 };
 
-test('REFUSED: semi-auto while her folder is not trusted, naming the command that trusts it; nothing written', async () => {
-  for (const trusted of [undefined, false]) {
-    if (trusted === false) trust(false);
-    const said = await refusal(() => runWith(e, LEVEL.handler({ level: 'semi-auto' })));
-    assert.match(said, /is not trusted/);
-    assert.ok(said.includes(`mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`), said);
-    assert.equal(readLevel(), undefined);
-  }
+test('semi-auto while her folder is not trusted is written, naming the command that trusts it; her session is filed only once it is', async () => {
   assert.equal(LEVEL.check?.({ level: 'auto' }), null);
   assert.match(LEVEL.check?.({ level: 'on' }) ?? '', /^"on" is no level/);
   assert.equal(LEVEL.check?.({ level: 'manual' }), null);
-  assert.equal(await beat().then((owed) => owed.length), 0, 'no level set owes nothing');
+  for (const trusted of [false, true]) {
+    trust(trusted);
+    assert.deepEqual(await beat(), [], 'no level set owes nothing, trusted or not');
+    assert.equal(fs.existsSync(levelFile()), false, 'never automatic: the keeper writes no level');
+  }
+  fs.rmSync(path.join(CONFIG, `.${DEFAULT_HARNESS}.json`));
+  const words = `mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`;
+  const set = await runWith(e, LEVEL.handler({ level: 'semi-auto' }));
+  assert.equal(set.level, 'semi-auto');
+  assert.ok(set.task !== null && readLevel()?.task === set.task, 'her task named, for the keeper');
+  assert.equal(set.trust, words);
+  assert.ok(
+    LEVEL.print(set, {}).some((line) => line.includes(words) && line.includes('accept the prompt')),
+    'nemia level says the command',
+  );
+  const filings = b.filings.length;
+  assert.deepEqual(await beat(), [], 'her session waits for her folder to be trusted');
+  trust(false);
+  assert.deepEqual(await beat(), []);
+  assert.equal(b.filings.length, filings, 'nothing filed where her harness would refuse its start');
+  trust(true);
+  assert.equal((await runWith(e, LEVEL.handler({}))).trust, null, 'trusted: no command to run');
+  assert.deepEqual(await beat(), ['file'], 'filed at the next beat, with no second level set');
+  assert.deepEqual(b.filings.slice(filings), [set.task]);
+  await runWith(e, LEVEL.handler({ level: 'manual' }));
+  assert.deepEqual(await beat(), ['stop']);
+  fs.rmSync(levelFile());
 });
 
 test("at semi-auto the keeper files her task long-lived in auto, the daemon's bin first on her path, every store write asked but her memory; subscribes it once open, and owes nothing on the next beat", async () => {
@@ -293,7 +312,7 @@ test('nemia memory lists her facts and prints one; a fact she does not keep is r
   );
 });
 
-test("REFUSED: a factory's raise or default above manual while her folder is not trusted, the store at manual; nothing written", async () => {
+test("a factory's raise or default above manual while her folder is not trusted is written, and files her only once it is", async () => {
   withPipao();
   fs.rmSync(levelFile(), { force: true });
   fs.rmSync(factoryLevelFile('pipao'), { force: true });
@@ -302,11 +321,19 @@ test("REFUSED: a factory's raise or default above manual while her folder is not
     { factory: 'pipao', level: 'semi-auto', for: '1h' },
     { factory: 'pipao', level: 'semi-auto' },
   ]) {
-    assert.match(await refusal(() => runWith(e, LEVEL.handler(ask))), /is not trusted/, JSON.stringify(ask));
-    assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, `${JSON.stringify(ask)} writes no factory's file`);
-    assert.equal(readLevel(), undefined, `${JSON.stringify(ask)} names no task`);
+    const set = await runWith(e, LEVEL.handler(ask));
+    assert.equal(set.factories.find((row) => row.factory === 'pipao')?.level, 'semi-auto', JSON.stringify(ask));
+    assert.ok(fs.existsSync(factoryLevelFile('pipao')), `${JSON.stringify(ask)} writes the factory's file`);
+    assert.equal(readLevel()?.task, set.task, `${JSON.stringify(ask)} names her task`);
+    assert.equal(set.trust, `mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`);
+    const filings = b.filings.length;
+    assert.deepEqual(await beat(), [], `${JSON.stringify(ask)}: her session waits`);
+    assert.equal(b.filings.length, filings);
   }
   trust(true);
+  assert.deepEqual(await beat(), ['file']);
+  await runWith(e, LEVEL.handler({ factory: 'pipao', level: 'manual' }));
+  assert.deepEqual(await beat(), ['stop']);
 });
 
 /** The person's custom words for her written, their folder made where no test before made it: a test of her tell runs alone too. */

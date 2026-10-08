@@ -1,62 +1,63 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, pickLevel, railPlace, themeOf } from '../board.ts';
-import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * The rail's Settings leads to the store's settings, where a pick of Semi-auto for Nemia is refused while her folder is not trusted: one
-   * 409, shown in the api's words, which name what trusts it; her level stays picked at Manual, and no level is written. Its one refusal
-   * is the point, so its page counts exactly it.
+   * The rail's Settings leads to the store's settings, where her folder is not trusted: under her level's switch, that no session of hers
+   * is filed until it is, and the line that trusts it, to copy, before she is turned on; a pick of Semi-auto is written all the same, a 200
+   * that names that line, which stays under the switch, and her session reads waiting on the person's trust. A pick of Manual takes it
+   * back, and the page removes the level file it wrote.
    */
   name: 'nemia-untrusted',
   route: '/settings',
   expect: async (page) => {
     const levelFile = path.join(store!, 'nemia', 'level.json');
-    const refused = await page.context().newPage();
     try {
-      const { problems } = watch(refused);
-      await refused.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
-      await idle(refused);
-      await railPlace(refused, 'Settings').click();
-      await refused.waitForURL((url) => url.pathname === '/settings', { timeout: WAIT_MS });
-      await idle(refused);
-      await expectVisible(refused.getByRole('heading', { level: 1, name: 'Settings' }), 'the rail leads to the Settings page');
-      const section = refused.locator('[data-nemia-section]');
+      await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+      await idle(page);
+      await railPlace(page, 'Settings').click();
+      await page.waitForURL((url) => url.pathname === '/settings', { timeout: WAIT_MS });
+      await idle(page);
+      await expectVisible(page.getByRole('heading', { level: 1, name: 'Settings' }), 'the rail leads to the Settings page');
+      const section = page.locator('[data-nemia-section]');
       await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'her session is off, no level ever set');
+      const trustLine = section.locator('[data-nemia-level] [data-nemia-trust]');
+      await expectVisible(trustLine, 'the line that trusts her folder is shown under her level, before she is turned on');
       const [answered] = await Promise.all([
-        refused.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', {
-          timeout: WAIT_MS,
-        }),
-        pickLevel(refused, section.locator('[data-nemia-pick]'), 'Semi-auto'),
+        page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', { timeout: WAIT_MS }),
+        pickLevel(page, section.locator('[data-nemia-pick]'), 'Semi-auto'),
       ]);
-      const { error } = (await answered.json()) as { error?: string };
-      if (answered.status() !== 409 || !error?.includes('is not trusted'))
-        throw new Refused(`the api refuses Semi-auto while her folder is untrusted — it answered ${answered.status()}: ${error}`);
-      const shown = section.locator('[data-nemia-refused]');
-      await expectVisible(shown, 'the refusal is shown');
-      if (!(await shown.textContent())?.includes(error))
-        throw new Refused(`in the api's words — it says ${JSON.stringify(await shown.textContent())}`);
-      await expectVisible(section.locator('[data-nemia-level="manual"]'), 'her level stays Manual');
-      const picked = section.locator('[data-nemia-pick] [data-slot="select-value"]');
-      if ((await picked.textContent()) !== 'Manual') throw new Refused(`the pick stays Manual — it reads ${await picked.textContent()}`);
-      if (fs.existsSync(levelFile)) throw new Refused(`no level is written — ${levelFile} is there`);
-      await settled(refused);
-      await photograph(refused, path.join(OUT, `nemia-untrusted-refused-${await themeOf(refused)}.png`));
-      await idle(refused);
-      const expected = `request answered 409: PUT ${answered.url()}`;
-      const seen = problems();
-      const others = seen.filter(
-        (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p),
-      );
-      if (!seen.includes(expected) || others.length)
+      const now = (await answered.json()) as { level?: string; trust?: string | null };
+      if (answered.status() !== 200 || now.level !== 'semi-auto' || typeof now.trust !== 'string')
         throw new Refused(
-          `the refused page saw its one refusal as the browser reports it (its answer, and the line Chromium writes to the console for one) and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+          `Semi-auto is written while her folder is untrusted, naming what trusts it — ${answered.status()}: ${JSON.stringify(now)}`,
         );
+      await idle(page);
+      await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
+      await expectVisible(section.locator('[data-nemia-session][data-state="untrusted"]'), 'her session waits on the trust');
+      await expectVisible(section.getByText('Waiting on your trust'), 'said in words');
+      await expectVisible(
+        trustLine.getByText('No session of hers is filed until her folder is trusted'),
+        'the wait is plain under the switch',
+      );
+      const code = trustLine.locator('code');
+      if ((await code.textContent()) !== now.trust)
+        throw new Refused(`the line shown is the api's — it shows ${JSON.stringify(await code.textContent())}, the api said ${now.trust}`);
+      if (!fs.existsSync(levelFile)) throw new Refused(`her level is written — ${levelFile} is not there`);
+      await settled(page);
+      await photograph(page, path.join(OUT, `nemia-untrusted-waiting-${await themeOf(page)}.png`), { fullPage: true });
+      const [back] = await Promise.all([
+        page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', { timeout: WAIT_MS }),
+        pickLevel(page, section.locator('[data-nemia-pick]'), 'Manual'),
+      ]);
+      if (back.status() !== 200) throw new Refused(`a pick of Manual takes it back — the api answered ${back.status()}`);
+      await idle(page);
+      await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'and her session reads off');
     } finally {
-      await refused.close();
       fs.rmSync(levelFile, { force: true });
     }
   },

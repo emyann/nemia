@@ -202,6 +202,13 @@ export const unitPathOf = (system: ServiceSystem, name: string, dirs: { home: st
 /** The unit's file name as systemd knows it, or the agent's label. */
 export const unitName = (system: ServiceSystem, name: string): string => (system === 'systemd' ? `${name}.service` : name);
 
+/** The file launchd writes what the agent `name` prints into, under `home`'s `Library/Logs`. */
+export const launchdLogs = (home: string, name: string): string => `${home}/Library/Logs/${name}.log`;
+
+/** How a person reads the service's log: `journalctl --user -u <unit>` for systemd, the file launchd writes for launchd. */
+export const logsLine = (system: ServiceSystem, name: string, home: string): string =>
+  system === 'systemd' ? `journalctl --user -u ${unitName(system, name)}` : `less ${launchdLogs(home, name)}`;
+
 /** A unit's double-quoted word read back: its escapes undone, `$$` too where it is a word of `ExecStart=`. */
 const unquoted = (word: string, exec: boolean): string => {
   const inner = word.replace(/^"|"$/g, '').replaceAll('%%', '%');

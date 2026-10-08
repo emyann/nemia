@@ -69,21 +69,23 @@ export function levelRefusal(word: string): string | undefined {
 export type HerTask = { settled: boolean; stopRequested: boolean };
 
 /**
- * Where she is: `off`, no factory above `manual` and nothing to stop; `due`, some factory above it and no task filed; `filed`, her task
+ * Where she is: `off`, no factory above `manual` and nothing to stop; `due`, some factory above it and no task filed; `untrusted`, as
+ * `due` but her folder not trusted by her harness, so her session waits for the person to trust it once; `filed`, her task
  * open and not yet subscribed with her floor; `kept`, open and subscribed with it; `stopped`, her task stopped or ended from outside while
  * some factory is above `manual`, never filed again until the person sets a level again; `leaving`, none above `manual` with her task
  * open or her subscription still there.
  */
-export type NemiaState = 'off' | 'due' | 'filed' | 'kept' | 'stopped' | 'leaving';
+export type NemiaState = 'off' | 'due' | 'untrusted' | 'filed' | 'kept' | 'stopped' | 'leaving';
 
 /** What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription, tell her open task her custom words. */
 export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'tell';
 
 /**
- * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now, her task's
- * id, and whether the instruction that composes now is not the one her task was filed with (`stale`), read only while she is kept.
+ * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now; her task's
+ * id; whether her harness trusts her folder (`trusted`, absent for a harness that keeps no trust, which is read as trusted); and whether
+ * the person's custom words are not those she was last filed or told with (`stale`), read only while she is kept.
  */
-export type Keeping = { above: boolean; task?: string; stale?: boolean };
+export type Keeping = { above: boolean; task?: string; trusted?: boolean; stale?: boolean };
 
 /** What the keeper reads of her subscription: the task it tells, and whether it carries her floor (`NEMIA_FLOOR`). */
 export type HerSubscription = { task: string; scoped: boolean };
@@ -97,7 +99,7 @@ const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !ta
  */
 export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaState {
   if (!keeping.above) return isOpen(task) || subscribed !== undefined ? 'leaving' : 'off';
-  if (task === undefined) return 'due';
+  if (task === undefined) return keeping.trusted === false ? 'untrusted' : 'due';
   if (!isOpen(task)) return 'stopped';
   return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped ? 'kept' : 'filed';
 }
@@ -105,8 +107,9 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
  * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`); at
- * `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing. A task settled from
- * outside is never filed again: the person said so by stopping it. Pure.
+ * `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else nothing, at `untrusted` too: a
+ * session filed in a folder her harness does not trust would be refused at its start. A task settled from outside is never filed again:
+ * the person said so by stopping it. Pure.
  */
 export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
   const state = nemiaState(keeping, task, subscribed);
@@ -152,14 +155,16 @@ export type NemiaVerb = { verb: string; from: NemiaState[]; to: NemiaState; guar
 export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: NemiaState[]; edges: NemiaEdge[]; verbs: NemiaVerb[] };
 
 /** Every state, in the order a session goes through them. */
-const STATES: NemiaState[] = ['off', 'due', 'filed', 'kept', 'stopped', 'leaving'];
+const STATES: NemiaState[] = ['off', 'due', 'untrusted', 'filed', 'kept', 'stopped', 'leaving'];
 
 /**
- * The keeper's moves, a change of her custom words told, a stop or end from outside, which it never undoes, and the end of the last raise
- * above `manual` as it passes.
+ * The keeper's moves, her folder's trust read each beat, a change of her custom words told, a stop or end from outside, which it never
+ * undoes, and the end of the last raise above `manual` as it passes.
  */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
+  { from: 'due', to: 'untrusted', event: 'FOLDER_UNTRUSTED', action: 'nothing' },
+  { from: 'untrusted', to: 'due', event: 'FOLDER_TRUSTED', action: 'nothing' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
   { from: 'filed', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
   { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
@@ -167,18 +172,25 @@ const EDGES: NemiaEdge[] = [
   { from: 'stopped', to: 'stopped', event: 'SUBSCRIBED', action: 'drop' },
   { from: 'leaving', to: 'off', event: 'OPEN_OR_SUBSCRIBED', action: 'stop, drop' },
   { from: 'due', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
+  { from: 'untrusted', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
   { from: 'filed', to: 'leaving', event: 'RAISE_ENDED', action: 'nothing' },
   { from: 'kept', to: 'leaving', event: 'RAISE_ENDED', action: 'nothing' },
 ];
 
 /**
- * The person's verbs: `nemia level` putting some factory above `manual` (the store's level, a factory's default or a raise), asked first
- * whether her folder is trusted, and putting none above it (a level set, or a raise ended early); and `nemia agents custom nemia`
- * setting or clearing her custom words, which the next beat tells her.
+ * The person's verbs: `nemia level` putting some factory above `manual` (the store's level, a factory's default or a raise), whatever
+ * her folder's trust, which the keeper reads, and putting none above it (a level set, or a raise ended early); and `nemia agents custom
+ * nemia` setting or clearing her custom words, which the next beat tells her. Nothing else raises a level: the level is the person's.
  */
 export const NEMIA_VERBS: NemiaVerb[] = [
-  { verb: 'level (a factory above manual)', from: ['off', 'stopped', 'leaving'], to: 'due', guard: 'trusted', by: 'person' },
-  { verb: 'level (none above manual)', from: ['due', 'filed', 'kept', 'stopped'], to: 'leaving', guard: 'always', by: 'person' },
+  { verb: 'level (a factory above manual)', from: ['off', 'untrusted', 'stopped', 'leaving'], to: 'due', guard: 'always', by: 'person' },
+  {
+    verb: 'level (none above manual)',
+    from: ['due', 'untrusted', 'filed', 'kept', 'stopped'],
+    to: 'leaving',
+    guard: 'always',
+    by: 'person',
+  },
   { verb: 'agents custom nemia (set or clear)', from: ['kept'], to: 'kept', guard: 'always', by: 'person' },
 ];
 

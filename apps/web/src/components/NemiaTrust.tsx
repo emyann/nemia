@@ -1,8 +1,8 @@
 import { CopyButton } from './CopyButton';
 
 /**
- * The line that trusts Nemia's folder, as the api answers it (`trust`), to run once in a terminal: her session is filed only once her folder
- * is trusted, and nothing on the board trusts it. None once it is trusted.
+ * The line that trusts Nemia's folder, as the api answers it (`trust`), to run once in a terminal: her session is filed only once her
+ * folder is trusted, and nothing on the board trusts it. None once it is trusted.
  */
 export function TrustLine({ trust }: { trust: string | null }) {
   if (trust === null) return null;

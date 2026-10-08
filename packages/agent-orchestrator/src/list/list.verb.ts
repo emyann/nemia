@@ -20,6 +20,7 @@ import { stepsOf, stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
+import { schedulesListed } from '../schedule/listed.store.ts';
 import {
   closeoutAsked,
   closeoutOf,
@@ -163,8 +164,8 @@ const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: R
  * tick's last pass read where the branches stand (`standingSnapshot`), or that none has. The cap on runs in flight is judged over the
  * whole store even for one run; each task is viewed once (`viewedOnce`), and where the branches stand is read off `standing.json`, with
  * no process. A run a task journal of which does not read, or whose unfrozen folder does not load, is answered unjudged (`unjudgedOf`),
- * the second with no result branch (`resultOf`); any other failure rejects. Refuses a run named that is not in the store, as
- * `runStore.runs.read` does.
+ * the second with no result branch (`resultOf`); any other failure rejects. With no run named, the factories' schedules
+ * (`schedulesListed`). Refuses a run named that is not in the store, as `runStore.runs.read` does.
  */
 export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const e = yield* EngineService;
@@ -186,7 +187,14 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const pause = readPause();
   const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
   const read = standing.at === undefined ? { none: true as const } : { at: standing.at };
-  return { runs: listed, daemon: daemonStanding(), standing: read, ...paused } satisfies RunsListed;
+  const schedules = runId ? [] : schedulesListed(runs);
+  return {
+    runs: listed,
+    daemon: daemonStanding(),
+    standing: read,
+    ...paused,
+    ...(schedules.length ? { schedules } : {}),
+  } satisfies RunsListed;
 });
 
 /** The run's result branches (`resultBranches`); none for a run whose unfrozen folder does not load, which cannot say its result steps. */

@@ -271,6 +271,7 @@ export type StartOptions = {
   context?: readonly string[];
   inputs?: readonly string[];
   from?: { inbox: string };
+  scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
   factory?: string;
 };
@@ -278,7 +279,18 @@ export type StartOptions = {
 /** What a run is told at `nemia start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
 type Told = Pick<
   Run,
-  'brief' | 'workflowDir' | 'workflow' | 'after' | 'context' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts' | 'gatesTimed'
+  | 'brief'
+  | 'workflowDir'
+  | 'workflow'
+  | 'after'
+  | 'context'
+  | 'inputs'
+  | 'from'
+  | 'scheduled'
+  | 'gates'
+  | 'factory'
+  | 'mounts'
+  | 'gatesTimed'
 >;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
@@ -365,6 +377,9 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(context.length ? { context: [...context] } : {}),
     ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
+    ...(opts.scheduled
+      ? { scheduled: { factory: opts.scheduled.factory, workflow: opts.scheduled.workflow, due: opts.scheduled.due } }
+      : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),

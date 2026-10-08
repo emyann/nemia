@@ -15,8 +15,18 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const { addFactory, attachWorkflow, detachWorkflow, factoriesDir, fireAgent, hireAgent, readFactories, readFactory } =
-  await import('../runner.ts');
+const {
+  addFactory,
+  attachWorkflow,
+  clearSchedule,
+  detachWorkflow,
+  factoriesDir,
+  fireAgent,
+  hireAgent,
+  readFactories,
+  readFactory,
+  setSchedule,
+} = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { FACTORY_HELP } = await import('./factory.verb.ts');
 const { hireRefusalOf } = await import('./factory.ts');
@@ -211,12 +221,12 @@ test("nemia factory rm removes that factory's file alone, and one that does not 
   assert.deepEqual(filed(), ['nemia.json']);
 });
 
-test('REFUSED: nemia factory with a subcommand it does not have names the seven; --help prints its help', async (t) => {
+test('REFUSED: nemia factory with a subcommand it does not have names its forms; --help prints its help', async (t) => {
   await assert.rejects(
     main(['factory', 'frob'], NO_ENGINE),
     refusedWith(
       'Invalid',
-      /^nemia factory does not take frob\. .*nemia factory ls.*nemia factory add <name> --repo <path>.*nemia factory attach <factory> <workflow>.*nemia factory detach <factory> <workflow>.*nemia factory hire <factory> <agent> --step <workflow>\/<step>.*nemia factory fire <factory> --step <workflow>\/<step>.*nemia factory rm <name>/,
+      /^nemia factory does not take frob\. .*nemia factory ls.*nemia factory add <name> --repo <path>.*nemia factory attach <factory> <workflow>.*nemia factory detach <factory> <workflow>.*nemia factory hire <factory> <agent> --step <workflow>\/<step>.*nemia factory fire <factory> --step <workflow>\/<step>.*nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>.*nemia factory unschedule <factory> <workflow>.*nemia factory rm <name>/,
     ),
   );
   await assert.rejects(main(['factory', 'add', 'pipao', '--rep', '/x'], NO_ENGINE), refusedWith('Invalid', /does not take --rep\./));
@@ -253,6 +263,7 @@ test('nemia factory hire files one agent a step, keeping repos and a key a later
     repos: [repo],
     workflows: ['build'],
     hires: { 'build/implement': 'ada', 'build/review': 'agora' },
+    schedules: {},
   });
   const listed = await printedBy(t, 'factory', 'ls');
   assert.deepEqual(listed.slice(1, 5), [
@@ -403,11 +414,11 @@ test('nemia factory attach adds a workflow by name, sorted and once, keeping eve
   assert.deepEqual(filed(), ['pipao.json']);
 });
 
-test('a factory file with no workflows key reads as one that has attached none', () => {
+test('a factory file with no workflows key reads as one that has attached, hired and scheduled none', () => {
   const repo = fresh();
   addFactory({ name: 'nemia', repos: [repo] });
   assert.deepEqual(fileOf('nemia'), { repos: [repo] }, 'an add writes no workflows key');
-  assert.deepEqual(readFactory('nemia'), { name: 'nemia', repos: [repo], workflows: [], hires: {} });
+  assert.deepEqual(readFactory('nemia'), { name: 'nemia', repos: [repo], workflows: [], hires: {}, schedules: {} });
   const listed = readFactories().find((f) => f.name === 'nemia');
   assert.ok(listed && !('error' in listed) && listed.workflows.length === 0);
 });
@@ -561,4 +572,144 @@ test('REFUSED: nemia factory attach and detach with no workflow, a second one, o
   for (const [argv, pattern] of refusals)
     await assert.rejects(main(['factory', ...argv], NO_ENGINE), refusedWith('Invalid', pattern), argv.join(' '));
   assert.deepEqual(fileOf('pipao'), { repos: [repo] });
+});
+
+test('nemia factory schedule writes a schedule stamped with since, read back on the factory, keeping every other key; unschedule takes it', () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  attachWorkflow({ factory: 'pipao', workflow: 'janitor' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
+  const before = Date.now();
+  const { schedule } = setSchedule({
+    factory: 'pipao',
+    workflow: 'janitor',
+    cron: '0 9 * * 1',
+    brief: 'Read the stats',
+    tz: 'America/Montreal',
+  });
+  assert.ok(Date.parse(schedule.since) >= before - 1000 && Date.parse(schedule.since) <= Date.now());
+  assert.deepEqual(readFactory('pipao').schedules, {
+    janitor: { cron: '0 9 * * 1', brief: 'Read the stats', tz: 'America/Montreal', since: schedule.since },
+  });
+  assert.deepEqual((fileOf('pipao') as { later: unknown }).later, { kept: true });
+  const again = setSchedule({ factory: 'pipao', workflow: 'janitor', cron: '0 10 * * 1', brief: 'Read the stats', repo });
+  assert.deepEqual(again.replaced, schedule);
+  assert.equal(again.schedule.tz, undefined, 'a schedule written again is written whole');
+  assert.equal(readFactory('pipao').schedules.janitor.repo, repo);
+  assert.deepEqual(clearSchedule({ factory: 'pipao', workflow: 'janitor' }).cleared, again.schedule);
+  assert.deepEqual(readFactory('pipao').schedules, {});
+  assert.deepEqual((fileOf('pipao') as { later: unknown }).later, { kept: true });
+});
+
+test("REFUSED: a schedule of a workflow not attached, a cron or zone Cron does not read, an empty brief or a repository not the factory's", () => {
+  const repo = fresh();
+  const other = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  addFactory({ name: 'pipao', repos: [repo] });
+  attachWorkflow({ factory: 'pipao', workflow: 'janitor' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  const before = fs.readFileSync(file);
+  const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
+  assert.throws(
+    () => setSchedule({ ...at, workflow: 'build' }),
+    refusedWith(
+      'Invalid',
+      /^pipao does not offer the workflow build.*nemia factory attach pipao build — then schedule it\. Nothing was scheduled\.$/,
+    ),
+  );
+  assert.throws(
+    () => setSchedule({ ...at, cron: '61 * * * *' }),
+    refusedWith('Invalid', /^--cron "61 \* \* \* \*": .*between 0 and 59.*Nothing was scheduled\.$/),
+  );
+  assert.throws(
+    () => setSchedule({ ...at, tz: 'Not/AZone' }),
+    refusedWith('Invalid', /--tz Not\/AZone: .*time zone.*Nothing was scheduled\.$/),
+  );
+  assert.throws(
+    () => setSchedule({ ...at, cron: '0 0 30 2 *', tz: 'UTC' }),
+    refusedWith('Invalid', /never fires.*Nothing was scheduled\.$/),
+  );
+  assert.throws(() => setSchedule({ ...at, brief: '  ' }), refusedWith('Invalid', /--brief says, and it is empty/));
+  assert.throws(
+    () => setSchedule({ ...at, repo: other }),
+    refusedWith('Invalid', new RegExp(`^${escaped(other)}: pipao works on ${escaped(repo)}: .*--repo`)),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.throws(
+    () => clearSchedule({ factory: 'pipao', workflow: 'janitor' }),
+    refusedWith('Missing', /^pipao does not schedule janitor\. It schedules none\. Nothing was unscheduled\.$/),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+});
+
+test('REFUSED: a schedule naming no repository in a factory of two, which a scheduled start could not choose between', () => {
+  const repo = fresh();
+  const other = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  addFactory({ name: 'pipao', repos: [repo, other] });
+  attachWorkflow({ factory: 'pipao', workflow: 'janitor' });
+  const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
+  assert.throws(
+    () => setSchedule(at),
+    refusedWith('Invalid', /^pipao works on .*: name the one its scheduled runs work on with --repo\. Nothing was scheduled\.$/),
+  );
+  assert.equal(setSchedule({ ...at, repo: other }).schedule.repo, other);
+});
+
+test('REFUSED: a detach of a workflow the factory schedules is Invalid, naming the unschedule, and writes nothing', () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  attachWorkflow({ factory: 'pipao', workflow: 'janitor' });
+  setSchedule({ factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  const before = fs.readFileSync(file);
+  assert.throws(
+    () => detachWorkflow({ factory: 'pipao', workflow: 'janitor' }),
+    refusedWith(
+      'Invalid',
+      /^pipao schedules janitor: unschedule it first — nemia factory unschedule pipao janitor — then detach it\. Nothing was detached\.$/,
+    ),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  clearSchedule({ factory: 'pipao', workflow: 'janitor' });
+  detachWorkflow({ factory: 'pipao', workflow: 'janitor' });
+  assert.deepEqual(readFactory('pipao').workflows, []);
+});
+
+test('nemia factory schedule and unschedule write through the command line; a bad cron is refused with exit 2, quoting Cron, writing nothing', async (t) => {
+  const repo = fresh();
+  addFactory({ name: 'nemia', repos: [repo] });
+  attachWorkflow({ factory: 'nemia', workflow: 'janitor' });
+  const file = path.join(FACTORIES, 'nemia.json');
+  const before = fs.readFileSync(file);
+  await assert.rejects(
+    main(['factory', 'schedule', 'nemia', 'janitor', '--cron', '61 * * * *', '--brief', 'Read the stats'], NO_ENGINE),
+    refusedWith('Invalid', /^--cron "61 \* \* \* \*": .*between 0 and 59/),
+  );
+  await assert.rejects(
+    main(['factory', 'schedule', 'nemia', 'janitor', '--cron', '0 9 * * 1', '--brief', 'Read the stats', '--tz', 'Not/AZone'], NO_ENGINE),
+    refusedWith('Invalid', /--tz Not\/AZone: .*time zone/),
+  );
+  await assert.rejects(
+    main(['factory', 'schedule', 'nemia', 'janitor', '--cron', '0 9 * * 1'], NO_ENGINE),
+    refusedWith('Invalid', /^nemia factory schedule takes --brief:/),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  const printed = await printedBy(
+    t,
+    'factory',
+    'schedule',
+    'nemia',
+    'janitor',
+    '--cron',
+    '0 9 * * 1',
+    '--brief',
+    'Read the stats',
+    '--tz',
+    'UTC',
+  );
+  assert.equal(printed[0], 'nemia  janitor at 0 9 * * 1 (UTC)');
+  assert.equal(readFactory('nemia').schedules.janitor.brief, 'Read the stats');
+  assert.match((await printedBy(t, 'factory', 'ls')).join('\n'), /schedule janitor {2}0 9 \* \* 1 \(UTC\) {2}"Read the stats"/);
+  assert.equal((await printedBy(t, 'factory', 'unschedule', 'nemia', 'janitor'))[0], 'nemia  janitor no longer at 0 9 * * 1');
+  assert.deepEqual(readFactory('nemia').schedules, {});
 });

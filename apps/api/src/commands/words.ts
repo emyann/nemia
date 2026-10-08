@@ -8,6 +8,7 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
+import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
@@ -628,4 +629,6 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'factory instruct': FACTORY_INSTRUCT,
   'factory hire': FACTORY_HIRE,
   'factory fire': FACTORY_FIRE,
+  'factory schedule': FACTORY_SCHEDULE,
+  'factory unschedule': FACTORY_UNSCHEDULE,
 };

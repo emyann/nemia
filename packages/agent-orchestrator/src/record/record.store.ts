@@ -71,6 +71,7 @@ const runBase = {
   context: Schema.optional(Strings),
   inputs: Schema.optional(Strings),
   from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
+  scheduled: Schema.optional(Kept({ factory: Schema.String, workflow: Schema.String, due: Schema.String })),
   gates: Schema.optional(Strings),
   factory: Schema.optional(Schema.String),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
@@ -308,8 +309,7 @@ const readRecord = (id: string): Run => {
   const { workflow, ...unfrozen } = read;
   const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
-  const pruned = readPruned(id);
-  const hold = readHold(id);
+  const [pruned, hold] = [readPruned(id), readHold(id)];
   const { approvals, acceptances } = within('asks', () => {
     const names = fileNames(asksDir(id));
     return { ...readApprovalsNow(id, names), ...readAcceptancesNow(id, names) };

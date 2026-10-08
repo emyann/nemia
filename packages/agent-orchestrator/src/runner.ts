@@ -203,7 +203,7 @@ export {
   unattachedRefusal,
   unfilledRefusal,
 } from './factory/factory.ts';
-export type { Factory, FactoryListing, Hires, InstructionAt } from './factory/factory.ts';
+export type { Factory, FactoryListing, Hires, InstructionAt, Schedule } from './factory/factory.ts';
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine, FeedPublished } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
@@ -342,10 +342,13 @@ export {
   hireAgent,
   readFactories,
   readFactory,
+  clearSchedule,
   removeFactory,
   setInstruction,
+  setSchedule,
   startFactory,
 } from './factory/factory.store.ts';
+export type { ScheduleListed } from './schedule/schedule.ts';
 export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';

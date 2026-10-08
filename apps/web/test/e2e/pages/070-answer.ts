@@ -15,8 +15,9 @@ export default {
    * step's row saying what `wf ls` says. The refusal comes first, in a page of its own whose one refusal is the point: a file `wf retry`
    * did not write sits at the name try 2's ask goes under, which no tick honours, so the step still waits on you and its box is there, and
    * the package refuses to write over it, naming the file and saying it is not an ask (`strayAsk`). Its sentence is beside the box, word
-   * for word, the answer still in the box, and nothing written. Each file is taken back, so every page after this one, in either theme,
-   * reads the store as seeded.
+   * for word, the answer still in the box, and nothing written, through the redraw that the decision read after it makes: the page holds
+   * that read until the refusal is answered. Each file is taken back, so every page after this one, in either theme, reads the store as
+   * seeded.
    */
   name: 'answer',
   route: `/runs/${FAKE.id}`,
@@ -30,10 +31,18 @@ export default {
     fs.mkdirSync(asks, { recursive: true });
     fs.writeFileSync(file, '{}\n');
     const refused = await page.context().newPage();
+    const decisionRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}/decision`;
+    let release = (): void => undefined;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     try {
       const { problems } = watch(refused);
+      await refused.route(decisionRead, async (route) => {
+        await released;
+        await route.continue();
+      });
       await refused.goto(page.url(), { waitUntil: 'load' });
-      await idle(refused);
       const refusedRow = refused.locator(`section[aria-label="Answer"] [data-step="${FAKE.blocked}"]`);
       const refusedBox = refusedRow.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` });
       await expectVisible(refusedBox, `the answer box for ${FAKE.blocked}, with a file that is no ask at its try's name`);
@@ -52,6 +61,13 @@ export default {
           `the package refuses to write over the file at try 2's name — the api answered ${answered.status()}: ${JSON.stringify(error)}`,
         );
       }
+      const decided = refused.waitForResponse((r) => decisionRead(new URL(r.url())), { timeout: WAIT_MS });
+      release();
+      await decided;
+      await expectVisible(
+        refused.locator('section[aria-label="Decide"] section[aria-label="Commands"]'),
+        'what there is to decide is drawn after the refusal: its row is drawn again',
+      );
       await expectVisible(refusedRow.locator('[data-refused]'), 'the refusal is shown beside the box, not swallowed');
       const shown = await refusedRow.locator('[data-refused] p.font-mono').textContent();
       if (shown !== error)
@@ -75,6 +91,8 @@ export default {
           `the refused page saw its one refusal, as its answer and the line Chromium writes to the console for one, and nothing else — it saw:\n    ${seen.join('\n    ')}`,
         );
     } finally {
+      release();
+      await refused.unrouteAll({ behavior: 'ignoreErrors' });
       await refused.close();
       fs.rmSync(file, { force: true });
     }

@@ -44,6 +44,7 @@ import {
   type RequestContext,
 } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, restHandler, UserBuilder } from '@a2a-js/sdk/server/express';
+import { TaskNotFoundError } from '@a2a-js/sdk/errors';
 
 export type Binding = 'JSONRPC' | 'HTTP+JSON' | 'GRPC';
 
@@ -130,6 +131,8 @@ export type RemoteServer = {
   live: () => number;
   /** While on, each new subscription is refused with an error, or answered with the Task and then nothing (`mute`). */
   subscriptions: { refuse: boolean; mute: boolean };
+  /** The Tasks the agent no longer has: a read of one, or a subscription to it, is refused as a Task not found. */
+  forgotten: Set<string>;
   close: () => Promise<void>;
 };
 
@@ -357,6 +360,12 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
 
   const handler = new DefaultRequestHandler(card(), new InMemoryTaskStore(), executor);
   const subscriptions = { refuse: false, mute: false };
+  const forgotten = new Set<string>();
+  const notFound = (id: string) => new TaskNotFoundError(`Task not found: ${id}`);
+  const unfound = async function* (id: string): AsyncGenerator<never> {
+    yield* [];
+    throw notFound(id);
+  };
   const streams = new Set<http.ServerResponse>();
   let closing: () => void = () => {};
   const closed = new Promise<void>((resolve) => (closing = resolve));
@@ -377,6 +386,9 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       return (...args: unknown[]) => {
         counts[key] = (counts[key] ?? 0) + 1;
         if (key === 'sendMessage') sent.push((args[0] as { message: Message }).message);
+        const id = (args[0] as { id?: string } | undefined)?.id;
+        if (key === 'getTask' && id !== undefined && forgotten.has(id)) return Promise.reject(notFound(id));
+        if (key === 'resubscribe' && id !== undefined && forgotten.has(id)) return unfound(id);
         if (key === 'resubscribe' && subscriptions.refuse) return refused();
         if (key === 'resubscribe' && subscriptions.mute) return muted(value.apply(target, args) as AsyncGenerator);
         return value.apply(target, args);
@@ -440,6 +452,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
     },
     live: () => [...streams].filter((r) => String(r.getHeader('content-type') ?? '').startsWith('text/event-stream')).length,
     subscriptions,
+    forgotten,
     close: async () => {
       closing();
       for (const wake of waiting.values()) wake('cancelled');

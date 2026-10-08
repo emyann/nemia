@@ -11,12 +11,15 @@ import { Engine as EngineService, type EngineShape, type TaskSpec } from '../src
 import { remoteOps, type RemoteOptions } from '../src/a2a/remote.ts';
 import { RESUBSCRIBES } from '../src/a2a/remote-follow.ts';
 import type { Followed, RunnerError } from '../src/harness/seam.ts';
-import { remoteServer, type RemoteServer, type ServerOptions } from './remote-server.ts';
+import { bearer, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
 import { bell, until, WAITED } from './waits.ts';
 import { elapsedMs } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
+
+/** The two bindings a remote agent is followed on: a subscription is `SubscribeToTask` over either. */
+const BINDINGS: Binding[] = ['JSONRPC', 'HTTP+JSON'];
 
 const servers: RemoteServer[] = [];
 afterEach(async () => {
@@ -97,47 +100,61 @@ const followed = async (e: EngineShape, id: string) => {
   return stream;
 };
 
-test(
-  "an agent that streams: its own stream is relayed through the engine's follow, each moment once and in order, and the transcript holds each event under its id",
-  WAITED,
-  async (t) => {
-    const s = await serve();
-    const { e, id, taskId } = await runningOn(t, s);
-    const got: Followed[] = [];
-    const ended = drained(await followed(e, id), got);
-    await holds(t, got, 1);
-    s.move(
-      taskId,
-      { piece: { id: 'a-1', text: 'Hel' } },
-      { piece: { id: 'a-1', text: 'lo', append: true, last: true } },
-      { state: 'working', words: 'wrote it' },
-      { state: 'completed', words: 'done' },
-    );
-    assert.ok(Exit.isSuccess(await ended), 'the follow ends once the session is over');
-    assert.deepEqual(shown(got), [
-      'state working',
-      'partial artifact:a-1 "Hel"',
-      'partial artifact:a-1 "lo" + last',
-      'events assistant "Hello"',
-      'events assistant "wrote it"',
-      'events assistant "done"',
-      'state completed',
-    ]);
-    assert.equal(s.counts.resubscribe, 1, 'one subscription, never dropped');
-    const read = await Effect.runPromise(e.transcript(id));
-    assert.deepEqual(
-      read.events.map((ev) => [ev.role, ev.text]),
-      [
-        ['user', read.events[0].text],
-        ['assistant', 'wrote it'],
-        ['assistant', 'done'],
-        ['assistant', 'Hello'],
-      ],
-    );
-    assert.deepEqual(new Set(read.events.slice(1).map((ev) => ev.id)), new Set(ids(got)), 'what was followed is read under the same ids');
-    assert.deepEqual((await Effect.runPromise(e.transcript(id, read.cursor))).events, [], 'nothing after the cursor the read gave');
-  },
-);
+/** A test's name, said over JSON-RPC as it always was, and with the binding beside it over another. */
+const over = (name: string, binding: Binding) => (binding === 'JSONRPC' ? name : `${name}, over ${binding}`);
+
+/** Whether every subscription to the agent `s` went on `binding`: its JSON-RPC route, or REST's `:subscribe`. */
+const subscribedOn = (s: RemoteServer, binding: Binding) => {
+  const asked = s.paths.filter((p) => (binding === 'JSONRPC' ? p.endsWith('/a2a/jsonrpc') : p.includes(':subscribe')));
+  return binding === 'JSONRPC' ? asked.length > 0 && !s.paths.some((p) => p.includes('/a2a/rest')) : asked.length === s.counts.resubscribe;
+};
+
+for (const binding of BINDINGS)
+  test(
+    over(
+      "an agent that streams: its own stream is relayed through the engine's follow, each moment once and in order, and the transcript holds each event under its id",
+      binding,
+    ),
+    WAITED,
+    async (t) => {
+      const s = await serve({ bindings: [binding] });
+      const { e, id, taskId } = await runningOn(t, s);
+      const got: Followed[] = [];
+      const ended = drained(await followed(e, id), got);
+      await holds(t, got, 1);
+      s.move(
+        taskId,
+        { piece: { id: 'a-1', text: 'Hel' } },
+        { piece: { id: 'a-1', text: 'lo', append: true, last: true } },
+        { state: 'working', words: 'wrote it' },
+        { state: 'completed', words: 'done' },
+      );
+      assert.ok(Exit.isSuccess(await ended), 'the follow ends once the session is over');
+      assert.deepEqual(shown(got), [
+        'state working',
+        'partial artifact:a-1 "Hel"',
+        'partial artifact:a-1 "lo" + last',
+        'events assistant "Hello"',
+        'events assistant "wrote it"',
+        'events assistant "done"',
+        'state completed',
+      ]);
+      assert.equal(s.counts.resubscribe, 1, 'one subscription, never dropped');
+      assert.ok(subscribedOn(s, binding), `subscribed on ${binding}: ${s.paths.join(', ')}`);
+      const read = await Effect.runPromise(e.transcript(id));
+      assert.deepEqual(
+        read.events.map((ev) => [ev.role, ev.text]),
+        [
+          ['user', read.events[0].text],
+          ['assistant', 'wrote it'],
+          ['assistant', 'done'],
+          ['assistant', 'Hello'],
+        ],
+      );
+      assert.deepEqual(new Set(read.events.slice(1).map((ev) => ev.id)), new Set(ids(got)), 'what was followed is read under the same ids');
+      assert.deepEqual((await Effect.runPromise(e.transcript(id, read.cursor))).events, [], 'nothing after the cursor the read gave');
+    },
+  );
 
 test(
   'REFUSED: an agent whose card does not say it streams is not subscribed to, and its session is read again every second',
@@ -304,6 +321,77 @@ test(
   },
 );
 
+test(
+  "a session still being sent that the agent answers with a Message is `submitted`, then given the reply under its transcript's id, then its state; nothing is subscribed to",
+  WAITED,
+  async (t) => {
+    let open: () => void = () => {};
+    const shut = new Promise<void>((resolve) => (open = resolve));
+    const s = await serve({ script: (turn) => (turn.turn === 1 ? [{ until: shut, reply: 'It is right.' }] : []) });
+    const ops = await opsOn(s, 'ae/reply/1', { spawnWaitMs: 10 });
+    const got: Followed[] = [];
+    const ended = drained(ops.follow!('ae/reply/1'), got);
+    await holds(t, got, 1);
+    open();
+    const exit = await ended;
+    assert.ok(Exit.isSuccess(exit), `the follow ends with the reply: ${Exit.isFailure(exit) ? failure(exit).message : ''}`);
+    assert.equal(s.replies(), 1, 'the agent answered with a Message');
+    assert.deepEqual(shown(got), ['state submitted', 'events assistant "It is right."', 'state completed']);
+    assert.equal(s.counts.resubscribe, undefined, 'no Task, so nothing subscribed to');
+    const read = await Effect.runPromise(ops.transcriptOf!('ae/reply/1'));
+    assert.ok(read);
+    assert.deepEqual(ids(got), ids([{ kind: 'events', ...read }]), 'the reply followed is the one read, under the same id');
+    assert.deepEqual(got[1].kind === 'events' && got[1].cursor, read.cursor, 'and a reader after it reads nothing again');
+  },
+);
+
+test(
+  'a session still being sent whose send the agent refuses is `submitted`, then `rejected`; nothing is subscribed to',
+  WAITED,
+  async (t) => {
+    const s = await serve({ security: bearer('right'), slowMs: 300 });
+    const ops = remoteOps('remote', { url: s.url }, scratch('ae-remote-follow-'), () => 'wrong', undefined, {
+      spawnWaitMs: 10,
+      resubscribeMs: 1,
+    });
+    await Effect.runPromise(ops.spawn({ name: 'ae/refused/1', brief: 'paint the fence', cwd: '/w' }));
+    const got: Followed[] = [];
+    const ended = drained(ops.follow!('ae/refused/1'), got);
+    await holds(t, got, 1);
+    const exit = await ended;
+    assert.ok(Exit.isSuccess(exit), `the follow ends with the refusal: ${Exit.isFailure(exit) ? failure(exit).message : ''}`);
+    assert.deepEqual(shown(got), ['state submitted', 'state rejected']);
+    assert.equal(s.counts.resubscribe, undefined, 'no Task, so nothing subscribed to');
+  },
+);
+
+test(
+  'a Task the agent no longer has ends the follow: not read again where it was never subscribed to, and not subscribed to again once read',
+  WAITED,
+  async (t) => {
+    const s = await serve();
+    const ops = await opsOn(s, 'ae/forgotten/1');
+    s.forgotten.add(s.tasks()[0]);
+    const reads = s.counts.getTask ?? 0;
+    const none: Followed[] = [];
+    assert.ok(Exit.isSuccess(await drained(ops.follow!('ae/forgotten/1'), none)), 'no refusal: nothing is left to follow');
+    assert.deepEqual(shown(none), []);
+    assert.equal(s.counts.resubscribe, 1, 'subscribed to once');
+    assert.equal(s.counts.getTask ?? 0, reads, 'a Task not found is no drop: it is not read whole after');
+
+    const cut = await opsOn(s, 'ae/forgotten/2');
+    const got: Followed[] = [];
+    const ended = drained(cut.follow!('ae/forgotten/2'), got);
+    await holds(t, got, 1);
+    s.forgotten.add(s.tasks()[1]);
+    assert.equal(s.cut(), 1, 'the one subscription cut');
+    assert.ok(Exit.isSuccess(await ended), 'no refusal: the Task read after the cut is gone');
+    assert.deepEqual(shown(got), ['state working']);
+    assert.equal(s.counts.resubscribe, 2, 'the second Task subscribed to once, never again after the read that found it gone');
+    assert.equal(s.counts.getTask ?? 0, reads + 1, 'read once, after the cut');
+  },
+);
+
 test('REFUSED: no session goes by the name: nothing is subscribed to', WAITED, async () => {
   const s = await serve();
   const ops = await opsOn(s, 'ae/known/1');
@@ -313,22 +401,28 @@ test('REFUSED: no session goes by the name: nothing is subscribed to', WAITED, a
   assert.equal(s.counts.resubscribe, undefined);
 });
 
-test('a subscription outlives the request bound: its headers alone are bounded, and one held without them is late', WAITED, async (t) => {
-  const s = await serve();
-  const ops = await opsOn(s, 'ae/long/1', {}, 100);
-  const got: Followed[] = [];
-  const ended = drained(ops.follow!('ae/long/1'), got);
-  await holds(t, got, 1);
-  const since = instantNow();
-  await until(t, () => elapsedMs(since, instantNow()) > 300, 'three request bounds gone by', { everyMs: 20 });
-  s.move(s.tasks()[0], { state: 'completed', words: 'done' });
-  assert.ok(Exit.isSuccess(await ended));
-  assert.deepEqual(shown(got), ['state working', 'events assistant "done"', 'state completed']);
-  assert.equal(s.counts.resubscribe, 1, 'the one subscription, open past the bound');
+for (const binding of BINDINGS)
+  test(
+    over('a subscription outlives the request bound: its headers alone are bounded, and one held without them is late', binding),
+    WAITED,
+    async (t) => {
+      const s = await serve({ bindings: [binding] });
+      const ops = await opsOn(s, 'ae/long/1', {}, 100);
+      const got: Followed[] = [];
+      const ended = drained(ops.follow!('ae/long/1'), got);
+      await holds(t, got, 1);
+      const since = instantNow();
+      await until(t, () => elapsedMs(since, instantNow()) > 300, 'three request bounds gone by', { everyMs: 20 });
+      s.move(s.tasks()[0], { state: 'completed', words: 'done' });
+      assert.ok(Exit.isSuccess(await ended));
+      assert.deepEqual(shown(got), ['state working', 'events assistant "done"', 'state completed']);
+      assert.equal(s.counts.resubscribe, 1, 'the one subscription, open past the bound');
+      assert.ok(subscribedOn(s, binding), `subscribed on ${binding}: ${s.paths.join(', ')}`);
 
-  const held = await opsOn(s, 'ae/held/1', {}, 100);
-  s.hanging.a2a = true;
-  const err = failure(await drained(held.follow!('ae/held/1'), []));
-  assert.equal(err.refused, true);
-  assert.match(err.message, /dropped, and 5 subscriptions again in a row gave nothing new \(.*did not answer within 0\.1 s\)/);
-});
+      const held = await opsOn(s, 'ae/held/1', {}, 100);
+      s.hanging.a2a = true;
+      const err = failure(await drained(held.follow!('ae/held/1'), []));
+      assert.equal(err.refused, true);
+      assert.match(err.message, /dropped, and 5 subscriptions again in a row gave nothing new \(.*did not answer within 0\.1 s\)/);
+    },
+  );

@@ -28,6 +28,7 @@ harness: claude
 model: opus
 tools: Read, Grep, Glob, Bash
 permissionMode: dontAsk
+allowedTools: Bash(git diff:*), Bash(git log:*), Bash(npm run lint)
 skills: review-a-change
 ---
 
@@ -40,12 +41,18 @@ narrows (below). The agents are read by `packages/agent-orchestrator/src/agents/
 
 ## Tools and the fence
 
-Two lists say what a session can do, and they work from opposite ends:
+Three things say what a session can do:
 
-- **Its tools** (`tools`) are the only tools the session has. A reviewer given `Read, Grep, Glob, Bash` has nothing that edits.
-- **Its fence** is what it may not do. On Claude Code, it is a permission mode (`permissionMode`) and a list of denied calls
-  (`disallowedTools`), such as `Bash(git push:*)`. A deny beats every allow. On Codex, it is a sandbox (`sandbox`): `read-only`,
-  `workspace-write` or `danger-full-access`.
+- **Its tools** (`tools`) are the only tools the session has. A session without `Edit` or `Write` cannot edit a file with them, but a
+  tool such as `Bash` can still write one, so the tools alone never make an agent read-only.
+- **Its fence** is what it may do with them. On Claude Code, it is a permission mode (`permissionMode`), a list of allowed calls
+  (`allowedTools`) and a list of denied calls (`disallowedTools`), such as `Bash(git push:*)`. A deny beats every allow. On Codex, it
+  is a sandbox (`sandbox`): `read-only`, `workspace-write` or `danger-full-access`.
+- **Its mode decides what is not listed.** In `dontAsk`, a call no allow reaches is refused without asking anyone. The reviewer above
+  has `Bash`, but runs only the commands its `allowedTools` names, here a diff, a log and the lint, and those the repository's
+  `.claude/settings.json` allows; any other shell call is refused.
+  That fence, not its list of tools, is what keeps it read-only. This repository's reviewer, `workflows/agents/agora.md`, is fenced
+  this way.
 
 **Fences only tighten.** A step may narrow its agent's fence, never widen it, and a step that would is refused when the workflow is read
 (`fenceRefusal`). Its tools may only be ones the agent has, its denies must keep each of the agent's, and its permission mode may be

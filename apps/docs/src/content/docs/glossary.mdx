@@ -1,0 +1,51 @@
+---
+title: Glossary
+description: Nemia's terms, one line each, linked to the page that explains them.
+---
+
+import { Badge } from '@astrojs/starlight/components';
+
+Each term has one line and a link to the page that explains it.
+
+## Terms
+
+- **A2A**: the protocol the runtime uses for every harness; each harness is an A2A agent, and a session is an A2A Task. [The runtime](/map/#the-runtime)
+- **Agent**: who does a step's work: its instructions, its tools, its fence and its skills, written once and named by the steps it works on. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Api**: `apps/api`, the workflows behind HTTP, and the system's public interface. [The api](/map/#the-api)
+- **Board**: `apps/web`, the pages a person looks at, which reach the api over HTTP alone. [The board](/map/#the-board)
+- **Card**: a piece of work written as a short markdown brief, started as a run. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Check**: a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on. [Who decides what](/#who-decides-what)
+- **Closeout**: how a step signs off: its outcome, its summary, and the fields its workflow asks of it. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Daemon**: the process that ticks the store's runs, one per store; the api's process is the daemon. [The api](/map/#the-api)
+- **Factory**: a named grouping in the store: the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps. [The orchestrator](/map/#the-orchestrator)
+- **Feed**: the store's stream of what happened, written by the daemon alone, which the board follows. [The api](/map/#the-api)
+- **Fence**: what a step's session may not do: the tools it is denied (`disallowedTools`) and the permission mode it runs in. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Gate**: a property of a step: nothing after it is started until a person approves. [Who decides what](/#who-decides-what)
+- **Harness**: the program a session runs in: Claude Code, Codex, a plain command, or a remote A2A agent. [The runtime](/map/#the-runtime)
+- **Inbox**: where cards wait before they are started. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Instruction layers**: what an agent is told, in order: its instructions, a person's custom instructions, the step's policy, and the files the harness reads in the workspace. [The orchestrator](/map/#the-orchestrator)
+- **Intent**: a confirmed idea, cut into cards; it is a word of this repository's own team (`workflows/`), not something Nemia ships. [What Nemia is](/)
+- **Journal**: the runtime's durable record of a task, an event a line, which every pass reads again. [The runtime](/map/#the-runtime)
+- **Landing**: the end of a run: the merge of its branch staged on the base, checked on the merged tree, and committed when the check passes. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Level**: how much a factory hands over to Nemia: `manual`, `semi-auto` or `auto`. [Who decides what](/#who-decides-what)
+- **Lifecycle**: the statechart a runtime task moves along. [The lifecycle of a task](/map/#the-lifecycle-of-a-task)
+- **Nemia**: the system as a whole, its command `nemia`, and the store's own agent. [Nemia, the store's own agent](/map/#nemia-the-stores-own-agent)
+- **Orchestrator**: `packages/agent-orchestrator`, which reads workflows and runs their steps. [The orchestrator](/map/#the-orchestrator)
+- **Round**: one more try of a loop's steps, when a reviewer asks for more. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Run**: one go of a workflow on a card: its record, its steps' tries, and the branch its work is on. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Runtime**: `packages/agent-runtime`, which runs agent sessions on a harness, durably. [The runtime](/map/#the-runtime)
+- **Session**: one agent's conversation on a harness: a job that runs to its end, or a long-lived session that runs until stopped. [The runtime](/map/#the-runtime)
+- **Skill**: a folder of instructions and files an agent is given for one kind of work. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Step**: one markdown file of a workflow: who does it, what it may do, and what must finish first. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Task**: the runtime's unit of work: a brief filed to run on a harness, with its attempts. [The lifecycle of a task](/map/#the-lifecycle-of-a-task)
+- **Tick**: one pass of the daemon: it reads the world, decides (`assess`), acts, and carries nothing to the next pass. [The orchestrator](/map/#the-orchestrator)
+- **Tools**: the only tools a step's session has (`tools`), beside its fence. [A card in, a landing out](/#a-card-in-a-landing-out)
+- **Workflow**: a folder of markdown files, one file a step. [A card in, a landing out](/#a-card-in-a-landing-out)
+
+## Planned <Badge text="planned" variant="caution" />
+
+These terms are designed and not built yet. No page explains them until they land.
+
+- **Factory template** <Badge text="planned" variant="caution" />: a package a factory is made from: its workflows, agents and skills in one folder, shared as an archive, applied and never run.
+- **Definition, instance and package** <Badge text="planned" variant="caution" />: the kinds the template workbench settled. A definition (a skill, an agent, a workflow) is inert; an instance (a factory, a run, a task, a subscription) has one controller, which alone writes its status; a package, the template, is applied to make a factory.
+- **The factory's controller** <Badge text="planned" variant="caution" />: the controller that would apply a template to a factory, keep its workflows, agents and hires as applied, and upgrade it by a three-way merge, reporting conflicts as status.

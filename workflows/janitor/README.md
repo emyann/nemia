@@ -14,8 +14,8 @@ workflow or repository, when two cards share a title, or when the period compare
 end the day before it. A card whose title the inbox already has is not filed again, so the check run again files only what is missing.
 Nothing is started: the inbox is where a person decides.
 
-The nemia factory schedules it, so the daemon starts it every Monday morning, at every level, Nemia off:
-`nemia factory schedule nemia janitor --cron "0 9 * * 1" --brief "Read the stats" --tz America/Montreal`; `nemia factory ls` and
+Schedule it in the nemia factory, and the daemon starts it every Monday morning, at every level, Nemia off:
+`nemia factory schedule nemia janitor --cron "0 9 * * 1" --brief "Read the stats" --tz America/Montreal`. Then `nemia factory ls` and
 `nemia ls` say its next run and its last, and `nemia factory unschedule nemia janitor` takes it back. A hand start still works, when the
 stats are worth reading sooner: `nemia start "Read the stats" --workflows janitor --factory nemia`, with a period in the message when the
 default is not the one wanted.

@@ -270,7 +270,10 @@ export type StartOptions = {
 };
 
 /** What a run is told at `nemia start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
-type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'context' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts'>;
+type Told = Pick<
+  Run,
+  'brief' | 'workflowDir' | 'workflow' | 'after' | 'context' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts' | 'gatesTimed'
+>;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
@@ -341,7 +344,8 @@ export function leftOutMounts(run: Run): string[] {
 
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, and `mounts`
- * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts.
+ * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts. No gate of it is
+ * timed yet (`gatesTimed`).
  */
 function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
   const after = opts.after ?? [];
@@ -358,6 +362,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(gates.length ? { gates: [...gates] } : {}),
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),
+    gatesTimed: [],
   };
 }
 

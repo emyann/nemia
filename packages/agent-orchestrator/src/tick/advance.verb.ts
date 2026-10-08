@@ -72,7 +72,7 @@ import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { RunPlace } from '../place/place.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
-import { roundsGranted, settledFacts, type StepFact } from '../meter/index.ts';
+import { gateWaits, roundsGranted, settledFacts, settledWaits, type StepFact, type WaitFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
@@ -232,7 +232,8 @@ export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
  * have, a line it refused, an `npm ci` that ran or failed), each try and each round filed and on whose word, a blocked session the engine
  * was asked to stop for a try, and an ask file that cannot be read. `looped` names the looping steps whose loop this pass took round again.
  * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass was handed as settled since the pass
- * before (`PassRead`'s `settled`), and each round granted; absent where there is none.
+ * before (`PassRead`'s `settled`) with the waits they ended, each round granted, and each gate wait not timed before (`timedGates`); absent
+ * where there is none.
  * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
@@ -305,6 +306,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   pass, and a worktree cut for it stays for `nemia rm` to find. A step's files directory is made before its brief names it, and again for
  *   its check, for a step filed without one.
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
+ * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it (`timedGates`).
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`BranchReader.shipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
@@ -355,6 +357,7 @@ export const advancePass = Effect.fn('advancePass')(
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
     const settled = settledOf(run, reads, pass?.settled);
+    const gated = timedGates(run, reads);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
@@ -370,29 +373,41 @@ export const advancePass = Effect.fn('advancePass')(
     const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
-      Boolean(tips || heldFirst || handed.marked || landing.landed);
+      Boolean(tips || heldFirst || handed.marked || landing.landed || gated.length);
     if (wrote) runStore.runs.rewrite(run);
     runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
-    const done = { filed, checked, tried, looped, notes, feed, facts: [...settled, ...roundsGranted(run, steps, looped)] };
+    const done = { filed, checked, tried, looped, notes, feed, facts: [...settled, ...roundsGranted(run, steps, looped), ...gated] };
     return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
   },
   (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
 );
 
 /**
- * The facts of the run's tasks the pass was handed as settled (`settledFacts`), off what it read of them, before it files anything over
- * them: a try filed moves the step's task among its earlier tries.
+ * The facts of the run's tasks the pass was handed as settled (`settledFacts`) and the waits they ended (`settledWaits`), off what it read
+ * of them, before it files anything over them: a try filed moves the step's task among its earlier tries.
  */
-const settledOf = (run: Run, r: PassReads, settled: ReadonlySet<string> | undefined): StepFact[] =>
-  settled?.size
-    ? settledFacts(run, r.steps, settled, {
-        views: r.views,
-        spendOf: r.spendOf,
-        signedOff: r.signedOff,
-        statusOf: (step) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf),
-      })
-    : [];
+function settledOf(run: Run, r: PassReads, settled: ReadonlySet<string> | undefined): StepFact[] {
+  if (!settled?.size) return [];
+  const reads = {
+    views: r.views,
+    spendOf: r.spendOf,
+    signedOff: r.signedOff,
+    statusOf: (step: Workflow) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf),
+  };
+  return [...settledFacts(run, r.steps, settled, reads), ...settledWaits(run, r.steps, settled, reads)];
+}
+
+/**
+ * The gate waits of the run's approvals the tick has not timed yet (`gateWaits`), off this pass's views, each marked timed on the run
+ * (`gatesTimed`) for the record this pass writes. The metrics record them once the pass is done, after that write (`tickRun`): a process
+ * that dies between the two loses them, and never records one twice.
+ */
+function timedGates(run: Run, r: PassReads): WaitFact[] {
+  const facts = gateWaits(run, r.steps, r.views);
+  run.gatesTimed?.push(...facts.map((f) => ({ step: f.attributes.step, try: f.try })));
+  return facts;
+}
 
 /**
  * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned

@@ -5,7 +5,7 @@
  */
 import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
-import { stepKeys, type StepKeys } from '../meter/step.ts';
+import { stepKeys, type StepKeys } from '../meter/index.ts';
 
 /** Where the process exports its traces, logs and metrics over OTLP: the collector's base `url`, and the service they are filed under. */
 export type Otlp = { url: string; serviceName: string };

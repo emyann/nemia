@@ -38,8 +38,8 @@ export function telemetryLayer(env: Readonly<Record<string, string | undefined>>
 }
 
 /**
- * `filing`, a pass's work on the step `step` of the run `run`, with its spans and its logs annotated with their labels (`stepLabels`): the runtime's spans
- * under it, and the journal it writes, say which they were for, beside the runtime's own task.
+ * `filing`, a pass's work on the step `step` of the run `run`, with its spans and its logs annotated with their labels (`stepLabels`):
+ * the runtime's spans under it, and the journal it writes, say which they were for, beside the runtime's own task.
  */
 export const forStep =
   (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: Workflow) =>

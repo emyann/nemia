@@ -18,7 +18,7 @@ import type { Closeout } from '../closeout/closeout.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
-import type { Timeline, TimelineTry } from '../timeline/index.ts';
+import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
 import {
@@ -136,33 +136,11 @@ export type RunRead = {
 /** The UTC day of a time, `YYYY-MM-DD`. */
 export const dayOf = (at: string): string => new Date(at).toISOString().slice(0, 10);
 
-/** When a try ended: its check's end, or its session's where it has no check; null while either is in flight. */
-const endOf = (t: TimelineTry): string | null => (t.check ? t.check.endedAt : (t.session?.endedAt ?? null));
-
 /** A sum of what is known, null where nothing is. */
 const knownSum = (values: ReadonlyArray<number | null | undefined>): number | null => {
   const known = values.filter((v): v is number => typeof v === 'number');
   return known.length ? known.reduce((n, v) => n + v, 0) : null;
 };
-
-const msBetween = (from: string | null, to: string): number | null => (from ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
-
-/**
- * How long a person took to approve a try: from its end to the approval of that step and that try, or, for a step approved before it is
- * filed (an ending in the checkout at a gate), from the latest end of the steps it waits on before the approval. Null with no approval.
- */
-function gateWaitOf(r: RunRead, step: Workflow, t: TimelineTry): number | null {
-  const approval = r.run.approvals?.find((a) => a.step === step.name && a.try === t.try);
-  if (!approval) return null;
-  const end = endOf(t);
-  if (end && end <= approval.at) return msBetween(end, approval.at);
-  const before = step.after
-    .flatMap((name) => (r.timeline.steps[name] ?? []).map(endOf))
-    .filter((at): at is string => at !== null && at <= approval.at)
-    .sort()
-    .at(-1);
-  return msBetween(before ?? null, approval.at);
-}
 
 /** The keys a run's facts carry. */
 export const keysOf = (run: Run): RunKeys => ({
@@ -184,7 +162,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
   const keys = keysOf(r.run);
   return r.steps.flatMap((step) =>
     (r.timeline.steps[step.name] ?? []).flatMap((t): TryFact[] => {
-      const end = endOf(t);
+      const end = tryEndOf(t);
       if (!end) return [];
       const denied = t.session && deniesRecorded(step) && ranAsJob(t.session) ? r.deniedOf(t.session.taskId) : null;
       return [
@@ -198,7 +176,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
           checkMs: t.check?.ranMs ?? null,
           costUsd: t.used?.costUsd ?? null,
           check: t.check ? r.verdictOf(t.check.taskId) : null,
-          gateWaitMs: gateWaitOf(r, step, t),
+          gateWaitMs: gateWaitOf(r.run, r.timeline, step, t),
           denied,
           skills: t.session ? r.skillsOf(t.session.taskId) : null,
           due: t.session ? skillsDueOf(r.filesOf(t.session.taskId), r.appliesOf(step)) : null,
@@ -257,13 +235,13 @@ function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
   if (r.run.cancelledAt) return null;
   if (ending && (r.run.steps[ending.name]?.landed || landsOnCheck(ending, r.run))) {
     const last = r.timeline.steps[ending.name]?.at(-1);
-    return r.run.steps[ending.name]?.landed && last ? endOf(last) : null;
+    return r.run.steps[ending.name]?.landed && last ? tryEndOf(last) : null;
   }
   if (r.timeline.run.inFlight || !(ending ? [ending] : r.steps).every((s) => doneStep(r, s))) return null;
   return (
     Object.values(r.timeline.steps)
       .flat()
-      .map(endOf)
+      .map(tryEndOf)
       .filter((at): at is string => at !== null)
       .sort()
       .at(-1) ?? null

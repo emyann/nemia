@@ -1,8 +1,8 @@
 /**
  * A step's task is filed with its run, its factory, its workflow, the step and its agent as labels (`stepLabels`), which the runtime hands
- * each of its sessions beside the task's id: a ready step, a try and a round alike, walked through the runtime itself over an in-memory journal and a harness that keeps what it
- * was asked to spawn. And the client's `engine()` hands the runtime the collector the process exports to (`otlpOf`), and none when it
- * exports nowhere. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
+ * each of its sessions beside the task's id: a ready step, a try and a round alike, walked through the runtime itself over an in-memory
+ * journal and a harness that keeps what it was asked to spawn. And the client's `engine()` hands the runtime the collector the process
+ * exports to (`otlpOf`), and none when it exports nowhere. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,10 +1,12 @@
 /**
  * What a pass records of each step in the process's metrics (`STEP_METRICS`, `meter.verb.ts`): a try or a check that settled, a round a
  * loop was granted or ran out of, each with the attributes a series is kept by — the factory, the workflow, the step, its agent and the
- * outcome, and nothing else (`boundedAttributes`): a run's or a task's id would make a series of every run.
+ * outcome, and nothing else (`boundedAttributes`): a run's or a task's id would make a series of every run. And how long a step waited
+ * outside its sessions once the wait ended (`WaitFact`): a session in the queue, its check's run, and a person at its gate.
  *
  * Pure: the tick hands it the run, the tasks the feed said settled since its last read (`settledIn`), and what the pass already read of
- * them; it reads nothing more.
+ * them; it reads nothing more, and nothing is carried from one pass to the next. A gate is timed on the first pass that reads its approval
+ * and does not find it among those the tick has timed (`gatesTimed`).
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
@@ -15,7 +17,8 @@ import type { StepStatus } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import type { SpendOf } from '../status/status.ts';
-import { ranMs, taskUsage, type AttemptClock, type TaskClock } from '../timeline/index.ts';
+import { hasGate } from '../status/status.ts';
+import { gateWaitOf, ranMs, taskUsage, timeline, type AttemptClock, type TaskClock } from '../timeline/index.ts';
 
 /** The only attributes a step's metric carries: a series for each, never one for each run. */
 export const STEP_ATTRIBUTE_KEYS: readonly string[] = ['factory', 'workflow', 'step', 'agent', 'outcome'];
@@ -57,8 +60,9 @@ export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
  * measured, how long it ran and the calls its harness denied it; a check that settled (`check`); a round its loop was granted or ran out
- * of (`round`). `attributes` are `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`,
- * `refused` or `unfinished` for a check; `granted` or `exhausted` for a round.
+ * of (`round`); a wait outside the step's sessions that ended (`WaitFact`). `attributes` are `stepAttributes`, the outcome among
+ * them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a check; `granted` or `exhausted` for a
+ * round.
  */
 export type StepFact =
   | {
@@ -70,10 +74,13 @@ export type StepFact =
       ms: number;
       denied: number;
     }
-  | { metric: 'check' | 'round'; attributes: Record<string, string> };
+  | { metric: 'check' | 'round'; attributes: Record<string, string> }
+  | WaitFact;
 
-/** The engine's view of a task, as far as a fact reads it: its attempts, a check's with its exit code, and its usage. */
-export type FactView = TaskClock & { state: { attempts: ReadonlyArray<AttemptClock & { exitCode?: number | null }> } };
+/** The engine's view of a task, as far as a fact reads it: its attempts, a check's with its exit code, its usage, and when it was filed. */
+export type FactView = TaskClock & {
+  state: { attempts: ReadonlyArray<AttemptClock & { exitCode?: number | null }>; filedAt?: string };
+};
 
 /** What a pass already read, that a step's facts are read off: the views of the run's tasks, their spend, the closeouts, each status. */
 export type FactReads = {
@@ -94,13 +101,13 @@ const tasksOf = (record: Run['steps'][string]): Array<{ taskId: string; metric: 
 ];
 
 /** How a session ended: `done` or `blocked` as it signed, the step's current one read off its closeout, else `failed` or `stopped`. */
-function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined): string {
+export function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined): string {
   if (view.state.settled !== 'succeeded') return view.state.settled ?? 'failed';
   return current && closeout?.outcome === 'blocked' ? 'blocked' : 'done';
 }
 
 /** How a check ended: `passed` on exit 0, `refused` on another exit, `unfinished` with none (`attemptVerdict`). */
-function checkOutcome(view: FactView): string {
+export function checkOutcome(view: FactView): string {
   const verdict = attemptVerdict(view.state.attempts.at(-1));
   return verdict === 'unfinished' ? verdict : verdict === 0 ? 'passed' : 'refused';
 }
@@ -147,3 +154,92 @@ export function settledFacts(run: Run, steps: readonly Workflow[], settled: Read
 /** A round `granted` for each looping step whose loop the pass took round again (`looped`). */
 export const roundsGranted = (run: Run, steps: readonly Workflow[], looped: readonly string[]): StepFact[] =>
   steps.filter((s) => looped.includes(s.name)).map((step) => ({ metric: 'round', attributes: stepAttributes(run, step, 'granted') }));
+
+/** The three waits a step is timed by outside its sessions. */
+export type Wait = 'queue' | 'check' | 'gate';
+
+/**
+ * One wait that ended: which (`wait`), the step's metric attributes with its outcome (`stepAttributes`) — the try's for a queue, the
+ * verdict for a check, `approved` for a gate — and, for its span alone, the run and the try; when it began and ended, and how long, in ms.
+ */
+export type WaitFact = {
+  metric: 'wait';
+  wait: Wait;
+  attributes: Record<string, string>;
+  run: string;
+  try: number;
+  from: string;
+  to: string;
+  ms: number;
+};
+
+/** When a wait began and ended, and the ms between: never negative. */
+export type Waited = { from: string; to: string; ms: number };
+
+/** The interval from `from` to `to`, or null where either is not known. */
+const between = (from: string | null | undefined, to: string | null | undefined): Waited | null =>
+  from && to ? { from, to, ms: Math.max(0, Date.parse(to) - Date.parse(from)) } : null;
+
+/** A task's wait in the queue: from its filing to its first attempt's spawn, the timeline's `queuedMs`; null where either is not known. */
+export const queueWait = (view: FactView): Waited | null =>
+  between(view.state.filedAt, view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt);
+
+/**
+ * A check's run: from its first attempt's spawn to its last attempt's end, the timeline's `ranMs` of a check; null where either is not
+ * known.
+ */
+export const checkWait = (view: FactView): Waited | null =>
+  between(view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt, view.state.attempts.at(-1)?.endedAt);
+
+/** Each task of a step's record, its session's and its check's, with the try it was first filed for: a recheck's session is not its own. */
+function triesOf(record: Run['steps'][string]): Array<{ taskId: string; try: number; check: boolean }> {
+  const tries = [...(record.tries ?? []), ...(record.taskId ? [{ taskId: record.taskId, check: record.check }] : [])];
+  const seen = new Set<string>();
+  return tries.flatMap((t, i) => {
+    const session = seen.has(t.taskId) ? [] : [{ taskId: t.taskId, try: i + 1, check: false }];
+    seen.add(t.taskId);
+    return [...session, ...(t.check ? [{ taskId: t.check.taskId, try: i + 1, check: true }] : [])];
+  });
+}
+
+/**
+ * The queue of each session and the run of each check of `run` that settled (`settled`), off what the pass read of them before it filed
+ * anything over them. A task of another run, one the pass has no view of, and one never spawned are no fact.
+ */
+export function settledWaits(run: Run, steps: readonly Workflow[], settled: ReadonlySet<string>, reads: FactReads): WaitFact[] {
+  if (!settled.size) return [];
+  return steps.flatMap((step) => {
+    const record = run.steps[step.name];
+    if (!record) return [];
+    return triesOf(record).flatMap((t): WaitFact[] => {
+      const view = settled.has(t.taskId) ? reads.views.get(t.taskId) : undefined;
+      const interval = view && (t.check ? checkWait(view) : queueWait(view));
+      if (!view || !interval) return [];
+      const outcome = t.check ? checkOutcome(view) : tryOutcome(view, record.taskId === t.taskId, reads.signedOff(step.name));
+      const wait = t.check ? 'check' : 'queue';
+      return [{ metric: 'wait', wait, attributes: stepAttributes(run, step, outcome), run: run.id, try: t.try, ...interval }];
+    });
+  });
+}
+
+/**
+ * The gate wait of each approval of `run` at a gated step that the tick has not timed (`gatesTimed`), off its `timeline` of `views`: the ms
+ * `gateWaitOf` gives, ending at the approval. None on a record with no `gatesTimed`, written before the tick timed gates; none for an
+ * approval whose try is not on the timeline yet, or whose wait is not known, which a later pass times once it is.
+ */
+export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
+  const timed = run.gatesTimed;
+  if (!timed || !run.approvals?.length) return [];
+  const tl = timeline(run, views, new Map(), steps);
+  return run.approvals.flatMap((a): WaitFact[] => {
+    const step = steps.find((s) => s.name === a.step);
+    if (!step || !hasGate(step, run) || timed.some((g) => g.step === a.step && g.try === a.try)) return [];
+    const t = tl.steps[a.step]?.find((x) => x.try === a.try);
+    const ms = t ? gateWaitOf(run, tl, step, t) : null;
+    if (ms === null) return [];
+    const from = new Date(Date.parse(a.at) - ms).toISOString();
+    return [
+      { metric: 'wait', wait: 'gate', attributes: stepAttributes(run, step, 'approved'), run: run.id, try: a.try, from, to: a.at, ms },
+    ];
+  });
+}

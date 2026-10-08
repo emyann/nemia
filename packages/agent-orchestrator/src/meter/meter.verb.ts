@@ -3,11 +3,11 @@
  * runtime's totals before and after it (`costOf`), and that cost put into the process's metrics (`recordPassMetrics`), beside the facts
  * of the steps it saw settle (`recordStepMetrics`). A controller, wrapping the engine whose type the client gives (`runtime-client.ts`).
  */
-import { Effect, Metric } from 'effect';
+import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
-import { boundedAttributes, type StepFact } from './step.ts';
+import { boundedAttributes, type StepFact, type Wait, type WaitFact } from './step.ts';
 
 /**
  * The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a
@@ -159,11 +159,19 @@ export const recordPassMetrics = Effect.fn('recordPassMetrics')(function* (cost:
 /** A step's time, in ms: a minute to two hours, the span a session runs in. */
 const STEP_BOUNDS = [60_000, 120_000, 300_000, 600_000, 900_000, 1_800_000, 3_600_000, 7_200_000];
 
+/** A wait in the queue or a check's run, in ms: a second to two hours, since a check or a free slot takes seconds. */
+export const WAIT_BOUNDS = [1_000, 5_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 1_800_000, 3_600_000, 7_200_000];
+
+/** A person's wait at a gate, in ms: a minute to a day, since a person may answer the next morning. */
+export const GATE_BOUNDS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_200_000, 14_400_000, 28_800_000, 43_200_000, 86_400_000];
+
 /**
  * The metrics of a step, each by the attributes of `stepAttributes` alone: what its settled sessions cost (`step.cost`, USD, where
  * measured), their tokens (`step.tokens.input`, `step.tokens.output`, where measured) and their time (`step.duration`, ms); the sessions
  * by how they ended (`step.tries`), the checks by their verdict (`step.checks`), the rounds granted and run out of (`step.rounds`), and
- * the calls a harness denied (`step.denied`). Each counter only grows, so a collector reads it as one.
+ * the calls a harness denied (`step.denied`); and the waits outside its sessions (`WaitFact`): a session's in the queue
+ * (`step.queue.duration`), its check's run by verdict (`step.check.duration`), both over `WAIT_BOUNDS`, and a person's at its gate
+ * (`step.gate.wait`, over `GATE_BOUNDS`), each in ms. Each counter only grows, so a collector reads it as one.
  */
 export const STEP_METRICS = {
   cost: Metric.counter('step.cost', { description: "a step's settled sessions' cost, in USD", incremental: true }),
@@ -174,15 +182,57 @@ export const STEP_METRICS = {
   checks: Metric.counter('step.checks', { description: "a step's checks settled, by verdict", incremental: true }),
   rounds: Metric.counter('step.rounds', { description: "a loop's rounds granted or exhausted", incremental: true }),
   denied: Metric.counter('step.denied', { description: "the calls a step's harness denied its sessions", incremental: true }),
+  queue: Metric.histogram('step.queue.duration', {
+    description: "a step's session's wait from its filing to its spawn, in ms",
+    boundaries: WAIT_BOUNDS,
+  }),
+  check: Metric.histogram('step.check.duration', { description: "a step's check's run, by verdict, in ms", boundaries: WAIT_BOUNDS }),
+  gate: Metric.histogram('step.gate.wait', {
+    description: "a step's wait for a person's approval at its gate, in ms",
+    boundaries: GATE_BOUNDS,
+  }),
 } as const;
+
+/** The span each wait is traced as, its name the one a dashboard reads. */
+export const WAIT_SPANS: Readonly<Record<Wait, string>> = { queue: 'step.queue', check: 'step.check', gate: 'step.gate' };
+
+/** The histogram each wait is measured into. */
+const WAIT_METRICS = { queue: STEP_METRICS.queue, check: STEP_METRICS.check, gate: STEP_METRICS.gate } as const;
+
+/** A time in ms since the epoch, as a span's clock reads it: ns. */
+const nanos = (at: string): bigint => BigInt(Date.parse(at)) * 1_000_000n;
+
+/**
+ * One wait into its histogram (`WAIT_METRICS`), by its step's attributes alone, and into a span of its own (`WAIT_SPANS`) from when it
+ * began to when it ended, a root of its own trace, carrying the run and the try beside those attributes: a wait spans passes, so no
+ * pass's span is its parent.
+ */
+const recordWait = (fact: WaitFact): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* into(WAIT_METRICS[fact.wait], fact.attributes, fact.ms);
+    const tracer = yield* Effect.tracer;
+    const span = tracer.span({
+      name: WAIT_SPANS[fact.wait],
+      parent: Option.none(),
+      annotations: Context.empty(),
+      links: [],
+      startTime: nanos(fact.from),
+      kind: 'internal',
+      root: true,
+      sampled: true,
+    });
+    for (const [key, value] of Object.entries({ run: fact.run, try: fact.try, ...fact.attributes })) span.attribute(key, value);
+    span.end(nanos(fact.to), Exit.void);
+  });
 
 /** `value` into `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
 const into = <In, Out>(metric: Metric.Metric<In, Out>, attributes: Record<string, string>, value: In) =>
   Metric.update(Metric.withAttributes(metric, boundedAttributes(attributes)), value);
 
-/** One fact into the metrics: a session's tally, cost, tokens, time and denials; a check's or a round's count. */
+/** One fact into the metrics: a session's tally, cost, tokens, time and denials; a check's or a round's count; a wait (`recordWait`). */
 function recordFact(fact: StepFact): Effect.Effect<void> {
   const { attributes } = fact;
+  if (fact.metric === 'wait') return recordWait(fact);
   if (fact.metric !== 'try') return into(fact.metric === 'check' ? STEP_METRICS.checks : STEP_METRICS.rounds, attributes, 1);
   return Effect.all(
     [

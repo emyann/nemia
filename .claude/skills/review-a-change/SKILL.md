@@ -18,8 +18,9 @@ description: "Review a change in this repository as a second engineer would: aga
    system path: your fence refuses them without asking. What your brief quotes from outside them is all you have of it.
 3. **Read the suite's verdict; run the cheap checks yourself**. Implement's check ran the whole test suite on this round's tree,
    forced, and your brief hands you its exit and the end of its output under `## What implement's check said`. That run is the floor,
-   and a run of yours on the same tree would only say it again; a check that did not pass is a finding. Run the typecheck and the lint
-   yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`. Run a package's tests,
+   and a run of yours on the same tree would only say it again, and your fence refuses the whole suite; a check that did not pass is a
+   finding. Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`,
+   `npm run lint`. Run a package's tests,
    `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on. Never wrap one in
    `timeout` or `( … )`, pipe it or redirect it; paths from the workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence
    refuses them. A claim you did not run or read in the check's output is not a finding.

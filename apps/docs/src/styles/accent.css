@@ -16,6 +16,13 @@ figure.diagram {
   overflow-x: auto;
 }
 
+figure.diagram figcaption {
+  position: sticky;
+  left: 0;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-3);
+}
+
 figure.diagram svg {
   max-width: 100%;
   min-width: calc(var(--drawn-width) * 0.75);

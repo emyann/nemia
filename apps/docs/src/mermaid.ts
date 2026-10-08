@@ -15,14 +15,21 @@ const DRAWN = /^(?:(?:graph|flowchart)\s+(?:TD|TB|LR|BT|RL)|sequenceDiagram)$/;
 /** The colours a diagram takes: Starlight's own variables, so one SVG follows the light and the dark theme. */
 const COLOURS = { bg: 'var(--sl-color-bg)', fg: 'var(--sl-color-white)', accent: 'var(--sl-color-accent)', transparent: true };
 
+/** The widest a page's column is, in pixels: Starlight's `--sl-content-width`, 45rem. */
+const COLUMN = 720;
+
+/** The caption of a figure that is wider than the column even at three quarters, above it, since its first screen shows only part of it. */
+const SCROLL = '<figcaption>The diagram is wider than the page: scroll it sideways.</figcaption>';
+
 /**
  * A drawn SVG in a figure, without the style element the renderer gives it: a page prints its CSS as an attribute, and it fetches a
  * font. The colours it derives are the site stylesheet's (`src/styles/accent.css`), and the figure carries the width it is drawn at
- * (`--drawn-width`), below three quarters of which the stylesheet never scales it.
+ * (`--drawn-width`), below three quarters of which the stylesheet never scales it; one still wider than the column says to scroll it.
  */
 const figureOf = (svg: string): string => {
   const width = /<svg[^>]*\swidth="([\d.]+)"/.exec(svg)?.[1] ?? '0';
-  return `<figure class="diagram" style="--drawn-width: ${width}px">${svg.replace(/<style>[\s\S]*?<\/style>\n?/g, '')}</figure>`;
+  const caption = Number(width) * 0.75 > COLUMN ? SCROLL : '';
+  return `<figure class="diagram" style="--drawn-width: ${width}px">${caption}${svg.replace(/<style>[\s\S]*?<\/style>\n?/g, '')}</figure>`;
 };
 
 /** The `diagram=<name>` a fence's meta names, or undefined for a fence drawn on its page. */

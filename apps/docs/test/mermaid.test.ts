@@ -146,3 +146,12 @@ test('a figure carries the width its diagram is drawn at, which the site never s
   const css = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'styles', 'accent.css'), 'utf8');
   assert.match(css, /min-width:\s*calc\(var\(--drawn-width\) \* 0\.75\)/);
 });
+
+test('a figure wider than the column at three quarters says to scroll it, and one that fits says nothing', () => {
+  for (const name of ['lifecycle', 'nemia']) {
+    const drawn = drawnPage(ROOT, `diagram=${name}`, '') as Html;
+    assert.match(drawn.value, /^<figure[^>]*><figcaption>[^<]*scroll it sideways[^<]*<\/figcaption><svg/, `${name} says to scroll`);
+  }
+  const small = drawnPage(ROOT, null, 'flowchart LR\n  card[A card] --> landing[A landing]') as Html;
+  assert.doesNotMatch(small.value, /<figcaption>/);
+});

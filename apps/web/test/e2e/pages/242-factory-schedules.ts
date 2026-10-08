@@ -23,6 +23,13 @@ function nextFire(now: number): string {
   return new Date(thisYear > now ? thisYear : Date.UTC(year + 1, 0, 1, 9)).toISOString();
 }
 
+/** The latest fire of CRON at or before `now`: the one the listing says a kept refusal of is still standing. */
+function latestFire(now: number): string {
+  const year = new Date(now).getUTCFullYear();
+  const thisYear = Date.UTC(year, 0, 1, 9);
+  return new Date(thisYear <= now ? thisYear : Date.UTC(year - 1, 0, 1, 9)).toISOString();
+}
+
 /** Go to `factory`'s settings page and wait for it to settle. */
 async function settingsOf(page: Page, factory: string): Promise<void> {
   await page.goto(new URL(`/factories/${factory}/settings`, page.url()).href, { waitUntil: 'load' });
@@ -77,12 +84,43 @@ async function expectNone(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `factory-schedules-none-${await themeOf(page)}.png`), { fullPage: true });
 }
 
+/**
+ * The card of a schedule whose latest fire the package refused, its workflow detached by hand from the factory's file: the refusal, in
+ * the package's words, under a destructive alert, and no last run, since the fire started none.
+ */
+async function expectRefused(page: Page, why: string): Promise<void> {
+  await settingsOf(page, FACTORY);
+  const row = page.locator(`[data-factory-schedules="${FACTORY}"] [data-factory-schedule="${WORKFLOW}"]`);
+  const alert = row.locator('[data-schedule-refused]');
+  await expectVisible(alert.getByText('Its latest fire started no run', { exact: true }), 'a refused fire says it started no run');
+  await expectVisible(alert.getByText(why, { exact: true }), 'and why, whole, in the words the tick kept');
+  await expectVisible(row.locator('[data-schedule-last]').getByText('none yet', { exact: true }), 'a refused fire is no last run');
+  await settled(page);
+  await photograph(page, path.join(OUT, `factory-schedules-refused-${await themeOf(page)}.png`), { fullPage: true });
+}
+
+/**
+ * Detach WORKFLOW from FACTORY by hand, keeping its schedule, and keep the tick's refusal of the cron's latest fire, in the words the
+ * package refuses such a start with. Returns those words.
+ */
+function refuseLatest(factoryFile: string, factory: Record<string, unknown>, schedule: object, tries: string): string {
+  const workflows = (factory.workflows as string[]).filter((w) => w !== WORKFLOW).sort();
+  const offers = workflows.length ? `it offers: ${workflows.join(', ')}` : 'it offers none yet';
+  const attach = `nemia factory attach ${FACTORY} ${WORKFLOW}`;
+  const why = `${WORKFLOW}: the factory ${FACTORY} does not offer this workflow — ${offers}. Attach it: ${attach}. Nothing was started.`;
+  fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, workflows, schedules: { [WORKFLOW]: schedule } }, null, 2)}\n`);
+  const kept = { due: latestFire(Date.now()), at: new Date().toISOString(), why, refused: true };
+  fs.writeFileSync(path.join(tries, FACTORY, `${WORKFLOW}.json`), `${JSON.stringify(kept, null, 2)}\n`);
+  return why;
+}
+
 export default {
   /**
    * A factory's schedules on its settings page, read-only. The page writes a schedule of the workflow attached to FACTORIES' `hiring` into
    * its file, as `nemia factory schedule` writes it, and the tick's kept try of it, naming FOLDER's run as the run its last fire started:
    * the card says the cron, the time zone, the brief, the next fire and the last run, a link to its page, and the line that takes it back.
-   * A factory with no schedule shows the api's line to schedule one. The factory's file and the kept try are taken back whatever happens.
+   * A factory with no schedule shows the api's line to schedule one. Then the workflow is detached by hand and the kept try is the tick's
+   * refusal of the latest fire: the card says it, whole. The factory's file and the kept try are taken back whatever happens.
    */
   name: 'factory-schedules',
   route: '/',
@@ -103,6 +141,7 @@ export default {
       await sidebar(page);
       await expectScheduled(page);
       await expectNone(page);
+      await expectRefused(page, refuseLatest(factoryFile, factory, schedule, tries));
     } finally {
       fs.writeFileSync(factoryFile, factoryText);
       fs.rmSync(tries, { recursive: true, force: true });

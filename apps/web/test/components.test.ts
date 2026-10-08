@@ -6982,3 +6982,33 @@ test('Nemia stopped from outside: said so, with a way to a fresh session', async
   assert.match(html, /data-state="stopped"/);
   assert.match(html, /data-nemia-restart[^>]*>Start a fresh session</);
 });
+
+test('REFUSED: a schedule whose latest fire was refused draws why, whole, under its alert; one whose fire started its run draws none', async () => {
+  const { FactorySchedules } = await import('../src/components/FactorySchedules.tsx');
+  const why =
+    'dev: the factory nemia does not offer this workflow — it offers none yet. Attach it: nemia factory attach nemia dev. Nothing was started.';
+  const scheduled = (workflow: string, extra: Partial<import('../src/lib/api.ts').FactorySchedule>) => ({
+    workflow,
+    cron: '0 9 * * 1',
+    tz: 'America/Montreal',
+    brief: 'Read the stats',
+    repo: null,
+    next: '2026-10-12T13:00:00.000Z',
+    last: null,
+    refused: null,
+    commands: { unschedule: `nemia factory unschedule nemia ${workflow}` },
+    ...extra,
+  });
+  const factory = filed('nemia', {
+    schedules: [
+      scheduled('dev', { refused: why }),
+      scheduled('janitor', { last: { run: 'read-the-stats-k2v9', at: '2026-10-05T13:00:02.000Z' } }),
+    ],
+  });
+  const html = await routedWith(createElement(FactorySchedules, { factory }));
+  const [, dev = '', janitor = ''] = html.split(/data-factory-schedule="(?=dev"|janitor")/);
+  assert.match(dev, /data-schedule-refused="true"[^]*Its latest fire started no run/, 'the refused fire under its alert');
+  assert.ok(dev.includes(why), `and why, whole: ${dev}`);
+  assert.match(janitor, /href="\/runs\/read-the-stats-k2v9"/, "the started fire's row, its last run a link to the run's page");
+  assert.doesNotMatch(janitor, /data-schedule-refused/, 'and no alert');
+});

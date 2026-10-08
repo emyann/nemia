@@ -1,0 +1,70 @@
+---
+title: Getting started
+description: Install Nemia, start its daemon and its board, make a factory, and start a first run in it.
+---
+
+Nemia runs from its repository today: there is no package to install from a registry yet. These are the commands, in the order you
+would type them the first time.
+
+## Install
+
+```bash
+npm install
+```
+
+The command `nemia` is linked at the root of the repository, so `npx nemia` runs it from there. It is the orchestrator's CLI,
+`packages/agent-orchestrator/src/cli/main.ts`; `wf` is its older name, and runs the same thing.
+
+## Start the daemon
+
+One process per store moves every run: it holds `~/.agent-workflows/daemon.json` (`WF_ROOT`) while it ticks, and a second one is
+refused, naming the first one's pid. You start it one of two ways:
+
+- **With the board**: `npm start` in `apps/api`. It is the daemon and the board's api at once, on port 8787.
+- **Without a board**: `nemia up`, the same daemon on a machine that serves no board.
+
+Where no daemon ticks, a command that files work, such as `nemia start` or `nemia approve`, starts one for you, and says where it logs.
+
+## Open the board
+
+The board is the web app's server. In `apps/web`, build it, then serve it:
+
+```bash
+npm run build
+npm run preview
+```
+
+It sends its `/api` calls on to the daemon on port 8787.
+
+To work on the board itself, `npm run dev` at the root runs an api on port 8788 that ticks nothing, and the web on port 5173.
+
+## Make a factory
+
+A run is started in a [factory](/factories/): a name for the repositories the work is on, the workflows it offers and the agents it
+hires into their steps.
+
+```bash
+nemia factory add pipao --repo ~/code/pipao
+nemia factory attach pipao build
+nemia factory hire pipao ada --step build/implement
+```
+
+The workflow you attach is a folder of markdown in the repository, `workflows/build/` here (see [Workflows](/workflows/)), and the
+agent you hire is a file of its `agents` folder (see [Agents](/agents/)). Nemia ships neither: a factory's are its own.
+
+## Start a first run
+
+```bash
+nemia start "add a --quiet flag to the export command" --workflows build --factory pipao
+nemia ls
+```
+
+The brief is the first argument, words or a markdown file. `nemia ls` lists the runs, and the board shows the same run, step by step.
+When it stops at a gate, `nemia approve` lets it go on. [How a run lives](/how-a-run-lives/) follows it to its landing.
+
+When you would rather not watch each run yourself, put [Nemia](/nemia/) on: `nemia level semi-auto`.
+
+## Sources
+
+This page is written from `README.md` (_Getting started_), `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the
+store_, _One daemon per store_), `apps/api/package.json`, `apps/web/package.json` and `packages/agent-orchestrator/package.json`.

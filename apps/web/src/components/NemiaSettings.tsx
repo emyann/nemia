@@ -133,7 +133,10 @@ function LevelSelect({
   );
 }
 
-/** Her level, picked among the three, what it means, and since when she is there. */
+/**
+ * Her level, picked among the three, what it means, and since when she is there; while her folder is not trusted, beside the switch, that
+ * no session of hers is filed until it is, and the line that trusts it.
+ */
 function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: boolean; onAsk: (level: Level) => void }) {
   const now = useNow(60_000);
   return (
@@ -146,6 +149,7 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
         {LEVEL_LINES[nemia.level]}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>
+      <TrustLine trust={nemia.trust} />
     </Part>
   );
 }
@@ -284,16 +288,12 @@ function RaiseControls({ row, pending, onAsk }: { row: FactoryLevel; pending: bo
   );
 }
 
-/**
- * Her session's state in the board's words, the line that trusts her folder while it is not, its task and its phase as the runtime says
- * it; stopped from outside, a way to a fresh one.
- */
+/** Her session's state in the board's words, its task and its phase as the runtime says it; stopped from outside, a way to a fresh one. */
 function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: boolean; onAsk: (level: Level) => void }) {
   const { kind, words } = sessionOf(nemia);
   return (
     <Part heading="Her session" data-nemia-session data-state={kind}>
       <p className="text-sm">{words}</p>
-      <TrustLine trust={nemia.trust} />
       {nemia.task !== null && (
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>

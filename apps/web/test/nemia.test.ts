@@ -62,10 +62,13 @@ test('her session reads off with no task, not filed with no phase, starting whil
   assert.match(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).words, /^Not filed yet: the keeper files her session/);
 });
 
-test('her session not filed while her folder is not trusted reads untrusted, sending a person to the trust line, and off whatever her trust', () => {
+test('her session not filed while her folder is not trusted reads untrusted, waiting on a person to trust it, and off whatever her trust', () => {
   const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', trust: "cd '/store/nemia' && claude" });
   assert.equal(sessionOf(waiting).kind, 'untrusted');
-  assert.match(sessionOf(waiting).words, /^Waiting on your trust: run the trust line once in a terminal/);
+  assert.match(
+    sessionOf(waiting).words,
+    /^Waiting on your trust: the keeper files her session at its next beat once her folder is trusted\.$/,
+  );
   assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'off');
   assert.equal(
     sessionOf({ ...up, trust: "cd '/store/nemia' && claude" }).kind,

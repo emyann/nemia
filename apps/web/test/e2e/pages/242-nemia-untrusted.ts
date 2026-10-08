@@ -7,9 +7,9 @@ import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * The rail's Settings leads to the store's settings, where her folder is not trusted: the line that trusts it is shown, to copy, before
-   * she is turned on; a pick of Semi-auto is written all the same, a 200 that names that line, and her session reads waiting on the
-   * person's trust, with the line still shown. A pick of Manual takes it back, and the page removes the level file it wrote.
+   * The rail's Settings leads to the store's settings, where her folder is not trusted: under her level's switch, that no session of hers
+   * is filed until it is, and the line that trusts it, to copy, before she is turned on; a pick of Semi-auto is written all the same, a 200
+   * that names that line, which stays under the switch, and her session reads waiting on the person's trust. A pick of Manual takes it back, and the page removes the level file it wrote.
    */
   name: 'nemia-untrusted',
   route: '/settings',
@@ -24,8 +24,8 @@ export default {
       await expectVisible(page.getByRole('heading', { level: 1, name: 'Settings' }), 'the rail leads to the Settings page');
       const section = page.locator('[data-nemia-section]');
       await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'her session is off, no level ever set');
-      const trustLine = section.locator('[data-nemia-trust]');
-      await expectVisible(trustLine, 'the line that trusts her folder is shown before she is turned on');
+      const trustLine = section.locator('[data-nemia-level] [data-nemia-trust]');
+      await expectVisible(trustLine, 'the line that trusts her folder is shown under her level, before she is turned on');
       const [answered] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', { timeout: WAIT_MS }),
         pickLevel(page, section.locator('[data-nemia-pick]'), 'Semi-auto'),
@@ -39,7 +39,11 @@ export default {
       await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
       await expectVisible(section.locator('[data-nemia-session][data-state="untrusted"]'), 'her session waits on the trust');
       await expectVisible(section.getByText('Waiting on your trust'), 'said in words');
-      const code = section.locator('[data-nemia-session] [data-nemia-trust] code');
+      await expectVisible(
+        trustLine.getByText('No session of hers is filed until her folder is trusted'),
+        'the wait is plain under the switch',
+      );
+      const code = trustLine.locator('code');
       if ((await code.textContent()) !== now.trust)
         throw new Refused(`the line shown is the api's — it shows ${JSON.stringify(await code.textContent())}, the api said ${now.trust}`);
       if (!fs.existsSync(levelFile)) throw new Refused(`her level is written — ${levelFile} is not there`);

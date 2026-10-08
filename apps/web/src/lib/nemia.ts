@@ -18,8 +18,7 @@ export type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'start
 const SESSION_WORDS: Record<SessionKind, string> = {
   off: 'Off: no session of hers runs.',
   leaving: 'Stopping: the keeper ends her session at its next beat.',
-  untrusted:
-    'Waiting on your trust: run the trust line once in a terminal and accept its prompt; the keeper files her session at its next beat.',
+  untrusted: 'Waiting on your trust: the keeper files her session at its next beat once her folder is trusted.',
   'not-filed': 'Not filed yet: the keeper files her session at its next beat.',
   starting: 'Filed: her session is starting.',
   up: 'Up: her session runs.',

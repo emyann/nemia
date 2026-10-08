@@ -2,6 +2,7 @@
  * A remote agent's registry, `remote/` under the store: one entry a session, `<name>.json` with the name URI-encoded, moved to
  * `remote/done/` once let go of. What an entry holds, how an older one is read, and how a session's entry is forgotten.
  */
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { formerStateOf, isSessionState, type Sighting } from '../core/index.ts';
@@ -34,6 +35,8 @@ export type Entry = {
   refused?: string;
   /** The send failed on the way, or was not answered in time: its words, the Task in doubt. */
   doubt?: string;
+  /** How many of the Task's artifacts were whole when it was last seen with its turn over: a later turn's are not, until it ends. */
+  whole?: number;
 };
 
 /**
@@ -77,3 +80,48 @@ export const forgetEntryOf =
     };
     return forgetFiles(harness, files, left, options.dry);
   };
+
+/** The names of the entries in `under`; none for a folder not made yet. */
+const entryNames = (under: string): string[] => {
+  try {
+    return fs.readdirSync(under).filter((f) => f.endsWith('.json'));
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw e;
+  }
+};
+
+/**
+ * The registry of the remote harness `harness` beneath the store `root`: `remote/` (`dir`) and `remote/done/` (`done`). `fileOf` is
+ * a session's entry file, open or under `done`; `write` writes an entry whole, to a temporary file renamed; `open` reads the open
+ * entries sent through this harness; `bySession` an entry open or let go of, by the Task's id, the id it was seen under, the
+ * message's id, or its context — the latest Task sent in it.
+ */
+export const registryOf = (harness: string, root: string) => {
+  const dir = path.join(root, 'remote');
+  const done = path.join(dir, 'done');
+  const fileOf = (name: string, under = dir) => entryFileOf(under, name);
+  const write = (e: Entry, under = dir) => {
+    fs.mkdirSync(under, { recursive: true });
+    const tmp = `${fileOf(e.name, under)}.${process.pid}.${randomUUID()}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(e)}\n`);
+    fs.renameSync(tmp, fileOf(e.name, under));
+  };
+  const entriesIn = (under: string): Entry[] =>
+    entryNames(under).flatMap((f) => {
+      const e = readEntry(path.join(under, f));
+      return e?.agent === harness ? [e] : [];
+    });
+  const open = (): Entry[] => entriesIn(dir);
+  const bySession = (sessionId: string): Entry | undefined => {
+    const all = [...entriesIn(dir), ...entriesIn(done)];
+    return (
+      all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId) ??
+      all
+        .filter((e) => e.contextId === sessionId && e.taskId)
+        .sort((a, b) => a.sentAt.localeCompare(b.sentAt))
+        .at(-1)
+    );
+  };
+  return { dir, done, fileOf, write, open, bySession };
+};

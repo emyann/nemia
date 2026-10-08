@@ -47,12 +47,12 @@ import type { Message, Task } from '@a2a-js/sdk';
 import { TaskNotCancelableError, TaskNotFoundError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
 import type { SessionState, Sighting } from '../core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
 import { instantNow } from '../core/engine/now.ts';
-import { entryFileOf, forgetEntryOf, readEntry, type Entry } from './entry.ts';
+import { forgetEntryOf, readEntry, registryOf, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
+import { turnOver } from './remote-events.ts';
 import { authOf, connectionOf, type Credentials, type MissingCredential, type RemoteAgent } from './remote-client.ts';
 import { alive, sendHeld } from './sending.ts';
 import { Doubt, late, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
@@ -139,51 +139,7 @@ export const remoteOps = (
     e.sending !== undefined &&
     sendHeld(e, instantNow(), sendMs) &&
     (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
-  const dir = path.join(root, 'remote');
-  const done = path.join(dir, 'done');
-  const fileOf = (name: string, under = dir) => entryFileOf(under, name);
-
-  const write = (e: Entry, under = dir) => {
-    fs.mkdirSync(under, { recursive: true });
-    const tmp = `${fileOf(e.name, under)}.${process.pid}.${randomUUID()}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(e)}\n`);
-    fs.renameSync(tmp, fileOf(e.name, under));
-  };
-  const open = (): Entry[] => {
-    let names: string[];
-    try {
-      names = fs.readdirSync(dir);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
-      throw e;
-    }
-    return names
-      .filter((f) => f.endsWith('.json'))
-      .flatMap((f) => {
-        const e = readEntry(path.join(dir, f));
-        return e && e.agent === harness ? [e] : [];
-      });
-  };
-  const bySession = (sessionId: string): Entry | undefined => {
-    const all: Entry[] = [];
-    for (const under of [dir, done]) {
-      let names: string[] = [];
-      try {
-        names = fs.readdirSync(under);
-      } catch {}
-      for (const f of names.filter((n) => n.endsWith('.json'))) {
-        const e = readEntry(path.join(under, f));
-        if (e?.agent === harness) all.push(e);
-      }
-    }
-    return (
-      all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId) ??
-      all
-        .filter((e) => e.contextId === sessionId && e.taskId)
-        .sort((a, b) => a.sentAt.localeCompare(b.sentAt))
-        .at(-1)
-    );
-  };
+  const { dir, done, fileOf, write, open, bySession } = registryOf(harness, root);
 
   const { client, ask, sends } = connectionOf(harness, agent, credentials, requestMs, sendMs);
 
@@ -345,8 +301,11 @@ export const remoteOps = (
       return e.seen ?? { sessionId: e.taskId, state: 'working', ...(e.contextId ? { nativeId: e.contextId } : {}) };
     }
     const s = sightingOfTask(task);
-    if (TERMINAL.has(s.state)) write({ ...e, seen: s, ended: true });
-    else if (s.state !== e.seen?.state || s.waitingFor !== e.seen?.waitingFor || s.nativeId !== e.seen?.nativeId) write({ ...e, seen: s });
+    const whole = turnOver(s.state) ? task.artifacts.length : e.whole;
+    const kept = whole === undefined ? {} : { whole };
+    if (TERMINAL.has(s.state)) write({ ...e, seen: s, ended: true, ...kept });
+    else if (s.state !== e.seen?.state || s.waitingFor !== e.seen?.waitingFor || s.nativeId !== e.seen?.nativeId || whole !== e.whole)
+      write({ ...e, seen: s, ...kept });
     return s;
   };
 

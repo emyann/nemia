@@ -20,6 +20,7 @@ import {
 } from './factory.store.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
+import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...]
@@ -27,6 +28,8 @@ nemia factory attach <factory> <workflow>
 nemia factory detach <factory> <workflow>
 nemia factory hire <factory> <agent> --step <workflow>/<step>
 nemia factory fire <factory> --step <workflow>/<step>
+nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
+nemia factory unschedule <factory> <workflow>
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
 nemia factory rm <name>
@@ -51,6 +54,11 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  fills any step; it is found, when the run starts, where the step's own agent: would be.
                  A step whose own file names its agent: takes no hire.
   nemia factory fire takes a step's hire back.
+  nemia factory schedule has the daemon start a run of an attached workflow at each fire of a cron (five or six
+                 fields, read in --tz, the machine's zone when none), asked what --brief says, on --repo or the
+                 factory's one repository, at every level; a pause stops it. A daemon that was down starts
+                 what it missed once. A second schedule of the workflow replaces the first.
+  nemia factory unschedule takes a workflow's schedule back.
   nemia factory instruction says where the factory's instruction is kept, and prints it: NEMIA.md in its first
                  folder — the first --repo it was filed with — unless its file names another path there
                  (--path <path>, relative, never climbing out), or the store (--store), in
@@ -73,7 +81,8 @@ with a --repo that is not a directory, an add of a name already filed, an rm, at
 name with no factory, an instruction of the default factory, two of --path, --store and --clear, a --path
 that is empty, absolute or climbs out of the folder, an instruct of an instruction kept in a folder or of blank
 words, a workflow's name that is empty, hidden, holds a slash or is agents or skills, a detach
-of a workflow not attached or still hired into, a --step that is not <workflow>/<step>, a hire into a workflow
+of a workflow not attached, still hired into or scheduled, a schedule of a workflow not attached, of a cron or a zone
+that does not read, or with an empty brief, an unschedule of a workflow not scheduled, a --step that is not <workflow>/<step>, a hire into a workflow
 not attached or into a step whose file names its own agent:, and a fire of a step with no hire. A start in a factory of a workflow it has not attached is
 refused, naming the attach.`;
 
@@ -95,7 +104,7 @@ const listed = ({ factories }: Listed): string[] => [
   `\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in ${factoriesDir()}`,
 ];
 
-/** `nemia factory`: the default factory, then each in the store; a word it does not take is refused naming its seven forms. */
+/** `nemia factory`: the default factory, then each in the store; a word it does not take is refused naming its nine forms. */
 export const FACTORY: Command<Listed> = {
   name: 'factory',
   usage: '',
@@ -108,7 +117,7 @@ export const FACTORY: Command<Listed> = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   nemia: 'read',
@@ -343,6 +352,8 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_DETACH,
   FACTORY_HIRE,
   FACTORY_FIRE,
+  FACTORY_SCHEDULE,
+  FACTORY_UNSCHEDULE,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,
   FACTORY_RM,

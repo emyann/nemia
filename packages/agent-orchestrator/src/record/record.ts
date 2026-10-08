@@ -118,6 +118,11 @@ type RunBase = {
    */
   from?: { inbox: string };
   /**
+   * The schedule that started the run, when the tick did (`startDue` in schedule.verb.ts): the factory, the workflow, and the fire it was
+   * started for (`due`). The schedule's last run is read off it. Absent on a run started any other way.
+   */
+  scheduled?: { factory: string; workflow: string; due: string };
+  /**
    * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `nemia start --gate <step>`, and an
    * inbox card's `gate:`. Each such step's closeout waits for a person — `nemia approve` — before anything after it is filed (`hasGate`).
    * Absent on a run given none.

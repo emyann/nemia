@@ -2,7 +2,8 @@
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and
- * `nemia plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`), a person's asks of a run —
+ * `nemia plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`, their schedules among them),
+ * a person's asks of a run —
  * `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and their steps (`nemia ls`, `runsListed`),
  * three reads the api alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots
  * (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its

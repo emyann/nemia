@@ -31,15 +31,23 @@ export const DEFAULT_INSTRUCTION = 'NEMIA.md';
 export type InstructionAt = { path: string } | { store: true };
 
 /**
+ * A schedule of a workflow a factory has attached: when the daemon starts a run of it, a cron expression of five or six fields (`cron`),
+ * read in the IANA zone `tz`, the machine's when none; what the run is asked (`brief`); the repository it works on (`repo`), the factory's
+ * one when none; and when the schedule was written (`since`), before which no fire counts.
+ */
+export type Schedule = { cron: string; brief: string; repo?: string; tz?: string; since: string };
+
+/**
  * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
- * attached to it, each by its folder's name, and its hires; none of either when the file names none. `instruction`: where its instruction
- * is kept, when the file says (`instructionAt`).
+ * attached to it, each by its folder's name, its hires and its schedules, by workflow; none of each when the file names none.
+ * `instruction`: where its instruction is kept, when the file says (`instructionAt`).
  */
 export type Factory = {
   name: string;
   repos: readonly string[];
   workflows: readonly string[];
   hires: Hires;
+  schedules: Readonly<Record<string, Schedule>>;
   instruction?: InstructionAt;
 };
 
@@ -87,7 +95,7 @@ export function factoryNameRefusal(name: string): string | undefined {
 }
 
 /** A verb of `nemia factory` that writes a factory's file. */
-export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire' | 'instruction' | 'instruct';
+export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire' | 'instruction' | 'instruct' | 'schedule' | 'unschedule';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -99,6 +107,8 @@ const INSTEAD: Record<FactoryWrite, string> = {
   fire: 'It hires no one: fire in a factory nemia factory ls lists.',
   instruction: 'It keeps no instruction: give one to a factory nemia factory ls lists.',
   instruct: 'It keeps no instruction: write one for a factory nemia factory ls lists.',
+  schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
+  unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
 };
 
 /** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
@@ -402,6 +412,16 @@ const workflowLine = (workflows: readonly string[], width: number): string[] =>
 const instructionLine = (at: InstructionAt | undefined, width: number): string[] =>
   at === undefined ? [] : [`${' '.repeat(width)}  instruction: ${'store' in at ? 'kept in the store' : at.path}`];
 
+/** A factory's schedules as `nemia factory ls` lists them under its line, by workflow: `schedule janitor  0 9 * * 1  "Read the stats"`. */
+const scheduleLines = (schedules: Factory['schedules'], width: number): string[] =>
+  Object.keys(schedules)
+    .sort()
+    .map((workflow) => {
+      const s = schedules[workflow];
+      const where = `${s.tz ? ` (${s.tz})` : ''}${s.repo ? ` on ${s.repo}` : ''}`;
+      return `${' '.repeat(width)}  schedule ${workflow}  ${s.cron}${where}  ${JSON.stringify(s.brief.split('\n')[0])}`;
+    });
+
 /** What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
 export function factoryLines(listing: readonly FactoryListing[]): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
@@ -412,7 +432,12 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
       `${l.name.padEnd(width)}  ${'error' in l ? `${l.file} ${l.error}` : l.repos.join(', ')}`,
       ...('error' in l
         ? []
-        : [...workflowLine(l.workflows, width), ...hireLines(l.hires, width), ...instructionLine(l.instruction, width)]),
+        : [
+            ...workflowLine(l.workflows, width),
+            ...hireLines(l.hires, width),
+            ...scheduleLines(l.schedules, width),
+            ...instructionLine(l.instruction, width),
+          ]),
     ]),
   ];
 }

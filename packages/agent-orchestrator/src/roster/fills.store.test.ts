@@ -34,7 +34,13 @@ write(path.join(home, 'workflows', 'omega', 'step.md'), '---\nagent: zed\n---\nS
 
 const theirs = (name: string): string => path.resolve(repo, 'workflows', 'agents', `${name}.md`);
 const yours = (name: string): string => path.resolve(home, 'workflows', 'agents', `${name}.md`);
-const factory = (name: string, workflows: string[], hires: Factory['hires'] = {}): Factory => ({ name, repos: [repo], workflows, hires });
+const factory = (name: string, workflows: string[], hires: Factory['hires'] = {}): Factory => ({
+  name,
+  repos: [repo],
+  workflows,
+  hires,
+  schedules: {},
+});
 
 test("every step of both places, credited to the file a start runs: the workflow's own agents/ before yours", () => {
   assert.deepEqual(stepsFilled(repo, home), [

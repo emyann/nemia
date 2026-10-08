@@ -29,3 +29,6 @@ text at build, by path from its root. A page holds landed material only; a term 
   plugin off or a heap cap leaves it over 1 GB. The builds run one after the other, so the second adds seconds, not a peak, and the
   links validator has no entry to call outside a build.
 - Both builds write this folder's `.astro/`, ignored: a test build and a `npm run dev` at once overwrite each other's types.
+- **The prerender environment inlines its dependencies on `astro build` alone** (`prerenderInlinedOnBuild` in `astro.config.mjs`): the build
+  needs it for `cookie`, and in dev it makes Vite's runner evaluate CommonJS `picomatch` with no `require`. `test/build.test.ts` starts
+  dev through `dev()` in a child (`test/dev.ts`), which writes no `.astro/dev.json`, and fails on the prerender server's error.

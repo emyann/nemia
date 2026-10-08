@@ -5,10 +5,23 @@ import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
 import { remarkMermaid } from './src/mermaid.ts';
 
+/**
+ * Inlines every dependency into the prerender environment on `astro build` alone, where Node cannot load `cookie`'s named
+ * exports for Astro's prerenderer; in dev, Astro's own external lists stay, so Vite's runner never evaluates a CommonJS package.
+ */
+const prerenderInlinedOnBuild = {
+  name: 'prerender-inlined-on-build',
+  hooks: {
+    'astro:config:setup': ({ command, updateConfig }) => {
+      if (command === 'build') updateConfig({ vite: { environments: { prerender: { resolve: { noExternal: true } } } } });
+    },
+  },
+};
+
 export default defineConfig({
-  vite: { environments: { prerender: { resolve: { noExternal: true } } } },
   markdown: { processor: unified({ remarkPlugins: [[remarkMermaid, { root: fileURLToPath(new URL('../..', import.meta.url)) }]] }) },
   integrations: [
+    prerenderInlinedOnBuild,
     starlight({
       title: 'Nemia',
       customCss: ['./src/styles/accent.css'],

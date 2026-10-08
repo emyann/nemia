@@ -6,7 +6,8 @@
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
  * repository's team from `workflows/agents/` (`words.test.ts`). Every package's test script loads the test-cost probe and reporter from
- * `tools/test-costs/`, so each package's test lists `tools/` too.
+ * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
+ * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -42,6 +43,18 @@ const INPUTS: Record<string, readonly string[]> = {
   ],
   'api#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**'],
   'web#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**'],
+  'docs#test': [
+    '$TURBO_DEFAULT$',
+    '$TURBO_ROOT$/tools/**',
+    '$TURBO_ROOT$/lint/**',
+    ...APPS,
+    '$TURBO_ROOT$/packages/**',
+    '!$TURBO_ROOT$/packages/*/.turbo/**',
+    '$TURBO_ROOT$/docs/**',
+    '$TURBO_ROOT$/workflows/**',
+    '$TURBO_ROOT$/README.md',
+    '$TURBO_ROOT$/CLAUDE.md',
+  ],
 };
 
 type Turbo = { tasks: Record<string, { inputs?: string[] }> };
@@ -83,10 +96,13 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
   assert.deepEqual(missingInputs(dropping('agent-runtime#test', '$TURBO_ROOT$/apps/*/*.ts')), [
     'agent-runtime#test does not list $TURBO_ROOT$/apps/*/*.ts among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
-  for (const task of ['agent-orchestrator#test', 'agent-runtime#test', 'api#test', 'web#test'])
+  for (const task of ['agent-orchestrator#test', 'agent-runtime#test', 'api#test', 'web#test', 'docs#test'])
     assert.deepEqual(missingInputs(dropping(task, '$TURBO_ROOT$/tools/**')), [
       `${task} does not list $TURBO_ROOT$/tools/** among its inputs in turbo.json: add it, or turbo replays it from its cache`,
     ]);
+  assert.deepEqual(missingInputs(dropping('docs#test', '$TURBO_ROOT$/packages/**')), [
+    'docs#test does not list $TURBO_ROOT$/packages/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  ]);
   assert.deepEqual(missingInputs(dropping('agent-runtime#test', '$TURBO_DEFAULT$')), [
     'agent-runtime#test does not list $TURBO_DEFAULT$ among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);

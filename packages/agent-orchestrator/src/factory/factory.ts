@@ -83,7 +83,16 @@ export function instructionPathRefusal(p: string): string | undefined {
 }
 
 /** A factory as `nemia factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
-export type FactoryListing = (Factory & { file: string }) | { name: string; file: string; error: string };
+export type FactoryListing = (Factory & { file: string; status?: TemplateStatus }) | { name: string; file: string; error: string };
+
+/** A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence. */
+export type FactoryCondition = { type: string; status: 'True' | 'False'; reason: string; message: string };
+
+/**
+ * What the controller last observed of a factory made from a template, as `nemia factory ls` lists it: the template's version its base
+ * holds (`applied`), null before its first render, and its conditions, none before then.
+ */
+export type TemplateStatus = { applied: string | null; conditions: readonly FactoryCondition[] };
 
 /** Why `name` cannot name a factory, or undefined: empty, or not a lowercase slug — the slug suggested when lowering its case makes one. */
 export function factoryNameRefusal(name: string): string | undefined {
@@ -410,6 +419,22 @@ const workflowLine = (workflows: readonly string[], width: number): string[] =>
 const instructionLine = (at: InstructionAt | undefined, width: number): string[] =>
   at === undefined ? [] : [`${' '.repeat(width)}  instruction: ${'store' in at ? 'kept in the store' : at.path}`];
 
+/**
+ * The template a factory was made from, as `nemia factory ls` lists it under its line: its folder and version, the version applied or that
+ * none is yet, and each condition that is not as it should be — `Applied` false, `ConflictsPending` true — with its sentence.
+ */
+function templateLines(template: FactoryTemplate | undefined, status: TemplateStatus | undefined, width: number): string[] {
+  if (template === undefined) return [];
+  const pad = ' '.repeat(width);
+  const applied = status?.applied ?? null;
+  const at = applied === null ? 'not rendered yet: the daemon renders it, nemia up' : `applied at ${applied}`;
+  const amiss = (status?.conditions ?? []).filter((c) => (c.type === 'Applied') === (c.status === 'False'));
+  return [
+    `${pad}  template: ${template.source} ${template.version}, ${at}`,
+    ...amiss.map((c) => `${pad}  ${c.type} ${c.status}, ${c.reason}: ${c.message}`),
+  ];
+}
+
 /** What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
 export function factoryLines(listing: readonly FactoryListing[]): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
@@ -420,7 +445,12 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
       `${l.name.padEnd(width)}  ${'error' in l ? `${l.file} ${l.error}` : l.repos.join(', ')}`,
       ...('error' in l
         ? []
-        : [...workflowLine(l.workflows, width), ...hireLines(l.hires, width), ...instructionLine(l.instruction, width)]),
+        : [
+            ...templateLines(l.template, l.status, width),
+            ...workflowLine(l.workflows, width),
+            ...hireLines(l.hires, width),
+            ...instructionLine(l.instruction, width),
+          ]),
     ]),
   ];
 }

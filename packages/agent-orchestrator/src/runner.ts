@@ -203,7 +203,15 @@ export {
   unattachedRefusal,
   unfilledRefusal,
 } from './factory/factory.ts';
-export type { Factory, FactoryListing, Hires, InstructionAt } from './factory/factory.ts';
+export type {
+  Factory,
+  FactoryCondition,
+  FactoryListing,
+  FactoryTemplate,
+  Hires,
+  InstructionAt,
+  TemplateStatus,
+} from './factory/factory.ts';
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine, FeedPublished } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';

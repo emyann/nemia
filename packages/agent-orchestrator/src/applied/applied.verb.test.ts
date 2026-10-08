@@ -17,7 +17,7 @@ const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate } = await import('../template/template.store.ts');
-const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactory } = await import('../runner.ts');
+const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
@@ -119,6 +119,11 @@ test("apply files only the factory's file, naming its template, version and para
     template: { source: dir, version: '0.1.0', params: { budget: 7, model: 'opus' } },
   });
   assert.deepEqual(readFactory('made').workflows, [], 'a tree not rendered yet offers nothing');
+  assert.deepEqual(
+    (readFactories().find((f) => f.name === 'made') as { status?: unknown }).status,
+    { applied: null, conditions: [] },
+    'none is applied before the controller renders it',
+  );
   await assert.rejects(apply('made', dir, repo, '--set', 'budget=7'), refusedWith('Conflict', /There is a factory made already/));
 });
 
@@ -170,7 +175,10 @@ test('a template moved to another version is drift: the base and tree are left a
   edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
     spec.steps[1].rounds = 5;
   });
+  const listed = () => readFactories().find((f) => f.name === 'drifted') as { status?: unknown };
+  assert.deepEqual(listed().status, { applied: '0.1.0', conditions: first.conditions }, 'the listing reads what the controller wrote');
   const status = reconcileFactory(templated('drifted'));
+  assert.deepEqual(listed().status, { applied: '0.1.0', conditions: status.conditions });
   assert.deepEqual(status.conditions[0], {
     type: 'Applied',
     status: 'False',

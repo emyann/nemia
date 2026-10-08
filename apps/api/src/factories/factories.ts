@@ -4,7 +4,16 @@
  * factory` is the one writer of a factory's file.
  */
 import { Hono } from 'hono';
-import { COMMANDS, commandLine, DEFAULT_FACTORY, FACTORY, type FactoryListing, type Hires, runWith } from 'agent-orchestrator';
+import {
+  COMMANDS,
+  commandLine,
+  DEFAULT_FACTORY,
+  FACTORY,
+  type FactoryCondition,
+  type FactoryListing,
+  type Hires,
+  runWith,
+} from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 import { type ApiEnv, served } from '../layer.ts';
 
@@ -24,9 +33,23 @@ const commandsOf = (name: string): FactoryCommands => ({
 });
 
 /**
+ * The template a factory was made from, as the board reads it: its folder (`source`), its version and the parameters given at
+ * `nemia factory apply`; the version its base holds (`applied`), null until the daemon renders it; and the conditions the daemon last
+ * wrote, `Applied` and `ConflictsPending`, none until then.
+ */
+export type FactoryTemplateAnswer = {
+  source: string;
+  version: string;
+  params: Record<string, string | number | boolean>;
+  applied: string | null;
+  conditions: FactoryCondition[];
+};
+
+/**
  * A factory as the board reads it: its name, whether it is the default factory, its repositories, the workflows it offers — null for the
  * default factory, which offers every workflow found — and its hires, `<workflow>/<step>` to an agent's name. A factory whose file does
- * not read has none of them, and `error` says why, in the package's words; null for every other. `commands`: its lines (`commandsOf`).
+ * not read has none of them, and `error` says why, in the package's words; null for every other. `template`: the template it was made
+ * from (`FactoryTemplateAnswer`), null for one filed by hand. `commands`: its lines (`commandsOf`).
  */
 export type FactoryAnswer = {
   name: string;
@@ -35,8 +58,21 @@ export type FactoryAnswer = {
   workflows: string[] | null;
   hires: Hires;
   error: string | null;
+  template: FactoryTemplateAnswer | null;
   commands: FactoryCommands;
 };
+
+/** The template of a factory that reads, as the board reads it, or null for one filed by hand. */
+const templateOf = (listing: Exclude<FactoryListing, { error: string }>): FactoryTemplateAnswer | null =>
+  listing.template === undefined
+    ? null
+    : {
+        source: listing.template.source,
+        version: listing.template.version,
+        params: { ...listing.template.params },
+        applied: listing.status?.applied ?? null,
+        conditions: (listing.status?.conditions ?? []).map((c) => ({ ...c })),
+      };
 
 /** One factory of the store as the board reads it, or one whose file does not read, with why. */
 const answerOf = (listing: FactoryListing): FactoryAnswer =>
@@ -48,6 +84,7 @@ const answerOf = (listing: FactoryListing): FactoryAnswer =>
         workflows: [],
         hires: {},
         error: `${listing.file} ${listing.error}`,
+        template: null,
         commands: commandsOf(listing.name),
       }
     : {
@@ -57,6 +94,7 @@ const answerOf = (listing: FactoryListing): FactoryAnswer =>
         workflows: [...listing.workflows],
         hires: { ...listing.hires },
         error: null,
+        template: templateOf(listing),
         commands: commandsOf(listing.name),
       };
 
@@ -79,6 +117,7 @@ export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
         workflows: null,
         hires: {},
         error: null,
+        template: null,
         commands: commandsOf(DEFAULT_FACTORY),
       },
       ...listed.factories.map(answerOf),

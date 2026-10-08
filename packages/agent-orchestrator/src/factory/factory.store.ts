@@ -33,7 +33,7 @@ import {
 import { frontmatterKey } from '../former/former.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
-import { readTreeWiring, treeDir, writeTreeWiring } from '../applied/applied.store.ts';
+import { readStatus, readTreeWiring, treeDir, writeTreeWiring } from '../applied/applied.store.ts';
 
 /** Where the factories are: `$WF_ROOT/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDir = (): string => path.join(HOME, 'factories');
@@ -120,13 +120,18 @@ function factoryOf(name: string, content: FactoryFile): Factory | { error: strin
   };
 }
 
-/** One entry of the folder as `nemia factory ls` lists it: the factory its file says, or why the file does not read as one. */
+/**
+ * One entry of the folder as `nemia factory ls` lists it: the factory its file says, with what the controller last observed of it where it
+ * is made from a template (`readStatus`), or why the file does not read as one.
+ */
 function factoryAt(file: string): FactoryListing {
   const name = file.slice(0, -'.json'.length);
   const read = factoryFile(name);
   const factory = 'error' in read ? read : factoryOf(name, read.content);
   if ('error' in factory) return { name, file: read.file, error: factory.error };
-  return { ...factory, file: read.file };
+  if (factory.template === undefined) return { ...factory, file: read.file };
+  const status = readStatus(name);
+  return { ...factory, file: read.file, status: { applied: status?.version ?? null, conditions: status?.conditions ?? [] } };
 }
 
 /**

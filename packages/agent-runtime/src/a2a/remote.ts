@@ -43,49 +43,21 @@
  * read again: the registry is the record.
  */
 import { Effect } from 'effect';
-import type { AgentCard, AgentInterface, Message, SecurityScheme, Task } from '@a2a-js/sdk';
-import {
-  Client,
-  ClientFactory,
-  createAuthenticatingFetchWithRetry,
-  JsonRpcTransportFactory,
-  RestTransportFactory,
-} from '@a2a-js/sdk/client';
+import type { Message, Task } from '@a2a-js/sdk';
 import { TaskNotCancelableError, TaskNotFoundError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { firstOf, quote, type SessionState, type Sighting, WORDS_QUOTE } from '../core/index.ts';
+import type { SessionState, Sighting } from '../core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
 import { instantNow } from '../core/engine/now.ts';
-import { cardOfJson, SCHEME_KINDS } from './card.ts';
 import { entryFileOf, forgetEntryOf, readEntry, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
+import { authOf, connectionOf, type Credentials, type MissingCredential, type RemoteAgent } from './remote-client.ts';
 import { alive, sendHeld } from './sending.ts';
-import { AuthRefused, Doubt, Late, late, messageOf, Redirected, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
+import { Doubt, late, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
 
-/**
- * A remote A2A agent, as a harness is configured: the agent's base URL, whose card is read from
- * `.well-known/agent-card.json` beneath its path (`https://a.example/reviewer` reads
- * `https://a.example/reviewer/.well-known/agent-card.json`), or at the URL itself when it names a `.json` file; or the
- * card itself, as the JSON the agent would serve. Its secrets are not here: the engine's `credentials` gives each when a
- * request needs it.
- */
-export type RemoteAgent = { url: string } | { card: Record<string, unknown> };
-
-/**
- * The secret for one of a card's security schemes, by its name on the card, for the agent at `agentUrl` — the URL the
- * harness was given, on whose origin every request goes, or for an agent given by its card the interface's URL;
- * `undefined` when there is none.
- */
-export type Credentials = (scheme: string, agentUrl: string, harness: string) => string | undefined;
-
-/**
- * The words a spawn is refused in when `credentials` gives no secret for `scheme`: what a caller that keeps its secrets
- * somewhere of its own says to do, say which variable to set. Absent, the refusal says to give `Engine.layer` a
- * `credentials` that answers for the scheme.
- */
-export type MissingCredential = (scheme: string, agentUrl: string, harness: string) => string;
+export type { Credentials, MissingCredential, RemoteAgent } from './remote-client.ts';
 
 /** How long a request to a remote agent is waited on, the card's included, before it is read as not answered. */
 export const REQUEST_MS = 10_000;
@@ -96,24 +68,6 @@ export const SEND_MS = 15 * 60_000;
 /** How long a spawn waits, in the pass, for its send's answer before it leaves the send to go on without it. */
 export const SPAWN_WAIT_MS = 1_000;
 
-/** Where the card of an agent given by `address` is read: the address itself when it names a `.json` file, else beneath its path. */
-export const cardUrlOf = (address: string): URL => {
-  const url = new URL(address);
-  if (url.pathname.endsWith('.json')) return url;
-  if (!url.pathname.endsWith('/')) url.pathname = `${url.pathname}/`;
-  return new URL('.well-known/agent-card.json', url);
-};
-
-/** An address as its words show it: origin and path, never the query, which can carry a key (as the api's `remoteOf` shows one). */
-const shownUrl = (u: string | URL | Request): string => {
-  const url = new URL(u instanceof Request ? u.url : u);
-  return `${url.origin}${url.pathname}`;
-};
-
-/** The bindings this runtime speaks, as a card names them: gRPC is not one. */
-const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
-const SPOKEN_WORDS = 'JSON-RPC (`JSONRPC`) and REST (`HTTP+JSON`), at A2A 1.0';
-
 /** Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments. */
 export const remoteRefuses =
   (harness: string) =>
@@ -123,110 +77,6 @@ export const remoteRefuses =
       ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
       : undefined;
   };
-
-/** The card's interfaces that this runtime speaks, in the card's order. */
-const spokenOf = (card: AgentCard): AgentInterface[] =>
-  card.supportedInterfaces.filter((i) => SPOKEN.includes(i.protocolBinding.toUpperCase()) && !i.protocolVersion.startsWith('0.'));
-
-const originOf = (url: string): string | undefined => (URL.canParse(url) ? new URL(url).origin : undefined);
-
-/** The headers a card's requirements ask for, as the caller's secrets meet them — or why none can be met. */
-type Auth = { headers: Record<string, string> } | { refusal: string };
-
-/**
- * One scheme's header, or why it cannot be sent. An OAuth 2 or OpenID Connect scheme is sent as a bearer token that
- * `credentials` gives: the runtime runs no OAuth flow.
- */
-const headerOf = (
-  name: string,
-  scheme: SecurityScheme | undefined,
-  secret: () => string | undefined,
-  missing: () => string | undefined,
-): [string, string] | string => {
-  name = quote(name);
-  if (!scheme) return `\`${name}\` is not a scheme the card declares`;
-  const s = scheme.scheme;
-  if (!s || !SCHEME_KINDS.includes(s.$case)) return `\`${name}\` is a kind of scheme this runtime does not know, and cannot send`;
-  const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
-    const given = secret();
-    return given === undefined || given === ''
-      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${missing() ?? `give \`Engine.layer\` a \`credentials\` that answers for \`${name}\``}`
-      : [header, value(given)];
-  };
-  switch (s.$case) {
-    case 'httpAuthSecurityScheme': {
-      const kind = s.value.scheme.toLowerCase();
-      if (kind === 'bearer') return needed('authorization', (t) => `Bearer ${t}`);
-      if (kind === 'basic') return needed('authorization', (t) => `Basic ${Buffer.from(t).toString('base64')}`);
-      return `\`${name}\` is HTTP \`${quote(s.value.scheme)}\` authentication, and this runtime sends only \`Bearer\` and \`Basic\``;
-    }
-    case 'oauth2SecurityScheme':
-    case 'openIdConnectSecurityScheme':
-      return needed('authorization', (t) => `Bearer ${t}`);
-    case 'apiKeySecurityScheme':
-      return s.value.location.toLowerCase() === 'header'
-        ? needed(s.value.name.toLowerCase(), (t) => t)
-        : `\`${name}\` is an API key in a ${quote(s.value.location) || 'place the card does not name'}, and this runtime sends a key only in a header, where no log of the address holds it`;
-    case 'mtlsSecurityScheme':
-      return `\`${name}\` is mutual TLS, and this runtime holds no client certificate`;
-  }
-};
-
-/** What the card's requirements ask of each request: the first requirement the secrets meet whole, else why none is met. */
-const authOf = (
-  card: AgentCard,
-  agentUrl: string,
-  harness: string,
-  credentials: Credentials | undefined,
-  missing?: MissingCredential,
-): Auth => {
-  if (!card.securityRequirements.length) return { headers: {} };
-  const why: string[] = [];
-  for (const requirement of card.securityRequirements) {
-    const headers: Record<string, string> = {};
-    const unmet: string[] = [];
-    for (const name of Object.keys(requirement.schemes)) {
-      const h = headerOf(
-        name,
-        card.securitySchemes[name],
-        () => credentials?.(name, agentUrl, harness),
-        () => missing?.(name, agentUrl, harness),
-      );
-      if (typeof h === 'string') unmet.push(h);
-      else headers[h[0]] = h[1];
-    }
-    if (!unmet.length) return { headers };
-    why.push(firstOf(unmet, ', and '));
-  }
-  return {
-    refusal: `the agent at ${agentUrl} asks for authentication this runtime cannot give: ${firstOf(why, '; or ')}. Nothing was sent.`,
-  };
-};
-
-/**
- * The card `read` gave, or a refusal in words: `what` names the card, its first wrong field follows, then `then`, and that nothing
- * was sent.
- */
-const taken = (read: { card: AgentCard } | { wrong: string }, what: string, then = ''): AgentCard => {
-  if ('wrong' in read) throw new Refusal(`${what}: ${read.wrong}. ${then ? `${then} nothing` : 'Nothing'} was sent.`);
-  return read.card;
-};
-
-/** The card an agent answered for at `at`, or a refusal that names it by its origin and path: nothing is sent past one. */
-const servedCard = async (at: URL, response: Response): Promise<AgentCard> => {
-  if (!response.ok)
-    throw new Refusal(
-      `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${quote(response.statusText, WORDS_QUOTE)}, and nothing was sent.`,
-    );
-  const json: unknown = await response.json().catch(() => undefined);
-  if (typeof json !== 'object' || json === null)
-    throw new Refusal(`what ${shownUrl(at)} serves is not an agent card, and nothing was sent.`);
-  return taken(
-    cardOfJson(json),
-    `what ${shownUrl(at)} serves is not an A2A 1.0 agent card this runtime reads`,
-    "The agent's operator serves the card;",
-  );
-};
 
 /** What a send came to: the agent's answer, its refusal, a failure on the way, or a stop that cut it. */
 type Answer = { task: Task } | { message: Message } | { refused: string } | { failed: unknown } | { canceled: true };
@@ -241,11 +91,8 @@ export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCred
  * schemes; absent, only an agent that asks for no authentication is reached. `requestMs` bounds each request but the send,
  * which `sendMs` bounds; `spawnWaitMs` is how long a spawn waits in the pass for its answer.
  *
- * What the client knows of the agent — its card, the interface chosen and the SDK's client (`seam`) — is a view: `ask`
- * drops it at any failure, and the next call reads the card again. The card carries no secret, so a redirect to it is
- * followed, and what it names is held to the address's origin. The headers are asked of `credentials` on every request,
- * so a secret that changes is sent as it is at the time; a refusal there was said before the send. The factory is handed
- * the card already read, with only the interface chosen.
+ * What the client knows of the agent — its card, the interface chosen and the SDK's client — is a view (`connectionOf`):
+ * `ask` drops it at any failure, and the next call reads the card again. A refusal of the auth was said before the send.
  *
  * The verbs:
  * - `spawn`, in order: a name whose entry has a Task adopts it, and nothing is sent again; one being sent by a process
@@ -338,100 +185,7 @@ export const remoteOps = (
     );
   };
 
-  const address = 'url' in agent ? agent.url : undefined;
-  let seam: Promise<{ card: AgentCard; agentUrl: string; client: Client }> | undefined;
-
-  const sends = new WeakSet<AbortSignal>();
-  const bounded = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
-    const ms = init.signal && sends.has(init.signal) ? sendMs : requestMs;
-    const bound = AbortSignal.timeout(ms);
-    try {
-      return await fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, bound]) : bound });
-    } catch (e) {
-      if (bound.aborted) throw new Late(`${shownUrl(input)} did not answer within ${ms / 1000} s`);
-      throw e;
-    }
-  };
-
-  const readCard = async (): Promise<AgentCard> => {
-    if (!address) return taken(cardOfJson((agent as { card: unknown }).card), 'its `card` is not an A2A 1.0 agent card this runtime reads');
-    const at = cardUrlOf(address);
-    let response: Response;
-    try {
-      response = await bounded(at, { headers: { accept: 'application/json' } });
-    } catch (e) {
-      throw new Refusal(
-        `the agent's card could not be read at ${shownUrl(at)} (${quote(messageOf((e as Error).cause ?? e), WORDS_QUOTE)}): the agent is not reachable, and nothing was sent.`,
-      );
-    }
-    return servedCard(at, response);
-  };
-
-  const connect = async () => {
-    const card = await readCard();
-    const spoken = spokenOf(card);
-    const chosen = address ? spoken.find((i) => originOf(i.url) === new URL(address).origin) : spoken[0];
-    if (!chosen && spoken.length) {
-      throw new Refusal(
-        `the agent's card names ${quote(spoken.map((i) => i.url).join(', '), WORDS_QUOTE)}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`,
-      );
-    }
-    if (!chosen) {
-      const offered = card.supportedInterfaces.map((i) => `${i.protocolBinding}${i.protocolVersion ? ` ${i.protocolVersion}` : ''}`);
-      throw new Refusal(
-        `the agent's card offers ${offered.length ? quote(offered.join(', '), WORDS_QUOTE) : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`,
-      );
-    }
-    const agentUrl = address ?? chosen.url;
-    const fetchImpl = createAuthenticatingFetchWithRetry(
-      async (input, init) => {
-        const response = await bounded(input, { ...init, redirect: 'manual' });
-        if (response.status >= 300 && response.status < 400) {
-          throw new Redirected(
-            `the agent answered ${response.status} to ${quote(response.headers.get('location') ?? 'nowhere it named', WORDS_QUOTE)}, and a redirect is not followed, since the secret a request carries would go with it: give the harness the address it names. Nothing it was asked was done.`,
-          );
-        }
-        if (response.status === 401 || response.status === 403) {
-          throw new AuthRefused(
-            `the agent refused the request's authentication (${response.status} ${quote(response.statusText, WORDS_QUOTE)}): check what \`credentials\` gives for the schemes its card declares.`,
-          );
-        }
-        return response;
-      },
-      {
-        headers: async () => {
-          const a = authOf(card, agentUrl, harness, credentials);
-          return 'headers' in a ? a.headers : {};
-        },
-        shouldRetryWithHeaders: async () => undefined,
-      },
-    );
-    const only: AgentCard = { ...card, supportedInterfaces: [chosen] };
-    const factory = new ClientFactory({
-      transports: [new JsonRpcTransportFactory({ fetchImpl }), new RestTransportFactory({ fetchImpl })],
-      cardResolver: { resolve: async () => only, normalizeAgentCard: (c: AgentCard) => c },
-    });
-    return { card, agentUrl, client: await factory.createFromAgentCard(only) };
-  };
-
-  const client = async () => {
-    seam ??= connect();
-    try {
-      return await seam;
-    } catch (e) {
-      seam = undefined;
-      throw e;
-    }
-  };
-  const ask = async <A>(f: (c: Client) => Promise<A>): Promise<A> => {
-    const { client: c } = await client();
-    try {
-      return await f(c);
-    } catch (e) {
-      seam = undefined;
-      throw e;
-    }
-  };
+  const { client, ask, sends } = connectionOf(harness, agent, credentials, requestMs, sendMs);
 
   const failure =
     (verb: string) =>

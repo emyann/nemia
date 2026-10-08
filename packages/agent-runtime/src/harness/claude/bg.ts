@@ -40,7 +40,8 @@ import type { Monotonic } from '../../core/clock.ts';
 import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError, refusedOsError } from '../error.ts';
 import { forgetFiles } from '../forget.ts';
-import { registryOf, type RegistryRow } from './registry.ts';
+import { bgFollowOf, sharedListing } from './bg-follow.ts';
+import { claudeStateOf, registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
 import { claudeQuota } from './quota.ts';
@@ -73,43 +74,6 @@ export const QUIESCENT_AFTER_MS = 90_000;
 const MTIME_SLOP_MS = 1_000;
 
 const FINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled']);
-
-/**
- * A `waitingFor` that names signing in, in Claude Code's words: `auth`, `authenticate` and its forms, `log in`, `login`,
- * `sign in`, `sign-in` — whole words only, so `author`, `authority` and `oauth-proxy` are not it. `authorize` and
- * `authorization` are left out on purpose: a tool call authorised is a permission, which a person gives with words
- * (`input-required`), not an identity. Written from words, not from a wait Claude Code is known to word so: one worded
- * otherwise reads `input-required` — a wait on a person all the same.
- */
-export const AUTH_WAIT = /\b(?:auth|authenticat(?:e|es|ed|ing|ion)|log[ -]?in|sign[ -]?in)\b/i;
-
-/**
- * A `claude agents --json` row's `state`, in A2A's names — translated here, once, as the registry is parsed:
- *
- *   working  → working         at work; `status` says whether it computes (`busy`)
- *   blocked  → auth-required   when what it waits for names signing in (`AUTH_WAIT`), since that is A2A's word for it
- *            → input-required  otherwise: a permission prompt, a question — a person's words
- *   done     → completed       ended on its own
- *   failed   → failed
- *   stopped  → canceled        stopped under it (`claude stop`, or a person at its side)
- *
- * Any other word is `failed`: a state this runner has no reading of is no session it can wait on, and a pass then ends the
- * attempt as the harness's failure, writing the journal's word, never the harness's raw one.
- */
-export const claudeStateOf = (word: string, waitingFor?: string): SessionState => {
-  switch (word) {
-    case 'working':
-      return 'working';
-    case 'blocked':
-      return waitingFor !== undefined && AUTH_WAIT.test(waitingFor) ? 'auth-required' : 'input-required';
-    case 'done':
-      return 'completed';
-    case 'stopped':
-      return 'canceled';
-    default:
-      return 'failed';
-  }
-};
 
 /**
  * A session's closing statement as this runner reads it: what it said, when it said it, its call's id when it has one, and
@@ -364,6 +328,7 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  *     start (`countsFrom`), so its spend is counted across every process Claude Code respawned it in; kept by every look
  *     told nothing of the session, so a view's look between the pass's and its release leaves it as the pass set it.
  * - What an attempt said and consumed (`Kept`), which only saves reads.
+ * - What `claude agents` listed for its followers (`follow`), read at most once a second however many follow (`sharedListing`).
  *
  * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
  * its own, and a wrong count is worse than none.
@@ -391,6 +356,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     release: releaseFrom(registry, options.usageFrom ?? transcriptUsageSince),
     logs: sessionLogs,
     transcript: sessionTranscript,
+    follow: bgFollowOf(sharedListing(sh('claude', ['agents', '--all', '--json'], { verb: 'follow' }))),
     say: sayThrough(sessionsDir, registry.pids),
     quota: claudeQuota(),
     forget: forgetUnder(root),

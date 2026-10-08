@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
+import { DRAFT_TRANSCRIPT, REGISTRY, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { apiEnv, heard, OUT, REPO, store } from '../world.ts';
 
@@ -14,8 +14,9 @@ export default {
    * record, where the step's detail and wf decide read them back. In a page of its own whose one refusal is the point, words sent after the
    * session ended while the page still shows it running are refused in the package's words under the box, and nothing is said or
    * journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its writes back, draft's task journal,
-   * the engine's feed and its conversation as seeded, at work and told nothing, so each page after it, in either theme, reads the store as
-   * it was: the session's end goes on the feed as the runtime writes it, and the feed cut back empties the api's memo of runs at rest.
+   * the engine's feed, its conversation and `claude agents` as seeded, at work and told nothing, so each page after it, in either theme,
+   * reads the store as it was: the session's end goes on the feed as the runtime writes it, and the feed cut back empties the api's memo of
+   * runs at rest; `claude agents` lists it done, its process gone, which ends its follow, and the workflow feed says the step settled.
    */
   name: 'say',
   route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
@@ -29,6 +30,8 @@ export default {
     const seeded = fs.readFileSync(journal, 'utf8');
     const conversation = path.join(store!, DRAFT_TRANSCRIPT);
     const seededConversation = fs.readFileSync(conversation, 'utf8');
+    const registry = path.join(store!, REGISTRY);
+    const listed = fs.readFileSync(registry, 'utf8');
     const sayRoute = `/api/runs/${SAYING.run}/steps/${SAYING.step}/say`;
     const said = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === sayRoute;
@@ -146,6 +149,10 @@ export default {
         ];
         fs.appendFileSync(journal, ended.map((event) => `${JSON.stringify(event)}\n`).join(''));
         fs.appendFileSync(engineFeed, ended.map((event) => `${JSON.stringify({ taskId, event })}\n`).join(''));
+        const rows = JSON.parse(listed) as Array<{ name: string; pid?: number }>;
+        const done = ({ pid: _gone, ...row }: (typeof rows)[number]) => ({ ...row, state: 'done', status: 'idle' });
+        fs.writeFileSync(registry, JSON.stringify(rows.map((row) => (row.name === `ae/${taskId}/1` ? done(row) : row))));
+        fed(SAYING.run, SAYING.step, 'succeeded');
         const journalled = fs.readFileSync(journal, 'utf8');
         const heardBefore = heard.length;
         await fieldOf(refused).fill(SAYING.words);
@@ -191,6 +198,7 @@ export default {
       fs.writeFileSync(journal, seeded);
       fs.writeFileSync(engineFeed, feedBefore);
       fs.writeFileSync(conversation, seededConversation);
+      fs.writeFileSync(registry, listed);
       fed(SAYING.run, SAYING.step, 'running');
     }
     await expectVisible(boxOf(page, 'open'), 'with the writes taken back, the box is open again once the run is read again');

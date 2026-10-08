@@ -12,10 +12,15 @@ import type { Transcript, TranscriptCursor, TranscriptEvent } from './seam.ts';
  * session repeats — its cwd, session id, version and branch come to a few hundred bytes — so the hash
  * covers the line's own id and time.
  */
-const CURSOR_TAIL_BYTES = 4096;
-const cursorAt = (offset: number, tail: Uint8Array): TranscriptCursor =>
+export const CURSOR_TAIL_BYTES = 4096;
+
+/**
+ * The cursor after `offset` bytes of a transcript whose last `CURSOR_TAIL_BYTES` before it, or all of them where there are fewer, are
+ * `tail`: the one writer of a cursor, for `readTranscript` and for a reader that follows a file as it grows.
+ */
+export const cursorOf = (offset: number, tail: Uint8Array): TranscriptCursor =>
   `${offset}.${createHash('sha256').update(tail).digest('hex').slice(0, 16)}`;
-const START: TranscriptCursor = cursorAt(0, new Uint8Array());
+const START: TranscriptCursor = cursorOf(0, new Uint8Array());
 
 /** Whether `after` is a cursor a transcript read could have given. */
 export const isTranscriptCursor = (after: string): boolean => /^(0|[1-9]\d*)\.[0-9a-f]{16}$/.test(after);
@@ -73,7 +78,7 @@ export const readTranscript = async (
     };
     const tailBefore = (offset: number) => bytes(Math.max(0, offset - CURSOR_TAIL_BYTES), offset);
     const asked = after === undefined ? 0 : Number(after.slice(0, after.indexOf('.')));
-    const from = asked > 0 && asked <= size && cursorAt(asked, await tailBefore(asked)) === after ? asked : 0;
+    const from = asked > 0 && asked <= size && cursorOf(asked, await tailBefore(asked)) === after ? asked : 0;
     const chunk = await bytes(from, size);
     const events: TranscriptEvent[] = [];
     let read = 0;
@@ -88,7 +93,7 @@ export const readTranscript = async (
       read = end + 1;
     }
     const offset = from + read;
-    return { events, cursor: offset === 0 ? START : cursorAt(offset, await tailBefore(offset)) };
+    return { events, cursor: offset === 0 ? START : cursorOf(offset, await tailBefore(offset)) };
   } finally {
     await handle.close();
   }

@@ -141,10 +141,18 @@ test('REFUSED: a name with no run is not followed', async () => {
   assert.equal((Cause.squash(exit.cause) as Error).message, 'claude: no session `ae/f4/2` is there to follow: there is no run of it.');
 });
 
-test("REFUSED: a session under the engine's name that no job's run file answers, as a background session, refused to stream", async () => {
-  const exit = await Effect.runPromiseExit(Stream.runDrain(claudeCodeOps({ root: scratch('ae-follow-') }).follow!('ae/f5/1')));
-  assert.ok(Exit.isFailure(exit));
-  const err = Cause.squash(exit.cause) as RunnerError;
-  assert.equal(err.refused, true, 'refused, so a follower reads its transcript again instead');
-  assert.match(err.message, /^claude: a background session does not stream yet/);
+test("a name under the engine's that no job's run file answers is followed as a background session, from `claude agents`", async () => {
+  const bin = scratch('ae-follow-bin-');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\n[ "$1" = agents ] && echo '[]'\n`, { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${bin}:${prev}`;
+  try {
+    const exit = await Effect.runPromiseExit(Stream.runDrain(claudeCodeOps({ root: scratch('ae-follow-') }).follow!('ae/f5/1')));
+    assert.ok(Exit.isFailure(exit));
+    const err = Cause.squash(exit.cause) as RunnerError;
+    assert.deepEqual([err.verb, err.refused], ['follow', undefined], 'no refusal to stream: the name is wrong');
+    assert.equal(err.message, "claude: no session `ae/f5/1` is there to follow: neither a job's run file nor `claude agents` lists it.");
+  } finally {
+    process.env.PATH = prev;
+  }
 });

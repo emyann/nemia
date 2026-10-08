@@ -650,7 +650,9 @@ an artifact's chunks as they come and the artifact whole at its last — and `tr
 each event under the id the follow gave it. A card that does not say it streams refuses the follow, saying so, and its reader reads
 the transcript again every second. A subscription that drops before the turn is over is read whole, which gives what the drop
 missed, and subscribed to again; five drops in a row that give nothing new refuse the follow the same way, and one silent for 60 s
-is read whole and subscribed to again without counting. The subscription's headers are bounded as any request is; its body is not
+is read whole and subscribed to again without counting; a Task the agent no longer has ends the follow. The subscription's headers
+are bounded as any request is; its body is not. A session followed while its message is still being sent is `submitted` until the
+agent answers: then its reply, under the transcript's id, and its state; a refusal, as `rejected`; or its Task, followed
 (`a2a/remote-follow.ts`, `test/remote-follow.test.ts`).
 
 **What a pass costs.** One GetTask per open remote session, in parallel, and none for a settled one: the pass's meter

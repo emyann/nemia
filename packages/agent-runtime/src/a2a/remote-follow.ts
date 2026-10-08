@@ -183,7 +183,7 @@ const answered = (d: FollowDeps, name: string): Effect.Effect<Entry | undefined>
 /**
  * The remote harness's `follow`: the session `name` followed live, its state first. Refused, in this order, where no session goes by
  * the name, where the agent's card cannot be read or does not say it streams, and where the send is in doubt. A session that has
- * ended gives its state alone; one still being sent is `submitted` until its Task is known, then followed.
+ * ended gives its state alone; one still being sent is `submitted` until the agent answers, then given its answer (`followAnswered`).
  */
 export const remoteFollowOf =
   (d: FollowDeps) =>

@@ -25,7 +25,7 @@ const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith } = await import('../src/runner.ts');
-const { artifactsDir, readRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, inputsDir, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 /** A git repository with one commit on `main`, in a folder named from `prefix`. */
@@ -514,7 +514,8 @@ test("a step's `reads: inbox` is filed the store's inbox read-only, on its first
 });
 
 test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or on a remote agent', () => {
-  const told = (step: { harness: string; reads?: string[] }) => mountsLine(step, {}, { handed: [], store: readsMounts(step, '/s/inbox') });
+  const told = (step: { harness: string; reads?: string[] }) =>
+    mountsLine(step, {}, { handed: [], store: readsMounts(step, '/s/inbox'), inputs: [] });
   assert.match(told({ harness: 'claude', reads: ['inbox'] }).join('\n'), /reads:` names them: `\/s\/inbox`/);
   assert.deepEqual(told({ harness: 'claude' }), []);
   assert.deepEqual(told({ harness: 'a2a:peer', reads: ['inbox'] }), []);
@@ -523,12 +524,12 @@ test('mountsLine names the inbox for a local step whose `reads:` names it, and n
 
 test('mountsLine names each folder the steps before it handed over, by its path and step, read-only, and how to list one; nothing for none', () => {
   const handed = readOnly('/s/runs/r-1/artifacts/design', '/s/runs/r-1/artifacts/implement');
-  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed, store: [] }), [
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed, store: [], inputs: [] }), [
     '',
     "Folders the steps before you handed over, which you may read and must not write: `/s/runs/r-1/artifacts/design` (design's), `/s/runs/r-1/artifacts/implement` (implement's). Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as `/s/runs/r-1/artifacts/design/**`.",
   ]);
-  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] }), [], 'a step handed none');
-  assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [] }), [], 'a remote agent is filed none');
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [], inputs: [] }), [], 'a step handed none');
+  assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [], inputs: [] }), [], 'a remote agent is filed none');
 });
 
 /**
@@ -580,9 +581,58 @@ test("every folder a local step is filed with is named on its brief, as it is mo
 
 test('REFUSED: a brief that leaves out a folder its filing mounts names that folder', () => {
   const handed = artifactsDir({ id: 'r-1' }, 'implement');
-  const brief = ['## What was asked for', '', 'build it', ...mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] })].join('\n');
+  const brief = [
+    '## What was asked for',
+    '',
+    'build it',
+    ...mountsLine({ harness: 'claude' }, {}, { handed: [], store: [], inputs: [] }),
+  ].join('\n');
   assert.deepEqual(unnamed({ brief, config: { mounts: readOnly(handed) } }), [handed]);
-  const told = [brief, ...mountsLine({ harness: 'claude' }, {}, { handed: readOnly(handed), store: [] })].join('\n');
+  const told = [brief, ...mountsLine({ harness: 'claude' }, {}, { handed: readOnly(handed), store: [], inputs: [] })].join('\n');
   assert.deepEqual(unnamed({ brief: told, config: { mounts: readOnly(handed) } }), []);
   assert.deepEqual(unnamed({ brief: told.replace('must not write', 'may write'), config: { mounts: readOnly(handed) } }), [handed]);
+});
+
+test('a run given an input files each local step its inputs folder read-only, on its first filing, a try and a round, and each brief names the file there', async () => {
+  const { repos, loop } = fresh();
+  const given = path.join(ROOT, 'template-draft.md');
+  fs.writeFileSync(given, 'the draft\n');
+  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, inputs: [given] }));
+  const inputs = inputsDir(run);
+  const said = `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${inputs}\`: \`template-draft.md\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const first = b.filed.get(`${run.id}-implement`)!;
+  assert.deepEqual(first.config?.mounts, readOnly(inputs), 'the first filing');
+  b.settle(`${run.id}-implement`, 'failed');
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const tried = readRun(run.id).steps.implement.taskId!;
+  assert.deepEqual(b.filed.get(tried)?.config?.mounts, readOnly(inputs), 'a try');
+  b.settle(tried, 'succeeded', SIGNED, true);
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const review = b.filed.get(`${run.id}-review`)!;
+  assert.deepEqual(review.config?.mounts, readOnly(artifactsDir(run, 'implement'), inputs), 'the step after it, beside what it was handed');
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const round = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(round, tried, 'a round is filed');
+  assert.deepEqual(b.filed.get(round)?.config?.mounts, readOnly(inputs), 'a round');
+  const filings = [...b.filed.values()];
+  assert.equal(filings.length, 4, 'a first filing, a try, the step after it, and a round');
+  for (const filing of filings) {
+    assert.equal(filing.brief.split(said).length, 2, filing.brief);
+    assert.deepEqual(unnamed(filing), [], filing.brief);
+  }
+});
+
+test('a run given no input is filed and told as before: no mount, and no line of files', async () => {
+  const { repos, loop } = fresh();
+  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }));
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const first = b.filed.get(`${run.id}-implement`)!;
+  assert.equal(Object.hasOwn(first.config!, 'mounts'), false, JSON.stringify(first.config));
+  assert.doesNotMatch(first.brief, /nemia start --input/);
 });

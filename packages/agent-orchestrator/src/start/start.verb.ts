@@ -82,7 +82,8 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  *   under those names, and would read one task as the other;
  * - a remote agent not declared (`undeclaredRefusal`): the engine refuses it only when the step is filed, with the run on the record;
  * - a store (`WF_ROOT`) whose path a permission rule a step would be filed cannot carry (`storeRootRefusal`), in the store's words, asked
- *   before the runtime's, which would speak of a rule or a folder the person never wrote;
+ *   before the runtime's, which would speak of a rule or a folder the person never wrote; the run's inputs folder among them when
+ *   `given`, for a run `nemia start --input` gives files;
  * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
  *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take.
  */
@@ -93,6 +94,7 @@ export function stepsToStart(
   factory?: Factory,
   gates: readonly string[] = [],
   refused: ConfigRefused = configRefused,
+  given = false,
 ): Workflow[] {
   const steps = stepsIn(workflowDir, places, factory);
   if (!isolate && isFolderTeam(steps)) {
@@ -136,7 +138,11 @@ export function stepsToStart(
   }
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
-  const unruled = storeRootRefusal(HOME, steps, { runArtifacts: startArtifacts(), inbox: inboxDir() });
+  const unruled = storeRootRefusal(HOME, steps, {
+    runArtifacts: startArtifacts(),
+    inbox: inboxDir(),
+    ...(given ? { inputs: inputsDir({ id: 'run' }) } : {}),
+  });
   if (unruled) throw new Invalid({ message: unruled });
   const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
@@ -525,7 +531,9 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
   const refused = yield* StartRefusal;
-  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates, refused));
+  const steps = yield* tried(() =>
+    stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates, refused, Boolean(opts.inputs?.length)),
+  );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
   const outside = factory && !folder ? outsideRefusal(factory, opts.repo) : undefined;

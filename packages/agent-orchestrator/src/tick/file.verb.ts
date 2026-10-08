@@ -57,7 +57,6 @@ import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
-import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, cutNotes, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
@@ -69,7 +68,7 @@ import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
-import { placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
+import { filedAt, placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -257,7 +256,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         undefined,
         inputsDir(run),
         checked,
-        filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
+        filedFolders(told.step, reads.steps, filedAt(run)),
         yield* costsFor(f, step, Boolean(resumeFrom)),
         { words: told.words, say: told.say },
       );
@@ -336,8 +335,7 @@ const trySpec = (
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
-      runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
-      inbox: inboxDir(),
+      ...filedAt(f.run),
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
     }),
@@ -440,7 +438,7 @@ function roundSpec(
       undefined,
       inputsDir(run),
       undefined,
-      filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
+      filedFolders(told.step, reads.steps, filedAt(run)),
       said.costs,
       { words: said.words, say: said.say },
     ),
@@ -451,8 +449,7 @@ function roundSpec(
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
-        runArtifacts: path.dirname(artifactsDir(run, target.name)),
-        inbox: inboxDir(),
+        ...filedAt(run),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
@@ -608,7 +605,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
-          filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
+          filedFolders(told.step, reads.steps, filedAt(run)),
           said.costs,
           { words: said.words, say: said.say },
           place.merge,
@@ -621,8 +618,7 @@ function readySpec(
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
-        runArtifacts: path.dirname(artifactsDir(run, step.name)),
-        inbox: inboxDir(),
+        ...filedAt(run),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],

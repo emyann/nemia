@@ -1184,6 +1184,9 @@ What was built:
   the request (`inputsLine`), and the tick passes it on every filing: a step, a try, a round. A brief that continues a session
   carries neither the request nor the line, since that session was handed both. A run given none composes byte for byte as
   before.
+- The directory is filed read-only on each step of a repository run on a harness fenced by a permission mode (`inputsMounts`,
+  in `filedFolders`), and its line names it as mounted, so the brief names no file the fence refuses; Codex and a remote agent
+  are filed none.
 - `wf start` prints where the inputs went, and `wf decide` names them under the run's line on every screen (`inputsNote`).
 - `wf plan` refuses `--input` by name: a card's inputs are later.
 

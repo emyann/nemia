@@ -3,7 +3,6 @@
  * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`retryRun`, over `EngineService`), run by a caller with `runWith`.
  */
-import path from 'node:path';
 import { Effect } from 'effect';
 import { configRefusal, tried } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
@@ -11,11 +10,11 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
 import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/status.ts';
-import { toldOf } from '../tick/told.verb.ts';
+import { filedAt, toldOf } from '../tick/told.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { artifactsDir, stepsOf } from '../record/record.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
@@ -113,12 +112,10 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
   const budgetUsd = budgetUsdFor(how.budget ?? budgetOf(step, record), stepSpend(run, step.name, spendOf));
-  const runArtifacts = path.dirname(artifactsDir(run, step.name));
   const config = filedConfig(step, steps, run, {
     model: tryModel(step, record, how),
     budgetUsd,
-    runArtifacts,
-    inbox: inboxDir(),
+    ...filedAt(run),
     own: toldOf(run, step).own,
     landingDenied: () => landingDenies(run),
   });

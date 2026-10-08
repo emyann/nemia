@@ -3,6 +3,7 @@
  * what its place says to it (`placeTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
  * the run's folder finds them, and the run's place.
  */
+import path from 'node:path';
 import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
@@ -15,6 +16,8 @@ import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
+import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { inboxDir } from '../record/files.store.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
@@ -78,6 +81,16 @@ export function placeTold(
     return undefined;
   }
 }
+
+/**
+ * Where a step of `run` is filed its folders from (`filedFolders`, `filedConfig`): the run's artifacts folder, the store's inbox, and the
+ * run's inputs folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before.
+ */
+export const filedAt = (run: Pick<Run, 'id' | 'inputs'>): { runArtifacts: string; inbox: string; inputs?: string } => ({
+  runArtifacts: path.dirname(artifactsDir(run, 'step')),
+  inbox: inboxDir(),
+  ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
+});
 
 /**
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):

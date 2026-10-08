@@ -3038,6 +3038,10 @@ with its `run`, and one about a step with its `step` too; the runtime's journal 
   harness takes one. A check is filed with no labels, and the runtime hands a check's command no telemetry at all; without an endpoint, no
   child is handed any. How each harness is told is the runtime's (`packages/agent-runtime/README.md`, *What a session exports*).
 - **`OTEL_SERVICE_NAME`** — the service the export is under, `nemia` unless set. Without an endpoint it does nothing.
+- **`NEMIA_TOOL_DETAILS`** — unset, blank or `0`, a session exports no tool's input. `1`, with an endpoint, makes each session the
+  daemon starts export its tools' inputs too — a command's text, a file's path, an error's words — to that collector, wherever it is:
+  set it only for a collector you would hand those to. Without an endpoint it does nothing; any other value is said on stderr and left
+  off (`sessionTelemetryOf`, `toolDetailsRefusalOf`).
 
 ```sh
 $ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=factory nemia up

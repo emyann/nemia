@@ -24,6 +24,7 @@ import type { SessionState, Sighting, Usage } from '../core/index.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { claudeOps, type ClaudeOptions } from './claude/bg.ts';
 import { causeWords, RunnerError } from './error.ts';
+import type { Telemetry } from './telemetry.ts';
 
 export { RunnerError } from './error.ts';
 
@@ -47,8 +48,11 @@ export type SpawnRequest = {
   resource?: Record<string, string>;
   /** The W3C trace context of the span that filed the task, journalled when its engine exports: the session's spans join that trace. */
   traceparent?: string;
-  /** Where the session exports its telemetry: set by an engine given a collector (`telemetered`), absent otherwise, and then none is. */
-  telemetry?: { endpoint: string };
+  /**
+   * Where the session exports its telemetry, and whether its tools' inputs too (`toolDetails`): set by an engine given a collector
+   * (`telemetered`), absent otherwise, and then none is.
+   */
+  telemetry?: Telemetry;
 };
 
 /**

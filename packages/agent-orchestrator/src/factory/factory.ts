@@ -33,7 +33,8 @@ export type InstructionAt = { path: string } | { store: true };
 /**
  * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
  * attached to it, each by its folder's name, and its hires; none of either when the file names none. `instruction`: where its instruction
- * is kept, when the file says (`instructionAt`).
+ * is kept, when the file says (`instructionAt`). `template` and `tree`: the template it was made from, and the folder it runs from, its
+ * workflows, agents, skills, wiring and instruction, when it was made from one.
  */
 export type Factory = {
   name: string;
@@ -41,7 +42,12 @@ export type Factory = {
   workflows: readonly string[];
   hires: Hires;
   instruction?: InstructionAt;
+  template?: FactoryTemplate;
+  tree?: string;
 };
+
+/** The template a factory was made from (`nemia factory apply`): its folder, its version then, and the parameters given, by name. */
+export type FactoryTemplate = { source: string; version: string; params: Readonly<Record<string, string | number | boolean>> };
 
 /**
  * Where a factory's instruction is read: a file in its first folder (`folder`, `path` its path there), or the store's file for it.
@@ -49,10 +55,12 @@ export type Factory = {
 export type InstructionPlace = { in: 'folder'; folder: string; path: string; file: string } | { in: 'store'; file: string };
 
 /**
- * Where the instruction of `factory` is read: the store's file `storeFile` when its file says the store; else the path it names, or
+ * Where the instruction of `factory` is read: its tree's `NEMIA.md`, kept by the store, when it was made from a template; the store's
+ * file `storeFile` when its file says the store; else the path it names, or
  * `NEMIA.md` when it names none, in its first folder, the first of `repos` as filed.
  */
-export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction'>, storeFile: string): InstructionPlace {
+export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction' | 'tree'>, storeFile: string): InstructionPlace {
+  if (factory.tree !== undefined) return { in: 'store', file: path.join(factory.tree, DEFAULT_INSTRUCTION) };
   const at = factory.instruction;
   if (at !== undefined && 'store' in at) return { in: 'store', file: storeFile };
   const folder = factory.repos[0];

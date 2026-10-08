@@ -213,7 +213,7 @@ function factorySource(ask: FactoryAsk, from: string, refusals: string[]): { sou
 }
 
 /** A copy of the file or folder `from` at `to`, each file with its mode; a link refused by name. */
-export function copyTree(from: string, to: string): void {
+function copyTree(from: string, to: string): void {
   const stat = fs.lstatSync(from);
   if (stat.isSymbolicLink())
     throw new Invalid({ message: `${from} is a link, and a template's files are its own: copy what it points at there.` });

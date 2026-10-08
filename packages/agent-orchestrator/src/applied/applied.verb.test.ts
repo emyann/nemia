@@ -1,0 +1,225 @@
+/**
+ * A factory made from a template, on disk: `nemia factory apply` refusing a bad parameter or template with nothing written, and filing
+ * only the factory's file; the controller rendering its base and seeding its tree once, level-triggered, its status written by it alone;
+ * and the factory's verbs reading and writing its tree. `WF_ROOT` is set before the import, since the store's modules read it as they load.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { parse, stringify } from 'yaml';
+import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
+import { teamCopy } from '../../test/team.ts';
+
+const ROOT = scratch('wf-applied-');
+process.env.WF_ROOT = ROOT;
+const FACTORIES = path.join(ROOT, 'factories');
+const { exportTemplate } = await import('../template/template.store.ts');
+const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactory } = await import('../runner.ts');
+const { main } = await import('../cli/main.ts');
+const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
+const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
+const { Effect } = await import('effect');
+
+/** No verb here asks the engine anything. */
+const NO_ENGINE = promised({});
+
+/** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
+const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
+  err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
+
+/** A repository holding the tests' team as its `workflows/`. */
+function repoWithTeam(): string {
+  const repo = scratch('wf-applied-repo-');
+  fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+  return repo;
+}
+
+/** The tests' team exported as a template, `budget` a parameter of the review step with no default, and `model` one with a default. */
+function template(): { dir: string; repo: string } {
+  const repo = repoWithTeam();
+  const dir = path.join(scratch('wf-applied-template-'), 'team');
+  exportTemplate({ dir, from: repo });
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.parameters = {
+      budget: { type: 'number', description: 'dollars for a review' },
+      model: { type: 'string', description: 'the reviewer model', default: 'opus' },
+    };
+  });
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[1].budget = { param: 'budget' };
+  });
+  edit(dir, 'agents/reviewer/agent.yaml', (spec) => {
+    spec.claude.model = { param: 'model' };
+  });
+  return { dir, repo };
+}
+
+/** The document `file` of `dir`, its spec changed by `change`. */
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+  const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+  change(doc.spec);
+  fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
+}
+
+/** Every file under the factories folder, by its path in it, so a refusal is seen to have written nothing. */
+const filed = (): string[] => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).sort() : []);
+
+/** `nemia factory apply` of the template `dir` as `name`, in the repository `repo`, with `rest` after. */
+const apply = (name: string, dir: string, repo: string, ...rest: string[]) =>
+  main(['factory', 'apply', name, '--template', dir, '--repo', repo, ...rest], NO_ENGINE);
+
+/** The factory `name`, read as the controller reads it. */
+const templated = (name: string) =>
+  readFactory(name) as ReturnType<typeof readFactory> & { template: NonNullable<ReturnType<typeof readFactory>['template']> };
+
+test('apply refuses a key not declared, a value of the wrong type and a required one not given, every one at once, and writes nothing', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  const before = filed();
+  await assert.rejects(
+    apply('refused', dir, repo, '--set', 'colour=red', '--set', 'model=x'),
+    refusedWith('Invalid', /with 2 problems:\n--set colour=red: the template declares no parameter colour[^\n]*\nbudget has no default/),
+  );
+  await assert.rejects(
+    apply('refused', dir, repo, '--set', 'budget=lots'),
+    refusedWith('Invalid', /--set budget=lots: budget is a number/),
+  );
+  await assert.rejects(apply('refused', dir, repo), refusedWith('Invalid', /budget has no default, and no --set gives it/));
+  await assert.rejects(
+    main(['factory', 'apply', 'refused', '--repo', repo], NO_ENGINE),
+    refusedWith('Invalid', /name its folder with --template <folder>/),
+  );
+  fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
+  await assert.rejects(
+    apply('refused', dir, repo, '--set', 'budget=3'),
+    refusedWith('Invalid', /nemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
+  );
+  assert.deepEqual(filed(), before);
+});
+
+test("apply files only the factory's file, naming its template, version and parameters; the controller renders the rest", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('made', dir, repo, '--set', 'budget=7');
+  assert.deepEqual(
+    filed().filter((f) => f.startsWith('made')),
+    ['made.json'],
+  );
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(FACTORIES, 'made.json'), 'utf8')), {
+    repos: [repo],
+    template: { source: dir, version: '0.1.0', params: { budget: 7, model: 'opus' } },
+  });
+  assert.deepEqual(readFactory('made').workflows, [], 'a tree not rendered yet offers nothing');
+  await assert.rejects(apply('made', dir, repo, '--set', 'budget=7'), refusedWith('Conflict', /There is a factory made already/));
+});
+
+test("the controller renders the base read-only and seeds the tree once; a second pass changes nothing, and the tree stays the person's", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('seeded', dir, repo, '--set', 'budget=7');
+  const status = reconcileFactory(templated('seeded'));
+  assert.deepEqual(status.conditions, [
+    { type: 'Applied', status: 'True', reason: 'Rendered', message: `The base holds ${dir} at 0.1.0; the tree is yours to change.` },
+    {
+      type: 'ConflictsPending',
+      status: 'False',
+      reason: 'NoUpgrade',
+      message: 'No upgrade is under way, so no change waits to be merged.',
+    },
+  ]);
+  assert.equal(status.version, '0.1.0');
+  assert.match(status.digest ?? '', /^sha256:[0-9a-f]{64}$/);
+  assert.deepEqual(readStatus('seeded'), status);
+  const review = path.join(treeDir('seeded'), 'workflows', 'dev', 'review.md');
+  assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m);
+  assert.match(fs.readFileSync(path.join(treeDir('seeded'), 'workflows/agents/reviewer.md'), 'utf8'), /^model: opus$/m);
+  assert.equal(fs.statSync(path.join(appliedDir('seeded'), 'workflows', 'dev', 'review.md')).mode & 0o222, 0, 'the base is read-only');
+  assert.throws(
+    () => fs.writeFileSync(path.join(appliedDir('seeded'), 'factory.json'), '{}'),
+    (err: Error) => /EACCES/.test(err.message),
+  );
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
+  const written = fs.statSync(statusFile('seeded')).mtimeMs;
+  assert.deepEqual(reconcileFactory(templated('seeded')), status);
+  assert.match(fs.readFileSync(review, 'utf8'), /^budget: 9$/m, "the tree, once seeded, is the person's");
+  assert.equal(fs.statSync(statusFile('seeded')).mtimeMs, written, 'a status that did not change is not written');
+  fs.rmSync(statusFile('seeded'));
+  fs.rmSync(treeDir('seeded'), { recursive: true });
+  await Effect.runPromise(reconcileOnce());
+  assert.deepEqual(readStatus('seeded'), status, 'a restart reads it all again off the disk');
+  assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
+});
+
+test('a template moved to another version is drift: the base and tree are left as they are, and Applied says so', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('drifted', dir, repo, '--set', 'budget=7');
+  const first = reconcileFactory(templated('drifted'));
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.version = '0.2.0';
+  });
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[1].rounds = 5;
+  });
+  const status = reconcileFactory(templated('drifted'));
+  assert.deepEqual(status.conditions[0], {
+    type: 'Applied',
+    status: 'False',
+    reason: 'VersionDrift',
+    message: `The template is at version 0.2.0, and drifted was applied at 0.1.0: its base and tree are left as they are until upgrades come. Put the template back at 0.1.0, or apply it again under another name.`,
+  });
+  assert.equal(status.digest, first.digest);
+  assert.doesNotMatch(fs.readFileSync(path.join(treeDir('drifted'), 'workflows/dev/review.md'), 'utf8'), /^rounds: 5$/m);
+  fs.writeFileSync(path.join(dir, 'nemia.yaml'), 'not: [yaml');
+  assert.equal(reconcileFactory(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
+});
+
+test("a templated factory reads its tree's wiring, and attach, hire, fire and detach write the tree; none while it is not rendered", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('wired', dir, repo, '--set', 'budget=7');
+  await assert.rejects(
+    async () => attachWorkflow({ factory: 'wired', workflow: 'other' }),
+    refusedWith('Conflict', /its tree is not rendered yet, at .*: start the daemon, nemia up/),
+  );
+  reconcileFactory(templated('wired'));
+  const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
+  const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'));
+  assert.deepEqual(readFactory('wired').workflows, ['dev']);
+  assert.deepEqual(readFactory('wired').hires, { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' });
+  fireAgent({ factory: 'wired', step: 'dev/review' });
+  hireAgent({ factory: 'wired', agent: 'implementer', step: 'dev/review' });
+  assert.equal(wiring().hires['dev/review'], 'implementer');
+  attachWorkflow({ factory: 'wired', workflow: 'other' });
+  assert.deepEqual(wiring().workflows, ['dev', 'other']);
+  detachWorkflow({ factory: 'wired', workflow: 'other' });
+  assert.deepEqual(readFactory('wired').workflows, ['dev']);
+  assert.equal(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'), own, "the factory's own file is not written");
+});
+
+test("a templated factory's instruction is its tree's NEMIA.md, written by instruct; and rm removes it all, its read-only base included", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('told', dir, repo, '--set', 'budget=7');
+  const words = path.join(scratch('wf-applied-words-'), 'words.md');
+  fs.writeFileSync(words, 'Operate the tree.\n');
+  await assert.rejects(
+    main(['factory', 'instruct', 'told', '--file', words], NO_ENGINE),
+    refusedWith('Conflict', /its tree is not rendered yet/),
+  );
+  assert.equal(fs.existsSync(treeDir('told')), false, 'an instruct refused seeds no tree');
+  reconcileFactory(templated('told'));
+  await main(['factory', 'instruct', 'told', '--file', words], NO_ENGINE);
+  assert.equal(fs.readFileSync(path.join(treeDir('told'), 'NEMIA.md'), 'utf8'), 'Operate the tree.\n');
+  await assert.rejects(
+    main(['factory', 'instruction', 'told', '--store'], NO_ENGINE),
+    refusedWith('Invalid', /its instruction is its tree's NEMIA\.md/),
+  );
+  await main(['factory', 'rm', 'told'], NO_ENGINE);
+  assert.deepEqual(
+    filed().filter((f) => f.startsWith('told')),
+    [],
+  );
+});

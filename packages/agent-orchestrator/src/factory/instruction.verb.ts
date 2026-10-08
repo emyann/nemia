@@ -48,7 +48,7 @@ export function factoryInstruction(name: string): FactoryInstruction {
     store: at.in === 'store',
     file: at.file,
     ...read,
-    stored: storeKeeps(name),
+    stored: storeKeeps(name, factory.tree === undefined ? undefined : at.file),
   };
 }
 
@@ -238,9 +238,9 @@ function instructed(args: Args): Instructed {
       message: `${name}'s instruction is read from ${before.file}, in the factory's first folder, and the store writes no file there: edit it in the folder, or keep it in the store first — nemia factory instruction ${name} --store. Nothing was written.`,
     });
   if (args.clear === true) {
-    const removed = clearInstructionText(name);
+    const removed = clearInstructionText(name, before.file);
     return { ...factoryInstruction(name), removed };
   }
-  writeInstructionText(name, textOf(args, 'words') ?? '');
+  writeInstructionText(name, textOf(args, 'words') ?? '', before.file);
   return factoryInstruction(name);
 }

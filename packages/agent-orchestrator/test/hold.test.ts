@@ -1236,7 +1236,7 @@ test("`nemia hold`'s and `--off`'s programs say in their type what they need and
   const heldInfallible: EffectOf<Holding, never, EngineService> = hold('x', []);
   const lifted: EffectOf<Holding, Refusal> = unhold('x');
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  const liftedInfallible: EffectOf<Holding, never> = unhold('x');
+  const liftedInfallible: EffectOf<Holding> = unhold('x');
   const unprovided = () =>
     // @ts-expect-error -- hold requires EngineService, and runPromise takes no requirement
     Effect.runPromise(hold('x', []));

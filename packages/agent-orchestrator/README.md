@@ -3531,7 +3531,7 @@ holding a concurrency slot forever.
 | `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |
 | `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
-| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun` and `acceptRun`; `hold` and `unhold` |
+| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun`, `acceptRun`, `hold` and `unhold` |
 | `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and what it would forget of the engine's tasks of each run, counted dry for `wf prune` (`runsForgetting`) |
 | `src/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), and by the tick for what had not settled (`finishForgetting`); asked dry by `runsForgetting` (`engineForgetting`) |
 | `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |

@@ -3,6 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { ScheduleListed } from '../schedule/schedule.ts';
 import {
   ambiguousFactoryRefusal,
   DEFAULT_FACTORY,
@@ -370,27 +371,54 @@ test('a hire is refused for the default factory first, then the workflow not off
   assert.equal(hireRefusalOf({ name: 'pipao', workflows: [] }, 'build', 'ada'), unattachedHireRefusal('pipao', 'build'));
 });
 
-test("nemia factory ls: a factory's schedules under its hires, by workflow, with the zone, the repository and the brief's first line", () => {
+test("nemia factory ls: a factory's schedules under its hires, by workflow, with the zone, the repository, the brief's first line, and the next fire and last run as listed", () => {
   const since = '2026-10-01T00:00:00.000Z';
+  const now = Date.parse('2026-10-08T12:00:00.000Z');
+  const listed = (workflow: string, over: Partial<ScheduleListed>): ScheduleListed => ({
+    factory: 'nemia',
+    workflow,
+    cron: '',
+    tz: null,
+    brief: '',
+    repo: null,
+    next: null,
+    last: null,
+    refused: null,
+    ...over,
+  });
   assert.deepEqual(
-    factoryLines([
-      {
-        name: 'nemia',
-        file: '/s/nemia.json',
-        repos: ['/code/nemia'],
-        workflows: ['janitor', 'build'],
-        hires: {},
-        schedules: {
-          janitor: { cron: '0 9 * * 1', brief: 'Read the stats\nand say what moved', tz: 'America/Montreal', since },
-          build: { cron: '0 0 1 * *', brief: 'Tidy', repo: '/code/nemia', since },
+    factoryLines(
+      [
+        {
+          name: 'nemia',
+          file: '/s/nemia.json',
+          repos: ['/code/nemia'],
+          workflows: ['janitor', 'build'],
+          hires: {},
+          schedules: {
+            janitor: { cron: '0 9 * * 1', brief: 'Read the stats\nand say what moved', tz: 'America/Montreal', since },
+            build: { cron: '0 0 1 * *', brief: 'Tidy', repo: '/code/nemia', since },
+          },
         },
-      },
-    ]).slice(1),
+      ],
+      [
+        listed('janitor', {
+          next: '2026-10-12T13:00:00.000Z',
+          last: { run: 'read-the-stats-ab12', at: '2026-10-05T13:00:02.000Z' },
+        }),
+        listed('build', { next: '2026-11-01T00:00:00.000Z', refused: 'build is not attached to nemia' }),
+        { ...listed('janitor', { last: { run: 'another-factory-s-run', at: since } }), factory: 'pipao' },
+      ],
+      now,
+    ).slice(1),
     [
       'nemia    /code/nemia',
       '         workflows: build, janitor',
       '         schedule build  0 0 1 * * on /code/nemia  "Tidy"',
+      '           next 2026-11-01T00:00:00.000Z, in 23d12h  last none',
+      '           refused: build is not attached to nemia',
       '         schedule janitor  0 9 * * 1 (America/Montreal)  "Read the stats"',
+      '           next 2026-10-12T13:00:00.000Z, in 4d01h  last read-the-stats-ab12 (2026-10-05T13:00:02.000Z, 2d22h ago)',
     ],
   );
 });

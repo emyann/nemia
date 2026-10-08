@@ -9,6 +9,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
+import { fireWord, type ScheduleListed } from '../schedule/schedule.ts';
 
 /** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -412,18 +413,38 @@ const workflowLine = (workflows: readonly string[], width: number): string[] =>
 const instructionLine = (at: InstructionAt | undefined, width: number): string[] =>
   at === undefined ? [] : [`${' '.repeat(width)}  instruction: ${'store' in at ? 'kept in the store' : at.path}`];
 
-/** A factory's schedules as `nemia factory ls` lists them under its line, by workflow: `schedule janitor  0 9 * * 1  "Read the stats"`. */
-const scheduleLines = (schedules: Factory['schedules'], width: number): string[] =>
-  Object.keys(schedules)
+/** A schedule's next fire and last run as `nemia ls` words them at `now` (`fireWord`), and the refusal kept of its latest fire. */
+const whenLines = (s: ScheduleListed, indent: string, now: number): string[] => [
+  `${indent}next ${s.next ? fireWord(s.next, now) : 'never'}  last ${s.last ? `${s.last.run} (${fireWord(s.last.at, now)})` : 'none'}`,
+  ...(s.refused ? [`${indent}refused: ${s.refused}`] : []),
+];
+
+/**
+ * A factory's schedules as `nemia factory ls` lists them under its line, by workflow: `schedule janitor  0 9 * * 1  "Read the stats"`,
+ * then its next fire and last run from `listed`, the schedules as `schedulesListed` read them at `now`, where it lists the schedule.
+ */
+const scheduleLines = (factory: Factory, listed: readonly ScheduleListed[], width: number, now: number): string[] =>
+  Object.keys(factory.schedules)
     .sort()
-    .map((workflow) => {
-      const s = schedules[workflow];
+    .flatMap((workflow) => {
+      const s = factory.schedules[workflow];
       const where = `${s.tz ? ` (${s.tz})` : ''}${s.repo ? ` on ${s.repo}` : ''}`;
-      return `${' '.repeat(width)}  schedule ${workflow}  ${s.cron}${where}  ${JSON.stringify(s.brief.split('\n')[0])}`;
+      const read = listed.find((l) => l.factory === factory.name && l.workflow === workflow);
+      return [
+        `${' '.repeat(width)}  schedule ${workflow}  ${s.cron}${where}  ${JSON.stringify(s.brief.split('\n')[0])}`,
+        ...(read ? whenLines(read, `${' '.repeat(width)}    `, now) : []),
+      ];
     });
 
-/** What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
-export function factoryLines(listing: readonly FactoryListing[]): string[] {
+/**
+ * What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read;
+ * each schedule with its next fire and last run as `listed` reads them at `now`.
+ */
+export function factoryLines(
+  listing: readonly FactoryListing[],
+  listed: readonly ScheduleListed[] = [],
+  now: number = Date.now(),
+): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
   const width = Math.max(DEFAULT_FACTORY.length, ...sorted.map((l) => l.name.length));
   return [
@@ -435,7 +456,7 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
         : [
             ...workflowLine(l.workflows, width),
             ...hireLines(l.hires, width),
-            ...scheduleLines(l.schedules, width),
+            ...scheduleLines(l, listed, width, now),
             ...instructionLine(l.instruction, width),
           ]),
     ]),

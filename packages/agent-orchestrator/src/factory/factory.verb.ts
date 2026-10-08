@@ -21,6 +21,9 @@ import {
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
+import { schedulesListed } from '../schedule/listed.store.ts';
+import type { ScheduleListed } from '../schedule/schedule.ts';
+import { runStore } from '../record/files.store.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...]
@@ -95,12 +98,15 @@ const textOf = (args: Args, key: string): string => {
   return typeof value === 'string' ? value : '';
 };
 
-/** The listing every factory shares: those of the store, as `readFactories` reads them. */
-type Listed = { factories: FactoryListing[] };
+/** The listing every factory shares: those of the store, as `readFactories` reads them, and their schedules as `schedulesListed` does. */
+type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[] };
+
+/** The store's factories, and their schedules with the runs they started. */
+const listedNow = (): Listed => ({ factories: readFactories(), schedules: schedulesListed(runStore.runs.list()) });
 
 /** The lines `nemia factory` prints of the store's factories, and how to file one or remove one. */
-const listed = ({ factories }: Listed): string[] => [
-  ...factoryLines(factories),
+const listed = ({ factories, schedules }: Listed): string[] => [
+  ...factoryLines(factories, schedules),
   `\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in ${factoriesDir()}`,
 ];
 
@@ -123,7 +129,7 @@ export const FACTORY: Command<Listed> = {
   nemia: 'read',
   route: { method: 'GET', path: '/api/factories', status: 200 },
   manual: FACTORY_HELP,
-  handler: () => tried(() => ({ factories: readFactories() })),
+  handler: () => tried(listedNow),
   print: listed,
 };
 
@@ -140,7 +146,7 @@ const FACTORY_LS: Command<Listed> = {
   writes: false,
   nemia: 'read',
   only: { side: 'cli', why: "the api lists the factories on nemia factory's route: ls is the command line's second name for it" },
-  handler: () => tried(() => ({ factories: readFactories() })),
+  handler: () => tried(listedNow),
   print: listed,
 };
 

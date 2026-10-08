@@ -2791,6 +2791,41 @@ The api serves both (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruc
 shows it on the factory's settings page, linked from its floor: the words of a store's instruction edited there, a folder's file shown as
 it reads.
 
+### Schedules: `nemia factory schedule` and `nemia factory unschedule`
+
+A factory can start a workflow it has attached on its own, at each fire of a cron. The schedule sits on the attachment, in the factory's
+file, since a run needs a factory and a repository and only the attachment knows both:
+
+```bash
+nemia factory schedule nemia janitor --cron "0 9 * * 1" --brief "Read the stats" --tz America/Montreal
+nemia factory unschedule nemia janitor
+```
+
+```json
+{ "schedules": { "janitor": { "cron": "0 9 * * 1", "brief": "Read the stats", "tz": "America/Montreal", "since": "2026-10-08T12:00:00.000Z" } } }
+```
+
+- **The words are cron**, five or six fields, read by Effect's `Cron` in `--tz` (an IANA zone; the machine's without it). A cron or a
+  zone it does not read is refused with its reason (`Invalid`), and so are a workflow the factory has not attached, naming the attach, an
+  empty `--brief`, and a factory of two or more repositories given no `--repo`. A second schedule of the workflow replaces the first.
+  `since` is stamped when it is written, so a new schedule starts nothing before its next fire.
+- **The daemon starts it, at every level**, Manual included, Nemia off: a schedule is the tick's machinery, never an agent's. A pass that
+  started no queued card, with a run slot free and the store not paused, starts the first schedule due (factories by name, then workflows),
+  one a pass, through `startRun`: the start a person's `nemia start --factory` takes, with its refusals, its run slot and the runtime's
+  admission. No quota is asked: a start asks none today.
+- **Level-triggered.** A schedule is due when its latest fire is later than its `since`, than the fire its newest run was started for, and
+  than the fire its kept try settled (`scheduleDue`). Only the latest fire is compared, so a daemon down across three fires starts one run.
+  The run carries `scheduled: { factory, workflow, due }` on its record, which is how its last run is read; and the tick keeps its last try
+  in `$WF_ROOT/schedules/<factory>/<workflow>.json`, the tick's file, so a run removed from the store does not bring its fire back.
+- **A refusal waits for the next fire**: a start refused (exit 2: the workflow detached, a step no agent fills) is kept for its fire, said
+  once by `nemia up` with the line that fixes it, and not tried again until the next fire; any other failure is tried again on the next
+  pass, and said again only when it fails otherwise. `nemia pause` holds scheduled starts as it holds the queue's.
+- **Detach refuses a workflow still scheduled**, naming the unschedule, so no schedule outlives its attachment.
+- **Where it shows**: `nemia ls` lists a line per schedule after the runs — its cron, its next fire and its last run, and a kept refusal
+  under it; `nemia factory ls` lists them under the factory, the same; the api answers them on `GET /api/factories` (`schedules`, each with
+  the line that takes it back) and writes them on `PUT` and `DELETE /api/factories/<name>/schedules/<workflow>`; the board shows them,
+  read-only, on the factory's settings page, with the line that writes one.
+
 ## Nemia, the store's own agent: `nemia level` and `nemia memory`
 
 Nemia watches every factory of the store for the person: a long-lived session, woken by the feed, that brings what waits on them with a

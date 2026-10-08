@@ -4863,7 +4863,7 @@ test("`nemia start --input` copies each file into the run's own inputs/, freezes
   assert.ok(printed.includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed.join('\n'));
   assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }), '', 'nothing written into the workspace');
 
-  const line = `Files given with it (\`nemia start --input\`), in \`${dir}\`: \`mock.png\`, \`brief notes.md\`.`;
+  const line = `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${dir}\`: \`mock.png\`, \`brief notes.md\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
   await runWith(b.e, advanceRun(readRun(id)));
   b.settle(`${id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(id)));

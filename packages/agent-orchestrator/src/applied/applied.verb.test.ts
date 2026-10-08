@@ -245,3 +245,47 @@ test("a bare workflow name started in a templated factory is its tree's, and the
   assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9, "the tree's step, as the person changed it");
   assert.equal(run.factory, 'started');
 });
+
+test("the writers' place factory writes a templated factory's tree; refused without --factory, for an untemplated one, and before its render", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('written', dir, repo, '--set', 'budget=7');
+  await main(['factory', 'add', 'plain', '--repo', repo], NO_ENGINE);
+  const drafts = scratch('wf-applied-drafts-');
+  const beside = path.join(drafts, 'workflows', 'lean');
+  fs.cpSync(path.join(repo, 'workflows', 'dev'), beside, { recursive: true });
+  for (const part of ['agents', 'skills'])
+    fs.cpSync(path.join(repo, 'workflows', part), path.join(drafts, 'workflows', part), { recursive: true });
+  const bare = path.join(scratch('wf-applied-bare-'), 'lean');
+  fs.cpSync(path.join(repo, 'workflows', 'dev'), bare, { recursive: true });
+  const agent = path.join(drafts, 'scout.md');
+  fs.copyFileSync(path.join(repo, 'workflows', 'agents', 'implementer.md'), agent);
+  const skill = path.join(drafts, 'skills', 'tidy', 'SKILL.md');
+  fs.mkdirSync(path.dirname(skill), { recursive: true });
+  fs.writeFileSync(skill, '---\nname: tidy\ndescription: Tidy a folder.\n---\nTidy it.\n');
+  const writes = (folder: string) => [
+    ['workflows', 'write', 'factory', 'lean', '--folder', folder],
+    ['agents', 'write', 'factory', '--file', agent],
+    ['skills', 'write', 'factory', '--file', skill],
+  ];
+  for (const write of writes(beside)) {
+    await assert.rejects(main(write, NO_ENGINE), refusedWith('Invalid', /`factory` writes the tree .* none was named: .*--factory <name>/));
+    await assert.rejects(
+      main([...write, '--factory', 'written'], NO_ENGINE),
+      refusedWith('Conflict', /its tree is not rendered yet, at .*: start the daemon, nemia up/),
+    );
+    await assert.rejects(main([...write, '--factory', 'plain'], NO_ENGINE), refusedWith('Invalid', /plain is not made from a template/));
+    await assert.rejects(
+      main([...write.slice(0, 2), 'yours', ...write.slice(3), '--factory', 'written'], NO_ENGINE),
+      refusedWith('Invalid', /yours is the store's, and --factory names a factory's tree/),
+    );
+  }
+  assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
+  reconcileFactory(templated('written'));
+  for (const write of writes(bare)) await main([...write, '--factory', 'written'], NO_ENGINE);
+  const tree = path.join(treeDir('written'), 'workflows');
+  assert.ok(fs.existsSync(path.join(tree, 'lean', 'review.md')), "the workflow is written into the tree's, its agents read in the tree");
+  assert.ok(fs.existsSync(path.join(tree, 'agents', 'scout.md')), "the agent is written into the tree's agents");
+  assert.ok(fs.existsSync(path.join(tree, 'skills', 'tidy', 'SKILL.md')), "the skill is written into the tree's skills");
+  assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'nothing of yours is written');
+});

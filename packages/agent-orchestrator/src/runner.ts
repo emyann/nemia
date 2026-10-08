@@ -345,6 +345,7 @@ export {
   removeFactory,
   setInstruction,
   startFactory,
+  templatedTree,
 } from './factory/factory.store.ts';
 export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';

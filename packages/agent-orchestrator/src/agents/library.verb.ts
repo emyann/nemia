@@ -7,7 +7,8 @@
  */
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
-import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { templatedTree } from '../factory/factory.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { HOME } from '../record/record.store.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
@@ -56,18 +57,20 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
  * An agent of yours written (`writeAgent`): `draft`, the agent as JSON text, which the command line reads off `--file`; `schema`, the
  * result schema its `output:` names as JSON text, read beside that file; `version`, what the agent was read at, none for a new one; and the
  * agent's name on the path (`name`), the one it is renamed from — none given for the agent of the draft's own name with no version, a new
- * one. Refused, as `Invalid`, for a place but yours (`yoursOrRefused`).
+ * one. Written to the tree of the factory `--factory` names for the place `factory`. Refused, as `Invalid`, for a place but those two
+ * (`yoursOrRefused`).
  */
 export const AGENTS_WRITE: Command<AgentWritten> = {
   name: 'agents write',
-  usage: 'yours [<name>] --file <name>.md [--version <v>]',
+  usage: '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
   help: [
-    'an agent of yours written from its file: <name> is the agent it',
-    'changes or renames, at the --version it was read at; none, a new one',
+    'an agent of yours, or of a templated --factory, written from its file:',
+    '<name> is the agent it changes or renames, at the --version it was',
+    'read at; none, a new one',
   ],
   spec: writerSpec(
     'agents write',
-    'yours [<name>] --file <name>.md [--version <v>]',
+    '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
     [FROM, { key: 'name', takes: 'optional', kind: 'name' }],
     [
       cliPath(
@@ -77,6 +80,7 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
         "the api is sent the agent's form, never a path to read",
       ),
       versionFlag('agents write', 'the agent'),
+      factoryFlag('agents write'),
       apiKey('draft', 'the command line reads the agent off --file, into the form the board sends'),
       apiKey('schema', 'the command line reads the result schema beside --file, as the board sends the one pasted'),
       REPO,
@@ -91,8 +95,11 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
   handler: (args, _env, home = HOME) =>
     tried(() => {
       const name = writerText(args, 'name');
-      const repo = writerText(args, 'repo');
-      const dir = yoursOrRefused('nemia agents write', 'agents', writerText(args, 'from') ?? '', name ?? null, repo ?? '', home);
+      const from = writerText(args, 'from') ?? '';
+      const factory = writerText(args, 'factory');
+      const tree = (named: string) => templatedTree(named, 'nemia agents write');
+      const repo = from === 'factory' && factory !== undefined ? tree(factory) : writerText(args, 'repo');
+      const dir = yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', home, { factory, treeOf: tree });
       const draft = JSON.parse(writerText(args, 'draft') ?? '{}') as AgentDraft;
       const version = writerText(args, 'version') ?? null;
       const schema = writerText(args, 'schema');

@@ -249,6 +249,23 @@ export function readFactory(name: string, notDone = 'Nothing was started.'): Fac
 }
 
 /**
+ * The tree of the factory `name`, made from a template, for `who` to write into. Refused: the factory (`readFactory`); one not made from a
+ * template (`Invalid`, naming yours); and a tree not rendered yet (`Conflict`, naming the daemon).
+ */
+export function templatedTree(name: string, who: string): string {
+  const factory = readFactory(name, 'Nothing was written.');
+  if (factory.tree === undefined)
+    throw new Invalid({
+      message: `${who}: the factory ${name} is not made from a template, so it has no tree to write; its workflows are its repositories' and yours. Write yours: \`${who} yours …\`. Nothing was written.`,
+    });
+  if (!fs.existsSync(factory.tree))
+    throw new Conflict({
+      message: `${who}: ${name} is made from a template, and its tree is not rendered yet, at ${factory.tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. Nothing was written.`,
+    });
+  return factory.tree;
+}
+
+/**
  * The tree the factory `name` runs from, where it is made from a template (`treeDir`): where a bare workflow name is looked for first.
  * None for no name, an untemplated factory, and one that is not there or does not read: what is wrong with it is the start's to say.
  */

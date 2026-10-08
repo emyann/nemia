@@ -21,6 +21,8 @@ when it is done and how to show it. Write every part below; a part you cannot fi
    brief, each step's median and p90 (*What runs of this workflow cost*): where a recent run's step quoted it (`nemia decide <run>`),
    use it. Say the figures and where they came from, and set the estimate against the person's line, the most they want one card to
    cost. Over it, propose the cut: two cards, each a whole slice, and what each proves.
+   The person's line is the `cost-line` fact in your memory, or their custom instruction; with neither, ask it now, once, and keep it
+   (your instruction's *What you learn of the person*).
 7. **Where it goes**: the factory and the workflow; `--after <run>` where it builds on a run not yet shipped; and the runs in flight it
    would collide with (`nemia ls`): the same files, the same feature, or a run that changes what it reads.
 

@@ -5211,7 +5211,7 @@ test('REFUSED before, now honoured at shipped defaults: `nemia retry` on a step 
   assert.deepEqual([b.stopped, b.filings.filter((f) => f === try2).length], [[taskId], 1], 'once');
 });
 
-test("`nemia start <card>.md` starts the card's body — its id from the body, its `workflow:` found from its plan folder, --workflows over it — and a card whose `after:` names cards starts only with --after; a brief whose frontmatter is not a card's is taken whole, as before", async (t) => {
+test("`nemia start <card>.md` starts the card's body — its id from the body, its `workflow:` found from its plan folder, --workflows over it — and a card whose `after:` names cards starts only with --after; a file whose frontmatter has a key a card lacks is refused by it, naming nemia inbox add, and one that opens with a rule it never closes is taken whole", async (t) => {
   const { repo, dir: dev } = aRepoWith('dev');
   const other = oneStep();
   const b = board();
@@ -5265,11 +5265,12 @@ test("`nemia start <card>.md` starts the card's body — its id from the body, i
 
   const brief = path.join(fs.mkdtempSync(path.join(ROOT, 'brief-')), 'brief.md');
   fs.writeFileSync(brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.\n');
-  assert.equal(
-    (await startedBy(brief, '--repo', repo, '--workflows', dev)).brief,
-    '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.',
-    'not a card: a brief whose frontmatter has a key a card does not have is taken whole',
+  const unstarted = runsWritten();
+  await assert.rejects(
+    main(['start', brief, '--repo', repo, '--workflows', dev], b.e),
+    refusedWith(new RegExp(`^${escaped(brief)}: \`title\` is not a key a plan's card has: [^]*nemia inbox add ${escaped(brief)}[ ,;.)]`)),
   );
+  assert.equal(runsWritten(), unstarted, 'a frontmatter block is never started as the brief: no run written');
   fs.writeFileSync(brief, '---\nA brief that opens with a rule.\n');
   assert.equal(
     (await startedBy(brief, '--repo', repo, '--workflows', dev)).brief,

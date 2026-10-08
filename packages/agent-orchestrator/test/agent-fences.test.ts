@@ -49,7 +49,7 @@ import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
-import { levelFile, promptFile, readNemia, storeDenies } from '../src/nemia/level.store.ts';
+import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
@@ -1384,11 +1384,11 @@ test('a prompt the person allowed by its own rule runs unasked once she is filed
   assert.equal(verdictOf(herRules(root, ['Bash(nemia tick:*)']), 'nemia tick'), 'deny');
 });
 
-test('REFUSED: an edit of the store outside her folder, of her level or of her instruction is denied her, not asked; her memory is hers', () => {
+test('REFUSED: an edit of the store outside her folder, of her level, her instruction or what she was told is denied her; her memory is hers', () => {
   const root = herStore();
   const rules = herRules(root);
-  for (const file of [path.join(root, 'runs', 'r-1', 'run.json'), path.join(root, 'daemon.json'), levelFile(), promptFile()])
-    assert.equal(editVerdictOf(rules, file), 'deny', file);
+  const files = [path.join(root, 'runs', 'r-1', 'run.json'), path.join(root, 'daemon.json'), levelFile(), promptFile(), toldFile()];
+  for (const file of files) assert.equal(editVerdictOf(rules, file), 'deny', file);
   assert.equal(editVerdictOf(rules, path.join(root, 'nemia', 'memory', 'fact.md')), 'allow');
   const open = { ...rules, deny: rules.deny.filter((rule) => !rule.includes(path.join(root, 'runs'))) };
   assert.equal(editVerdictOf(open, path.join(root, 'runs', 'r-1', 'run.json')), 'unmatched', 'without the deny, her mode decides');

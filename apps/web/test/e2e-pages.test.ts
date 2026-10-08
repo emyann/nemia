@@ -35,20 +35,74 @@ test('every file in pages/ but NAMES is a page the e2e visits, once, named as it
   assert.equal(new Set(pages.map((p) => p.name)).size, pages.length, 'no page twice');
 });
 
-test('the runner visits what loadPages reads, and no list of its own', () => {
+test('the runner and its workers visit what loadPages reads, and no list of their own', () => {
+  const read = (file: string) => fs.readFileSync(path.join(import.meta.dirname, 'e2e', file), 'utf8');
+  const runner = read('run.ts');
+  const worker = read('worker.ts');
+  assert.match(runner, /const pages = await loadPages\(\);\s*const plan = planOf\(process\.argv\.slice\(2\), pages\);/);
+  assert.match(runner, /const queue = queueOf\(plan\.visit\.map\(\(p\) => p\.name\)\);/, 'the runner hands out the pages of its plan');
+  assert.match(worker, /const plan = planOf\(rest, await loadPages\(\)\);/, 'a worker knows the pages by what loadPages reads');
+  assert.match(
+    worker,
+    /for await \(const page of pagesOf\(plan\.visit, seat\.worker\)\)/,
+    'a worker visits the pages of its plan it is handed',
+  );
+  assert.match(
+    worker,
+    /visitAll\(browser, seat\.base, \[page\], OUT, \{\s*store: root,\s*themes: plan\.themes,\s*pictured: plan\.pictured,/,
+    'a worker visits each page, and hands the store its api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
+  );
+  for (const [file, text] of [
+    ['run.ts', runner],
+    ['worker.ts', worker],
+  ]) {
+    assert.doesNotMatch(text, /from '\.\/pages\//, `${file} imports no page by its file`);
+    assert.doesNotMatch(text, /PageSpec\[\]/, `${file} keeps no array of pages`);
+  }
+});
+
+test('the runner refuses two workers sharing a store, an api or an app, and a worker refuses a store its pages left changed', () => {
+  const read = (file: string) => fs.readFileSync(path.join(import.meta.dirname, 'e2e', file), 'utf8');
+  const runner = read('run.ts');
+  const worker = read('worker.ts');
+  assert.match(
+    runner,
+    /apart\(seats\);\n(?:.*\n)*?\s*results = await Promise\.all\(seats\.map\([^\n]*\n\s*apart\(results\);/,
+    'the runner refuses two workers sharing a store before it starts them, and an api or an app once they report theirs',
+  );
+  assert.match(
+    worker,
+    /const before = fingerprint\(root\);\n(?:.*\n)*?\s*for await \(const page of pagesOf\([^\n]*\n(?:.*\n)*?\s*const left = leftOver\(before, fingerprint\(root\), visited\);\s*if \(left\) throw new Error\(/,
+    'a worker prints its store before its first page, and fails when its pages leave it other than it was (`leftOver`)',
+  );
+});
+
+test('a worker that exits other than 0 stops the queue: no worker starts another page', () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(
     runner,
-    /visitAll\(browser, base, plan\.visit, OUT, \{ store, themes: plan\.themes, pictured: plan\.pictured \}\)/,
-    'the runner visits its plan, and hands the store the api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
+    /child\.on\('exit', \(code, signal\) => \{\s*if \(code !== 0\) queue\.stop\(\);/,
+    'a worker that failed, or was killed, stops the queue the moment it exits',
   );
-  assert.match(runner, /const pages = await loadPages\(\);\s*const plan = planOf\(process\.argv\.slice\(2\), pages\);/);
-  assert.doesNotMatch(runner, /from '\.\/pages\//, 'run.ts imports no page by its file');
-  assert.doesNotMatch(runner, /PageSpec\[\]/, 'run.ts keeps no array of pages');
 });
 
-test('no page imports run.ts, which would start the whole e2e as the pages load', () => {
-  for (const file of pageFiles()) assert.doesNotMatch(fs.readFileSync(path.join(PAGES_DIR, file), 'utf8'), /from '\.\.\/run\.ts'/, file);
+test('a whole run over the bound fails: the runner throws what overBound says', () => {
+  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
+  assert.match(
+    runner,
+    /async function main\(\): Promise<void> \{\s*const started = performance\.now\(\);/,
+    'the runner starts its clock first, so the bound covers the whole run',
+  );
+  assert.match(
+    runner,
+    /const totalMs = performance\.now\(\) - started;\s*const late = overBound\(totalMs, timings, plan\.whole\);\s*if \(late\) throw new Error\(late\);/,
+    'the runner holds a whole run to its bound, and fails with what overBound says',
+  );
+});
+
+test('no page imports run.ts or worker.ts, which would start the whole e2e as the pages load', () => {
+  for (const file of pageFiles())
+    assert.doesNotMatch(fs.readFileSync(path.join(PAGES_DIR, file), 'utf8'), /from '\.\.\/(?:run|worker)\.ts'/, file);
 });
 
 test('the pages are visited by their numbers, then their names — not by name alone, not in the order given', () => {
@@ -189,16 +243,39 @@ test('--photos visits every page in light, then dark, and pictures each', () => 
   assert.deepEqual(picturedOf(plan), ['a', 'b', 'c']);
 });
 
-test('--pages visits every page up to the last one named, for the leavings it reads, and --photos pictures only the ones named', () => {
+test('--pages visits only the pages named, in the order of the pages, and --photos pictures only those', () => {
   const photos = planOf(['--photos', '--pages', 'b'], ABC);
-  assert.deepEqual(namesOf(photos.visit), ['a', 'b'], 'a is visited for what it leaves, c is not');
+  assert.deepEqual(namesOf(photos.visit), ['b'], 'a page reads only the seed and what it writes itself: no page before it is visited');
   assert.deepEqual(photos.themes, ['light', 'dark']);
   assert.deepEqual(picturedOf(photos), ['b']);
   const named = planOf(['--pages', 'c,a'], ABC);
-  assert.deepEqual(namesOf(named.visit), ['a', 'b', 'c'], 'the last named in the order of the pages, not of the names');
+  assert.deepEqual(namesOf(named.visit), ['a', 'c'], 'in the order of the pages, not of the names, and b left out');
   assert.deepEqual(named.themes, ['dark']);
   assert.deepEqual(picturedOf(named), [], 'no picture without --photos');
   assert.deepEqual(picturedOf(planOf(['--pages', 'a,c', '--photos'], ABC)), ['a', 'c'], 'in either order of the flags');
+});
+
+test('only a run of every page in the dark theme is whole, the run a check makes and holds to its bound', () => {
+  assert.equal(planOf([], ABC).whole, true);
+  assert.equal(planOf(['--workers', '2'], ABC).whole, true, 'however many workers');
+  assert.equal(planOf(['--photos'], ABC).whole, false);
+  assert.equal(planOf(['--pages', 'a,b,c'], ABC).whole, false, 'a run of pages named, even all of them');
+});
+
+test('--workers says how many workers visit the pages; without it the machine says', () => {
+  assert.equal(planOf(['--workers', '3'], ABC).workers, 3);
+  assert.equal(planOf(['--pages', 'b', '--workers', '1'], ABC).workers, 1);
+  assert.equal(planOf([], ABC).workers, undefined);
+});
+
+test('REFUSED: --workers with no whole number of one or more after it', () => {
+  for (const argv of [['--workers'], ['--workers', '0'], ['--workers', 'x'], ['--workers', '1.5'], ['--workers', '--photos']]) {
+    assert.throws(
+      () => planOf(argv, ABC),
+      (e: Error) => e.message.startsWith('--workers takes a whole number of workers, one or more (--workers 4), not '),
+      argv.join(' '),
+    );
+  }
 });
 
 test('REFUSED: a page --pages names that there is not, naming it and the pages there are', () => {
@@ -221,10 +298,10 @@ test('REFUSED: --pages with no page after it', () => {
 test('REFUSED: a flag the e2e does not know', () => {
   assert.throws(
     () => planOf(['--colour'], ABC),
-    (e: Error) => /^the e2e takes --photos and --pages <name,…>, not --colour\b/.test(e.message),
+    (e: Error) => /^the e2e takes --photos, --pages <name,…> and --workers <n>, not --colour\b/.test(e.message),
   );
   assert.throws(
     () => planOf(['b'], ABC),
-    (e: Error) => /^the e2e takes --photos and --pages <name,…>, not b\b/.test(e.message),
+    (e: Error) => /^the e2e takes --photos, --pages <name,…> and --workers <n>, not b\b/.test(e.message),
   );
 });

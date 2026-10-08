@@ -10,6 +10,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { expectTheme, idle, Refused, settled, track, watch } from './checks.ts';
 import { photograph } from './board.ts';
 import { photographing, setPhotographing } from './world.ts';
+import { costLine, PHASES, type PageTiming, type Phase } from './timing.ts';
 
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
@@ -52,8 +53,9 @@ class PageFailure extends Error {
 
 /**
  * One page in one theme: loaded, held to its spec, and photographed as a person would see it, once whatever the last assertion started has
- * settled, when it is pictured (`photographing`). Resolves with the screenshot, or nothing when it is not pictured; rejects with a
- * `PageFailure` and a picture of the page as it failed, which is taken whether or not the page is pictured.
+ * settled, when it is pictured (`photographing`). Resolves with the screenshot, or nothing when it is not pictured, and the time each
+ * phase took (`PHASES`, timing.ts) by `performance.now()`; rejects with a `PageFailure` and a picture of the page as it failed, which is
+ * taken whether or not the page is pictured.
  */
 async function visit(
   context: BrowserContext,
@@ -62,21 +64,29 @@ async function visit(
   theme: Theme,
   out: string,
   store?: string,
-): Promise<string | undefined> {
+): Promise<{ shot?: string; phases: Record<Phase, number> }> {
   const page = await context.newPage();
   const { problems } = watch(page);
   const shot = path.join(out, `${spec.name}-${theme}.png`);
+  const phases = Object.fromEntries(PHASES.map((phase) => [phase, 0])) as Record<Phase, number>;
+  const timed = async (phase: Phase, step: () => Promise<unknown>) => {
+    const from = performance.now();
+    await step();
+    phases[phase] += performance.now() - from;
+  };
   try {
-    await page.goto(base + spec.route, { waitUntil: 'load' });
-    if (!spec.follows) await idle(page);
-    await expectTheme(page, theme);
-    await spec.expect(page);
-    if (!spec.follows) await idle(page);
-    await settled(page);
-    await photograph(page, shot, { fullPage: true });
+    await timed('load', () => page.goto(base + spec.route, { waitUntil: 'load' }));
+    if (!spec.follows) await timed('idle', () => idle(page));
+    await timed('expect', async () => {
+      await expectTheme(page, theme);
+      await spec.expect(page);
+    });
+    if (!spec.follows) await timed('quiet', () => idle(page));
+    await timed('settle', () => settled(page));
+    await timed('picture', () => photograph(page, shot, { fullPage: true }));
     const seen = problems();
     if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
-    return photographing ? shot : undefined;
+    return { shot: photographing ? shot : undefined, phases };
   } catch (err) {
     fs.rmSync(shot, { force: true });
     const failed = path.join(out, `${spec.name}-${theme}-failed.png`);
@@ -88,19 +98,25 @@ async function visit(
 }
 
 /**
- * Every page, in each of `themes` in turn, each in a 1280 × 800 browser; a screenshot into `out` of each page `pictured` names, which
- * alone take their own pictures too (`setPhotographing`). Resolves with the screenshots. Rejects on the first page that fails, naming the
- * page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place of the assertion
- * (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its requests counted from
- * its first, for `idle`.
+ * The pages given, in each of `themes` in turn, each in a 1280 × 800 browser; a screenshot into `out` of each page `pictured` names, which
+ * alone take their own pictures too (`setPhotographing`). Says each page passed with its time and its phases. Resolves with the
+ * screenshots, and what each page took in each theme, stamped with `worker`, the worker that visited it. Rejects on the first page that
+ * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place
+ * of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its
+ * requests counted from its first, for `idle`.
  */
 export async function visitAll(
   browser: Browser,
   base: string,
   pages: readonly PageSpec[],
   out: string,
-  { store, themes, pictured }: { store?: string; themes: readonly Theme[]; pictured: (name: string) => boolean },
-): Promise<string[]> {
+  {
+    store,
+    themes,
+    pictured,
+    worker = 0,
+  }: { store?: string; themes: readonly Theme[]; pictured: (name: string) => boolean; worker?: number },
+): Promise<{ shots: string[]; timings: PageTiming[] }> {
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
     for (const theme of THEMES) {
@@ -109,6 +125,7 @@ export async function visitAll(
     }
   }
   const shots: string[] = [];
+  const timings: PageTiming[] = [];
   for (const theme of themes) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
     context.on('page', track);
@@ -116,16 +133,19 @@ export async function visitAll(
       for (const spec of pages) {
         if (store !== undefined && !fs.existsSync(store)) throw new Error(`before ${where(spec, theme)}: ${storeGone(store)}`);
         setPhotographing(pictured(spec.name));
-        const shot = await visit(context, base, spec, theme, out, store);
+        const from = performance.now();
+        const { shot, phases } = await visit(context, base, spec, theme, out, store);
+        const timing = { name: spec.name, theme, worker, ms: performance.now() - from, phases };
+        timings.push(timing);
         if (shot) shots.push(shot);
-        console.log(`e2e: ${where(spec, theme)} ✓`);
+        console.log(`e2e: ${where(spec, theme)} ✓ ${costLine(timing)}`);
       }
     } finally {
       setPhotographing(false);
       await context.close();
     }
   }
-  return shots;
+  return { shots, timings };
 }
 
 export async function launch(): Promise<Browser> {

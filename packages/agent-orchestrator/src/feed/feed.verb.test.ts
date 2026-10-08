@@ -220,6 +220,32 @@ test('REFUSED: a feed cut under an open reader fails it on the next beat, and is
   );
 });
 
+test('REFUSED: the lines of one emission reach a reader as one chunk, a run and its step together', WAITED, async (t) => {
+  const rt = hubbed(t);
+  const chunks: Followed[][] = [];
+  const pushed = bell();
+  const was = followers();
+  const fiber = rt.runFork(
+    Stream.runForEachArray(followFeed(feedSize(), { beat: '1 hour' }), (chunk) =>
+      Effect.sync(() => {
+        chunks.push([...chunk]);
+        pushed.ring();
+      }),
+    ),
+  );
+  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  await read(t, () => followers() === was + 1, 'the reader counted');
+  await rt.runPromise(emitFeed(judged('awaiting approval', 'land')));
+  await until(t, () => chunks.flat().length >= 2, 'both lines handed', { bell: pushed });
+  assert.deepEqual(
+    chunks.map((c) => c.map((f) => (f.kind === 'line' ? `${f.line.step ?? '—'} ${f.line.word}` : f.kind))),
+    [['— awaiting approval', 'land awaiting approval']],
+    'one chunk of two lines, the run first',
+  );
+  const [, step] = chunks[0];
+  assert.equal(step.kind === 'line' && step.cursor, feedSize());
+});
+
 test('each line emitFeed writes is logged at Info, annotated with its run, its step where it names one, and its word', async () => {
   const logs: { level: string; text: string; annotations: Record<string, unknown> }[] = [];
   const keeper = Logger.make(({ message, logLevel, fiber }) => {

@@ -1635,9 +1635,10 @@ output: implement.schema.json   # screenshots, pages
 
 - **The e2e runs once, on the merged tree.** `WF_BASE_REF` is set in every check the run executes on a step, so
   a round's check builds and runs no e2e, and a gated ship, where it is not set, runs the line whole on the merged
-  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it against a seeded store,
-  visits every page in headless Chromium in a light and a dark theme, asserts what each page must have, and
-  screenshots each into `WF_ARTIFACTS`.
+  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it to workers in parallel,
+  each against a seeded store of its own, visits every page in headless Chromium in the dark theme, and asserts what
+  each page must have; with `--photos`, in a light and a dark theme, screenshots each into `WF_ARTIFACTS`. This
+  repository's own build workflow runs it in implement's round check too.
 - **`implement` declares `screenshots` and `pages`**, and `review` reads the diff, is handed those and nothing else
   of implement, and looks at the screenshots and the pages side by side. Its schema can say where a finding is as
   `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that names
@@ -2445,9 +2446,10 @@ run 'wf tick' (or 'wf up') to start them
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
   card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
-  A file is a card only when every line of its frontmatter is `workflow:` or `after:` — or an inbox card's `repo:`, which a
-  plan's card refuses by name, since its repository is `--repo`. A brief with any other key, or one that opens with a `---`
-  it never closes, is taken whole, as before.
+  A file that opens with a closed frontmatter block whose every line is a key (`KEY_LINE`) is a plan's card, and a block of
+  keys is never taken into a brief: a key a plan's card lacks — an inbox card's `repo:` or `factory:`, a `title:` — is
+  refused by name, exit 2, naming `wf inbox add <file>`, whose cards read those keys. A file whose block has a line of
+  prose, is empty, or opens with a `---` it never closes is not a card, and is taken whole.
 
 ## An inbox: cards before they are started — `wf inbox`
 
@@ -2798,8 +2800,8 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
 
 What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
 for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
-board's Settings, though no place names her), read once, as her session is filed: an open session keeps
-the words it was filed with, so a change takes effect after `nemia level manual`, then `nemia level semi-auto`; a factory's rules are its
+board's Settings, though no place names her), read as her session is filed; a write or a clear while she is kept is told to her open
+session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`

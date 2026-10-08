@@ -1,10 +1,12 @@
 /**
  * A subscription to the feed: a long-lived task the daemon tells what the feed says, at once for a line that needs judgement (a wake line)
- * and as one digest for routine news, said with the next wake or once `digestEvery` minutes have passed with none.
+ * and as one digest for routine news, said with the next wake or once `digestEvery` minutes have passed with none. The wake lines of one
+ * read of the feed are told in one message.
  *
- * Pure: what a line means for a subscriber (`sortLine`), the words it is told (`messageOf`, `digestOf`), when a digest falls due
- * (`digestDue`), and the refusals of a subscription asked for (`subscribeRefusalOf`). The person's file and the deliverer's are
- * `subscription.store.ts`'s, the deliverer is `deliver.verb.ts`, and the commands are `subscription.verb.ts`.
+ * Pure: what a line means for a subscriber (`sortLine`), what one read of the feed comes to (`readDelivered`), the words it is told
+ * (`messageOf`, `digestOf`), when a digest falls due (`digestDue`), and the refusals of a subscription asked for (`subscribeRefusalOf`).
+ * The person's file and the deliverer's are `subscription.store.ts`'s, the deliverer is `deliver.verb.ts`, and the commands are
+ * `subscription.verb.ts`.
  */
 import { feedLineWords, type FeedLine } from '../feed/feed.ts';
 import { elapsedMs, type Instant } from '../daemon/daemon.ts';
@@ -72,14 +74,38 @@ const digestLines = (lines: readonly FeedLine[]): string[] => [
 ];
 
 /**
- * What a subscriber is told of a wake line: the line, and under it the digest that rides it, when it holds any line. Pure.
+ * What a subscriber is told of the wake lines of one read: each line in the order given, and under them the digest that rides them, when it
+ * holds any line. Pure.
  */
-export const messageOf = (line: FeedLine, digest: readonly FeedLine[]): string =>
+export const messageOf = (lines: readonly FeedLine[], digest: readonly FeedLine[]): string =>
   [
     'The feed needs your judgement:',
-    `  ${feedLineWords(line)}`,
+    ...lines.map((l) => `  ${feedLineWords(l)}`),
     ...(digest.length ? ['', 'Since your last news:', ...digestLines(digest)] : []),
   ].join('\n');
+
+/** What one read of the feed comes to: its message, where a line wakes, the wake lines it holds, and where the deliverer is next. */
+export type ReadDelivered = { message?: string; wakes: number; next: Delivery };
+
+/**
+ * What one read of the feed, ending at `cursor`, comes to for a subscriber at `at`, given the lines it carries of that read (`carried`), in
+ * feed order. Where one wakes (`sortLine`), every wake line is said in one message, with the digest and every routine line of the read
+ * riding it, and the digest is emptied; else each routine line is folded into the digest, begun at `now` where it was empty. Pure.
+ */
+export function readDelivered(
+  at: Delivery,
+  carried: readonly FeedLine[],
+  wake: readonly string[],
+  cursor: number,
+  now: Instant,
+): ReadDelivered {
+  const wakes = carried.filter((l) => sortLine(l, wake) === 'wake');
+  const routine = carried.filter((l) => sortLine(l, wake) === 'routine');
+  const digest = [...at.digest, ...routine];
+  if (wakes.length) return { message: messageOf(wakes, digest), wakes: wakes.length, next: { cursor, digest: [] } };
+  if (!routine.length) return { wakes: 0, next: { ...at, cursor } };
+  return { wakes: 0, next: { cursor, digest, since: at.since ?? now } };
+}
 
 /** What a subscriber is told of routine news with no wake to ride: the digest, one line each, and its count. Pure. */
 export const digestOf = (lines: readonly FeedLine[]): string =>

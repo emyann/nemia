@@ -2358,7 +2358,8 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
   never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
   `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: auto`, with every factory's folders mounted
-  read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one. At 5b
+  read-only and her memory writable; her instruction is written at filing, the shipped one followed by the person's custom one (a
+  change while she is kept is told, *Her custom instruction told*, below). At 5b
   her settings asked the person each write, through an askTools: list in her instruction and an Edit asked on each folder of the store
   but hers; card A replaced both (*at Semi-auto, only what waits on the person prompts*, below): her fence is derived from the command
   classes (`nemiaFence`), the store outside her folder is denied her edits (`storeDenies`), and `readNemia` refuses an askTools: line.
@@ -2382,6 +2383,7 @@ stateDiagram-v2
   filed --> kept: NOT_SUBSCRIBED / subscribe
   filed --> stopped: SETTLED_OUTSIDE / nothing
   kept --> stopped: SETTLED_OUTSIDE / nothing
+  kept --> kept: CUSTOM_CHANGED / tell
   stopped --> stopped: SUBSCRIBED / drop
   leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
   due --> off: RAISE_ENDED / nothing
@@ -2394,6 +2396,7 @@ stateDiagram-v2
   filed --> leaving: level (none above manual) [always] (by person)
   kept --> leaving: level (none above manual) [always] (by person)
   stopped --> leaving: level (none above manual) [always] (by person)
+  kept --> kept: agents custom nemia (set or clear) [always] (by person)
 ```
 <!-- diagram:nemia:end -->
 
@@ -2422,6 +2425,29 @@ a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` not
 `src/stats/discipline.test.ts` (the calls so far beside the ended ones the stats count),
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
 `default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).
+
+## Shipped: her custom instruction told (phase 7, card 2)
+
+`nemia agents custom nemia` and the board's Settings (her rules, *Custom instructions*) write the person's words for her, and a change
+reaches her open long-lived session within one keeper beat, through the runtime's `say` alone: no verb of hers, no restart, no new filing.
+
+- **Owed, level-triggered**: while she is `kept`, each beat reads the person's words for her as they read now and compares them with
+  those her session was last filed or told with, the keeper's record (`customChanged`, `$WF_ROOT/nemia/told.json`, denied her as
+  `prompt.md` is); where they differ, `nemiaDue` owes `tell`. Her shipped instruction is never compared: a change to it alone tells her
+  nothing. A session filed before the keeper kept the record is judged by the words her filed instruction ends with, and is never told a
+  removal of words it is unknown she had. Nothing is carried between beats, so a restart owes what the files say. In any other state no
+  tell is owed, and the words are not read, so words that do not read never hold a stop.
+- **Told, then recorded** (`tellHer`, `src/nemia/keep.verb.ts`): the words as read once (`toldCustom`: the new words whole, or that she
+  has none), said to her task, and only once the runtime took them her filed instruction written with them, so an attempt started again
+  reads them too, and the words recorded as told. A refused `say` writes nothing, and the tell is owed again on the next beat.
+- **Said in its words**: `nemia agents custom nemia` prints that her open session is told at the keeper's next beat, where a hired
+  agent's says a run already started keeps its words; the board's panel says a save or a clear is told to her open session.
+- **Her instruction** (`nemia/nemia.md`) says that the keeper's tell replaces the words she was started with.
+
+Tested in `src/nemia/nemia.test.ts` (a tell owed in `kept` alone; its words; the edge drawn), `src/nemia/keep.verb.test.ts` (told once
+to her open task, never by a filing or a stop, and a clear; a refused `say`; words that do not read; her shipped instruction changed alone; a session kept before the record), `test/nemia-told.test.ts` (on
+the runtime: the words in her live session's inbox, one attempt, never stopped), `test/agents-cli.test.ts` (her print) and
+`apps/web/test/components.test.ts` (her panel's words).
 
 ## Shipped: at Semi-auto, only what waits on the person prompts
 
@@ -5821,3 +5847,23 @@ place, live, when a decision is read (`docs/design-2026-09-29-git-out.md`, open 
 A decision read costs two node processes and a `git diff` per check-affecting path: 150 to 450 ms on this repository's branches, where
 the git calls it replaced took 20 to 120, the radii equal. Tested in `test/report.test.ts`, `test/radius.test.ts`, `test/decide.test.ts`
 and `test/store.test.ts` (a report not heard), `test/ship.test.ts` (a trial that read no base) and the api's `decide/decision.test.ts`.
+
+## Shipped: one read of the feed, one message to a subscriber (2026-10-07)
+
+A gate writes two wake lines at one instant, its run's and its step's, and each `say` is a turn of the subscriber's session, which reads
+its whole conversation again: one gate cost two turns. The deliverer now says what one read of the feed finds in one message.
+
+- **A read** is what the feed's reader handed on since the deliverer last took, at least one item (`Stream.buffer` and
+  `Stream.runForEachArray` in `src/subscription/deliver.verb.ts`). `followFeed` hands the items of one take of the hub, as a pass's lines
+  published together, as one chunk (`Stream.mapAccumArrayEffect`), and a read of the file was one already. Lines that come while a `say`
+  is in flight, or waits on its backoff, make the next message. No window waits for more: the first line of a wake is said at once.
+- **One message a read** (`readDelivered`, `src/subscription/subscription.ts`): every wake line in feed order under the heading, each as
+  the feed says it, its step and the verb that answers it in its note; then the digest with every routine line of the read. A gate's run
+  line and step line stay two lines of it. One wake line reads as before. `subscription.wakes` still counts wake lines.
+- **The guarantees hold per message**: the cursor is written once its `say` resolved; a failed `say` is said again whole; a deliverer
+  stopped between a `say` and its cursor says the message again on restart, at least once.
+
+Tested in `src/subscription/subscription.test.ts` (the message of several lines in the order given; a read with a wake, and with none),
+`src/feed/feed.verb.test.ts` (one emission reaches a reader as one chunk) and `src/subscription/deliver.verb.test.ts` (one gate one say;
+three gates in one read, the digest once; a gate over the hub; a failed `say` said again whole; a restart between a `say` and its
+cursor).

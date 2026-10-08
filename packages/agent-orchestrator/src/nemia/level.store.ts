@@ -1,7 +1,8 @@
 /**
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
- * and what ships with her in the package's `nemia/` folder: her definition (`nemia.md`) and her skills.
+ * the custom words she was last filed or told with (`told.json`, the keeper's record), and what ships with her in the package's `nemia/`
+ * folder: her definition (`nemia.md`) and her skills.
  *
  * Beneath the controllers, beside `subscription.store.ts`: it imports no store of runs.
  */
@@ -17,7 +18,7 @@ import type { Workflow } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { AUTO_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { LEVELS, type LevelFile } from './nemia.ts';
+import { LEVELS, nemiaPrompt, type LevelFile, type ToldCustom } from './nemia.ts';
 
 /** The store she is kept in, read once as the package loads, as `subscription.store.ts` reads its `ROOT`. */
 const ROOT = wfRoot();
@@ -33,6 +34,9 @@ export const levelFile = (): string => path.join(nemiaDir(), 'level.json');
 
 /** The instruction her session is filed with: what ships, then the person's custom words. */
 export const promptFile = (): string => path.join(nemiaDir(), 'prompt.md');
+
+/** The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`). */
+export const toldFile = (): string => path.join(nemiaDir(), 'told.json');
 
 /** What ships with her: her definition, `nemia.md`, and her skills, `skills/`, a plugin folder. */
 export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia');
@@ -136,8 +140,9 @@ export function ownBin(root: string = PACKAGE): string | undefined {
 
 /**
  * The deny rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, the
- * rules for auto among them whether or not their folder is there yet (`AUTO_FOLDER`), and on her level and her instruction, the two
- * files of her folder she does not own. Read at each filing, so a folder the store gains is denied at the next.
+ * rules for auto among them whether or not their folder is there yet (`AUTO_FOLDER`), and on her level, her instruction and the record
+ * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the
+ * store gains is denied at the next.
  */
 export function storeDenies(root: string = ROOT): string[] {
   let names: string[];
@@ -156,18 +161,68 @@ export function storeDenies(root: string = ROOT): string[] {
     `Edit(/${path.join(root, AUTO_FOLDER)}/**)`,
     `Edit(/${levelFile()})`,
     `Edit(/${promptFile()})`,
+    `Edit(/${toldFile()})`,
   ];
+}
+
+/** The person's custom words for her in the store `home`, or undefined where there are none (`readCustomInstructions`). */
+export const nemiaCustom = (home: string = ROOT): string | undefined => readCustomInstructions(home, 'nemia');
+
+/** Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file. */
+export function writePrompt(text: string): string {
+  fs.mkdirSync(nemiaDir(), { recursive: true });
+  fs.writeFileSync(promptFile(), text);
+  return promptFile();
+}
+
+/** Records `custom` as the words her session was last filed or told with (`toldFile`): none where undefined. */
+export function writeTold(custom: string | undefined): void {
+  fs.mkdirSync(nemiaDir(), { recursive: true });
+  fs.writeFileSync(toldFile(), `${JSON.stringify(custom === undefined ? {} : { words: custom })}\n`);
+}
+
+/** The decoded record of the words she was last filed or told with: an object, with words, if any, as a string. */
+const ToldSchema = Schema.Struct({ words: Schema.optionalKey(Schema.String) });
+
+/**
+ * The custom words her session was last filed or told with (`toldFile`), or undefined where the keeper kept no record, or one that does
+ * not read as one: a session filed before the keeper kept them, read off her instruction instead (`customChanged`).
+ */
+export function readTold(): ToldCustom | undefined {
+  let text: string;
+  try {
+    text = fs.readFileSync(toldFile(), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
+  try {
+    const read = Schema.decodeUnknownResult(ToldSchema)(JSON.parse(text));
+    return Result.isSuccess(read) ? { ...read.success } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * Writes the instruction her session is filed with (`promptFile`): her shipped instruction, then the person's custom words for her from
- * the store `home`, where there are any. Answers the file.
+ * the store `home`, where there are any, and records those words (`writeTold`). Answers the file.
  */
 export function composePrompt(body: string, home: string = ROOT): string {
-  const custom = readCustomInstructions(home, 'nemia');
-  fs.mkdirSync(nemiaDir(), { recursive: true });
-  fs.writeFileSync(promptFile(), `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`);
-  return promptFile();
+  const custom = nemiaCustom(home);
+  const file = writePrompt(nemiaPrompt(body, custom));
+  writeTold(custom);
+  return file;
+}
+
+/** The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written. */
+export function filedPrompt(): string | undefined {
+  try {
+    return fs.readFileSync(promptFile(), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
 }
 
 /** A fact's name: a file of her memory, a letter or a digit first, and no folder. */

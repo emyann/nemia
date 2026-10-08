@@ -9,12 +9,12 @@ import { AgentRefused } from './AgentParts';
 
 /**
  * What a panel of custom instructions says of where the words reach and when a save takes effect: `told`, who is told them; `takes`, when
- * a change reaches them, marked `frozen` or `filed`; `saved` and `cleared`, said after a write; `clearAsks`, the question Clear asks;
+ * a change reaches them, marked `frozen` or `told`; `saved` and `cleared`, said after a write; `clearAsks`, the question Clear asks;
  * `placeholder`, the empty draft's hint; `unread`, what words that do not read stop.
  */
 export type Reach = {
   told: (name: ReactNode) => ReactNode;
-  takes: { mark: 'frozen' | 'filed'; words: string };
+  takes: { mark: 'frozen' | 'told'; words: string };
   saved: string;
   cleared: string;
   clearAsks: string;
@@ -38,20 +38,24 @@ export const HIRED: Reach = {
   unread: (name) => `These do not read, so no run can start a step naming ${name} until you clear them or save words over them:`,
 };
 
-/** The words for the store's own agent, hired by no step: told in her session, read once as it is filed. */
+/** The words for the store's own agent, hired by no step: told in her session as it is filed, and to her open session when they change. */
 export const SESSION: Reach = {
-  told: (name) => <>Your words for {name}, the store's own agent: told after her own instruction, in the session she is filed with.</>,
+  told: (name) => (
+    <>
+      Your words for {name}, the store's own agent: told after her own instruction, in the session she is filed with, and to her open
+      session when they change.
+    </>
+  ),
   takes: {
-    mark: 'filed',
-    words:
-      'Her open session keeps the words it was filed with: a save or a clear takes effect when her session is next filed. To file it again, ' +
-      'set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back.',
+    mark: 'told',
+    words: 'Her open session is told a save or a clear at her keeper’s next beat, within seconds: no restart, no new session.',
   },
-  saved: 'Saved: her session is told these words once it is next filed.',
-  cleared: 'Cleared: her session is told none once it is next filed.',
-  clearAsks: 'Remove these words, from her next session?',
+  saved: 'Saved: her open session is told these words.',
+  cleared: 'Cleared: her open session is told she has none.',
+  clearAsks: 'Remove these words? Her open session is told.',
   placeholder: () => 'What she is told after her own instruction: how your factories are run, what she may answer for you at Auto.',
-  unread: () => 'These do not read, so her session cannot be filed again until you clear them or save words over them:',
+  unread: () =>
+    'These do not read, so her open session is told nothing and she cannot be filed again until you clear them or save words over them:',
 };
 
 /**
@@ -94,7 +98,7 @@ export function CustomInstructions({ name, reach = HIRED }: { name: string; reac
         <p className="text-xs text-neutral-600 dark:text-neutral-400">{reach.told(<code className="font-mono">{name}</code>)}</p>
         <p
           data-custom-frozen={reach.takes.mark === 'frozen' || undefined}
-          data-custom-filed={reach.takes.mark === 'filed' || undefined}
+          data-custom-told={reach.takes.mark === 'told' || undefined}
           className="text-xs text-neutral-600 dark:text-neutral-400"
         >
           {reach.takes.words}

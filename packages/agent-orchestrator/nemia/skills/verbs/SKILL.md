@@ -84,7 +84,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told
                                after its instructions. Bare, prints them; --file writes them (- for
                                stdin); --clear removes them. Words only: a frontmatter block is
-                               refused. A run keeps the words it was started with
+                               refused. A run keeps the words it was started with; nemia, the
+                               store's own agent, is told them in her open session
                                reads bare; prompts the person given --file, --clear
   nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]
                                Nemia, the store's own agent: bare, where she is, each factory's level and
@@ -145,6 +146,8 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
                                a card of a plan (nemia plan --help) starts its body: --workflows is its
                                workflow: unless given, and its after: needs an --after for each
+                               a frontmatter block of keys a plan's card lacks is refused by its key,
+                               never taken as the brief: file an inbox card with nemia inbox add <file>
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
                                --factory <name>: the workflow must be attached to the factory, whose

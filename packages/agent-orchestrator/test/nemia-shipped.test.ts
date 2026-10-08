@@ -167,7 +167,10 @@ test('her skills recruit-or-create and first-meeting, and her instruction, keep 
 
 test('REFUSED: a first-meeting with a section dropped and another renamed is named for both', () => {
   const files = new Map([
-    ['skills/first-meeting/SKILL.md', '---\nname: first-meeting\n---\n# First meeting\n\n## When\n\n## Introduce yourself\n\n## Never asked\n'],
+    [
+      'skills/first-meeting/SKILL.md',
+      '---\nname: first-meeting\n---\n# First meeting\n\n## When\n\n## Introduce yourself\n\n## Never asked\n',
+    ],
   ]);
   assert.deepEqual(
     missingSections(files).filter((line) => line.startsWith('skills/first-meeting/')),

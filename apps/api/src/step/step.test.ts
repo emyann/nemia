@@ -90,10 +90,10 @@ test("a step's recent runs: its folder's only, newest first, at most RECENT_RUNS
 
 test('the factories that hire into a step: those that attach its workflow and, for a repository workflow, work on the repository', () => {
   const factories: FactoryListing[] = [
-    { name: 'nemia', file: 'nemia.json', repos: ['/r'], workflows: ['build'], hires: { 'build/implement': 'ada' } },
-    { name: 'loose', file: 'loose.json', repos: ['/r'], workflows: [], hires: { 'build/implement': 'bob' } },
-    { name: 'far', file: 'far.json', repos: ['/s'], workflows: ['build'], hires: { 'build/implement': 'cy' } },
-    { name: 'idle', file: 'idle.json', repos: ['/r'], workflows: ['build'], hires: { 'build/review': 'dee' } },
+    { name: 'nemia', file: 'nemia.json', repos: ['/r'], workflows: ['build'], hires: { 'build/implement': 'ada' }, schedules: {} },
+    { name: 'loose', file: 'loose.json', repos: ['/r'], workflows: [], hires: { 'build/implement': 'bob' }, schedules: {} },
+    { name: 'far', file: 'far.json', repos: ['/s'], workflows: ['build'], hires: { 'build/implement': 'cy' }, schedules: {} },
+    { name: 'idle', file: 'idle.json', repos: ['/r'], workflows: ['build'], hires: { 'build/review': 'dee' }, schedules: {} },
     { name: 'broken', file: 'broken.json', error: 'does not read' },
   ];
   assert.deepEqual(hiredInOf(factories, 'build', 'implement', 'repo', '/r'), [{ factory: 'nemia', agent: 'ada' }]);

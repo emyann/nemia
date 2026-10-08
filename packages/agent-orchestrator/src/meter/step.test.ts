@@ -209,6 +209,28 @@ test("each settled session's queue is filed to first spawn and each check's run 
   );
 });
 
+test("a session's queue ends at its first attempt's spawn: neither when that attempt started, nor a later attempt's spawn", () => {
+  const attempt = (started: string, spawned: string, ended: string) => ({
+    startedAt: `${DAY}T${started}:00.000Z`,
+    spawnedAt: `${DAY}T${spawned}:00.000Z`,
+    endedAt: `${DAY}T${ended}:00.000Z`,
+    reason: null,
+    usage: null,
+  });
+  const retried: FactView = {
+    state: {
+      brief: 'Do it.',
+      settled: 'succeeded',
+      filedAt: `${DAY}T10:00:00.000Z`,
+      attempts: [attempt('10:03', '10:04', '10:05'), attempt('10:06', '10:07', '10:09')],
+    },
+  };
+  assert.deepEqual(queueWait(retried), { from: `${DAY}T10:00:00.000Z`, to: `${DAY}T10:04:00.000Z`, ms: 240_000 });
+  const views = new Map([['r-1-work', retried]]);
+  const tl = timeline({ ...RUN, steps: { work: { status: 'done', taskId: 'r-1-work' } } } as unknown as Run, views, filedOf(views), [WORK]);
+  assert.equal(queueWait(retried)?.ms, tl.steps.work[0].session?.queuedMs, "the timeline's own");
+});
+
 test('REFUSED: a task not settled, one never spawned, one with no filing and a recheck sharing a session are no wait', () => {
   const unspawned: FactView = { state: { brief: 'Do it.', settled: 'stopped', filedAt: '2026-10-06T10:00:00.000Z', attempts: [] } };
   const unfiled = clocked('10:00', '10:04', '10:05');
@@ -276,6 +298,39 @@ test("a gate's wait is from its try's end to its approval, the one `nemia stats`
     ],
     'a gate the run was started with is timed too',
   );
+});
+
+const SHIP = { name: 'ship', gate: true, after: ['plan'] } as unknown as Workflow;
+const UNGATED_PLAN = { name: 'plan', after: [] } as unknown as Workflow;
+const PRE_APPROVED = {
+  id: 'r-3',
+  workflowDir: '/w/build',
+  createdAt: '2026-10-06T09:39:00.000Z',
+  steps: { plan: { status: 'done', taskId: 'r-3-plan' }, ship: { status: 'running', taskId: 'r-3-ship' } },
+  approvals: [{ step: 'ship', try: 1, at: '2026-10-06T10:25:00.000Z' }],
+  gatesTimed: [],
+} as unknown as Run;
+const PRE_APPROVED_VIEWS = new Map([
+  ['r-3-plan', clocked('09:40', '09:41', '09:50')],
+  ['r-3-ship', clocked('10:30', '10:31', '10:40')],
+]);
+
+test("a gate approved before its step was filed waits from its after step's end to the approval, as `nemia stats` reads it", () => {
+  const waits = gateWaits(PRE_APPROVED, [UNGATED_PLAN, SHIP], PRE_APPROVED_VIEWS);
+  assert.deepEqual(waits, [
+    {
+      metric: 'wait',
+      wait: 'gate',
+      attributes: { factory: 'default', workflow: 'build', step: 'ship', agent: 'none', outcome: 'approved' },
+      run: 'r-3',
+      try: 1,
+      from: '2026-10-06T09:50:00.000Z',
+      to: '2026-10-06T10:25:00.000Z',
+      ms: 2_100_000,
+    },
+  ]);
+  const tl = timeline(PRE_APPROVED, PRE_APPROVED_VIEWS, new Map(), [UNGATED_PLAN, SHIP]);
+  assert.equal(waits[0].ms, gateWaitOf(PRE_APPROVED, tl, SHIP, tl.steps.ship[0]));
 });
 
 test('REFUSED: a gate already timed, a record with no gatesTimed and an approval with no try on the clock are no wait', () => {

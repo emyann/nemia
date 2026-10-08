@@ -196,6 +196,9 @@ export const STEP_METRICS = {
 /** The span each wait is traced as, its name the one a dashboard reads. */
 export const WAIT_SPANS: Readonly<Record<Wait, string>> = { queue: 'step.queue', check: 'step.check', gate: 'step.gate' };
 
+/** The keys a wait's span carries beside its step's attributes: its run and its try, which no histogram is kept by. */
+export const WAIT_SPAN_KEYS = ['run', 'try'] as const satisfies ReadonlyArray<keyof WaitFact>;
+
 /** The histogram each wait is measured into. */
 const WAIT_METRICS = { queue: STEP_METRICS.queue, check: STEP_METRICS.check, gate: STEP_METRICS.gate } as const;
 
@@ -204,8 +207,8 @@ const nanos = (at: string): bigint => BigInt(Date.parse(at)) * 1_000_000n;
 
 /**
  * One wait into its histogram (`WAIT_METRICS`), by its step's attributes alone, and into a span of its own (`WAIT_SPANS`) from when it
- * began to when it ended, a root of its own trace, carrying the run and the try beside those attributes: a wait spans passes, so no
- * pass's span is its parent.
+ * began to when it ended, a root of its own trace, carrying its run and its try (`WAIT_SPAN_KEYS`) beside those attributes: a wait spans
+ * passes, so no pass's span is its parent.
  */
 const recordWait = (fact: WaitFact): Effect.Effect<void> =>
   Effect.gen(function* () {
@@ -221,7 +224,8 @@ const recordWait = (fact: WaitFact): Effect.Effect<void> =>
       root: true,
       sampled: true,
     });
-    for (const [key, value] of Object.entries({ run: fact.run, try: fact.try, ...fact.attributes })) span.attribute(key, value);
+    for (const key of WAIT_SPAN_KEYS) span.attribute(key, fact[key]);
+    for (const [key, value] of Object.entries(fact.attributes)) span.attribute(key, value);
     span.end(nanos(fact.to), Exit.void);
   });
 

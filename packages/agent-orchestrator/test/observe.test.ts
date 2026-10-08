@@ -6,8 +6,8 @@
  * `counter`) and named as Prometheus shows them through the collector, as measured on the stack: dots become underscores, a histogram
  * gets `_bucket`, `_count` and `_sum`, a gauge `_ratio`, a counter that only grows `_total` and any other counter nothing. The spans,
  * their attributes and the logs' annotations come from a pass of the tick traced over the runtime's engine as the client builds it
- * (`engineOf`), the orchestrator's own `Effect.fn` names, and the waits' spans (`WAIT_SPANS`) with their run, try and step attributes;
- * the labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives.
+ * (`engineOf`), the orchestrator's own `Effect.fn` names, and the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`)
+ * and their step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -33,7 +33,7 @@ delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { PASS_METRICS, STEP_METRICS, WAIT_SPANS } = await import('../src/meter/meter.verb.ts');
+const { PASS_METRICS, STEP_METRICS, WAIT_SPAN_KEYS, WAIT_SPANS } = await import('../src/meter/meter.verb.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
@@ -248,7 +248,7 @@ const KNOWN: Known = {
     ...Object.values(WAIT_SPANS),
     ...[...SOURCE_TEXT.matchAll(/Effect\.fn\(\s*'([^']+)'/g)].map(([, name]) => name),
   ]),
-  attributes: new Set([...TRACED.attributes, 'run', 'try', ...STEP_ATTRIBUTE_KEYS]),
+  attributes: new Set([...TRACED.attributes, ...WAIT_SPAN_KEYS, ...STEP_ATTRIBUTE_KEYS]),
   resources: new Set(RESOURCE_ATTRIBUTES),
   logFields: new Set([...TRACED.annotations, ...LOKI_FIELDS]),
   profileLabels: new Set(PROFILE_LABELS),

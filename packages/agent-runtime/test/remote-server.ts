@@ -16,6 +16,11 @@
  * What an agent elsewhere may do is an option too: live under a path (`prefix`), serve its card at a path of its own
  * (`cardAt`), serve a card of its own making (`cardJson`), name interfaces on another origin (`interfacesAt`), answer every A2A
  * request with a redirect (`redirectTo`), or hold a request with no answer (`hanging`, switched on and off as the test goes).
+ *
+ * An agent that streams (`streaming`) answers `SubscribeToTask` through the SDK's own handler, which relays the events its executor
+ * publishes while the Task's execution lives; a step's `piece` is one chunk of an artifact. What a stream elsewhere may do is a switch
+ * too: every subscription open cut mid-stream (`cut`), each new one refused (`subscriptions.refuse`), or answered with the Task and
+ * then nothing (`subscriptions.mute`).
  */
 import express from 'express';
 import http from 'node:http';
@@ -62,6 +67,8 @@ export type Step = {
   reply?: string;
   after?: number;
   until?: Promise<unknown>;
+  /** One chunk of the artifact `id`, its text `text`: added to the last (`append`), and the artifact's end (`last`). */
+  piece?: { id: string; text: string; append?: boolean; last?: boolean };
 };
 
 /** A message the agent was sent, as its script is handed it: the turn is 1 for the message that made the task, then 2, 3… */
@@ -93,6 +100,8 @@ export type ServerOptions = {
   redirectTo?: string;
   /** Every request to the A2A routes waits this many milliseconds before it is looked at: an agent slow to answer, or to refuse. */
   slowMs?: number;
+  /** Whether the card says the agent streams, and `SubscribeToTask` is answered. */
+  streaming?: boolean;
 };
 
 export type RemoteServer = {
@@ -115,6 +124,12 @@ export type RemoteServer = {
   replies: () => number;
   /** Move a held task on: its steps published in order, as a script's are. */
   move: (taskId: string, ...steps: Step[]) => void;
+  /** Every subscription open, cut mid-stream as a network drop cuts it; how many were cut. */
+  cut: () => number;
+  /** How many subscriptions are open. */
+  live: () => number;
+  /** While on, each new subscription is refused with an error, or answered with the Task and then nothing (`mute`). */
+  subscriptions: { refuse: boolean; mute: boolean };
   close: () => Promise<void>;
 };
 
@@ -187,6 +202,18 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   };
 
   const publish = (bus: ExecutionEventBus, taskId: string, contextId: string, s: Step) => {
+    if (s.piece) {
+      const { id, text, append = false, last = false } = s.piece;
+      const artifact: Artifact = {
+        artifactId: id,
+        name: 'result',
+        description: '',
+        parts: [textPart(text)],
+        metadata: undefined,
+        extensions: [],
+      };
+      bus.publish(AgentEvent.artifactUpdate({ taskId, contextId, artifact, append, lastChunk: last, metadata: undefined }));
+    }
     if (s.data !== undefined || s.text !== undefined) {
       const artifact: Artifact = {
         artifactId: `a-${Math.random().toString(36).slice(2)}`,
@@ -319,7 +346,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
     provider: undefined,
     documentationUrl: undefined,
     iconUrl: undefined,
-    capabilities: { streaming: false, pushNotifications: false, extensions: [], extendedAgentCard: false },
+    capabilities: { streaming: o.streaming ?? false, pushNotifications: false, extensions: [], extendedAgentCard: false },
     securitySchemes: o.security?.schemes ?? {},
     securityRequirements: o.security?.requirements ?? [],
     defaultInputModes: ['text/plain'],
@@ -329,6 +356,20 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   });
 
   const handler = new DefaultRequestHandler(card(), new InMemoryTaskStore(), executor);
+  const subscriptions = { refuse: false, mute: false };
+  const streams = new Set<http.ServerResponse>();
+  let closing: () => void = () => {};
+  const closed = new Promise<void>((resolve) => (closing = resolve));
+  const refused = async function* (): AsyncGenerator<never> {
+    yield* [];
+    throw new Error('the test refuses this subscription');
+  };
+  const muted = async function* <A>(inner: AsyncGenerator<A>): AsyncGenerator<A> {
+    const first = await inner.next();
+    if (!first.done) yield first.value;
+    await closed;
+    await inner.return(undefined);
+  };
   const counted = new Proxy(handler, {
     get(target, key, receiver) {
       const value = Reflect.get(target, key, receiver);
@@ -336,6 +377,8 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       return (...args: unknown[]) => {
         counts[key] = (counts[key] ?? 0) + 1;
         if (key === 'sendMessage') sent.push((args[0] as { message: Message }).message);
+        if (key === 'resubscribe' && subscriptions.refuse) return refused();
+        if (key === 'resubscribe' && subscriptions.mute) return muted(value.apply(target, args) as AsyncGenerator);
         return value.apply(target, args);
       };
     },
@@ -351,6 +394,8 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   app.use(`${prefix}/a2a`, async (req, res, go) => {
     headers.push({ ...req.headers });
     paths.push(req.originalUrl);
+    streams.add(res);
+    res.on('close', () => streams.delete(res));
     if (hanging.a2a) return;
     if (o.slowMs) await new Promise((resolve) => setTimeout(resolve, o.slowMs));
     if (o.redirectTo) {
@@ -388,7 +433,15 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       if (wake) wake(steps);
       else queued.set(taskId, [...(queued.get(taskId) ?? []), steps]);
     },
+    cut: () => {
+      const open = [...streams].filter((r) => String(r.getHeader('content-type') ?? '').startsWith('text/event-stream'));
+      for (const r of open) r.socket?.destroy();
+      return open.length;
+    },
+    live: () => [...streams].filter((r) => String(r.getHeader('content-type') ?? '').startsWith('text/event-stream')).length,
+    subscriptions,
     close: async () => {
+      closing();
       for (const wake of waiting.values()) wake('cancelled');
       waiting.clear();
       server.closeAllConnections();

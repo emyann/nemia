@@ -163,13 +163,34 @@ const servedCard = async (at: URL, response: Response): Promise<AgentCard> => {
 /** A `fetch` whose every request has its bound. */
 type Bounded = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
+/** The signals a connection's calls carry: a send's (`sends`), and a subscription's (`follows`). */
+type Signals = { sends: WeakSet<AbortSignal>; follows: WeakSet<AbortSignal> };
+
 /**
- * A `fetch` that bounds each request by `requestMs`, a send's (a signal in `sends`) by `sendMs`, and fails one not answered in
- * time as `Late`, naming its origin and path.
+ * `fetch(input, init)` with its headers bounded by `ms` and its body by nothing: a subscription's stream lasts as long as the Task it
+ * follows.
+ */
+const headersBounded = async (input: string | URL | Request, init: RequestInit & { signal: AbortSignal }, ms: number) => {
+  const bound = new AbortController();
+  const timer = setTimeout(() => bound.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: AbortSignal.any([init.signal, bound.signal]) });
+  } catch (e) {
+    if (bound.signal.aborted) throw new Late(`${shownUrl(input)} did not answer within ${ms / 1000} s`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * A `fetch` that bounds each request by `requestMs`, a send's (a signal in `sends`) by `sendMs`, a subscription's (a signal in
+ * `follows`) only until its headers come, by `requestMs`, and fails one not answered in time as `Late`, naming its origin and path.
  */
 const boundedOf =
-  (requestMs: number, sendMs: number, sends: WeakSet<AbortSignal>): Bounded =>
+  (requestMs: number, sendMs: number, { sends, follows }: Signals): Bounded =>
   async (input, init = {}) => {
+    if (init.signal && follows.has(init.signal)) return headersBounded(input, { ...init, signal: init.signal }, requestMs);
     const ms = init.signal && sends.has(init.signal) ? sendMs : requestMs;
     const bound = AbortSignal.timeout(ms);
     try {
@@ -245,12 +266,14 @@ export type Seam = { card: AgentCard; agentUrl: string; client: Client };
 
 /**
  * A connection: `client` the view of the agent, made at the first call and dropped at the first failure; `ask` a call on the
- * client, which drops the view when it fails; `sends` the signals of the sends, bounded by `sendMs` and not `requestMs`.
+ * client, which drops the view when it fails; `sends` the signals of the sends, bounded by `sendMs` and not `requestMs`;
+ * `follows` those of the subscriptions, whose headers alone are bounded.
  */
 export type Connection = {
   client: () => Promise<Seam>;
   ask: <A>(f: (c: Client) => Promise<A>) => Promise<A>;
   sends: WeakSet<AbortSignal>;
+  follows: WeakSet<AbortSignal>;
 };
 
 /**
@@ -268,7 +291,8 @@ export const connectionOf = (
 ): Connection => {
   const address = 'url' in agent ? agent.url : undefined;
   const sends = new WeakSet<AbortSignal>();
-  const bounded = boundedOf(requestMs, sendMs, sends);
+  const follows = new WeakSet<AbortSignal>();
+  const bounded = boundedOf(requestMs, sendMs, { sends, follows });
   let seam: Promise<Seam> | undefined;
 
   const connect = async (): Promise<Seam> => {
@@ -302,5 +326,5 @@ export const connectionOf = (
       throw e;
     }
   };
-  return { client, ask, sends };
+  return { client, ask, sends, follows };
 };

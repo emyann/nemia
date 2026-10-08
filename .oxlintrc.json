@@ -734,7 +734,7 @@
     {
       "files": ["packages/agent-runtime/src/a2a/remote.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 313, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 302, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 19]
       }
     },

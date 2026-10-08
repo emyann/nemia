@@ -48,11 +48,13 @@ import { TaskNotCancelableError, TaskNotFoundError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import type { SessionState, Sighting } from '../core/index.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
+import { RunnerError, type SpawnRequest, type TranscriptCursor } from '../harness/index.ts';
 import { instantNow } from '../core/engine/now.ts';
 import { forgetEntryOf, readEntry, registryOf, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { turnOver } from './remote-events.ts';
+import type { SeamOps } from './client.ts';
+import { QUIET_MS, remoteFollowOf, remoteTranscriptByName, remoteTranscriptOf, RESUBSCRIBE_MS, type FollowDeps } from './remote-follow.ts';
 import { authOf, connectionOf, type Credentials, type MissingCredential, type RemoteAgent } from './remote-client.ts';
 import { alive, sendHeld } from './sending.ts';
 import { Doubt, late, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
@@ -83,13 +85,20 @@ type Answer = { task: Task } | { message: Message } | { refused: string } | { fa
 
 const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
 
-/** The bounds of a send, and the words for a secret not given: each has its shipped default. */
-export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCredential?: MissingCredential };
+/** The bounds of a send and of a subscription, and the words for a secret not given: each has its shipped default. */
+export type RemoteOptions = {
+  sendMs?: number;
+  spawnWaitMs?: number;
+  missingCredential?: MissingCredential;
+  quietMs?: number;
+  resubscribeMs?: number;
+};
 
 /**
- * A remote A2A agent's `RunnerOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
+ * A remote A2A agent's `SeamOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
  * schemes; absent, only an agent that asks for no authentication is reached. `requestMs` bounds each request but the send,
- * which `sendMs` bounds; `spawnWaitMs` is how long a spawn waits in the pass for its answer.
+ * which `sendMs` bounds; `spawnWaitMs` is how long a spawn waits in the pass for its answer; `quietMs` how long a subscription may
+ * say nothing, and `resubscribeMs` the first wait before a dropped one is made again (`a2a/remote-follow.ts`).
  *
  * What the client knows of the agent — its card, the interface chosen and the SDK's client — is a view (`connectionOf`):
  * `ask` drops it at any failure, and the next call reads the card again. A refusal of the auth was said before the send.
@@ -123,6 +132,7 @@ export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCred
  * - `say` sends words to a Task that waits on its caller, as A2A's follow-up on it; the engine's `say` refuses them to a Task
  *   at work.
  * - `forget` removes the session's entry, open or let go of, and names the Task the remote party keeps, which is not ours.
+ * - `follow`, `transcript` and `transcriptOf` are `remoteFollowOf`'s, `remoteTranscriptOf`'s and `remoteTranscriptByName`'s.
  */
 export const remoteOps = (
   harness: string,
@@ -131,7 +141,7 @@ export const remoteOps = (
   credentials?: Credentials,
   requestMs = REQUEST_MS,
   o: RemoteOptions = {},
-): RunnerOps => {
+): SeamOps => {
   const sendMs = o.sendMs ?? SEND_MS;
   const spawnWaitMs = o.spawnWaitMs ?? SPAWN_WAIT_MS;
   const inFlight = new Map<string, AbortController>();
@@ -141,7 +151,8 @@ export const remoteOps = (
     (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
   const { dir, done, fileOf, write, open, bySession } = registryOf(harness, root);
 
-  const { client, ask, sends } = connectionOf(harness, agent, credentials, requestMs, sendMs);
+  const connection = connectionOf(harness, agent, credentials, requestMs, sendMs);
+  const { client, ask, sends } = connection;
 
   const failure =
     (verb: string) =>
@@ -411,5 +422,34 @@ export const remoteOps = (
       },
     });
 
-  return { spawn, observe, find, stop, logs, release, say, forget: forgetEntryOf(harness, dir), refuses: remoteRefuses(harness) };
+  const followed: FollowDeps = {
+    harness,
+    entryOf: (name) => readEntry(fileOf(name)) ?? readEntry(fileOf(name, done)),
+    bySession,
+    sendingLive,
+    connection,
+    quietMs: o.quietMs ?? QUIET_MS,
+    resubscribeMs: o.resubscribeMs ?? RESUBSCRIBE_MS,
+  };
+  const read = remoteTranscriptOf(followed);
+  const transcript = (sessionId: string, after?: TranscriptCursor) =>
+    Effect.tryPromise({ catch: failure('transcript'), try: () => read(sessionId, after) });
+  const readByName = remoteTranscriptByName(followed);
+  const transcriptOf = (name: string, after?: TranscriptCursor) =>
+    Effect.tryPromise({ catch: failure('transcript'), try: () => readByName(name, after) });
+
+  return {
+    spawn,
+    observe,
+    find,
+    stop,
+    logs,
+    release,
+    say,
+    follow: remoteFollowOf(followed),
+    transcript,
+    transcriptOf,
+    forget: forgetEntryOf(harness, dir),
+    refuses: remoteRefuses(harness),
+  };
 };

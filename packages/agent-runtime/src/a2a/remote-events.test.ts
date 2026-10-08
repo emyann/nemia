@@ -154,14 +154,14 @@ test('a followed Task in order: its state, the pieces of an artifact as sent, th
   assert.deepEqual(cursors, [remoteCursorOf('m-0', 1), remoteCursorOf('m-1', 1)], 'each events moment carries the cursor after it');
 });
 
-test("the first Task is the transcript's: its messages and whole artifacts are counted said, and an artifact being written is its text so far", () => {
+test("the first Task is the transcript's: its state first, its messages and whole artifacts counted said, an artifact being written its text so far", () => {
   const r = relayOf(SENT, 1);
   const t = task(
     TaskState.TASK_STATE_WORKING,
     [asked, message('m-1', 'on it')],
     [artifact('a-0', 'result', 'earlier'), artifact('a-1', 'result', 'Hel')],
   );
-  assert.deepEqual(shown(followedOfRemote(r, ofTask(t), true)), ['partial artifact:a-1 "Hel"', 'state working']);
+  assert.deepEqual(shown(followedOfRemote(r, ofTask(t), true)), ['state working', 'partial artifact:a-1 "Hel"']);
   assert.deepEqual(shown(followedOfRemote(r, chunk('a-1', 'lo', true, true))), [
     'partial artifact:a-1 "lo" + last',
     'events assistant artifact:a-1 "Hello"',

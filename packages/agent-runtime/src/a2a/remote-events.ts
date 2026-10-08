@@ -157,8 +157,9 @@ const openGiven = (r: Relay): TranscriptEvent[] => [...r.open].flatMap(([id, tex
 
 /**
  * The Task `t` as the relay has not given it. The first a follow reads (`first`) is the transcript's to give, which a reader reads once
- * the follow has said its state: its messages and its whole artifacts are counted said, not given. Then each artifact of this turn
- * not given is its text so far, whole (`append: false`), or whole once the turn is over; each message not given an event; and the state.
+ * the follow has said its state: its state is given first, and its messages and its whole artifacts are counted said, not given.
+ * Then each artifact of this turn not given is its text so far, whole (`append: false`), or whole once the turn is over; each
+ * message not given an event; and the state.
  */
 const taskGiven = (r: Relay, t: Task, first: boolean): Followed[] => {
   const state = sightingOfTask(t).state;
@@ -181,7 +182,7 @@ const taskGiven = (r: Relay, t: Task, first: boolean): Followed[] => {
       pieces.push({ kind: 'partial', key: artifactKey(a.artifactId), text, append: false, last: false });
     }
   });
-  return [...pieces, ...given(r, events), ...stateGiven(r, state)];
+  return first ? [...stateGiven(r, state), ...pieces] : [...pieces, ...given(r, events), ...stateGiven(r, state)];
 };
 
 /** A status: its message where it was not given, the artifacts still open whole where the turn is over, and the state. */

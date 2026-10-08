@@ -200,17 +200,22 @@ export const remoteFollowOf =
     );
 
 /**
- * The conversation of the session `e`, which goes by `sessionId`, from `after` on: `remoteTranscriptOf`'s and `remoteTranscriptByName`'s.
+ * The conversation of the session `e` from `after` on, read off the Task `taskId`, none where it has none: `remoteTranscriptOf`'s and
+ * `remoteTranscriptByName`'s.
  */
-const transcriptOfEntry = async (d: FollowDeps, e: Entry | undefined, sessionId: string, after?: TranscriptCursor): Promise<Transcript> => {
+const transcriptOfEntry = async (
+  d: FollowDeps,
+  e: Entry | undefined,
+  taskId: string | undefined,
+  after?: TranscriptCursor,
+): Promise<Transcript> => {
   const none: Transcript = { events: [], cursor: after ?? remoteCursorOf('', 0) };
   if (e?.reply !== undefined) {
     const cursor = remoteCursorOf(e.messageId, 1);
     if (after === cursor) return { events: [], cursor };
     return { events: [{ id: `reply:${e.messageId}`, at: e.sentAt, role: 'assistant', kind: 'text', text: e.reply }], cursor };
   }
-  if (e && e.taskId === undefined) return none;
-  const task = await taskRead(d, e?.taskId ?? sessionId);
+  const task = taskId === undefined ? undefined : await taskRead(d, taskId);
   return task ? transcriptOfTask(task, e?.sentAt ?? task.status?.timestamp ?? '', e?.whole ?? 0, after) : none;
 };
 
@@ -220,13 +225,15 @@ const transcriptOfEntry = async (d: FollowDeps, e: Entry | undefined, sessionId:
  */
 export const remoteTranscriptOf =
   (d: FollowDeps) =>
-  (sessionId: string, after?: TranscriptCursor): Promise<Transcript> =>
-    transcriptOfEntry(d, d.bySession(sessionId), sessionId, after);
+  (sessionId: string, after?: TranscriptCursor): Promise<Transcript> => {
+    const e = d.bySession(sessionId);
+    return transcriptOfEntry(d, e, e ? e.taskId : sessionId, after);
+  };
 
 /** The remote harness's `transcriptOf`: `remoteTranscriptOf`'s read of the session `name`; `null` when no session goes by it. */
 export const remoteTranscriptByName =
   (d: FollowDeps) =>
   async (name: string, after?: TranscriptCursor): Promise<Transcript | null> => {
     const e = d.entryOf(name);
-    return e ? transcriptOfEntry(d, e, e.taskId ?? e.messageId, after) : null;
+    return e ? transcriptOfEntry(d, e, e.taskId, after) : null;
   };

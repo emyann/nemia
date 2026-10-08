@@ -238,6 +238,26 @@ test(
 );
 
 test(
+  'a stream cut as its Task ends is read whole, which gives the end the cut missed, and is not subscribed to again',
+  WAITED,
+  async (t) => {
+    const s = await serve();
+    const ops = await opsOn(s, 'ae/ends/1', { resubscribeMs: 200 });
+    const taskId = s.tasks()[0];
+    const got: Followed[] = [];
+    const ended = drained(ops.follow!('ae/ends/1'), got);
+    await holds(t, got, 1);
+    s.subscriptions.refuse = true;
+    assert.equal(s.cut(), 1, 'the one subscription cut');
+    s.move(taskId, { state: 'completed', words: 'done' });
+    const exit = await ended;
+    assert.ok(Exit.isSuccess(exit), `the end read whole: ${Exit.isFailure(exit) ? failure(exit).message : ''}`);
+    assert.deepEqual(shown(got), ['state working', 'events assistant "done"', 'state completed']);
+    assert.equal(s.counts.resubscribe, 1, 'a Task that has ended is not subscribed to');
+  },
+);
+
+test(
   'a stream that says nothing is read whole after the quiet bound and subscribed to again: what it kept back is given',
   WAITED,
   async (t) => {

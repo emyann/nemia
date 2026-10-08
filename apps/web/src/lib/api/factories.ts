@@ -7,10 +7,26 @@ import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { get, send } from './read.ts';
 
+/** A condition of a factory made from a template, as the daemon wrote it: `Applied` or `ConflictsPending`, its state and why. */
+export type FactoryCondition = { type: string; status: 'True' | 'False'; reason: string; message: string };
+
+/**
+ * The template a factory is made from: where it is, the version wanted and the parameters given; the version its tree was last applied
+ * at, null before the daemon renders it; and the conditions the daemon wrote, none before then.
+ */
+export type FactoryTemplate = {
+  source: string;
+  version: string;
+  params: Record<string, string | number | boolean>;
+  applied: string | null;
+  conditions: FactoryCondition[];
+};
+
 /**
  * Mirrors `FactoryAnswer` in apps/api/src/factories/factories.ts: a factory's name, whether it is the default factory, the repositories it
  * works on, the workflows it offers — null for the default factory, which offers every workflow found — and its hires, `<workflow>/<step>`
  * to an agent's name. A factory whose file does not read has none of them, and `error` says why, naming the file; null for every other.
+ * `template` is the template it is made from, null for one that is not.
  */
 export type Factory = {
   name: string;
@@ -21,6 +37,7 @@ export type Factory = {
   error: string | null;
   /** The lines a person types for it: a workflow attached to it, its file removed, and filed again. */
   commands: { attach: string; rm: string; add: string };
+  template: FactoryTemplate | null;
 };
 
 /** Decodes a `Factory`. */
@@ -32,6 +49,24 @@ const FactorySchema = Schema.Struct({
   hires: Schema.Record(Schema.String, Schema.String),
   error: Schema.NullOr(Schema.String),
   commands: Schema.Struct({ attach: Schema.String, rm: Schema.String, add: Schema.String }),
+  template: Schema.NullOr(
+    Schema.Struct({
+      source: Schema.String,
+      version: Schema.String,
+      params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
+      applied: Schema.NullOr(Schema.String),
+      conditions: Schema.mutable(
+        Schema.Array(
+          Schema.Struct({
+            type: Schema.String,
+            status: Schema.Literals(['True', 'False']),
+            reason: Schema.String,
+            message: Schema.String,
+          }),
+        ),
+      ),
+    }),
+  ),
 }) satisfies Schema.Schema<Factory>;
 
 /**

@@ -15,7 +15,7 @@
 import { Effect, Schedule, Schema, Stream } from 'effect';
 import type { StreamResponse, Task } from '@a2a-js/sdk';
 import { TaskNotFoundError } from '@a2a-js/sdk/errors';
-import { RunnerError, type Followed, type Transcript, type TranscriptCursor } from '../harness/index.ts';
+import { RunnerError, type Followed, type Transcript, type TranscriptCursor, type TranscriptEvent } from '../harness/index.ts';
 import type { Entry } from './entry.ts';
 import { followedOfRemote, relayOf, relayOver, remoteCursorOf, transcriptOfTask } from './remote-events.ts';
 import type { Connection } from './remote-client.ts';
@@ -153,6 +153,26 @@ const followTask = (d: FollowDeps, e: Entry, taskId: string, given: boolean): St
   );
 };
 
+/** The agent's answer to the session `e` where it made no Task: its words as one event, and where a read of it ends. */
+const replyOf = (e: Entry & { reply: string }): { events: TranscriptEvent[]; cursor: TranscriptCursor } => ({
+  events: [{ id: `reply:${e.messageId}`, at: e.sentAt, role: 'assistant', kind: 'text', text: e.reply }],
+  cursor: remoteCursorOf(e.messageId, 1),
+});
+
+/**
+ * The session `e` followed once its send has an answer: a reply as its words then its state, a send refused as its state, and a Task
+ * followed, the follow already begun on it.
+ */
+const followAnswered = (d: FollowDeps, e: Entry): Stream.Stream<Followed, RunnerError> => {
+  if (e.reply !== undefined)
+    return Stream.fromIterable<Followed>([
+      { kind: 'events', ...replyOf({ ...e, reply: e.reply }) },
+      { kind: 'state', state: e.seen?.state ?? 'completed' },
+    ]);
+  if (e.ended && e.seen) return Stream.succeed<Followed>({ kind: 'state', state: e.seen.state });
+  return e.taskId === undefined ? Stream.empty : followTask(d, e, e.taskId, true);
+};
+
 /** The session `name`'s entry once its send has an answer, read every second while it is under way; `undefined` once it has none. */
 const answered = (d: FollowDeps, name: string): Effect.Effect<Entry | undefined> =>
   Effect.sync(() => d.entryOf(name)).pipe(
@@ -192,9 +212,7 @@ export const remoteFollowOf =
               `the send of \`${name}\` to the \`${d.harness}\` agent is in doubt: there is no Task to follow, and \`logs\` says why.`,
             ),
           );
-        const later = Stream.unwrap(
-          answered(d, name).pipe(Effect.map((a) => (a?.taskId ? followTask(d, a, a.taskId, true) : Stream.empty))),
-        );
+        const later = Stream.unwrap(answered(d, name).pipe(Effect.map((a) => (a ? followAnswered(d, a) : Stream.empty))));
         return Stream.concat(Stream.succeed<Followed>({ kind: 'state', state: 'submitted' }), later);
       }),
     );
@@ -211,9 +229,8 @@ const transcriptOfEntry = async (
 ): Promise<Transcript> => {
   const none: Transcript = { events: [], cursor: after ?? remoteCursorOf('', 0) };
   if (e?.reply !== undefined) {
-    const cursor = remoteCursorOf(e.messageId, 1);
-    if (after === cursor) return { events: [], cursor };
-    return { events: [{ id: `reply:${e.messageId}`, at: e.sentAt, role: 'assistant', kind: 'text', text: e.reply }], cursor };
+    const reply = replyOf({ ...e, reply: e.reply });
+    return after === reply.cursor ? { events: [], cursor: reply.cursor } : reply;
   }
   const task = taskId === undefined ? undefined : await taskRead(d, taskId);
   return task ? transcriptOfTask(task, e?.sentAt ?? task.status?.timestamp ?? '', e?.whole ?? 0, after) : none;

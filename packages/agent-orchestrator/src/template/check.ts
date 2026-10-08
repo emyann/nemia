@@ -235,7 +235,7 @@ function profileRefusals(file: string, at: At, harness: string, profile: Record<
   return refusals;
 }
 
-/** Why `key` may not be an option of `harness`'s block: a fence key, a key of the block, a flag the runtime sets, or one it does not read. */
+/** Why `key` may not be an option of `harness`'s block: a fence key, a key of the block, a flag the runtime sets, or one unread. */
 function optionRefusal(harness: string, key: string): string | undefined {
   const flags = HARNESS_KNOBS[harness].flags;
   if (FENCE_KEYS.includes(key)) return `${key} is a fence key, read by nemia: write it under fence, never in options.`;

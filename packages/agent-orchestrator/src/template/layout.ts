@@ -173,7 +173,7 @@ export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: Readonl
   return [...manifest, ...outside, ...folderRefusals(folder.files)];
 }
 
-/** A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, and `not-yet` for a git or url source v1 refuses. */
+/** A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, and `not-yet` for a git or url source. */
 type Leaf = 'string' | 'number' | 'boolean' | 'strings' | 'text' | 'words' | 'count' | 'option' | 'any' | 'not-yet';
 
 /** A document's shape: a leaf, a list of one shape, or named fields, some required, and the shape of any other key (`rest`). */

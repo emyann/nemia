@@ -185,3 +185,21 @@ test("a session's queue, a check's run and a gate's wait are each recorded once,
   assert.equal(await counted('step.queue.duration'), 2);
   assert.equal(await counted('step.gate.wait'), 1);
 });
+
+/** The workflow folder `alone`: one step, gated, that nothing waits on. */
+const ALONE = path.join(ROOT, 'alone');
+fs.mkdirSync(ALONE);
+fs.writeFileSync(path.join(ALONE, 'plan.md'), '---\nplace: git\ngate: true\n---\nPlan it.\n');
+
+test('a gate approved with nothing after it, on passes that file nothing, is recorded once and marked on disk', async () => {
+  const before = await counted('step.gate.wait');
+  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: ALONE, isolate: false }));
+  const plan = `${run.id}-plan`;
+  await tickUntil(() => sessions.has(nameFor(plan, 1)));
+  sign(plan);
+  await tick(3);
+  await runWith(engine, approveRun(run.id, 'plan'));
+  await tick(4);
+  assert.equal(await counted('step.gate.wait'), before + 1, "plan's gate, once over every pass");
+  assert.deepEqual(readRun(run.id).gatesTimed, [{ step: 'plan', try: 1 }], 'marked timed on disk');
+});

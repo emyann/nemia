@@ -2552,6 +2552,28 @@ the caller runs it again with `--version`; a workflow's own schemas left to a fo
   handler against its spec), `apps/api/src/commands/writers.test.ts` (the keys each route hands, against the same spec),
   `test/verbs-skill.test.ts`, `test/demand-cli.test.ts` (the try starts a daemon) and `src/folder/workflows.verb.test.ts`.
 
+## Shipped: recruit-or-create and her first meeting (phase 7, card 4)
+
+Behaviour taught to Nemia in what ships with her (`nemia/`), with no code in `src` and no verb of hers: every command it uses was already
+served (`agents sources`, `agents copy`, `agents card`, the library's writers, `agents custom nemia`, `level`, `memory`).
+
+- **`recruit-or-create`** (`nemia/skills/recruit-or-create/SKILL.md`): searches only where the store points (`nemia agents`, `nemia
+  agents sources`, and `--path` for a folder the person named), reads each candidate's card against the step's file, proposes at most
+  three with one recommended, and brings the copy and the hire in one message, each its own prompt; when none fits, drafts an agent with
+  the person, writes it with `nemia agents write yours`, tries it and hires it. `create-a-factory` hands its hires to it.
+- **`first-meeting`** (`nemia/skills/first-meeting/SKILL.md`): when the person writes and her memory holds no `met` fact, a few lines on
+  who she is, her level and how to reach her (read from `nemia level`), then `met`, then one offer: a factory to make, or a tour and a
+  recap. At a first meeting she makes or changes no factory without a yes, scans no disk, starts no work, raises no level, and asks no
+  batch of settings. Level-triggered: read from her memory as it stands, so a person whose memory has no `met` is met once.
+- **Her settings learned as they matter** (`nemia.md`, *What you learn of the person*): `language` from how they write, `time-zone` the
+  first time she would say a clock time (UTC until then, said so), `cost-line` the first time she sizes work (`write-a-card`, part 6);
+  each kept in memory at once, then proposed for her custom instruction, the whole read and written back through `nemia agents custom
+  nemia --file -`.
+
+Tested in `test/nemia-shipped.test.ts`: the new skills' and her instruction's sections (`SECTIONS`), the facts' names said alike in each
+file (`FACTS`), and none of the owner's settings in what ships (`OWNER`, joined to `OURS`), each with a fixture it refuses. Her wording is
+judged at the landing from a dogfood transcript of three first meetings on a scratch store.
+
 ## Shipped: freeing the space — `wf prune`
 
 `wf rm` frees a run's space only by forgetting it, and a finished run is still read: its closeouts, its cost, what it decided. A

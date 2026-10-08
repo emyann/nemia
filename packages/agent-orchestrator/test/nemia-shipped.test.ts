@@ -1,9 +1,10 @@
 /**
  * What ships with Nemia (`nemia/`) is any factory's, never this repository's: her instruction and her skills name no agent of this
- * repository's team, no file of its own and no playbook of its operator, and each skill her instruction and her skills name is one she
- * ships, under `nemia/skills/`, its `name:` its folder's, read as Claude Code reads her plugin. "Gate" names a step's gate alone
- * (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Its wording is judged by a person at the landing
- * step; this holds only what it names.
+ * repository's team, no file of its own, no playbook of its operator and none of its owner's settings, and each skill her instruction and
+ * her skills name is one she ships, under `nemia/skills/`, its `name:` its folder's, read as Claude Code reads her plugin. "Gate" names a
+ * step's gate alone (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Her skills and her instruction
+ * keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in each file that writes or reads them
+ * (`FACTS`). Its wording is judged by a person at the landing step; this holds only what it names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,13 +32,16 @@ const TEAM = fs
   .filter((f) => f.endsWith('.md'))
   .map((f) => f.slice(0, -'.md'.length));
 
-/** The words of this repository that what ships must not say: its team, its operator's playbook, its docs. */
-const OURS = [...TEAM, 'playbook-operator', 'architecture.md', 'CLAUDE.md', 'features.md'];
+/** The settings of this repository's owner, which what ships must not say: their city, its zone and their cost line. */
+const OWNER = ['Montreal', 'America/Montreal', 'EDT', '$80'];
+
+/** The words of this repository that what ships must not say: its team, its operator's playbook, its docs, its owner's settings. */
+const OURS = [...TEAM, 'playbook-operator', 'architecture.md', 'CLAUDE.md', 'features.md', ...OWNER];
 
 /** Where `files` say one of `OURS`, whole and in any case: a line each, `<file>: <word>`. */
 const oursIn = (files: Map<string, string>): string[] =>
   [...files].flatMap(([file, text]) =>
-    OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[.\\-]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
+    OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
       (word) => `${file}: ${word}`,
     ),
   );
@@ -57,6 +61,11 @@ test('REFUSED: a skill of hers that names an agent of the team, or the playbook,
     ['nemia.md', 'Follow docs/playbook-operator.md.'],
   ]);
   assert.deepEqual(oursIn(files), [`skills/x/SKILL.md: ${TEAM[0]}`, 'nemia.md: playbook-operator']);
+});
+
+test("REFUSED: a skill of hers that says the owner's settings is named for each", () => {
+  const files = new Map([['skills/x/SKILL.md', 'Say times in Montreal; the line is $80 a card.']]);
+  assert.deepEqual(oursIn(files), ['skills/x/SKILL.md: Montreal', 'skills/x/SKILL.md: $80']);
 });
 
 test('each skill her instruction and her skills name ships under nemia/skills/, with its folder as its name', () => {
@@ -136,5 +145,87 @@ test('each status that waits on the person has a section of bring-what-waits tha
   assert.deepEqual(
     waiting.filter((status) => !skill.includes(`\n## ${BROUGHT_IN[status]}\n`)),
     [],
+  );
+});
+
+/** The sections each of these files keeps, by its path under `nemia/`, each a `## <heading>` line of its own. */
+const SECTIONS: Record<string, string[]> = {
+  'skills/recruit-or-create/SKILL.md': ['When', 'Search', 'Read each against the need', 'Propose', 'Recruit', 'Create'],
+  'skills/first-meeting/SKILL.md': ['When', 'Introduce yourself', 'The offer', 'Never unasked'],
+  'nemia.md': ['What you learn of the person'],
+};
+
+/** The sections of `SECTIONS` that `files` miss, a file not there missing them all: a line each, `<file>: <heading>`. */
+const missingSections = (files: Map<string, string>): string[] =>
+  Object.entries(SECTIONS).flatMap(([file, headings]) =>
+    headings.filter((heading) => !(files.get(file) ?? '').includes(`\n## ${heading}\n`)).map((heading) => `${file}: ${heading}`),
+  );
+
+test('her skills recruit-or-create and first-meeting, and her instruction, keep their sections', () => {
+  assert.deepEqual(missingSections(shipped()), []);
+});
+
+test('REFUSED: a first-meeting with a section dropped and another renamed is named for both', () => {
+  const files = new Map([
+    [
+      'skills/first-meeting/SKILL.md',
+      '---\nname: first-meeting\n---\n# First meeting\n\n## When\n\n## Introduce yourself\n\n## Never asked\n',
+    ],
+  ]);
+  assert.deepEqual(
+    missingSections(files).filter((line) => line.startsWith('skills/first-meeting/')),
+    ['skills/first-meeting/SKILL.md: The offer', 'skills/first-meeting/SKILL.md: Never unasked'],
+  );
+});
+
+/** The facts of her memory each of these files names, by its path under `nemia/`, each said in backticks. */
+const FACTS: Record<string, string[]> = {
+  'nemia.md': ['met', 'language', 'time-zone', 'cost-line'],
+  'skills/first-meeting/SKILL.md': ['met'],
+  'skills/write-a-card/SKILL.md': ['cost-line'],
+  'skills/recap/SKILL.md': ['feed-cursor'],
+};
+
+/** The phrases that name a fact of her memory, across line breaks: "fact named `x`", "the fact `x`", "`x` fact", "kept as `x`". */
+const FACT_SAID = /(?:\bfact(?:\s+named)?|\bkept\s+as|\bkeep\s+it\s+as)\s+`([a-z][a-z-]*)`|`([a-z][a-z-]*)`\s+fact\b/g;
+
+/**
+ * Where `files` name the facts of her memory otherwise than `FACTS`: a fact a file of `FACTS` does not say in backticks, and a fact said
+ * by a phrase of `FACT_SAID` that `FACTS` does not hold: a line each, `<file>: <fact>`.
+ */
+const unnamedFacts = (files: Map<string, string>): string[] => {
+  const known = new Set(Object.values(FACTS).flat());
+  const unsaid = Object.entries(FACTS).flatMap(([file, facts]) =>
+    facts.filter((fact) => !(files.get(file) ?? '').includes(`\`${fact}\``)).map((fact) => `${file}: ${fact}`),
+  );
+  const unknown = [...files].flatMap(([file, text]) =>
+    [...text.matchAll(FACT_SAID)]
+      .map((m) => m[1] ?? m[2])
+      .filter((fact) => !known.has(fact))
+      .map((fact) => `${file}: ${fact}`),
+  );
+  return [...unsaid, ...unknown];
+};
+
+test('the facts of her memory are named alike in her instruction and in each skill that writes or reads them', () => {
+  const files = shipped();
+  assert.ok(unnamedFacts(new Map()).length > 0, 'a file of FACTS not there says none of its facts');
+  assert.deepEqual(unnamedFacts(files), []);
+});
+
+test('REFUSED: a fact named otherwise, or said by another name across a line break, is named', () => {
+  const files = new Map([
+    ['skills/first-meeting/SKILL.md', 'With no fact named `met`, meet them. Then write the fact `met-person`: the date.'],
+    ['skills/x/SKILL.md', 'Ask their zone once, and keep it as\n`timezone`; the `budget` fact too.'],
+  ]);
+  assert.deepEqual(
+    unnamedFacts(files).filter((line) => /^skills\/(first-meeting|x)\//.test(line)),
+    ['skills/first-meeting/SKILL.md: met-person', 'skills/x/SKILL.md: timezone', 'skills/x/SKILL.md: budget'],
+  );
+  assert.deepEqual(
+    unnamedFacts(new Map([['skills/first-meeting/SKILL.md', 'Then write the fact `met-person`.']])).filter((line) =>
+      line.startsWith('skills/first-meeting/'),
+    ),
+    ['skills/first-meeting/SKILL.md: met', 'skills/first-meeting/SKILL.md: met-person'],
   );
 });

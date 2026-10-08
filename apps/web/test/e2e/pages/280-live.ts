@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fed, photograph, sidebar, themeOf } from '../board.ts';
-import { expectCount, expectVisible, FEED_STREAM, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, FEED_STREAM, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -29,6 +29,7 @@ export default {
     if (fs.existsSync(asks))
       throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
     const footer = page.locator('footer[data-feed]');
+    await feedAnswered(page);
     await expectVisible(page.locator('footer[data-feed="open"]'), 'the bottom bar says the feed is followed (data-feed="open")');
     await idle(page);
 

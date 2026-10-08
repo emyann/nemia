@@ -183,22 +183,49 @@ const FACTS: Record<string, string[]> = {
   'nemia.md': ['met', 'language', 'time-zone', 'cost-line'],
   'skills/first-meeting/SKILL.md': ['met'],
   'skills/write-a-card/SKILL.md': ['cost-line'],
+  'skills/recap/SKILL.md': ['feed-cursor'],
 };
 
-/** The facts of `FACTS` that `files` do not say in backticks: a line each, `<file>: <fact>`. */
-const unnamedFacts = (files: Map<string, string>): string[] =>
-  Object.entries(FACTS).flatMap(([file, facts]) =>
+/** The phrases that name a fact of her memory, across line breaks: "fact named `x`", "the fact `x`", "`x` fact", "kept as `x`". */
+const FACT_SAID = /(?:\bfact(?:\s+named)?|\bkept\s+as|\bkeep\s+it\s+as)\s+`([a-z][a-z-]*)`|`([a-z][a-z-]*)`\s+fact\b/g;
+
+/**
+ * Where `files` name the facts of her memory otherwise than `FACTS`: a fact a file of `FACTS` does not say in backticks, and a fact said
+ * by a phrase of `FACT_SAID` that `FACTS` does not hold: a line each, `<file>: <fact>`.
+ */
+const unnamedFacts = (files: Map<string, string>): string[] => {
+  const known = new Set(Object.values(FACTS).flat());
+  const unsaid = Object.entries(FACTS).flatMap(([file, facts]) =>
     facts.filter((fact) => !(files.get(file) ?? '').includes(`\`${fact}\``)).map((fact) => `${file}: ${fact}`),
   );
+  const unknown = [...files].flatMap(([file, text]) =>
+    [...text.matchAll(FACT_SAID)]
+      .map((m) => m[1] ?? m[2])
+      .filter((fact) => !known.has(fact))
+      .map((fact) => `${file}: ${fact}`),
+  );
+  return [...unsaid, ...unknown];
+};
 
 test('the facts of her memory are named alike in her instruction and in each skill that writes or reads them', () => {
-  assert.deepEqual(unnamedFacts(shipped()), []);
+  const files = shipped();
+  assert.ok(unnamedFacts(new Map()).length > 0, 'a file of FACTS not there says none of its facts');
+  assert.deepEqual(unnamedFacts(files), []);
 });
 
-test('REFUSED: a first-meeting that names its fact otherwise is named', () => {
-  const files = new Map([['skills/first-meeting/SKILL.md', 'Then write the fact `met-person`: the date.']]);
+test('REFUSED: a fact named otherwise, or said by another name across a line break, is named', () => {
+  const files = new Map([
+    ['skills/first-meeting/SKILL.md', 'With no fact named `met`, meet them. Then write the fact `met-person`: the date.'],
+    ['skills/x/SKILL.md', 'Ask their zone once, and keep it as\n`timezone`; the `budget` fact too.'],
+  ]);
   assert.deepEqual(
-    unnamedFacts(files).filter((line) => line.startsWith('skills/first-meeting/')),
-    ['skills/first-meeting/SKILL.md: met'],
+    unnamedFacts(files).filter((line) => /^skills\/(first-meeting|x)\//.test(line)),
+    ['skills/first-meeting/SKILL.md: met-person', 'skills/x/SKILL.md: timezone', 'skills/x/SKILL.md: budget'],
+  );
+  assert.deepEqual(
+    unnamedFacts(new Map([['skills/first-meeting/SKILL.md', 'Then write the fact `met-person`.']])).filter((line) =>
+      line.startsWith('skills/first-meeting/'),
+    ),
+    ['skills/first-meeting/SKILL.md: met', 'skills/first-meeting/SKILL.md: met-person'],
   );
 });

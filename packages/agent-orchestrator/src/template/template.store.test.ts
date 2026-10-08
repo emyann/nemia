@@ -136,6 +136,22 @@ test('a key a template has no place for is refused by name, and nothing is writt
   assert.deepEqual(fs.readdirSync(path.dirname(dir)), [], 'no staging folder is left beside it');
 });
 
+test("an agent's harness prompt and remote have no place in a template, each refused at the agent's file, and nothing is written", () => {
+  const repo = repoWithTeam();
+  const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
+  const written = fs.readFileSync(reviewer, 'utf8').replace('harness: claude', 'harness: claude\nharnessPrompt: replace\nremote: true');
+  fs.writeFileSync(reviewer, written);
+  const dir = target();
+  assert.throws(
+    () => exportTemplate({ dir, from: repo }),
+    refusedWith(
+      'Invalid',
+      /reviewer\.md: `remote:` has no place in a template[^]*reviewer\.md: `harnessPrompt:` has no place in a template/,
+    ),
+  );
+  assert.equal(fs.existsSync(dir), false);
+});
+
 test('a folder that holds files, or is no name, is refused, and left as it was', () => {
   const repo = repoWithTeam();
   const dir = target();

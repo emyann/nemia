@@ -9,7 +9,8 @@ export default {
   /**
    * The rail's Settings leads to the store's settings, where her folder is not trusted: under her level's switch, that no session of hers
    * is filed until it is, and the line that trusts it, to copy, before she is turned on; a pick of Semi-auto is written all the same, a 200
-   * that names that line, which stays under the switch, and her session reads waiting on the person's trust. A pick of Manual takes it back, and the page removes the level file it wrote.
+   * that names that line, which stays under the switch, and her session reads waiting on the person's trust. A pick of Manual takes it
+   * back, and the page removes the level file it wrote.
    */
   name: 'nemia-untrusted',
   route: '/settings',

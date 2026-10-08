@@ -31,6 +31,8 @@ const FACTORY_SAYS =
   'It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with ' +
   'nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with ' +
   'nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, ' +
+  "schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back " +
+  'with nemia factory unschedule <factory> <workflow>, ' +
   'says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, ' +
   'and removes one with nemia factory rm <name> (nemia factory --help).';
 const START_SAYS =

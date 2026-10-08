@@ -1,7 +1,7 @@
 /**
  * The factories, for the board: the default factory and every factory in the store, each with the repositories it works on, the workflows
- * it offers, the agents it hires and its schedules. Read from the store on each request, by `nemia factory`'s entry (`FACTORY`), never written: `nemia
- * factory` is the one writer of a factory's file.
+ * it offers, the agents it hires and its schedules. Read from the store on each request, by `nemia factory`'s entry (`FACTORY`), never
+ * written: `nemia factory` is the one writer of a factory's file.
  */
 import { Hono } from 'hono';
 import {

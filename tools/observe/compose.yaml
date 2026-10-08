@@ -12,9 +12,13 @@ services:
       - "127.0.0.1:4040:4040"
     environment:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/nemia/dashboards/system.json
+      OTELCOL_EXTRA_ARGS: --config=/otel-lgtm/nemia/otelcol.yaml
+      PROMETHEUS_EXTRA_ARGS: --storage.tsdb.retention.time=90d
     volumes:
       - ./provisioning/nemia.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/nemia.yaml:ro
       - ./dashboards:/otel-lgtm/nemia/dashboards:ro
+      - ./otelcol.yaml:/otel-lgtm/nemia/otelcol.yaml:ro
+      - ./tempo.yaml:/otel-lgtm/tempo-config.yaml:ro
       - data:/data
 
 volumes:

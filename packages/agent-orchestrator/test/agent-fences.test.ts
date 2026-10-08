@@ -393,10 +393,13 @@ const shippedStepOf = (agent: string): Step => {
   return found.step;
 };
 
+/** The line of review-a-change that names Agora's checks. */
+const REVIEW_CHECKS = "**Read the suite's verdict; run the cheap checks yourself**";
+
 /** Each dontAsk agent whose skill names the checks it runs, with the line those checks are on. */
 const CHECKERS = [
   { agent: 'seldon', skill: 'write-a-spec', from: 'Run each check bare' },
-  { agent: 'agora', skill: 'review-a-change', from: '**Run the suite yourself**' },
+  { agent: 'agora', skill: 'review-a-change', from: REVIEW_CHECKS },
   { agent: 'argus', skill: 'read-the-stats', from: '**Run each read bare**' },
 ];
 
@@ -415,11 +418,10 @@ test("REFUSED: a skill's check the agent's fence does not allow is named", () =>
   const agora = shippedStepOf('agora');
   const without = (step: Step, rule: string): Step => ({ ...step, allowedTools: step.allowedTools?.filter((r) => r !== rule) });
   assert.deepEqual(unallowed(without(seldon, 'Bash(npm run lint)'), checksOf('write-a-spec', 'Run each check bare')), ['npm run lint']);
-  assert.deepEqual(
-    unallowed(without(agora, 'Bash(npx turbo run typecheck --force)'), checksOf('review-a-change', '**Run the suite yourself**')),
-    ['npx turbo run typecheck --force'],
-  );
-  assert.deepEqual(unallowed(seldon, checksOf('review-a-change', '**Run the suite yourself**')), ['npx turbo run typecheck --force']);
+  assert.deepEqual(unallowed(without(agora, 'Bash(npx turbo run typecheck --force)'), checksOf('review-a-change', REVIEW_CHECKS)), [
+    'npx turbo run typecheck --force',
+  ]);
+  assert.deepEqual(unallowed(seldon, checksOf('review-a-change', REVIEW_CHECKS)), ['npx turbo run typecheck --force']);
   assert.deepEqual(unallowed({ ...agora, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']), ['npm run lint'], 'a deny wins');
   assert.throws(
     () => checksOf('write-a-spec', 'Run no check'),

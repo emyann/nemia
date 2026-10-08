@@ -1860,7 +1860,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
   `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
   (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
-  `LANDING_CHECK_DEADLINE_SECONDS` (longer than a round's: the e2e runs on the merged tree), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
+  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
   `landEnding` in `ending/ending.verb.ts` acts through the place's `land`), commits the merge with the message on exit 0 or
   aborts it on anything else: a refusal, a check that did not finish, a message left blank, a merge that

@@ -27,15 +27,23 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 
 /**
- * The seconds a step's check may run before the engine stops it, where the check does not land the run. A hung suite must not hold a run
- * for ever.
+ * The seconds a step's check may run before the engine stops it, where the check does not land the run: a round's check. A hung check must
+ * not hold a run for ever.
  *
- * A guard against a hang, not a budget, so it is set well above the slowest such check that finishes: the suite on the step's branch, and
- * the web app's e2e where the change touches it, which its own runner fails past eight minutes; the landing check runs the suite on the
- * merged tree (`LANDING_CHECK_DEADLINE_SECONDS`). A constant rather than a step key: every shipped check is the same command family and
- * none needs another number.
+ * A guard against a hang, not a budget, so it is set well above the slowest round check: the whole suite forced, the typecheck and the
+ * lint, each mutant the closeout names, which its runner fails past five minutes, and the build and the e2e where the change touches the
+ * board, the api or the root's package files, which its runner fails past eight minutes. The number is twice the slowest round check,
+ * rounded up to five minutes, never less than 2400.
+ *
+ * Measured from the round checks' journals, spawned to ended: 346 passed round checks that ran the mutants over a week, median 22 s, p90
+ * 160 s, slowest 865 s, the forced suite, four mutants and the e2e; most replayed the suite from turbo's cache, which the forced suite no
+ * longer does. One more was stopped at the old 1200 s with five of its nine mutants left; tried again, those five took 303 s, one of them
+ * ended at five minutes, so it would have run an estimated 1510 s whole. Twice that, rounded up to five minutes, is 3300.
+ *
+ * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a landing's check runs no mutant, and a round's runs as many as its closeout
+ * names. A constant rather than a step key: every shipped check is the same command family and none needs another number.
  */
-export const CHECK_DEADLINE_SECONDS = 1200;
+export const CHECK_DEADLINE_SECONDS = 3300;
 
 /**
  * The seconds the check of an ending that lands on it (`landsOnCheck`) may run before the engine stops it: the whole suite on the merged
@@ -48,8 +56,8 @@ export const CHECK_DEADLINE_SECONDS = 1200;
  * to five minutes, is 2700.
  *
  * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
- * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check,
- * whose e2e its runner holds to eight minutes, keeps the shorter bound on a hang.
+ * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check, which
+ * runs the mutants besides, is measured on its own.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 

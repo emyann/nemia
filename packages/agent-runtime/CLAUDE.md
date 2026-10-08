@@ -136,6 +136,10 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A sentence quotes another party's content through `quote` (`core/quote.ts`)**, and an error in the runtime's own words is a class
   `wordsOf` leaves whole (`a2a/said.ts`); anything else is cut at 200. `test/remote-quotes.test.ts` holds a huge-value fixture per site.
 - **A paged read is served from the listing its token names** (`OPEN_LISTINGS`), never the latest.
+- **An async generator's `return` waits behind its pending `next`**: `Stream.fromAsyncIterable` calls it on interruption, so a silent
+  subscription is aborted first (`abortedOnReturn`, `a2a/remote-follow.ts`), or its interruption never ends.
+- **`Stream.retry` starts its schedule again at the attempt's first output**, an empty array included: a bound on failures in a row
+  is counted by hand (`drops` in `followTask`).
 
 ## Claude Code, as a harness
 

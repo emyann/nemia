@@ -13,8 +13,10 @@ import { spawnSync } from 'node:child_process';
 import type { Engine } from '../runtime-client.ts';
 import { commandHarness, Engine as EngineService } from 'agent-runtime';
 import {
+  CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
   INSTALL,
+  LANDING_CHECK_DEADLINE_SECONDS,
   attemptVerdict,
   checkArgv,
   checkContract,
@@ -66,6 +68,17 @@ test('the verdict is the exit code an attempt recorded; none, or one its deadlin
   assert.equal(attemptVerdict({ exitCode: 0, reason: null }), 0);
   for (const attempt of [undefined, {}, { exitCode: null }, { exitCode: 1, reason: 'deadline' }, { exitCode: 1, reason: 'operator' }])
     assert.equal(attemptVerdict(attempt), 'unfinished', JSON.stringify(attempt));
+});
+
+test("a check's bound on a hang, a round's as a landing's, is never below 2400 s; a round's mutants may make it the longer", () => {
+  assert.ok(
+    CHECK_DEADLINE_SECONDS >= 2400,
+    `CHECK_DEADLINE_SECONDS is ${CHECK_DEADLINE_SECONDS}: a round's check is bounded no shorter than 2400 s`,
+  );
+  assert.ok(
+    LANDING_CHECK_DEADLINE_SECONDS >= 2400,
+    `LANDING_CHECK_DEADLINE_SECONDS is ${LANDING_CHECK_DEADLINE_SECONDS}: a landing's check is bounded no shorter than 2400 s`,
+  );
 });
 
 test("the run's `check` harness is the runtime's command harness under the name checks have always run under", () => {

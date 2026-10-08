@@ -25,6 +25,7 @@ import {
   expectUncut,
   expectVisible,
   FEED_STREAM,
+  feedAnswered,
   idle,
   QUIET_MS,
   Refused,
@@ -457,6 +458,34 @@ test("idle waits for any other request: one answered late, and a stream that is 
     (err: Error) =>
       err instanceof Refused && err.message === `the network idles — still in flight after 1000 ms: GET ${origin}/api/runs/r-1/stream`,
   );
+});
+
+test("feedAnswered resolves once the feed's stream answers: at once for one answered before the call, else when it is", async () => {
+  const opens = `<p>ok</p><script>window.es = new EventSource('${FEED_STREAM}')</script>`;
+  const { page } = await servedPage(opens);
+  await page.waitForFunction(() => (window as unknown as { es: EventSource }).es.readyState === EventSource.OPEN);
+  await feedAnswered(page, 1);
+
+  const { page: later } = await servedPage('<p>ok</p>');
+  const answered = feedAnswered(later, 5_000);
+  await later.evaluate((p) => {
+    (window as unknown as { es: EventSource }).es = new EventSource(p);
+  }, FEED_STREAM);
+  await answered;
+});
+
+test("REFUSED by feedAnswered: a feed's stream never answered, and one answered only before the page's reload, each naming the stream", async () => {
+  const want = (err: Error) =>
+    err instanceof Refused && err.message === `the feed's stream is answered — GET ${FEED_STREAM} has no answer after 300 ms`;
+  const { page } = await servedPage('<p>ok</p>');
+  await assert.rejects(feedAnswered(page, 300), want);
+
+  const opens = `<p>ok</p><script>window.es = new EventSource('${FEED_STREAM}')</script>`;
+  const { page: reloaded } = await servedPage(opens);
+  await reloaded.waitForFunction(() => (window as unknown as { es: EventSource }).es.readyState === EventSource.OPEN);
+  served.set(new URL(reloaded.url()).pathname, '<p>ok</p>');
+  await reloaded.reload({ waitUntil: 'load' });
+  await assert.rejects(feedAnswered(reloaded, 300), want);
 });
 
 test("the board closing the feed's stream while it stays on the page is a failed request the watch counts", WAITED, async (t) => {

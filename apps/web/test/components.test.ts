@@ -6980,3 +6980,19 @@ test('Nemia stopped from outside: said so, with a way to a fresh session', async
   assert.match(html, /data-state="stopped"/);
   assert.match(html, /data-nemia-restart[^>]*>Start a fresh session</);
 });
+
+test('Nemia not filed, or waiting on her trust, names no task; filed, it names its task and phase', async () => {
+  const untrusted = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', trust: TRUST });
+  assert.match(untrusted, /data-state="untrusted"/);
+  assert.doesNotMatch(untrusted, /data-nemia-task|>Task/, 'waiting on her trust: nothing filed, no task named');
+  const notFiled = await nemiaWith({ level: 'semi-auto', task: 'nemia-1' });
+  assert.match(notFiled, /data-state="not-filed"/);
+  assert.doesNotMatch(notFiled, /data-nemia-task|>Task/, 'not filed yet: no task named');
+  const starting = await nemiaWith({ level: 'semi-auto', task: 'nemia-1', phase: 'pending' });
+  assert.match(starting, /data-state="starting"/);
+  assert.match(starting, /data-nemia-task[^>]*>nemia-1</);
+  assert.match(starting, /data-nemia-phase[^>]*>pending</);
+  const stopped = await nemiaWith({ ...nemiaUp, stopped: true });
+  assert.match(stopped, /data-nemia-task[^>]*>nemia-1</);
+  assert.match(stopped, /data-nemia-phase[^>]*>running</);
+});

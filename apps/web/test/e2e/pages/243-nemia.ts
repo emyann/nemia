@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, pickLevel, themeOf } from '../board.ts';
-import { expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -52,7 +52,7 @@ async function photographPhone(page: Page): Promise<void> {
 export default {
   /**
    * Nemia's section on the store's Settings, her folder trusted: a pick of Semi-auto writes it, which says it asks what waits on you, and
-   * her session reads not filed yet, naming its task, since the e2e's api keeps no keeper; her memory lists the seeded facts and opens one;
+   * her session reads not filed yet, naming no task, since the e2e's api keeps no keeper; her memory lists the seeded facts and opens one;
    * a pick of Auto keeps her task and says a session kept from before asks every answer until filed again; a pick of Manual then writes
    * it and her session reads off. The trust, the facts and the level are written by the page and taken back after.
    */
@@ -77,7 +77,7 @@ export default {
       if (on.level !== 'semi-auto' || on.task === null) throw new Refused(`Semi-auto is written with a task — ${JSON.stringify(on)}`);
       await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
       await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'her session reads not filed yet');
-      await expectVisible(section.locator('[data-nemia-task]', { hasText: on.task }), 'naming its task');
+      await expectCount(section.locator('[data-nemia-task]'), 0, 'naming no task before one is filed');
       await expectVisible(
         section.getByText('what waits on you waits for your answer'),
         'Semi-auto asks what waits on you, not every write',

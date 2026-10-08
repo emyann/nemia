@@ -21,8 +21,8 @@ export class Refused extends Error {}
 export const FEED_STREAM = '/api/feed/stream';
 const isFeedStream = (request: Request): boolean => new URL(request.url()).pathname === FEED_STREAM;
 
-/** A page's requests in flight, the feed's stream left out; and when one last started or ended. */
-type Flights = { open: Set<Request>; last: number };
+/** A page's requests in flight, the feed's stream left out; when one last started or ended; whether the feed's stream answered. */
+type Flights = { open: Set<Request>; last: number; fed: boolean };
 const flights = new WeakMap<Page, Flights>();
 
 /**
@@ -33,11 +33,12 @@ const flights = new WeakMap<Page, Flights>();
  * `requestfinished`, no `requestfailed`. So once the page's own navigation has committed, every request in flight but that navigation's is
  * let go — those the old document asked for while the navigation was on its way too, as its polls may — which is what Playwright's own
  * `networkidle` does at a commit. The new document asks for nothing before its commit. A same-document navigation (`history.pushState`)
- * asks for nothing, and lets nothing go.
+ * asks for nothing, and lets nothing go. It also notes when the feed's stream answers its headers, forgotten at each such commit, for
+ * `feedAnswered`.
  */
 export function track(page: Page): void {
   if (flights.has(page)) return;
-  const f: Flights = { open: new Set(), last: performance.now() };
+  const f: Flights = { open: new Set(), last: performance.now(), fed: false };
   let uncommittedNavigation: Request | undefined;
   page.on('request', (request) => {
     if (request.isNavigationRequest() && request.frame() === page.mainFrame()) uncommittedNavigation = request;
@@ -50,13 +51,32 @@ export function track(page: Page): void {
   };
   page.on('requestfinished', done);
   page.on('requestfailed', done);
+  page.on('response', (response) => {
+    if (isFeedStream(response.request())) f.fed = true;
+  });
   page.on('framenavigated', (frame) => {
     if (frame !== page.mainFrame() || uncommittedNavigation === undefined) return;
     for (const request of f.open) if (request !== uncommittedNavigation) f.open.delete(request);
     uncommittedNavigation = undefined;
+    f.fed = false;
     f.last = performance.now();
   });
   flights.set(page, f);
+}
+
+/**
+ * Once the feed's stream of `page`'s current document has answered its headers: at once if it already has, as `track` saw it from before
+ * the page loaded, else when it does. What the board says of the feed is judged from then, since a loaded machine answers the stream late
+ * and the board says `connecting` until it does. A stream unanswered after `timeout`, the api's bound as `idle`'s, is refused, naming it.
+ */
+export async function feedAnswered(page: Page, timeout = 30_000): Promise<void> {
+  track(page);
+  if (flights.get(page)!.fed) return;
+  try {
+    await page.waitForResponse((response) => isFeedStream(response.request()), { timeout });
+  } catch {
+    throw new Refused(`the feed's stream is answered — GET ${FEED_STREAM} has no answer after ${timeout} ms`);
+  }
 }
 
 /** How long no request may be in flight for the network to be idle: Playwright's `networkidle`'s half a second. */

@@ -7,6 +7,10 @@
  * request without it is refused 401. Each message it is sent makes a Task, which `answer` completes at once with one artifact, a text part
  * or a data part, fails, or leaves waiting on a question (`input-required`). What it was sent and the headers it was sent with are kept for
  * the test. The JSON-RPC handler is made once the port is known, since the card names it.
+ *
+ * With `streaming`, the card says the agent streams, and the SDK's handler answers a subscription to a Task with the events its executor
+ * publishes. With `held`, a Task stays `working` until `held` settles; then the agent says `reading the note`, writes a text answer in
+ * two chunks, and ends it: a follower sees each event come.
  */
 import express from 'express';
 import http from 'node:http';
@@ -35,7 +39,20 @@ const textPart = (text: string): Part => ({
   mediaType: 'text/plain',
 });
 
-export async function a2aServer(o: { token?: string; answer?: (text: string) => Answer } = {}): Promise<A2AServer> {
+const agentSaid = (taskId: string, contextId: string, id: string, words: string): Message => ({
+  messageId: id,
+  contextId,
+  taskId,
+  role: Role.ROLE_AGENT,
+  parts: [textPart(words)],
+  metadata: undefined,
+  extensions: [],
+  referenceTaskIds: [],
+});
+
+export async function a2aServer(
+  o: { token?: string; answer?: (text: string) => Answer; streaming?: boolean; held?: Promise<void> } = {},
+): Promise<A2AServer> {
   const answer = o.answer ?? (() => ({ text: 'done' }));
   const sent: string[] = [];
   const headers: http.IncomingHttpHeaders[] = [];
@@ -59,18 +76,34 @@ export async function a2aServer(o: { token?: string; answer?: (text: string) => 
         }),
       );
       const said = answer(text);
+      if (o.held) {
+        await o.held;
+        const message = agentSaid(taskId, contextId, `m-${taskId}-reading`, 'reading the note');
+        const state = TaskState.TASK_STATE_WORKING;
+        bus.publish(AgentEvent.statusUpdate({ taskId, contextId, status: { state, message, timestamp: now() }, metadata: undefined }));
+      }
+      if (o.held && 'text' in said) {
+        const half = Math.ceil(said.text.length / 2);
+        for (const [i, words] of [said.text.slice(0, half), said.text.slice(half)].entries()) {
+          const artifact: Artifact = {
+            artifactId: `a-${taskId}`,
+            name: 'result',
+            description: '',
+            metadata: undefined,
+            extensions: [],
+            parts: [textPart(words)],
+          };
+          bus.publish(AgentEvent.artifactUpdate({ taskId, contextId, artifact, append: i > 0, lastChunk: i > 0, metadata: undefined }));
+        }
+        const state = TaskState.TASK_STATE_COMPLETED;
+        bus.publish(
+          AgentEvent.statusUpdate({ taskId, contextId, status: { state, message: undefined, timestamp: now() }, metadata: undefined }),
+        );
+        return;
+      }
       if ('failed' in said || 'asks' in said) {
         const words = 'failed' in said ? said.failed : said.asks;
-        const message: Message = {
-          messageId: `m-${taskId}`,
-          contextId,
-          taskId,
-          role: Role.ROLE_AGENT,
-          parts: [textPart(words)],
-          metadata: undefined,
-          extensions: [],
-          referenceTaskIds: [],
-        };
+        const message = agentSaid(taskId, contextId, `m-${taskId}`, words);
         const state = 'failed' in said ? TaskState.TASK_STATE_FAILED : TaskState.TASK_STATE_INPUT_REQUIRED;
         bus.publish(AgentEvent.statusUpdate({ taskId, contextId, status: { state, message, timestamp: now() }, metadata: undefined }));
         return;
@@ -108,7 +141,7 @@ export async function a2aServer(o: { token?: string; answer?: (text: string) => 
     provider: undefined,
     documentationUrl: undefined,
     iconUrl: undefined,
-    capabilities: { streaming: false, pushNotifications: false, extensions: [], extendedAgentCard: false },
+    capabilities: { streaming: o.streaming === true, pushNotifications: false, extensions: [], extendedAgentCard: false },
     securitySchemes: o.token
       ? { token: { scheme: { $case: 'httpAuthSecurityScheme', value: { description: '', scheme: 'Bearer', bearerFormat: '' } } } }
       : {},

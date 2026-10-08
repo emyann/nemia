@@ -18,21 +18,8 @@ import { SKILL_NAME } from '../keys/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { entriesOf, isShippedPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
 import { splitFrontmatter } from '../step/step.ts';
-import {
-  ARCHIVE_LIMIT,
-  checkTemplate,
-  contentDigest,
-  documentFile,
-  draftOf,
-  packArchive,
-  pathRefusals,
-  unpackArchive,
-  type Draft,
-  type ReadFolder,
-  type Source,
-  type StepSource,
-  type TreeFile,
-} from './index.ts';
+import { ARCHIVE_LIMIT, contentDigest, packArchive, pathRefusals, unpackArchive, type TreeFile } from '../archive/archive.ts';
+import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
 
 /** A problem of a template on disk: its file, the line and column it stands on where it is in a document, and the words. */
 export type Problem = { file: string; line?: number; col?: number; message: string };
@@ -163,7 +150,7 @@ export function checkedTemplate(source: string, name?: string): CheckedTemplate 
   return { ...read, version: manifest?.spec?.version };
 }
 
-/** Every problem of the template at `source`, a folder (named `name`, by default its base name) or an archive, as `checkedTemplate` finds. */
+/** Every problem of the template at `source`, a folder (named `name`, by default its base name) or an archive: `checkedTemplate`'s. */
 export const checkTemplateAt = (source: string, name?: string): Problem[] => checkedTemplate(source, name).problems;
 
 /** The files of the workflow folder `dir` but its steps, by path from it; a link refused by name. */

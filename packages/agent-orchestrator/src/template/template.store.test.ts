@@ -15,7 +15,7 @@ import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
-import { packArchive } from './archive.ts';
+import { packArchive } from '../archive/archive.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;

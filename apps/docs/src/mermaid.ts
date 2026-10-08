@@ -15,6 +15,16 @@ const DRAWN = /^(?:(?:graph|flowchart)\s+(?:TD|TB|LR|BT|RL)|sequenceDiagram)$/;
 /** The colours a diagram takes: Starlight's own variables, so one SVG follows the light and the dark theme. */
 const COLOURS = { bg: 'var(--sl-color-bg)', fg: 'var(--sl-color-white)', accent: 'var(--sl-color-accent)', transparent: true };
 
+/**
+ * A drawn SVG in a figure, without the style element the renderer gives it: a page prints its CSS as an attribute, and it fetches a
+ * font. The colours it derives are the site stylesheet's (`src/styles/accent.css`), and the figure carries the width it is drawn at
+ * (`--drawn-width`), below three quarters of which the stylesheet never scales it.
+ */
+const figureOf = (svg: string): string => {
+  const width = /<svg[^>]*\swidth="([\d.]+)"/.exec(svg)?.[1] ?? '0';
+  return `<figure class="diagram" style="--drawn-width: ${width}px">${svg.replace(/<style>[\s\S]*?<\/style>\n?/g, '')}</figure>`;
+};
+
 /** The `diagram=<name>` a fence's meta names, or undefined for a fence drawn on its page. */
 const NAMED = /(?:^|\s)diagram=([a-z][\w-]*)(?=\s|$)/;
 
@@ -86,7 +96,7 @@ const drawn = (root: string, page: string, code: Code): Html => {
     const source = name ? diagramFrom(root, name) : code.value;
     const unread = unreadLines(source);
     if (unread.length > 0) throw new Error(`these lines are read as nothing, and left out: ${unread.join(' | ')}`);
-    return { type: 'html', value: `<figure class="diagram">${renderMermaidSVG(source, COLOURS)}</figure>` };
+    return { type: 'html', value: figureOf(renderMermaidSVG(source, COLOURS)) };
   } catch (error) {
     throw new Error(`${page}: ${what} does not draw: ${(error as Error).message}`, { cause: error });
   }

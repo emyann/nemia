@@ -36,7 +36,9 @@ test('the site builds, with its three pages and both code-drawn diagrams on the 
   const { status, said } = build(APP, out);
   assert.equal(status, 0, said);
   for (const page of ['index.html', 'map/index.html', 'glossary/index.html']) assert.ok(fs.existsSync(path.join(out, page)), page);
-  const map = svgsOf(fs.readFileSync(path.join(out, 'map', 'index.html'), 'utf8'));
+  const html = fs.readFileSync(path.join(out, 'map', 'index.html'), 'utf8');
+  assert.doesNotMatch(html, /set:html/, 'no figure prints its style as an attribute');
+  const map = svgsOf(html);
   assert.ok(
     map.some((svg) => svg.includes('input-required')),
     'the map draws the lifecycle',

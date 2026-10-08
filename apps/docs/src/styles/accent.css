@@ -18,5 +18,22 @@ figure.diagram {
 
 figure.diagram svg {
   max-width: 100%;
+  min-width: calc(var(--drawn-width) * 0.75);
   height: auto;
+  --_text: var(--fg);
+  --_text-sec: color-mix(in srgb, var(--fg) 60%, var(--bg));
+  --_text-muted: color-mix(in srgb, var(--fg) 40%, var(--bg));
+  --_text-faint: color-mix(in srgb, var(--fg) 25%, var(--bg));
+  --_line: color-mix(in srgb, var(--fg) 50%, var(--bg));
+  --_arrow: var(--accent);
+  --_node-fill: color-mix(in srgb, var(--fg) 3%, var(--bg));
+  --_node-stroke: color-mix(in srgb, var(--fg) 20%, var(--bg));
+  --_group-fill: var(--bg);
+  --_group-hdr: color-mix(in srgb, var(--fg) 5%, var(--bg));
+  --_inner-stroke: color-mix(in srgb, var(--fg) 12%, var(--bg));
+  --_key-badge: color-mix(in srgb, var(--fg) 10%, var(--bg));
+}
+
+figure.diagram svg text {
+  font-family: var(--sl-font);
 }

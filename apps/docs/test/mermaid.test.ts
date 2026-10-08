@@ -101,7 +101,7 @@ test('unreadLines finds each line the renderer drops, in a flowchart, a state di
 test('a hand-drawn flowchart and both code-drawn diagrams render, each into an SVG holding its own words', () => {
   const flow = drawnPage(ROOT, null, 'flowchart LR\n  card[A card] --> landing[A landing]') as Html;
   assert.equal(flow.type, 'html');
-  assert.match(flow.value, /^<figure class="diagram"><svg[\s\S]*A landing[\s\S]*<\/svg><\/figure>$/);
+  assert.match(flow.value, /^<figure class="diagram" style="--drawn-width: [\d.]+px"><svg[\s\S]*A landing[\s\S]*<\/svg><\/figure>$/);
   for (const [name, state] of [
     ['lifecycle', 'input-required'],
     ['nemia', 'untrusted'],
@@ -111,4 +111,38 @@ test('a hand-drawn flowchart and both code-drawn diagrams render, each into an S
     assert.equal(drawn.type, 'html');
     assert.ok(drawn.value.includes('<svg') && drawn.value.includes(state), `${name} draws ${state}`);
   }
+});
+
+test('REFUSED: a drawn figure keeps no style of its own, which a page would print as an attribute and which fetches a font', () => {
+  for (const [meta, body] of [
+    [null, 'flowchart LR\n  card[A card] --> landing[A landing]'],
+    ['diagram=lifecycle', ''],
+    ['diagram=nemia', ''],
+  ] as const) {
+    const drawn = drawnPage(ROOT, meta, body) as Html;
+    assert.doesNotMatch(drawn.value, /<style/, `${meta ?? 'a flowchart'} carries no style element`);
+    assert.doesNotMatch(drawn.value, /@import|url\(['"]?https?:/, `${meta ?? 'a flowchart'} fetches nothing`);
+  }
+});
+
+test('every colour a drawn figure reads is defined by the site’s stylesheet', () => {
+  const css = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'styles', 'accent.css'), 'utf8');
+  const read = new Set(
+    [
+      drawnPage(ROOT, null, 'flowchart LR\n  a[A] --> b{B}'),
+      drawnPage(ROOT, 'diagram=lifecycle', ''),
+      drawnPage(ROOT, 'diagram=nemia', ''),
+    ].flatMap((node) => [...(node as Html).value.matchAll(/var\((--_[\w-]+)/g)].map((m) => m[1])),
+  );
+  assert.ok(read.size > 0, 'the figures read derived colours');
+  for (const name of read) assert.match(css, new RegExp(`${name}:`), `${name} is defined`);
+});
+
+test('a figure carries the width its diagram is drawn at, which the site never scales below three quarters', () => {
+  const drawn = drawnPage(ROOT, 'diagram=lifecycle', '') as Html;
+  const width = /<svg[^>]*\swidth="([\d.]+)"/.exec(drawn.value)?.[1];
+  assert.ok(width, 'the SVG says its width');
+  assert.match(drawn.value, new RegExp(`^<figure class="diagram" style="--drawn-width: ${width}px">`));
+  const css = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'styles', 'accent.css'), 'utf8');
+  assert.match(css, /min-width:\s*calc\(var\(--drawn-width\) \* 0\.75\)/);
 });

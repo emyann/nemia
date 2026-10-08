@@ -510,9 +510,23 @@ listing carries it only when it asks (`includeArtifacts`, A2A's default being no
 harness still lists it `done` — a job is never let go — or not at all: the journal is read for that, once per read of a
 session listed `done`. A listing keeps the harness's `COMPLETED` of the same session, since `observe` reads the harness's
 word; the two differ on purpose. `answer` and `close` stay the engine's verbs, journalled; the agent reads the journal and
-never writes it. Not done, by the owner's decision at the plan gate: no `SubscribeToTask` (nothing reads a live stream —
-the api polls the engine — and every subscription opens with the Task, a listing here); no collected files as Artifacts
-(they are the orchestrator's, for its own Task, stage 6); and a Task is still one attempt, not one runtime task.
+never writes it. Not done: no collected files as Artifacts (they are the orchestrator's, for its own Task, stage 6); and a
+Task is still one attempt, not one runtime task.
+
+**Streaming is done** (`SubscribeToTask`, `a2a/follow.ts`). A harness whose runner follows a session (`follow`) says
+`capabilities.streaming: true` on its card and answers a subscription with the Task, then each moment as a status or an artifact
+update, until the session settles; one whose runner does not says `false`, and a subscription is refused in the SDK's own error.
+Nothing above the runtime reads a session again on a timer: the api relays what the runtime streams, and a step whose session is
+not streamed is sent what it has said and told so. What each harness gives:
+
+| harness | streams | what a follower is handed |
+|---|---|---|
+| `claude`, a job | yes | its state, the text of each message in pieces as it is written (`--include-partial-messages`, `claudePartials`), and each whole event of its transcript once (`followOf`, `test/follow.test.ts`) |
+| `claude`, `--bg` | yes | its state from `claude agents`, read once a second for every follower, and each whole line of its transcript once, across its turns and respawns (`bgFollowOf`, `test/follow-bg.test.ts`) |
+| `codex` | yes | its state, and each event of its rollout once and in order as Codex writes it, its stdout decoded as it comes; no pieces of text: `exec --json` prints each message whole (`followOf`, `codexPartials`, `test/codex-follow.test.ts`) |
+| `claude-detached` | no | nothing while it runs: `claude -p --output-format json` names its session only as it exits; its transcript is read once it has |
+| `command` | no | nothing: a process keeps no conversation; its output is `logs` and `output` |
+| a remote A2A agent | yes | its Task's own stream where its card says it streams; else, and after five drops in a row, its Task read whole every second at the runtime's edge, each event once (`a2a/remote-follow.ts`, `test/remote-follow.test.ts`) |
 
 **Codex as an A2A agent** (stage 3). The detached `codex exec` driver answers in the same shape, through the real worker
 and the SDK's client, with a fake `codex` (`test/codex-agent.test.ts`) and once live (M13, open issue 31):
@@ -647,12 +661,14 @@ the caller's function alone: it is on no filing, journal, registry entry or feed
 **Following a remote session.** An agent whose card says `capabilities.streaming: true` is followed through its Task's own
 stream (`SubscribeToTask`): `follow` relays each answer as the moments a `--bg` session's follow gives — the state, each message once,
 an artifact's chunks as they come and the artifact whole at its last — and `transcriptOf` reads the Task (GetTask) from a cursor,
-each event under the id the follow gave it. A card that does not say it streams refuses the follow, saying so, and its reader reads
-the transcript again every second. A subscription that drops before the turn is over is read whole, which gives what the drop
-missed, and subscribed to again; five drops in a row that give nothing new refuse the follow the same way, and one silent for 60 s
-is read whole and subscribed to again without counting; a Task the agent no longer has ends the follow. The subscription's headers
-are bounded as any request is; its body is not. A session followed while its message is still being sent is `submitted` until the
-agent answers: then its reply, under the transcript's id, and its state; a refusal, as `rejected`; or its Task, followed
+each event under the id the follow gave it. A card that does not say it streams is followed all the same, here at the runtime's
+edge: its Task is read whole every second (`READ_EVERY_MS`), each event given once, until it settles or is gone; six reads in a row
+that fail refuse the follow, saying its session cannot be followed live. A subscription that drops before the turn is over is read
+whole, which gives what the drop missed, and subscribed to again; after five drops in a row that give nothing new the Task is read
+every second instead, to its end; one silent for 60 s is read whole and subscribed to again without counting; a Task the agent no
+longer has ends the follow. The subscription's headers are bounded as any request is; its body is not. A session followed while its
+message is still being sent is `submitted` until the agent answers: then its reply, under the transcript's id, and its state; a
+refusal, as `rejected`; or its Task, followed; a send that falls into doubt leaves no Task to follow, and refuses the follow
 (`a2a/remote-follow.ts`, `test/remote-follow.test.ts`).
 
 **What a pass costs.** One GetTask per open remote session, in parallel, and none for a settled one: the pass's meter
@@ -2141,7 +2157,7 @@ of pure code sits beside it.
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
-| `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
+| `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, its usage, and what a follow reads of it (`codexPartials`: no pieces of text, its lines decoded) |
 | `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
@@ -2157,7 +2173,7 @@ of pure code sits beside it.
 | `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
 | `src/a2a/remote-client.ts` | a remote agent's connection: its card read and held to its origin, the interface chosen, auth as the card asks it, and a `fetch` that bounds each request (a subscription's headers alone) and follows no redirect |
 | `src/a2a/remote-events.ts` | a remote agent's Task as a transcript (`transcriptOfTask`), and a subscription's answers as the moments a follow gives (`followedOfRemote`), each event once |
-| `src/a2a/remote-follow.ts` | a remote agent's session followed through its Task's own stream, a dropped subscription read whole and made again, and its conversation read by id or by name |
+| `src/a2a/remote-follow.ts` | a remote agent's session followed through its Task's own stream, a dropped subscription read whole and made again, its Task read every second where it does not stream or keeps dropping, and its conversation read by id or by name |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
 | `src/a2a/entry.ts` | the remote harness's registry entry: its shape, an older one read in today's words, its file under `remote/`, and the remote `forget`, which removes the entry and names the Task the agent keeps (`forgetEntryOf`) |
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
@@ -2211,7 +2227,8 @@ of pure code sits beside it.
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
 | `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |
-| `test/codex-agent.test.ts` | Codex as an A2A agent through the real worker and the SDK's client, a fake `codex` on PATH: its context, its closeout Artifact, a cancel that ends what it started, a held task's turns in one context, and no words while it runs |
+| `test/codex-follow.test.ts` | a Codex session followed live, its run file, stdout and rollout written by the test: its state, each rollout event once and in order, no piece of text, the end, and a stdout line that does not decode refused |
+| `test/codex-agent.test.ts` | Codex as an A2A agent through the real worker and the SDK's client, a fake `codex` on PATH: its context, its closeout Artifact, a cancel that ends what it started, a held task's turns in one context, no words while it runs, and a subscription to a working session answered |
 | `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `src/a2a/map.test.ts` | a remote agent's Task in the runtime's words and a spawn in A2A's, pure: every state, where a statement is read, and none before completion |

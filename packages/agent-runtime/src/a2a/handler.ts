@@ -12,8 +12,9 @@
  * `sendMessage` is a spawn when the message carries the runtime's extension, and otherwise words said to a running
  * session (`say`); `listTasks` is an observe, `getTask` one session's view, `cancelTask` a stop. What A2A has no call
  * for — a session found by name, its logs, a session let go of, its conversation read from a cursor — are the
- * extension's methods (`SessionMethods`). What the runtime has no use for — streaming, push notifications, an extended
- * card — is refused in the SDK's own errors, never taken and ignored. A transcript is not a stream: `SubscribeToTask`
+ * extension's methods (`SessionMethods`). A session is streamed where its driver follows it (`SubscribeToTask`, `subscription`), as
+ * the card's `capabilities.streaming` says. What the runtime has no use for — push notifications, an extended card — is refused in
+ * the SDK's own errors, never taken and ignored. A transcript is not a stream: `SubscribeToTask`
  * is refused on a Task in a terminal state, and a finished session's conversation is still read, and its first event
  * is the Task as it stands, a listing of the harness on every read (`sessionTranscript`).
  */

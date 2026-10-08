@@ -2,8 +2,8 @@
  * A step on a remote A2A agent followed live (`followStep`), as the api's follower reads it, over the engine `nemia up` makes and the
  * SDK's own server (`a2a-server.ts`): an agent whose card says it streams has each event of its Task relayed, in order, from the
  * subscription the runtime holds, to the step's end; one whose card does not is followed as the runtime reads its Task whole, every
- * second, to the step's end. The ticks run on the follower's runtime, so the feed's lines they write wake it. `WF_ROOT` is set before the import, since
- * the module reads it as it loads.
+ * second, to the step's end. The ticks run on the follower's runtime, so the feed's lines they write wake it. `WF_ROOT` is set
+ * before the import, since the module reads it as it loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';

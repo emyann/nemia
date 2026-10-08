@@ -34,10 +34,10 @@ read it, then write it into yours from there:
 - a workflow: `drafts/<factory>/<workflow>/`, a markdown file per step, its keys in its frontmatter, and its README —
   `nemia workflows write yours <workflow> --folder drafts/<factory>/<workflow>`.
 
-An agent the person already has, in another factory's repository or in their library, is recruited with the
-`recruit-or-create` skill, not written again. To start from one that exists, copy it there and change the copy. To change one in yours, write it again with `--version`, the version
-it was read at: a write without one, of a name there already, is refused naming the version it is at now — read it again, and write
-your change on what it holds. `nemia agents remove` and `nemia workflows remove` take one back, at its version too.
+An agent the person already has, in another factory's repository or in their library, is recruited with the `recruit-or-create` skill, not
+written again. To start from one that exists, copy it there and change the copy. To change one in yours, write it again with `--version`,
+the version it was read at: a write without one, of a name there already, is refused naming the version it is at now — read it again, and
+write your change on what it holds. `nemia agents remove` and `nemia workflows remove` take one back, at its version too.
 
 **Two things no verb writes**: a workflow's own `*.schema.json`, beside its steps, and a skill's files beside its SKILL.md. Draft those
 in the same folder, show the person each, and ask them to place it — on the board, or copied into yours by hand. Keep a pending fact
@@ -52,9 +52,8 @@ before work depends on it.
 
 ## 5. Hire agents into steps
 
-Who to hire into a step, find with the `recruit-or-create` skill. `nemia factory hire <factory> <agent> --step <workflow>/<step>`, one
-agent a step; `nemia factory fire <factory> --step
-<workflow>/<step>` takes a hire back. A step whose own file names its `agent:` takes no hire.
+Who to hire into a step, find with the `recruit-or-create` skill. `nemia factory hire <factory> <agent> --step <workflow>/<step>`, one agent
+a step; `nemia factory fire <factory> --step <workflow>/<step>` takes a hire back. A step whose own file names its `agent:` takes no hire.
 
 ## 6. Its instruction
 

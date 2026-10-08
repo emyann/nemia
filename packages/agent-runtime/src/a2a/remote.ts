@@ -54,15 +54,7 @@ import { forgetEntryOf, readEntry, registryOf, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { turnOver } from './remote-events.ts';
 import type { SeamOps } from './client.ts';
-import {
-  QUIET_MS,
-  READ_EVERY_MS,
-  remoteFollowOf,
-  remoteTranscriptByName,
-  remoteTranscriptOf,
-  RESUBSCRIBE_MS,
-  type FollowDeps,
-} from './remote-follow.ts';
+import { pacesOf, remoteFollowOf, remoteTranscriptByName, remoteTranscriptOf, type FollowDeps } from './remote-follow.ts';
 import { authOf, connectionOf, type Credentials, type MissingCredential, type RemoteAgent } from './remote-client.ts';
 import { alive, sendHeld } from './sending.ts';
 import { Doubt, late, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
@@ -438,9 +430,7 @@ export const remoteOps = (
     bySession,
     sendingLive,
     connection,
-    quietMs: o.quietMs ?? QUIET_MS,
-    resubscribeMs: o.resubscribeMs ?? RESUBSCRIBE_MS,
-    readEveryMs: o.readEveryMs ?? READ_EVERY_MS,
+    ...pacesOf(o),
   };
   const read = remoteTranscriptOf(followed);
   const transcript = (sessionId: string, after?: TranscriptCursor) =>

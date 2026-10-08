@@ -2,11 +2,12 @@
  * What a Codex session prints under `codex exec --json` as it enters (`codexEventsOf` in `harness/codex/stream.ts`): each event
  * of a type the runtime reads decoded strictly, every other line passed over undecoded, and a stream refused in words that name
  * the line, the event, the first wrong field and the fix. Pure, so each rule is a stream here; the refusal as `observe` gives it
- * is `test/detached.test.ts`'s.
+ * is `test/detached.test.ts`'s. What it says of text being written (`codexPartials`) is nothing, its lines decoded as a follow reads
+ * them: from where the last read stopped.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { codexEventsOf, codexOutput } from './stream.ts';
+import { codexEventsOf, codexOutput, codexPartials } from './stream.ts';
 
 const stream = (...lines: Array<object | string>) =>
   ['Reading additional input from stdin...', ...lines.map((l) => (typeof l === 'string' ? l : JSON.stringify(l)))].join('\n');
@@ -129,4 +130,20 @@ test('codexOutput refuses a stream that does not decode by throwing its words, a
     cacheReadTokens: 1000,
     outputTokens: 80,
   });
+});
+
+test('codexPartials marks nothing in a stream that decodes, its messages printed whole, and passes a torn line and another type', () => {
+  const read = codexPartials(
+    stream(THREAD, TURN, item('completed', { id: 'item_0', type: 'agent_message', text: 'Done.' }), completed(), '{"type":"turn.com', {
+      type: 'error',
+    }),
+    0,
+  );
+  assert.deepEqual(read, { marks: [] });
+});
+
+test('REFUSED: codexPartials refuses a line that does not decode by its number in the whole output, past the lines read before', () => {
+  const read = codexPartials([JSON.stringify(TURN), JSON.stringify(completed({ ...USED, output_tokens: 'many' }))].join('\n'), 5);
+  assert.ok('wrong' in read, 'a turn.completed whose output_tokens is a string was taken');
+  assert.match(read.wrong, /^line 7 of the `codex exec --json` stream is a `turn\.completed` event whose `usage\.output_tokens` /);
 });

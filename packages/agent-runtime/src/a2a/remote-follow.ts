@@ -57,6 +57,13 @@ export type FollowDeps = {
   readEveryMs: number;
 };
 
+/** The paces of a follow: each one given, or its default (`QUIET_MS`, `RESUBSCRIBE_MS`, `READ_EVERY_MS`). */
+export const pacesOf = (o: Partial<Pick<FollowDeps, 'quietMs' | 'resubscribeMs' | 'readEveryMs'>>) => ({
+  quietMs: o.quietMs ?? QUIET_MS,
+  resubscribeMs: o.resubscribeMs ?? RESUBSCRIBE_MS,
+  readEveryMs: o.readEveryMs ?? READ_EVERY_MS,
+});
+
 const refusal = (message: string) => new RunnerError({ verb: 'follow', message, refused: true });
 
 /** The words that end a refusal of a session that cannot be followed: what is new is still read. */

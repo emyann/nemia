@@ -18,8 +18,10 @@
  *
  * What `codex exec` cannot do, each pinned here rather than faked: it takes no words while it runs (its card says `say:
  * false`, and a follow-up is refused with nothing written to it), and it is never `INPUT_REQUIRED` while it runs — the worker
- * writes no `blocked` — only as a held task between turns, with no process. What a live Codex does with a resume is M13
- * (`live.test.ts`); here the fake prints the thread it was given by construction, so this proves the plumbing, not Codex.
+ * writes no `blocked` — only as a held task between turns, with no process. What it does stream: its card says so, and a
+ * subscription to a working session is answered, from its stdout and its rollout (`test/codex-follow.test.ts`). What a live
+ * Codex does with a resume is M13 (`live.test.ts`); here the fake prints the thread it was given by construction, so this
+ * proves the plumbing, not Codex.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -424,8 +426,14 @@ test(
   async (t) => {
     const root = tmp('store');
     const ops = detachedOps(codex, root);
-    const extension = cardOf('codex', ops).capabilities!.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
-    assert.deepEqual(extension.params, { methods: ['sessionLogs', 'sessionTranscript', 'observeSessions', 'forgetSession'], say: false });
+    const card = cardOf('codex', ops);
+    assert.ok(card.capabilities, 'its card says what it can do');
+    assert.equal(card.capabilities.streaming, true, 'its card says it streams: a session is followed from its stdout and its rollout');
+    const extension = card.capabilities.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
+    assert.deepEqual(extension.params, {
+      methods: ['sessionLogs', 'sessionOutput', 'sessionTranscript', 'observeSessions', 'forgetSession'],
+      say: false,
+    });
 
     const cwd = workdir({ gate: 'go' });
     const client = agent(root);
@@ -434,6 +442,15 @@ test(
       t,
       async () => (await get(client, 'ae/c-say/1')).status!.state === TaskState.TASK_STATE_WORKING && pidIn(cwd, 'pid') > 0,
       'working',
+    );
+    const subscribed = client.resubscribeTask({ tenant: '', id: 'ae/c-say/1' });
+    const first = await subscribed.next();
+    await subscribed.return(undefined);
+    const opened = first.value?.payload?.$case === 'task' ? first.value.payload.value : undefined;
+    assert.equal(
+      opened?.status?.state,
+      TaskState.TASK_STATE_WORKING,
+      'a subscription to the working session is answered: its Task, working',
     );
     await assert.rejects(
       client.sendMessage({

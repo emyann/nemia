@@ -186,6 +186,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   the place skill `place/git` (`packages/agent-orchestrator/place/git`, run through `runPlaceVerb`), the skills the api lists as shipped
   (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
+- `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read
+  from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
 - `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
   reporter beside spec, and `report.ts`; held by `agent-orchestrator/test/test-costs.test.ts` and `suite.test.ts`.
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a

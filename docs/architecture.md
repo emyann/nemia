@@ -13,6 +13,10 @@ broken. This page says what the tests hold; the tests are the rules.
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
 
+`apps/docs`, the documentation site, sits beside the layers and is none of them: it imports no workspace package and depends on
+none (`apps/docs/test/structure.test.ts`), and reads the repository's text at build, by path from its root. Its pages draw each state
+machine from between its `diagram:<name>` markers in the package docs, never from a copy (`apps/docs/src/mermaid.ts`).
+
 Each layer reaches exactly the one below it, and nothing reaches up or skips one:
 
 - the web reaches the api over HTTP alone (`apps/web/test/structure.test.ts`, and the web's lint block);

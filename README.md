@@ -15,6 +15,7 @@ work.
 | `packages/agent-orchestrator` | sequences engine tasks into runs of steps; the `wf` CLI | `agent-runtime` |
 | `apps/api` | Node server (Hono) that puts the workflows behind HTTP | `agent-orchestrator` |
 | `apps/web` | React app: Vite, TanStack Router + Query, Tailwind | `apps/api`, over HTTP only |
+| `apps/docs` | the documentation site: Astro Starlight, the state diagrams read from the package docs at build | — |
 
 Dependencies point down this table, never up. The web app imports no package: the engine spawns
 processes and reads your home directory, so it lives behind the API.

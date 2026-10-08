@@ -1,0 +1,67 @@
+---
+title: Factories
+description: A factory names the repositories a body of work is on, the workflows it offers, the agents it hires into their steps, and its instruction.
+---
+
+A factory is a body of work, named. It says which repositories the work is on, which workflows it offers, which agent does each step,
+and what Nemia is to know about it. Every run is started in a factory.
+
+**It owns** its repositories, the workflows attached to it, its hires and its instruction.
+
+**It never touches** a run already started. A run reads its factory once, when it starts, and freezes what it read: a hire or a detach
+afterwards reaches only the runs started after it.
+
+**It is reached through** one file in your store, `~/.agent-workflows/factories/<name>.json` (`WF_ROOT`), written by the `nemia factory`
+verbs and by the board. Its name is the file's. The code is in `packages/agent-orchestrator/src/factory/`.
+
+```bash
+nemia factory add pipao --repo ~/code/pipao          # a factory on one repository
+nemia factory attach pipao build                      # it offers the workflow build
+nemia factory hire pipao ada --step build/implement   # ada does build's implement step
+nemia start "add a flag" --workflows build --factory pipao
+```
+
+## Its repositories
+
+A factory names one repository or more, as folders on your machine (`"repos"` in its file). A run works in one of them, in a worktree
+of its own. Every other repository of the factory is mounted for each step read-only (`factoryMounts`), so a step can read the code it
+does not change. A step that must write one of them says so with `writable`, naming the folder; that widens where its writes reach,
+never what it may do.
+
+## Attached workflows
+
+A factory offers only the workflows attached to it, and none until one is. Attaching records the workflow's folder name in the
+factory's file (`"workflows"`); detaching takes it back. Starting a workflow a factory has not attached is refused, naming the attach that
+would add it (`unattachedRefusal`).
+
+## Hires
+
+A step need not name its agent: a factory hires one into it. A hire maps a step, written `<workflow>/<step>`, to an agent
+(`"hires": { "build/implement": "ada" }` in the file). So two factories can run the same workflow with different agents.
+
+- A step whose own file names its agent is filled already, in every factory, and takes no hire.
+- When a run starts, each hired step is read exactly as if its file named the agent, and frozen so on the run.
+- A start that would leave a step with no agent is refused, naming each such step and the hire that would fill it (`unfilledRefusal`).
+
+## The default factory
+
+Runs and cards written before every run had a factory are in the default factory. It is no file: it holds that history, offers every
+workflow, hires no one, and starts nothing. A start that names it is refused (`defaultStartRefusal`). A start that names no factory
+runs in the one whose repository it is typed in.
+
+## Its instruction
+
+A factory has one instruction: what Nemia is to know about this body of work, in markdown. By default it is `NEMIA.md` at the root of
+the factory's first repository, edited with the code it speaks of. The factory's file may point at another file of that repository,
+or keep the words in your store instead, for a repository you would rather not write into.
+
+- [Nemia](/nemia/) reads it before she acts in the factory.
+- The board shows it on the factory's settings page, and the api serves it (`packages/agent-orchestrator/src/factory/instruction.store.ts`).
+- It is not told to a step. What every agent at work in a repository must know belongs in the files the harness reads there,
+  `CLAUDE.md` or `AGENTS.md`: the fourth of an agent's [instruction layers](/agents/#what-an-agent-is-told-four-layers).
+
+## Sources
+
+This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
+_A factory's instruction_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
+`packages/agent-orchestrator/src/factory/factory.store.ts` and `packages/agent-orchestrator/src/factory/instruction.store.ts`.

@@ -25,7 +25,10 @@ const oneLine = (err: unknown): string =>
     .filter(Boolean)
     .join(' / ');
 
-/** The start of the schedule read `r` for its fire `due`, as a person's `nemia start --factory` is: its repository and folder first. */
+/**
+ * The start of the schedule read `r` for its fire `due`, as a person's `nemia start --factory` is: its repository and folder first, the
+ * factory's tree before the repository's `workflows/` when it is made from a template.
+ */
 const started = (r: Read, due: string, daemonRepo: string) =>
   Effect.suspend(() => {
     const repo = repoFor(r.factory.name, r.schedule.repo, daemonRepo);
@@ -33,7 +36,7 @@ const started = (r: Read, due: string, daemonRepo: string) =>
       brief: r.schedule.brief,
       repo,
       repoNamed: r.schedule.repo !== undefined,
-      workflowDir: workflowFolder(r.workflow, path.join(repo, 'workflows'), repo),
+      workflowDir: workflowFolder(r.workflow, path.join(r.factory.tree ?? repo, 'workflows'), repo, r.factory.tree),
       factory: r.factory.name,
       scheduled: { factory: r.factory.name, workflow: r.workflow, due },
     });

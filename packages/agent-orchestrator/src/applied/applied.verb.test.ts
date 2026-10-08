@@ -22,6 +22,8 @@ const { main } = await import('../cli/main.ts');
 const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
+const { startDue } = await import('../schedule/schedule.verb.ts');
+const { runWith } = await import('../runtime-client.ts');
 const { Effect } = await import('effect');
 
 /** No verb here asks the engine anything. */
@@ -291,6 +293,21 @@ test("a bare workflow name started in a templated factory is its tree's, and the
   assert.equal(run.workflowDir, path.join(treeDir('started'), 'workflows', 'dev'));
   assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9, "the tree's step, as the person changed it");
   assert.equal(run.factory, 'started');
+});
+
+test("a templated factory's due schedule starts its tree's workflow, as a person's start does, never the repository's", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  await apply('scheduled', dir, repo, '--set', 'budget=7');
+  reconcileFactory(templated('scheduled'));
+  const review = path.join(treeDir('scheduled'), 'workflows', 'dev', 'review.md');
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
+  await main(['factory', 'schedule', 'scheduled', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views'], NO_ENGINE);
+  const started = await runWith(NO_ENGINE, startDue(repo, [], Date.now() + 120_000));
+  assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
+  const run = readRun(started.run);
+  assert.equal(run.workflowDir, path.join(treeDir('scheduled'), 'workflows', 'dev'));
+  assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9, "the tree's step, as the person changed it");
 });
 
 test("the writers' place factory writes a templated factory's tree; refused without --factory, for an untemplated one, and before its render", async (t) => {

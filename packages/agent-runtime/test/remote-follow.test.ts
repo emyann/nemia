@@ -158,11 +158,11 @@ for (const binding of BINDINGS)
   );
 
 test(
-  'an agent whose card does not say it streams is not subscribed to: its Task is read whole again and again, each event given once',
+  'an agent whose card does not say it streams is not subscribed to, nor waited on as a stream that drops: its Task is read whole again and again, each event given once',
   WAITED,
   async (t) => {
     const s = await serve({ streaming: false });
-    const ops = await opsOn(s, 'ae/unstreamed/1', { readEveryMs: 10 });
+    const ops = await opsOn(s, 'ae/unstreamed/1', { readEveryMs: 10, resubscribeMs: 600_000 });
     const taskId = s.tasks()[0];
     const got: Followed[] = [];
     const ended = drained(ops.follow!('ae/unstreamed/1'), got);

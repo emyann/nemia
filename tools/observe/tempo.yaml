@@ -49,8 +49,8 @@ backend_worker:
 metrics_generator:
   processor:
     span_metrics:
-      # Changed: the image's three, then a step's names (resource attributes of a session) and a tool's (span attributes). Never a run
-      # or a task: a series for each would never end.
+      # Changed: the image's three, then a step's names (resource attributes of a session) and a tool's (span attributes), the
+      # collector's test_scope among them, one of five values. Never a run or a task: a series for each would never end.
       dimensions:
         - service_name
         - operation
@@ -62,6 +62,7 @@ metrics_generator:
         - tool_name
         - bash_command_class
         - command_head
+        - test_scope
       # Changed: a subagent's own spans (agent_id, measured) are left out: its time is counted once, as its Agent tool's span.
       filter_policies:
         - exclude:

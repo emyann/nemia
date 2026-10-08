@@ -209,7 +209,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "A Claude Code step's **wall** time is its turns (`claude_code.interaction`); its **busy** time is the sum of its leaves: the model (`claude_code.llm_request`), each tool by name (`claude_code.tool`), Bash by its command head. A subagent counts once, as its `Agent` tool. **Other** is wall less busy, so the bars add up. Permission wait is *of which* tool time. Queue, check and gate are outside the session. A Codex step sends no spans: it is **unmeasured**, its session time alone below. One run's step reads Tempo, 7 days back at most; a step across runs reads the span metrics in Prometheus."
+        "content": "A Claude Code step's **wall** time is its turns (`claude_code.interaction`); its **busy** time is the sum of its leaves: the model (`claude_code.llm_request`), each tool by name (`claude_code.tool`), Bash by its command head. A subagent counts once, as its `Agent` tool. **Other** is wall less busy, so the bars add up. Permission wait is *of which* tool time. **Tests by scope** is Bash time by what its test command ran: the whole suite, one package, some files, or e2e on every page or some. Queue, check and gate are outside the session. A Codex step sends no spans: it is **unmeasured**, its session time alone below. One run's step reads Tempo, 7 days back at most; a step across runs reads the span metrics in Prometheus."
       }
     },
     {
@@ -238,7 +238,7 @@
         "x": 0,
         "y": 5,
         "w": 12,
-        "h": 12
+        "h": 17
       },
       "targets": [
         {
@@ -508,6 +508,77 @@
       ]
     },
     {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Tests by scope",
+      "description": "Bash time in the run's step by the scope of its test command: the whole suite, one package, some files, or e2e on every page or some; a command that runs no tests is left out.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"claude-code\" && span.run=\"$run\" && span.task=~\"$session\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\" && name=\"claude_code.interaction\"} > {name=\"claude_code.tool\" && span.tool_name=\"Bash\" && span.test_scope=~\".+\"} | sum_over_time(span:duration) by (span.test_scope)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^\\{span\\.test_scope=\"(.*)\"\\}$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
       "id": 5,
       "type": "table",
       "title": "Outside the session",
@@ -518,7 +589,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 10,
+        "y": 15,
         "w": 12,
         "h": 7
       },
@@ -583,7 +654,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 22,
         "w": 24,
         "h": 1
       },
@@ -600,9 +671,9 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 23,
         "w": 12,
-        "h": 12
+        "h": 17
       },
       "targets": [
         {
@@ -694,7 +765,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 18,
+        "y": 23,
         "w": 12,
         "h": 6
       },
@@ -778,6 +849,67 @@
       }
     },
     {
+      "id": 13,
+      "type": "bargauge",
+      "title": "Tests by scope",
+      "description": "Bash time of the measured steps by the scope of its test command, from the span metrics: the whole suite, one package, some files, or e2e on every page or some; a command that runs no tests is left out.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (test_scope) (increase(traces_spanmetrics_latency_sum{service=\"claude-code\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\", span_name=\"claude_code.tool\", tool_name=\"Bash\", test_scope!=\"\"}[$__range]))",
+          "legendFormat": "{{test_scope}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 13
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
       "id": 9,
       "type": "bargauge",
       "title": "Outside the session",
@@ -788,7 +920,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 24,
+        "y": 34,
         "w": 12,
         "h": 6
       },
@@ -871,7 +1003,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 30,
+        "y": 40,
         "w": 16,
         "h": 9
       },
@@ -949,7 +1081,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 30,
+        "y": 40,
         "w": 8,
         "h": 9
       },

@@ -1,9 +1,11 @@
 /**
- * What the side Grafana (`tools/observe/`) changes in its image to time a step: the collector overlay's command head, Tempo's span
- * metrics, its retention and the reach of its queries, and the compose file that mounts both and keeps metrics 90 days.
+ * What the side Grafana (`tools/observe/`) changes in its image to time a step: the collector overlay's command head and test scope,
+ * Tempo's span metrics, its retention and the reach of its queries, and the compose file that mounts both and keeps metrics 90 days.
  *
  * The command head is read as the collector runs it: the pattern is taken out of `otelcol.yaml`'s OTTL string (`\\` one backslash,
- * `$$` the collector's `$`) and run over a table of commands, a match setting the head and any other command left `other`. Each rule is
+ * `$$` the collector's `$`) and run over a table of commands, a match setting the head and any other command left `other`. The test
+ * scope is read the same way, each statement's pattern in order over its own table, the last match setting its literal and a command
+ * none matches left without one. Each rule is
  * a function of the parsed file returning what is wrong, each a line, shown to refuse a fixture that breaks it. The image's own paths
  * (`/otel-lgtm/tempo-config.yaml`, read by its Tempo; a second `--config` merged by its collector) are its pinned digest's, as
  * measured (`tools/observe/README.md`).

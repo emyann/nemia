@@ -335,13 +335,27 @@ export function exportTemplate(ask: ExportAsk): { dir: string; from: Draft['from
   return { dir, from: draft.from };
 }
 
+/** The words a version may hold to name a default archive: one file-name part, never a slash, a backslash or a part that climbs. */
+const VERSION_PART = /^[0-9A-Za-z][0-9A-Za-z.+-]*$/;
+
+/** The archive pack writes where `--out` names none, `<name>-<version>.tgz` in `cwd`; a version that is no file-name part refused. */
+function defaultOut(dir: string, name: string, version: unknown): string {
+  const text = String(version);
+  if (!VERSION_PART.test(text))
+    throw new Invalid({
+      message: `${dir}: the version ${JSON.stringify(text)} in nemia.yaml names no file, and pack names its archive <name>-<version>.tgz: write a version of letters, digits, dots, + and -, or name the archive with --out.`,
+    });
+  return `${name}-${text}.tgz`;
+}
+
 /** What `nemia template pack` asks: the template's folder, the archive to write (by default `<name>-<version>.tgz`), and where from. */
 export type PackAsk = { dir: string; out?: string; cwd: string };
 
 /**
  * The archive of the template folder `ask.dir`, written at `ask.out` (resolved from `ask.cwd`), staged beside it and renamed into place;
  * answers the archive and the digest of its content. Refused, nothing written: a `dir` that is no folder (Missing), one that does not pass
- * its check, every problem at its line, or that `packArchive` refuses (Invalid), and an `out` that is there already (Conflict).
+ * its check, every problem at its line, or that `packArchive` refuses, a version that names no file where no `out` is given (Invalid),
+ * and an `out` that is there already (Conflict).
  */
 export function packTemplate(ask: PackAsk): { out: string; digest: string } {
   if (!fs.statSync(ask.dir, { throwIfNoEntry: false })?.isDirectory())
@@ -351,7 +365,7 @@ export function packTemplate(ask: PackAsk): { out: string; digest: string } {
     throw new Invalid({
       message: `${ask.dir} was not packed, since it does not pass:\n${read.problems.map((p) => `  ${problemLine(p)}`).join('\n')}`,
     });
-  const out = path.resolve(ask.cwd, ask.out ?? `${read.name}-${String(read.version)}.tgz`);
+  const out = path.resolve(ask.cwd, ask.out ?? defaultOut(ask.dir, read.name, read.version));
   if (fs.lstatSync(out, { throwIfNoEntry: false }))
     throw new Conflict({ message: `${out} is there already, and pack writes a new file: name another with --out, or remove it.` });
   const { archive, digest } = packArchive(read.name, read.files);

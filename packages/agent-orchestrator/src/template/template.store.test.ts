@@ -367,6 +367,28 @@ test('pack refuses a folder that does not pass, at its line, and an --out that i
   assert.throws(() => packTemplate({ dir: path.join(cwd, 'mine.tgz'), cwd }), refusedWith('Missing', /is no folder/));
 });
 
+test('pack refuses a version that names no file where --out names none, and writes nothing in its folder or outside it', () => {
+  const dir = exported();
+  const manifest = path.join(dir, 'nemia.yaml');
+  const text = fs.readFileSync(manifest, 'utf8');
+  const outer = scratch('wf-template-outer-');
+  const cwd = path.join(outer, 'a', 'b');
+  fs.mkdirSync(cwd, { recursive: true });
+  for (const version of ['1/../../x', '1.0/x', '..', '1\\x']) {
+    fs.writeFileSync(manifest, text.replace(/version: .*/, `version: ${JSON.stringify(version)}`));
+    assert.deepEqual(checkTemplateAt(dir), [], `${version} passes the check`);
+    assert.throws(
+      () => packTemplate({ dir, cwd }),
+      refusedWith('Invalid', /names no file, and pack names its archive <name>-<version>\.tgz[^]*or name the archive with --out/),
+      version,
+    );
+    assert.deepEqual(fs.readdirSync(cwd), [], version);
+    assert.deepEqual(fs.readdirSync(outer), ['a'], version);
+    assert.deepEqual(fs.readdirSync(path.join(outer, 'a')), ['b'], version);
+  }
+  assert.equal(packTemplate({ dir, out: 'named.tgz', cwd }).out, path.join(cwd, 'named.tgz'), '--out names it whatever the version');
+});
+
 test('unpack refuses a <dir>/<name> that holds files or is no folder, and leaves it as it was', () => {
   const { out } = packTemplate({ dir: exported(), cwd: scratch('wf-template-pack-') });
   const parent = scratch('wf-template-unpack-');

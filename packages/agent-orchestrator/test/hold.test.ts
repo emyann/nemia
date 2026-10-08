@@ -591,7 +591,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   const loopLs = (await typed(t, b.e, 'ls', loop.id)).printed;
   assert.doesNotMatch(loopLs, /waiting on you/, loopLs);
   assert.doesNotMatch(loopLs, VERBS, loopLs);
-  assert.equal(unhold(loop.id).run.id, loop.id);
+  assert.equal((await runWith(b.e, unhold(loop.id))).run.id, loop.id);
   assert.match((await typed(t, b.e, 'decide', loop.id)).printed, /ROUNDS EXHAUSTED, waiting on you/);
 });
 
@@ -625,7 +625,7 @@ test("a blocked step's question stays on its record while the run is held, asked
   );
   assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed, /asked|files it/);
   fs.rmSync(asks, { recursive: true });
-  unhold(run.id);
+  await runWith(b.e, unhold(run.id));
   assert.match((await typed(t, b.e, 'ls', run.id)).printed, /waiting on you: implement/);
   assert.match((await typed(t, b.e, 'decide', run.id)).printed, /which colour\?/);
 });
@@ -752,7 +752,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const run = await Effect.runPromise(startRun({ brief: 'held twice', repo, workflowDir: oneStep() }));
   await runWith(b.e, hold(run.id, [target.id]));
   const stale = readRun(run.id);
-  unhold(run.id);
+  await runWith(b.e, unhold(run.id));
   await runWith(b.e, hold(run.id, [other.id]));
   const second = fs.readFileSync(holdFileOf(run.id), 'utf8');
   assert.notEqual(JSON.parse(second).at, stale.hold!.at, 'two holds, told apart by when they were put');
@@ -778,8 +778,8 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
     return read.apply(this, args);
   });
-  assert.throws(
-    () => unhold(run.id),
+  await assert.rejects(
+    runWith(b.e, unhold(run.id)),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
       err.message ===
@@ -863,7 +863,7 @@ test('REFUSED while held or pruned: nemia say to a step that has settled offers 
       ) &&
       !VERBS.test(err.message),
   );
-  unhold(run.id);
+  await runWith(b.e, unhold(run.id));
   assert.equal((await runWith(b.e, prune(done.id, { yes: true, unmerged: true }))).kind, 'pruned');
   await assert.rejects(
     runWith(b.e, sayRun(done.id, 'implement', 'hello')),
@@ -1246,7 +1246,7 @@ test("`nemia hold`'s and `--off`'s programs say in their type what they need and
   );
 });
 
-test('REFUSED as a typed failure: each refusal of `hold` and `unhold` is its program\'s failure, recovered by its tag in the words `runWith` rejects with', async (t) => {
+test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its program's failure, recovered by its tag in the words `runWith` rejects with", async (t) => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);

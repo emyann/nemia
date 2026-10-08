@@ -1,0 +1,22 @@
+/* The board's one hue, its sidebar primary oklch(0.488 0.243 264.376) (apps/web/src/styles.css), its lightness set per theme. */
+:root {
+  --sl-color-accent-low: oklch(0.3 0.12 264.376);
+  --sl-color-accent: oklch(0.62 0.2 264.376);
+  --sl-color-accent-high: oklch(0.88 0.07 264.376);
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: oklch(0.9 0.05 264.376);
+  --sl-color-accent: oklch(0.488 0.243 264.376);
+  --sl-color-accent-high: oklch(0.4 0.2 264.376);
+}
+
+figure.diagram {
+  margin-inline: 0;
+  overflow-x: auto;
+}
+
+figure.diagram svg {
+  max-width: 100%;
+  height: auto;
+}

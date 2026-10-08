@@ -109,7 +109,8 @@ function collectorFaults(config: Collector): string[] {
 const SCOPES = ['suite', 'package', 'files', 'e2e: all', 'e2e: pages'];
 
 /** A statement of the scope's transform: `test_scope` set to a literal where the command matches one pattern. */
-const SCOPE_STATEMENT = /^set\(attributes\["test_scope"\], ("(?:[^"\\]|\\.)*")\) where IsMatch\(attributes\["full_command"\], "(?:[^"\\]|\\.)*"\)$/;
+const SCOPE_STATEMENT =
+  /^set\(attributes\["test_scope"\], ("(?:[^"\\]|\\.)*")\) where IsMatch\(attributes\["full_command"\], "(?:[^"\\]|\\.)*"\)$/;
 
 /** The scope a statement sets and the pattern it matches the command against, or undefined when it is not of that form. */
 function scopeStatementOf(statement: string): { scope: string; pattern: string } | undefined {

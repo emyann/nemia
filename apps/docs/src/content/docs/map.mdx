@@ -24,7 +24,9 @@ flowchart TD
   `agent-orchestrator/workflow` (`packages/agent-orchestrator/test/contract.test.ts`).
 - The orchestrator reaches the runtime's behaviour through one client, `packages/agent-orchestrator/src/runtime-client.ts`, and its
   words through a pure door, `agent-runtime/vocabulary` (`packages/agent-orchestrator/test/boundary.test.ts`).
-- The runtime reaches every harness over A2A. Each harness is an A2A agent of its own, reached in the same process.
+- The runtime reaches every harness over A2A. Claude Code, Codex and a plain command are each an A2A agent the runtime runs, reached
+  in its own process (`packages/agent-runtime/src/a2a/client.ts`); a remote agent is reached over the network, at its address
+  (`packages/agent-runtime/src/a2a/remote.ts`).
 
 The packages speak Effect, and the api is the system's public interface: whatever is not a package's own code reaches Nemia through
 the api's routes.

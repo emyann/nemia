@@ -15,8 +15,10 @@ A card goes through these stages:
 2. **A run.** Starting a card makes a run of one workflow. A workflow is a folder of markdown files, and each file is one step
    (`packages/agent-orchestrator/README.md`, _The format_).
 3. **The steps.** Each step is done by an agent: a session on a harness, such as Claude Code or Codex, with its own instructions,
-   tools and fence. Steps run in order, and a step whose work can be judged has a check. The check is a command the run executes
-   after the step signs off. Its exit code decides whether the run goes on; the agent's own word does not.
+   tools and fence, and the skills it is given: folders of instructions and files for one kind of work. A step signs off with a
+   closeout: its outcome, its summary, and the fields its workflow asks of it. Steps run in order, and a step whose work can be
+   judged has a check. The check is a command the run executes after the step signs off. Its exit code decides whether the run goes
+   on; the agent's own word does not. Where a reviewing step asks for more, the steps of its loop run again: another round.
 4. **Gates.** Where a step has a gate, nothing after it starts until a person approves.
 5. **A landing.** The last step of a run stages the merge of the run's branch on the base. The run checks the merged tree, then
    commits it if the check passes, or aborts the merge if it fails (`landingDue`).

@@ -1,0 +1,111 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Page } from 'playwright';
+import { photograph, sidebar, themeOf } from '../board.ts';
+import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
+import type { PageSpec } from '../visit.ts';
+import { OUT, store } from '../world.ts';
+
+/** The factory the page schedules a workflow in, and the workflow attached to it that it schedules. */
+const FACTORY = FACTORIES.hiring.name;
+const WORKFLOW = WORKFLOWS.good.name;
+/** A factory the seed gives no schedule. */
+const NONE = FACTORIES.bare;
+/** Once a year, on the first of January at 9 in UTC: no fire falls between the page's write and its end, so the tick starts nothing. */
+const CRON = '0 9 1 1 *';
+const BRIEF = 'Sweep the year: what the factory left behind.';
+
+/** The next fire of CRON after `now`, as the api answers it. */
+function nextFire(now: number): string {
+  const year = new Date(now).getUTCFullYear();
+  const thisYear = Date.UTC(year, 0, 1, 9);
+  return new Date(thisYear > now ? thisYear : Date.UTC(year + 1, 0, 1, 9)).toISOString();
+}
+
+/** Go to `factory`'s settings page and wait for it to settle. */
+async function settingsOf(page: Page, factory: string): Promise<void> {
+  await page.goto(new URL(`/factories/${factory}/settings`, page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+}
+
+/** The line the api answers for scheduling a workflow of `factory`. */
+async function scheduleLine(page: Page, factory: string): Promise<string> {
+  const answer = await page.request.get(new URL('/api/factories', page.url()).href);
+  const listed = (await answer.json()) as { name: string; commands: { schedule: string } }[];
+  const line = listed.find((f) => f.name === factory)?.commands.schedule;
+  if (!line) throw new Refused(`GET /api/factories answers ${factory} with the line that schedules one — it answers none`);
+  return line;
+}
+
+/**
+ * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it, and the last run, a
+ * link to the run's page; no refusal, since the kept try started its run.
+ */
+async function expectScheduled(page: Page): Promise<void> {
+  const card = page.locator(`[data-factory-schedules="${FACTORY}"]`);
+  await expectVisible(card.getByText('Schedules', { exact: true }), 'the settings page draws the Schedules card');
+  const row = card.locator(`[data-factory-schedule="${WORKFLOW}"]`);
+  await expectVisible(row, `the card has a row for ${WORKFLOW}`);
+  await expectVisible(row.getByText(CRON, { exact: true }), 'the row says its cron');
+  await expectVisible(row.getByText('UTC', { exact: true }), 'and the time zone it is read in');
+  await expectVisible(row.getByText(BRIEF, { exact: true }), 'and what each run is asked');
+  const next = nextFire(Date.now());
+  const shown = await row.locator('[data-schedule-next]').getAttribute('title');
+  if (shown !== next) throw new Refused(`the next run is the cron's next fire, ${next} — the row says ${JSON.stringify(shown)}`);
+  const last = row.locator('[data-schedule-last]').getByRole('link', { name: FOLDER.id });
+  await expectVisible(last, 'the last run is a link named by the run');
+  const href = await last.getAttribute('href');
+  if (href !== `/runs/${FOLDER.id}`) throw new Refused(`the last run links to its page, /runs/${FOLDER.id} — it links to ${href}`);
+  await expectCount(row.locator('[data-schedule-refused]'), 0, 'a fire that started its run says no refusal');
+  await expectVisible(row.locator('code', { hasText: `factory unschedule ${FACTORY} ${WORKFLOW}` }), 'the line that takes it back');
+  await settled(page);
+  await photograph(page, path.join(OUT, `factory-schedules-scheduled-${await themeOf(page)}.png`), { fullPage: true });
+  await last.click();
+  await page.waitForURL((url) => url.pathname === `/runs/${FOLDER.id}`);
+  await idle(page);
+}
+
+/** The card of a factory with no schedule: an empty state that shows the api's line to schedule one. */
+async function expectNone(page: Page): Promise<void> {
+  const line = await scheduleLine(page, NONE);
+  await settingsOf(page, NONE);
+  const empty = page.locator(`[data-factory-schedules="${NONE}"] [data-no-schedules]`);
+  await expectVisible(empty, 'a factory with no schedule says it has none');
+  await expectVisible(empty.locator('code', { hasText: line }), `and shows the api's line to schedule one, ${line}`);
+  await settled(page);
+  await photograph(page, path.join(OUT, `factory-schedules-none-${await themeOf(page)}.png`), { fullPage: true });
+}
+
+export default {
+  /**
+   * A factory's schedules on its settings page, read-only. The page writes a schedule of the workflow attached to FACTORIES' `hiring` into
+   * its file, as `nemia factory schedule` writes it, and the tick's kept try of it, naming FOLDER's run as the run its last fire started:
+   * the card says the cron, the time zone, the brief, the next fire and the last run, a link to its page, and the line that takes it back.
+   * A factory with no schedule shows the api's line to schedule one. The factory's file and the kept try are taken back whatever happens.
+   */
+  name: 'factory-schedules',
+  route: '/',
+  expect: async (page) => {
+    const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
+    const tries = path.join(store!, 'schedules');
+    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    if (fs.existsSync(tries)) throw new Refused(`the seed keeps no schedule's try — ${tries} is there`);
+    const since = new Date().toISOString();
+    const factory = JSON.parse(factoryText) as Record<string, unknown>;
+    const schedule = { cron: CRON, brief: BRIEF, tz: 'UTC', since };
+    try {
+      fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, schedules: { [WORKFLOW]: schedule } }, null, 2)}\n`);
+      fs.mkdirSync(path.join(tries, FACTORY), { recursive: true });
+      const kept = { due: '2026-01-01T09:00:00.000Z', at: '2026-01-01T09:00:03.000Z', run: FOLDER.id };
+      fs.writeFileSync(path.join(tries, FACTORY, `${WORKFLOW}.json`), `${JSON.stringify(kept, null, 2)}\n`);
+      await settingsOf(page, FACTORY);
+      await sidebar(page);
+      await expectScheduled(page);
+      await expectNone(page);
+    } finally {
+      fs.writeFileSync(factoryFile, factoryText);
+      fs.rmSync(tries, { recursive: true, force: true });
+    }
+  },
+} satisfies PageSpec;

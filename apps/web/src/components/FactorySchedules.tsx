@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Separator } from '@/components/ui/separator';
 import type { Factory, FactorySchedule } from '../lib/api';
-import { clockWord } from '../lib/quota';
+import { fireWord } from '../lib/schedules';
 import { useNow } from '../lib/useNow';
 import { CopyButton } from './CopyButton';
 import { routeLink } from './routeLink';
@@ -18,7 +18,7 @@ const RouterLinkButton = routeLink(LinkButton);
 function CommandText({ text }: { text: string }) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
-      <code className="min-w-0 flex-1 overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs whitespace-nowrap">{text}</code>
+      <code className="min-w-0 flex-1 rounded bg-muted px-2 py-1 text-left font-mono text-xs [overflow-wrap:anywhere]">{text}</code>
       <CopyButton text={text} />
     </div>
   );
@@ -42,7 +42,7 @@ function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Dat
       <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Next run</dt>
         <dd data-schedule-next title={s.next ?? undefined}>
-          {s.next ? clockWord(new Date(s.next), now) : 'none: its cron never fires'}
+          {s.next ? fireWord(new Date(s.next), now) : 'none: its cron never fires'}
         </dd>
         <dt className="text-muted-foreground">Last run</dt>
         <dd data-schedule-last>
@@ -51,7 +51,7 @@ function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Dat
               <RouterLinkButton to="/runs/$runId" params={{ runId: s.last.run }} variant="link" size="sm" className="h-auto px-0">
                 {s.last.run}
               </RouterLinkButton>{' '}
-              <span className="text-muted-foreground">{clockWord(new Date(s.last.at), now)}</span>
+              <span className="text-muted-foreground">{fireWord(new Date(s.last.at), now)}</span>
             </>
           ) : (
             'none yet'
@@ -97,7 +97,7 @@ export function FactorySchedules({ factory }: { factory: Factory }) {
               <EmptyTitle>No schedule</EmptyTitle>
               <EmptyDescription>This factory starts no run on its own. To start one of its workflows on a cron, type:</EmptyDescription>
             </EmptyHeader>
-            <EmptyContent>
+            <EmptyContent className="max-w-full">
               <CommandText text={factory.commands.schedule} />
             </EmptyContent>
           </Empty>

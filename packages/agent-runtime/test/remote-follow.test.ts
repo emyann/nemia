@@ -210,6 +210,34 @@ test(
 );
 
 test(
+  `a stream cut ${RESUBSCRIBES + 1} times, each subscription giving something new before its cut, is followed to its end: only drops in a row count`,
+  WAITED,
+  async (t) => {
+    const s = await serve();
+    const ops = await opsOn(s, 'ae/cuts/1');
+    const taskId = s.tasks()[0];
+    const got: Followed[] = [];
+    let over: Exit.Exit<void, RunnerError> | undefined;
+    const ended = drained(ops.follow!('ae/cuts/1'), got).then((exit) => (over = exit));
+    const subscribed = async (n: number) => {
+      await until(t, () => over !== undefined || (s.counts.resubscribe === n && s.live() === 1), `subscription ${n}`, { everyMs: 20 });
+      assert.equal(over, undefined, `the follow went on to subscription ${n}: ${over && failure(over).message}`);
+    };
+    for (let n = 1; n <= RESUBSCRIBES + 1; n++) {
+      await subscribed(n);
+      s.move(taskId, { state: 'working', words: `said before cut ${n}` });
+      await holds(t, got, n + 1);
+      assert.equal(s.cut(), 1, `cut ${n}`);
+    }
+    await subscribed(RESUBSCRIBES + 2);
+    s.move(taskId, { state: 'completed', words: 'done' });
+    assert.ok(Exit.isSuccess(await ended), 'never refused: each drop was the first in a row');
+    assert.equal(shown(got).at(-1), 'state completed');
+    assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
+  },
+);
+
+test(
   'a stream that says nothing is read whole after the quiet bound and subscribed to again: what it kept back is given',
   WAITED,
   async (t) => {

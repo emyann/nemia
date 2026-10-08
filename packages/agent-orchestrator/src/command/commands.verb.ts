@@ -1,19 +1,19 @@
 /**
- * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
- * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
- * same entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and
- * `nemia plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`, their schedules among them),
- * a person's asks of a run —
- * `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and their steps (`nemia ls`, `runsListed`),
- * three reads the api alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots
- * (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its
- * custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia hold`, `nemia rm`, `nemia prune`),
- * and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves): `runs.verb.ts`; Nemia's level and memory
- * (`nemia level`, `nemia memory`: `nemia/`); an agent's rules at auto (`nemia auto`: `AUTO_ENTRIES`); the reads of the store (`nemia
- * show`, `nemia logs`, `nemia feed`, `nemia stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api
- * alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries
- * (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI
- * serves alone and runs itself, with no handler: `nemia plan`, `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
+ * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data it
+ * answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the same
+ * entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and `nemia plan`,
+ * `PLAN`, which the CLI alone runs), the inbox (`INBOXES`), the factories (`FACTORIES`, their schedules among them), their templates
+ * (`TEMPLATES`), a person's asks of a run — `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and
+ * their steps (`nemia ls`, `runsListed`), three reads the api alone serves: a run's decision (`decideRun`), whether its branches still
+ * merge (`MERGES`) and the run slots (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents
+ * card`, `agentCardRead`) and its custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia
+ * hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves):
+ * `runs.verb.ts`; Nemia's level and memory (`nemia level`, `nemia memory`: `nemia/`); an agent's rules at auto (`nemia auto`:
+ * `AUTO_ENTRIES`); the reads of the store (`nemia show`, `nemia logs`, `nemia feed`, `nemia stats`: `reads.verb.ts`); and what the board
+ * alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation
+ * (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole
+ * table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia plan`, `nemia tick`, `nemia up` and
+ * `nemia watch` (`RAN`).
  */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -36,7 +36,7 @@ import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
-import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
+import { amountIn, commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
 import { PAGES } from './pages.verb.ts';
@@ -47,6 +47,7 @@ import { MERGES } from '../branches/merges.verb.ts';
 import { MERGE } from '../merge/merge.verb.ts';
 import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
+import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { CONCLUDED, PLAN, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
@@ -60,12 +61,6 @@ import { VERSIONS } from '../release/version.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { AUTO_ENTRIES } from '../auto/auto.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
-
-/** The dollars under `key`, or undefined where none were given. */
-const amountIn = (args: Args, key: string): number | undefined => {
-  const value = args[key];
-  return typeof value === 'number' ? value : undefined;
-};
 
 /** The run's id and the step's name, as every route and command line names them. */
 const named = (args: Args): { runId: string; step: string } => ({ runId: textOf(args, 'runId') ?? '', step: textOf(args, 'step') ?? '' });
@@ -523,6 +518,7 @@ export const COMMANDS: readonly Command[] = [
   CONCLUDED,
   ...INBOXES,
   ...FACTORIES,
+  ...TEMPLATES,
   RETRY,
   APPROVE,
   ROUND,

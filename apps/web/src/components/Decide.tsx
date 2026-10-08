@@ -25,26 +25,30 @@ import { RaiseRow } from './Raise';
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
  * person — read once for the run's state (`decisionQuery`), only while the run has something to decide, and shown when the api says
- * there is. A run that still runs with a try asked — of a session the harness blocked, continued from the banner — has that try's note
- * and nothing to decide. An api that refuses says why, here.
+ * there is. The answers keep their place in one frame while the decision is read, refused or drawn, so a row keeps what was typed in it
+ * and the refusal of its ask. A run that still runs with a try asked — of a session the harness blocked, continued from the banner — has
+ * that try's note and nothing to decide. An api that refuses says why, here.
  */
 export function Decide({ run }: { run: RunDetail }) {
   const decidable = decidableRun(run);
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   const offers = answersOf(run);
   const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
-  if (decidable && error) {
-    return (
-      <DecideFrame>
-        {answers}
-        <p className="text-sm text-red-600 dark:text-red-400">
-          Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
-        </p>
-      </DecideFrame>
-    );
-  }
-  if (decidable && isDecidable(data)) return <DecideSection runId={run.id} decision={data} offers={answers} run={run} />;
-  return answers && <DecideFrame>{answers}</DecideFrame>;
+  const body =
+    decidable && error ? (
+      <p className="text-sm text-red-600 dark:text-red-400">
+        Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
+      </p>
+    ) : decidable && isDecidable(data) ? (
+      <DecisionParts runId={run.id} decision={data} run={run} />
+    ) : null;
+  if (!answers && !body) return null;
+  return (
+    <DecideFrame>
+      {answers}
+      {body}
+    </DecideFrame>
+  );
 }
 
 /** The Decide section's frame: its heading, and what the board does from it and what it leaves to you. */
@@ -75,23 +79,22 @@ function DecideFrame({ children }: { children: ReactNode }) {
  * would file. A folder run has no branch and nothing to merge, so nothing is said of one: where its work is instead, as the CLI's `decide`
  * says.
  */
-export function DecideSection({
-  runId,
-  decision,
-  offers = null,
-  run = null,
-}: {
-  runId: string;
-  decision: Decidable;
-  offers?: ReactNode;
-  run?: Pick<RunDetail, 'place' | 'work'> | null;
-}) {
+export const DecideSection = ({ offers = null, ...parts }: DecisionProps & { offers?: ReactNode }) => (
+  <DecideFrame>
+    {offers}
+    <DecisionParts {...parts} />
+  </DecideFrame>
+);
+
+/** What `DecisionParts` reads: the run's id, its decision, and where it worked, if known. */
+type DecisionProps = { runId: string; decision: Decidable; run?: Pick<RunDetail, 'place' | 'work'> | null };
+
+/** What there is to decide, after the answers, as `DecideSection` lists it; a fragment, so its parts sit in the frame's own spacing. */
+function DecisionParts({ runId, decision, run = null }: DecisionProps) {
   const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
   const inFolders = run?.place === 'folder';
   return (
-    <DecideFrame>
-      {offers}
-
+    <>
       {overBudget && (
         <p
           data-over-budget
@@ -127,7 +130,7 @@ export function DecideSection({
       </section>
 
       <Commands runId={runId} commands={commands} />
-    </DecideFrame>
+    </>
   );
 }
 

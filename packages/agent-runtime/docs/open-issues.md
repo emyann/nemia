@@ -172,7 +172,8 @@ has no Codex servers configured.
 -p --output-format json` prints that id in the one object it prints at exit, so until then there are no
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
 (`claudeResultOutput` in `agent-runtime/src/harness/detached/output.ts`). Low priority, like issue 4: this
-harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
+harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox, and it is not
+followed live: its runner has no `follow`, its card says `streaming: false`, and a subscription is refused.
 
 **Closed for a job on `claude`** (stage 2 part 1): its spec prints `stream-json`, whose first line names the session, so the
 worker has its id while it runs and `transcript` reads it by the job's name then (`claudeStreamOutput`). `claude-detached`
@@ -442,13 +443,12 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   state (`UnsupportedOperationError`, and the SDK's `DefaultRequestHandler.resubscribe` throws it), and a subscription's
   first event is the Task, which this agent answers with a listing: a cost on every read that the read never needed.
   `GetTask`'s `history` has no cursor either (`historyLength` is the last N). A cursor was not the blocker: the SDK does
-  carry request-scoped values, a service parameter into `ServerCallContext.state`. `SubscribeToTask` waits for a consumer
-  that reads a live stream, and then streams what `sessionTranscript` reads, beside it, not instead. **Asked again at stage 2
-  part 5, and still none:** the `-p` job's `stream-json` lines are read by its worker, not by any A2A caller, and the board
-  follows a session by polling the api, which reads the engine's `transcript`, never the seam's Tasks. A stream would cost
-  what CLAUDE.md's transcript rule says a read costs — for an attempt in flight, a `find` or one `claude agents` call, and
-  two journal reads — on every event it forwarded, plus a listing to open it, and a subscription held for each follower.
-  The owner kept it refused at the plan gate; `sendMessageStream` and `resubscribe` stay `UnsupportedOperationError`.
+  carry request-scoped values, a service parameter into `ServerCallContext.state`. `SubscribeToTask` streams a session
+  live beside it, not instead (`a2a/follow.ts`): where a harness's runner follows a session — a `claude` job, a `--bg`
+  session, a Codex session, a remote agent — its card says `streaming: true` and a subscription is answered with the Task,
+  then each moment; where it does not — `claude-detached`, `command` — its card says `false`, and a subscription is refused.
+  The api relays what the runtime streams and reads no session again on a timer (`apps/api/src/steps/reread.test.ts`).
+  `sendMessageStream` stays `UnsupportedOperationError`.
 - **A Task's context is the conversation, not the runtime's task.** Its `contextId` is the sighting's `nativeId`, or the
   attempt's off the journal, and empty while none is known — a job's until its first `stream-json` line. So a listing by
   context is every attempt that continued one conversation: a job keeps its id on `-p --resume` (M12), a `claude --bg`
@@ -654,8 +654,10 @@ What `codex exec` cannot do, said and not faked:
 - **Never `INPUT_REQUIRED` mid-run.** The worker writes no `blocked`: a sandboxed command is refused and the turn goes on,
   so only a held task's signed attempt, between turns, waits on a person.
 - **No spend cap.** A budget is refused at `file` and at `answer`.
-- **No live stream.** `SubscribeToTask` is refused for Codex, whose runner has no `follow`; a transcript is read from a cursor.
-  Claude Code's sessions are followed: a job (`claude -p`) to the text it is writing, a background one (`--bg`) at message level.
+- **No text as it is written.** `exec --json` prints each message whole, in its `item.completed`, so a Codex session is
+  followed live at message level: its state, then each event of its rollout once and in order as Codex writes it, its
+  stdout decoded as it comes (`codexPartials`, `test/codex-follow.test.ts`). Claude Code's job (`claude -p`) is followed to
+  the text it is writing, a background one (`--bg`) at message level.
 
 And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
 attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/core/engine/engine.ts`), and Codex writes
@@ -1233,6 +1235,7 @@ harness's cancel and still left a direct caller to ask again.
 |---|---|---|
 | `wf tick` could never reach the quiescence verdict: the clock lived in process memory | the clock reads the transcript's own mtime | engine `3cdfb8f` |
 | `ae watch` polled while the layer above used the pushed feed | `ae watch` uses `engine.watch` | engine `60b7aac` |
+| the api read a step's session again every second where its harness did not stream, and Codex did not | a Codex session followed live from its stdout and rollout; a remote agent that does not stream read every second at the runtime's edge; the api's beat removed, refused by `apps/api/src/steps/reread.test.ts` | `e4099f6d`, `80352d96`, `a75d25f8` |
 | `ae up` exited immediately (an unref'd timer); `resumeFrom` could not be written in a brief | the loop holds the process; `resumeFrom` in briefs | engine `187e20e` |
 | completion could only be guessed from outside | a task declares its own end — first a file, now a structured answer | engine `0d2de7d`, `e53f227` |
 | a done file travelled down a branch: two steps settled in six seconds having done nothing | marker cleared per attempt, then replaced by a statement made to the harness | engine `dc8d906`, `e53f227`; workflows `a641ad7`, `a6c7b0c` |

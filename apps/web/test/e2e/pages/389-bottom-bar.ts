@@ -4,7 +4,7 @@ import { atWork, atWorkWords, versionWords } from '../../../src/lib/footer.ts';
 import type { RunSummary } from '../../../src/lib/api/runs.ts';
 import type { Version } from '../../../src/lib/api/version.ts';
 import { photograph, railOf, themeOf } from '../board.ts';
-import { expectCount, expectTexts, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectUncut, expectVisible, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
@@ -50,6 +50,7 @@ async function acrossTheFoot(page: Page): Promise<void> {
 async function groups(page: Page): Promise<void> {
   const bar = footerOf(page);
   await expectVisible(bar.locator('[data-daemon-dot="none"][data-tone="down"]'), "the daemon's dot: the e2e's api ticks nothing");
+  await feedAnswered(page);
   await expectTexts(bar.locator('[data-feed-word="open"]'), ['feed live'], 'whether the board follows the feed');
   const work = atWorkWords(atWork(await answer<RunSummary[]>(page, '/api/runs')));
   if (work.text.startsWith('0 runs')) throw new Refused(`the seeded store has a run in flight — the api's runs make ${work.text}`);

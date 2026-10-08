@@ -800,7 +800,13 @@ test(
     s.hanging.a2a = false;
 
     await Effect.runPromise(ops.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
-    const taskId = s.tasks()[0];
+    const taskId: string = await untilEvent(
+      t,
+      () => JSON.parse(fs.readFileSync(entryFile(root, 'ae/seen/1'), 'utf8')).taskId,
+      'the Task of ae/seen/1 recorded on its entry',
+      { everyMs: 25 },
+    );
+    assert.equal(taskId, s.tasks()[0], 'the Task the agent made');
     s.hanging.a2a = true;
     const [observeMs, seen] = await timed(() => Effect.runPromise(ops.observe));
     assert.ok(observeMs < 3_000, `${observeMs} ms`);

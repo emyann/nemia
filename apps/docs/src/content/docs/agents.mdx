@@ -1,0 +1,97 @@
+---
+title: Agents
+description: Who does a step's work, with its tools, its fence and its skills, and the four layers of what it is told.
+---
+
+An agent is who does a step's work. A step is a place in a workflow, with its wiring; an agent is what is attached to it, and the run
+hands it a brief. One agent can do the work of many steps, in many workflows: a reviewer is written once and named by every step that
+needs a review.
+
+**It owns** who the worker is: its instructions, the harness and model it runs on, the tools it has, what it may not do, and the
+skills it is given.
+
+**It never touches** the wiring. Which step comes after which, the check, the gate and the loop are the step's, and an agent file that
+names one is refused, saying it belongs on the step.
+
+**It is reached through** a step's `agent` key. At the start of a run, each step's agent is read once and frozen on the run, so an
+edit to an agent changes only the runs started after it.
+
+## An agent's file
+
+An agent is one markdown file in an `agents` folder, beside the workflow folders: under `workflows/agents/` in a repository, or under
+`~/.agent-workflows/workflows/agents/` for your own. Its frontmatter holds a role's keys, and its body holds its instructions.
+
+```md
+---
+description: Reviews a change read-only, as a second engineer would
+harness: claude
+model: opus
+tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
+allowedTools: Bash(git diff:*), Bash(git log:*), Bash(npm run lint)
+skills: review-a-change
+---
+
+Review the changes on this branch. Be specific about correctness, not style.
+```
+
+The agent's keys are defaults. A step may set one of the same keys, and the step's wins, with one exception: a key of the fence only
+narrows (below). The agents are read by `packages/agent-orchestrator/src/agents/read.store.ts`. This repository's own team sits in
+`workflows/agents/`.
+
+## Tools and the fence
+
+Three things say what a session can do:
+
+- **Its tools** (`tools`) are the only tools the session has. A session without `Edit` or `Write` cannot edit a file with them, but a
+  tool such as `Bash` can still write one, so the tools alone never make an agent read-only.
+- **Its fence** is what it may do with them. On Claude Code, it is a permission mode (`permissionMode`), a list of allowed calls
+  (`allowedTools`) and a list of denied calls (`disallowedTools`), such as `Bash(git push:*)`. A deny beats every allow. On Codex, it
+  is a sandbox (`sandbox`): `read-only`, `workspace-write` or `danger-full-access`.
+- **Its mode decides what is not listed.** In `dontAsk`, a call no allow reaches is refused without asking anyone. The reviewer above
+  has `Bash`, but runs only the commands its `allowedTools` names, here a diff, a log and the lint, and those the repository's
+  `.claude/settings.json` allows; any other shell call is refused.
+  That fence, not its list of tools, is what keeps it read-only. This repository's reviewer, `workflows/agents/agora.md`, is fenced
+  this way.
+
+**Fences only tighten.** A step may narrow its agent's fence, never widen it, and a step that would is refused when the workflow is read
+(`fenceRefusal`). Its tools may only be ones the agent has, its denies must keep each of the agent's, and its permission mode may be
+no wider than the agent's. From narrowest, the modes are `plan`; then `dontAsk`, `default` and `manual`; then `acceptEdits`; then
+`auto`; then `bypassPermissions`. A step that needs a wider fence needs another agent.
+
+## Skills
+
+A skill is a folder of instructions and files for one kind of work, with a SKILL.md file at its head (this repository's `.claude/skills/look/SKILL.md` is one). An agent lists the skills it is
+given (`skills`), and a step may add more for its own position, but never take one of the agent's away. A skill is found in a
+`skills` folder beside the agents, or in the repository's `.claude/skills/`; the first place that has the name wins.
+
+On Claude Code, each step's agent is rendered when the run starts: its instructions go after Claude Code's own prompt, and its skills
+become a plugin of the step's own, `nemia-<agent>`, which the session loads by name.
+
+## What an agent is told: four layers
+
+What reaches an agent comes in four layers, each written by whoever owns it:
+
+1. **Instructions**: the agent's own body, written once in its file. Who it is and how it works, whatever step it does.
+2. **Custom instructions**: what a person adds to an agent they use without rewriting it. They live in your store, one file per agent,
+   `~/.agent-workflows/custom-instructions/<agent>.md` (`WF_ROOT`), never in the agent's folder. They only add words: they never widen
+   a fence, give a tool, or change the model. They are frozen with the step when the run starts (`StepAgent.customInstructions`).
+3. **The step's policy**: the step's own words and keys. What this place in this process asks of whoever does its work, such as "in
+   this team, also check the build".
+4. **Factory rules**: the files the harness itself reads in the workspace, today `CLAUDE.md` and `AGENTS.md`. They hold for every agent
+   at work there, and for a person too. Nemia composes nothing of them: the harness reads them as it would for anyone.
+
+The words reach the agent in that order, then the task. Where two layers say different things, the later one wins: the step knows the
+process, and the task knows the case.
+
+The run page on the board shows a step's layers apart, as the run froze them (`toldLayers`): the agent's instructions and skills, your
+custom instructions, the step's policy and the skills it adds, then the task.
+
+A factory's instruction, `NEMIA.md`, is not one of these layers: it is written for Nemia, and no step is told it (see
+[Factories](/factories/#its-instruction)).
+
+## Sources
+
+This page is written from `packages/agent-orchestrator/README.md` (_An agent is a node's attachment_, _Four layers_, _An agent rendered
+for Claude Code_, _What a step may have_, _What a step may not have_), and from
+`packages/agent-orchestrator/src/agents/read.store.ts`.

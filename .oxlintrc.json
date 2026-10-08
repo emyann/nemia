@@ -147,6 +147,19 @@
       }
     },
     {
+      "files": ["apps/docs/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
       "files": ["apps/web/**"],
       "rules": {
         "comments/no-code-comments": "error",
@@ -332,12 +345,6 @@
       }
     },
     {
-      "files": ["apps/api/src/steps/steps.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 22 }]
@@ -358,7 +365,7 @@
     {
       "files": ["apps/web/src/components/Decide.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 561, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 560, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 92, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 26 }],
         "sonarjs/cognitive-complexity": ["error", 26]
@@ -734,7 +741,7 @@
     {
       "files": ["packages/agent-runtime/src/a2a/remote.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 302, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 301, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 19]
       }
     },

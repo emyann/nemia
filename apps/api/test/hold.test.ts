@@ -599,7 +599,7 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it: its f
   assert.ok(decided.commands.some((c) => c.command === `nemia approve ${LIFT} plan`));
   const again = await lift(LIFT);
   assert.equal(again.status, 409, "lifted, it is held no more: a second lift is the package's refusal");
-  assert.equal(((await again.json()) as { error: string }).error, await refusal(async () => unhold(LIFT)));
+  assert.equal(((await again.json()) as { error: string }).error, await refusal(() => runWith(engine(), unhold(LIFT))));
 });
 
 test('a hold written by hand on a pruned run is lifted, as `nemia hold --off` lifts it: nothing of the run is filed again either way', async () => {
@@ -617,7 +617,7 @@ test('REFUSED at shipped defaults: a lift of a run nobody holds — one never he
     const res = await lift(id);
     assert.equal(res.status, 409, id);
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, await refusal(async () => unhold(id)), id);
+    assert.equal(error, await refusal(() => runWith(engine(), unhold(id))), id);
     assert.match(error, new RegExp(`^${id} is not held, so there is no hold to lift`), id);
     assert.deepEqual(filesOf(id), before, id);
   }

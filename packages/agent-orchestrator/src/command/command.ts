@@ -130,6 +130,12 @@ export const routeList = (command: Pick<CommandSpec, 'route'>): readonly Route[]
 /** A route the table generates on the api: a write the api serves by no hand of its own. */
 export const generated = (route: Route): boolean => route.method !== 'GET' && route.hand === undefined;
 
+/** The dollars under `key`, or undefined where none were given. */
+export const amountIn = (args: Args, key: string): number | undefined => {
+  const value = args[key];
+  return typeof value === 'number' ? value : undefined;
+};
+
 /**
  * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the
  * flag's own `takes`, or null. A flag the api alone takes is not looked at: its value is whatever a body sends.

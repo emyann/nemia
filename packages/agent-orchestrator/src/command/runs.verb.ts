@@ -187,7 +187,7 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   handler: Effect.fnUntraced(function* (args: Args) {
     const runId = textOf(args, 'runId') ?? '';
     if (args.off === true) {
-      const { run, hold: lifted } = unhold(runId);
+      const { run, hold: lifted } = yield* unhold(runId);
       return { id: run.id, lifted: true, hold: lifted };
     }
     const { run, hold: put } = yield* hold(runId, [...listOf(args, 'until')], { why: saidOf(args, 'why'), by: saidOf(args, 'by') });

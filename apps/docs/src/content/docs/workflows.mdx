@@ -1,0 +1,129 @@
+---
+title: Workflows
+description: A workflow is a folder of markdown, one file a step; its gates, checks, loops and rounds, its landing, and what a step may spend.
+---
+
+A workflow is how a team works on a card: which steps there are, who does each, in what order, what is checked, and where a person
+decides. It is a folder of markdown files, and each file is one step. The orchestrator, `packages/agent-orchestrator`, reads it and
+runs it.
+
+**It owns** the order of the steps and what each step is allowed: its agent, its tools, its check, its gate, its budget.
+
+**It never touches** whether the work is good. That is a judgement, made in a step by an agent or measured by a check, never by a
+condition in the workflow.
+
+**It is reached through** the folder itself. A repository keeps its workflows checked in, one folder each under `workflows/` at its
+root, as it keeps its CI; your own sit under `~/.agent-workflows/workflows/` (`WF_ROOT`). Nemia ships no workflow: a factory's are
+its own, written by the people who run it.
+
+## A step
+
+A step is one markdown file. Its frontmatter wires it, and its body is its brief: what the step is asked to do.
+
+```md
+---
+after: implement
+agent: reviewer
+loop: implement
+rounds: 3
+budget: 16
+---
+
+Review the changes on this branch. Be specific about correctness, not style.
+```
+
+The keys are a closed list, and a key the orchestrator does not know is refused by name before anything is spent
+(`packages/agent-orchestrator/src/workflow/step-file.ts`). The main ones:
+
+- `after` says which steps must finish first. Steps run in that order.
+- `agent` names who does the work: an agent written once, in the `agents` folder beside the workflows (see [Agents](/agents/)).
+- `check` is a command that measures the work.
+- `gate` makes a person approve before anything after the step starts.
+- `loop` and `rounds` send the work back for another round.
+- `budget` caps what the step's tries may cost together.
+- `workspace` says which folder the step works in: a worktree of the run's own, by default, or the repository's checkout.
+
+The folder's `README.md` is no step: it says what the workflow is for, and the board shows it.
+
+**No key is control flow.** There are no conditions, no expressions and no templating. "Is this good enough?" is not a predicate a
+workflow language could evaluate; it is a judgement, and a judgement belongs to a step with an agent in it. The workflow is a team, not
+a program.
+
+## The closeout
+
+Every step ends by signing off with a structured answer, its closeout: an `outcome` (`done` or `blocked`), a `summary` for the person
+who decides, the `artifacts` it made, and what it `needs`. A workflow can ask a step for more fields with `output`, and a later step
+reads them with `input`, as data. Claude Code gives the answer through its `StructuredOutput` tool, and Codex through its output
+schema. A step that signs off `blocked` stops what waits on it, and says so to the person.
+
+## The check
+
+The run does not take the agent's word that the work is done. A step's check is a command the run executes after the step signs off,
+in the step's own workspace.
+
+- Exit 0 is `verified`, and the next step is filed.
+- Any other exit is `failed (check)`, and nothing that waits on the step runs.
+- A step with no check reads `unverified`, so it never passes for a step somebody checked.
+
+The command comes from the folder as it was when the run started, frozen on the run's record: a check written into the folder later,
+even by a step, never reaches the run. Only a check that finished is a verdict on the work. A check killed at its deadline, or stopped,
+said nothing about the work, and is run again with `--recheck`.
+
+## Trying again
+
+When a check refuses a step, `retries` says how many times the run sends the work back on its own: it continues the same session and
+tells it why. A person can try a step again too, with `nemia retry`: continuing the session with a message, starting fresh, on another
+model, or just running its check again.
+
+## A loop and its rounds
+
+A reviewing step can send the work back. Its `loop` names an earlier step to run again, and `rounds` caps how many times, 3 when it
+does not say. After each round the reviewer's closeout says `again`, yes or no:
+
+- `again: true`, with rounds left: the next round starts. The earlier step continues its session, and is handed the reviewer's
+  findings as data. It answers each finding, fixed or not and why.
+- `again: false`: the loop is done, and what waits on it starts.
+
+When the rounds run out, a person decides: one more round (`nemia round`), or enough (`nemia accept`).
+
+## A gate
+
+A gate is a property of a step: `gate: true`. When the step signs off, nothing after it is started until a person approves. The step
+reads `awaiting approval`, holds no slot and spends nothing while it waits.
+
+- `nemia approve <run> <step> --message "…"` lets the run go on. The message reaches the next step as data.
+- `nemia retry <run> <step> --message "…"` sends the step back with an objection, and it waits at its gate again.
+
+A gate can also be asked for when a run is started (`--gate <step>`), or on a card.
+
+## The landing
+
+The end of a run is a step too, its workflow's last: in a workflow that ships to a branch, that step stages the merge. It runs in the
+repository's own checkout (`workspace: main`), has a gate, and has a check.
+
+1. A person approves the gate.
+2. The step's agent stages the merge of the run's branch onto the base, without committing it, and signs off with the commit message.
+3. The run executes the check on the merged tree. On exit 0 it commits the merge; on any other exit it aborts it
+   (`landEnding` in `packages/agent-orchestrator/src/ending/ending.verb.ts`, on `landingDue`).
+
+Nothing in the packages knows what shipping means: another workflow's last step might open a pull request, or be a study a person
+accepts.
+
+## What a step may spend
+
+`budget` is in dollars: the most a step's tries may cost together, every try and every round. Past it, the step reads `over budget`,
+and the run files nothing more of it on its own word. A person raises the cap with `--budget` on `nemia retry` or `nemia round`. The
+cost is what the harness priced each attempt at, read by the runtime once the attempt has ended.
+
+## An example
+
+This repository's own team is a workflow, `workflows/build/`: design, then implement, then review looping back on implement, then
+land. Its steps are `workflows/build/design.md` (gated), `workflows/build/implement.md` (with a check that runs the whole suite),
+`workflows/build/review.md` (`loop: implement`, three rounds) and `workflows/build/land.md` (gated, in the checkout). It is this
+repository's, not something Nemia ships.
+
+## Sources
+
+This page is written from `packages/agent-orchestrator/README.md` (_The format_, _What a step may spend_, _The closeout_, _The check_,
+_Trying again_, _Going round again_, _The end of a run is a step_, _A gate_), and from `packages/agent-orchestrator/src/workflow.ts`
+and `packages/agent-orchestrator/src/workflow/step-file.ts`.

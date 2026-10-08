@@ -2,7 +2,8 @@
  * A remote A2A agent's session followed live (`a2a/remote-follow.ts`), against the SDK's own server over HTTP (`remote-server.ts`):
  * through the `Engine` at shipped defaults, each moment the agent's own stream carries handed to the follower once and in order, and
  * the transcript read under the same ids; and through the remote harness's ops with its bounds made short, what a stream that drops,
- * fails or says nothing comes to. An agent whose card does not say it streams refuses the follow, in words saying it is read again.
+ * fails or says nothing comes to. An agent whose card does not say it streams is followed by reading its Task whole, as is one whose
+ * stream keeps dropping; a send in doubt refuses the follow.
  */
 import { afterEach, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -157,16 +158,40 @@ for (const binding of BINDINGS)
   );
 
 test(
-  'REFUSED: an agent whose card does not say it streams is not subscribed to, and its session is read again every second',
+  'an agent whose card does not say it streams is not subscribed to, nor waited on as a stream that drops: its Task is read whole again and again, each event given once',
   WAITED,
   async (t) => {
     const s = await serve({ streaming: false });
-    const { e, id } = await runningOn(t, s);
-    const err = failure(await drained(await followed(e, id), []));
+    const ops = await opsOn(s, 'ae/unstreamed/1', { readEveryMs: 10, resubscribeMs: 600_000 });
+    const taskId = s.tasks()[0];
+    const got: Followed[] = [];
+    const ended = drained(ops.follow!('ae/unstreamed/1'), got);
+    await holds(t, got, 1);
+    s.move(taskId, { state: 'working', words: 'reading' });
+    await holds(t, got, 2);
+    s.move(taskId, { state: 'completed', words: 'done' });
+    const exit = await ended;
+    assert.ok(Exit.isSuccess(exit), `followed to its end: ${Exit.isFailure(exit) ? failure(exit).message : ''}`);
+    assert.deepEqual(shown(got), ['state working', 'events assistant "reading"', 'events assistant "done"', 'state completed']);
+    assert.equal(s.counts.resubscribe, undefined, 'never subscribed to');
+    assert.ok((s.counts.getTask ?? 0) >= 3, 'read whole, again and again');
+    assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
+  },
+);
+
+test(
+  `REFUSED: a Task that cannot be read ${RESUBSCRIBES + 1} times in a row, where the agent does not stream, says its session cannot be followed`,
+  WAITED,
+  async () => {
+    const s = await serve({ streaming: false });
+    const ops = await opsOn(s, 'ae/unread/1', { readEveryMs: 1 }, 100);
+    s.hanging.a2a = true;
+    const err = failure(await drained(ops.follow!('ae/unread/1'), []));
     assert.equal(err.refused, true);
-    assert.equal(err.message, "the `remote` agent's card does not say it streams: its transcript is read again every second instead.");
-    assert.equal(s.counts.resubscribe, undefined, 'nothing asked of the agent');
-    assert.equal((await Effect.runPromise(e.transcript(id))).events.length, 1, 'its transcript is read: the message it was sent');
+    assert.equal(
+      err.message,
+      `the \`remote\` agent's Task \`${s.tasks()[0]}\` could not be read ${RESUBSCRIBES + 1} times in a row (${s.url}/a2a/jsonrpc did not answer within 0.1 s): its session cannot be followed live, and a read of its transcript gives what is new.`,
+    );
   },
 );
 
@@ -208,21 +233,24 @@ const opsOn = async (s: RemoteServer, name: string, o: RemoteOptions = {}, reque
 };
 
 test(
-  `REFUSED: a stream refused ${RESUBSCRIBES} times again in a row leaves the session to be read again every second, saying why`,
+  `a stream refused ${RESUBSCRIBES} times again in a row is left: the Task is read whole every so often instead, to its end`,
   WAITED,
-  async () => {
+  async (t) => {
     const s = await serve();
-    const ops = await opsOn(s, 'ae/drops/1');
+    const ops = await opsOn(s, 'ae/drops/1', { readEveryMs: 10 });
+    const taskId = s.tasks()[0];
     s.subscriptions.refuse = true;
     const got: Followed[] = [];
-    const err = failure(await drained(ops.follow!('ae/drops/1'), got));
-    assert.equal(err.refused, true);
-    assert.equal(
-      err.message,
-      `the \`remote\` agent's stream of \`${s.tasks()[0]}\` dropped, and ${RESUBSCRIBES} subscriptions again in a row gave nothing new (the test refuses this subscription): its transcript is read again every second instead.`,
-    );
-    assert.equal(s.counts.resubscribe, RESUBSCRIBES + 1, 'the first subscription, then each again');
-    assert.deepEqual(shown(got), ['state working'], 'the Task read whole between them still said its state');
+    const ended = drained(ops.follow!('ae/drops/1'), got);
+    await until(t, () => s.counts.resubscribe === RESUBSCRIBES + 1, 'every subscription refused', { everyMs: 20 });
+    s.move(taskId, { state: 'working', words: 'reading' });
+    await holds(t, got, 2);
+    s.move(taskId, { state: 'completed', words: 'done' });
+    const exit = await ended;
+    assert.ok(Exit.isSuccess(exit), `followed to its end: ${Exit.isFailure(exit) ? failure(exit).message : ''}`);
+    assert.equal(s.counts.resubscribe, RESUBSCRIBES + 1, 'the first subscription, then each again, and none after');
+    assert.deepEqual(shown(got), ['state working', 'events assistant "reading"', 'events assistant "done"', 'state completed']);
+    assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
   },
 );
 
@@ -366,6 +394,26 @@ test(
 );
 
 test(
+  'REFUSED: a session still being sent whose send falls into doubt is `submitted`, then refused: there is no Task to follow',
+  WAITED,
+  async (t) => {
+    const s = await serve({ slowMs: 300 });
+    const ops = await opsOn(s, 'ae/doubt/1', { spawnWaitMs: 10, sendMs: 50 });
+    const got: Followed[] = [];
+    const ended = drained(ops.follow!('ae/doubt/1'), got);
+    await holds(t, got, 1);
+    const err = failure(await ended);
+    assert.equal(err.refused, true);
+    assert.equal(
+      err.message,
+      'the send of `ae/doubt/1` to the `remote` agent is in doubt: there is no Task to follow, and `logs` says why.',
+    );
+    assert.deepEqual(shown(got), ['state submitted']);
+    assert.equal(s.counts.resubscribe, undefined, 'no Task, so nothing subscribed to');
+  },
+);
+
+test(
   'a Task the agent no longer has ends the follow: not read again where it was never subscribed to, and not subscribed to again once read',
   WAITED,
   async (t) => {
@@ -423,6 +471,9 @@ for (const binding of BINDINGS)
       s.hanging.a2a = true;
       const err = failure(await drained(held.follow!('ae/held/1'), []));
       assert.equal(err.refused, true);
-      assert.match(err.message, /dropped, and 5 subscriptions again in a row gave nothing new \(.*did not answer within 0\.1 s\)/);
+      assert.match(
+        err.message,
+        /could not be read 6 times in a row \(.*did not answer within 0\.1 s\): its session cannot be followed live/,
+      );
     },
   );

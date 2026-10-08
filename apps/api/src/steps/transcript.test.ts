@@ -124,7 +124,7 @@ fs.writeFileSync(
     brief: 'Talk it through',
     workflowDir: path.join(root, 'no-such-workflow'),
     createdAt: at(0),
-    workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'live', 'gone', 'broken', 'flaky', 'vanishing', 'lost', 'review'].map(
+    workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'live', 'gone', 'broken', 'unpushed', 'unread', 'lost', 'review'].map(
       (name) => ({ name, after: [], body: `${name} it.` }),
     ),
     steps: {
@@ -137,8 +137,8 @@ fs.writeFileSync(
       live: { taskId: 't-live' },
       gone: { taskId: 't-gone' },
       broken: { taskId: 't-broken' },
-      flaky: { taskId: 't-flaky' },
-      vanishing: { taskId: 't-vanishing' },
+      unpushed: { taskId: 't-unpushed' },
+      unread: { taskId: 't-unread' },
       /** Filed, and the engine has no record of its task. */
       lost: { taskId: 't-lost' },
       review: { taskId: null },
@@ -395,8 +395,8 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
 });
 
 /**
- * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it: its steps are
- * read on a beat. Its runtime is let go once the test `t` ends.
+ * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it. Its runtime is
+ * let go once the test `t` ends.
  */
 function unstreamedApp(t: TestContext) {
   const unstreamed = {
@@ -409,82 +409,50 @@ function unstreamedApp(t: TestContext) {
 }
 
 test(
-  'a read that fails mid-stream on the beat of a harness that does not stream is said once and read again every second: following resumes from the same cursor, and ends settled',
+  'the stream of a live step whose session is not pushed sends `following` false and what it has said, then `unreadable`, never read again: it names the read that gives what is new, and closes',
   { timeout: 30_000 },
   async (t) => {
     const app = unstreamedApp(t);
-    const sessionId = runningTask('t-flaky');
+    const sessionId = runningTask('t-unpushed');
     const lines = conversation(sessionId);
     writeTranscript(sessionId, lines.slice(0, 4));
-    const res = await app.request(streamUrl('flaky'));
-    const reader = res.body!.getReader();
-    const text = { value: '' };
-    const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
-    assert.deepEqual(early[0], { event: 'following', data: JSON.stringify({ streamed: false }) }, 'read on a beat, not pushed');
-
-    const aside = `${journalFile('t-flaky')}.aside`;
-    fs.renameSync(journalFile('t-flaky'), aside);
-    fs.mkdirSync(journalFile('t-flaky'));
-    const failing = (await readUntil(reader, text, (said) => said.some((b) => b.event === 'unreadable'))).filter(
-      (b) => b.event === 'unreadable',
-    );
-    const { error, retrying } = JSON.parse(failing[0].data!);
-    assert.equal(
-      retrying,
-      true,
-      "the task's journal, a directory where the file was, cannot be read for a while: said as a read that will be tried again",
-    );
-    assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
-    const answered = await app.request(url('flaky'));
-    assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
-    assert.match(
-      ((await answered.json()) as { error: string }).error,
-      /^Could not read task t-flaky of step 'flaky': .*`nemia ls` reads the same record/,
-    );
-    await sleep(2_500);
-
-    fs.rmdirSync(journalFile('t-flaky'));
-    fs.renameSync(aside, journalFile('t-flaky'));
-    writeTranscript(sessionId, lines.slice(4));
-    await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
-    journal('t-flaky', ending('t-flaky', sessionId));
-    const said = await readUntil(reader, text, () => false);
-
-    assert.deepEqual(said.filter((b) => b.event === 'unreadable').length, 1, 'the failure is said once, however many beats it lasts');
-    const [unreadableAt, readableAt] = [said.findIndex((b) => b.event === 'unreadable'), said.findIndex((b) => b.event === 'readable')];
-    assert.ok(readableAt > unreadableAt, 'and cleared by `readable` once a read works');
-    assert.equal(said.filter((b) => b.event === 'readable').length, 1);
-    assert.deepEqual(
-      eventsIn(said),
-      (await Effect.runPromise(engine().transcript('t-flaky'))).events,
-      'every event, once each: read again from the cursor it had',
-    );
-    assert.equal(said.at(-1)?.event, 'settled');
-  },
-);
-
-test(
-  "a task that leaves the engine's record mid-stream on the beat of a harness that does not stream ends the stream: `unreadable`, not tried again, and never `settled`",
-  { timeout: 30_000 },
-  async (t) => {
-    const app = unstreamedApp(t);
-    const sessionId = runningTask('t-vanishing');
-    writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
-    const res = await app.request(streamUrl('vanishing'));
-    const reader = res.body!.getReader();
-    const text = { value: '' };
-    await readUntil(reader, text, (said) => eventsIn(said).length >= 1);
-    fs.rmSync(journalFile('t-vanishing'));
-    const said = await readUntil(reader, text, () => false);
+    const res = await app.request(streamUrl('unpushed'));
+    const said = await readUntil(res.body!.getReader(), { value: '' }, () => false);
+    assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: false }) }, 'not pushed');
+    assert.deepEqual(eventsIn(said), (await Effect.runPromise(engine().transcript('t-unpushed'))).events, 'what it has said, once each');
     const last = said.at(-1)!;
-    assert.equal(
-      last.event,
-      'unreadable',
-      'the read resolves only once the api closes the stream: one that went on trying would time the test out',
-    );
-    const { error, retrying } = JSON.parse(last.data!);
+    assert.equal(last.event, 'unreadable', 'the read resolves only once the api closes the stream: one read again would time the test out');
+    const { error, retrying } = JSON.parse(last.data!) as { error: string; retrying: boolean };
     assert.equal(retrying, false);
-    assert.match(error, /was filed as task t-vanishing, and the engine has no record of it/);
+    assert.equal(
+      error,
+      "Step 'unpushed' of run 'r-talk' runs a session that is not pushed as it is written: what it said so far is sent. GET /api/runs/r-talk/steps/unpushed/transcript?after=<the last id> gives what it says next.",
+    );
     assert.ok(!said.some((b) => b.event === 'settled'));
+
+    writeTranscript(sessionId, lines.slice(4));
+    const after = said.filter((b) => b.id !== undefined).at(-1)!.id!;
+    const next = (await (await app.request(url('unpushed', `?after=${encodeURIComponent(after)}`))).json()) as StepTranscript;
+    assert.deepEqual(
+      next.events.map((e) => e.id),
+      (await Effect.runPromise(engine().transcript('t-unpushed', after))).events.map((e) => e.id),
+      'the read it names gives what is new, from the id of the last event sent',
+    );
+    assert.ok(next.events.length > 0);
   },
 );
+
+test('a live task whose journal cannot be read is a 502 on the read and on the stream, which says where the same record is read', async (t) => {
+  const app = unstreamedApp(t);
+  runningTask('t-unread');
+  fs.rmSync(journalFile('t-unread'));
+  fs.mkdirSync(journalFile('t-unread'));
+  for (const route of [url('unread'), streamUrl('unread')]) {
+    const res = await app.request(route);
+    assert.equal(res.status, 502, `${route}: a directory where the journal should be, read before any stream opens`);
+    assert.match(
+      ((await res.json()) as { error: string }).error,
+      /^Could not read task t-unread of step 'unread': .*`nemia ls` reads the same record/,
+    );
+  }
+});

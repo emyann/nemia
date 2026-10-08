@@ -9,7 +9,7 @@
  * (`engineOf`), the orchestrator's own `Effect.fn` names, and the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`)
  * and their step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives. What a
  * step's Claude Code session sends, and what Tempo's span metrics write, are no code of ours: they are listed as measured, dated, and
- * the span metrics' dimensions and the collector's `command_head` are read from `tempo.yaml` and `otelcol.yaml`.
+ * the span metrics' dimensions and the collector's `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -73,8 +73,8 @@ const CLAUDE_SPANS = [
 
 /**
  * The attributes of those spans a dashboard reads beside a step's own, as measured: a tool call's name, and the task a
- * session runs as, one of the labels it is started with and copies onto its spans. `command_head` is the collector's
- * (`tools/observe/otelcol.yaml`).
+ * session runs as, one of the labels it is started with and copies onto its spans. `command_head` and `test_scope` are the
+ * collector's (`tools/observe/otelcol.yaml`).
  */
 const CLAUDE_SPAN_ATTRIBUTES = ['tool_name', 'task'];
 
@@ -631,6 +631,8 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
     ['Time', 'tempo', 'name="claude_code.llm_request"', 'name="claude_code.llm_call"', 'claude_code.llm_call'],
     ['Time', 'tempo', 'span.command_head', 'span.bash_head', 'bash_head'],
     ['Time', 'prometheus', 'sum by (command_head)', 'sum by (run)', 'run'],
+    ['Time', 'tempo', 'span.test_scope', 'span.bash_scope', 'bash_scope'],
+    ['Time', 'prometheus', 'sum by (test_scope)', 'sum by (bash_scope)', 'bash_scope'],
     ['Time', 'prometheus', 'traces_spanmetrics_latency_sum', 'traces_spanmetrics_duration_sum', 'traces_spanmetrics_duration_sum'],
   ];
   for (const [title, datasource, from, to, named] of cases)

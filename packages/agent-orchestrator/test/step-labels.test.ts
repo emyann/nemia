@@ -3,7 +3,8 @@
  * each of its sessions beside the task's id, by the same keys as its metrics (`stepAttributes`): a ready step, a try and a round alike,
  * walked through the runtime itself over an in-memory journal and a harness that keeps what it was asked to spawn. And the client's
  * `engine()` hands the runtime the collector the process exports to (`otlpOf`), and none when it exports nowhere; and asks its sessions
- * for their tools' inputs only when `NEMIA_TOOL_DETAILS` is `1` (`sessionTelemetryOf`), which a stub harness on PATH reads back.
+ * for their tools' inputs only when `NEMIA_TOOL_DETAILS` is `1` (`sessionTelemetryOf`), which a stub harness on PATH reads back, and
+ * says on stderr a value that asks nothing (`toolDetailsRefusalOf`).
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
@@ -249,15 +250,32 @@ require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(env));
   return JSON.parse(fs.readFileSync(seen, 'utf8')) as Record<string, string>;
 };
 
-test("the client's engine asks a session for its tools' details when NEMIA_TOOL_DETAILS is 1, and never by default", WAITED, async (t) => {
-  await t.test('asked', async (t) => {
-    const env = await jobTelemetry(t, '1');
-    assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
-    assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
-  });
-  await t.test('unset', async (t) => {
-    const env = await jobTelemetry(t, undefined);
-    assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
-    assert.equal(env.OTEL_LOG_TOOL_DETAILS, undefined);
-  });
-});
+test(
+  "the client's engine asks a session for its tools' details when NEMIA_TOOL_DETAILS is 1, never by default, and says a value that asks nothing",
+  WAITED,
+  async (t) => {
+    await t.test('asked', async (t) => {
+      const env = await jobTelemetry(t, '1');
+      assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
+      assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
+    });
+    await t.test('unset', async (t) => {
+      const env = await jobTelemetry(t, undefined);
+      assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
+      assert.equal(env.OTEL_LOG_TOOL_DETAILS, undefined);
+    });
+    await t.test('refused', async (t) => {
+      const said = t.mock.method(console, 'error', () => {});
+      const env = await jobTelemetry(t, 'true');
+      assert.equal(env.OTEL_LOG_TOOL_DETAILS, undefined);
+      assert.deepEqual(
+        said.mock.calls.map((c) => c.arguments).filter((a) => String(a[0]).includes('NEMIA_TOOL_DETAILS')),
+        [
+          [
+            'nemia: NEMIA_TOOL_DETAILS is "true", which asks nothing: set it to 1 for each session to export its tools\' inputs, or unset it. Their tools\' details are left off.',
+          ],
+        ],
+      );
+    });
+  },
+);

@@ -1860,7 +1860,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
   `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
   (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
-  `LANDING_CHECK_DEADLINE_SECONDS` (longer than a round's: the e2e runs on the merged tree), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
+  `LANDING_CHECK_DEADLINE_SECONDS` (measured on its own: the whole suite and the e2e on the merged tree, and no mutant), `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
   `landEnding` in `ending/ending.verb.ts` acts through the place's `land`), commits the merge with the message on exit 0 or
   aborts it on anything else: a refusal, a check that did not finish, a message left blank, a merge that
@@ -3566,7 +3566,7 @@ holding a concurrency slot forever.
 | `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |
 | `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
-| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun` and `acceptRun`; `hold` and `unhold` |
+| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun`, `acceptRun`, `hold` and `unhold` |
 | `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and what it would forget of the engine's tasks of each run, counted dry for `wf prune` (`runsForgetting`) |
 | `src/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), and by the tick for what had not settled (`finishForgetting`); asked dry by `runsForgetting` (`engineForgetting`) |
 | `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |

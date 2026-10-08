@@ -23,7 +23,9 @@
  * does the store's inbox, for a step whose `reads:` names it (`readsMounts`): read-only, in any mode, and to no other step.
  *
  * Agora, the reviewer, asks git's read-only questions by its own allow, whatever the settings say, and runs no git write (`GIT_QUESTIONS`,
- * `GIT_WRITES`, `runs`); every git question its skill names is one that allow reaches (`askedGit`).
+ * `GIT_WRITES`, `runs`); every git question its skill names is one that allow reaches (`askedGit`). It is refused the whole suite its
+ * round's check already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
+ * (`SCOPED_TESTS`).
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
@@ -992,6 +994,37 @@ test('every git question review-a-change names is one Agora asks by its own allo
   assert.ok(asked.length >= 7, `review-a-change names its git questions: ${asked.join(', ')}`);
   const calls = asked.map((command) => ({ tool: 'Bash', command }) as const);
   assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
+});
+
+/** The whole suite in the spellings a session types: what implement's check already ran on the round's tree. */
+const WHOLE_SUITE: Call[] = [
+  'npx turbo run test --force --continue',
+  'npx turbo run test',
+  'npx turbo run test --force',
+  'npx turbo run test --continue',
+  'npx turbo run test --continue --force',
+  'npm test',
+  'timeout 900 npx turbo run test --force --continue',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** A package's tests and a file's, which a reviewer runs where a finding needs a run to stand on. */
+const SCOPED_TESTS: Call[] = [
+  'npx turbo run test --force --continue --filter=agent-orchestrator',
+  'npx turbo run test --filter=web --force',
+  'node --test test/a.test.ts',
+].map((command) => ({ tool: 'Bash', command }));
+
+test("Agora is refused the whole suite by its own deny, and runs a package's tests and a file's", () => {
+  const agora = shippedStepOf('agora');
+  assert.deepEqual(runs(agora, WHOLE_SUITE), []);
+  assert.deepEqual(runs(agora, SCOPED_TESTS), SCOPED_TESTS.map(shown));
+});
+
+test("REFUSED: Agora without its denies of the whole suite, read from its file as a run reads it, runs each the settings' allow reaches", () => {
+  const agora = shippedStepOf('agora');
+  const whole = new Set(WHOLE_SUITE.map(shown));
+  const open = { ...agora, disallowedTools: (agora.disallowedTools ?? []).filter((rule) => !whole.has(rule)) };
+  assert.deepEqual(runs(open, WHOLE_SUITE), WHOLE_SUITE.map(shown));
 });
 
 test("REFUSED: a git question review-a-change names that Agora's own allow does not reach is named", () => {

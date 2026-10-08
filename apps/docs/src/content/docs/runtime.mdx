@@ -1,0 +1,112 @@
+---
+title: The runtime
+description: Tasks, attempts and harnesses; the engine that reconciles them; a job and a long-lived session; and how a queued task is admitted.
+---
+
+The runtime runs one agent session on one harness, durably, and knows nothing else. It is `packages/agent-runtime`, and its command
+is `ae`. Everything this page names lives there.
+
+**It owns** how a session runs: the brief and the harness it runs on, its command, its mounts, its deadline, its restarts, the
+journal of each task and its attempts, and admitting queued tasks under a ceiling.
+
+**It never touches** a second workload. Anything that knows about two sessions, such as "implement, then review", a board, a gate or a
+budget across tries, is the layer above: the orchestrator. The runtime's own README calls this the place where it stops
+(`packages/agent-runtime/README.md`, _Where this stops_).
+
+**It is reached through** two entries: `agent-runtime` (`packages/agent-runtime/src/index.ts`) and `agent-runtime/vocabulary`
+(`packages/agent-runtime/src/vocabulary.ts`), the harnesses' words with nothing that reads or writes. The orchestrator reaches it
+through one client, `packages/agent-orchestrator/src/runtime-client.ts`.
+
+## A task
+
+A task is a brief filed to run on a harness. It is the runtime's unit of work: what you ask for, written down before anything runs. A
+task carries its brief, the folder it runs in, the harness, and the harness's own arguments in one object, its `config`
+(`HarnessArgs`, in `packages/agent-runtime/src/harness/args.ts`). The runtime hands `config` to the harness without opening it.
+
+## An attempt
+
+An attempt is one start of a task's session. The runtime starts one attempt per start, and whatever ends it settles the task:
+`succeeded` when the harness ended it done, `failed` when it failed, was lost, could not start or ran out of time, and `stopped` when
+someone asked it to stop.
+
+Nothing in the runtime tries again. Whether to try again, and whether to continue the same conversation or start clean, is a judgement
+about the work, so it belongs to the caller. A caller that wants to continue files the task again with `resumeFrom`, naming the session
+to continue. In a workflow, the orchestrator does that.
+
+## A harness
+
+A harness is the program a session runs in. The runtime has four of its own, chosen per task: `claude` (Claude Code), `codex`,
+`claude-detached`, and `command`, a plain process. A remote agent at an address is a fifth kind. Every one of them is reached the same
+way, over A2A (see [A2A](/a2a/)). A harness of your own is declared with a `HarnessSpec`.
+
+## The engine
+
+The engine is the loop that makes each task happen. It compares two things:
+
+- **What you asked for**, which is the journal: one append-only file per task, an event a line, written by the runtime alone.
+- **What the machine is doing**, which is what the harness lists: the sessions it holds, and what each is doing.
+
+The two are joined by a name the runtime chooses, `ae/<task>/<attempt>`, which every session is given when it starts. On each pass the
+engine reads both, asks one pure function, `decide` (`packages/agent-runtime/src/core/domain.ts`), for the one thing to do, and does
+it. Nothing else is decided anywhere: `decide` is the runtime's whole judgement.
+
+**The engine never holds a session.** A job runs in a process the engine detaches, and a long-lived session is handed to the harness.
+Either way the session outlives the engine, so the engine can be stopped, upgraded or restarted in the middle of a three-hour session
+and pick it up on its next pass.
+
+**It is level-triggered.** A pass reads the world, decides and acts, and carries nothing to the next pass. `tick` is one pass, and
+`up` is `tick` on a timer. That one-shot `tick` can drive a task to its end is the proof that no state hides in the process
+(`packages/agent-runtime/README.md`, _`tick` and `up`, and why both_).
+
+## A job and a long-lived session
+
+A task is a **job** by default: its session runs to its end, and the task settles on that end. A workflow's steps are jobs.
+
+A task filed with `restartPolicy` set to `Always`, and `background` in its `config`, is a **long-lived session**: it stays open between
+turns, and only a stop ends it. Between turns it is idle (`idleOf`): nothing is done and nobody is asked anything. `say` gives it its
+next words. If it ends when no one asked it to stop, it is started again on the same conversation, after a back-off of 10 seconds,
+doubled for each end in a row, at most 300 seconds. [Nemia](/nemia/) runs this way.
+
+## Admission
+
+A task filed `queued` waits for a word before it starts. Two things can give that word:
+
+- **`admit`**, a word given by name (`ae admit <id>`).
+- **The engine itself, under its ceiling.** `maxConcurrent` says how many sessions of each pool may work at once. When a slot is
+  free, it goes to the waiting task with the highest `priority`, then to the earliest filed, then to the lower id. Nothing running is
+  stopped for a waiting task. This choice is one pure function, `toAdmit` (`packages/agent-runtime/src/core/admission.ts`).
+
+An engine can be `unschedulable`, as a Kubernetes node can: while it says so, nothing queued starts, and what is at work goes on. The
+orchestrator files every step's task queued, with its run's momentum as the priority, and hands the engine its ceiling.
+
+**A call's admission is another thing.** A task's `callAdmission` names a command that is asked before some of its session's tool
+calls, and answers allow, ask the person, or deny (`packages/agent-runtime/src/harness/admission.ts`). It is about one call inside a
+running session, not about whether a task starts. [Nemia](/nemia/#what-she-is-allowed-to-do) is fenced this way.
+
+## The lifecycle of a task
+
+A task moves along this statechart. Its states are A2A's task states, plus `starting`, `stopping` and `ending`, the runtime's own. It
+is drawn from its code, `packages/agent-runtime/src/core/lifecycle.ts`, which `decide` uses as a function and never runs.
+
+```mermaid diagram=lifecycle
+
+```
+
+Read it this way:
+
+- A task is `submitted`, waits while it is queued, then goes through `starting` to `working` once its session is spawned.
+- A session that ends goes to `ending`, where the attempt's end is recorded, and the task settles `completed`, `failed` or `canceled`.
+- A task held open for a person waits in `input-required` (`holdOpen`) until the person answers or closes it.
+- A person's stop sends a task to `stopping`, and it settles `canceled` once nothing is left open.
+
+The guards in brackets decide between two edges of one event: `holds` sends a held task to wait on a person, `live` stops a session
+still running past its deadline, and `lastDone`, `endedDone` and `endedStopped` choose the end a task settles on. A person's verbs,
+`requestStop`, `answer` and `close`, are declared beside the machine (`VERBS`), since no pass takes them.
+
+## Sources
+
+This page is written from `packages/agent-runtime/README.md` (_Where this stops_, _Admission_, _One attempt per start_, _The model_,
+_The lifecycle: a statechart used as a function_, _Queued and admitted_, _A long-lived session_, _`tick` and `up`, and why both_), and
+from `packages/agent-runtime/src/core/domain.ts`, `packages/agent-runtime/src/core/lifecycle.ts`,
+`packages/agent-runtime/src/core/engine/engine.ts`, `packages/agent-runtime/src/core/admission.ts` and
+`packages/agent-runtime/src/harness/args.ts`.

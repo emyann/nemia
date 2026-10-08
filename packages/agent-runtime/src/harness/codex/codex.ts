@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
-import { CODEX_START, codexOutput } from './stream.ts';
+import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
 import { CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
@@ -106,6 +106,8 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
  * line that does not decode leaves that session unread while it runs, and failed once it has ended — and the conversation from Codex's
  * own rollout of the thread rather than the stream: the rollout dates every record, and `exec --json` dates none. Its `start` is
  * the stream's `thread.started`, whose `thread_id` the worker reads as the session's id, which a resume and the rollout are found by.
+ * Its worker keeps stdout apart (`streams`), so a session is followed live (`follow`): its state, then its rollout's events as Codex
+ * writes them, each message whole (`codexPartials`), its stdout decoded as it comes.
  */
 export const codex: HarnessSpec = {
   name: 'codex',
@@ -160,6 +162,8 @@ export const codex: HarnessSpec = {
     return undefined;
   },
   readOutput: codexOutput,
+  streams: true,
+  partials: codexPartials,
   transcript: { file: codexRolloutFile, events: codexRolloutEvents },
   noChannel:
     '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.',

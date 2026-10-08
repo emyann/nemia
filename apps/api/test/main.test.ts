@@ -8,6 +8,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { MetricRead } from '../src/factory/ceilings.ts';
+import { OPENED } from '../src/factory/feed.ts';
 import { DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
 import { scratch } from './scratch.ts';
 
@@ -341,7 +342,10 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
     if (done) assert.fail(`the stream ended before the run's line:\n${said}\n${api.output()}`);
     said += new TextDecoder().decode(value);
   }
-  assert.match(said, /^event: daemon\n/, "the stream opens on the daemon's started line, written before the api listened");
+  assert.ok(
+    said.startsWith(`${OPENED}event: daemon\n`),
+    `the stream opens, after its comment, on the daemon's started line, written before the api listened:\n${said}`,
+  );
   assert.equal(
     (await metricOf(url, 'feed.follow.reads'))?.count,
     reads,

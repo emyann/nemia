@@ -17,8 +17,11 @@ docker compose -f tools/observe/compose.yaml down -v    # down, and drop what it
 
 What it stores (traces, logs, metrics, profiles, Grafana's own database) lives in the volume `nemia-observe_data`, mounted on `/data`.
 Traces are kept 14 days (`336h`, written out in `tempo.yaml`) and metrics 90 (`PROMETHEUS_EXTRA_ARGS` in `compose.yaml`). A stack made
-before a change to `compose.yaml`, `tempo.yaml` or `otelcol.yaml` takes it with `docker compose -f tools/observe/compose.yaml up -d`,
-which recreates the container and keeps the volume.
+before a change to `compose.yaml` takes it with `docker compose -f tools/observe/compose.yaml up -d`, which recreates the container and
+keeps the volume. A change to `tempo.yaml` or `otelcol.yaml`, which are bind-mounted, is taken only with `docker compose -f
+tools/observe/compose.yaml up -d --force-recreate`: compose's config hash does not see a mounted file's contents, so `up -d` alone says
+the container is running and recreates nothing. `docker compose restart` fails on WSL, where Docker Desktop's bind mount of a file is
+not found again, and leaves the stack stopped; `up -d --force-recreate` brings it back.
 
 Open Grafana at <http://localhost:3000>: it lets anyone on this machine in as an admin, with no login. It lands on **System**.
 
@@ -97,21 +100,21 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   journals with their task and kind, and its logs, by step. The orchestrator's `fileReady`, `fileTries`, `fileRounds` and `fileChecks`
   spans carry no run: they are a pass's phases, under its `advancePass`.
 - **Steps** — tokens and denied calls by step and agent. Its note links to **Time** for the steps and the range it shows.
-- **Time** — where a step's time goes. **One run's step**, from Tempo: pick a run (and a session, `task`), and its turns' time is the
-  sum of their leaves — the model (`claude_code.llm_request`), each tool by name, Bash by its command's head — beside the turns' own
-  length, with **Other** the turns' time no leaf covers, so the bars add up to the turns; the time waiting on a permission is shown as
-  part of the tools'; and the run's queue, checks (by verdict) and gates, as span tables. **A step across runs**, from Prometheus: the
-  same over the range, by factory, workflow, step and agent, from Tempo's span metrics, beside the daemon's step time (`step_duration`),
-  its queue, checks and gates, a trend of the leaves, and **Unmeasured**: the steps with time but no session spans, a Codex step today.
-  **A run** links to it for its run.
+- **Time** — where a step's time goes. **One run's step**, from Tempo: pick a run (and a session, `task`), and its turns' time is the sum of
+  their leaves — the model (`claude_code.llm_request`), each tool by name, Bash by its command's head — beside the turns' own length, with
+  **Other** the turns' time no leaf covers, so the bars add up to the turns; the time waiting on a permission is shown as part of the
+  tools'; **Tests by scope**, Bash time by what its test command ran; and the run's queue, checks (by verdict) and gates, as span tables.
+  **A step across runs**, from Prometheus: the same over the range, by factory, workflow, step and agent, from Tempo's span metrics, beside
+  the daemon's step time (`step_duration`), its queue, checks and gates, **Tests by scope**, a trend of the leaves, and **Unmeasured**: the
+  steps with time but no session spans, a Codex step today. **A run** links to it for its run.
 
-`packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log
-field the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler
-does not send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, and a server-side
-expression reading a query its panel has not. What a session sends and what the span metrics write are no code of ours: the test lists
-them as measured below. `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head over a table of commands,
-the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with
-no endpoint, nothing loaded and nothing opened.
+`packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log field
+the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler does not
+send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, and a server-side expression reading a
+query its panel has not. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
+`agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
+the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
+endpoint, nothing loaded and nothing opened.
 
 ## Timing a step
 
@@ -130,10 +133,20 @@ is counted once, as its Agent tool.
 - **The command head** (`otelcol.yaml`, a transform the collector runs before its batch) gives each Bash `claude_code.tool` span that
   carries its command a `command_head`: past a leading `cd <dir> &&`, `NAME=value` words and the wrappers `timeout` (its flags and
   duration), `nohup`, `time` and `npx`, the first word, a second after a command of subcommands (`npm`, `git`, `turbo`, `docker`…), and
-  a third after its `run`; a flag, path, quote, `$`, `=` or the next line ends it. `npx turbo run test --force` is `turbo run test`,
-  `git commit -m "…"` is `git commit`, and a command it does not read, `./run.sh`, is `other`. No argument gets in, so it is a label.
-- **Span metrics** (Tempo's generator) keep span time by factory, workflow, step, agent, span type, `tool_name`, `bash_command_class` and
-  `command_head`, never by a run or a task, and leave a subagent's spans out (`agent_id`). They are written as
+  a third after the `run` of a package runner (`npm`, `pnpm`, `yarn`, `turbo`) alone; a flag, path, quote, `$`, `=` or the next line
+  ends it. `npx turbo run test --force` is `turbo run test`, `docker run postgres:16-alpine` is `docker run`, `git commit -m "…"` is
+  `git commit`, and a command it does not read, `./run.sh`, is `other`. No argument gets in, so it is a label.
+- **The test scope** (`otelcol.yaml`, a second transform, after the head) gives the same spans a `test_scope`, what a test command ran:
+  `suite` (`turbo run test`, or `npm test` from the root), `package` (with `--filter`, `-F`, `-w` or `--workspace`, or after a `cd` into
+  `packages/<name>` or `apps/<name>`), `files` (`node --test`), `e2e: all` (`npm run e2e`) or `e2e: pages` (with `--pages`). It is read
+  at any command of the line, not only the head, so `npm run build && npm run e2e -- --pages time` is `e2e: pages`; a flag counts only
+  in its own command, and the last statement that matches wins. Each value is a literal, so no package, file or page name gets in; a
+  command that runs no tests has none. A `cd` counts only when the test command comes right after it, joined by `&&` or `;`: `cd
+  packages/agent-runtime; npm test` and `cd packages/agent-orchestrator && npx turbo run test --force` are `package`, and `cd apps/web
+  && cd ../.. && npx turbo run test` is `suite`. It reads the text, not the shell: a bare `npm test` in a package's folder after an
+  earlier `cd` is `suite`.
+- **Span metrics** (Tempo's generator) keep span time by factory, workflow, step, agent, span type, `tool_name`, `bash_command_class`,
+  `command_head` and `test_scope`, never by a run or a task, and leave a subagent's spans out (`agent_id`). They are written as
   `traces_spanmetrics_latency_{bucket,count,sum}` (seconds), `traces_spanmetrics_calls_total` and `traces_spanmetrics_size_total`, each
   labelled `service`, `span_name`, `span_kind` and `status_code` beside the dimensions.
 - **A session sends a span when it ends**, so a turn arrives minutes after it began. Tempo's generator keeps span time for a span that

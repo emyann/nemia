@@ -79,7 +79,7 @@ test('nemia ls lists each schedule with its next fire and last run, and a kept r
   assert.deepEqual(scheduleLines([], clock), []);
 });
 
-test("nemia ls says each fire and run as the instant and how far off it is, and lists the schedules after the runs", async () => {
+test('nemia ls says each fire and run as the instant and how far off it is, and lists the schedules after the runs', async () => {
   const { lsLines } = await import('../list/list.ts');
   const now = Date.parse('2026-10-08T12:00:00Z');
   assert.equal(fireWord('2026-10-12T13:00:00.000Z', now), '2026-10-12T13:00:00.000Z, in 4d01h');

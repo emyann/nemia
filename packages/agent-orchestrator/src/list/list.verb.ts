@@ -20,7 +20,7 @@ import { stepsOf, stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
-import { schedulesListed } from '../schedule/schedule.verb.ts';
+import { schedulesListed } from '../schedule/listed.store.ts';
 import {
   closeoutAsked,
   closeoutOf,
@@ -188,7 +188,13 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
   const read = standing.at === undefined ? { none: true as const } : { at: standing.at };
   const schedules = runId ? [] : schedulesListed(runs);
-  return { runs: listed, daemon: daemonStanding(), standing: read, ...paused, ...(schedules.length ? { schedules } : {}) } satisfies RunsListed;
+  return {
+    runs: listed,
+    daemon: daemonStanding(),
+    standing: read,
+    ...paused,
+    ...(schedules.length ? { schedules } : {}),
+  } satisfies RunsListed;
 });
 
 /** The run's result branches (`resultBranches`); none for a run whose unfrozen folder does not load, which cannot say its result steps. */

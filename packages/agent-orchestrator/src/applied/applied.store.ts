@@ -3,7 +3,8 @@
  * (`treeDir`), the person's once seeded; `applied/`, the template as last rendered, read-only, the base an upgrade will merge from
  * (`appliedDir`); and `status.json`, what the controller last observed (`readStatus`, `writeStatus`). The tree's wiring, `factory.json`, is
  * read and written whole here (`readTreeWiring`, `writeTreeWiring`) for the factory's verbs; a folder is staged whole beside its place and
- * renamed onto it, so no reader sees half of one (`stageFolder`).
+ * renamed onto it, so no reader sees half of one (`stageFolder`), and swapped whole for an upgrade (`swapTree`, `replaceBase`); the person's
+ * choices for an upgrade's conflicts are `resolutions.json` (`readResolutions`, `writeResolutions`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,9 +82,20 @@ const ConditionSchema = Schema.Struct({
   message: Schema.String,
 });
 
+/** A side of a conflict as the status keeps it: its text, cut, or null where that side has none. */
+const SideSchema = Schema.NullOr(Schema.String);
+
+/** An upgrade waiting on the person: the version it is from and to, and each conflict still without a choice, its sides cut. */
+const UpgradeSchema = Schema.Struct({
+  from: Schema.String,
+  to: Schema.String,
+  conflicts: Schema.Array(Schema.Struct({ at: Schema.String, base: SideSchema, ours: SideSchema, theirs: SideSchema })),
+});
+
 /**
  * What the controller observed of a templated factory: the template's version its base holds, the base's digest, the parameters it was
- * rendered with, and its conditions, `Applied` and `ConflictsPending`; a key a later `nemia` writes is kept.
+ * rendered with, its conditions, `Applied` and `ConflictsPending`, and the upgrade waiting on the person's choices, where one does; a key a
+ * later `nemia` writes is kept.
  */
 const StatusSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -91,6 +103,7 @@ const StatusSchema = Schema.StructWithRest(
     digest: Schema.NullOr(Schema.String),
     params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
     conditions: Schema.Array(ConditionSchema),
+    upgrade: Schema.optionalKey(UpgradeSchema),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -148,29 +161,90 @@ export function entriesIn(dir: string, under = ''): Entry[] {
   });
 }
 
+/** `entries` written into a hidden folder beside `dir`, each file with its mode, made read-only where `readOnly`; the hidden folder. */
+function hiddenFolder(dir: string, entries: readonly Entry[], readOnly: boolean): string {
+  fs.mkdirSync(path.dirname(dir), { recursive: true });
+  const hidden = path.join(path.dirname(dir), `.${path.basename(dir)}.${process.pid}.${randomBytes(4).toString('hex')}`);
+  for (const entry of entries) {
+    const at = path.join(hidden, entry.path);
+    fs.mkdirSync(path.dirname(at), { recursive: true });
+    fs.writeFileSync(at, entry.bytes);
+    const mode = entry.mode ?? 0o644;
+    fs.chmodSync(at, readOnly ? mode & 0o555 : mode | 0o200);
+  }
+  fs.mkdirSync(hidden, { recursive: true });
+  return hidden;
+}
+
 /**
  * The folder `dir` made of `entries`, staged whole in a hidden folder beside it and renamed onto it, each file with its mode, made
  * read-only where `readOnly`; false, nothing changed, where `dir` is there already, so a pass that lost the race leaves the winner's.
  */
 export function stageFolder(dir: string, entries: readonly Entry[], readOnly: boolean): boolean {
   if (fs.existsSync(dir)) return false;
-  fs.mkdirSync(path.dirname(dir), { recursive: true });
-  const hidden = path.join(path.dirname(dir), `.${path.basename(dir)}.${process.pid}.${randomBytes(4).toString('hex')}`);
+  let hidden: string | undefined;
   try {
-    for (const entry of entries) {
-      const at = path.join(hidden, entry.path);
-      fs.mkdirSync(path.dirname(at), { recursive: true });
-      fs.writeFileSync(at, entry.bytes);
-      const mode = entry.mode ?? 0o644;
-      fs.chmodSync(at, readOnly ? mode & 0o555 : mode | 0o200);
-    }
-    fs.mkdirSync(hidden, { recursive: true });
+    hidden = hiddenFolder(dir, entries, readOnly);
     fs.renameSync(hidden, dir);
     return true;
   } catch (err) {
     if (fs.existsSync(dir)) return false;
     throw err;
   } finally {
-    fs.rmSync(hidden, { recursive: true, force: true });
+    if (hidden) fs.rmSync(hidden, { recursive: true, force: true });
   }
 }
+
+/**
+ * The folder `dir` there now replaced by one made of `entries`: staged whole beside it, the old one renamed aside, the new one renamed in,
+ * the old one removed. Where `unless` is given, nothing is changed, and false is said, if `dir` no longer digests to it by then: a write
+ * made since it was read is never lost.
+ */
+function swapFolder(dir: string, entries: readonly Entry[], readOnly: boolean, unless?: string): boolean {
+  const hidden = hiddenFolder(dir, entries, readOnly);
+  const aside = `${hidden}.old`;
+  try {
+    if (unless !== undefined && digestOf(entriesIn(dir)) !== unless) return false;
+    fs.renameSync(dir, aside);
+    fs.renameSync(hidden, dir);
+    return true;
+  } finally {
+    fs.rmSync(hidden, { recursive: true, force: true });
+    fs.rmSync(aside, { recursive: true, force: true });
+  }
+}
+
+/** The tree of the factory `name` replaced by `entries`, unless it no longer digests to `read`, what the merge read: whether it was. */
+export const swapTree = (name: string, entries: readonly Entry[], read: string): boolean => swapFolder(treeDir(name), entries, false, read);
+
+/** The base of the factory `name` replaced by `entries`, read-only: the template as now applied. */
+export const replaceBase = (name: string, entries: readonly Entry[]): void => void swapFolder(appliedDir(name), entries, true);
+
+/** The person's choices for an upgrade's conflicts: the version they are for, and a choice by address. */
+const ResolutionsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    to: Schema.String,
+    choices: Schema.Record(Schema.String, Schema.Union([Schema.Literals(['ours', 'theirs']), Schema.Struct({ text: Schema.String })])),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
+/** The person's choices for an upgrade, as they read. */
+export type Resolutions = typeof ResolutionsSchema.Type;
+
+/** The file of the person's choices for the factory `name`'s upgrade, written by `nemia factory resolve` alone. */
+export const resolutionsFile = (name: string): string => path.join(folderOf(name), 'resolutions.json');
+
+/** The person's choices for the factory `name`'s upgrade, or none where there are none or they do not read. */
+export function readResolutions(name: string): Resolutions | undefined {
+  try {
+    const decoded = Schema.decodeUnknownResult(ResolutionsSchema)(JSON.parse(fs.readFileSync(resolutionsFile(name), 'utf8')));
+    return Result.isSuccess(decoded) ? decoded.success : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The person's choices for the factory `name`'s upgrade written whole. */
+export const writeResolutions = (name: string, resolutions: Resolutions): void =>
+  writeWhole(resolutionsFile(name), `${JSON.stringify(resolutions, null, 2)}\n`);

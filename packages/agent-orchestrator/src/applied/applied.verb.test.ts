@@ -210,7 +210,7 @@ test('a template moved to another version is drift: the base and tree are left a
     type: 'Applied',
     status: 'False',
     reason: 'VersionDrift',
-    message: `The template is at version 0.2.0, and drifted was applied at 0.1.0: its base and tree are left as they are until upgrades come. Put the template back at 0.1.0, or apply it again under another name.`,
+    message: `The template is at version 0.2.0, and drifted was applied at 0.1.0: its base and tree are left as they are. Put the template back at 0.1.0, or upgrade to 0.2.0: nemia factory plan drifted --to 0.2.0, then nemia factory upgrade drifted --to 0.2.0.`,
   });
   assert.equal(status.digest, first.digest);
   assert.doesNotMatch(fs.readFileSync(path.join(treeDir('drifted'), 'workflows/dev/review.md'), 'utf8'), /^rounds: 5$/m);
@@ -235,7 +235,7 @@ test("parameters changed in the factory's file, or the template's files changed 
     status: 'False',
     reason: 'ParamsChanged',
     message:
-      "The parameters in moved's file differ from those its base was rendered with: its base and tree are left as they are until upgrades come.",
+      "The parameters in moved's file differ from those its base was rendered with: its base and tree are left as they are. Put them back, or upgrade with them to the template's next version: nemia factory plan moved --to <version>, then nemia factory upgrade moved --to <version>.",
   });
   assert.deepEqual([changed.digest, changed.params], [first.digest, first.params]);
   assert.match(review(appliedDir('moved')), /^budget: 7$/m);

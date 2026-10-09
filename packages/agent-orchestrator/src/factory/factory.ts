@@ -113,7 +113,18 @@ export function factoryNameRefusal(name: string): string | undefined {
 }
 
 /** A verb of `nemia factory` that writes a factory's file. */
-export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire' | 'instruction' | 'instruct' | 'schedule' | 'unschedule';
+export type FactoryWrite =
+  | 'add'
+  | 'rm'
+  | 'attach'
+  | 'detach'
+  | 'hire'
+  | 'fire'
+  | 'instruction'
+  | 'instruct'
+  | 'schedule'
+  | 'unschedule'
+  | 'upgrade';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -127,6 +138,7 @@ const INSTEAD: Record<FactoryWrite, string> = {
   instruct: 'It keeps no instruction: write one for a factory nemia factory ls lists.',
   schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
+  upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
 };
 
 /** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */

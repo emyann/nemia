@@ -181,3 +181,13 @@ test('REFUSED: a confirm or a drop of a rule is asked every time, at auto and wi
     /^nemia auto confirm nemia tries is yours, asked every time/,
   );
 });
+
+test("REFUSED: a factory's apply, upgrade and resolve are asked every time, at auto and with no list; its plan is a read", () => {
+  for (const line of [
+    'nemia factory apply made --template /t --repo /r',
+    'nemia factory upgrade made --to 0.2.0',
+    "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
+  ])
+    for (const auto of [undefined, atAuto([DEFAULT_AUTO, TRIES])]) assert.equal(decidedAt(line, auto), 'ask', line);
+  assert.equal(decidedAt('nemia factory plan made --to 0.2.0', atAuto([DEFAULT_AUTO])), undefined, 'the plan is no ask');
+});

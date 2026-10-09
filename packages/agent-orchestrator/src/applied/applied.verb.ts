@@ -130,6 +130,15 @@ function appliedOf(factory: Factory & { template: FactoryTemplate }, base: strin
   );
 }
 
+/** The `Applied` condition of a base that is not the template rendered now, where no status names the version it was applied at. */
+const unknownOf = ({ name, template }: Factory & { template: FactoryTemplate }): Condition =>
+  condition(
+    'Applied',
+    false,
+    'VersionUnknown',
+    `${name}'s base is not ${template.source} at ${template.version}, and no status names the version it was applied at: its base and tree are left as they are. Name that version, nemia factory upgrade ${name} --to <it> [--template <folder|archive>], and the next pass checks it against the base.`,
+  );
+
 /** The conditions of a factory whose base holds the template as an upgrade merged it, the tree holding the merge. */
 const upgraded = (factory: Factory & { template: FactoryTemplate }, version: string): Condition[] => [
   condition(
@@ -200,6 +209,19 @@ function upgradePass(factory: Factory & { template: FactoryTemplate }, now: Rend
   return status;
 }
 
+/** The `Applied` condition of a pass that merges nothing: the render's problem, else a version no status names, else `appliedOf`'s. */
+function observedOf(
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt | Condition,
+  digest: string | null,
+  version: string | null,
+  last: Status | undefined,
+): Condition {
+  if ('type' in now) return now;
+  if (digest !== null && version === null) return unknownOf(factory);
+  return appliedOf(factory, digest ?? '', now, last);
+}
+
 /** Whether the last status says the base it holds now came by an upgrade to `version`. */
 const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
   last?.version === version && last.conditions.some((c) => c.type === 'Applied' && c.reason === 'Upgraded');
@@ -207,7 +229,7 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
 /**
  * One templated factory brought to its template: its base rendered where absent, then its tree seeded from its base where absent, an
  * upgrade merged where one is due (`upgradePass`), and its status written where it changed. The version its base holds is the template's
- * wherever the base is its render, else the one last written. The status it observed.
+ * wherever the base is its render, else the one last written, else unknown, said by its own condition. The status it observed.
  */
 export function reconcileFactory(factory: Factory & { template: FactoryTemplate }): Status {
   const now = readTemplate(factory);
@@ -219,14 +241,15 @@ export function reconcileFactory(factory: Factory & { template: FactoryTemplate 
   if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last))
     return upgradePass(factory, now, base, last as Status & { version: string });
   const current = !('type' in now) && digest === digestOf(now.entries);
+  const version = base.length ? (current ? now.version : (last?.version ?? null)) : null;
   const status: Status = {
-    version: base.length ? (current ? now.version : (last?.version ?? factory.template.version)) : null,
+    version,
     digest,
     params: current ? factory.template.params : (last?.params ?? factory.template.params),
     conditions:
       current && cameByUpgrade(last, now.version)
         ? upgraded(factory, now.version)
-        : ['type' in now ? now : appliedOf(factory, digest ?? '', now, last), NO_CONFLICTS],
+        : [observedOf(factory, now, digest, version, last), NO_CONFLICTS],
   };
   writeStatus(factory.name, status);
   return status;

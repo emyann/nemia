@@ -30,8 +30,14 @@ import { compareVersions, compose, mergeTrees, planLines, resolveLine, type Choi
 /** A factory made from a template. */
 type Templated = Factory & { template: FactoryTemplate };
 
-/** What an upgrade to `to` is asked of: the factory, the version its base holds, the template's source, and its render at `to`. */
-type Asked = { factory: Templated; from: string; to: string; source: string; render: RenderedAt; base: Entry[] };
+/**
+ * What an upgrade to `to` is asked of: the factory, the version its base holds where a status names it, the template's source, and its
+ * render at `to`.
+ */
+type Asked = { factory: Templated; from: string | undefined; to: string; source: string; render: RenderedAt; base: Entry[] };
+
+/** The version a base holds where no status names it, as the plan and the upgrade print it. */
+const UNKNOWN = 'a version no status names';
 
 const HERE = { side: 'cli', why: 'a template is a folder on the machine nemia runs on; the board upgrades none' } as const;
 
@@ -45,22 +51,21 @@ const textOf = (args: Args, key: string): string | undefined => {
 const VERSION = /^\d+\.\d+\.\d+$/;
 
 /**
- * The templated factory `name`, rendered once: the version its base holds. Refused: the factory, one made from no template, one not
- * rendered.
+ * The templated factory `name`, rendered once: its base, and the version it holds where its status names it. Refused: the factory, one
+ * made from no template, one not rendered.
  */
-function rendered(name: string, verb: string, notDone: string): { factory: Templated; from: string; base: Entry[] } {
+function rendered(name: string, verb: string, notDone: string): { factory: Templated; from: string | undefined; base: Entry[] } {
   const factory = readFactory(name, notDone);
   if (factory.template === undefined)
     throw new Invalid({
       message: `${verb}: ${name} is not made from a template, so it has none to upgrade; nemia factory apply makes one from a template. ${notDone}`,
     });
-  const from = readStatus(name)?.version;
   const base = entriesIn(appliedDir(name));
-  if (typeof from !== 'string' || !base.length)
+  if (!base.length)
     throw new Conflict({
       message: `${verb}: ${name} is not rendered yet, so there is no base to merge with: start the daemon, nemia up, and try again once nemia factory ls shows it applied. ${notDone}`,
     });
-  return { factory: factory as Templated, from, base };
+  return { factory: factory as Templated, from: readStatus(name)?.version ?? undefined, base };
 }
 
 /**
@@ -89,7 +94,8 @@ function renderTo(verb: string, factory: Templated, source: string, to: string, 
  * The upgrade of the factory `args` name to `--to`, as `verb` asks it, refused in order before anything is written: the factory, one made
  * from no template (`Invalid`) and one not rendered (`Conflict`); a `--to` that is no `x.y.z` (`Invalid`); a template at another version
  * than `--to` (`Conflict`, naming `--template`); the version its base holds asked again, the same content or another (`Conflict`); a
- * downgrade without `--downgrade` where `downgrades` (`Conflict`); and a template that does not render (`Invalid`).
+ * downgrade without `--downgrade` where `downgrades` (`Conflict`); and a template that does not render (`Invalid`). Where no status
+ * names the version its base holds, any `--to` is taken: the controller checks it against the base.
  */
 function upgradeAsked(args: Args, verb: string, notDone: string, downgrades = true): Asked {
   const { factory, from, base } = rendered(textOf(args, 'factory') ?? '', verb, notDone);
@@ -108,7 +114,7 @@ function upgradeAsked(args: Args, verb: string, notDone: string, downgrades = tr
           ? `${verb}: ${factory.name} is already applied at ${to}: its base holds the template at ${to}. ${notDone}`
           : `${verb}: ${factory.name} was applied at ${to}, and the template at ${to} now renders other content: a template changed under the same version is no upgrade — give it a new version, then ${verb} ${factory.name} --to <it>. ${notDone}`,
     });
-  if (downgrades && compareVersions(to, from) < 0 && args.downgrade !== true)
+  if (downgrades && from !== undefined && compareVersions(to, from) < 0 && args.downgrade !== true)
     throw new Conflict({
       message: `${verb}: ${to} is below ${from}, the version ${factory.name} was applied at: a downgrade is asked with --downgrade, ${verb} ${factory.name} --to ${to} --downgrade. ${notDone}`,
     });
@@ -147,7 +153,7 @@ const PLAN_SPEC: Spec = {
 };
 
 /** What `nemia factory plan` previews: the factory, the versions, and the merge. */
-type Planned = { name: string; from: string; to: string; merge: TreeMerge };
+type Planned = { name: string; from: string | undefined; to: string; merge: TreeMerge };
 
 /** `nemia factory plan`: the merge an upgrade would make, what merges cleanly and each conflict; nothing written. */
 export const FACTORY_PLAN: Command<Planned> = {
@@ -164,7 +170,7 @@ export const FACTORY_PLAN: Command<Planned> = {
       const { factory, from, to, render, base } = upgradeAsked(args, 'nemia factory plan', 'Nothing was written.', false);
       return { name: factory.name, from, to, merge: mergeOf(factory.name, base, render) };
     }),
-  print: ({ name, from, to, merge }) => planLines(name, from, to, merge),
+  print: ({ name, from, to, merge }) => planLines(name, from ?? UNKNOWN, to, merge),
 };
 
 /** `nemia factory upgrade`'s spec: the factory, `--to`, `--template` and `--downgrade`. */
@@ -179,7 +185,7 @@ const UPGRADE_SPEC: Spec = {
 };
 
 /** What `nemia factory upgrade` filed: the factory, the versions, its file, and the conflicts the merge waits on. */
-type Upgraded = { name: string; from: string; to: string; file: string; conflicts: number };
+type Upgraded = { name: string; from: string | undefined; to: string; file: string; conflicts: number };
 
 /** `nemia factory upgrade`: the version wanted written into the factory's file; the daemon merges it. */
 export const FACTORY_UPGRADE: Command<Upgraded> = {
@@ -205,7 +211,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
       return { name: factory.name, from, to, file, conflicts };
     }),
   print: ({ name, from, to, file, conflicts }) => [
-    `${name}: ${from} → ${to}`,
+    `${name}: ${from ?? UNKNOWN} → ${to}`,
     `filed: ${file}`,
     conflicts
       ? `${conflicts} conflict${conflicts === 1 ? '' : 's'} wait for a choice: nemia factory plan ${name} --to ${to} shows each, and nemia factory resolve its line; the daemon merges once each has one`
@@ -237,13 +243,13 @@ const RESOLVE_SPEC: Spec = {
     'nemia factory resolve takes the factory and the conflict, as nemia factory plan names it: nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>.',
 };
 
-/** The person's choice the resolve `args` give: ours, theirs, or the text of `--file`, refused where it is not there (`Missing`). */
+/** The person's choice the resolve `args` give: ours, theirs, or the text of `--file`, refused where it is not there (`Invalid`). */
 function choiceOf(args: Args): Choice {
   if (args.ours === true) return 'ours';
   if (args.theirs === true) return 'theirs';
   const file = path.resolve(textOf(args, 'file') ?? '');
   if (!fs.existsSync(file) || !fs.statSync(file).isFile())
-    throw new Missing({
+    throw new Invalid({
       message: `nemia factory resolve: there is no file at ${file} to resolve the conflict with. Nothing was resolved.`,
     });
   return { text: fs.readFileSync(file, 'utf8') };
@@ -254,14 +260,18 @@ type Resolved = { name: string; at: string; to: string; file: string; left: stri
 
 /**
  * The choice `args` give, written for one conflict of the upgrade under way. Refused, nothing written: the factory as an upgrade is
- * (`rendered`); no upgrade under way, or a template that no longer renders at the version wanted (`Conflict`); an address that is no
- * conflict of the merge (`Invalid`, naming those there are); and a `--file` that is not there (`Missing`).
+ * (`rendered`); a base whose version no status names, no upgrade under way, or a template that no longer renders at the version wanted (`Conflict`); an address that is no
+ * conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there (`Invalid`).
  */
 function resolved(args: Args): Resolved {
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
   const { factory, from, base } = rendered(textOf(args, 'factory') ?? '', verb, notDone);
   const to = factory.template.version;
+  if (from === undefined)
+    throw new Conflict({
+      message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
+    });
   if (to === from)
     throw new Conflict({
       message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory plan ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
@@ -269,7 +279,7 @@ function resolved(args: Args): Resolved {
   const merge = mergeOf(factory.name, base, renderTo(verb, factory, factory.template.source, to, notDone));
   const at = textOf(args, 'conflict') ?? '';
   if (!merge.conflicts.some((c) => c.at === at))
-    throw new Invalid({
+    throw new Missing({
       message: `${verb}: ${at} is no conflict of ${factory.name}'s upgrade to ${to}; ${merge.conflicts.length ? `its conflicts: ${merge.conflicts.map((c) => c.at).join(', ')}` : 'it has none'} (nemia factory plan ${factory.name} --to ${to}). ${notDone}`,
     });
   const choice = choiceOf(args);

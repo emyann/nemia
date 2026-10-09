@@ -244,10 +244,10 @@ test('conflicts wait for a choice with only the status written; resolve writes e
   assert.deepEqual(readStatus('clash'), waiting);
 
   const resolve = (...rest: string[]) => main(['factory', 'resolve', 'clash', ...rest], NO_ENGINE);
-  await assert.rejects(resolve('nowhere.md', '--ours'), refusedWith('Invalid', /nowhere\.md is no conflict[^]*its conflicts: /));
+  await assert.rejects(resolve('nowhere.md', '--ours'), refusedWith('Missing', /nowhere\.md is no conflict[^]*its conflicts: /));
   await assert.rejects(resolve(`${REVIEW}#rounds`), refusedWith('Invalid', /takes one choice/));
   await assert.rejects(resolve(`${REVIEW}#rounds`, '--ours', '--theirs'), refusedWith('Invalid', /takes one choice/));
-  await assert.rejects(resolve(`${REVIEW}#rounds`, '--file', path.join(dir, 'gone.md')), refusedWith('Missing', /no file at/));
+  await assert.rejects(resolve(`${REVIEW}#rounds`, '--file', path.join(dir, 'gone.md')), refusedWith('Invalid', /no file at/));
   assert.ok(!fs.existsSync(resolutionsFile('clash')), 'a refused resolve writes nothing');
 
   assert.match((await printedBy(t, 'factory', 'resolve', 'clash', `${REVIEW}#rounds`, '--theirs'))[1], /^1 conflict still wait/);
@@ -309,6 +309,36 @@ test('choices made for another version are not merged, and the next resolve drop
   );
 });
 
+test('a status lost while an upgrade waits leaves the version unknown, and an upgrade naming the base version brings it back', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('lost');
+  const old = path.join(scratch('wf-upgrade-old-'), 'team');
+  fs.cpSync(dir, old, { recursive: true });
+  released(dir, '0.2.0', 5);
+  await main(['factory', 'upgrade', 'lost', '--to', '0.2.0'], NO_ENGINE);
+  fs.rmSync(statusFile('lost'));
+  const tree = bytesUnder(treeDir('lost'));
+  const base = bytesUnder(appliedDir('lost'));
+  const unknown = reconcileFactory(templated('lost'));
+  assert.equal(unknown.version, null, 'the base is not the render, and no status names its version');
+  assert.deepEqual([unknown.conditions[0].status, unknown.conditions[0].reason], ['False', 'VersionUnknown']);
+  assert.match(unknown.conditions[0].message, /nemia factory upgrade lost --to <it>/);
+  assert.deepEqual(bytesUnder(treeDir('lost')), tree, 'the tree is left as it is');
+  assert.deepEqual(bytesUnder(appliedDir('lost')), base, 'and the base');
+  await assert.rejects(
+    main(['factory', 'resolve', 'lost', `${REVIEW}#rounds`, '--ours'], NO_ENGINE),
+    refusedWith('Conflict', /no status names the version lost's base was applied at/),
+  );
+
+  await main(['factory', 'upgrade', 'lost', '--to', '0.1.0', '--template', old], NO_ENGINE);
+  const named = reconcileFactory(templated('lost'));
+  assert.deepEqual([named.version, named.conditions[0].reason], ['0.1.0', 'Rendered']);
+  await main(['factory', 'upgrade', 'lost', '--to', '0.2.0', '--template', dir], NO_ENGINE);
+  const merged = reconcileFactory(templated('lost'));
+  assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
+  assert.match(textIn(treeDir('lost'), REVIEW), /^rounds: 5$/m);
+});
+
 test('the tree is swapped only where no one wrote it since the merge read it', async (t) => {
   t.mock.method(console, 'log', () => {});
   await applied('raced');
@@ -339,7 +369,10 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
     if (renamingIn(from, to)) throw Object.assign(new Error('EIO: i/o error, rename'), { code: 'EIO' });
     rename(from, to);
   });
-  assert.throws(() => swapTree('stuck', merge, digestOf(entriesIn(treeDir('stuck')))), (err: Error) => /EIO/.test(err.message));
+  assert.throws(
+    () => swapTree('stuck', merge, digestOf(entriesIn(treeDir('stuck')))),
+    (err: Error) => /EIO/.test(err.message),
+  );
   failing.mock.restore();
   assert.deepEqual(bytesUnder(treeDir('stuck')), tree, "the person's tree is put back whole");
   assert.deepEqual(fs.readdirSync(path.join(FACTORIES, 'stuck')).sort(), ['applied', 'status.json', 'tree']);

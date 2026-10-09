@@ -227,7 +227,7 @@ function putBack(aside: string, dir: string, failed: Error): void {
   } catch (err) {
     throw new Error(
       `${dir} could not be replaced (${failed.message}), nor put back (${(err as Error).message}): what it held is kept in ${aside}; move it back onto ${dir} by hand.`,
-      { cause: failed },
+      { cause: err },
     );
   }
 }

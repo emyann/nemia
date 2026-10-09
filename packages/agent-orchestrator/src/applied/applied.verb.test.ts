@@ -98,7 +98,7 @@ test('apply refuses a key not declared, a value of the wrong type and a required
   await assert.rejects(apply('refused', dir, repo), refusedWith('Invalid', /budget has no default, and no --set gives it/));
   await assert.rejects(
     main(['factory', 'apply', 'refused', '--repo', repo], NO_ENGINE),
-    refusedWith('Invalid', /name its folder with --template <folder>/),
+    refusedWith('Invalid', /name its folder or archive with --template <folder\|archive>/),
   );
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
   await assert.rejects(
@@ -166,7 +166,32 @@ test("the controller renders the base read-only and seeds the tree once; a secon
   assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
 });
 
-test('a template moved to another version is drift: the base and tree are left as they are, and Applied says so', async (t) => {
+test('a template packed into an archive applies as its folder does, each file read off the archive, its mode kept', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir, repo } = template();
+  const script = 'skills/implement-a-change/scripts/run.sh';
+  fs.mkdirSync(path.dirname(path.join(dir, script)), { recursive: true });
+  fs.writeFileSync(path.join(dir, script), '#!/bin/sh\necho run\n', { mode: 0o755 });
+  const archive = path.join(scratch('wf-applied-archive-'), 'team.tgz');
+  await main(['template', 'pack', dir, '--out', archive], NO_ENGINE);
+  fs.rmSync(dir, { recursive: true });
+  await apply('packed', archive, repo, '--set', 'budget=7');
+  assert.deepEqual(templated('packed').template, { source: archive, version: '0.1.0', params: { budget: 7, model: 'opus' } });
+  const status = reconcileFactory(templated('packed'));
+  assert.deepEqual(status.conditions[0], {
+    type: 'Applied',
+    status: 'True',
+    reason: 'Rendered',
+    message: `The base holds ${archive} at 0.1.0; the tree is yours to change.`,
+  });
+  assert.match(fs.readFileSync(path.join(treeDir('packed'), 'workflows', 'dev', 'review.md'), 'utf8'), /^budget: 7$/m);
+  const copied = path.join(treeDir('packed'), 'workflows', script);
+  assert.equal(fs.readFileSync(copied, 'utf8'), '#!/bin/sh\necho run\n');
+  assert.equal(fs.statSync(copied).mode & 0o111, 0o111, 'a copied file keeps the mode the archive holds');
+  assert.deepEqual(reconcileFactory(templated('packed')), status, 'a second pass reads the archive to the same base');
+});
+
+test('a template moved to another version is drift:the base and tree are left as they are, and Applied says so', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('drifted', dir, repo, '--set', 'budget=7');

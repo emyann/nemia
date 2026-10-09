@@ -1,20 +1,25 @@
 /**
  * A template's folder on disk: `nemia template export` of the tests' team into a folder that passes `nemia template check`, what it
- * writes read back as it was written, what it refuses with nothing written, and each problem of a folder at its file and line. `WF_ROOT`
- * is set before the import, since the store's modules read it as they load.
+ * writes read back as it was written, what it refuses with nothing written, and each problem of a folder at its file and line; and
+ * `nemia template pack` and `unpack`, the folder back byte for byte with its modes, an archive checked as its folder, and every refusal
+ * with nothing written. `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { parse } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
+import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
+import { packArchive } from '../archive/archive.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
-const { checkTemplateAt, exportTemplate, problemLine } = await import('./template.store.ts');
+const { checkTemplateAt, exportTemplate, packTemplate, problemLine, readTemplate, unpackTemplate } = await import('./template.store.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { instructionOf } = await import('./template.verb.ts');
@@ -280,10 +285,197 @@ test('nemia template check prints that a folder passes, and refuses one that doe
   } finally {
     log.mock.restore();
   }
-  assert.deepEqual(printed, [`${dir} passes`]);
+  assert.deepEqual(printed, [`${dir} passes`, `digest of the content: ${readTemplate(dir).digest}`]);
+  assert.match(printed[1], /^digest of the content: sha256:[0-9a-f]{64}$/);
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
   await assert.rejects(
     main(['template', 'check', dir], promised({})),
     refusedWith('Invalid', /does not pass, with 1 problem:\nnemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
   );
+});
+
+/** The files under `dir`, each with its mode and its bytes in hex, by path from it. */
+function filesOf(dir: string, under = ''): Array<[string, number, string]> {
+  return fs
+    .readdirSync(path.join(dir, under), { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : 1))
+    .flatMap((entry): Array<[string, number, string]> => {
+      const file = under ? `${under}/${entry.name}` : entry.name;
+      const at = path.join(dir, file);
+      if (entry.isDirectory()) return filesOf(dir, file);
+      return [[file, fs.statSync(at).mode & 0o777, fs.readFileSync(at).toString('hex')]];
+    });
+}
+
+/** The tests' team exported to a folder named `team`, with a script of mode 0755 and a file of all 256 bytes. */
+function exported(): string {
+  const dir = target();
+  const repo = repoWithTeam();
+  fs.writeFileSync(path.join(repo, 'workflows', 'skills', 'review-a-change', 'look.sh'), '#!/bin/sh\n', { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(repo, 'workflows', 'skills', 'review-a-change', 'data.bin'),
+    Uint8Array.from({ length: 256 }, (_, i) => i),
+  );
+  exportTemplate({ dir, from: repo });
+  return dir;
+}
+
+test('a folder packs into <name>-<version>.tgz, and unpacks into <dir>/<name> byte for byte with its modes, one digest for all three', () => {
+  const dir = exported();
+  const cwd = scratch('wf-template-pack-');
+  const { out, digest } = packTemplate({ dir, cwd });
+  assert.equal(out, path.join(cwd, 'team-0.1.0.tgz'));
+  assert.deepEqual(fs.readdirSync(cwd), ['team-0.1.0.tgz'], 'no staged file is left beside it');
+  const parent = path.join(scratch('wf-template-unpack-'), 'new');
+  const unpacked = unpackTemplate({ archive: out, dir: parent });
+  assert.deepEqual(unpacked, { dir: path.join(parent, 'team'), digest });
+  assert.deepEqual(fs.readdirSync(parent), ['team'], 'no staged folder is left beside it');
+  assert.deepEqual(filesOf(unpacked.dir), filesOf(dir));
+  assert.ok(filesOf(dir).some(([file, mode]) => file === 'skills/review-a-change/look.sh' && mode === 0o755));
+  assert.deepEqual(checkTemplateAt(out), []);
+  assert.deepEqual(checkTemplateAt(unpacked.dir), []);
+  assert.deepEqual([readTemplate(dir).digest, readTemplate(out).digest, readTemplate(unpacked.dir).digest], [digest, digest, digest]);
+  assert.equal(packTemplate({ dir, out: 'again.tgz', cwd }).digest, digest);
+  assert.deepEqual(fs.readFileSync(path.join(cwd, 'again.tgz')), fs.readFileSync(out), 'the same folder packs to the same bytes');
+});
+
+test("the system's tar opens an archive into the same files and modes as unpack writes", () => {
+  const dir = exported();
+  const { out } = packTemplate({ dir, cwd: scratch('wf-template-pack-') });
+  const byTar = scratch('wf-template-tar-');
+  execFileSync('tar', ['-xzf', out, '-C', byTar], { stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.deepEqual(fs.readdirSync(byTar), ['team']);
+  assert.deepEqual(filesOf(path.join(byTar, 'team')), filesOf(dir));
+});
+
+test('pack refuses a folder that does not pass, at its line, and an --out that is there, and writes nothing', () => {
+  const dir = exported();
+  const cwd = scratch('wf-template-pack-');
+  const manifest = path.join(dir, 'nemia.yaml');
+  const text = fs.readFileSync(manifest, 'utf8');
+  fs.writeFileSync(manifest, text.replace('v1alpha1', 'v2'));
+  assert.throws(
+    () => packTemplate({ dir, cwd }),
+    refusedWith('Invalid', /was not packed, since it does not pass:\n {2}nemia\.yaml:1:\d+: apiVersion/),
+  );
+  assert.deepEqual(fs.readdirSync(cwd), []);
+  fs.writeFileSync(manifest, text);
+  fs.writeFileSync(path.join(cwd, 'mine.tgz'), 'mine');
+  assert.throws(() => packTemplate({ dir, out: 'mine.tgz', cwd }), refusedWith('Conflict', /mine\.tgz is there already/));
+  assert.equal(fs.readFileSync(path.join(cwd, 'mine.tgz'), 'utf8'), 'mine');
+  assert.deepEqual(fs.readdirSync(cwd), ['mine.tgz']);
+  assert.throws(() => packTemplate({ dir: path.join(cwd, 'mine.tgz'), cwd }), refusedWith('Missing', /is no folder/));
+});
+
+test('pack refuses a version that names no file where --out names none, and writes nothing in its folder or outside it', () => {
+  const dir = exported();
+  const manifest = path.join(dir, 'nemia.yaml');
+  const text = fs.readFileSync(manifest, 'utf8');
+  const outer = scratch('wf-template-outer-');
+  const cwd = path.join(outer, 'a', 'b');
+  fs.mkdirSync(cwd, { recursive: true });
+  for (const version of ['1/../../x', '1.0/x', '..', '1\\x']) {
+    fs.writeFileSync(manifest, text.replace(/version: .*/, `version: ${JSON.stringify(version)}`));
+    assert.deepEqual(checkTemplateAt(dir), [], `${version} passes the check`);
+    assert.throws(
+      () => packTemplate({ dir, cwd }),
+      refusedWith('Invalid', /names no file, and pack names its archive <name>-<version>\.tgz[^]*or name the archive with --out/),
+      version,
+    );
+    assert.deepEqual(fs.readdirSync(cwd), [], version);
+    assert.deepEqual(fs.readdirSync(outer), ['a'], version);
+    assert.deepEqual(fs.readdirSync(path.join(outer, 'a')), ['b'], version);
+  }
+  assert.equal(packTemplate({ dir, out: 'named.tgz', cwd }).out, path.join(cwd, 'named.tgz'), '--out names it whatever the version');
+});
+
+test('unpack refuses a <dir>/<name> that holds files or is no folder, and leaves it as it was', () => {
+  const { out } = packTemplate({ dir: exported(), cwd: scratch('wf-template-pack-') });
+  const parent = scratch('wf-template-unpack-');
+  fs.mkdirSync(path.join(parent, 'team'));
+  fs.writeFileSync(path.join(parent, 'team', 'mine.txt'), 'mine');
+  assert.throws(
+    () => unpackTemplate({ archive: out, dir: parent }),
+    refusedWith('Conflict', /team holds files already, and unpack writes/),
+  );
+  assert.deepEqual(fs.readdirSync(path.join(parent, 'team')), ['mine.txt']);
+  const beside = scratch('wf-template-unpack-');
+  fs.writeFileSync(path.join(beside, 'team'), 'mine');
+  assert.throws(() => unpackTemplate({ archive: out, dir: beside }), refusedWith('Conflict', /team is there, and is no folder/));
+  assert.equal(fs.readFileSync(path.join(beside, 'team'), 'utf8'), 'mine');
+  assert.throws(() => unpackTemplate({ archive: path.join(beside, 'none.tgz'), dir: beside }), refusedWith('Missing', /is no file/));
+});
+
+test('export refuses a folder that is a file, and leaves it as it was', () => {
+  const dir = target();
+  fs.writeFileSync(dir, 'mine');
+  assert.throws(() => exportTemplate({ dir, from: repoWithTeam() }), refusedWith('Conflict', /team is there, and is no folder: export/));
+  assert.equal(fs.readFileSync(dir, 'utf8'), 'mine');
+});
+
+test('unpack refuses an archive whose entry climbs out of its folder, and writes nothing at all', () => {
+  const archive = path.join(scratch('wf-template-evil-'), 'evil.tgz');
+  fs.writeFileSync(
+    archive,
+    gzipSync(
+      rawTar([
+        { name: 'team/nemia.yaml', body: 'a' },
+        { name: 'team/../escape', body: 'pwned' },
+        { name: 'team/x', body: 'b' },
+      ]),
+    ),
+  );
+  const parent = scratch('wf-template-unpack-');
+  assert.throws(
+    () => unpackTemplate({ archive, dir: parent }),
+    refusedWith('Invalid', /evil\.tgz was refused, and nothing was written:\n {2}team\/\.\.\/escape: has a part/),
+  );
+  assert.deepEqual(fs.readdirSync(parent), [], 'no escape, no team, no staged folder');
+  assert.equal(fs.existsSync(path.join(path.dirname(parent), 'escape')), false);
+});
+
+test('check reads an archive as the folder it holds, every problem at its line; and refuses what is neither folder nor file', async () => {
+  const dir = exported();
+  const manifest = path.join(dir, 'nemia.yaml');
+  fs.writeFileSync(manifest, fs.readFileSync(manifest, 'utf8').replace('v1alpha1', 'v2'));
+  const { files } = readTemplate(dir);
+  const archive = path.join(scratch('wf-template-pack-'), 'bad.tgz');
+  fs.writeFileSync(archive, packArchive('team', files).archive);
+  await assert.rejects(
+    main(['template', 'check', archive], promised({})),
+    refusedWith('Invalid', /bad\.tgz does not pass, with 1 problem:\nnemia\.yaml:1:\d+: apiVersion is "nemia\.dev\/v2"/),
+  );
+  await assert.rejects(
+    main(['template', 'check', path.join(dir, 'none')], promised({})),
+    refusedWith('Missing', /is neither a folder nor a file: name a template's folder[^]*or an archive/),
+  );
+});
+
+test('a folder entry that is neither a file nor a folder is refused by name, never read', () => {
+  const dir = exported();
+  execFileSync('mkfifo', [path.join(dir, 'workflows', 'dev', 'pipe.yaml')], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const problems = checkTemplateAt(dir);
+  assert.deepEqual(
+    problems.map((p) => [p.file, p.message]),
+    [['workflows/dev/pipe.yaml', 'workflows/dev/pipe.yaml is neither a file nor a folder, and a template holds files: remove it.']],
+  );
+});
+
+test('nemia template pack and unpack print what they wrote, the digest of its content, and how to check it', async (t) => {
+  const dir = exported();
+  const out = path.join(scratch('wf-template-pack-'), 'shared.tgz');
+  const parent = scratch('wf-template-unpack-');
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+    printed.push(args.join(' '));
+  });
+  try {
+    await main(['template', 'pack', dir, '--out', out], promised({}));
+    await main(['template', 'unpack', out, parent], promised({}));
+  } finally {
+    log.mock.restore();
+  }
+  const digest = `digest of the content: ${readTemplate(dir).digest}`;
+  const team = path.join(parent, 'team');
+  assert.deepEqual(printed, [`written: ${out}`, digest, `written: ${team}`, digest, `check it: nemia template check ${team}`]);
 });

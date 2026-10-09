@@ -85,6 +85,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory rm', 'cli'],
       ['template check', 'cli'],
       ['template export', 'cli'],
+      ['template pack', 'cli'],
+      ['template unpack', 'cli'],
       ['retry', { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 }],
       ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
       ['round', { method: 'POST', path: '/api/runs/:runId/round', status: 202 }],

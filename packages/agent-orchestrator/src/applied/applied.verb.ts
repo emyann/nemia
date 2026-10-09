@@ -15,7 +15,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { addFactory, factoryRepos, readFactories } from '../factory/factory.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
-import { checkTemplateAt, problemLine, templateAt } from '../template/template.store.ts';
+import { openTemplate, problemLine } from '../template/template.store.ts';
 import type { FactorySpec } from '../template/index.ts';
 import {
   appliedDir,
@@ -38,13 +38,13 @@ export type RenderedAt = { version: string; params: Params; entries: Entry[] };
 const setsOf = (params: FactoryTemplate['params']): string[] => Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
 
 /**
- * The template in `source` rendered with `params`, each `<key>=<value>`, or why it is not: its problems (`nemia template check`), a
- * parameter refused (`resolveParams`) and what the render refuses (`renderFactory`), every one a line. Nothing is written.
+ * The template at `source`, a folder or an archive, rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it
+ * is not: its problems (`nemia template check`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`),
+ * every one a line. Nothing is written.
  */
 export function renderedAt(source: string, sets: readonly string[]): RenderedAt | { problems: string[] } {
-  const problems = checkTemplateAt(source);
-  if (problems.length) return { problems: problems.map(problemLine) };
-  const read = templateAt(source, path.basename(path.resolve(source)));
+  const read = openTemplate(source);
+  if (read.problems.length) return { problems: read.problems.map(problemLine) };
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
   const { params, refusals } = resolveParams(spec.parameters ?? {}, sets);
   if (refusals.length) return { problems: refusals };
@@ -53,8 +53,8 @@ export function renderedAt(source: string, sets: readonly string[]): RenderedAt 
   const entries: Entry[] = [
     ...rendered.files.map((file) => ({ path: file.path, bytes: Buffer.from(file.text) })),
     ...rendered.copies.map((copy) => {
-      const from = path.join(source, copy.from);
-      return { path: copy.path, bytes: fs.readFileSync(from), mode: fs.statSync(from).mode & 0o777 };
+      const from = read.file(copy.from);
+      return { path: copy.path, bytes: Buffer.from(from.bytes), mode: from.mode };
     }),
   ];
   return { version: spec.version, params, entries };
@@ -184,7 +184,7 @@ const manyOf = (args: Args, key: string): string[] => {
   return Array.isArray(value) ? value.map(String) : [];
 };
 
-/** `nemia factory apply`'s spec: the factory's name, its template's folder, one `--repo` at least and a `--set` per parameter. */
+/** `nemia factory apply`'s spec: the factory's name, its template (a folder or an archive), a `--repo` or more, a `--set` a parameter. */
 const APPLY_SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
   flags: [
@@ -192,7 +192,8 @@ const APPLY_SPEC: Spec = {
       flag: '--template',
       kind: 'text',
       key: 'template',
-      takes: "--template takes the template's folder, the one that holds its nemia.yaml: nemia factory apply <name> --template <folder>",
+      takes:
+        "--template takes the template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <folder|archive>",
       twice: 'nemia factory apply takes --template once: a factory is made from one template.',
     },
     {
@@ -200,7 +201,8 @@ const APPLY_SPEC: Spec = {
       kind: 'text',
       key: 'repos',
       many: true,
-      takes: "--repo takes a repository's directory: nemia factory apply <name> --template <folder> --repo <path> [--repo <path> ...]",
+      takes:
+        "--repo takes a repository's directory: nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...]",
     },
     {
       flag: '--set',
@@ -212,10 +214,10 @@ const APPLY_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory apply does not take ${arg}. It takes the name, --template <folder>, --repo <path> once per repository and --set <key>=<value> once per parameter.`
-      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <folder> --repo <path>.`,
+      ? `nemia factory apply does not take ${arg}. It takes the name, --template <folder|archive>, --repo <path> once per repository and --set <key>=<value> once per parameter.`
+      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <folder|archive> --repo <path>.`,
   missing:
-    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <folder> --repo <path> [--set <key>=<value> ...].",
+    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <folder|archive> --repo <path> [--set <key>=<value> ...].",
 };
 
 /** What `nemia factory apply` filed: the factory, its repositories, its file, the template it was made from, and the tree it runs from. */
@@ -231,7 +233,7 @@ function applied(args: Args): Applied {
   const given = textOf(args, 'template');
   if (given === undefined)
     throw new Invalid({
-      message: `nemia factory apply makes a factory from a template: name its folder with --template <folder>. Nothing was filed.`,
+      message: `nemia factory apply makes a factory from a template: name its folder or archive with --template <folder|archive>. Nothing was filed.`,
     });
   const repos = factoryRepos(name, manyOf(args, 'repos'));
   const source = path.resolve(given);
@@ -248,7 +250,7 @@ function applied(args: Args): Applied {
 /** `nemia factory apply`: a factory filed from a template; the daemon renders its tree. */
 export const FACTORY_APPLY: Command<Applied> = {
   name: 'factory apply',
-  usage: '<name> --template <folder> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]',
+  usage: '<name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]',
   help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
   spec: APPLY_SPEC,
   check: (args) => leftOut(APPLY_SPEC, args),

@@ -12,7 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 import { teamCopy } from '../../test/team.ts';
 
 process.env.WF_ROOT = scratch('wf-render-');
-const { exportTemplate, templateAt } = await import('../template/template.store.ts');
+const { exportTemplate, openTemplate } = await import('../template/template.store.ts');
 const { loadWorkflows } = await import('../folder/folder.store.ts');
 const { renderFactory, resolveParams } = await import('./index.ts');
 
@@ -27,7 +27,7 @@ function exported(): { repo: string; dir: string } {
 
 /** The template `dir` rendered with `sets`, written into a new tree. */
 function rendered(dir: string, sets: string[] = []): { tree: string; out: ReturnType<typeof renderFactory> } {
-  const read = templateAt(dir, path.basename(dir));
+  const read = openTemplate(dir);
   const manifest = read.folder.documents.get('nemia.yaml') as { spec: { parameters?: Record<string, never> } };
   const out = renderFactory(read, resolveParams(manifest.spec.parameters ?? {}, sets).params);
   const tree = scratch('wf-render-tree-');
@@ -79,6 +79,19 @@ test("the tests' team, exported and rendered, loads as the team loads, its hires
   assert.equal(
     fs.readFileSync(path.join(tree, 'workflows/dev/README.md'), 'utf8'),
     fs.readFileSync(path.join(repo, 'workflows/dev/README.md'), 'utf8'),
+  );
+});
+
+test('a file a render asks for that is no file of the template is refused, so a {path} cannot reach outside it', () => {
+  const { dir } = exported();
+  fs.writeFileSync(path.join(path.dirname(dir), 'outside.md'), 'not the template');
+  const read = openTemplate(dir);
+  assert.equal(read.text('nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8'));
+  assert.throws(
+    () => read.text('../outside.md'),
+    (err: Error & { _tag?: string }) =>
+      err._tag === 'Invalid' &&
+      err.message === `../outside.md is no file of the template ${dir}: name a file of the template, by its path in it.`,
   );
 });
 

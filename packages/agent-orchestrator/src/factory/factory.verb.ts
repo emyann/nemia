@@ -28,7 +28,7 @@ import { runStore } from '../record/files.store.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...]
-nemia factory apply <name> --template <folder> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
+nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
 nemia factory attach <factory> <workflow>
 nemia factory detach <factory> <workflow>
 nemia factory hire <factory> <agent> --step <workflow>/<step>

@@ -30,8 +30,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                from a file in the factory's first folder, --store keeps it in the
                                store, --clear reads NEMIA.md in the first folder again
                                reads bare; prompts the person given --path, --store, --clear
-  nemia template check <folder>
-                               check a template's folder: every problem at once, each at its file and line
+  nemia template check <folder|archive>
+                               check a template's folder or archive: every problem at once, each at its
+                               file and line
   nemia ls [<runId>]
                                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
@@ -248,7 +249,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                drop a card without starting it
   nemia factory add <name> --repo <path> [--repo <path> ...]
                                file a factory: a lowercase slug naming one or more directories
-  nemia factory apply <name> --template <folder> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
+  nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
   nemia factory attach <factory> <workflow>
@@ -273,6 +274,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia template export <folder> --from <repo> [--factory <name>]
                                write a template from a repository and a factory, and say where each
                                part came from
+  nemia template pack <folder> [--out <file>]
+                               pack a template's folder that passes its check into one archive, and print
+                               the digest of its content
+  nemia template unpack <archive> <dir>
+                               write the folder a template's archive holds at <dir>/<name>, each file's
+                               bytes and mode as packed
   nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]
                                an agent of yours, or of a templated --factory, written from its file:
                                <name> is the agent it changes or renames, at the --version it was

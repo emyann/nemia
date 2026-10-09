@@ -105,8 +105,8 @@ Bring it:
 
 - **Factory and versions**: the factory, the version it was applied at, and the one offered.
 - **What merges cleanly**: the files, by area, and whether each comes from the template, from their tree, or both.
-- **Each conflict**: its address, as the plan names it, and its three sides quoted — the base, theirs as their tree holds it, the
-  template's.
+- **Each conflict**: its address, as the plan names it, and its three sides quoted under the plan's own labels — `base`, the
+  template as applied; `ours`, the factory's tree, the person's side; `theirs`, the template's new version.
 - **Recommendation**: one, with its reason in a sentence:
   - upgrade: `nemia factory upgrade <factory> --to <version>`, which prompts them; `--downgrade` only where they asked for a lower one;
   - for each conflict, a choice: `nemia factory resolve <factory> '<conflict>' --ours` to keep their tree's side, `--theirs` to take the

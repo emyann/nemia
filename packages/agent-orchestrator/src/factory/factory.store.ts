@@ -354,6 +354,7 @@ const DONE = {
   instruct: 'written',
   schedule: 'scheduled',
   unschedule: 'unscheduled',
+  upgrade: 'upgraded',
 } as const;
 
 /**
@@ -621,4 +622,17 @@ export function clearSchedule(opts: { factory: string; workflow: string }): { fi
   }
   writeWhole(file, { ...content, schedules });
   return { file, cleared };
+}
+
+/**
+ * The template the factory `name` wants retargeted to `version`, and to `source` where given, its parameters and every other key kept, its
+ * file written whole: what `nemia factory upgrade` files, and the daemon merges. Refused: the factory (`fileToChange`), and one not made
+ * from a template (`Invalid`).
+ */
+export function retargetTemplate(name: string, to: { version: string; source?: string }): { file: string } {
+  const { file, content } = fileToChange(name, 'upgrade');
+  if (content.template === undefined)
+    throw new Invalid({ message: `${name} is not made from a template, so it has none to upgrade. Nothing was upgraded.` });
+  writeWhole(file, { ...content, template: { ...content.template, version: to.version, source: to.source ?? content.template.source } });
+  return { file };
 }

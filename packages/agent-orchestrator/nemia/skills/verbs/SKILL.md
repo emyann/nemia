@@ -25,6 +25,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                repositories (nemia factory --help)
   nemia factory ls
                                the same, by its name
+  nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]
+                               preview a templated factory's upgrade: what merges cleanly, and each
+                               conflict with its sides; nothing is written
   nemia factory instruction <name> [--path <path> | --store | --clear]
                                where a factory's instruction is kept: bare, prints it; --path reads it
                                from a file in the factory's first folder, --store keeps it in the
@@ -252,6 +255,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
+  nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]
+                               upgrade a templated factory: its file wants --to, and the daemon merges
+                               the template's change into its tree once each conflict is resolved
+  nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
+                               choose for one conflict of a templated factory's upgrade: your tree, the
+                               template, or the text of a file; the daemon merges once each has one
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it

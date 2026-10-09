@@ -1,11 +1,11 @@
 ---
 name: bring-what-waits
-description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
+description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade — in chat with a recommendation, then run the verb they choose with their words as --message, so its prompt is their decision, asked once.
 ---
 # Bring what waits
 
-Four things wait on the person, and only these: a step at its gate, a step's question to them, a loop out of rounds, and a step at its
-cap. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
+Five things wait on the person, and only these: a step at its gate, a step's question to them, a loop out of rounds, a step at its cap,
+and a factory's upgrade. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
 choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that prompt is their decision, asked
 once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run that verb, which prompts again.
 
@@ -92,6 +92,28 @@ Bring it:
     tries have cost;
   - for a step of a loop whose next round would run past the cap: `nemia round <run> <step> --budget <amount>`, as above;
   - stop there: `nemia cancel <run>`, which prompts them too.
+
+## A factory's upgrade
+
+A factory made from a template is upgraded when its template has a new version. The upgrade is the person's, and so is every
+conflict it raises: their tree and the template both changed the same part.
+
+When they ask for one, or the template has moved past the version the factory was applied at, preview it first with
+`nemia factory plan <factory> --to <version>` (`--template <folder|archive>` where the new version is elsewhere). It writes nothing.
+
+Bring it:
+
+- **Factory and versions**: the factory, the version it was applied at, and the one offered.
+- **What merges cleanly**: the files, by area, and whether each comes from the template, from their tree, or both.
+- **Each conflict**: its address, as the plan names it, and its three sides quoted under the plan's own labels — `base`, the
+  template as applied; `ours`, the factory's tree, the person's side; `theirs`, the template's new version.
+- **Recommendation**: one, with its reason in a sentence:
+  - upgrade: `nemia factory upgrade <factory> --to <version>`, which prompts them; `--downgrade` only where they asked for a lower one;
+  - for each conflict, a choice: `nemia factory resolve <factory> '<conflict>' --ours` to keep their tree's side, `--theirs` to take the
+    template's, or `--file <path>` with the text you would write for it, shown to them first.
+
+The daemon merges once every conflict has a choice; until then the factory's tree and base stay as they are, and its runs in flight
+keep their own folders. After each resolve, say what it answered: the conflicts still waiting, or that the merge is next.
 
 ## Carry the answer back
 

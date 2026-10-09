@@ -2,9 +2,11 @@
  * A factory made from a template. `nemia factory apply`, an entry of the command table, the command line's alone, files
  * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`).
  * The factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template,
- * its base (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, and its status written —
- * the version and digest of its base and its conditions, `Applied` and `ConflictsPending` (`reconcileFactory`). Nothing is carried
- * between passes: what a pass does, it reads off the disk. A tree once seeded is the person's, and never written here again.
+ * its base (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version
+ * its file wants merged three ways once the person has chosen for each conflict (`upgradePass`), and its status written — the version and
+ * digest of its base and its conditions, `Applied` and `ConflictsPending` (`reconcileFactory`). Nothing is carried between passes: what a
+ * pass does, it reads off the disk. A tree once seeded is the person's, written here again only by an upgrade's merge, and never over a
+ * write of theirs made since the merge read it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,8 +23,11 @@ import {
   appliedDir,
   digestOf,
   entriesIn,
+  readResolutions,
   readStatus,
+  replaceBase,
   stageFolder,
+  swapTree,
   treeDir,
   writeStatus,
   type Condition,
@@ -30,26 +35,28 @@ import {
   type Status,
 } from './applied.store.ts';
 import { renderFactory, resolveParams, type Params } from './index.ts';
+import { compose, conflictCut, mergeTrees, resolveLine, type Conflict } from '../upgrade/index.ts';
 
 /** A template rendered with a factory's parameters: its version, and the files of a tree, each with its bytes. */
 export type RenderedAt = { version: string; params: Params; entries: Entry[] };
 
 /** The `--set` words that give `params`, each `<key>=<value>`. */
-const setsOf = (params: FactoryTemplate['params']): string[] => Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
+export const setsOf = (params: FactoryTemplate['params']): string[] =>
+  Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
 
 /**
  * The template at `source`, a folder or an archive, rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it
  * is not: its problems (`nemia template check`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`),
- * every one a line. Nothing is written.
+ * every one a line, with the template's version where it was read. Nothing is written.
  */
-export function renderedAt(source: string, sets: readonly string[]): RenderedAt | { problems: string[] } {
+export function renderedAt(source: string, sets: readonly string[]): RenderedAt | { problems: string[]; version?: string } {
   const read = openTemplate(source);
   if (read.problems.length) return { problems: read.problems.map(problemLine) };
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
   const { params, refusals } = resolveParams(spec.parameters ?? {}, sets);
-  if (refusals.length) return { problems: refusals };
+  if (refusals.length) return { problems: refusals, version: spec.version };
   const rendered = renderFactory(read, params);
-  if (rendered.refusals.length) return { problems: rendered.refusals };
+  if (rendered.refusals.length) return { problems: rendered.refusals, version: spec.version };
   const entries: Entry[] = [
     ...rendered.files.map((file) => ({ path: file.path, bytes: Buffer.from(file.text) })),
     ...rendered.copies.map((copy) => {
@@ -68,14 +75,14 @@ const condition = (type: string, status: boolean, reason: string, message: strin
   message,
 });
 
-/** No upgrade is under way, so nothing waits to be merged: the one `ConflictsPending` a factory has until upgrades come. */
+/** No upgrade is under way, so nothing waits to be merged. */
 const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgrade is under way, so no change waits to be merged.');
 
 /** The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not. */
 function readTemplate(factory: Factory & { template: FactoryTemplate }): RenderedAt | Condition {
   const { source, version, params } = factory.template;
   const fix = `nemia template check ${source}`;
-  let read: RenderedAt | { problems: string[] };
+  let read: RenderedAt | { problems: string[]; version?: string };
   try {
     read = renderedAt(source, setsOf(params));
   } catch (err) {
@@ -90,7 +97,7 @@ function readTemplate(factory: Factory & { template: FactoryTemplate }): Rendere
       'Applied',
       false,
       'VersionDrift',
-      `The template is at version ${read.version}, and ${factory.name} was applied at ${version}: its base and tree are left as they are until upgrades come. Put the template back at ${version}, or apply it again under another name.`,
+      `The template is at version ${read.version}, and ${factory.name} was applied at ${version}: its base and tree are left as they are. Put the template back at ${version}, or upgrade to ${read.version}: nemia factory plan ${factory.name} --to ${read.version}, then nemia factory upgrade ${factory.name} --to ${read.version}.`,
     );
   return read;
 }
@@ -113,7 +120,7 @@ function appliedOf(factory: Factory & { template: FactoryTemplate }, base: strin
       'Applied',
       false,
       'ParamsChanged',
-      `The parameters in ${factory.name}'s file differ from those its base was rendered with: its base and tree are left as they are until upgrades come.`,
+      `The parameters in ${factory.name}'s file differ from those its base was rendered with: its base and tree are left as they are. Put them back, or upgrade with them to the template's next version: nemia factory plan ${factory.name} --to <version>, then nemia factory upgrade ${factory.name} --to <version>.`,
     );
   return condition(
     'Applied',
@@ -123,22 +130,126 @@ function appliedOf(factory: Factory & { template: FactoryTemplate }, base: strin
   );
 }
 
+/** The `Applied` condition of a base that is not the template rendered now, where no status names the version it was applied at. */
+const unknownOf = ({ name, template }: Factory & { template: FactoryTemplate }): Condition =>
+  condition(
+    'Applied',
+    false,
+    'VersionUnknown',
+    `${name}'s base is not ${template.source} at ${template.version}, and no status names the version it was applied at: its base and tree are left as they are. Name that version, nemia factory upgrade ${name} --to <it> [--template <folder|archive>], and the next pass checks it against the base.`,
+  );
+
+/** The conditions of a factory whose base holds the template as an upgrade merged it, the tree holding the merge. */
+const upgraded = (factory: Factory & { template: FactoryTemplate }, version: string): Condition[] => [
+  condition(
+    'Applied',
+    true,
+    'Upgraded',
+    `The base holds ${factory.template.source} at ${version}, and the tree its merge with your changes; the tree is yours to change.`,
+  ),
+  condition('ConflictsPending', false, 'Merged', `The upgrade to ${version} is merged, so no change waits to be merged.`),
+];
+
+/** The conditions of an upgrade from `from` waiting on the person's choice for each conflict of `pending`. */
+function waiting(factory: Factory & { template: FactoryTemplate }, from: string, pending: readonly Conflict[]): Condition[] {
+  const { name, template } = factory;
+  const count = `${pending.length} conflict${pending.length === 1 ? '' : 's'}`;
+  return [
+    condition(
+      'Applied',
+      false,
+      'UpgradePending',
+      `${name} waits to be upgraded from ${from} to ${template.version}: ${count} wait for a choice (nemia factory plan ${name} --to ${template.version} shows each). Its base and tree are left as they are until each has one.`,
+    ),
+    condition(
+      'ConflictsPending',
+      true,
+      'Conflicts',
+      `${count} of the upgrade to ${template.version} wait for a choice: ${pending.map((c) => resolveLine(name, c.at)).join('; ')}.`,
+    ),
+  ];
+}
+
+/** Whether an upgrade is due: the base was applied at a known version other than the one wanted, and does not hold the template now. */
+const upgradeDue = (factory: Factory & { template: FactoryTemplate }, now: RenderedAt, digest: string, last?: Status): boolean =>
+  typeof last?.version === 'string' && last.version !== factory.template.version && digest !== digestOf(now.entries);
+
 /**
- * One templated factory brought to its template: its base rendered where absent, then its tree seeded from its base where absent, and its
- * status written where it changed. The status it observed.
+ * The upgrade of a factory from the version its base holds (`last`) to the one its file wants, the template rendered at it (`now`): its
+ * tree merged three ways with its base, and the person's choices for the version composed into it. While a conflict has none, only the
+ * status is written, naming each; once every one has, the tree is swapped for the merge where no one wrote it since it was read, then the
+ * base for the render, then the status. A pass that stops between them composes the same tree on the next.
+ */
+function upgradePass(factory: Factory & { template: FactoryTemplate }, now: RenderedAt, base: Entry[], last: Status & { version: string }) {
+  const { name, template } = factory;
+  const ours = entriesIn(treeDir(name));
+  const merge = mergeTrees(base, ours, now.entries);
+  const resolutions = readResolutions(name);
+  const composed = compose(merge, resolutions?.to === template.version ? resolutions.choices : {});
+  if ('pending' in composed) {
+    const status: Status = {
+      version: last.version,
+      digest: digestOf(base),
+      params: last.params,
+      conditions: waiting(factory, last.version, composed.pending),
+      upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictCut(c)) },
+    };
+    writeStatus(name, status);
+    return status;
+  }
+  if (!swapTree(name, composed.entries, digestOf(ours))) return last;
+  replaceBase(name, now.entries);
+  const status: Status = {
+    version: now.version,
+    digest: digestOf(now.entries),
+    params: template.params,
+    conditions: upgraded(factory, now.version),
+  };
+  writeStatus(name, status);
+  return status;
+}
+
+/** The `Applied` condition of a pass that merges nothing: the render's problem, else a version no status names, else `appliedOf`'s. */
+function observedOf(
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt | Condition,
+  digest: string | null,
+  version: string | null,
+  last: Status | undefined,
+): Condition {
+  if ('type' in now) return now;
+  if (digest !== null && version === null) return unknownOf(factory);
+  return appliedOf(factory, digest ?? '', now, last);
+}
+
+/** Whether the last status says the base it holds now came by an upgrade to `version`. */
+const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
+  last?.version === version && last.conditions.some((c) => c.type === 'Applied' && c.reason === 'Upgraded');
+
+/**
+ * One templated factory brought to its template: its base rendered where absent, then its tree seeded from its base where absent, an
+ * upgrade merged where one is due (`upgradePass`), and its status written where it changed. The version its base holds is the template's
+ * wherever the base is its render, else the one last written, else unknown, said by its own condition. The status it observed.
  */
 export function reconcileFactory(factory: Factory & { template: FactoryTemplate }): Status {
   const now = readTemplate(factory);
   const last = readStatus(factory.name);
-  const staged = !('type' in now) && stageFolder(appliedDir(factory.name), now.entries, true);
+  if (!('type' in now)) stageFolder(appliedDir(factory.name), now.entries, true);
   const base = entriesIn(appliedDir(factory.name));
   if (base.length && !fs.existsSync(treeDir(factory.name))) stageFolder(treeDir(factory.name), base, false);
   const digest = base.length ? digestOf(base) : null;
+  if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last))
+    return upgradePass(factory, now, base, last as Status & { version: string });
+  const current = !('type' in now) && digest === digestOf(now.entries);
+  const version = base.length ? (current ? now.version : (last?.version ?? null)) : null;
   const status: Status = {
-    version: base.length ? (staged ? factory.template.version : (last?.version ?? factory.template.version)) : null,
+    version,
     digest,
-    params: staged ? factory.template.params : (last?.params ?? factory.template.params),
-    conditions: ['type' in now ? now : appliedOf(factory, digest ?? '', now, last), NO_CONFLICTS],
+    params: current ? factory.template.params : (last?.params ?? factory.template.params),
+    conditions:
+      current && cameByUpgrade(last, now.version)
+        ? upgraded(factory, now.version)
+        : [observedOf(factory, now, digest, version, last), NO_CONFLICTS],
   };
   writeStatus(factory.name, status);
   return status;
@@ -256,6 +367,7 @@ export const FACTORY_APPLY: Command<Applied> = {
   check: (args) => leftOut(APPLY_SPEC, args),
   writes: true,
   nemia: 'prompts',
+  asksAlways: true,
   only: HERE,
   handler: (args) => tried(() => applied(args)),
   print: ({ name, repos, file, template, tree }) => [

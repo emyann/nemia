@@ -171,7 +171,10 @@ const mapOf = (value: unknown): Record<string, string> =>
 const jsonQuoted = (value: unknown, hire: boolean): string | null =>
   value === undefined ? null : hire && typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
-/** The value a choice gives a key of `factory.json`: a side's, or the person's, a hire's agent by name, else JSON (as words where it is none). */
+/**
+ * The value a choice gives a key of `factory.json`: a side's, or the person's, a hire's agent by name, else JSON (as words where it is
+ * none).
+ */
 function jsonChosen(slot: Slot, choice: Choice | undefined): unknown {
   if (choice === undefined) return undefined;
   if (choice === 'ours') return slot.sides?.[1];
@@ -238,7 +241,10 @@ function partsMerge(path: string, parts: readonly Part[], mode: number | undefin
   return { path, mode, conflicts, build: (choices) => Buffer.from(built(parts, choices)) };
 }
 
-/** A text file both sides changed and neither deleted, merged by its kind: `factory.json` by key where all three read, markdown by frontmatter. */
+/**
+ * A text file both sides changed and neither deleted, merged by its kind: `factory.json` by key where all three read, markdown by
+ * frontmatter.
+ */
 function bothChanged(path: string, sides: [string, string, string], mode: number | undefined): FileMerge {
   const [base, ours, theirs] = sides;
   if (path === 'factory.json') {
@@ -293,7 +299,10 @@ export function mergeTrees(base: readonly TreeFile[], ours: readonly TreeFile[],
   return out;
 }
 
-/** Whether a conflict is of lines or of a frontmatter key, whose text the person writes ends in a newline: neither a whole file nor JSON. */
+/**
+ * Whether a conflict is of lines or of a frontmatter key, whose text the person writes ends in a newline: neither a whole file nor
+ * JSON.
+ */
 const ofLines = (at: string): boolean => /:\d+-\d+$/.test(at) || (at.includes('#') && !at.startsWith('factory.json#'));
 
 /** The text a choice gives a conflict: one side's, or the person's, given its newline where the conflict is of lines. */
@@ -304,7 +313,10 @@ function chosenText(conflict: Conflict, choice: Choice | undefined): string | nu
   return ofLines(conflict.at) && choice.text && !choice.text.endsWith('\n') ? `${choice.text}\n` : choice.text;
 }
 
-/** The merge `merge` composed with the person's `choices`, by address: the tree's files where every conflict has one, else those pending. */
+/**
+ * The merge `merge` composed with the person's `choices`, by address: the tree's files where every conflict has one, else those
+ * pending.
+ */
 export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choice>>): { entries: TreeFile[] } | { pending: Conflict[] } {
   const pending = merge.conflicts.filter((conflict) => !Object.hasOwn(choices, conflict.at));
   if (pending.length) return { pending };

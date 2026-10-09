@@ -191,7 +191,7 @@ test('a template packed into an archive applies as its folder does, each file re
   assert.deepEqual(reconcileFactory(templated('packed')), status, 'a second pass reads the archive to the same base');
 });
 
-test('a template moved to another version is drift:the base and tree are left as they are, and Applied says so', async (t) => {
+test('a template moved to another version is drift: the base and tree are left as they are, and Applied says so', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('drifted', dir, repo, '--set', 'budget=7');

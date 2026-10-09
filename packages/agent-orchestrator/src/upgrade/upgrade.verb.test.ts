@@ -277,6 +277,38 @@ test('conflicts wait for a choice with only the status written; resolve writes e
   await assert.rejects(resolve(`${README}:1-1`, '--ours'), refusedWith('Conflict', /no upgrade of clash is under way/));
 });
 
+test('choices made for another version are not merged, and the next resolve drops them', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('stale');
+  rewrite(treeDir('stale'), REVIEW, 'rounds: 3', 'rounds: 4');
+  rewrite(treeDir('stale'), README, '# dev\n', '# dev, ours\n');
+  released(dir, '0.2.0', 5);
+  rewrite(dir, README, '# dev\n', '# dev, theirs\n');
+  await main(['factory', 'upgrade', 'stale', '--to', '0.2.0'], NO_ENGINE);
+  await main(['factory', 'resolve', 'stale', `${REVIEW}#rounds`, '--theirs'], NO_ENGINE);
+  await main(['factory', 'resolve', 'stale', `${README}:1-1`, '--ours'], NO_ENGINE);
+  released(dir, '0.3.0', 6);
+  rewrite(dir, README, '# dev, theirs\n', '# dev, three\n');
+  await main(['factory', 'upgrade', 'stale', '--to', '0.3.0'], NO_ENGINE);
+  const tree = bytesUnder(treeDir('stale'));
+  const waiting = reconcileFactory(templated('stale'));
+  assert.deepEqual(
+    waiting.upgrade?.conflicts.map((c) => c.at),
+    [`${README}:1-1`, `${REVIEW}#rounds`],
+    'the choices for 0.2.0 answer no conflict of 0.3.0',
+  );
+  assert.deepEqual(bytesUnder(treeDir('stale')), tree, 'and nothing is merged with them');
+  await main(['factory', 'resolve', 'stale', `${README}:1-1`, '--theirs'], NO_ENGINE);
+  assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('stale'), 'utf8')), {
+    to: '0.3.0',
+    choices: { [`${README}:1-1`]: 'theirs' },
+  });
+  assert.deepEqual(
+    reconcileFactory(templated('stale')).upgrade?.conflicts.map((c) => c.at),
+    [`${REVIEW}#rounds`],
+  );
+});
+
 test('the tree is swapped only where no one wrote it since the merge read it', async (t) => {
   t.mock.method(console, 'log', () => {});
   await applied('raced');

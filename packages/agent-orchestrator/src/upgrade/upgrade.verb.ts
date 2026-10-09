@@ -260,8 +260,9 @@ type Resolved = { name: string; at: string; to: string; file: string; left: stri
 
 /**
  * The choice `args` give, written for one conflict of the upgrade under way. Refused, nothing written: the factory as an upgrade is
- * (`rendered`); a base whose version no status names, no upgrade under way, or a template that no longer renders at the version wanted (`Conflict`); an address that is no
- * conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there (`Invalid`).
+ * (`rendered`); a base whose version no status names, no upgrade under way, or a template that no longer renders at the version wanted
+ * (`Conflict`); an address that is no conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there
+ * (`Invalid`).
  */
 function resolved(args: Args): Resolved {
   const verb = 'nemia factory resolve';

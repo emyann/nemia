@@ -295,6 +295,38 @@ test('the tree is swapped only where no one wrote it since the merge read it', a
   );
 });
 
+test("a swap whose new tree cannot be renamed in puts the person's tree back, or keeps it aside and says where", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  await applied('stuck');
+  rewrite(treeDir('stuck'), REVIEW, 'budget: 7', 'budget: 8');
+  const tree = bytesUnder(treeDir('stuck'));
+  const merge = entriesIn(appliedDir('stuck'));
+  const rename = fs.renameSync;
+  const renamingIn = (from: fs.PathLike, to: fs.PathLike) => to === treeDir('stuck') && !String(from).endsWith('.old');
+  const failing = t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+    if (renamingIn(from, to)) throw Object.assign(new Error('EIO: i/o error, rename'), { code: 'EIO' });
+    rename(from, to);
+  });
+  assert.throws(() => swapTree('stuck', merge, digestOf(entriesIn(treeDir('stuck')))), (err: Error) => /EIO/.test(err.message));
+  failing.mock.restore();
+  assert.deepEqual(bytesUnder(treeDir('stuck')), tree, "the person's tree is put back whole");
+  assert.deepEqual(fs.readdirSync(path.join(FACTORIES, 'stuck')).sort(), ['applied', 'status.json', 'tree']);
+
+  t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+    if (renamingIn(from, to)) fs.mkdirSync(path.join(treeDir('stuck'), 'seeded'), { recursive: true });
+    rename(from, to);
+  });
+  let kept = '';
+  assert.throws(
+    () => swapTree('stuck', merge, digestOf(entriesIn(treeDir('stuck')))),
+    (err: Error) => {
+      kept = /kept in (\S+);/.exec(err.message)?.[1] ?? '';
+      return /could not be replaced[^]*nor put back[^]*move it back onto/.test(err.message);
+    },
+  );
+  assert.deepEqual(bytesUnder(kept), tree, "a tree made in between: the person's is kept aside, where the error says");
+});
+
 test('a pass stopped after the tree is swapped merges the same tree on the next; stopped after the base, the version is the render', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir } = await applied('stopped');

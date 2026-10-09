@@ -197,8 +197,9 @@ export function stageFolder(dir: string, entries: readonly Entry[], readOnly: bo
 
 /**
  * The folder `dir` there now replaced by one made of `entries`: staged whole beside it, the old one renamed aside, the new one renamed in,
- * the old one removed. Where `unless` is given, nothing is changed, and false is said, if `dir` no longer digests to it by then: a write
- * made since it was read is never lost.
+ * the old one removed once the new one is in place. Where `unless` is given, nothing is changed, and false is said, if `dir` no longer
+ * digests to it by then: a write made since it was read is never lost. Where the new one cannot be renamed in, the old one is renamed
+ * back; where it cannot be either, it is kept aside, and the error names where.
  */
 function swapFolder(dir: string, entries: readonly Entry[], readOnly: boolean, unless?: string): boolean {
   const hidden = hiddenFolder(dir, entries, readOnly);
@@ -206,11 +207,28 @@ function swapFolder(dir: string, entries: readonly Entry[], readOnly: boolean, u
   try {
     if (unless !== undefined && digestOf(entriesIn(dir)) !== unless) return false;
     fs.renameSync(dir, aside);
-    fs.renameSync(hidden, dir);
+    try {
+      fs.renameSync(hidden, dir);
+    } catch (err) {
+      putBack(aside, dir, err as Error);
+      throw err;
+    }
+    fs.rmSync(aside, { recursive: true, force: true });
     return true;
   } finally {
     fs.rmSync(hidden, { recursive: true, force: true });
-    fs.rmSync(aside, { recursive: true, force: true });
+  }
+}
+
+/** The folder set `aside` renamed back onto `dir` after `failed`, or, where it cannot be, an error naming where it is kept. */
+function putBack(aside: string, dir: string, failed: Error): void {
+  try {
+    fs.renameSync(aside, dir);
+  } catch (err) {
+    throw new Error(
+      `${dir} could not be replaced (${failed.message}), nor put back (${(err as Error).message}): what it held is kept in ${aside}; move it back onto ${dir} by hand.`,
+      { cause: failed },
+    );
   }
 }
 

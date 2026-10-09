@@ -371,6 +371,37 @@ test('a hire is refused for the default factory first, then the workflow not off
   assert.equal(hireRefusalOf({ name: 'pipao', workflows: [] }, 'build', 'ada'), unattachedHireRefusal('pipao', 'build'));
 });
 
+test("nemia factory ls: a templated factory's template under its line, applied or not yet, and each condition that is amiss", () => {
+  const made = {
+    name: 'made',
+    file: '/s/factories/made.json',
+    repos: ['/code/made'],
+    workflows: ['dev'],
+    hires: {},
+    schedules: {},
+    template: { source: '/t/team', version: '0.2.0', params: {} },
+  };
+  const fine = [
+    { type: 'Applied', status: 'True', reason: 'Rendered', message: 'The tree is seeded.' },
+    { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade.' },
+  ] as const;
+  assert.deepEqual(factoryLines([{ ...made, status: { applied: null, conditions: [] } }]).slice(1), [
+    'made     /code/made',
+    '         template: /t/team 0.2.0, not rendered yet: the daemon renders it, nemia up',
+    '         workflows: dev',
+  ]);
+  assert.deepEqual(factoryLines([{ ...made, status: { applied: '0.2.0', conditions: fine } }]).slice(2, 3), [
+    '         template: /t/team 0.2.0, applied at 0.2.0',
+  ]);
+  const drifted = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at 0.3.0.' } as const;
+  const pending = { type: 'ConflictsPending', status: 'True', reason: 'Merging', message: 'Two files wait.' } as const;
+  assert.deepEqual(factoryLines([{ ...made, status: { applied: '0.2.0', conditions: [drifted, pending] } }]).slice(2, 5), [
+    '         template: /t/team 0.2.0, applied at 0.2.0',
+    '         Applied False, VersionDrift: The template is at 0.3.0.',
+    '         ConflictsPending True, Merging: Two files wait.',
+  ]);
+});
+
 test("nemia factory ls: a factory's schedules under its hires, by workflow, with the zone, the repository, the brief's first line, and the next fire and last run as listed", () => {
   const since = '2026-10-01T00:00:00.000Z';
   const now = Date.parse('2026-10-08T12:00:00.000Z');

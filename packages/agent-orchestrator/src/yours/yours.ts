@@ -1,7 +1,8 @@
 /**
  * The library's writers' ground — `nemia agents write`, `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows
- * remove`. Where they write: yours alone, in the store, never a checkout. An agent, a workflow or a skill is written into
- * `<home>/workflows/{agents,<name>,skills}`, and one named in the repository (`repo`) is refused with the copy a person makes by hand,
+ * remove`. Where they write: yours, in the store, never a checkout; and, for a writer that takes `--factory`, the tree of a factory made
+ * from a template (`factory`). An agent, a workflow or a skill is written into `<home>/workflows/{agents,<name>,skills}`, or the same
+ * under the factory's tree, and one named in the repository (`repo`) is refused with the copy a person makes by hand,
  * where git shows it as a change to commit, in words the command line and the api both say, each prefixing who refused (`who`: the
  * route, or the command). What their specs share on both sides: a text read off their arguments, the flag of the version a write or a
  * removal is checked against, a flag the command line alone takes (the file or folder its runner reads) and one the api alone takes
@@ -61,9 +62,13 @@ export function repoWriteRefusal(who: string, kind: YoursKind, name: string | nu
   return `${who} refuses to write the repository's ${kind} (${theirs}): only ${noun} is written, in ${yours}, and nothing into a checkout. ${copyWords(kind, name, yours, theirs)}`;
 }
 
+/** A writer that takes `--factory`: the factory it names, if any, and the tree of a factory made from a template, refused where none. */
+export type FactoryTarget = { factory: string | undefined; treeOf: (factory: string) => string };
+
 /**
- * Why `who` does not write the `kind` of the place `from`, or null for yours: the repository's (`repoWriteRefusal`), or a place that is
- * neither, which names the two.
+ * Why `who` does not write the `kind` of the place `from`, or null for yours, and for `factory` with a factory named where the writer
+ * takes one (`target`): the repository's (`repoWriteRefusal`); `factory` with no `--factory`; `--factory` beside `yours`, which writes
+ * the store's; and a place that is none of them, which names those the writer takes.
  */
 export function yoursOnlyRefusal(
   who: string,
@@ -72,18 +77,46 @@ export function yoursOnlyRefusal(
   name: string | null,
   repo: string,
   home: string,
+  target?: Pick<FactoryTarget, 'factory'>,
 ): string | null {
+  if (from === 'yours' && target?.factory !== undefined)
+    return `${who}: yours is the store's, and --factory names a factory's tree: write \`${who} factory … --factory ${target.factory}\` for its tree, or leave out --factory for yours.`;
   if (from === 'yours') return null;
   if (from === 'repo') return repoWriteRefusal(who, kind, name, repo, home);
-  return `${who}: ${kind} are read from \`repo\` or \`yours\`, and written to yours alone, in ${yoursOf(kind, home)}. This named ${JSON.stringify(from)}: name \`yours\`.`;
+  if (from === 'factory' && target !== undefined)
+    return target.factory === undefined
+      ? `${who}: \`factory\` writes the tree of a factory made from a template, and none was named: \`${who} factory … --factory <name>\`.`
+      : null;
+  const places = target === undefined ? '' : `, or to a factory's tree, \`factory\` with --factory <name>`;
+  return `${who}: ${kind} are read from \`repo\` or \`yours\`, and written to yours, in ${yoursOf(kind, home)}${places}. This named ${JSON.stringify(from)}: name \`yours\`.`;
 }
 
-/** The folder `who` writes the `kind` of the place `from` into (`yoursOf`), or refused (`Invalid`) as `yoursOnlyRefusal` says. */
-export function yoursOrRefused(who: string, kind: YoursKind, from: string, name: string | null, repo: string, home: string): string {
-  const refused = yoursOnlyRefusal(who, kind, from, name, repo, home);
+/**
+ * The folder `who` writes the `kind` of the place `from` into: yours (`yoursOf`), or the same under the tree of the factory `target` names
+ * (`target.treeOf`, which refuses a factory that has none). Refused (`Invalid`) as `yoursOnlyRefusal` says.
+ */
+export function yoursOrRefused(
+  who: string,
+  kind: YoursKind,
+  from: string,
+  name: string | null,
+  repo: string,
+  home: string,
+  target?: FactoryTarget,
+): string {
+  const refused = yoursOnlyRefusal(who, kind, from, name, repo, home, target);
   if (refused) throw new Invalid({ message: refused });
-  return yoursOf(kind, home);
+  return from === 'factory' && target?.factory !== undefined ? yoursOf(kind, target.treeOf(target.factory)) : yoursOf(kind, home);
 }
+
+/** `--factory`, the factory made from a template whose tree a writer named on `factory` writes into: taken on both sides, once. */
+export const factoryFlag = (command: string): Flag => ({
+  flag: '--factory',
+  kind: 'text',
+  key: 'factory',
+  takes: `--factory takes the name of a factory made from a template, whose tree is written: ${CLI} ${command} factory … --factory <name>`,
+  twice: `${CLI} ${command} takes --factory once: one tree is written.`,
+});
 
 /** The text under `key`, or undefined where none was given. */
 export const writerText = (args: Args, key: string): string | undefined => {

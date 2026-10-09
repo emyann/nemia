@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
 import {
+  conditionAmiss,
   factoryBlocks,
   factoryOf,
   factorySearch,
@@ -41,6 +42,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
     add: `nemia factory add ${name} --repo <path>`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
   },
+  template: null,
   ...extra,
 });
 
@@ -267,4 +269,11 @@ test('REFUSED: an agent made from New agent is hired only when the api takes the
   assert.deepEqual(sent, ['mill mine/plan scribe'], 'the step is sent as <workflow>/<step>');
   const words = 'mill does not offer the workflow mine, so it hires no one into its steps.';
   assert.deepEqual(await hireOnCreate(place, 'scribe', () => Promise.reject(new Error(words))), { hired: false, why: words });
+});
+
+test("a template's condition is amiss when Applied is not true, or ConflictsPending is: the others are as they should be", () => {
+  assert.equal(conditionAmiss({ type: 'Applied', status: 'True' }), false);
+  assert.equal(conditionAmiss({ type: 'Applied', status: 'False' }), true);
+  assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'False' }), false);
+  assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'True' }), true);
 });

@@ -8,7 +8,8 @@ import { tried } from '../runtime-client.ts';
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { apiKey, cliPath, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { templatedTree } from '../factory/factory.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { skillVersion } from './read.store.ts';
 import {
@@ -98,15 +99,20 @@ const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
 /**
  * A skill of yours written into your library (`yourSkillsDir`): copied whole from the folder of skills Nemia ships (`shipped`) under the
  * name `copy` (`copySkill`), or else written from its change (`change`, as JSON text, which the command line reads off `--file`) at the
- * `version` it was read at, none for a skill made (`writeSkill`). Refused, as `Invalid`, for a place but yours (`yoursOrRefused`).
+ * `version` it was read at, none for a skill made (`writeSkill`). Written to the tree of the factory `--factory` names for the place
+ * `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
  */
 export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
   name: 'skills write',
-  usage: 'yours [<name>] --file <SKILL.md> [--version <v>]',
-  help: ['a skill of yours written from its SKILL.md: <name> is the skill it', 'changes, at the --version it was read at; none, a new one'],
+  usage: '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
+  help: [
+    'a skill of yours, or of a templated --factory, written from its',
+    'SKILL.md: <name> is the skill it changes, at the --version it was',
+    'read at; none, a new one',
+  ],
   spec: writerSpec(
     'skills write',
-    'yours [<name>] --file <SKILL.md> [--version <v>]',
+    '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
     [FROM, { key: 'name', takes: 'optional', kind: 'name' }],
     [
       cliPath(
@@ -116,6 +122,7 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
         "the api is sent the skill's form, never a path to read",
       ),
       versionFlag('skills write', 'the skill'),
+      factoryFlag('skills write'),
       apiKey('change', 'the command line reads the skill off --file, into the form the board sends'),
       apiKey('copy', 'the board copies a skill Nemia ships; the command line writes one a person wrote'),
       apiKey('shipped', 'the board names the folder of skills Nemia ships, where a copy is read from'),
@@ -136,6 +143,7 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
         writerText(args, 'name') ?? null,
         '',
         home,
+        { factory: writerText(args, 'factory'), treeOf: (factory) => templatedTree(factory, 'nemia skills write') },
       );
       const copy = writerText(args, 'copy');
       if (copy !== undefined) return copySkill(writerText(args, 'shipped') ?? '', library, copy);

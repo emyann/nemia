@@ -58,6 +58,7 @@ const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('.
 const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/Decide.tsx');
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
+const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
@@ -5910,6 +5911,7 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
     add: `nemia factory add ${name} --repo <path>`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
   },
+  template: null,
   ...extra,
 });
 
@@ -6997,6 +6999,42 @@ test('Nemia not filed, or waiting on her trust, names no task; filed, it names i
   const stopped = await nemiaWith({ ...nemiaUp, stopped: true });
   assert.match(stopped, /data-nemia-task[^>]*>nemia-1</);
   assert.match(stopped, /data-nemia-phase[^>]*>running</);
+});
+
+/** A factory's template as the api answers it: applied at `applied`, with `conditions`. */
+const template = (applied: string | null, conditions: import('../src/lib/api.ts').FactoryCondition[] = []) => ({
+  source: '/drafts/team',
+  version: 'v2',
+  params: { repo: '/work/repo', retries: 2 },
+  applied,
+  conditions,
+});
+
+test("a factory's Template card: where it is, the version wanted and applied, each parameter, and each condition, amiss in the destructive colour", () => {
+  const html = renderToStaticMarkup(
+    createElement(TemplateCard, {
+      template: template('v1', [
+        { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'the template is at v2, applied at v1' },
+        { type: 'ConflictsPending', status: 'False', reason: 'None', message: 'nothing to merge' },
+      ]),
+    }),
+  );
+  assert.match(html, /data-template="\/drafts\/team"/);
+  assert.match(html, />Template</);
+  assert.match(html, /data-template-version="true">v2</);
+  assert.match(html, /data-template-applied="v1">applied at <span[^>]*>v1</);
+  assert.match(html, /data-param="repo"><dt[^>]*>repo<\/dt><dd[^>]*>\/work\/repo</);
+  assert.match(html, /data-param="retries"><dt[^>]*>retries<\/dt><dd[^>]*>2</);
+  assert.match(html, /data-condition="Applied" data-condition-status="False" data-amiss=""><span[^>]*data-variant="destructive"/);
+  assert.match(html, /VersionDrift<\/span><span[^>]*>the template is at v2, applied at v1</);
+  assert.match(html, /data-condition="ConflictsPending" data-condition-status="False"><span[^>]*data-variant="secondary"/);
+  assert.doesNotMatch(html, /<(button|input|textarea)/, 'read-only: nothing to press or type in');
+});
+
+test('a Template card not rendered yet says the daemon renders it, and lists no condition', () => {
+  const html = renderToStaticMarkup(createElement(TemplateCard, { template: template(null) }));
+  assert.match(html, /data-template-applied="">not rendered yet: the daemon renders its tree on its next pass</);
+  assert.doesNotMatch(html, /data-condition=/);
 });
 
 test('REFUSED: a schedule whose latest fire was refused draws why, whole, under its alert; one whose fire started its run draws none', async () => {

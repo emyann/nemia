@@ -60,6 +60,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory', { method: 'GET', path: '/api/factories', status: 200 }],
       ['factory ls', 'cli'],
       ['factory add', 'cli'],
+      ['factory apply', 'cli'],
       ['factory attach', 'cli'],
       ['factory detach', 'cli'],
       ['factory hire', { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 }],

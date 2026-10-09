@@ -1,0 +1,138 @@
+/**
+ * A template rendered into a factory's tree: the tests' team exported, rendered back, and loaded by today's reader as the team itself
+ * loads, its hires filling the steps; a parameter given where a document names it; and what today's folder has no line for refused by
+ * name. `WF_ROOT` is set before the import, since the store's modules read it as they load.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { parse, stringify } from 'yaml';
+import { scratch } from '../../test/scratch.ts';
+import { teamCopy } from '../../test/team.ts';
+
+process.env.WF_ROOT = scratch('wf-render-');
+const { exportTemplate, openTemplate } = await import('../template/template.store.ts');
+const { loadWorkflows } = await import('../folder/folder.store.ts');
+const { renderFactory, resolveParams } = await import('./index.ts');
+
+/** The tests' team exported into a template folder, and the repository it came from. */
+function exported(): { repo: string; dir: string } {
+  const repo = scratch('wf-render-repo-');
+  fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+  const dir = path.join(scratch('wf-render-out-'), 'team');
+  exportTemplate({ dir, from: repo });
+  return { repo, dir };
+}
+
+/** The template `dir` rendered with `sets`, written into a new tree. */
+function rendered(dir: string, sets: string[] = []): { tree: string; out: ReturnType<typeof renderFactory> } {
+  const read = openTemplate(dir);
+  const manifest = read.folder.documents.get('nemia.yaml') as { spec: { parameters?: Record<string, never> } };
+  const out = renderFactory(read, resolveParams(manifest.spec.parameters ?? {}, sets).params);
+  const tree = scratch('wf-render-tree-');
+  for (const file of out.files) {
+    fs.mkdirSync(path.dirname(path.join(tree, file.path)), { recursive: true });
+    fs.writeFileSync(path.join(tree, file.path), file.text);
+  }
+  for (const copy of out.copies) fs.cpSync(path.join(dir, copy.from), path.join(tree, copy.path));
+  return { tree, out };
+}
+
+/**
+ * The steps of a loaded workflow, each without where its hire came from, which the team names in its step file and the tree in its
+ * wiring, and its schema's file unnamed: the tree names it after its agent, and its schema is compared whole.
+ */
+const stepsOf = (workflows: ReturnType<typeof loadWorkflows>): unknown =>
+  JSON.parse(
+    JSON.stringify(workflows, (key, value) => {
+      if (key === 'hire') return undefined;
+      return typeof value === 'string' && value.endsWith('.schema.json') ? '<schema>' : value;
+    }),
+  );
+
+/** The document `file` of `dir`, its spec changed by `change`. */
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+  const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+  change(doc.spec);
+  fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
+}
+
+test("the tests' team, exported and rendered, loads as the team loads, its hires filling the steps and its skills carried", () => {
+  const { repo, dir } = exported();
+  const { tree, out } = rendered(dir);
+  assert.deepEqual(out.refusals, []);
+  assert.deepEqual(out.wiring, {
+    workflows: ['dev'],
+    hires: { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' },
+  });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(tree, 'factory.json'), 'utf8')), out.wiring);
+  const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+  assert.deepEqual(
+    stepsOf(loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills)),
+    stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))),
+  );
+  assert.equal(
+    fs.readFileSync(path.join(tree, 'workflows/skills/review-a-change/SKILL.md'), 'utf8'),
+    fs.readFileSync(path.join(repo, 'workflows/skills/review-a-change/SKILL.md'), 'utf8'),
+  );
+  assert.equal(
+    fs.readFileSync(path.join(tree, 'workflows/dev/README.md'), 'utf8'),
+    fs.readFileSync(path.join(repo, 'workflows/dev/README.md'), 'utf8'),
+  );
+});
+
+test('a file a render asks for that is no file of the template is refused, so a {path} cannot reach outside it', () => {
+  const { dir } = exported();
+  fs.writeFileSync(path.join(path.dirname(dir), 'outside.md'), 'not the template');
+  const read = openTemplate(dir);
+  assert.equal(read.text('nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8'));
+  assert.throws(
+    () => read.text('../outside.md'),
+    (err: Error & { _tag?: string }) =>
+      err._tag === 'Invalid' &&
+      err.message === `../outside.md is no file of the template ${dir}: name a file of the template, by its path in it.`,
+  );
+});
+
+test('a parameter is given where a document names it, and a default where no --set gives it', () => {
+  const { dir } = exported();
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.parameters = {
+      model: { type: 'string', description: 'the model', default: 'sonnet' },
+      budget: { type: 'number', description: 'dollars' },
+    };
+    spec.instruction = 'Operate this factory.';
+  });
+  edit(dir, 'agents/reviewer/agent.yaml', (spec) => {
+    spec.claude.model = { param: 'model' };
+  });
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[1].budget = { param: 'budget' };
+  });
+  const { tree } = rendered(dir, ['budget=7']);
+  assert.match(fs.readFileSync(path.join(tree, 'workflows/agents/reviewer.md'), 'utf8'), /^model: sonnet$/m);
+  assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/review.md'), 'utf8'), /^budget: 7$/m);
+  assert.equal(fs.readFileSync(path.join(tree, 'NEMIA.md'), 'utf8'), 'Operate this factory.\n');
+  const { tree: other } = rendered(dir, ['budget=9', 'model=haiku']);
+  assert.match(fs.readFileSync(path.join(other, 'workflows/agents/reviewer.md'), 'utf8'), /^model: haiku$/m);
+});
+
+test("a harness's options, and a block of a harness it does not run on, are refused by name", () => {
+  const { dir } = exported();
+  edit(dir, 'agents/reviewer/agent.yaml', (spec) => {
+    spec.claude.options = { verbose: true };
+    spec.codex = { model: 'gpt-5' };
+  });
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[0].overrides = { codex: { model: 'gpt-5' } };
+  });
+  const { out } = rendered(dir);
+  assert.equal(out.refusals.length, 3, out.refusals.join('\n'));
+  assert.match(out.refusals.join('\n'), /agents\/reviewer\/agent\.yaml: `codex:` is a block for codex, and this runs on claude/);
+  assert.match(out.refusals.join('\n'), /agents\/reviewer\/agent\.yaml: `claude\.options` is handed to claude as it is/);
+  assert.match(
+    out.refusals.join('\n'),
+    /workflows\/dev\/workflow\.yaml, step implement: `codex:` is a block for codex, and this runs on claude/,
+  );
+});

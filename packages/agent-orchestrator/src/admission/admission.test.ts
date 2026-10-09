@@ -98,8 +98,8 @@ test('REFUSED: a call that acts on a run or a factory below the floor is denied,
   );
 });
 
-test('REFUSED to name a factory unscoped: every factory verb but the one that files a new factory takes it under the key admission reads', () => {
-  const unscoped = TABLE.filter((e) => e.name.startsWith('factory ') && e.name !== 'factory add')
+test('REFUSED to name a factory unscoped: every factory verb but the two that file a new factory takes it under the key admission reads', () => {
+  const unscoped = TABLE.filter((e) => e.name.startsWith('factory ') && e.name !== 'factory add' && e.name !== 'factory apply')
     .filter((e) => (e.spec?.positionals.length ?? 0) > 0 && e.spec?.positionals[0].key !== 'factory')
     .map((e) => e.name);
   assert.deepEqual(unscoped, []);

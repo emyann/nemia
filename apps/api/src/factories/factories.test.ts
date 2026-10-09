@@ -420,6 +420,7 @@ test('GET /api/factories serves the default factory first, then each factory by 
       hires: {},
       error: null,
       schedules: [],
+      template: null,
       commands: commandsOf('default'),
     });
     assert.deepEqual(body[2], {
@@ -430,15 +431,69 @@ test('GET /api/factories serves the default factory first, then each factory by 
       hires: { 'alpha/implement': 'ada' },
       error: null,
       schedules: [],
+      template: null,
       commands: commandsOf('hired'),
     });
     assert.deepEqual(body[1].commands, commandsOf('broken'), 'a file that does not read is filed again by the same lines');
     assert.deepEqual(body[3].repos, [repoR, repoS]);
     assert.equal(body[1].default, false);
     assert.match(body[1].error ?? '', /is not JSON/);
-    assert.deepEqual([body[1].repos, body[1].workflows, body[1].hires, body[1].schedules], [[], [], {}, []]);
+    assert.deepEqual([body[1].repos, body[1].workflows, body[1].hires, body[1].schedules, body[1].template], [[], [], {}, [], null]);
   } finally {
     fs.rmSync(path.join(root, 'factories', 'broken.json'));
+  }
+});
+
+test("GET /api/factories serves a templated factory's template: not applied before the daemon renders it, then the version and conditions it wrote", async () => {
+  addFactory({ name: 'shaped', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: { budget: 7 } } });
+  const shaped = async () => (await get<FactoryAnswer[]>('/api/factories')).body.find((f) => f.name === 'shaped')?.template;
+  try {
+    assert.deepEqual(await shaped(), { source: '/t/team', version: '0.1.0', params: { budget: 7 }, applied: null, conditions: [] });
+    const drift = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at version 0.2.0.' };
+    const pending = { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade is under way.' };
+    write(
+      path.join(root, 'factories', 'shaped', 'status.json'),
+      JSON.stringify({ version: '0.1.0', digest: 'sha256:0', params: { budget: 7 }, conditions: [drift, pending] }),
+    );
+    assert.deepEqual(await shaped(), {
+      source: '/t/team',
+      version: '0.1.0',
+      params: { budget: 7 },
+      applied: '0.1.0',
+      conditions: [drift, pending],
+    });
+  } finally {
+    removeFactory('shaped');
+  }
+});
+
+test("a templated factory's workflows are its tree's, before its repository's: listed, paged and started from the tree", async () => {
+  addFactory({ name: 'treed', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: {} } });
+  const tree = path.join(root, 'factories', 'treed', 'tree');
+  write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['alpha', 'gamma'], hires: {} }));
+  write(path.join(tree, 'workflows', 'alpha', 'implement.md'), '---\nplace: git\nagent: ada\n---\nImplement it, as the tree says.\n');
+  write(path.join(tree, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what the tree asks.\n');
+  try {
+    const { body } = await get<WorkflowListing[]>('/api/workflows?factory=treed');
+    assert.deepEqual(
+      body.map((w) => [w.from, w.name, w.dir]),
+      [
+        ['repo', 'alpha', path.join(tree, 'workflows', 'alpha')],
+        ['repo', 'gamma', path.join(repoR, 'workflows', 'gamma')],
+      ],
+      "alpha is the tree's, which shadows the repository's; gamma, which the tree has not, is the repository's",
+    );
+    const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=treed');
+    assert.equal(page.status, 200);
+    assert.equal(page.body.dir, path.join(tree, 'workflows', 'alpha'));
+    assert.match(page.body.source, /Implement it, as the tree says\./, "the tree's step file, as written");
+
+    const res = await post('/api/runs?factory=treed', { workflow: 'alpha', brief: 'Add a cache' });
+    assert.equal(res.status, 201, await res.clone().text());
+    const run = runStore.runs.read(((await res.json()) as { id: string }).id);
+    assert.deepEqual([run.factory, run.repo, run.workflowDir], ['treed', repoR, path.join(tree, 'workflows', 'alpha')]);
+  } finally {
+    removeFactory('treed');
   }
 });
 

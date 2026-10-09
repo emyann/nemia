@@ -187,21 +187,26 @@ export function knownRepos(repo?: string): Set<string> {
   return known;
 }
 
+/** The trees of the factories made from a template, each resolved: where such a factory runs from, laid out as a repository. */
+const factoryTrees = (): Set<string> =>
+  new Set(readFactories().flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : [])));
+
 /**
  * Whether `dir` holds the workflows the board lists: the store's `workflows/`, or the `workflows/` of a repository the store knows — a
- * factory's, or `repo` when the caller names one, as the api names its own.
+ * factory's, or `repo` when the caller names one, as the api names its own — or of the tree of a factory made from a template.
  */
 export function isWorkflowsHolder(dir: string, repo?: string): boolean {
   const at = path.resolve(dir);
   if (at === path.resolve(HOME, 'workflows')) return true;
-  return path.basename(at) === 'workflows' && knownRepos(repo).has(path.dirname(at));
+  if (path.basename(at) !== 'workflows') return false;
+  return knownRepos(repo).has(path.dirname(at)) || factoryTrees().has(path.dirname(at));
 }
 
 /**
- * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository it is in —
- * `<repo>/workflows/<name>`, for a repository a factory names — and the store. A folder of the store's is only the store's.
+ * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository or factory's tree it is in
+ * — `<repo>/workflows/<name>`, for a repository a factory names — and the store. A folder of the store's is only the store's.
  */
 export function placesAround(workflowDir: string): Places {
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));
-  return { ...(knownRepos().has(repo) ? { repo } : {}), home: HOME };
+  return { ...(knownRepos().has(repo) || factoryTrees().has(repo) ? { repo } : {}), home: HOME };
 }

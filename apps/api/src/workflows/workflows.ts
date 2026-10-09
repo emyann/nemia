@@ -226,11 +226,19 @@ export const keyRows = (step: Workflow): KeyRow[] =>
 /** The file of the step `name` in the workflow folder `dir`, as written: frontmatter and all. */
 export const stepSourceOf = (dir: string, name: string): string => fs.readFileSync(path.join(dir, `${name}.md`), 'utf8');
 
-/** Where workflows are read from, in the order they are listed: the repository's, then yours. */
-export const sourcesOf = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> => [
+/**
+ * Where workflows are read from, in the order they are listed: the repository's, then yours — and, in a factory made from a template, its
+ * `tree` first, read as the repository's and shadowing its folder of the same name, as a start looks for a bare name.
+ */
+export const sourcesOf = (repo: string, home: string, tree?: string): Array<{ from: WorkflowSource; dir: string }> => [
+  ...(tree !== undefined ? [{ from: 'repo' as const, dir: path.join(tree, 'workflows') }] : []),
   { from: 'repo', dir: path.join(repo, 'workflows') },
   { from: 'yours', dir: path.join(home, 'workflows') },
 ];
+
+/** The first of `found` from each source: the folder a tree shadows is no second one. */
+const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], name: (t: T) => string = () => ''): T[] =>
+  found.filter((f, i) => found.findIndex((g) => g.from === f.from && name(g) === name(f)) === i);
 
 /** The table's entries the board's workflows are read through, each served on the api alone. */
 const LIST = COMMANDS.find((c) => c.name === 'workflows list')!;
@@ -247,13 +255,17 @@ export const loadedOf = async (e: Engine['Service'], dirs: readonly string[], re
 
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
- * it. Loads every folder, so each can say whether it reads, and, in a factory, which steps its hires leave unfilled.
+ * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
+ * factory, which steps its hires leave unfilled.
  */
 export async function listWorkflows(e: Engine['Service'], repo: string, home: string, factory?: Factory): Promise<WorkflowListing[]> {
-  const folders = sourcesOf(repo, home).flatMap(({ from, dir }) =>
-    foldersIn(dir)
-      .filter((name) => !factory || factory.workflows.includes(name))
-      .map((name) => ({ name, from, dir: path.join(dir, name) })),
+  const folders = unshadowed(
+    sourcesOf(repo, home, factory?.tree).flatMap(({ from, dir }) =>
+      foldersIn(dir)
+        .filter((name) => !factory || factory.workflows.includes(name))
+        .map((name) => ({ name, from, dir: path.join(dir, name) })),
+    ),
+    (f) => f.name,
   );
   const loaded = await loadedOf(
     e,
@@ -450,11 +462,18 @@ const START: Guarded = {
 
 /**
  * The workflow folder a start names, found among the folders the sources have — never joined from what was sent, so no
- * name reaches a folder outside them — or why not: none of that name, or one in each source and no `from` to choose.
+ * name reaches a folder outside them — or why not: none of that name, or one in each source and no `from` to choose. In a factory made
+ * from a template, its `tree` is looked in first.
  */
-export function folderOf(name: string, from: WorkflowSource | undefined, repo: string, home: string): { dir: string } | Refusal {
-  const sources = sourcesOf(repo, home);
-  const found = sources.filter((s) => (!from || s.from === from) && foldersIn(s.dir).includes(name));
+export function folderOf(
+  name: string,
+  from: WorkflowSource | undefined,
+  repo: string,
+  home: string,
+  tree?: string,
+): { dir: string } | Refusal {
+  const sources = sourcesOf(repo, home, tree);
+  const found = unshadowed(sources.filter((s) => (!from || s.from === from) && foldersIn(s.dir).includes(name)));
   if (found.length === 1) return { dir: path.join(found[0].dir, name) };
   if (found.length > 1) {
     return {
@@ -498,9 +517,9 @@ export type Asked =
  * card the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse,
  * as `nemia start <card> --brief ""` is.
  */
-function startOf(body: typeof START_BODY.Type, repo: string, home: string): Asked | Refusal {
+function startOf(body: typeof START_BODY.Type, repo: string, home: string, tree?: string): Asked | Refusal {
   const { workflow, brief, from, after, context, card } = body;
-  const folder = folderOf(workflow, from, repo, home);
+  const folder = folderOf(workflow, from, repo, home, tree);
   if ('status' in folder) return folder;
   const handed = { after: after && [...after], context: context && [...context] };
   if (card !== undefined) return { dir: folder.dir, brief, ...handed, card };
@@ -593,7 +612,7 @@ export const workflows = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      const asked = startOf(read.body, repo, home);
+      const asked = startOf(read.body, repo, home, factory?.tree);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       const named = c.req.query('factory') === DEFAULT_FACTORY ? DEFAULT_FACTORY : factory?.name;
       if (asked.card !== undefined) {

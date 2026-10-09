@@ -1,6 +1,7 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryCanvas } from '@/components/FactoryCanvas';
+import { TemplateCard } from '@/components/TemplateCard';
 import { LinkButton } from '@/components/ui/button';
 import { routeLink } from '@/components/routeLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +32,8 @@ export const Route = createFileRoute('/factories/$factory')({
 
 /**
  * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), the factory named in the sidebar's picker
- * (`FactoryPicker`). A name the api lists no factory by says so: no route of the api is asked about it.
+ * (`FactoryPicker`), and above the floor the template it is made from, where it is (`TemplateCard`). A name the api lists no factory by
+ * says so: no route of the api is asked about it.
  */
 function FactoryPage() {
   const { factory: name } = Route.useParams();
@@ -39,7 +41,8 @@ function FactoryPage() {
   const { data: runs } = useSuspenseQuery(runsQuery);
   const factory = factories.find((f) => f.name === name);
   if (!factory) return <NoSuchFactory name={name} />;
-  return <FactoryCanvas runs={runsIn(runs, factory)} factory={factory} />;
+  const above = factory.template ? <TemplateCard template={factory.template} /> : undefined;
+  return <FactoryCanvas runs={runsIn(runs, factory)} factory={factory} above={above} />;
 }
 
 /** A button to a route, as the router draws its links (`routeLink`). */

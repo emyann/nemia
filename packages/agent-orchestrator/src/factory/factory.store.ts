@@ -26,6 +26,7 @@ import {
   workflowNameRefusal,
   type Factory,
   type FactoryListing,
+  type FactoryTemplate,
   type FactoryWrite,
   type InstructionAt,
   type Schedule,
@@ -34,6 +35,7 @@ import { firesOf } from '../schedule/schedule.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
+import { readStatus, readTreeWiring, treeDir, writeTreeWiring } from '../applied/applied.store.ts';
 
 /** Where the factories are: `$WF_ROOT/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDir = (): string => path.join(HOME, 'factories');
@@ -53,7 +55,8 @@ const ScheduleSchema = Schema.StructWithRest(
 /**
  * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a
  * step's `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path
- * or the store, when it says; a key a later `nemia` writes beside them is kept, not refused.
+ * or the store, when it says; and the template it was made from, when it was (`nemia factory apply`): its folder, its version and the
+ * parameters given. A key a later `nemia` writes beside them is kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -62,6 +65,16 @@ const FactoryFileSchema = Schema.StructWithRest(
     hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     schedules: Schema.optionalKey(Schema.Record(Schema.String, ScheduleSchema)),
     instruction: Schema.optionalKey(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
+    template: Schema.optionalKey(
+      Schema.StructWithRest(
+        Schema.Struct({
+          source: Schema.String,
+          version: Schema.String,
+          params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
+        }),
+        [Schema.Record(Schema.String, Schema.Unknown)],
+      ),
+    ),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -98,25 +111,44 @@ function factoryFile(name: string): FileRead {
   return { file, error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.` };
 }
 
+/** The workflows and hires of a templated factory `name`: its tree's, none while the tree is not rendered, or why they do not read. */
+function treeWiringOf(name: string): Pick<Factory, 'workflows' | 'hires'> | { error: string } {
+  const read = readTreeWiring(name);
+  if ('absent' in read) return { workflows: [], hires: {} };
+  return 'error' in read ? read : { workflows: read.wiring.workflows, hires: read.wiring.hires };
+}
+
 /**
  * The factory `name` its file's `content` says: none attached, hired or scheduled when the file names none, and where its instruction is
- * kept only when the file says.
+ * kept only when the file says. A factory made from a template reads its workflows and hires from its tree (`tree`), or why they do not
+ * read; its schedules, from its file.
  */
-const factoryOf = (name: string, content: FactoryFile): Factory => ({
-  name,
-  repos: content.repos,
-  workflows: content.workflows ?? [],
-  hires: content.hires ?? {},
-  schedules: content.schedules ?? {},
-  ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
-});
+function factoryOf(name: string, content: FactoryFile): Factory | { error: string } {
+  const template = content.template;
+  const wiring = template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {} } : treeWiringOf(name);
+  if ('error' in wiring) return wiring;
+  return {
+    name,
+    repos: content.repos,
+    ...wiring,
+    schedules: content.schedules ?? {},
+    ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
+    ...(template === undefined ? {} : { template, tree: treeDir(name) }),
+  };
+}
 
-/** One entry of the folder as `nemia factory ls` lists it: the factory its file says, or why the file does not read as one. */
+/**
+ * One entry of the folder as `nemia factory ls` lists it: the factory its file says, with what the controller last observed of it where it
+ * is made from a template (`readStatus`), or why the file does not read as one.
+ */
 function factoryAt(file: string): FactoryListing {
   const name = file.slice(0, -'.json'.length);
   const read = factoryFile(name);
-  if ('error' in read) return { name, file: read.file, error: read.error };
-  return { ...factoryOf(name, read.content), file: read.file };
+  const factory = 'error' in read ? read : factoryOf(name, read.content);
+  if ('error' in factory) return { name, file: read.file, error: factory.error };
+  if (factory.template === undefined) return { ...factory, file: read.file };
+  const status = readStatus(name);
+  return { ...factory, file: read.file, status: { applied: status?.version ?? null, conditions: status?.conditions ?? [] } };
 }
 
 /**
@@ -140,7 +172,7 @@ export function readFactories(): FactoryListing[] {
  * The repositories a factory is given, each resolved from where `nemia` is typed, as `nemia start --repo` records one, and named once.
  * Refused, `Invalid`: none given, and any that is not a directory, every one named. A directory is enough: git is never asked.
  */
-function factoryRepos(name: string, given: readonly string[]): string[] {
+export function factoryRepos(name: string, given: readonly string[]): string[] {
   if (!given.length)
     throw new Invalid({
       message: `A factory names one repository at least, and none was given: nemia factory add ${name} --repo <path> [--repo <path> ...]. Nothing was filed.`,
@@ -162,18 +194,23 @@ function refuseName(name: string, verb: FactoryWrite): void {
 }
 
 /**
- * `nemia factory add`: a factory filed as `<name>.json`, written whole to a hidden file first and linked onto its name, which fails when
- * the name is taken: no reader sees half a file, and two adds of one name file one. Refused before anything is written: the name
- * (`refuseName`) and the repositories (`factoryRepos`); and, the file already there, `Conflict`, the file left as it was.
+ * `nemia factory add`, and `nemia factory apply` with the `template` it is made from: a factory filed as `<name>.json`, written whole to a
+ * hidden file first and linked onto its name, which fails when the name is taken: no reader sees half a file, and two adds of one name
+ * file one. Refused before anything is written: the name (`refuseName`) and the repositories (`factoryRepos`); and, the file already
+ * there, `Conflict`, the file left as it was.
  */
-export function addFactory(opts: { name: string; repos: readonly string[] }): { factory: Factory; file: string } {
+export function addFactory(opts: { name: string; repos: readonly string[]; template?: FactoryTemplate }): {
+  factory: Factory;
+  file: string;
+} {
   refuseName(opts.name, 'add');
   const repos = factoryRepos(opts.name, opts.repos);
+  const template = opts.template;
   fs.mkdirSync(factoriesDir(), { recursive: true });
   const file = path.join(factoriesDir(), `${opts.name}.json`);
   const hidden = path.join(factoriesDir(), `.${opts.name}.json.${process.pid}.${randomBytes(4).toString('hex')}`);
   try {
-    fs.writeFileSync(hidden, `${JSON.stringify({ repos }, null, 2)}\n`);
+    fs.writeFileSync(hidden, `${JSON.stringify({ repos, ...(template === undefined ? {} : { template }) }, null, 2)}\n`);
     fs.linkSync(hidden, file);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
@@ -183,7 +220,8 @@ export function addFactory(opts: { name: string; repos: readonly string[] }): { 
   } finally {
     fs.rmSync(hidden, { force: true });
   }
-  return { factory: { name: opts.name, repos, workflows: [], hires: {}, schedules: {} }, file };
+  const made = template === undefined ? {} : { template, tree: treeDir(opts.name) };
+  return { factory: { name: opts.name, repos, workflows: [], hires: {}, schedules: {}, ...made }, file };
 }
 
 /** That the store has no factory `name`, naming those it has: `Missing`, with what was not done. */
@@ -227,7 +265,36 @@ export function readFactory(name: string, notDone = 'Nothing was started.'): Fac
   const read = factoryFile(name);
   if (!fs.existsSync(read.file)) throw noFactory(name, notDone);
   if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
-  return factoryOf(name, read.content);
+  const factory = factoryOf(name, read.content);
+  if ('error' in factory) throw new Invalid({ message: `the factory ${name}: ${factory.error}` });
+  return factory;
+}
+
+/**
+ * The tree of the factory `name`, made from a template, for `who` to write into. Refused: the factory (`readFactory`); one not made from a
+ * template (`Invalid`, naming yours); and a tree not rendered yet (`Conflict`, naming the daemon).
+ */
+export function templatedTree(name: string, who: string): string {
+  const factory = readFactory(name, 'Nothing was written.');
+  if (factory.tree === undefined)
+    throw new Invalid({
+      message: `${who}: the factory ${name} is not made from a template, so it has no tree to write; its workflows are its repositories' and yours. Write yours: \`${who} yours …\`. Nothing was written.`,
+    });
+  if (!fs.existsSync(factory.tree))
+    throw new Conflict({
+      message: `${who}: ${name} is made from a template, and its tree is not rendered yet, at ${factory.tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. Nothing was written.`,
+    });
+  return factory.tree;
+}
+
+/**
+ * The tree the factory `name` runs from, where it is made from a template (`treeDir`): where a bare workflow name is looked for first.
+ * None for no name, an untemplated factory, and one that is not there or does not read: what is wrong with it is the start's to say.
+ */
+export function treeOf(name: string | undefined): string | undefined {
+  if (name === undefined || factoryNameRefusal(name)) return undefined;
+  const read = factoryFile(name);
+  return 'error' in read || read.content.template === undefined ? undefined : treeDir(name);
 }
 
 /**
@@ -314,11 +381,51 @@ function writeWhole(file: string, content: FactoryFile): void {
 }
 
 /**
- * The first file of the step `step` of `workflow` that names its own agent, and the agent it names: in each of `repos`' `workflows/`, then
- * in the store `home`'s, where a start in the factory reads a workflow by its name. A file that is not there or does not read names none.
+ * What a verb reads of a factory's wiring and how it writes it back: its file's, or, made from a template, its tree's; the folders
+ * whose `workflows/<workflow>/` a start reads a step's own file from (`rootsOf`); and its schedules, its file's either way.
  */
-function ownAgentOf(repos: readonly string[], home: string, workflow: string, step: string): { named: string; file: string } | undefined {
-  for (const root of [...repos, home]) {
+type WiringChange = {
+  file: string;
+  rootsOf: (workflow: string) => readonly string[];
+  wiring: Pick<Factory, 'workflows' | 'hires'>;
+  schedules: Factory['schedules'];
+  write: (wiring: Partial<Pick<Factory, 'workflows' | 'hires'>>) => void;
+};
+
+/**
+ * The wiring of the factory `name`, to be written back by `verb`, with the folders a start reads its workflows from (`rootsOf`): its
+ * file's, every other key kept; or, made from a template, its tree's `factory.json`, and the first of its tree, its repositories and
+ * `home` that holds the workflow, as a start reads it by name. Refused: the factory (`fileToChange`); a tree not rendered yet
+ * (`Conflict`, naming the daemon); and a tree's wiring that does not read (`Invalid`).
+ */
+function wiringToChange(name: string, verb: 'attach' | 'detach' | 'hire' | 'fire', home: string): WiringChange {
+  const { file, content } = fileToChange(name, verb);
+  if (content.template === undefined) {
+    const wiring = { workflows: content.workflows ?? [], hires: content.hires ?? {} };
+    const roots = [...content.repos, home];
+    return { file, rootsOf: () => roots, wiring, schedules: content.schedules ?? {}, write: (w) => writeWhole(file, { ...content, ...w }) };
+  }
+  const read = readTreeWiring(name);
+  const tree = treeDir(name);
+  if ('absent' in read)
+    throw new Conflict({
+      message: `${name} is made from a template, and its tree is not rendered yet, at ${tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. Nothing was ${DONE[verb]}.`,
+    });
+  if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.error} Nothing was ${DONE[verb]}.` });
+  const write = (w: Partial<Pick<Factory, 'workflows' | 'hires'>>) => writeTreeWiring(name, { ...read.wiring, ...w });
+  const rootsOf = (workflow: string) => {
+    const holder = [tree, ...content.repos, home].find((root) => fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)));
+    return holder === undefined ? [] : [holder];
+  };
+  return { file: path.join(tree, 'factory.json'), rootsOf, wiring: read.wiring, schedules: content.schedules ?? {}, write };
+}
+
+/**
+ * The first file of the step `step` of `workflow` that names its own agent, and the agent it names: in each of `roots`' `workflows/`,
+ * where a start in the factory reads a workflow by its name. A file that is not there or does not read names none.
+ */
+function ownAgentOf(roots: readonly string[], workflow: string, step: string): { named: string; file: string } | undefined {
+  for (const root of roots) {
     const file = path.join(path.resolve(root), 'workflows', workflow, `${step}.md`);
     let named: string | undefined;
     try {
@@ -342,17 +449,17 @@ function ownAgentOf(repos: readonly string[], home: string, workflow: string, st
 export function hireAgent(opts: { factory: string; agent: string; step: string; home?: string }): { file: string; replaced?: string } {
   const bad = hireRefusal(opts.step, opts.agent);
   if (bad) throw new Invalid({ message: `${bad} Nothing was hired.` });
-  const { file, content } = fileToChange(opts.factory, 'hire');
+  const { file, rootsOf, wiring, write } = wiringToChange(opts.factory, 'hire', opts.home ?? HOME);
   const workflow = opts.step.slice(0, opts.step.indexOf('/'));
-  if (!content.workflows?.includes(workflow))
+  if (!wiring.workflows.includes(workflow))
     throw new Invalid({ message: `${unattachedHireRefusal(opts.factory, workflow)} Nothing was hired.` });
-  const own = ownAgentOf(content.repos, opts.home ?? HOME, workflow, opts.step.slice(workflow.length + 1));
+  const own = ownAgentOf(rootsOf(workflow), workflow, opts.step.slice(workflow.length + 1));
   if (own)
     throw new Conflict({
-      message: `${hireRefusalOf({ name: opts.factory, workflows: content.workflows }, workflow, own.named)} ${own.file} names it. Nothing was hired.`,
+      message: `${hireRefusalOf({ name: opts.factory, workflows: wiring.workflows }, workflow, own.named)} ${own.file} names it. Nothing was hired.`,
     });
-  const replaced = content.hires?.[opts.step];
-  writeWhole(file, { ...content, hires: { ...content.hires, [opts.step]: opts.agent } });
+  const replaced = wiring.hires[opts.step];
+  write({ hires: { ...wiring.hires, [opts.step]: opts.agent } });
   return { file, ...(replaced !== undefined && replaced !== opts.agent ? { replaced } : {}) };
 }
 
@@ -361,8 +468,8 @@ export function hireAgent(opts: { factory: string; agent: string; step: string; 
  * agent it hired. Refused: the factory (`fileToChange`), and a step it hires no one into (`Missing`, naming its hires).
  */
 export function fireAgent(opts: { factory: string; step: string }): { file: string; fired: string } {
-  const { file, content } = fileToChange(opts.factory, 'fire');
-  const hires = { ...content.hires };
+  const { file, wiring, write } = wiringToChange(opts.factory, 'fire', HOME);
+  const hires = { ...wiring.hires };
   const fired = hires[opts.step];
   if (fired === undefined) {
     const there = Object.keys(hires).sort();
@@ -371,7 +478,7 @@ export function fireAgent(opts: { factory: string; step: string }): { file: stri
     });
   }
   delete hires[opts.step];
-  writeWhole(file, { ...content, hires });
+  write({ hires });
   return { file, fired };
 }
 
@@ -389,10 +496,10 @@ function refuseWorkflowName(workflow: string, verb: 'attach' | 'detach' | 'sched
  */
 export function attachWorkflow(opts: { factory: string; workflow: string }): { file: string; already?: true } {
   refuseWorkflowName(opts.workflow, 'attach');
-  const { file, content } = fileToChange(opts.factory, 'attach');
-  const workflows = content.workflows ?? [];
+  const { file, wiring, write } = wiringToChange(opts.factory, 'attach', HOME);
+  const workflows = wiring.workflows;
   if (workflows.includes(opts.workflow)) return { file, already: true };
-  writeWhole(file, { ...content, workflows: [...workflows, opts.workflow].sort() });
+  write({ workflows: [...workflows, opts.workflow].sort() });
   return { file };
 }
 
@@ -404,24 +511,24 @@ export function attachWorkflow(opts: { factory: string; workflow: string }): { f
  */
 export function detachWorkflow(opts: { factory: string; workflow: string }): { file: string } {
   refuseWorkflowName(opts.workflow, 'detach');
-  const { file, content } = fileToChange(opts.factory, 'detach');
-  const workflows = content.workflows ?? [];
+  const { file, wiring, schedules, write } = wiringToChange(opts.factory, 'detach', HOME);
+  const workflows = wiring.workflows;
   if (!workflows.includes(opts.workflow))
     throw new Missing({
       message: `${opts.factory} has not attached ${opts.workflow}. ${workflows.length ? `It offers: ${workflows.join(', ')}.` : 'It offers none.'} Nothing was detached.`,
     });
-  const hired = Object.keys(content.hires ?? {})
+  const hired = Object.keys(wiring.hires)
     .filter((step) => step.startsWith(`${opts.workflow}/`))
     .sort();
   if (hired.length)
     throw new Invalid({
       message: `${opts.factory} hires into ${opts.workflow}'s steps: ${hired.join(', ')}. Fire each first — ${hired.map((step) => `nemia factory fire ${opts.factory} --step ${step}`).join('; ')} — then detach it. Nothing was detached.`,
     });
-  if (content.schedules?.[opts.workflow])
+  if (schedules[opts.workflow])
     throw new Invalid({
       message: `${opts.factory} schedules ${opts.workflow}: unschedule it first — nemia factory unschedule ${opts.factory} ${opts.workflow} — then detach it. Nothing was detached.`,
     });
-  writeWhole(file, { ...content, workflows: workflows.filter((w) => w !== opts.workflow) });
+  write({ workflows: workflows.filter((w) => w !== opts.workflow) });
   return { file };
 }
 
@@ -438,6 +545,10 @@ export function setInstruction(opts: { factory: string; at: InstructionAt | unde
     if (bad) throw new Invalid({ message: `${bad} Nothing was changed.` });
   }
   const { file, content } = fileToChange(opts.factory, 'instruction');
+  if (content.template !== undefined)
+    throw new Invalid({
+      message: `${opts.factory} is made from a template, and its instruction is its tree's NEMIA.md, at ${path.join(treeDir(opts.factory), 'NEMIA.md')}: write it with nemia factory instruct ${opts.factory} --file <path>. Nothing was changed.`,
+    });
   const { instruction: _was, ...rest } = content;
   const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
   writeWhole(file, kept === undefined ? rest : { ...rest, instruction: kept });
@@ -467,8 +578,8 @@ function scheduleRefusal(
 /**
  * `nemia factory schedule`: the schedule of the workflow `workflow` written into the factory `factory`'s file, stamped with when it was
  * written (`since`), so it starts nothing until its next fire; one already there is replaced (`replaced`), and every other key kept.
- * Refused before anything is written: the name (`workflowNameRefusal`, `Invalid`), the factory (`fileToChange`), and what
- * `scheduleRefusal` refuses (`Invalid`).
+ * Refused before anything is written: the name (`workflowNameRefusal`, `Invalid`), the factory (`fileToChange`), a templated one whose
+ * tree's wiring does not read (`Invalid`), and what `scheduleRefusal` refuses (`Invalid`).
  */
 export function setSchedule(opts: { factory: string; workflow: string; cron: string; brief: string; repo?: string; tz?: string }): {
   file: string;
@@ -477,7 +588,9 @@ export function setSchedule(opts: { factory: string; workflow: string; cron: str
 } {
   refuseWorkflowName(opts.workflow, 'schedule');
   const { file, content } = fileToChange(opts.factory, 'schedule');
-  const bad = scheduleRefusal(factoryOf(opts.factory, content), opts);
+  const factory = factoryOf(opts.factory, content);
+  if ('error' in factory) throw new Invalid({ message: `the factory ${opts.factory}: ${factory.error} Nothing was scheduled.` });
+  const bad = scheduleRefusal(factory, opts);
   if (bad) throw new Invalid({ message: `${bad} Nothing was scheduled.` });
   const schedule: Schedule = {
     cron: opts.cron,

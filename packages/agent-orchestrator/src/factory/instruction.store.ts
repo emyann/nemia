@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_INSTRUCTION, factoryNameRefusal, type InstructionPlace } from './factory.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { HOME } from '../record/record.store.ts';
 
 /** The words of a factory's instruction, null where there is no file; and why the file there does not read, null where it reads. */
@@ -81,20 +81,28 @@ export function readInstructionAt(at: InstructionPlace): InstructionRead {
   }
 }
 
-/** Whether the store keeps text for the factory `name`, read or not: a file, or anything else, at its place. */
-export const storeKeeps = (name: string): boolean => fs.lstatSync(instructionFile(name), { throwIfNoEntry: false }) !== undefined;
+/**
+ * Whether the store keeps text for the factory `name`, read or not: a file, or anything else, at its place, `file` where it was made from
+ * a template (its tree's).
+ */
+export const storeKeeps = (name: string, file = instructionFile(name)): boolean =>
+  fs.lstatSync(file, { throwIfNoEntry: false }) !== undefined;
 
 /**
- * `nemia factory instruct`: `words` written as the instruction the store keeps for the factory `name`, trimmed, and the file. A link at the
- * file or at its folder is replaced, never written through. Refused, writing nothing: blank words (`Invalid`).
+ * `nemia factory instruct`: `words` written as the instruction the store keeps for the factory `name`, trimmed, at `file` (its tree's
+ * `NEMIA.md` where it was made from a template), and the file. A link at the file or at its folder is replaced, never written through.
+ * Refused, writing nothing: blank words (`Invalid`), and a tree not rendered yet (`Conflict`), which a write would leave unseeded.
  */
-export function writeInstructionText(name: string, words: string): string {
-  const file = instructionFile(name);
+export function writeInstructionText(name: string, words: string, file = instructionFile(name)): string {
   if (!words.trim())
     throw new Invalid({
       message: `the instruction of ${name} is blank. Write the words its runs are to be told, or clear it: nemia factory instruct ${name} --clear. Nothing was written.`,
     });
   const folder = path.dirname(file);
+  if (file !== instructionFile(name) && !fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
+    throw new Conflict({
+      message: `${name} is made from a template, and its tree is not rendered yet, at ${folder}: start the daemon, nemia up, and write it once nemia factory ls shows it applied. Nothing was written.`,
+    });
   const there = fs.lstatSync(folder, { throwIfNoEntry: false });
   if (there && !there.isDirectory()) fs.rmSync(folder, { force: true });
   fs.mkdirSync(folder, { recursive: true });
@@ -103,9 +111,8 @@ export function writeInstructionText(name: string, words: string): string {
   return file;
 }
 
-/** The instruction the store keeps for the factory `name` removed: whether there was one. */
-export function clearInstructionText(name: string): boolean {
-  const file = instructionFile(name);
+/** The instruction the store keeps for the factory `name` removed, at `file` where it was made from a template: whether there was one. */
+export function clearInstructionText(name: string, file = instructionFile(name)): boolean {
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });
   return true;

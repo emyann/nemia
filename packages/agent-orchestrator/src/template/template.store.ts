@@ -130,8 +130,8 @@ const placeSkillNames = (): string[] => entriesOf(PLACE_SKILLS).filter((name) =>
 /** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
 export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
 
-/** A template as read and checked: every problem, sorted, and the version its manifest gives. */
-export type CheckedTemplate = ReadTemplate & { version: unknown };
+/** A template as read and checked: every problem, sorted, its documents read (`folder`), and the version its manifest gives. */
+export type CheckedTemplate = ReadTemplate & { folder: ReadFolder; version: unknown };
 
 /**
  * The template at `source`, read by `readTemplate` and checked: every problem at once, sorted by file then line — a link, a document
@@ -147,11 +147,31 @@ export function checkedTemplate(source: string, name?: string): CheckedTemplate 
   }
   problems.sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0) || (a.col ?? 0) - (b.col ?? 0));
   const manifest = folder.documents.get('nemia.yaml') as { spec?: { version?: unknown } } | null | undefined;
-  return { ...read, version: manifest?.spec?.version };
+  return { ...read, folder, version: manifest?.spec?.version };
 }
 
 /** Every problem of the template at `source`, a folder (named `name`, by default its base name) or an archive: `checkedTemplate`'s. */
 export const checkTemplateAt = (source: string, name?: string): Problem[] => checkedTemplate(source, name).problems;
+
+/** A template opened for a render: `checkedTemplate`'s, one of its files by its path in it (`file`), and that file's text (`text`). */
+export type OpenTemplate = CheckedTemplate & { file: (at: string) => TreeFile; text: (at: string) => string };
+
+/**
+ * The template at `source`, a folder or an archive, read and checked (`checkedTemplate`), each of its files then read off its tree, never
+ * off the disk. Refused: a file asked for that is no file of the template (Invalid), so a `{path}` cannot reach out; else as
+ * `readTemplate` refuses.
+ */
+export function openTemplate(source: string, name?: string): OpenTemplate {
+  const checked = checkedTemplate(source, name);
+  const byPath = new Map(checked.files.map((f) => [f.path, f]));
+  const file = (at: string): TreeFile => {
+    const found = byPath.get(at);
+    if (found === undefined)
+      throw new Invalid({ message: `${at} is no file of the template ${source}: name a file of the template, by its path in it.` });
+    return found;
+  };
+  return { ...checked, file, text: (at) => Buffer.from(file(at).bytes).toString('utf8') };
+}
 
 /** The files of the workflow folder `dir` but its steps, by path from it; a link refused by name. */
 function othersOf(dir: string, refusals: string[]): string[] {

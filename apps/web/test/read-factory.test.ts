@@ -220,6 +220,7 @@ const factories = (): Factory[] => [
       add: 'nemia factory add default --repo <path>',
       schedule: 'nemia factory schedule default <workflow> --cron <expr> --brief <text>',
     },
+    template: null,
   },
   {
     name: 'nemia',
@@ -258,6 +259,7 @@ const factories = (): Factory[] => [
       add: 'nemia factory add nemia --repo <path>',
       schedule: 'nemia factory schedule nemia <workflow> --cron <expr> --brief <text>',
     },
+    template: null,
   },
   {
     name: 'broken',
@@ -273,12 +275,47 @@ const factories = (): Factory[] => [
       add: 'nemia factory add broken --repo <path>',
       schedule: 'nemia factory schedule broken <workflow> --cron <expr> --brief <text>',
     },
+    template: null,
   },
 ];
 
 test('the factories decode as the api gives them, every key kept: the default offering every workflow, a hire, a file that does not read', async (t) => {
   answering(t, factories());
   assert.deepEqual(await readFactories(), factories());
+});
+
+/** A factory made from a template, its tree applied at an older version than the one wanted. */
+const shaped = (): Factory => ({
+  ...factories()[1],
+  name: 'shaped',
+  template: {
+    source: '/drafts/team',
+    version: 'v2',
+    params: { repo: '/work/repo', retries: 2, gated: true },
+    applied: 'v1',
+    conditions: [
+      { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'the template is at v2, and its tree was applied at v1' },
+      { type: 'ConflictsPending', status: 'False', reason: 'None', message: 'nothing to merge' },
+    ],
+  },
+});
+
+test("a templated factory's template decodes as the api gives it, its parameters of every kind and each condition; one not rendered yet, with none", async (t) => {
+  answering(t, [shaped()]);
+  assert.deepEqual(await readFactories(), [shaped()]);
+  const unrendered = { ...shaped(), template: { ...shaped().template!, applied: null, conditions: [] } };
+  answering(t, [unrendered]);
+  assert.deepEqual(await readFactories(), [unrendered]);
+});
+
+test("REFUSED, a factory's template: one without it, and a condition whose state is neither True nor False", async (t) => {
+  answering(t, [without(factories()[1], 'template')]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].template', 'is missing'));
+
+  const maybe = shaped();
+  maybe.template!.conditions[0] = { ...maybe.template!.conditions[0], status: 'Unknown' as never };
+  answering(t, [maybe]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].template.conditions[0].status', '"Unknown", where'));
 });
 
 test('REFUSED, the factories: one without its error, the default offering its workflows as a word, and a schedule without its refusal', async (t) => {

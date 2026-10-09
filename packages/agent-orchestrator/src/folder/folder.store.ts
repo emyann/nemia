@@ -158,17 +158,19 @@ const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEnt
 
 /**
  * The workflow folder a person names: a path, relative to where it is written — the directory `nemia start` is typed in, the plan folder a
- * card is in — or, when no folder is there and it is a bare name, the repository's workflow of that name: `dev` is `<repo>/workflows/dev`.
- * The path is looked at first, so a folder a person points at is never shadowed by one of the repository's.
+ * card is in — or, when no folder is there and it is a bare name, the workflow of that name in `tree`, the tree of a factory made from a
+ * template, then in the repository: `dev` is `<tree>/workflows/dev`, else `<repo>/workflows/dev`. The path is looked at first, so a folder
+ * a person points at is never shadowed by one of the tree's or the repository's.
  *
- * Refused when neither is a folder, naming where it looked and the workflows the repository has. Whether the folder is a workflow is
+ * Refused when none is a folder, naming where it looked and the workflows the repository has. Whether the folder is a workflow is
  * `loadWorkflows`' to say.
  */
-export function workflowFolder(given: string, from: string, repo: string): string {
+export function workflowFolder(given: string, from: string, repo: string, tree?: string): string {
   const at = path.resolve(from, given);
   if (isFolder(at)) return at;
   const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
   if (bare && given === AGENTS_FOLDER) throw new WorkflowError(agentsFolderRefusal(path.join(repo, 'workflows', given))!);
+  if (bare && tree !== undefined && isFolder(path.join(tree, 'workflows', given))) return path.join(tree, 'workflows', given);
   const workflows = path.join(repo, 'workflows');
   if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
   const theirs = workflowsIn(workflows);

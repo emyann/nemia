@@ -24,6 +24,7 @@ import { workRoot } from '../record/places.store.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
+import { treeOf } from '../factory/factory.store.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 
@@ -51,14 +52,18 @@ export const readInbox = (): InboxListing[] =>
  * board, and refusing its start, or its plain re-queue, would strand it — so its `repo:` is ignored and said
  * (`InboxStarted.ignoredRepo`).
  *
- * Silent when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
+ * The workflow is looked for as its start would look: in the tree of the card's factory first, where it is made from a template. Silent
+ * when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
  * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
  */
-function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string }): string | null {
+function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string; factory?: string }): string | null {
   if (opts.repo === undefined || opts.workflow === undefined) return null;
   let steps: readonly Workflow[];
   try {
-    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo), { repo: opts.repo, home: HOME });
+    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo, treeOf(opts.factory)), {
+      repo: opts.repo,
+      home: HOME,
+    });
   } catch {
     return null;
   }
@@ -136,7 +141,7 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     if (why) throw queueRefused(why, card, startedAs);
   }
   if (how.workflow !== undefined) {
-    const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo });
+    const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
     if (refusedRepo) throw new WorkflowError(refusedRepo);
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);

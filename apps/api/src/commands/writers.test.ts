@@ -4,7 +4,8 @@
  * handler only the keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is
  * answered as it would be. The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken
  * is refused in the one sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the
- * command line.
+ * command line. A factory's tree, the writers' place `factory`, is the command line's alone: each writer's route refuses it before its
+ * handler.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
@@ -154,5 +155,23 @@ test("a name yours has taken, a workflow or a file, is refused in workflowTaken'
     assert.equal(typed.status, 2, typed.stderr);
     assert.equal(typed.stderr.trim(), board, name);
     assert.equal(board, workflowTaken(path.join(STORE, name), version), name);
+  }
+});
+
+test("REFUSED on the api: a writer's place `factory`, a factory's tree, which the command line alone writes, is 400 before any handler", async (t) => {
+  const skill = { name: 'tidy', description: 'Use this when notes need tidying.', body: 'Tidy them.' };
+  for (const [name, method, url, body] of [
+    ['agents write', 'POST', '/api/agents/factory', { name: 'scribe', body: 'Write it.' }],
+    ['agents write', 'PUT', '/api/agents/factory/scribe', { body: 'Write it.', version: 'v' }],
+    ['skills write', 'POST', '/api/skills/factory', { skill }],
+    ['skills write', 'PUT', '/api/skills/factory/tidy', { skill, version: 'v' }],
+    ['workflows write', 'POST', '/api/workflows/factory', { name: 'dev-3' }],
+    ['workflows write', 'PUT', '/api/workflows/factory/dev', { steps: [], version: 'v' }],
+  ] as const) {
+    const { res, handed } = await watched(t, name, () => sent(method, url, body));
+    const { error } = (await res.json()) as { error: string };
+    assert.equal(res.status, 400, error);
+    assert.match(error, new RegExp(`^${method} ${url}: .*yours.*named "factory"`), `${method} ${url} says the board writes yours`);
+    assert.equal(handed.length, 0, `${method} ${url} reaches no handler of ${name}`);
   }
 });

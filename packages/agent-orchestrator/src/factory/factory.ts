@@ -41,7 +41,8 @@ export type Schedule = { cron: string; brief: string; repo?: string; tz?: string
 /**
  * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
  * attached to it, each by its folder's name, its hires and its schedules, by workflow; none of each when the file names none.
- * `instruction`: where its instruction is kept, when the file says (`instructionAt`).
+ * `instruction`: where its instruction is kept, when the file says (`instructionAt`). `template` and `tree`: the template it was made
+ * from, and the folder it runs from, its workflows, agents, skills, wiring and instruction, when it was made from one.
  */
 export type Factory = {
   name: string;
@@ -50,7 +51,12 @@ export type Factory = {
   hires: Hires;
   schedules: Readonly<Record<string, Schedule>>;
   instruction?: InstructionAt;
+  template?: FactoryTemplate;
+  tree?: string;
 };
+
+/** The template a factory was made from (`nemia factory apply`): its folder, its version then, and the parameters given, by name. */
+export type FactoryTemplate = { source: string; version: string; params: Readonly<Record<string, string | number | boolean>> };
 
 /**
  * Where a factory's instruction is read: a file in its first folder (`folder`, `path` its path there), or the store's file for it.
@@ -58,10 +64,12 @@ export type Factory = {
 export type InstructionPlace = { in: 'folder'; folder: string; path: string; file: string } | { in: 'store'; file: string };
 
 /**
- * Where the instruction of `factory` is read: the store's file `storeFile` when its file says the store; else the path it names, or
+ * Where the instruction of `factory` is read: its tree's `NEMIA.md`, kept by the store, when it was made from a template; the store's
+ * file `storeFile` when its file says the store; else the path it names, or
  * `NEMIA.md` when it names none, in its first folder, the first of `repos` as filed.
  */
-export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction'>, storeFile: string): InstructionPlace {
+export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction' | 'tree'>, storeFile: string): InstructionPlace {
+  if (factory.tree !== undefined) return { in: 'store', file: path.join(factory.tree, DEFAULT_INSTRUCTION) };
   const at = factory.instruction;
   if (at !== undefined && 'store' in at) return { in: 'store', file: storeFile };
   const folder = factory.repos[0];
@@ -84,7 +92,16 @@ export function instructionPathRefusal(p: string): string | undefined {
 }
 
 /** A factory as `nemia factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
-export type FactoryListing = (Factory & { file: string }) | { name: string; file: string; error: string };
+export type FactoryListing = (Factory & { file: string; status?: TemplateStatus }) | { name: string; file: string; error: string };
+
+/** A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence. */
+export type FactoryCondition = { type: string; status: 'True' | 'False'; reason: string; message: string };
+
+/**
+ * What the controller last observed of a factory made from a template, as `nemia factory ls` lists it: the template's version its base
+ * holds (`applied`), null before its first render, and its conditions, none before then.
+ */
+export type TemplateStatus = { applied: string | null; conditions: readonly FactoryCondition[] };
 
 /** Why `name` cannot name a factory, or undefined: empty, or not a lowercase slug — the slug suggested when lowering its case makes one. */
 export function factoryNameRefusal(name: string): string | undefined {
@@ -413,6 +430,22 @@ const workflowLine = (workflows: readonly string[], width: number): string[] =>
 const instructionLine = (at: InstructionAt | undefined, width: number): string[] =>
   at === undefined ? [] : [`${' '.repeat(width)}  instruction: ${'store' in at ? 'kept in the store' : at.path}`];
 
+/**
+ * The template a factory was made from, as `nemia factory ls` lists it under its line: its folder and version, the version applied or that
+ * none is yet, and each condition that is not as it should be — `Applied` false, `ConflictsPending` true — with its sentence.
+ */
+function templateLines(template: FactoryTemplate | undefined, status: TemplateStatus | undefined, width: number): string[] {
+  if (template === undefined) return [];
+  const pad = ' '.repeat(width);
+  const applied = status?.applied ?? null;
+  const at = applied === null ? 'not rendered yet: the daemon renders it, nemia up' : `applied at ${applied}`;
+  const amiss = (status?.conditions ?? []).filter((c) => (c.type === 'Applied') === (c.status === 'False'));
+  return [
+    `${pad}  template: ${template.source} ${template.version}, ${at}`,
+    ...amiss.map((c) => `${pad}  ${c.type} ${c.status}, ${c.reason}: ${c.message}`),
+  ];
+}
+
 /** A schedule's next fire and last run as `nemia ls` words them at `now` (`fireWord`), and the refusal kept of its latest fire. */
 const whenLines = (s: ScheduleListed, indent: string, now: number): string[] => [
   `${indent}next ${s.next ? fireWord(s.next, now) : 'never'}  last ${s.last ? `${s.last.run} (${fireWord(s.last.at, now)})` : 'none'}`,
@@ -454,6 +487,7 @@ export function factoryLines(
       ...('error' in l
         ? []
         : [
+            ...templateLines(l.template, l.status, width),
             ...workflowLine(l.workflows, width),
             ...hireLines(l.hires, width),
             ...scheduleLines(l, listed, width, now),

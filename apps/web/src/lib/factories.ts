@@ -4,7 +4,7 @@
  * with, what the factory picked keeps, the factories a workflow is in and the workflows the factory picked offers. A run or a card belongs
  * to the factory it names, and one naming none to the default factory. Pure.
  */
-import type { Factory, InboxEntry, PagePlace, RunSummary, WorkflowListing, WorkflowPageAddress } from './api.ts';
+import type { Factory, FactoryCondition, InboxEntry, PagePlace, RunSummary, WorkflowListing, WorkflowPageAddress } from './api.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
@@ -29,6 +29,13 @@ export type FactoryBlock = {
   hires: number;
   error: string | null;
 };
+
+/**
+ * Whether the condition `condition` of a factory's template is amiss: `Applied` that is not true, or another (`ConflictsPending`) that
+ * is.
+ */
+export const conditionAmiss = (condition: Pick<FactoryCondition, 'type' | 'status'>): boolean =>
+  (condition.type === 'Applied') === (condition.status === 'False');
 
 /** Whether `item` is in `factory`: it names it, or it names none and `factory` is the default. */
 const isIn = (item: { factory: string | null }, factory: FactoryPlace): boolean =>

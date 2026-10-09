@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   applyNodeChanges,
@@ -165,12 +165,17 @@ const minimapFill = (node: RunFlowNode) =>
  * factory's; the daemon and the quota are the frame's bottom bar's (`FrameFooter`). The cap is read again as the runs are, on each run's
  * event of the workflow feed; the queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees,
  * and nothing on the board asks it to.
+ *
+ * What the page puts `above` the floor, its template among them, takes its height from the floor's, which fills the rest of the frame.
  */
-export function FactoryCanvas({ runs, factory }: { runs: readonly RunSummary[]; factory: FactoryPlace }) {
+export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunSummary[]; factory: FactoryPlace; above?: ReactNode }) {
   return (
-    <ReactFlowProvider>
-      <Floor runs={runs} factory={factory} />
-    </ReactFlowProvider>
+    <div className="flex h-[calc(100svh-5rem)] min-h-96 flex-col">
+      {above}
+      <ReactFlowProvider>
+        <Floor runs={runs} factory={factory} />
+      </ReactFlowProvider>
+    </div>
   );
 }
 
@@ -454,7 +459,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   }, 0);
 
   return (
-    <div className="flex h-[calc(100svh-5rem)] min-h-96 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <FloorCounts runs={runs} flying={flying.size} />

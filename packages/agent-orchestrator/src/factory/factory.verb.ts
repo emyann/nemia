@@ -20,6 +20,7 @@ import {
 } from './factory.store.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
+import { FACTORY_APPLY } from '../applied/applied.verb.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
 import { schedulesListed } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
@@ -27,6 +28,7 @@ import { runStore } from '../record/files.store.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
 nemia factory add <name> --repo <path> [--repo <path> ...]
+nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
 nemia factory attach <factory> <workflow>
 nemia factory detach <factory> <workflow>
 nemia factory hire <factory> <agent> --step <workflow>/<step>
@@ -48,6 +50,14 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  does not read as a factory is listed with why.
   nemia factory add files a factory: its name a lowercase slug (letters, digits, dashes; 40 at most), and one
                  --repo at least, each a directory, written as an absolute path and named once. Git is not asked.
+  nemia factory apply files a factory made from a template that passes its check (nemia template check), its
+                 parameters given with --set, typed as nemia.yaml declares them, a default filling one not
+                 given. Its file names the template; the daemon renders the template into
+                 factories/<name>/applied/, read-only, and seeds factories/<name>/tree/ from it once — the
+                 workflows, agents, skills, wiring (factory.json) and NEMIA.md the factory runs from, yours to
+                 change after — and writes factories/<name>/status.json: the version, the digest and the
+                 conditions Applied and ConflictsPending. Its attach, detach, hire, fire and instruct write the
+                 tree, and nemia workflows, agents and skills write into it with --factory <name>.
   nemia factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
                  workflows attached to it — none, until one is. Only the name is stored, and a step that
                  names its own agent is filled already; whether the workflow exists is judged at the start.
@@ -354,6 +364,7 @@ export const FACTORIES: readonly Command[] = [
   FACTORY,
   FACTORY_LS,
   FACTORY_ADD,
+  FACTORY_APPLY,
   FACTORY_ATTACH,
   FACTORY_DETACH,
   FACTORY_HIRE,

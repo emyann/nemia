@@ -129,7 +129,7 @@ test('REFUSED at shipped defaults: an agent written where one is, at a version i
   );
   assert.equal(
     await refused(t, 'agents', 'write', 'yours'),
-    "nemia agents write takes --file, the agent's file to write, named <name>.md: nemia agents write yours [<name>] --file <name>.md [--version <v>]",
+    "nemia agents write takes --file, the agent's file to write, named <name>.md: nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]",
   );
   const nowhere = path.join(DRAFTS, 'agents', 'nobody.md');
   assert.match(
@@ -144,7 +144,7 @@ test('REFUSED at shipped defaults: a key the api alone takes, typed at the comma
   const file = drafted('agents/plain.md', '---\ndescription: Use this plainly.\n---\nDo it.\n');
   assert.equal(
     await refused(t, 'agents', 'write', 'yours', '--file', file, '--draft', '{}'),
-    'nemia agents write takes no --draft: nemia agents write yours [<name>] --file <name>.md [--version <v>]',
+    'nemia agents write takes no --draft: nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
   );
   assert.equal(
     await refused(t, 'agents', 'remove', 'yours', 'plain', '--repo', DRAFTS),
@@ -152,11 +152,11 @@ test('REFUSED at shipped defaults: a key the api alone takes, typed at the comma
   );
   assert.equal(
     await refused(t, 'skills', 'write', 'yours', '--copy', 'tidy'),
-    'nemia skills write takes no --copy: nemia skills write yours [<name>] --file <SKILL.md> [--version <v>]',
+    'nemia skills write takes no --copy: nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
   );
   assert.equal(
     await refused(t, 'workflows', 'write', 'yours', 'dev', '--draft', '[]'),
-    'nemia workflows write takes no --draft: nemia workflows write yours <name> --folder <draft> [--version <v>]',
+    'nemia workflows write takes no --draft: nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
   );
 });
 
@@ -270,7 +270,7 @@ test('REFUSED at shipped defaults: a workflow written where one is, at a version
   );
   assert.equal(
     await refused(t, 'workflows', 'write', 'yours', 'review'),
-    'nemia workflows write takes --folder, the draft folder whose steps and README to write: nemia workflows write yours <name> --folder <draft> [--version <v>]',
+    'nemia workflows write takes --folder, the draft folder whose steps and README to write: nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
   );
   const file = path.join(folder, 'README.md');
   assert.equal(

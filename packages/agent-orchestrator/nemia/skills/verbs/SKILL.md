@@ -249,6 +249,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                drop a card without starting it
   nemia factory add <name> --repo <path> [--repo <path> ...]
                                file a factory: a lowercase slug naming one or more directories
+  nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...]
+                               make a factory from a template that passes its check, its parameters
+                               given with --set; the daemon renders its tree
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it
@@ -277,17 +280,19 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia template unpack <archive> <dir>
                                write the folder a template's archive holds at <dir>/<name>, each file's
                                bytes and mode as packed
-  nemia agents write yours [<name>] --file <name>.md [--version <v>]
-                               an agent of yours written from its file: <name> is the agent it
-                               changes or renames, at the --version it was read at; none, a new one
+  nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]
+                               an agent of yours, or of a templated --factory, written from its file:
+                               <name> is the agent it changes or renames, at the --version it was
+                               read at; none, a new one
   nemia agents copy <file> [--as <name>] [--keep <part>]...
                                an agent file copied into your library, with its schema and skills;
                                a part your library holds otherwise stops it: --as or --keep
   nemia agents remove yours <name> --version <v>
                                an agent of yours removed, at the --version it was read at
-  nemia skills write yours [<name>] --file <SKILL.md> [--version <v>]
-                               a skill of yours written from its SKILL.md: <name> is the skill it
-                               changes, at the --version it was read at; none, a new one
+  nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]
+                               a skill of yours, or of a templated --factory, written from its
+                               SKILL.md: <name> is the skill it changes, at the --version it was
+                               read at; none, a new one
   nemia cancel <runId>
                                stop what it has in flight; file nothing more
   nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
@@ -346,9 +351,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                switched to without a rebuild, so an older tag rolls back. --repo:
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia)
-  nemia workflows write yours <name> --folder <draft> [--version <v>]
-                               a workflow folder of yours written from the steps and README of a
-                               draft folder; one there already, at the --version it was read at
+  nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
+                               a workflow folder of yours, or of a templated --factory, written from
+                               a draft folder; one there already, at the --version it was read at
   nemia workflows remove yours <name> --version <v>
                                a workflow folder of yours removed, at the --version it was read at
 ```

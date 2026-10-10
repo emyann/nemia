@@ -4,7 +4,7 @@ description: Builds the change a spec describes, with the tests that prove it, a
 skills: implement-a-change, git, look, shadcn
 harness: claude
 model: opus
-effort: high
+effort: medium
 context: 200k
 permissionMode: auto
 disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json)

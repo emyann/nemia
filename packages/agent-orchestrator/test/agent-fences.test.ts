@@ -432,7 +432,11 @@ test("REFUSED: a step's check that neither its fence nor the settings allow is n
   assert.deepEqual(unallowed(janitor.step, janitor.checks, without('Bash(npx nemia stats:*)')), stats);
   assert.deepEqual(unallowed(janitor.step, janitor.checks, without('Bash(npx nemia inbox)')), ['npx nemia inbox']);
   assert.deepEqual(unallowed(design.step, design.checks, []), design.checks, 'Seldon allows none of them itself');
-  assert.deepEqual(unallowed({ ...review.step, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']), ['npm run lint'], 'a deny wins');
+  assert.deepEqual(
+    unallowed({ ...review.step, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']),
+    ['npm run lint'],
+    'a deny wins',
+  );
   assert.throws(
     () => checksOf('workflows/build/design.md', 'Run no check'),
     (err: Error) => err.message.includes('workflows/build/design.md: no "Run no check"'),

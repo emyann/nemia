@@ -16,7 +16,7 @@ import path from 'node:path';
 import { splitFrontmatter } from '../src/step/step.ts';
 import { REPO } from './team.ts';
 
-/** This repository's words, which no agent of the team, no schema beside one and no skill of theirs may say: each with text that says it. */
+/** This repository's words, which no agent of the team, no schema beside one, no skill of theirs may say, each with text that says it. */
 const PLANTED: Record<string, string> = {
   'apps/': 'When the change touches `apps/web`, picture its pages.',
   'packages/': 'Read packages/agent-runtime/README.md first.',
@@ -106,7 +106,11 @@ test("REFUSED: each of this repository's words, planted in an agent's body, in i
       ['workflows/agents/y.md', `---\nrole: Y\nallowedTools: Agent\nnote: ${says}\n---\nYou are Y.\n`],
       ['.claude/skills/x/SKILL.md', `# X\n\n1. ${says}\n`],
     ]);
-    assert.deepEqual(oursIn(files, [word]), [...files.keys()].map((file) => `${file}: ${word}`), word);
+    assert.deepEqual(
+      oursIn(files, [word]),
+      [...files.keys()].map((file) => `${file}: ${word}`),
+      word,
+    );
   }
   assert.ok(REPOSITORY_WORDS.length >= 22, 'the list only grows');
 });

@@ -156,7 +156,10 @@ test('REFUSED: a step that denies a command no more is named', () => {
   const intake = shippedEdited('intake', 'intake', (text) => text.replace(', Bash(npm run build)', ''));
   assert.deepEqual(untold('intake', intake), ['intake/intake: denies Bash(npm run build)']);
   const janitor = shippedEdited('janitor', 'argus', (text) => text.replace(/^disallowedTools: .*\n/m, ''));
-  assert.deepEqual(untold('janitor', janitor), NO_BUILD.map((rule) => `janitor/argus: denies ${rule}`));
+  assert.deepEqual(
+    untold('janitor', janitor),
+    NO_BUILD.map((rule) => `janitor/argus: denies ${rule}`),
+  );
 });
 
 test('REFUSED: a step whose note says a sentence no more is named, whatever line the sentence broke on', () => {
@@ -186,7 +189,13 @@ test("the build review's schema is the reviewer's with `mutants` added, field fo
   const theirs = fs.readFileSync(path.join(HOLDER, 'agents', 'review.schema.json'), 'utf8');
   assert.equal(schemaDrift(ours, theirs, 'mutants'), undefined);
   assert.ok(theirs.includes('"again"') && theirs.includes('"findings"'), 'the reviewer declares its findings and the round');
-  assert.equal(schemaDrift(ours.replace('one finding each', 'a finding each'), theirs, 'mutants'), "is not the agent's schema with mutants added");
+  assert.equal(
+    schemaDrift(ours.replace('one finding each', 'a finding each'), theirs, 'mutants'),
+    "is not the agent's schema with mutants added",
+  );
   assert.equal(schemaDrift(theirs, theirs, 'mutants'), 'declares no required mutants');
-  assert.equal(schemaDrift(ours.replace('["findings", "mutants", "again"]', '["findings", "again"]'), theirs, 'mutants'), 'declares no required mutants');
+  assert.equal(
+    schemaDrift(ours.replace('["findings", "mutants", "again"]', '["findings", "again"]'), theirs, 'mutants'),
+    'declares no required mutants',
+  );
 });

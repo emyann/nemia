@@ -11,22 +11,78 @@ import { OUT, store } from '../world.ts';
 const FACTORY = FACTORIES.hiring.name;
 /** The words the page keeps in the store. */
 const WORDS = 'Run the checks before every commit, and say in the message why the change is made.';
+/** The rules the page writes for the factory. */
+const RULES = 'Never push on a Friday. A change comes with the test that proves it.';
 /** A file of the checkout the page points the instruction at: the README of the workflow `dev`. */
 const README = path.join('workflows', WORKFLOWS.good.name, 'README.md');
 
 const route = `/api/factories/${FACTORY}/instruction`;
+const rulesRoute = `/api/factories/${FACTORY}/rules`;
 
-/** The answer to the next `method` on the instruction's route, or on its words' with `words`. */
-const answered = (page: Page, method: 'PUT' | 'DELETE', words = false) =>
-  page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === (words ? `${route}/words` : route), {
-    timeout: WAIT_MS,
-  });
+/** Which route a press writes: the instruction's, its words', or the rules'. */
+type Written = 'instruction' | 'words' | 'rules';
 
-/** Press `button` in `section`, wait for the api's answer to `method`, and refuse any but a 200. */
-async function wrote(page: Page, section: Locator, button: string, method: 'PUT' | 'DELETE', words = false): Promise<void> {
-  const [answer] = await Promise.all([answered(page, method, words), section.getByRole('button', { name: button, exact: true }).click()]);
+const ROUTES: Record<Written, string> = { instruction: route, words: `${route}/words`, rules: rulesRoute };
+
+/** The answer to the next `method` on the route of `what`. */
+const answered = (page: Page, method: 'PUT' | 'DELETE', what: Written) =>
+  page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === ROUTES[what], { timeout: WAIT_MS });
+
+/** Press `button` in `section`, wait for the api's answer to `method` on the route of `what`, and refuse any but a 200. */
+async function wrote(page: Page, section: Locator, button: string, method: 'PUT' | 'DELETE', what: Written = 'instruction'): Promise<void> {
+  const [answer] = await Promise.all([answered(page, method, what), section.getByRole('button', { name: button, exact: true }).click()]);
   if (answer.status() !== 200) throw new Refused(`${button} writes — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
+}
+
+/**
+ * The factory's rules, above its instruction: none yet, and no Clear offered; written, they are the store's file, said saved, and read
+ * again on a reload; cleared, asked twice, the file is gone. The instruction's block says it is Nemia's, told to no step.
+ */
+async function keepRules(page: Page, kept: string): Promise<void> {
+  const section = page.locator('section[data-factory-rules]');
+  const instruction = page.locator('section[data-factory-instruction]');
+  const above = await section.evaluate(
+    (el, other) => Boolean(other && el.compareDocumentPosition(other) & 4),
+    await instruction.elementHandle(),
+  );
+  if (!above) throw new Refused("the factory's rules are drawn above its instruction");
+  await expectVisible(
+    section.locator('[data-rules-told]', {
+      hasText:
+        "Told to every agent hired into this factory, after its custom instructions and before the step's own policy. Runs already started keep what they were told.",
+    }),
+    'the rules say who is told them, where in the order, and that a run keeps what it was told',
+  );
+  await expectVisible(
+    instruction.getByText('What Nemia is to know about this factory', { exact: false }),
+    "the instruction's block says it is Nemia's",
+  );
+  await expectVisible(instruction.getByText('no step of a run is told it', { exact: false }), 'and that no step is told it');
+  const shown = await section.locator('[data-rules-file]').textContent();
+  if (shown !== kept) throw new Refused(`the rules name the file they are kept in, ${kept} — they name ${JSON.stringify(shown)}`);
+  const words = section.getByRole('textbox', { name: 'Words' });
+  if ((await words.inputValue()) !== '') throw new Refused(`a factory with no rules shows none — ${await words.inputValue()}`);
+  await expectCount(section.getByRole('button', { name: 'Clear…' }), 0, 'with no rules kept, there is nothing to clear');
+  await words.fill(RULES);
+  await wrote(page, section, 'Save', 'PUT', 'rules');
+  if (!fs.existsSync(kept) || fs.readFileSync(kept, 'utf8') !== `${RULES}\n`)
+    throw new Refused(`saved, the rules are ${kept}'s — it holds ${fs.existsSync(kept) ? fs.readFileSync(kept, 'utf8') : 'nothing'}`);
+  await expectVisible(section.locator('[data-rules-done]', { hasText: 'Saved' }), 'the page says they are saved');
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  await expectVisible(words, 'the rules, read again');
+  if ((await words.inputValue()) !== RULES) throw new Refused(`reloaded, the rules are read again — ${await words.inputValue()}`);
+  await settled(page);
+  await photograph(page, path.join(OUT, `factory-settings-rules-${await themeOf(page)}.png`));
+  await section.getByRole('button', { name: 'Clear…' }).click();
+  await expectVisible(section.locator('[data-rules-clear-asks]'), 'Clear asks once more before it removes them');
+  await settled(page);
+  await photograph(section, path.join(OUT, `factory-settings-rules-clear-${await themeOf(page)}.png`));
+  await wrote(page, section, 'Clear', 'DELETE', 'rules');
+  if (fs.existsSync(kept)) throw new Refused(`cleared, ${kept} is gone`);
+  if ((await words.inputValue()) !== '') throw new Refused(`cleared, the rules are empty — ${await words.inputValue()}`);
+  await expectVisible(section.locator('[data-rules-done]', { hasText: 'Cleared' }), 'the page says they are cleared');
 }
 
 /** Where the section says the instruction is kept, and the file it names. */
@@ -80,7 +136,7 @@ async function keepInStore(page: Page, section: Locator, stored: string): Promis
   if (await section.getByRole('button', { name: 'Read this file' }).isEnabled())
     throw new Refused('kept in the store, an empty path reads no file: Read this file waits for one');
   await section.getByRole('textbox', { name: 'Words' }).fill(WORDS);
-  await wrote(page, section, 'Save', 'PUT', true);
+  await wrote(page, section, 'Save', 'PUT', 'words');
   if (!fs.existsSync(stored) || fs.readFileSync(stored, 'utf8').trim() !== WORDS)
     throw new Refused(`saved, the words are ${stored}'s — it holds ${fs.existsSync(stored) ? fs.readFileSync(stored, 'utf8') : 'nothing'}`);
   await expectVisible(section.locator('[data-instruction-done]', { hasText: 'Saved.' }), 'the page says they are saved');
@@ -96,7 +152,7 @@ async function keepInStore(page: Page, section: Locator, stored: string): Promis
 
   await section.getByRole('button', { name: 'Clear…' }).click();
   await expectVisible(section.locator('[data-instruction-clear-asks]'), 'Clear asks once more before it removes them');
-  await wrote(page, section, 'Clear', 'DELETE', true);
+  await wrote(page, section, 'Clear', 'DELETE', 'words');
   if (fs.existsSync(stored)) throw new Refused(`cleared, ${stored} is gone`);
   if ((await words.inputValue()) !== '') throw new Refused(`cleared, the words are empty — ${await words.inputValue()}`);
 }
@@ -118,10 +174,12 @@ async function onPhone(page: Page, theme: string): Promise<void> {
 
 export default {
   /**
-   * A factory's settings, reached by the Settings link on its floor: its instruction, read by default from `NEMIA.md` in the factory's
-   * first folder, no file there yet. Pointed at a file of that folder, it reads that file and the factory's file names its path; Back to
-   * NEMIA.md undoes it. Kept in the store, its words are saved to the store's file and read again on a reload, then cleared, asked twice;
-   * Back to NEMIA.md leaves the factory's file as it was. The factory's file and the store's folder for it are taken back whatever happens.
+   * A factory's settings, reached by the Settings link on its floor. Its rules, drawn above its instruction: none yet; written, they are
+   * the store's `RULES.md` for the factory, read again on a reload, then cleared, asked twice. Its instruction, said as Nemia's, read by
+   * default from `NEMIA.md` in the factory's first folder, no file there yet. Pointed at a file of that folder, it reads that file and
+   * the factory's file names its path; Back to NEMIA.md undoes it. Kept in the store, its words are saved to the store's file and read
+   * again on a reload, then cleared, asked twice; Back to NEMIA.md leaves the factory's file as it was. The factory's file and the
+   * store's folder for it are taken back whatever happens.
    */
   name: 'factory-settings',
   route: `/factories/${FACTORY}`,
@@ -136,6 +194,7 @@ export default {
     const section = page.locator('section[data-factory-instruction]');
     try {
       await followSettings(page, section, checkout);
+      await keepRules(page, path.join(folder, 'RULES.md'));
       await pointAtFile(page, section, checkout, factoryFile);
       await keepInStore(page, section, stored);
       await wrote(page, section, 'Back to NEMIA.md', 'DELETE');

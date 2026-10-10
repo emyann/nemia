@@ -1,10 +1,11 @@
 /**
  * What a step was told, folded away: it is long, and it does not change while you look at the step. Where its run froze its layers,
  * each is drawn apart, as the run froze it when it started — the agent's instructions with its own skills, the person's custom
- * instructions, the step's policy with the skills its line adds and the fence lines it tightens, and the task; a run that froze none
- * shows its brief whole. Each is drawn as the markdown it is written in (`Words`). At a gate, the step's policy is drawn open on its
- * own (`StepPolicy`), the layer a person judges the step by. The task is drawn in its parts where the api split it (`TaskParts`): each
- * run it was handed a block of its own, headed by how it was handed and linked to that run.
+ * instructions, the rules of the factory it was started in where it froze some, the step's policy with the skills its line adds and the
+ * fence lines it tightens, and the task; a run that froze none shows its brief whole. Each is drawn as the markdown it is written in
+ * (`Words`). At a gate, the step's policy is drawn open on its own (`StepPolicy`), the layer a person judges the step by. The task is
+ * drawn in its parts where the api split it (`TaskParts`): each run it was handed a block of its own, headed by how it was handed and
+ * linked to that run.
  *
  * On a step's own page the same layers are what a run of it will be told, read now (`homes`): each beside where it lives, linked to where
  * it is edited, and the task left to the brief a run is started with.
@@ -16,10 +17,34 @@ import { RouteLink } from './AgentParts';
 import { Markdown } from './Markdown';
 
 /**
- * Where each layer of a step lives, for its page: drawn beside the agent's instructions, your custom instructions and the step's policy,
- * each a link to where it is edited or the file it is written in; and each skill, by its name, as a link to its page or its name alone.
+ * Where each layer of a step lives, for its page: drawn beside the agent's instructions, your custom instructions, the factory's rules and
+ * the step's policy, each a link to where it is edited or the file it is written in; and each skill, by its name, as a link to its page or
+ * its name alone. `factory` is null where the page is read in no factory, which has no rules to tell.
  */
-export type LayerHomes = { instructions: ReactNode; custom: ReactNode; words: ReactNode; skill: (name: string) => ReactNode };
+export type LayerHomes = {
+  instructions: ReactNode;
+  custom: ReactNode;
+  factory: ReactNode;
+  words: ReactNode;
+  skill: (name: string) => ReactNode;
+};
+
+/** What the board calls the layer of a factory's rules. */
+const FACTORY_RULES = "The factory's rules";
+
+/**
+ * What a step's policy is told after, in words: agent `agent`'s instructions, then your custom instructions and the factory's rules,
+ * each where `layers` holds some.
+ */
+export function toldBefore(agent: string, layers: Pick<StepLayers, 'custom' | 'factory'>): string {
+  const first = `${agent}'s instructions`;
+  const rest = [
+    ...(layers.custom === null ? [] : ['your custom instructions']),
+    ...(layers.factory === null ? [] : ["the factory's rules"]),
+  ];
+  if (!rest.length) return first;
+  return rest.length === 1 ? `${first} and ${rest[0]}` : `${first}, ${rest[0]} and ${rest[1]}`;
+}
 
 /**
  * The fold: `told`, the brief whole, drawn only where `layers` is null; `parts`, the task in its parts, where the api split it; `filed`
@@ -51,7 +76,10 @@ export function Told({
   );
 }
 
-/** The four layers in the order the session reads them, and where the agent's words and the person's went. */
+/**
+ * The layers in the order the session reads them, the factory's rules among them only where the run froze some, and where the agent's
+ * words, the person's and the factory's went.
+ */
 function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | null }) {
   return (
     <div className="mt-2 flex flex-col gap-3">
@@ -60,7 +88,8 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
       ) : (
         <>
           <p className="text-xs text-muted-foreground">
-            The agent's instructions and yours were frozen at the start of the run and given{' '}
+            {layers.factory === null ? "The agent's instructions and yours" : "The agent's instructions, yours and the factory's rules"}{' '}
+            were frozen at the start of the run and given{' '}
             {layers.via === 'prompt' ? "in the session's system prompt" : 'at the head of its brief'}.
           </p>
           <Layer name="instructions" title={`Instructions — ${layers.agent}'s`}>
@@ -70,6 +99,11 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
           <Layer name="custom" title="Your custom instructions">
             <Words text={layers.custom} />
           </Layer>
+          {layers.factory !== null && (
+            <Layer name="factory" title={FACTORY_RULES}>
+              <Words text={layers.factory} />
+            </Layer>
+          )}
         </>
       )}
       <Layer name="policy" title="The step's policy">
@@ -86,7 +120,8 @@ function Layers({ layers, parts }: { layers: StepLayers; parts: TaskPart[] | nul
 
 /**
  * What a run of a step will be told, read now from the files and frozen when a run starts: the layers in the order the session reads them,
- * each beside where it lives, the agent's instructions folded, and the task left to the brief a run is started with.
+ * each beside where it lives, the agent's instructions folded, the factory's rules where the page is read in a factory or some are told,
+ * and the task left to the brief a run is started with.
  */
 function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }) {
   return (
@@ -113,6 +148,11 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
             <Layer name="custom" title="Your custom instructions" home={homes.custom}>
               <Words text={layers.custom} none="None written" />
             </Layer>
+            {(layers.factory !== null || homes.factory) && (
+              <Layer name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
+                <Words text={layers.factory} none="None written: this factory tells its agents no rules" />
+              </Layer>
+            )}
           </>
         )}
         <Layer name="policy" title="The step's policy" home={homes.words}>
@@ -139,14 +179,13 @@ export function StepBody({ body, layers }: { body: string | null; layers: StepLa
 
 /**
  * The step's policy, drawn open at its gate: its own words, the skills it adds and the fence lines it tightens, then what it was told
- * before — its agent's instructions, and the person's custom instructions where there are any — over which it wins where they conflict,
- * and where every layer is. Nothing for a step with no agent, whose own words are all it was told and are its policy layer in the fold,
- * nor for a run that froze no layers (`layers` null).
+ * before (`toldBefore`) — its agent's instructions, then the person's custom instructions and the factory's rules where there are any —
+ * over which it wins where they conflict, and where every layer is. Nothing for a step with no agent, whose own words are all it was told
+ * and are its policy layer in the fold, nor for a run that froze no layers (`layers` null).
  */
 export function StepPolicy({ layers }: { layers: StepLayers | null }) {
   const agent = layers?.agent ?? null;
   if (layers === null || agent === null) return null;
-  const before = layers.custom === null ? `${agent}'s instructions` : `${agent}'s instructions and your custom instructions`;
   return (
     <div data-gate-policy className="flex flex-col gap-2 rounded border border-neutral-200 p-3 dark:border-neutral-800">
       <Layer name="policy" title="The step's policy">
@@ -155,7 +194,7 @@ export function StepPolicy({ layers }: { layers: StepLayers | null }) {
         <Fence agent={agent} fence={layers.fence} />
       </Layer>
       <p className="text-xs text-muted-foreground">
-        Told after {before}; where they conflict, this wins. Every layer is under “What it was told”.
+        Told after {toldBefore(agent, layers)}; where they conflict, this wins. Every layer is under “What it was told”.
       </p>
     </div>
   );

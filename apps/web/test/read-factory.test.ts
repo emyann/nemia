@@ -12,13 +12,17 @@ import { quotaQuery, type Quota } from '../src/lib/api/quota.ts';
 import { ceilingsQuery, passesQuery, type Ceilings, type PassesRead } from '../src/lib/api/ceilings.ts';
 import { daemonQuery, type Daemon } from '../src/lib/api/daemon.ts';
 import {
+  clearRules,
   factoriesQuery,
   factoryInstructionQuery,
+  factoryRulesQuery,
   fireAgent,
   hireAgent,
   writeInstruction,
+  writeRules,
   type Factory,
   type FactoryInstruction,
+  type FactoryRules,
 } from '../src/lib/api/factories.ts';
 import {
   capabilities,
@@ -51,6 +55,7 @@ const readPasses = passesQuery.queryFn as unknown as () => Promise<PassesRead>;
 const readDaemon = daemonQuery.queryFn as unknown as () => Promise<Daemon>;
 const readFactories = factoriesQuery.queryFn as unknown as () => Promise<Factory[]>;
 const readInstruction = factoryInstructionQuery('mill').queryFn as unknown as () => Promise<FactoryInstruction>;
+const readRules = factoryRulesQuery('mill').queryFn as unknown as () => Promise<FactoryRules>;
 
 /** Whether `err` is an `UnreadAnswer` of `route` whose message names `at`, what was found there, and the fix. */
 const unread = (route: string, at: string, found: string) => (err: unknown) => {
@@ -397,6 +402,56 @@ test("REFUSED, a factory's instruction: one that does not say whether the store 
   await assert.rejects(readInstruction(), unread('/api/factories/mill/instruction', 'store', 'is missing'));
   answering(t, without(instruction, 'words'));
   await assert.rejects(readInstruction(), unread('/api/factories/mill/instruction', 'words', 'is missing'));
+});
+
+/** A factory's rules as the api answers them: kept in its file, with words. */
+const rules: FactoryRules = {
+  name: 'mill',
+  file: '/home/me/.agent-workflows/factories/mill/RULES.md',
+  words: 'Never push on a Friday.',
+  error: null,
+};
+
+test("a factory's rules read as the api gives them: with words, with none, and with why a file cannot be told; a write's answer and a clear's the same", async (t) => {
+  answering(t, rules);
+  assert.deepEqual(await readRules(), rules);
+  const none = { ...rules, words: null };
+  answering(t, none);
+  assert.deepEqual(await readRules(), none);
+  const untold = { ...rules, words: '---\nmodel: x\n---', error: 'RULES.md opens with a frontmatter block: start it with a word.' };
+  answering(t, untold);
+  assert.deepEqual(await readRules(), untold);
+  answering(t, rules);
+  assert.deepEqual(await writeRules('mill', 'Never push on a Friday.'), rules);
+  answering(t, { ...none, removed: true });
+  assert.deepEqual(await clearRules('mill'), none, "whether a file was removed is not the board's to read");
+});
+
+test("REFUSED, a factory's rules: an answer whose words are left out, and one that does not say whether its file can be told", async (t) => {
+  answering(t, without(rules, 'words'));
+  await assert.rejects(readRules(), unread('/api/factories/mill/rules', 'words', 'is missing'));
+  answering(t, without(rules, 'error'));
+  await assert.rejects(readRules(), unread('/api/factories/mill/rules', 'error', 'is missing'));
+});
+
+test("a factory's rules are written and cleared at the factory's own route, its name one segment", async (t) => {
+  const before = globalThis.fetch;
+  const sent: Array<{ method: string; url: string; body: unknown }> = [];
+  globalThis.fetch = async (input, init) => {
+    sent.push({ method: init?.method ?? 'GET', url: String(input), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    return new Response(JSON.stringify(rules), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  await factoryRulesQuery('the mill').queryFn?.({} as never);
+  await writeRules('the mill', 'Never push.');
+  await clearRules('the mill');
+  assert.deepEqual(sent, [
+    { method: 'GET', url: '/api/factories/the%20mill/rules', body: undefined },
+    { method: 'PUT', url: '/api/factories/the%20mill/rules', body: { words: 'Never push.' } },
+    { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: {} },
+  ]);
 });
 
 test("a hire and a fire are sent to the step's hire, the step one segment, and read back as the api answers them", async (t) => {

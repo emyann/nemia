@@ -186,6 +186,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
     agent: null,
     instructions: null,
     custom: null,
+    factory: null,
     agentSkills: [],
     policy: 'Land it.',
     addedSkills: [],

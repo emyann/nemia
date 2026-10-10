@@ -1,21 +1,25 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryInstruction } from '@/components/FactoryInstruction';
+import { FactoryRules } from '@/components/FactoryRules';
 import { FactorySchedules } from '@/components/FactorySchedules';
 import { routeLink } from '@/components/routeLink';
 import { LinkButton } from '@/components/ui/button';
-import { factoriesQuery, factoryInstructionQuery } from '@/lib/api';
+import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery } from '@/lib/api';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.
- * It waits for the factories, then prefetches the instruction of a factory a person made, which says why it does not read in its own
- * section; the default factory and a name no factory has ask for none.
+ * It waits for the factories, then prefetches the rules and the instruction of a factory a person made, each of which says why it does
+ * not read in its own section; the default factory and a name no factory has ask for neither.
  */
 export const Route = createFileRoute('/factories/$factory_/settings')({
   loader: async ({ context, params }) => {
     const factories = await context.queryClient.ensureQueryData(factoriesQuery);
     if (factories.some((f) => f.name === params.factory && !f.default))
-      await context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory));
+      await Promise.all([
+        context.queryClient.prefetchQuery(factoryRulesQuery(params.factory)),
+        context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory)),
+      ]);
   },
   component: SettingsPage,
   errorComponent: ({ error }) => (
@@ -27,9 +31,9 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * What a person sets of one factory: its instruction (`FactoryInstruction`), then its schedules, shown as the factories' read answers them
- * (`FactorySchedules`). The default factory, and a name no factory has, have no settings to keep, and say so: the instruction is not read
- * for them.
+ * What a person sets of one factory: its rules, what every agent hired into it is told (`FactoryRules`); its instruction, what Nemia is to
+ * know about it (`FactoryInstruction`); then its schedules, shown as the factories' read answers them (`FactorySchedules`). The default
+ * factory, and a name no factory has, have no settings to keep, and say so: neither the rules nor the instruction is read for them.
  */
 function SettingsPage() {
   const { factory: name } = Route.useParams();
@@ -58,6 +62,7 @@ function SettingsPage() {
         </p>
       ) : (
         <>
+          <FactoryRules name={name} />
           <FactoryInstruction name={name} />
           <FactorySchedules factory={factory} />
         </>

@@ -1,18 +1,20 @@
 /**
  * A step with an agent, on the builder, read by layer as S5's fold reads a run's: what its agent brings — the agent's instructions with its
- * skills, and your custom instructions for it, read-only here and written on the agent's page — then the step's policy, what the step's
- * own file adds over them. Each layer is labelled as `Told` labels it.
+ * skills, and your custom instructions for it, read-only here and written on the agent's page — then the rules of the factory the
+ * listing was read in, where it keeps some, and the step's policy, what the step's own file adds over them. Each layer is labelled as
+ * `Told` labels it.
  */
 import type { ReactNode } from 'react';
 import type { StepLayers } from '../lib/api';
 import { AgentLink } from './AgentParts';
-import { Layer, Skills, Words } from './Told';
+import { Layer, Skills, toldBefore, Words } from './Told';
 
 const LINE = 'text-[11px] leading-snug text-neutral-500 dark:text-neutral-400';
 
 /**
- * What agent `agent` brings a step, from the listing's `layers`: its instructions, folded, with its skills, and your custom instructions
- * for it, or none. Where the listing read another agent — the draft moved the step to `agent` since — one line says a save reads them.
+ * What agent `agent` brings a step, from the listing's `layers`: its instructions, folded, with its skills, your custom instructions for
+ * it, or none, and the factory's rules a run started there is told after them, where the listing read some. Where the listing read
+ * another agent — the draft moved the step to `agent` since — one line says a save reads them.
  */
 export function AgentLayers({ agent, layers }: { agent: string; layers: StepLayers | null }) {
   if (layers?.agent !== agent)
@@ -44,14 +46,20 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
           <Words text={layers.custom} />
         )}
       </Layer>
+      {layers.factory !== null && (
+        <Layer name="factory" title="The factory's rules">
+          <Words text={layers.factory} />
+          <p className={LINE}>Written on the factory's Settings: every agent hired into it is told them.</p>
+        </Layer>
+      )}
     </>
   );
 }
 
 /**
  * The step's policy over agent `agent`: its own words (`note`), then the keys its file sets as its policy (`children`), which may only
- * tighten the agent's fence. `layers` says whether there are custom instructions it is told after; where it was read for another agent,
- * only that any are told before it.
+ * tighten the agent's fence. `layers` says whether there are custom instructions and factory's rules it is told after (`toldBefore`);
+ * where it was read for another agent, only that any are told before it.
  */
 export function PolicyLayer({
   agent,
@@ -64,19 +72,15 @@ export function PolicyLayer({
   note: ReactNode;
   children: ReactNode;
 }) {
-  const custom =
-    layers?.agent !== agent
-      ? ', and any custom instructions you wrote for it'
-      : layers.custom === null
-        ? ''
-        : ' and your custom instructions';
+  const before =
+    layers?.agent !== agent ? `${agent}'s instructions, and any custom instructions you wrote for it` : toldBefore(agent, layers);
   return (
     <Layer name="policy" title="The step's policy">
       <div className="space-y-3">
         <div className="space-y-1">
           {note}
           <p data-agent-note className={LINE}>
-            Told after {agent}'s instructions{custom}; where they conflict, these words win.
+            Told after {before}; where they conflict, these words win.
           </p>
         </div>
         <p data-fence-note className={LINE}>

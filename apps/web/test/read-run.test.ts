@@ -76,6 +76,32 @@ test("REFUSED: a run's detail without its graph, its run's time, or with who it 
   await assert.rejects(readDetail(), unread('/api/runs/r-1', 'onYou', '"approve plan", where the board reads array'));
 });
 
+/** What a step was told, by layer, as the api answers it for a run started in a factory that keeps rules. */
+const LAYERS = {
+  agent: 'ada',
+  instructions: 'Build what was asked.',
+  custom: null,
+  factory: 'Never push on a Friday.',
+  agentSkills: [],
+  policy: 'Keep the diff small.',
+  addedSkills: [],
+  fence: [],
+  task: 'A note.',
+  via: 'prompt' as const,
+};
+
+test("a step's layers decode as the api gave them, the factory's rules a layer of their own, or null where its run froze none", async (t) => {
+  for (const layers of [LAYERS, { ...LAYERS, factory: null }]) {
+    answering(t, detail({ steps: [step({ layers })] }));
+    assert.deepEqual((await readDetail()).steps[0].layers, layers);
+  }
+});
+
+test("REFUSED: a step's layers that leave the factory's rules out, naming the key and the fix", async (t) => {
+  answering(t, detail({ steps: [step({ layers: without(LAYERS, 'factory') as typeof LAYERS })] }));
+  await assert.rejects(readDetail(), unread('/api/runs/r-1', 'steps[0].layers.factory', 'is missing'));
+});
+
 test('a file a closeout names keeps what the api served it with, or pruned it with: a bare path does not swallow either', async (t) => {
   answering(t, detail());
   const [artifact, pruned, bare] = (await readDetail()).steps[0].closeout?.artifacts ?? [];

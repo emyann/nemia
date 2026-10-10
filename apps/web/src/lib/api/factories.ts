@@ -1,7 +1,9 @@
 /**
- * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts), a factory's instruction (`GET`, `PUT` and `DELETE` on
- * `/api/factories/<name>/instruction`, apps/api/src/factories/instruction.ts and the routes the api generates beside it), and its hires
- * (`PUT` and `DELETE` on `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates), and its schedules, read-only.
+ * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts); a factory's rules, what every agent hired into it is told
+ * (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/rules`, apps/api/src/factories/rules.ts and the routes the api generates beside
+ * it); its instruction, Nemia's, which no step is told (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruction`,
+ * apps/api/src/factories/instruction.ts and the routes the api generates beside it); its hires (`PUT` and `DELETE` on
+ * `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates); and its schedules, read-only.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
@@ -112,10 +114,49 @@ export const factoriesQuery = queryOptions({
 });
 
 /**
- * Mirrors `FactoryInstruction` in the orchestrator, as apps/api/src/factories/instruction.ts answers it: the factory's `name`; `path`, the
- * path in its first folder its file names, null where it names none or keeps the instruction in the store; `store`, whether the store
- * keeps it; `file`, the file it is read from; `words`, null where there is no file; `error`, why a file there does not read, else null; and
- * `stored`, whether the store holds text for it, read or not.
+ * Mirrors `FactoryRules` in the orchestrator, as apps/api/src/factories/rules.ts answers it: the factory's `name`; `file`, the file its
+ * rules are kept in; `words`, null where it keeps none; and `error`, why a file there cannot be told, else null.
+ */
+export type FactoryRules = { name: string; file: string; words: string | null; error: string | null };
+
+/** Decodes a `FactoryRules`. */
+const FactoryRulesSchema = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  words: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<FactoryRules>;
+
+/** The route of the rules of the factory `name`. */
+const rulesRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/rules`;
+
+/** The rules of the factory `name`, read from its file on each request. */
+export const factoryRulesQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['factory-rules', name],
+    queryFn: () => get(rulesRoute(name), FactoryRulesSchema),
+  });
+
+/** What a write of a factory's rules may have done, and what to look at before writing them again. */
+const RULES_WRITTEN = "The rules may be changed: read the factory's settings again before changing them again.";
+
+/**
+ * Write `words` as the rules of the factory `name`: the rules as they then read. Rejects with a `WriteRefusal` in the package's words: no
+ * such factory (404), the default factory (409), blank words or words that open with a frontmatter block (422).
+ */
+export const writeRules = (name: string, words: string): Promise<FactoryRules> =>
+  send('PUT', rulesRoute(name), FactoryRulesSchema, { body: { words }, may: RULES_WRITTEN });
+
+/** Remove the rules of the factory `name`: the rules as they then read, none. */
+export const clearRules = (name: string): Promise<FactoryRules> =>
+  send('DELETE', rulesRoute(name), FactoryRulesSchema, { body: {}, may: RULES_WRITTEN });
+
+/**
+ * Mirrors `FactoryInstruction` in the orchestrator, as apps/api/src/factories/instruction.ts answers it — what Nemia is to know about the
+ * factory, which no step of a run is told: the factory's `name`; `path`, the path in its first folder its file names, null where it
+ * names none or keeps the instruction in the store; `store`, whether the store keeps it; `file`, the file it is read from; `words`, null
+ * where there is no file; `error`, why a file there does not read, else null; and `stored`, whether the store holds text for it, read or
+ * not.
  */
 export type FactoryInstruction = {
   name: string;

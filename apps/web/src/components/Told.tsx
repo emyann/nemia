@@ -132,7 +132,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
           Read now from the files, and frozen when a run starts: a run is told what they say then
           {layers.agent === null
             ? '.'
-            : `, ${layers.via === 'prompt' ? "the agent's words and yours in its system prompt" : "the agent's words and yours at the head of its brief"}.`}
+            : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}.`}
         </p>
         {layers.agent === null ? (
           <p className="text-xs text-muted-foreground">No agent: its own words are all it will be told, before the task.</p>

@@ -6357,6 +6357,11 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   );
   assert.match(ruled, /data-layer="custom"[^]*data-layer="factory"[^]*Never push on a Friday\.[^]*data-layer="policy"/);
   assert.doesNotMatch(ruled, /None written: this factory/);
+  assert.match(
+    ruled,
+    /data-read-now[^>]*>[^<]*, the agent&#x27;s words, yours and the factory&#x27;s rules (in its system prompt|at the head)/,
+  );
+  assert.match(html, /data-read-now[^>]*>[^<]*, the agent&#x27;s words and yours (in its system prompt|at the head of its brief)\./);
 
   const repo = await routedWith(
     createElement(StepTold, { page: await hiredPage({ from: 'repo', dir: '/code/app/workflows/w' }), place: {} }),
@@ -6553,6 +6558,42 @@ test("an agent's custom instructions say a run keeps the words it froze; the sto
     /data-custom-frozen|A run already started|wherever it is hired|runs started from now|next filed|keeps the words it was filed with/,
     'no run freezes her words',
   );
+});
+
+/** A factory's rules as its settings page draws them over the api's answer `read`: the file is `/store/factories/hiring/RULES.md`. */
+async function rulesMarkup(read: { words: string | null; error: string | null }): Promise<string> {
+  const { FactoryRules } = await import('../src/components/FactoryRules.tsx');
+  const { factoryRulesQuery } = await import('../src/lib/api/factories.ts');
+  const answer = { name: 'hiring', file: '/store/factories/hiring/RULES.md', ...read };
+  return routedWith(createElement(FactoryRules, { name: 'hiring' }), [[factoryRulesQuery('hiring').queryKey, answer]]);
+}
+
+test("a factory's rules draw their words, where they are kept and who is told them; Clear is offered only while a file is kept", async () => {
+  const kept = await rulesMarkup({ words: 'Never push on a Friday.', error: null });
+  assert.match(kept, /<section aria-label="Rules" data-factory-rules="true"/);
+  assert.match(kept, /data-rules-told[^>]*>Told to every agent hired into this factory, after its custom instructions and before/);
+  assert.match(kept, /<textarea[^>]*>Never push on a Friday\.<\/textarea>/);
+  assert.match(kept, /data-rules-file[^>]*>\/store\/factories\/hiring\/RULES\.md</);
+  assert.match(kept, />Clear…</, 'rules kept: they can be cleared');
+  assert.doesNotMatch(kept, /data-rules-error|data-rules-refused|data-rules-done/, 'rules that read say no trouble, and nothing done yet');
+  const none = await rulesMarkup({ words: null, error: null });
+  assert.match(none, /<textarea[^>]*><\/textarea>/);
+  assert.doesNotMatch(none, />Clear…<|data-rules-error/, 'no file kept: nothing to clear, and nothing wrong');
+});
+
+test("a factory's rules that cannot be told say why and what they stop, and what is there can be cleared, words read or not", async () => {
+  const why = '/store/factories/hiring/RULES.md is not a file: remove it, and write the rules again.';
+  const untold = await rulesMarkup({ words: null, error: why });
+  const alert = /<div[^>]*data-rules-error="true"[^>]*>[^]*?<\/div><\/div>/.exec(untold)?.[0] ?? '';
+  assert.match(alert, /role="alert"/, untold);
+  assert.match(alert, /These rules cannot be told, and no run starts in this factory until they can/);
+  assert.ok(alert.includes(why), alert);
+  assert.match(untold, /<textarea[^>]*><\/textarea>/, 'no words were read');
+  assert.match(untold, />Clear…</, 'with no words read, what is at the file can still be cleared');
+  const keyed = await rulesMarkup({ words: '---\ntools: Bash\n---\nUse Bash.', error: 'RULES.md opens with a frontmatter block.' });
+  assert.match(keyed, /data-rules-error="true"[^]*RULES\.md opens with a frontmatter block\./);
+  assert.match(keyed, /<textarea[^>]*>---\ntools: Bash\n---\nUse Bash\.<\/textarea>/, 'the words are given beside it, to mend');
+  assert.match(keyed, />Clear…</);
 });
 
 /** `StepPolicy` drawn as a server draws it. */

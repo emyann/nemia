@@ -16,6 +16,9 @@ const RECENT = { id: 'reviews-in-a-factory-e2e47', title: 'Reviews in a factory'
 
 const PHONE = { width: 390, height: 844 };
 
+/** The layers a step with an agent is told, read in a factory, in the order the page draws them. */
+const LAYERS = ['instructions', 'custom', 'factory', 'policy', 'task'];
+
 const goto = async (page: Page, to: string): Promise<void> => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
@@ -89,10 +92,10 @@ export default {
   /**
    * What a step will be told, on its page, read now. With no factory picked, `dev`'s `review` says its file names no agent, and that
    * FACTORIES' `hiring` hires one into it, linked to the page in that factory; there, the hire is marked hired, and the layers are drawn
-   * open, each beside where it is edited — the agent's page, its custom instructions on it, the step's file in the checkout — with the run
-   * of `dev` in that factory among its recent runs, not reached yet; and its file reads as written, its agent row said to be the hire's.
-   * The run's step links back to the step's page in its place, and its header to its workflow's. The page writes the hire, the agent and
-   * the run, and takes them back.
+   * open, each beside where it is edited — the agent's page, its custom instructions on it, the factory's rules, none written, on the
+   * factory's Settings, the step's file in the checkout — with the run of `dev` in that factory among its recent runs, not reached yet;
+   * and its file reads as written, its agent row said to be the hire's. The run's step links back to the step's page in its place, and
+   * its header to its workflow's. The page writes the hire, the agent and the run, and takes them back.
    */
   name: 'step-told',
   route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
@@ -124,6 +127,23 @@ export default {
       await expectVisible(told.locator('[data-read-now]'), 'read now, and frozen when a run starts');
       await expectHref(page, '[data-home="instructions"] a', `/agents/repo/${REVIEWER}`, "the agent's instructions live on its page");
       await expectHref(page, '[data-home="custom"] a', `/agents/repo/${REVIEWER}#custom-instructions`, 'your custom instructions too');
+      const rules = told.locator('[data-layer="factory"]');
+      await expectVisible(
+        rules.getByRole('heading', { name: "The factory's rules", exact: true }),
+        'read in a factory, its rules are a layer of their own',
+      );
+      await expectVisible(
+        rules.getByText('None written: this factory tells its agents no rules', { exact: true }),
+        'which says the factory has written none',
+      );
+      await expectHref(
+        page,
+        '[data-home="factory"] a',
+        `/factories/${factory}/settings`,
+        "the rules are written on the factory's Settings",
+      );
+      const order = await told.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
+      if (order.join() !== LAYERS.join()) throw new Refused(`the layers are drawn ${LAYERS.join(', ')} — they are ${order.join(', ')}`);
       await expectVisible(
         page.locator('[data-home="policy"] code', { hasText: path.join(checkout, 'workflows', good.name, 'review.md') }),
         "the step's words live in its file in the checkout",

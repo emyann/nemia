@@ -13,6 +13,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { fillsOf, workflowNameRefusal } from '../factory/factory.ts';
 import { readFactories, readFactory, templatedTree } from '../factory/factory.store.ts';
+import { readRules, rulesAt } from '../rules/rules.store.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
@@ -49,13 +50,16 @@ const placesOf = (args: Args, home: string | undefined): Places => ({
 
 /**
  * What the loader fills the steps of a workflow with in the factory the arguments name, read once: its hires into them, by the
- * workflow's name; none with no factory.
+ * workflow's name, and its rules where they read (`readRules`), left out where they do not, since a listing refuses nothing a start
+ * will; none with no factory.
  */
 function fillsIn(args: Args) {
   const name = textOf(args, 'factory');
   if (name === undefined) return () => undefined;
-  const { hires } = readFactory(name);
-  return (workflow: string) => ({ factory: name, workflow, agents: fillsOf(hires, workflow) });
+  const factory = readFactory(name);
+  const read = readRules(rulesAt(factory));
+  const rules = read.error === null && read.words !== null ? { rules: read.words } : {};
+  return (workflow: string) => ({ factory: name, workflow, agents: fillsOf(factory.hires, workflow), ...rules });
 }
 
 /** Why the board's workflow writes are served by the api's own routes. */

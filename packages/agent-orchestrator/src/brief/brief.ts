@@ -403,14 +403,16 @@ function remoteTrySection(step: Workflow, r: RetryBriefing): string {
 
 /**
  * What a step was told, by layer: its agent and the agent's instructions, the person's custom instructions for it and the agent's own
- * skills; the step's policy, its own note, the skills its line adds (`skillLayers`) and the fence lines it tightens its agent's with
- * (`fenceLines`); and the task, what its brief told it after them. Null where the step has none. `via` says where the first two went:
- * the session's prompt (`prompt`), or the head of its brief (`brief`).
+ * skills; the rules of the factory its run was started in (`factory`), as the run froze them; the step's policy, its own note, the skills
+ * its line adds (`skillLayers`) and the fence lines it tightens its agent's with (`fenceLines`); and the task, what its brief told it
+ * after them. Null where the step has none. `via` says where the agent's words, the person's and the factory's went: the session's prompt
+ * (`prompt`), or the head of its brief (`brief`).
  */
 export type ToldLayers = {
   agent: string | null;
   instructions: string | null;
   custom: string | null;
+  factory: string | null;
   agentSkills: string[];
   policy: string;
   addedSkills: string[];
@@ -434,7 +436,8 @@ function fenceLines(step: Workflow): ToldLayers['fence'] {
 
 /**
  * What the frozen `step` was told, by layer (`ToldLayers`), its task cut from `brief`, the brief it was filed with or would be: after its
- * own note where its agent is rendered (`rendersAgent`), after its instructions, custom instructions and note where they head the brief —
+ * own note where its agent is rendered (`rendersAgent`), after its instructions, custom instructions, factory's rules and note where they
+ * head the brief —
  * a step on another harness or on `resume:`, or one filed with its rendered folder gone. A brief that opens with neither, then a blank
  * line — a resumed try's, or one of a record frozen without its instructions — is the task whole, never cut at a guess; a null brief is
  * no task.
@@ -444,8 +447,9 @@ export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
   const policy = ownNote(step);
   const instructions = agent?.instructions ?? null;
   const custom = agent?.customInstructions ?? null;
+  const factory = agent?.factoryRules ?? null;
   const skills = skillLayers(step);
-  const layered = [instructions, custom, policy].filter(Boolean).join('\n\n');
+  const layered = [instructions, custom, factory, policy].filter(Boolean).join('\n\n');
   const openings: Array<{ via: ToldLayers['via']; opening: string }> = [
     ...(rendersAgent(step) ? [{ via: 'prompt' as const, opening: policy }] : []),
     { via: 'brief', opening: layered },
@@ -455,6 +459,7 @@ export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
     agent: agent?.name ?? null,
     instructions,
     custom,
+    factory,
     agentSkills: skills.agent,
     policy,
     addedSkills: skills.added,

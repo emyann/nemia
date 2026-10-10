@@ -20,6 +20,7 @@ import {
 } from './factory.store.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
+import { FACTORY_RULES } from '../rules/rules.verb.ts';
 import { FACTORY_APPLY } from '../applied/applied.verb.ts';
 import { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from '../upgrade/upgrade.verb.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../schedule/schedule.verb.ts';
@@ -39,6 +40,7 @@ nemia factory hire <factory> <agent> --step <workflow>/<step>
 nemia factory fire <factory> --step <workflow>/<step>
 nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
 nemia factory unschedule <factory> <workflow>
+nemia factory rules <name> [--file <path>|- | --clear]
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
 nemia factory rm <name>
@@ -88,15 +90,23 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  factory's one repository, at every level; a pause stops it. A daemon that was down starts
                  what it missed once. A second schedule of the workflow replaces the first.
   nemia factory unschedule takes a workflow's schedule back.
-  nemia factory instruction says where the factory's instruction is kept, and prints it: NEMIA.md in its first
+  nemia factory rules prints the factory's rules and policies, writes them (--file <path>, - for stdin) or
+                 removes them (--clear): words told to every agent hired into it, after its custom
+                 instructions and before the step's own note, kept by the store in factories/<name>/RULES.md
+                 beside its file (in its tree, for a factory made from a template), never in a repository.
+                 Words only: a frontmatter block is refused. Read once at nemia start and frozen with the
+                 run's steps, so a run in flight keeps the rules it was started with. A step on a remote
+                 agent is not told them.
+  nemia factory instruction says where the factory's instruction is kept, and prints it: what Nemia, who operates
+                 the factory, is to know of it, read by her and told to no step. NEMIA.md in its first
                  folder — the first --repo it was filed with — unless its file names another path there
                  (--path <path>, relative, never climbing out), or the store (--store), in
                  factories/<name>/NEMIA.md beside its file. --clear goes back to NEMIA.md.
   nemia factory instruct writes the instruction the store keeps (--file <path>, - for stdin), or removes it
                  (--clear): only while the factory keeps its instruction in the store. A file in a
                  folder is edited there.
-  nemia factory rm  removes a factory's file, one that does not read included, then the instruction the store
-                 keeps for it.
+  nemia factory rm  removes a factory's file, one that does not read included, then the instruction and the
+                 rules the store keeps for it.
 
 nemia start --factory <name> starts a run in a factory, of a workflow attached to it: each step its hires fill runs
 as its agent, and the start is refused while a step names no agent and is hired none, or names its own agent
@@ -107,7 +117,8 @@ agent's try; no start names it.
 
 Refused by name, and nothing written: a name that is not a slug, the name default, an add with no --repo or
 with a --repo that is not a directory, an add of a name already filed, an rm, attach, detach, hire or fire of a
-name with no factory, an instruction of the default factory, two of --path, --store and --clear, a --path
+name with no factory, rules or an instruction of the default factory, rules that are blank or open with a
+frontmatter block, two of --path, --store and --clear, a --path
 that is empty, absolute or climbs out of the folder, an instruct of an instruction kept in a folder or of blank
 words, a workflow's name that is empty, hidden, holds a slash or is agents or skills, a detach
 of a workflow not attached, still hired into or scheduled, a schedule of a workflow not attached, of a cron or a zone
@@ -149,7 +160,7 @@ export const FACTORY: Command<Listed> = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   nemia: 'read',
@@ -353,7 +364,7 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
 const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   name: 'factory rm',
   usage: '<name>',
-  help: ["remove a factory's file, and the instruction the store keeps for it"],
+  help: ["remove a factory's file, and the instruction and the rules the store", 'keeps for it'],
   spec: {
     positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
     flags: [],
@@ -390,6 +401,7 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_FIRE,
   FACTORY_SCHEDULE,
   FACTORY_UNSCHEDULE,
+  FACTORY_RULES,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,
   FACTORY_RM,

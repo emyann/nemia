@@ -85,6 +85,14 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory schedule', { method: 'PUT', path: '/api/factories/:factory/schedules/:workflow', status: 200 }],
       ['factory unschedule', { method: 'DELETE', path: '/api/factories/:factory/schedules/:workflow', status: 200 }],
       [
+        'factory rules',
+        [
+          { method: 'GET', path: '/api/factories/:factory/rules', status: 200, hand: true },
+          { method: 'PUT', path: '/api/factories/:factory/rules', status: 200, sets: { clear: false } },
+          { method: 'DELETE', path: '/api/factories/:factory/rules', status: 200, sets: { clear: true } },
+        ],
+      ],
+      [
         'factory instruction',
         [
           { method: 'GET', path: '/api/factories/:factory/instruction', status: 200, hand: true },

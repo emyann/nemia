@@ -361,7 +361,7 @@ const DONE = {
  * The file of the factory `name`, to be written back by `verb`. Refused: the name (`refuseName`), a name with no file (`Missing`), and a
  * file that does not read (`Invalid`), left as it is.
  */
-function fileToChange(name: string, verb: Exclude<FactoryWrite, 'add' | 'rm'>): FileRead & { content: FactoryFile } {
+function fileToChange(name: string, verb: Exclude<FactoryWrite, 'add' | 'rm' | 'rules'>): FileRead & { content: FactoryFile } {
   refuseName(name, verb);
   const read = factoryFile(name);
   if (!fs.existsSync(read.file)) throw noFactory(name, `Nothing was ${DONE[verb]}.`);

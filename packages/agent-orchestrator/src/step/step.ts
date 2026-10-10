@@ -261,6 +261,12 @@ export type StepAgent = {
    * at `nemia start`: told after the agent's instructions and before the step's own note, so a later edit reaches no run already started.
    */
   customInstructions?: string;
+  /**
+   * The rules of the factory the run was started in (`nemia factory rules`), as `nemia start` read them and froze them with the step: told
+   * after the custom instructions and before the step's own note, so a later edit reaches no run already started. Absent in a factory
+   * that keeps none, and on a step on a remote agent, which is not told them. Written by `parseWorkflow` alone.
+   */
+  factoryRules?: string;
   skills?: string[];
   /**
    * The skills the step's own `skills:` line gives that its agent does not, in the line's order, frozen at `nemia start` so the run tells

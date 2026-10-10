@@ -258,6 +258,7 @@ const StepAgentSchema = Schema.StructWithRest(
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
     customInstructions: Schema.optionalKey(Schema.String),
+    factoryRules: Schema.optionalKey(Schema.String),
     skills: Schema.optionalKey(Strings),
     addedSkills: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),

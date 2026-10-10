@@ -56,6 +56,20 @@ import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
 import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
 
+/** A factory's `rules` as a step on `harness` is told them, trimmed: none for blank rules, and none on a remote agent. */
+const rulesTold = (rules: string | undefined, harness: string | undefined): string | undefined =>
+  isRemoteHarness(harness?.trim()) ? undefined : rules?.trim() || undefined;
+
+/**
+ * The words a step is told above its own note, each kept apart on the frozen step: its agent's instructions, the person's custom
+ * instructions for the agent, and the factory's rules as `rulesTold` gives them. A layer that says nothing has no key.
+ */
+const wordsAbove = (agent: Agent, factoryRules: string | undefined) => ({
+  ...(agent.body && { instructions: agent.body }),
+  ...(agent.customInstructions && { customInstructions: agent.customInstructions }),
+  ...(factoryRules && { factoryRules }),
+});
+
 /**
  * One step, from its file's text.
  *
@@ -74,6 +88,10 @@ import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
  * `hired` is the agent a factory hires into a step (`Hire`): a step whose file names no agent is resolved with it exactly as if its file
  * said `agent: <name>`. A step whose file names its own agent and is hired one too is refused, naming both (`attachedAgent`).
  *
+ * `rules` are the rules of the factory the step is loaded in, told between the custom instructions and the step's own note and kept on
+ * the step's agent (`StepAgent.factoryRules`): words too, which set no key. A step with no agent is not told them, nor one on a remote
+ * agent, whose brief leaves the machine.
+ *
  * A file that says no `place:` is refused before any line is judged against its agent (`placeRequired`): no agent gives a step its place.
  */
 export function parseWorkflow(
@@ -83,6 +101,7 @@ export function parseWorkflow(
   agents?: Agents,
   skills?: SkillsFound,
   hired?: Hire,
+  rules?: string,
 ): Workflow {
   const { block, body: own } = splitFrontmatter(name, text);
   let {
@@ -108,7 +127,8 @@ export function parseWorkflow(
   const agent = agentOf(name, attached, agents, hired);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
-  const body = [agent.body, agent.customInstructions, own].filter(Boolean).join('\n\n');
+  const factoryRules = rulesTold(rules, meta.harness ?? agent.keys.harness);
+  const body = [agent.body, agent.customInstructions, factoryRules, own].filter(Boolean).join('\n\n');
   if (!body)
     throw new WorkflowError(
       `${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`,
@@ -133,8 +153,7 @@ export function parseWorkflow(
       keys,
       body: own,
       given,
-      ...(agent.body && { instructions: agent.body }),
-      ...(agent.customInstructions && { customInstructions: agent.customInstructions }),
+      ...wordsAbove(agent, factoryRules),
       ...(sessionSkills.length && { skills: sessionSkills }),
       ...(added && { addedSkills: added }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),

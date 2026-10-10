@@ -23,7 +23,10 @@ export const FACTORY_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
  */
 export type Hires = Readonly<Record<string, string>>;
 
-/** The file a factory's instruction is read from when its file names none: in the factory's first folder. */
+/**
+ * The file a factory's instruction, what Nemia is to know of it and no step is told, is read from when its file names none: in the
+ * factory's first folder.
+ */
 export const DEFAULT_INSTRUCTION = 'NEMIA.md';
 
 /**
@@ -122,6 +125,7 @@ export type FactoryWrite =
   | 'fire'
   | 'instruction'
   | 'instruct'
+  | 'rules'
   | 'schedule'
   | 'unschedule'
   | 'upgrade';
@@ -136,6 +140,7 @@ const INSTEAD: Record<FactoryWrite, string> = {
   fire: 'It hires no one: fire in a factory nemia factory ls lists.',
   instruction: 'It keeps no instruction: give one to a factory nemia factory ls lists.',
   instruct: 'It keeps no instruction: write one for a factory nemia factory ls lists.',
+  rules: 'It keeps no rules, since it hires no one: write them for a factory nemia factory ls lists.',
   schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',

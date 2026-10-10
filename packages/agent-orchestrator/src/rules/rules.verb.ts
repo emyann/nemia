@@ -72,13 +72,14 @@ const SPEC: Spec = {
  */
 function ruled(args: Args): FactoryRules {
   const name = textOf(args, 'factory') ?? '';
+  const words = textOf(args, 'words');
+  if (args.clear !== true && words === undefined) return factoryRules(name);
   const factory = factoryOf(name, 'Nothing was written.');
   if (args.clear === true) {
     const removed = clearRules(factory);
     return { ...factoryRules(name), removed };
   }
-  const words = textOf(args, 'words');
-  if (words !== undefined) writeRules(factory, words);
+  writeRules(factory, words ?? '');
   return factoryRules(name);
 }
 

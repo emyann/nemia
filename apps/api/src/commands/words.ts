@@ -495,7 +495,7 @@ const INBOX_FROM: RouteWords = {
 
 const INSTRUCTION_PUT_SHAPE = '`{ "path": "<path in the factory\'s first folder>" }` or `{ "store": true }`';
 
-const INSTRUCT_PUT_SHAPE = '`{ "words": "<what the factory\'s runs are told>" }`';
+const INSTRUCT_PUT_SHAPE = '`{ "words": "<what Nemia is to know about the factory>" }`';
 
 /**
  * The route of a factory's instruction `at` names, as a refusal says it: `PUT /api/factories/<name>/instruction`, and `…/words` for its
@@ -522,7 +522,7 @@ const FACTORY_INSTRUCTION: RouteWords = {
     route: instructionRoute(at, false),
     does: "says where a factory's instruction is kept",
     forAnother: 'move it',
-    why: 'every run started in the factory after is told the instruction read there',
+    why: 'Nemia reads the instruction kept there before she acts in the factory',
     reach: "choose where it is kept on the factory's settings page on the board",
     instead: "Choose where it is kept on the factory's settings page on the board",
     shape: at.method === 'DELETE' ? '`{}`' : INSTRUCTION_PUT_SHAPE,
@@ -543,15 +543,44 @@ const FACTORY_INSTRUCT: RouteWords = {
     route: instructionRoute(at, true),
     does: "writes a factory's instruction",
     forAnother: 'write it',
-    why: 'every run started in the factory after is told it',
+    why: 'Nemia reads it before she acts in the factory',
     reach: "write it on the factory's settings page on the board",
     instead: "Write it on the factory's settings page on the board",
     shape: at.method === 'DELETE' ? '`{}`' : INSTRUCT_PUT_SHAPE,
   }),
   issue: (at) => (_issue, body) =>
-    `${instructionRoute(at, true)}: \`words\` are what the factory's runs are told, a string: ${INSTRUCT_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
+    `${instructionRoute(at, true)}: \`words\` are what Nemia is to know about the factory, a string: ${INSTRUCT_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
   named: factoryNamed(true),
   notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
+};
+
+const RULES_PUT_SHAPE = '`{ "words": "<the factory\'s rules>" }`';
+
+/** The route of a factory's rules `at` names, as a refusal says it: `PUT /api/factories/<name>/rules`. */
+const rulesRoute = ({ method, factory }: Named): string => `${method} /api/factories/${factory}/rules`;
+
+/**
+ * A factory's rules written or removed, as the guard's refusals word it: a name that is no factory's is refused in the package's words,
+ * before anything is read, and words that are not a string in the api's.
+ */
+const FACTORY_RULES: RouteWords = {
+  shape: RULES_PUT_SHAPE,
+  guard: (at) => ({
+    route: rulesRoute(at),
+    does: "writes a factory's rules",
+    forAnother: 'write them',
+    why: 'they are told to every agent hired into the factory, in every step of every run started after',
+    reach: "write them on the factory's settings page on the board",
+    instead: "Write them on the factory's settings page on the board",
+    shape: at.method === 'DELETE' ? '`{}`' : RULES_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${rulesRoute(at)}: \`words\` are what every agent hired into the factory is told, a string: ${RULES_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
+  named: (at) => {
+    const wrong = factoryNameRefusal(at.factory);
+    return wrong === undefined ? null : `${rulesRoute(at)}: ${wrong}`;
+  },
+  notJson: (at) => `${rulesRoute(at)} takes a JSON body: ${RULES_PUT_SHAPE}.`,
 };
 
 const HIRE_PUT_SHAPE = '`{ "agent": "<the agent\'s name>" }`';
@@ -625,6 +654,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'inbox rm': INBOX_RM,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,
+  'factory rules': FACTORY_RULES,
   'factory instruction': FACTORY_INSTRUCTION,
   'factory instruct': FACTORY_INSTRUCT,
   'factory hire': FACTORY_HIRE,

@@ -86,7 +86,7 @@ test('a run started in a factory with rules answers them as a layer of their own
     assert.equal(write.layers?.factory, 'Never push on a Friday.');
     assert.equal(write.layers?.custom, 'Be verbose.');
     assert.equal(write.layers?.policy, 'Write the note.');
-    assert.equal(write.layers?.task.includes('Never push'), false, 'the rules are not said again in the task');
+    assert.equal(write.layers?.task?.includes('Never push'), false, 'the rules are not said again in the task');
   }
   const [after] = (await detailOf((await start()).id)).steps;
   assert.equal(after.layers?.factory, null, 'a run started once they are removed is told none');

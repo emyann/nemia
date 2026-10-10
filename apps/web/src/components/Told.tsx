@@ -33,6 +33,12 @@ export type LayerHomes = {
 const FACTORY_RULES = "The factory's rules";
 
 /**
+ * What the rules' layer says of a step told none on a page read in a factory: what is true of the step. Its listing leaves the rules out
+ * where the factory wrote none, where what it keeps cannot be told, and where the step is on a remote agent, and says no more.
+ */
+const NO_RULES_TOLD = 'This step is told none: the factory keeps none that can be told, or the step is on a remote agent';
+
+/**
  * What a step's policy is told after, in words: agent `agent`'s instructions, then your custom instructions and the factory's rules,
  * each where `layers` holds some.
  */
@@ -150,7 +156,7 @@ function WillBeTold({ layers, homes }: { layers: StepLayers; homes: LayerHomes }
             </Layer>
             {(layers.factory !== null || homes.factory) && (
               <Layer name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
-                <Words text={layers.factory} none="None written: this factory tells its agents no rules" />
+                <Words text={layers.factory} none={NO_RULES_TOLD} />
               </Layer>
             )}
           </>

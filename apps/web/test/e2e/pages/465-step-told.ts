@@ -19,6 +19,9 @@ const PHONE = { width: 390, height: 844 };
 /** The layers a step with an agent is told, read in a factory, in the order the page draws them. */
 const LAYERS = ['instructions', 'custom', 'factory', 'policy', 'task'];
 
+/** What the rules' layer says of a step told none, read in a factory. */
+const NONE_TOLD = 'This step is told none: the factory keeps none that can be told, or the step is on a remote agent';
+
 const goto = async (page: Page, to: string): Promise<void> => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
@@ -30,6 +33,29 @@ async function expectHref(page: Page, selector: string, href: string, what: stri
   await expectVisible(link, what);
   const at = await link.getAttribute('href');
   if (at !== href) throw new Refused(`${what}: it links ${href} — it links ${at}`);
+}
+
+/**
+ * Plants a directory where the store keeps `factory`'s rules, which cannot be told, and reads the step's page there (`placed`) again:
+ * refuses unless the page reads all the same, its rules' layer saying the step is told none and never that the factory wrote none. Takes
+ * the directory back.
+ */
+async function untold(page: Page, placed: string, factory: string): Promise<void> {
+  const folder = path.join(store!, 'factories', factory);
+  const had = fs.existsSync(folder);
+  fs.mkdirSync(path.join(folder, 'RULES.md'), { recursive: true });
+  try {
+    await goto(page, placed);
+    const rules = page.locator('details[data-will-be-told] [data-layer="factory"]');
+    await expectVisible(
+      rules.getByText(NONE_TOLD, { exact: true }),
+      'rules that cannot be told: the step is told none, and its page says so',
+    );
+    await expectCount(rules.getByText('None written'), 0, 'and not that the factory wrote none: its Settings keep some');
+    await expectVisible(page.locator(`[data-hired="${factory}"]`), 'the listing refuses nothing: the hire still reads');
+  } finally {
+    fs.rmSync(had ? path.join(folder, 'RULES.md') : folder, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -92,10 +118,11 @@ export default {
   /**
    * What a step will be told, on its page, read now. With no factory picked, `dev`'s `review` says its file names no agent, and that
    * FACTORIES' `hiring` hires one into it, linked to the page in that factory; there, the hire is marked hired, and the layers are drawn
-   * open, each beside where it is edited — the agent's page, its custom instructions on it, the factory's rules, none written, on the
+   * open, each beside where it is edited — the agent's page, its custom instructions on it, the factory's rules, none told, on the
    * factory's Settings, the step's file in the checkout — with the run of `dev` in that factory among its recent runs, not reached yet;
    * and its file reads as written, its agent row said to be the hire's. The run's step links back to the step's page in its place, and
-   * its header to its workflow's. The page writes the hire, the agent and the run, and takes them back.
+   * its header to its workflow's. With rules planted that cannot be told, the step's page reads all the same, and says the step is told
+   * none. The page writes the hire, the agent, the run and those rules, and takes them back.
    */
   name: 'step-told',
   route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
@@ -132,10 +159,7 @@ export default {
         rules.getByRole('heading', { name: "The factory's rules", exact: true }),
         'read in a factory, its rules are a layer of their own',
       );
-      await expectVisible(
-        rules.getByText('None written: this factory tells its agents no rules', { exact: true }),
-        'which says the factory has written none',
-      );
+      await expectVisible(rules.getByText(NONE_TOLD, { exact: true }), 'which says the step is told none');
       await expectHref(
         page,
         '[data-home="factory"] a',
@@ -183,6 +207,7 @@ export default {
         `/workflows/repo/${good.name}?factory=${factory}&repo=${encodeURIComponent(checkout)}`,
         'whose way back to its workflow keeps the place',
       );
+      await untold(page, placed, factory);
       await goto(page, step);
     } finally {
       takeBack();

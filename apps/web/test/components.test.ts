@@ -6348,7 +6348,16 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   assert.match(html, /data-layer="task"[^>]*>Then the task: the brief a run is started with\./);
   assert.doesNotMatch(html, /Not composed|What it was told|What it would be told now/);
   assert.match(home('factory'), /written on[^]*href="\/factories\/hiring\/settings"[^>]*>hiring&#x27;s Settings</, "the rules' home");
-  assert.match(html, /data-layer="factory"[^]*None written: this factory tells its agents no rules[^]*data-layer="policy"/);
+  assert.match(
+    html,
+    /data-layer="factory"[^]*This step is told none: the factory keeps none that can be told, or the step is on a remote agent[^]*data-layer="policy"/,
+    'told none, the page says so of the step: its factory may keep rules that cannot be told, or that a remote agent is not told',
+  );
+  assert.doesNotMatch(
+    html,
+    /None written: this factory|tells its agents no rules/,
+    'never that the factory wrote none, which it cannot know',
+  );
   const ruled = await routedWith(
     createElement(StepTold, {
       page: await hiredPage({ layers: { ...LAYERS, task: null, factory: 'Never push on a Friday.' } }),
@@ -6356,7 +6365,7 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
     }),
   );
   assert.match(ruled, /data-layer="custom"[^]*data-layer="factory"[^]*Never push on a Friday\.[^]*data-layer="policy"/);
-  assert.doesNotMatch(ruled, /None written: this factory/);
+  assert.doesNotMatch(ruled, /This step is told none/);
   assert.match(
     ruled,
     /data-read-now[^>]*>[^<]*, the agent&#x27;s words, yours and the factory&#x27;s rules (in its system prompt|at the head)/,

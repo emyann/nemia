@@ -28,10 +28,19 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; nothing is written
+  nemia factory rules <name> [--file <path>|- | --clear]
+                               a factory's rules and policies: words told to every agent hired into
+                               it, after its custom instructions and before the step's own note,
+                               kept by the store with the factory. Bare, prints them; --file writes
+                               them (- for stdin); --clear removes them. Words only: a frontmatter
+                               block is refused. A run keeps the rules it was started with
+                               reads bare; prompts the person given --file, --clear
   nemia factory instruction <name> [--path <path> | --store | --clear]
-                               where a factory's instruction is kept: bare, prints it; --path reads it
-                               from a file in the factory's first folder, --store keeps it in the
-                               store, --clear reads NEMIA.md in the first folder again
+                               where a factory's instruction is kept, what Nemia is to know of the
+                               factory (its agents are told its rules: nemia factory rules): bare,
+                               prints it; --path reads it from a file in the factory's first folder,
+                               --store keeps it in the store, --clear reads NEMIA.md in the first
+                               folder again
                                reads bare; prompts the person given --path, --store, --clear
   nemia template check <folder|archive>
                                check a template's folder or archive: every problem at once, each at its
@@ -276,10 +285,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory unschedule <factory> <workflow>
                                take a workflow's schedule back: the daemon starts it no more
   nemia factory instruct <name> --file <path>|- | --clear
-                               write the instruction the store keeps for a factory (- for stdin), or
-                               remove it with --clear
+                               write the instruction the store keeps for a factory (- for stdin), what
+                               Nemia is to know of it and no step is told, or remove it with --clear
   nemia factory rm <name>
-                               remove a factory's file, and the instruction the store keeps for it
+                               remove a factory's file, and the instruction and the rules the store
+                               keeps for it
   nemia template export <folder> --from <repo> [--factory <name>]
                                write a template from a repository and a factory, and say where each
                                part came from

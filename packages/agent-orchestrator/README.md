@@ -390,18 +390,19 @@ there is refused listing the agents there are. A link in `agents/` is refused as
 workflow — the listings skip it, and a workflow named `agents` is refused by name.
 
 At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
-anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Four layers*, below) —
+anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
-session (`resume:`), the brief is the agent's instructions, then your custom instructions for it (*Four layers*, below), then the step's
-own words, each after a blank line; on Claude Code the instructions and the custom instructions go after Claude Code's own prompt (*An
-agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep`
+session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory
+(*Five layers*, below), then the step's own words, each after a blank line; on Claude Code the instructions, the custom instructions and
+the factory's rules go after Claude Code's own prompt (*An agent rendered for Claude Code*, below) and the brief is the step's own words
+alone. `renderStep`
 writes a resolved step back as its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
 
-#### Four layers: what shapes an agent, apart from its task
+#### Five layers: what shapes an agent, apart from its task
 
-What an agent is told comes in four layers, each written by whoever owns it:
+What an agent is told comes in five layers, each written by whoever owns it:
 
 1. **Instructions** — the agent's own body, written once in its file: who it is and how it works, whatever node it is attached to.
 2. **Custom instructions** — what a person adds to an agent they use without rewriting it, any agent, the repository's or their own. They
@@ -414,20 +415,30 @@ What an agent is told comes in four layers, each written by whoever owns it:
    mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
    `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
    `--clear` keeps the words it froze, and only runs started after it get the new ones.
-3. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
+3. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it, whichever agent and whichever
+   step: one file a factory, `$WF_ROOT/factories/<name>/RULES.md`, kept in the store and never in a repository (a factory made from a
+   template keeps it in its tree, `$WF_ROOT/factories/<name>/tree/RULES.md`, where a template carries it and an upgrade merges it as
+   text). `nemia factory rules <name> --file <path>` writes them (`--file -` reads stdin), `nemia factory rules <name>` prints them,
+   and `--clear` removes them; the factory's Settings on the board reads, writes and clears them through the same command. They only
+   add words, as custom instructions do: blank words and a frontmatter block are refused, and a frontmatter block written by hand, a
+   link or a folder in the file's place stops a start in the factory, naming the file. `nemia start` reads them once and freezes them
+   with every step of the run (`StepAgent.factoryRules`): a run started before an edit or a `--clear` keeps the words it froze. A
+   factory with none tells nothing, the default factory keeps none, and a step on a remote agent is told none: it runs as its operator
+   configured it. `NEMIA.md` is another file, Nemia's: no step is told it (*A factory's instruction*, below).
+4. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
    policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
    normal layer, the place a process says what it expects of a role. A step's `skills:` adds skills to its agent's, and takes none away
    (below).
-4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds
+5. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
    there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person.
 
-The words reach the agent in that order — instructions, then custom instructions, then the step's policy, then the task — and where
-two say different things, the later one wins: the step knows the process, and the task knows the case. Telling the agent so is coming,
-not built.
+The words reach the agent in that order — instructions, then custom instructions, then the factory's rules, then the step's policy,
+then the task — and where two say different things, the later one wins: the factory knows its work better than a person's words for
+an agent anywhere, the step knows the process, and the task knows the case. Telling the agent so is coming, not built.
 
 The run page shows a step's layers apart, as the run froze them at `wf start` (`toldLayers`), never as the files read now: the agent's
-instructions and its own skills, your custom instructions, the step's policy and the skills its `skills:` line adds, and the task, its
-brief after them. A skill the step adds is the step's layer, not its agent's: `wf start` freezes which they are (`StepAgent.addedSkills`),
+instructions and its own skills, your custom instructions, the factory's rules where the run froze some, the step's policy and the
+skills its `skills:` line adds, and the task, its brief after them. A skill the step adds is the step's layer, not its agent's: `wf start` freezes which they are (`StepAgent.addedSkills`),
 so one both name stays the agent's, and the stats mark an added skill's change on the step, never on its agent.
 
 Fences only tighten: a step may narrow its agent's fence, never widen it, and the loader refuses one that would (`fenceRefusal`). A
@@ -498,7 +509,7 @@ card moves with the version, and the board refuses a save against a stale read. 
 session loads through the `Skill` tool. The card entry is the sentence about it.
 
 `wf agents` lists both places, each agent by its description with its skills under it, and the file of your custom instructions for it
-when you have some (*Four layers*, above; `wf agents custom <name>`, or the agent's page on the board, prints, writes or clears them).
+when you have some (*Five layers*, above; `wf agents custom <name>`, or the agent's page on the board, prints, writes or clears them).
 `wf agents card <name>` prints one in the shape of an A2A Agent Card, JSON on stdout and nothing else:
 
 ```
@@ -532,11 +543,11 @@ tools: Read, Edit, Skill
 You write notes. Load `write-a-note` before you start.
 ```
 
-A Claude Code step whose agent has instructions, custom instructions, skills or a `harnessPrompt:` other than `keep` is *rendered* at `wf start`, under
+A Claude Code step whose agent has instructions, custom instructions, skills or a `harnessPrompt:` other than `keep`, or whose factory has rules, is *rendered* at `wf start`, under
 `runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`agents/agents.ts`, `writeAgentFiles` in `agents/agents.store.ts`), and filed with
 Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-25-agents-skills.md says what each was measured to do):
 
-- `prompt.md` — the instructions, then your custom instructions for the agent, then a line naming each skill by its namespaced name, then the whole text of each skill whose
+- `prompt.md` — the instructions, then your custom instructions for the agent, then the factory's rules, then a line naming each skill by its namespaced name, then the whole text of each skill whose
   SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own prompt, which is kept (F1).
 - `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
   it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
@@ -2769,7 +2780,9 @@ agent.
 
 ### A factory's instruction: `wf factory instruction` and `wf factory instruct`
 
-A factory has one instruction: what its runs are to know about its work, in markdown. Where it is kept is a key of the factory's file:
+A factory has one instruction: what Nemia is to know about it, in markdown. It is hers: no step of a run is told it. What every agent
+hired into the factory is told is another file, the factory's rules (`nemia factory rules`, *Five layers*, above). Where the instruction
+is kept is a key of the factory's file:
 
 - **By default, `NEMIA.md` in its first repository** — the file is the checkout's, edited with the code it speaks of, and read as it is
   on each request; no file there means no instruction yet.
@@ -2785,7 +2798,8 @@ it, keeping every other key, and never moves the words: the store's text stays, 
 **`wf factory instruct <name> --file <path>`** (`--file -` for stdin) writes the words the store keeps, replacing a link there rather
 than writing through it, and `--clear` removes them; both are refused while the instruction is read from the factory's folder
 (`Conflict`, naming the file to edit instead), and blank words are refused (`Invalid`). **`wf factory rm`** removes the store's folder
-for the factory after its file. The default factory has no file, so it keeps no instruction: both verbs refuse it.
+for the factory after its file, its rules with it. The default factory has no file, so it keeps no instruction and no rules: the three
+verbs refuse it.
 
 The api serves both (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruction`, and on `…/instruction/words`), and the board
 shows it on the factory's settings page, linked from its floor: the words of a store's instruction edited there, a folder's file shown as
@@ -3554,6 +3568,7 @@ holding a concurrency slot forever.
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`, which asks `runStore.inbox.nameAt`) |
 | `src/factory/factory.store.ts` | the factories on disk (`factoriesDir`): read, a file that does not decode listed with why (`readFactories`), one read for a start (`readFactory`), filed through a hidden file linked onto its name (`addFactory`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflow`, `detachWorkflow`, `hireAgent`, `fireAgent`), removed (`removeFactory`) |
+| `src/rules/rules.ts`, `rules.store.ts`, `rules.verb.ts` | a factory's rules — the file's name and where it is kept (`FACTORY_RULES_FILE`, `rulesFile`) and what it may not open with (`factoryRulesRefusal`), pure; read without throwing, written whole and removed (`readRules`, `writeRules`, `clearRules`), store; and `nemia factory rules` (`FACTORY_RULES`, `factoryRules`), controller |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `test/engine-board.ts` gives one), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, the lifecycle as data the board draws (`lifecycleGraph`), and the runtime's types, passed through |
 | `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentRead`), and when each task was filed (`filingsRead`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/views/views-words.ts` | a step's phase off its view (`phaseOfView`), and the words `wf ls` and `wf decide` say of how its session ended (`endWords`, `wordOfView`) — pure |

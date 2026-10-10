@@ -35,21 +35,24 @@ The body is its instructions, appended to Claude Code's own prompt (`harnessProm
 it ends a turn, what its closeout holds. The procedure belongs in a skill, and a rule the machinery holds (a fence, a gate) needs no
 sentence. A resumed session keeps the body it started with: an edit reaches the next run, never one in flight.
 
-## The four layers
+## The five layers
 
-The instructions are one of four layers that shape an agent apart from its task, each written by whoever owns it:
+The instructions are one of five layers that shape an agent apart from its task, each written by whoever owns it:
 
 1. **Instructions** — the agent's body: who it is, wherever it is hired.
 2. **Custom instructions** — what a person adds to an agent they use without rewriting it, kept in their store, one file per agent name
    (`wf agents custom <name>`), never in the agent's folder. Words only: they set no key, so they never widen the fence or give a tool.
    A run freezes them when it starts, so an edit reaches only the runs after it.
-3. **The step's policy** — the step's own words and keys: what this position of this process asks of a role. A normal layer, not a
+3. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it: one file a factory, kept in the
+   store (`nemia factory rules <name>`), never in a repository. Words only, and frozen by a run when it starts, as custom instructions
+   are. A step on a remote agent is told none.
+4. **The step's policy** — the step's own words and keys: what this position of this process asks of a role. A normal layer, not a
    workaround: say there what one workflow expects, and keep it out of the instructions. A step may add skills, never take one away.
-4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds there
-   for every agent at work in it. Nemia composes nothing of them.
+5. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
+   there for every agent at work in it. Nemia composes nothing of them.
 
-They reach the agent in that order — instructions, custom instructions, the step's policy, then the task — and where two conflict, the
-later wins. Fences only tighten: a step may narrow its agent's fence and never widen it — the loader refuses a step's `tools:`,
+They reach the agent in that order — instructions, custom instructions, the factory's rules, the step's policy, then the task — and
+where two conflict, the later wins. Fences only tighten: a step may narrow its agent's fence and never widen it — the loader refuses a step's `tools:`,
 `allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would give the agent what its file does not, and a step's
 `background: true` over an agent in any mode but `bypassPermissions`. So the instructions
 say what holds for the role everywhere, and nothing about one workflow or one workspace.

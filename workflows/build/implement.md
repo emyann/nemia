@@ -16,6 +16,8 @@ The check refuses a change under `apps/web/src` whose `artifacts` names no pictu
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
 but to measure it: this step's check runs every page, in workers, outside your session.
 
+When the change touches `apps/web`, load `change-the-board` before `shadcn`: it says where your shell must be for that load.
+
 When you start a Claude Code session of your own to measure something, a probe, start it through `node workflows/build/probe.ts start
 <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you. It names the session for the run, runs it in the
 machinery's trusted folder (`$WF_ROOT/probes`), and tells the person no action is needed; pass `--settings` rather than edit a folder's

@@ -8,6 +8,7 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
+import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
 
 /**
@@ -554,35 +555,6 @@ const FACTORY_INSTRUCT: RouteWords = {
   notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
 };
 
-const RULES_PUT_SHAPE = '`{ "words": "<the factory\'s rules>" }`';
-
-/** The route of a factory's rules `at` names, as a refusal says it: `PUT /api/factories/<name>/rules`. */
-const rulesRoute = ({ method, factory }: Named): string => `${method} /api/factories/${factory}/rules`;
-
-/**
- * A factory's rules written or removed, as the guard's refusals word it: a name that is no factory's is refused in the package's words,
- * before anything is read, and words that are not a string in the api's.
- */
-const FACTORY_RULES: RouteWords = {
-  shape: RULES_PUT_SHAPE,
-  guard: (at) => ({
-    route: rulesRoute(at),
-    does: "writes a factory's rules",
-    forAnother: 'write them',
-    why: 'they are told to every agent hired into the factory, in every step of every run started after',
-    reach: "write them on the factory's settings page on the board",
-    instead: "Write them on the factory's settings page on the board",
-    shape: at.method === 'DELETE' ? '`{}`' : RULES_PUT_SHAPE,
-  }),
-  issue: (at) => (_issue, body) =>
-    `${rulesRoute(at)}: \`words\` are what every agent hired into the factory is told, a string: ${RULES_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
-  named: (at) => {
-    const wrong = factoryNameRefusal(at.factory);
-    return wrong === undefined ? null : `${rulesRoute(at)}: ${wrong}`;
-  },
-  notJson: (at) => `${rulesRoute(at)} takes a JSON body: ${RULES_PUT_SHAPE}.`,
-};
-
 const HIRE_PUT_SHAPE = '`{ "agent": "<the agent\'s name>" }`';
 
 /** The route of the hire into a step `at` names, as a refusal says it, the step encoded as the path carries it. */
@@ -654,7 +626,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'inbox rm': INBOX_RM,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,
-  'factory rules': FACTORY_RULES,
+  'factory rules': FACTORY_RULES_WORDS,
   'factory instruction': FACTORY_INSTRUCTION,
   'factory instruct': FACTORY_INSTRUCT,
   'factory hire': FACTORY_HIRE,

@@ -306,9 +306,9 @@ export type RunDetail = {
     /** For a filed step, the brief the engine was filed with; for one not yet filed, what it would be given now. */
     told: string | null;
     /**
-     * What it was told, by layer (`toldLayers`): its agent's instructions, the person's custom instructions, the step's policy and the
-     * task, each from the step the run froze at `nemia start`, the task cut from `told`. Null for a record that froze no workflow, never
-     * read from the folder.
+     * What it was told, by layer (`toldLayers`): its agent's instructions, the person's custom instructions, the factory's rules, the
+     * step's policy and the task, each from the step the run froze at `nemia start`, the task cut from `told`. Null for a record that
+     * froze no workflow, never read from the folder.
      */
     layers: ToldLayers | null;
     /** The task by part (`TaskPart`): its own text and each run it was handed, with how; null where nothing was told. */

@@ -1,7 +1,7 @@
 /**
- * The runners of `nemia agents custom` and `nemia factory instruct`, which read the words a file holds; and the runners of `nemia rm` and
- * `nemia prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally
- * what was not done into the exit code; and the runner of `nemia admit`, which reads the call on stdin.
+ * The runners of `nemia agents custom`, `nemia factory instruct` and `nemia factory rules`, which read the words a file holds; and the
+ * runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask
+ * a person's yes, and tally what was not done into the exit code; and the runner of `nemia admit`, which reads the call on stdin.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +10,7 @@ import {
   AGENTS_CUSTOM,
   AUTO_PROPOSE,
   FACTORY_INSTRUCT,
+  FACTORY_RULES,
   HOME,
   PRUNE,
   pruneLines,
@@ -223,6 +224,15 @@ export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
   const data = await runWith(e, FACTORY_INSTRUCT.handler(asked, undefined, HOME));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
+}
+
+/**
+ * `nemia factory rules`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
+ */
+export async function factoryRulesRun(args: Args, e: Engine): Promise<void> {
+  const asked = withWords(args, FACTORY_RULES.name);
+  const data = await runWith(e, FACTORY_RULES.handler(asked, undefined, HOME));
+  for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
 }
 
 /**

@@ -1,7 +1,7 @@
 /**
- * What a step was told, by layer (`toldLayers`): its agent's instructions, the person's custom instructions, the step's own policy and the
- * skills it adds, and the task, cut from the brief the step was filed with only where that brief opens with the layers above it. And the
- * skills split between the agent and the step (`skillLayers`), from the frozen record.
+ * What a step was told, by layer (`toldLayers`): its agent's instructions, the person's custom instructions, its factory's rules, the
+ * step's own policy and the skills it adds, and the task, cut from the brief the step was filed with only where that brief opens with the
+ * layers above it. And the skills split between the agent and the step (`skillLayers`), from the frozen record.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,12 @@ const AGENTS: Agents = new Map([
 /** The step `name` written with `lines` as its frontmatter and `note` as its own words, resolved with the agents above. */
 const stepOf = (lines: string, note = 'Build it.', name = 'build'): Workflow =>
   parseWorkflow(name, `---\nplace: git\n${lines}\n---\n${note}\n`, undefined, AGENTS);
+
+const RULES = 'Never push on a Friday.';
+
+/** The step `build` written with `lines`, in a factory whose rules are `RULES`. */
+const ruledStep = (lines: string): Workflow =>
+  parseWorkflow('build', `---\nplace: git\n${lines}\n---\nBuild it.\n`, undefined, AGENTS, undefined, undefined, RULES);
 
 /** A run of `steps`, none filed, asked for `brief`. */
 const runOf = (steps: readonly Workflow[], brief = 'add a flag'): RepositoryRun => ({
@@ -45,6 +51,7 @@ test("a rendered step's layers: the agent's words and the person's apart, its ow
   assert.equal(told.agent, 'ada');
   assert.equal(told.instructions, 'You are Ada.');
   assert.equal(told.custom, 'Be terse.');
+  assert.equal(told.factory, null, 'a step frozen with no rules was told none');
   assert.equal(told.policy, 'Build it.');
   assert.deepEqual(told.agentSkills, ['alpha', 'beta']);
   assert.deepEqual(told.addedSkills, ['gamma']);
@@ -65,6 +72,33 @@ test("a codex step and a `resume:` step are told their agent's words in the brie
   }
   const codex = stepOf('agent: cody\nharness: codex');
   assert.equal(toldLayers(codex, briefOf(codex)).task?.startsWith('## What was asked for'), true);
+});
+
+test("the factory's rules are a layer of their own, as frozen: apart from the custom instructions and the policy, never told again in the task", () => {
+  const rendered = ruledStep('agent: ada');
+  const brief = briefOf(rendered);
+  const told = toldLayers(rendered, brief);
+  assert.equal(told.via, 'prompt');
+  assert.equal(told.factory, RULES);
+  assert.equal(told.custom, 'Be terse.');
+  assert.equal(told.policy, 'Build it.');
+  assert.ok(told.task?.startsWith('## What was asked for'), told.task ?? 'null');
+  assert.ok(!brief.includes(RULES), "the rules are the rendered prompt's, not the brief's");
+
+  for (const step of [ruledStep('agent: cody\nharness: codex'), ruledStep('agent: cody\nresume: plan')]) {
+    const inBrief = toldLayers(step, `${step.body}\n\n## What was asked for\n\nadd a flag`);
+    assert.equal(inBrief.via, 'brief', step.harness ?? step.resume);
+    assert.equal(inBrief.factory, RULES);
+    assert.equal(inBrief.policy, 'Build it.');
+    assert.equal(inBrief.task, '## What was asked for\n\nadd a flag', 'the task starts after the four layers');
+  }
+
+  const bare = ruledStep('agent: bare\nharness: codex');
+  assert.equal(toldLayers(bare, null).custom, null);
+  assert.equal(toldLayers(bare, null).factory, RULES, 'with no custom instructions, the rules are still their own layer');
+
+  const { factoryRules: _r, ...before } = rendered.agent!;
+  assert.equal(toldLayers({ ...rendered, agent: before }, brief).factory, null, 'a record frozen before there were rules shows none');
 });
 
 test('a brief that does not open with the layers is the task whole, never cut at a wrong offset', () => {
@@ -95,6 +129,7 @@ test('a step with no agent: its own words are the policy, no agent layer, and a 
     agent: null,
     instructions: null,
     custom: null,
+    factory: null,
     agentSkills: [],
     policy: 'Build it.',
     addedSkills: [],

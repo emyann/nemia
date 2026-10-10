@@ -96,7 +96,7 @@ export const storeKeeps = (name: string, file = instructionFile(name)): boolean 
 export function writeInstructionText(name: string, words: string, file = instructionFile(name)): string {
   if (!words.trim())
     throw new Invalid({
-      message: `the instruction of ${name} is blank. Write the words its runs are to be told, or clear it: nemia factory instruct ${name} --clear. Nothing was written.`,
+      message: `the instruction of ${name} is blank. Write the words Nemia is to know of the factory, or clear it: nemia factory instruct ${name} --clear. Nothing was written.`,
     });
   const folder = path.dirname(file);
   if (file !== instructionFile(name) && !fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())

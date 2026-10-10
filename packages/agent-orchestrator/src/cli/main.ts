@@ -51,7 +51,7 @@ import {
 } from '../runner.ts';
 import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, pruneVerb, rmVerb } from './runs.ts';
+import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
@@ -237,6 +237,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
   ['inbox queue', inboxQueueRun],
   ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
+  ['factory rules', factoryRulesRun],
   ['auto propose', autoProposeRun],
   ['agents write', agentsWriteRun],
   ['skills write', skillsWriteRun],

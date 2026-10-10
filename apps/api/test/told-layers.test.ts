@@ -1,8 +1,8 @@
 /**
  * What a step was told, by layer, as the run page reads it (`GET /api/runs/:id`, `layers`): each layer from what the run froze at
- * `nemia start` — the agent's instructions and skills, the person's custom instructions, the step's note, the skill and the deny its line
- * adds, and the task — never from the agent's, the custom instructions' or the step's file as it is now; and none for a record that froze
- * no workflow.
+ * `nemia start` — the agent's instructions and skills, the person's custom instructions, the factory's rules, the step's note, the skill
+ * and the deny its line adds, and the task — never from the agent's, the custom instructions', the rules' or the step's file as it is
+ * now; and none for a record that froze no workflow.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -11,7 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { runWith, startRun, engine } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, runWith, startRun, engine } from 'agent-orchestrator';
+import { scratch } from './scratch.ts';
 
 const WORKFLOWS = path.join(root, 'workflows');
 const AGENT = path.join(WORKFLOWS, 'agents', 'layered.md');
@@ -50,6 +51,7 @@ test('each layer is answered as the run froze it: an edit of the agent, its cust
     agent: 'layered',
     instructions: 'You are the writer.',
     custom: 'Be terse.',
+    factory: null,
     agentSkills: ['alpha'],
     policy: 'Write the note.',
     addedSkills: ['gamma'],
@@ -63,6 +65,31 @@ test('each layer is answered as the run froze it: an edit of the agent, its cust
     write.told?.slice('Write the note.\n\n'.length),
     "a step not filed: the task is its preview's, after the note",
   );
+});
+
+test('a run started in a factory with rules answers them as a layer of their own, as it froze them: an edit or a removal since reaches none', async () => {
+  fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\n---\nWrite the note.\n');
+  addFactory({ name: 'ruled', repos: [scratch('nemia-api-layers-ruled-')] });
+  attachWorkflow({ factory: 'ruled', workflow: 'layers' });
+  const rules = (method: string, words?: string) =>
+    app.request('/api/factories/ruled/rules', {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(words === undefined ? {} : { words }),
+    });
+  assert.equal((await rules('PUT', 'Never push on a Friday.')).status, 200);
+  const start = () => runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: TEAM, factory: 'ruled' }));
+  const run = await start();
+  for (const edit of [() => rules('PUT', 'Push whenever.'), () => rules('DELETE')]) {
+    assert.equal((await edit()).status, 200);
+    const [write] = (await detailOf(run.id)).steps;
+    assert.equal(write.layers?.factory, 'Never push on a Friday.');
+    assert.equal(write.layers?.custom, 'Be verbose.');
+    assert.equal(write.layers?.policy, 'Write the note.');
+    assert.equal(write.layers?.task?.includes('Never push'), false, 'the rules are not said again in the task');
+  }
+  const [after] = (await detailOf((await start()).id)).steps;
+  assert.equal(after.layers?.factory, null, 'a run started once they are removed is told none');
 });
 
 test('a record that froze no workflow answers no layers, and still what it was told', async () => {

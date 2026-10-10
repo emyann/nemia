@@ -8,6 +8,7 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
+import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
 
 /**
@@ -495,7 +496,7 @@ const INBOX_FROM: RouteWords = {
 
 const INSTRUCTION_PUT_SHAPE = '`{ "path": "<path in the factory\'s first folder>" }` or `{ "store": true }`';
 
-const INSTRUCT_PUT_SHAPE = '`{ "words": "<what the factory\'s runs are told>" }`';
+const INSTRUCT_PUT_SHAPE = '`{ "words": "<what Nemia is to know about the factory>" }`';
 
 /**
  * The route of a factory's instruction `at` names, as a refusal says it: `PUT /api/factories/<name>/instruction`, and `…/words` for its
@@ -522,7 +523,7 @@ const FACTORY_INSTRUCTION: RouteWords = {
     route: instructionRoute(at, false),
     does: "says where a factory's instruction is kept",
     forAnother: 'move it',
-    why: 'every run started in the factory after is told the instruction read there',
+    why: 'Nemia reads the instruction kept there before she acts in the factory',
     reach: "choose where it is kept on the factory's settings page on the board",
     instead: "Choose where it is kept on the factory's settings page on the board",
     shape: at.method === 'DELETE' ? '`{}`' : INSTRUCTION_PUT_SHAPE,
@@ -543,13 +544,13 @@ const FACTORY_INSTRUCT: RouteWords = {
     route: instructionRoute(at, true),
     does: "writes a factory's instruction",
     forAnother: 'write it',
-    why: 'every run started in the factory after is told it',
+    why: 'Nemia reads it before she acts in the factory',
     reach: "write it on the factory's settings page on the board",
     instead: "Write it on the factory's settings page on the board",
     shape: at.method === 'DELETE' ? '`{}`' : INSTRUCT_PUT_SHAPE,
   }),
   issue: (at) => (_issue, body) =>
-    `${instructionRoute(at, true)}: \`words\` are what the factory's runs are told, a string: ${INSTRUCT_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
+    `${instructionRoute(at, true)}: \`words\` are what Nemia is to know about the factory, a string: ${INSTRUCT_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
   named: factoryNamed(true),
   notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
 };
@@ -625,6 +626,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'inbox rm': INBOX_RM,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,
+  'factory rules': FACTORY_RULES_WORDS,
   'factory instruction': FACTORY_INSTRUCTION,
   'factory instruct': FACTORY_INSTRUCT,
   'factory hire': FACTORY_HIRE,

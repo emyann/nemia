@@ -6214,6 +6214,7 @@ const LAYERS: StepLayers = {
   agent: 'writer',
   instructions: 'You are the writer.',
   custom: 'Be terse.',
+  factory: null,
   agentSkills: ['alpha'],
   policy: 'Write the note.',
   addedSkills: ['gamma'],
@@ -6247,6 +6248,30 @@ test('what a step was told is drawn by layer, in the order it reads them, each s
   assert.match(html, /What it was told/);
   assert.match(html, /in the session&#x27;s system prompt/);
   assert.match(toldMarkup({ told: null, layers: { ...LAYERS, via: 'brief' }, filed: false }), /at the head of its brief/);
+});
+
+test("the factory's rules are a layer of their own, between your custom instructions and the step's policy, drawn only where the run froze some", () => {
+  const html = toldMarkup({ told: null, layers: { ...LAYERS, factory: 'Never push on a **Friday**.' }, filed: true });
+  const at = (needle: string): number => {
+    const i = html.indexOf(needle);
+    assert.ok(i >= 0, `${needle} in ${html}`);
+    return i;
+  };
+  const order = [at('data-layer="custom"'), at('data-layer="factory"'), at('data-layer="policy"')];
+  assert.deepEqual(
+    [...order].sort((a, b) => a - b),
+    order,
+    'custom, factory, policy',
+  );
+  const layer = html.slice(order[1], order[2]);
+  assert.match(layer, /<h4[^>]*>The factory&#x27;s rules<\/h4>/);
+  assert.match(layer, /Never push on a <strong>Friday<\/strong>\./, 'its words, as the markdown they are');
+  assert.equal(html.split('Friday').length - 1, 1, 'drawn once');
+  assert.match(html, /The agent&#x27;s instructions, yours and the factory&#x27;s rules were\s+frozen at the start of the run/);
+
+  const none = toldMarkup({ told: null, layers: LAYERS, filed: true });
+  assert.doesNotMatch(none, /data-layer="factory"|factory&#x27;s rules/, 'a run that froze none draws no layer for them, nor names them');
+  assert.match(none, /The agent&#x27;s instructions and yours were\s+frozen at the start of the run/);
 });
 
 test('the task is drawn in its parts: its text, and each run it was handed a block headed by how, linked to the run — a run handed neither way a plain block', async () => {
@@ -6322,6 +6347,30 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'a skill found nowhere: its name alone');
   assert.match(html, /data-layer="task"[^>]*>Then the task: the brief a run is started with\./);
   assert.doesNotMatch(html, /Not composed|What it was told|What it would be told now/);
+  assert.match(home('factory'), /written on[^]*href="\/factories\/hiring\/settings"[^>]*>hiring&#x27;s Settings</, "the rules' home");
+  assert.match(
+    html,
+    /data-layer="factory"[^]*This step is told none: the factory keeps none that can be told, or the step is on a remote agent[^]*data-layer="policy"/,
+    'told none, the page says so of the step: its factory may keep rules that cannot be told, or that a remote agent is not told',
+  );
+  assert.doesNotMatch(
+    html,
+    /None written: this factory|tells its agents no rules/,
+    'never that the factory wrote none, which it cannot know',
+  );
+  const ruled = await routedWith(
+    createElement(StepTold, {
+      page: await hiredPage({ layers: { ...LAYERS, task: null, factory: 'Never push on a Friday.' } }),
+      place: { factory: 'hiring' },
+    }),
+  );
+  assert.match(ruled, /data-layer="custom"[^]*data-layer="factory"[^]*Never push on a Friday\.[^]*data-layer="policy"/);
+  assert.doesNotMatch(ruled, /This step is told none/);
+  assert.match(
+    ruled,
+    /data-read-now[^>]*>[^<]*, the agent&#x27;s words, yours and the factory&#x27;s rules (in its system prompt|at the head)/,
+  );
+  assert.match(html, /data-read-now[^>]*>[^<]*, the agent&#x27;s words and yours (in its system prompt|at the head of its brief)\./);
 
   const repo = await routedWith(
     createElement(StepTold, { page: await hiredPage({ from: 'repo', dir: '/code/app/workflows/w' }), place: {} }),
@@ -6332,6 +6381,8 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
     "the repository's: its file",
   );
   assert.doesNotMatch(repo, /build=true/);
+  const nowhere = await routedWith(createElement(StepTold, { page: await hiredPage({ factory: null, hired: null }), place: {} }));
+  assert.doesNotMatch(nowhere, /data-layer="factory"|data-home="factory"/, 'read in no factory: no rules to tell, and no layer for them');
 });
 
 test("a step's agent: the one the factory picked hires, marked hired; else its file's, and each factory that hires into it, linked to this page there", async () => {
@@ -6518,6 +6569,42 @@ test("an agent's custom instructions say a run keeps the words it froze; the sto
   );
 });
 
+/** A factory's rules as its settings page draws them over the api's answer `read`: the file is `/store/factories/hiring/RULES.md`. */
+async function rulesMarkup(read: { words: string | null; error: string | null }): Promise<string> {
+  const { FactoryRules } = await import('../src/components/FactoryRules.tsx');
+  const { factoryRulesQuery } = await import('../src/lib/api/factories.ts');
+  const answer = { name: 'hiring', file: '/store/factories/hiring/RULES.md', ...read };
+  return routedWith(createElement(FactoryRules, { name: 'hiring' }), [[factoryRulesQuery('hiring').queryKey, answer]]);
+}
+
+test("a factory's rules draw their words, where they are kept and who is told them; Clear is offered only while a file is kept", async () => {
+  const kept = await rulesMarkup({ words: 'Never push on a Friday.', error: null });
+  assert.match(kept, /<section aria-label="Rules" data-factory-rules="true"/);
+  assert.match(kept, /data-rules-told[^>]*>Told to every agent hired into this factory, after its custom instructions and before/);
+  assert.match(kept, /<textarea[^>]*>Never push on a Friday\.<\/textarea>/);
+  assert.match(kept, /data-rules-file[^>]*>\/store\/factories\/hiring\/RULES\.md</);
+  assert.match(kept, />Clear…</, 'rules kept: they can be cleared');
+  assert.doesNotMatch(kept, /data-rules-error|data-rules-refused|data-rules-done/, 'rules that read say no trouble, and nothing done yet');
+  const none = await rulesMarkup({ words: null, error: null });
+  assert.match(none, /<textarea[^>]*><\/textarea>/);
+  assert.doesNotMatch(none, />Clear…<|data-rules-error/, 'no file kept: nothing to clear, and nothing wrong');
+});
+
+test("a factory's rules that cannot be told say why and what they stop, and what is there can be cleared, words read or not", async () => {
+  const why = '/store/factories/hiring/RULES.md is not a file: remove it, and write the rules again.';
+  const untold = await rulesMarkup({ words: null, error: why });
+  const alert = /<div[^>]*data-rules-error="true"[^>]*>[^]*?<\/div><\/div>/.exec(untold)?.[0] ?? '';
+  assert.match(alert, /role="alert"/, untold);
+  assert.match(alert, /These rules cannot be told, and no run starts in this factory until they can/);
+  assert.ok(alert.includes(why), alert);
+  assert.match(untold, /<textarea[^>]*><\/textarea>/, 'no words were read');
+  assert.match(untold, />Clear…</, 'with no words read, what is at the file can still be cleared');
+  const keyed = await rulesMarkup({ words: '---\ntools: Bash\n---\nUse Bash.', error: 'RULES.md opens with a frontmatter block.' });
+  assert.match(keyed, /data-rules-error="true"[^]*RULES\.md opens with a frontmatter block\./);
+  assert.match(keyed, /<textarea[^>]*>---\ntools: Bash\n---\nUse Bash\.<\/textarea>/, 'the words are given beside it, to mend');
+  assert.match(keyed, />Clear…</);
+});
+
 /** `StepPolicy` drawn as a server draws it. */
 const policyMarkup = (layers: StepLayers): string => renderToStaticMarkup(createElement(StepPolicy, { layers }));
 
@@ -6558,6 +6645,15 @@ test("at a gate, the step's policy is drawn open: its words, the skills it adds,
   assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, this wins\./);
   assert.doesNotMatch(html, /You are the writer\.|Be terse\./, "the agent's words and the person's are in the fold, not here");
   assert.match(policyMarkup({ ...LAYERS, custom: null }), /Told after writer&#x27;s instructions; where they conflict/);
+  assert.match(
+    policyMarkup({ ...LAYERS, factory: 'Never push.' }),
+    /Told after writer&#x27;s instructions, your custom instructions and the factory&#x27;s rules; where they conflict, this wins\./,
+  );
+  assert.match(
+    policyMarkup({ ...LAYERS, custom: null, factory: 'Never push.' }),
+    /Told after writer&#x27;s instructions and the factory&#x27;s rules; where they conflict/,
+  );
+  assert.doesNotMatch(policyMarkup({ ...LAYERS, factory: 'Never push.' }), /Never push\./, 'the rules are in the fold, not here');
   assert.match(
     policyMarkup({ ...LAYERS, policy: '', addedSkills: [], fence: [] }),
     /No words of its own: writer&#x27;s instructions are all it was told/,
@@ -6646,6 +6742,14 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
   assert.match(html, /May only tighten writer&#x27;s fence/);
   assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, these words win\./);
 
+  assert.doesNotMatch(html, /data-layer="factory"/, 'a listing that read no rules draws no layer for them');
+  const ruled = await stepFormMarkup({ ...LAYERS, factory: 'Never push on a Friday.' });
+  assert.match(ruled, /data-layer="custom"[^]*data-layer="factory"[^]*Never push on a Friday\.[^]*data-layer="policy"/);
+  assert.match(
+    ruled,
+    /Told after writer&#x27;s instructions, your custom instructions and the factory&#x27;s rules; where they conflict, these words win\./,
+  );
+
   const uncustomised = await stepFormMarkup({ ...LAYERS, custom: null });
   assert.match(uncustomised, /data-layer="custom"[^]*None\. Write them on[^]*writer[^]*&#x27;s page\./);
   assert.match(uncustomised, /Told after writer&#x27;s instructions; where they conflict/);
@@ -6715,6 +6819,7 @@ test("a workflow's steps, a row each: an agent's step by its policy, its agent l
     agent: 'ada',
     instructions: 'Build what was asked.',
     custom: null,
+    factory: null,
     agentSkills: ['implement-a-change'],
     policy: 'Keep the **diff** small.',
     addedSkills: ['look'],

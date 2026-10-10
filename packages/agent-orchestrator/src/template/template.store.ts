@@ -1,8 +1,9 @@
 /**
  * A factory template on disk, a folder or an archive of one: read through one reader (`readTemplate`), each YAML document parsed with
  * the line every value stands on, and checked (`checkTemplateAt`); written from a repository's workflows, agents and skills, and a
- * factory's hires and instruction (`exportTemplate`), read through the loader's own readers, staged beside the folder, checked, and only
- * then put in place; packed into an archive (`packTemplate`) and unpacked from one (`unpackTemplate`), each staged and renamed into place.
+ * factory's hires, instruction and rules (`exportTemplate`), read through the loader's own readers, staged beside the folder, checked,
+ * and only then put in place; packed into an archive (`packTemplate`) and unpacked from one (`unpackTemplate`), each staged and renamed
+ * into place.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -254,12 +255,15 @@ function factorySource(ask: FactoryAsk, from: string, refusals: string[]): { sou
   }
   const read = ask.instruction(factory);
   if (read.error) refusals.push(`the factory ${name}'s instruction: ${read.error}`);
+  const rules = ask.rules(factory);
+  if (rules.error) refusals.push(`the factory ${name}'s rules: ${rules.error}`);
   return {
     source: {
       name,
       file: path.join(factoriesDir(), `${name}.json`),
       hires: factory.hires,
       instruction: read.words === null ? undefined : { words: read.words, file: read.file },
+      rules: rules.words === null ? undefined : { words: rules.words, file: rules.file },
     },
     workflows: [...factory.workflows],
   };
@@ -311,18 +315,18 @@ function placeRefusal(dir: string, name: string, verb: 'export' | 'unpack'): voi
 /** A factory's instruction as read where it is kept: its words, or null where there are none, why it does not read, and its file. */
 export type InstructionReader = (factory: Factory) => { words: string | null; error: string | null; file: string };
 
-/** A factory an export holds the parts of: its name, and how its instruction is read. */
-export type FactoryAsk = { name: string; instruction: InstructionReader };
+/** A factory an export holds the parts of: its name, and how its instruction and its rules are read, each as the other is. */
+export type FactoryAsk = { name: string; instruction: InstructionReader; rules: InstructionReader };
 
 /** What `nemia template export` asks: the folder to write, the repository to read, and the factory whose parts it holds. */
 export type ExportAsk = { dir: string; from: string; factory?: FactoryAsk };
 
 /**
  * The draft of a template written at `ask.dir` from the repository `ask.from`: each workflow of its `workflows/` (with `factory`, only
- * those it attaches), the agents and skills they name as the loader finds them, the factory's hires and instruction; staged beside the
- * folder, checked, then put in place. Answers the folder and where each part came from. Refused, nothing written: a folder that holds
- * files (Conflict), one that is no name, a factory not filed or whose repositories are not `from`, a workflow it attaches that `from`
- * lacks, what `draftOf` refuses, and a draft that does not pass its own check (Invalid), each problem by name.
+ * those it attaches), the agents and skills they name as the loader finds them, the factory's hires, instruction and rules; staged
+ * beside the folder, checked, then put in place. Answers the folder and where each part came from. Refused, nothing written: a folder
+ * that holds files (Conflict), one that is no name, a factory not filed or whose repositories are not `from`, a workflow it attaches
+ * that `from` lacks, what `draftOf` refuses, and a draft that does not pass its own check (Invalid), each problem by name.
  */
 export function exportTemplate(ask: ExportAsk): { dir: string; from: Draft['from'] } {
   const dir = path.resolve(ask.dir);

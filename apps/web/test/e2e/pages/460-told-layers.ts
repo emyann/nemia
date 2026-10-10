@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { FOLDER } from '../seed.ts';
+import { FACTORIES, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -21,6 +21,11 @@ const LAYERED = {
   addedSkill: 'cite-sources',
   deny: 'WebFetch',
   review: 'Read the note, and say whether it holds up.',
+  /** The run the page writes beside it, started in a factory that kept rules, and the rules it froze. */
+  ruled: 'told-ruled-e2e46',
+  rules: 'Never push on a **Friday**. A change comes with the test that proves it.',
+  /** The rules' first words, as a person reads them drawn. */
+  rulesSay: 'Never push on a Friday.',
   /** The run the page writes beside it, which froze no workflow, so its steps are read from the folder and have no layers. */
   unfrozen: 'told-unfrozen-e2e46',
   /** What the folder's `write` step says, its body on a record that froze no layers. */
@@ -34,18 +39,19 @@ const goto = async (page: Page, to: string): Promise<void> => {
 };
 
 /**
- * Writes LAYERED's record into the e2e's store, as `wf start` freezes it: `write`, hired from `writer` with the person's custom
+ * Writes a record into the e2e's store under `id`, as `wf start` freezes it: `write`, hired from `writer` with the person's custom
  * instructions and one skill of its own, its line adding another and a deny; and `review`, with no agent. Neither is filed, so each says
- * what it would be told now.
+ * what it would be told now. Given `rules`, it is a run started in FACTORIES' `hiring` while the factory kept them: `write`'s agent froze
+ * them, after the custom instructions, and `review`, with no agent, was told none.
  */
-function written(): string {
-  const record = path.join(store!, 'runs', `${LAYERED.id}.json`);
-  const work = path.join(store!, 'runs', LAYERED.id, 'work');
+function written(id: string = LAYERED.id, rules: string | null = null): string {
+  const record = path.join(store!, 'runs', `${id}.json`);
+  const work = path.join(store!, 'runs', id, 'work');
   fs.mkdirSync(work, { recursive: true });
   const write = {
     name: 'write',
     after: [],
-    body: [LAYERED.instructions, LAYERED.custom, LAYERED.policy].join('\n\n'),
+    body: [LAYERED.instructions, LAYERED.custom, ...(rules === null ? [] : [rules]), LAYERED.policy].join('\n\n'),
     harness: 'claude',
     workspace: 'folder',
     permissionMode: 'dontAsk',
@@ -58,6 +64,7 @@ function written(): string {
       given: {},
       instructions: LAYERED.instructions,
       customInstructions: LAYERED.custom,
+      ...(rules !== null && { factoryRules: rules }),
       skills: [LAYERED.agentSkill, LAYERED.addedSkill],
       addedSkills: [LAYERED.addedSkill],
     },
@@ -71,7 +78,8 @@ function written(): string {
     permissionMode: 'dontAsk',
   };
   const run = {
-    id: LAYERED.id,
+    id,
+    ...(rules !== null && { factory: FACTORIES.hiring.name }),
     place: { kind: 'folder' },
     workspace: work,
     brief: LAYERED.brief,
@@ -151,11 +159,46 @@ async function onPhone(page: Page, write: Locator): Promise<void> {
 
 const PHONE = { width: 390, height: 844 };
 
+/**
+ * The run started in a factory that kept rules: `write`'s fold draws them as a layer of their own, between the custom instructions and
+ * the step's policy, once, and says they went where the agent's words and the person's did; `review`, with no agent, was told none.
+ */
+async function expectRules(page: Page): Promise<void> {
+  await goto(page, `/runs/${LAYERED.ruled}`);
+  const write = sectionOf(page, 'write');
+  const fold = write.locator('details[data-told]');
+  await fold.locator('summary').click();
+  const layers = ['instructions', 'custom', 'factory', 'policy', 'task'];
+  await expectCount(fold.locator('[data-layer]'), layers.length, 'five layers, in a factory that kept rules');
+  const drawn = await fold.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
+  if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
+  const rules = fold.locator('[data-layer="factory"]');
+  await expectVisible(rules.locator('h4', { hasText: "The factory's rules" }), 'the layer is named');
+  await expectVisible(rules.locator('[data-markdown]', { hasText: LAYERED.rulesSay }), 'and says the rules the run froze');
+  await expectVisible(rules.locator('strong', { hasText: 'Friday' }), 'as the markdown they are');
+  await expectVisible(
+    fold.getByText("The agent's instructions, yours and the factory's rules were frozen at the start of the run", { exact: false }),
+    'the fold says the rules were frozen with them',
+  );
+  await expectOnce(write, [
+    ["the factory's rules", LAYERED.rulesSay],
+    ['the custom instructions', LAYERED.custom],
+    ['the policy', LAYERED.policySays],
+  ]);
+  const review = sectionOf(page, 'review').locator('details[data-told]');
+  await review.locator('summary').click();
+  await expectCount(review.locator('[data-layer="factory"]'), 0, 'a step with no agent is told no rules');
+  await settled(page);
+  await photograph(write, path.join(OUT, `told-layers-rules-${await themeOf(page)}.png`));
+}
+
 export default {
   /**
    * What a step was told, by layer, from what its run froze. `write`'s fold, opened, draws the agent's instructions with its skill, the
    * person's custom instructions, the step's policy with the skill and the deny its line adds, and the task, in that order, each once, and
-   * says the first two went into the session's system prompt; `review`, with no agent, says its own words are all it was told. Each
+   * says the first two went into the session's system prompt — four layers, and none for a factory's rules, the run having frozen none;
+   * a run started in a factory that kept rules draws them as a fifth, between the custom instructions and the policy (`expectRules`);
+   * `review`, with no agent, says its own words are all it was told. Each
    * section, fold and all, says each layer's words once: no body above the fold says them again. A run that froze no layers still draws
    * its step's body above the fold, which is all it has of the step's words. The page writes its runs and takes them back, so each visit
    * reads the store as seeded.
@@ -167,6 +210,7 @@ export default {
     try {
       records.push(written());
       records.push(unfrozen());
+      records.push(written(LAYERED.ruled, LAYERED.rules));
       await goto(page, `/runs/${LAYERED.id}`);
       const write = sectionOf(page, 'write');
       const fold = write.locator('details[data-told]');
@@ -175,7 +219,7 @@ export default {
       await photograph(write, path.join(OUT, `told-layers-closed-${await themeOf(page)}.png`));
       await fold.locator('summary').click();
       const layers = ['instructions', 'custom', 'policy', 'task'];
-      await expectCount(fold.locator('[data-layer]'), layers.length, 'four layers');
+      await expectCount(fold.locator('[data-layer]'), layers.length, "four layers: the run froze no factory's rules, and none is drawn");
       const drawn = await fold.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
       if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
       const words: Array<[string, string]> = [
@@ -219,6 +263,7 @@ export default {
       await settled(page);
       await photograph(write, path.join(OUT, `told-layers-open-${await themeOf(page)}.png`));
       await onPhone(page, write);
+      await expectRules(page);
 
       await goto(page, `/runs/${LAYERED.unfrozen}`);
       const whole = sectionOf(page, 'write');
@@ -232,7 +277,8 @@ export default {
       await goto(page, `/runs/${FOLDER.id}`);
     } finally {
       for (const record of records) fs.rmSync(record, { force: true });
-      for (const id of [LAYERED.id, LAYERED.unfrozen]) fs.rmSync(path.join(store!, 'runs', id), { recursive: true, force: true });
+      for (const id of [LAYERED.id, LAYERED.unfrozen, LAYERED.ruled])
+        fs.rmSync(path.join(store!, 'runs', id), { recursive: true, force: true });
     }
   },
 } satisfies PageSpec;

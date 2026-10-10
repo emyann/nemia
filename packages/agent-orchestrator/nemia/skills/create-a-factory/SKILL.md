@@ -1,6 +1,6 @@
 ---
 name: create-a-factory
-description: Make a whole factory, short of a run — create it, write its workflows, agents and skills into yours, attach its workflows, hire agents into steps, write its instruction, try an agent on a short brief — and stop before any work starts.
+description: Make a whole factory, short of a run — create it, write its workflows, agents and skills into yours, attach its workflows, hire agents into steps, write its rules and its instruction, try an agent on a short brief — and stop before any work starts.
 ---
 # Create a factory
 
@@ -55,10 +55,19 @@ before work depends on it.
 Who to hire into a step, find with the `recruit-or-create` skill. `nemia factory hire <factory> <agent> --step <workflow>/<step>`, one agent
 a step; `nemia factory fire <factory> --step <workflow>/<step>` takes a hire back. A step whose own file names its `agent:` takes no hire.
 
-## 6. Its instruction
+## 6. Its rules, and its instruction
 
-The factory's own rules, which win over your habits there and are read by its agents' steps. Draft it in `drafts/<factory>/NEMIA.md`
-and show it. The person may keep it in the repository (`NEMIA.md` in its first folder, which they place); or, kept in the store,
+Two files, each told to someone else.
+
+**Its rules** are what every agent hired into the factory is told, in every step of every run started there, after the agent's custom
+instructions and before the step's own policy: the factory's rules and policies, whoever does the work. Draft them in
+`drafts/<factory>/RULES.md`, show them, then `nemia factory rules <factory> --file drafts/<factory>/RULES.md`; `nemia factory rules
+<factory>` reads them back and `--clear` removes them. They are kept in your store, never in a repository, and only add words: a
+frontmatter block is refused. A run freezes them when it starts, so an edit reaches only the runs started after it. A factory with none
+tells nothing.
+
+**Its instruction** is yours: what you are to know about the factory, which wins over your habits there. No step is told it. Draft it
+in `drafts/<factory>/NEMIA.md` and show it. The person may keep it in the repository (`NEMIA.md` in its first folder, which they place); or, kept in the store,
 `nemia factory instruction <factory> --store`, then `nemia factory instruct <factory> --file drafts/<factory>/NEMIA.md`.
 
 Words a person adds to one agent without rewriting it are its custom instructions: `nemia agents custom <name> --file <path>`.

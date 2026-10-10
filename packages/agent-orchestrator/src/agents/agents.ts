@@ -7,9 +7,10 @@
  *
  * Under `runs/<id>/agents/<step>/`, frozen with the run as its workflow is:
  *
- * - `prompt.md`, the agent's instructions, then the person's custom instructions for it (`customInstructions`), then a line naming each
- *   skill it is given, then the whole text of each skill that asks to be told whole (`preload: true`): appended to Claude Code's own
- *   prompt, which is kept (`--append-system-prompt-file`), or put in its place for `harnessPrompt: replace` (`--system-prompt-file`);
+ * - `prompt.md`, the agent's instructions, then the person's custom instructions for it (`customInstructions`), then the rules of the
+ *   factory the run was started in (`factoryRules`), then a line naming each skill it is given, then the whole text of each skill that
+ *   asks to be told whole (`preload: true`): appended to Claude Code's own prompt, which is kept (`--append-system-prompt-file`), or put
+ *   in its place for `harnessPrompt: replace` (`--system-prompt-file`);
  * - `nemia-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
  *   so a session loads them as `nemia-<agent>:<name>`; and, for `harnessPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied.
@@ -510,17 +511,21 @@ export const NO_CODING_STYLE = 'no-coding';
 /** The plugin an agent's skills are served from, and so their namespace: `nemia-<agent>`. */
 export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
+/** Whether the frozen `agent` carries words of a layer above its step's note: its instructions, custom instructions or factory's rules. */
+const toldWords = (agent: StepAgent): boolean => Boolean(agent.instructions || agent.customInstructions || agent.factoryRules);
+
 /**
  * Whether `nemia start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
- * takes no prompt of ours — whose record gives its agent instructions, custom instructions, skills or a harness prompt other than `keep`
- * (`StepAgent.instructions`, `customInstructions`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a
+ * takes no prompt of ours — whose record gives its agent instructions, custom instructions, its factory's rules, skills or a harness
+ * prompt other than `keep` (`StepAgent.instructions`, `customInstructions`, `factoryRules`, `skills`, `harnessPrompt`; a record without
+ * them renders nothing), and which starts a
  * session of its own. A step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its
  * brief (and may give no skills, nor a harness prompt: `composedRefusal`).
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
   if (!agent || step.harness === 'codex' || isRemoteHarness(step.harness) || step.resume) return false;
-  return Boolean(agent.instructions || agent.customInstructions || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
+  return Boolean(toldWords(agent) || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
 };
 
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
@@ -552,7 +557,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;
-  const { instructions: _i, customInstructions: _c, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
+  const { instructions: _i, customInstructions: _c, factoryRules: _r, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
   if (!skills.length) return { ...step, agent };
   return {
     ...step,
@@ -571,7 +576,8 @@ export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): 
 export type RenderedSkill = { name: string; whole?: string };
 
 /**
- * The text of `prompt.md`: the agent's instructions, then the person's custom instructions for it, then each skill it is given by its
+ * The text of `prompt.md`: the agent's instructions, then the person's custom instructions for it, then its factory's rules, then each
+ * skill it is given by its
  * namespaced name, the session to load it with the Skill tool when the instructions say it is needed, then each skill told whole, under a
  * heading of its name. Claude Code lists a plugin's skills to the session by name and description all the same; naming them here says they
  * are this agent's. A bare skill of the same name is hidden from the session (`sessionSettings`), so the name it is told is the only one it
@@ -586,6 +592,7 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
     [
       ...(agent.instructions ? [agent.instructions.trimEnd()] : []),
       ...(agent.customInstructions ? [agent.customInstructions.trimEnd()] : []),
+      ...(agent.factoryRules ? [agent.factoryRules.trimEnd()] : []),
       ...(named.length
         ? [
             `Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`,
@@ -647,7 +654,7 @@ export function renderedFlags(
   const agent = step.agent!;
   const prompt = path.join(dir, PROMPT_FILE);
   const plugin = pluginOf(agent.name);
-  const told = Boolean(agent.instructions || agent.customInstructions || agent.skills?.length);
+  const told = Boolean(toldWords(agent) || agent.skills?.length);
   const settings = sessionSettings(agent);
   return {
     ...(told ? (agent.harnessPrompt === 'replace' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),

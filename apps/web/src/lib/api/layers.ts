@@ -6,14 +6,16 @@ import { Schema } from 'effect';
 
 /**
  * Mirrors `ToldLayers` (agent-orchestrator/run), the api's `layers`: what a step was told, by layer — its agent, the agent's
- * instructions and own skills, the person's custom instructions for it, the step's own note, the skills its line adds and the fence lines
- * it tightens the agent's with, and the task, its brief after them. `via` says where the agent's words and the person's went: the
+ * instructions and own skills, the person's custom instructions for it, the rules of the factory its run was started in (`factory`, null
+ * where the factory keeps none or the step is told none), the step's own note, the skills its line adds and the fence lines it tightens
+ * the agent's with, and the task, its brief after them. `via` says where the agent's words, the person's and the factory's went: the
  * session's system prompt (`prompt`), or the head of its brief (`brief`).
  */
 export type StepLayers = {
   agent: string | null;
   instructions: string | null;
   custom: string | null;
+  factory: string | null;
   agentSkills: string[];
   policy: string;
   addedSkills: string[];
@@ -27,6 +29,7 @@ export const StepLayersSchema = Schema.Struct({
   agent: Schema.NullOr(Schema.String),
   instructions: Schema.NullOr(Schema.String),
   custom: Schema.NullOr(Schema.String),
+  factory: Schema.NullOr(Schema.String),
   agentSkills: Schema.mutable(Schema.Array(Schema.String)),
   policy: Schema.String,
   addedSkills: Schema.mutable(Schema.Array(Schema.String)),

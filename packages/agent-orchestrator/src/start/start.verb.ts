@@ -49,7 +49,22 @@ import {
   type Factory,
 } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
+import { readRules, rulesAt } from '../rules/rules.store.ts';
 import { Context, Effect } from 'effect';
+
+/**
+ * The rules of `factory` a run started in it is told, read once from its file (`readRules`), or undefined where it keeps none. Refused
+ * (`Invalid`), naming the file, before a run is written: a file there that cannot be told — a link, anything that is no file, one that
+ * does not read, and a frontmatter block, since rules only add words.
+ */
+function rulesToTell(factory: Factory): string | undefined {
+  const { words, error } = readRules(rulesAt(factory));
+  if (error !== null)
+    throw new Invalid({
+      message: `${error} Or remove the rules: nemia factory rules ${factory.name} --clear. Nothing was started.`,
+    });
+  return words ?? undefined;
+}
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`fillsOf`, by the folder's name) resolved against
@@ -57,13 +72,17 @@ import { Context, Effect } from 'effect';
  * folder is read, since a factory offers only its workflows; then every step left with no agent (`unfilledRefusal`), since a factory's
  * steps are filled by its hires; and a hire into a step whose file names its own agent (`parseWorkflow`). With no factory — the default —
  * every workflow is offered, and a step that names no agent is a plain session, as it always was.
+ *
+ * The factory's rules are read here, once (`rulesToTell`), and handed to every step with its hires: the run freezes them with its steps.
  */
 function stepsIn(workflowDir: string, places: Places, factory: Factory | undefined): Workflow[] {
   if (!factory) return loadWorkflows(workflowDir, places);
   const workflow = path.basename(path.resolve(workflowDir));
   const unattached = unattachedRefusal(factory, workflow);
   if (unattached) throw new Invalid({ message: unattached });
-  const steps = loadWorkflows(workflowDir, places, { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow) });
+  const rules = rulesToTell(factory);
+  const fills = { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow), ...(rules !== undefined && { rules }) };
+  const steps = loadWorkflows(workflowDir, places, fills);
   const unfilled = unfilledRefusal(steps, factory.name, workflow);
   if (unfilled) throw new Invalid({ message: unfilled });
   return steps;

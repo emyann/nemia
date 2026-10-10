@@ -37,10 +37,11 @@ const SAID: Record<Change['kind'], { done: string; refused: string }> = {
 };
 
 /**
- * A factory's instruction, on its settings page: where it is kept, in a person's words, and its words. Kept in the store, it is edited here
- * — saved, or cleared, asked twice; kept in a file of the factory's first folder, it is shown as that file reads, edited in the checkout.
- * Either way the person may keep it in the store, read it from another file in the folder, or go back to `NEMIA.md`. A change sets what the
- * page shows from the api's answer and reads the instruction again; a refusal is shown in the api's words.
+ * A factory's instruction, on its settings page — what Nemia is to know about it, which no step of a run is told: where it is kept, in a
+ * person's words, and its words. Kept in the store, it is edited here — saved, or cleared, asked twice; kept in a file of the factory's
+ * first folder, it is shown as that file reads, edited in the checkout. Either way the person may keep it in the store, read it from
+ * another file in the folder, or go back to `NEMIA.md`. A change sets what the page shows from the api's answer and reads the instruction
+ * again; a refusal is shown in the api's words.
  */
 export function FactoryInstruction({ name }: { name: string }) {
   const queryClient = useQueryClient();
@@ -63,8 +64,8 @@ export function FactoryInstruction({ name }: { name: string }) {
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold">Instruction</h2>
         <p className="text-sm text-muted-foreground">
-          What this factory's runs are to know about its work: its conventions, its checks, what it holds dear. One text, read where it is
-          kept.
+          What Nemia is to know about this factory: what it is for, how its work goes, what to ask you first. She reads it before she acts
+          here; no step of a run is told it. One text, read where it is kept.
         </p>
       </div>
       {data ? (
@@ -157,7 +158,7 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
       <TextField value={draft} onChange={setDraft} className="flex flex-col gap-1.5">
         <Label className="text-xs">Words</Label>
         <Textarea
-          placeholder="What this factory's runs are to know: the conventions of its code, the checks it runs, what to ask before changing."
+          placeholder="What Nemia is to know about this factory: what it is for, how its work goes, what to ask you before she acts."
           className="min-h-40 leading-relaxed"
         />
       </TextField>

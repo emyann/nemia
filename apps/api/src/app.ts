@@ -8,7 +8,7 @@ import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
-import { factories, factoryInstruction } from './factories/index.ts';
+import { factories, factoryInstruction, factoryRules } from './factories/index.ts';
 import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
@@ -81,8 +81,11 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - factories/factories.ts — the factories a request may be answered in, each with its repositories, workflows and hires. Every route is
  *   answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused
  *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
- * - factories/instruction.ts — a factory's instruction, read through `nemia factory instruction`'s entry; where it is kept put and
- *   cleared, and the store's text written and cleared, on the routes the table generates from it and `nemia factory instruct`'s.
+ * - factories/rules.ts — a factory's rules, what every agent hired into it is told, read through `nemia factory rules`'s entry; written
+ *   and removed on the routes the table generates from it.
+ * - factories/instruction.ts — a factory's instruction, what Nemia is to know of it, read through `nemia factory instruction`'s entry;
+ *   where it is kept put and cleared, and the store's text written and cleared, on the routes the table generates from it and
+ *   `nemia factory instruct`'s.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -157,6 +160,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       served(c, async ({ e, env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { e, env, home, asker: mcp }))),
     )
     .route('/', factories)
+    .route('/', factoryRules)
     .route('/', factoryInstruction)
     .route('/', workflows)
     .route('/', step)

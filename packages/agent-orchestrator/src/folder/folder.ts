@@ -101,10 +101,11 @@ export const workflowInUse = (dir: string, users: readonly string[]): string =>
 export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
 /**
- * The agents a factory hires into one workflow's steps: the factory's name, the workflow's — its folder's name, as a hire names it — and
- * the agent each step is hired, by step.
+ * What a factory gives one workflow's steps: the agents it hires into them — the factory's name, the workflow's (its folder's name, as a
+ * hire names it) and the agent each step is hired, by step — and its rules, the words every step with an agent is told (`rules`), none
+ * when it keeps none.
  */
-export type Fills = { factory: string; workflow: string; agents: Readonly<Record<string, string>> };
+export type Fills = { factory: string; workflow: string; agents: Readonly<Record<string, string>>; rules?: string };
 
 /** The hire `fills` makes into the step `step`, or undefined for none. */
 function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
@@ -116,7 +117,8 @@ function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
  * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the
  * order of its file's name as a folder lists them, then the ways the steps do not form a workflow (`validate`), and in the order they run.
  * Pure: `read` answers for a file beside the steps, and `agents` are those `agent:` may name, as `parseWorkflow`'s are. `fills` are the
- * agents a factory hires into the steps (`Fills`), each handed to its step as `parseWorkflow`'s `hired`.
+ * agents a factory hires into the steps (`Fills`), each handed to its step as `parseWorkflow`'s `hired`, and its rules, handed to every
+ * step.
  *
  * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a
  * folder written is refused for what a folder read would be, in the same words.
@@ -129,7 +131,7 @@ export function parseFolder(
   fills?: Fills,
 ): Workflow[] {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
-  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills, hireOf(fills, name)));
+  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills, hireOf(fills, name), fills?.rules));
   validate(steps);
   return orderSteps(steps);
 }

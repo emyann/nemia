@@ -1,7 +1,8 @@
 /**
- * A factory's instruction, its two verbs each an entry of the command table: `nemia factory instruction`, where it is kept — read bare,
- * and set or cleared in the factory's file — and `nemia factory instruct`, the text the store keeps, written or cleared. The api serves
- * the writes on the routes the table generates, and the read by a route of its own, which calls the same handler (`factoryInstruction`).
+ * A factory's instruction, what Nemia is to know of the factory and no step is told (its agents are told its rules, `nemia factory rules`),
+ * its two verbs each an entry of the command table: `nemia factory instruction`, where it is kept — read bare, and set or cleared in the
+ * factory's file — and `nemia factory instruct`, the text the store keeps, written or cleared. The api serves the writes on the routes
+ * the table generates, and the read by a route of its own, which calls the same handler (`factoryInstruction`).
  */
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -138,9 +139,11 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
   name: 'factory instruction',
   usage: '<name> [--path <path> | --store | --clear]',
   help: [
-    "where a factory's instruction is kept: bare, prints it; --path reads it",
-    "from a file in the factory's first folder, --store keeps it in the",
-    'store, --clear reads NEMIA.md in the first folder again',
+    "where a factory's instruction is kept, what Nemia is to know of the",
+    'factory (its agents are told its rules: nemia factory rules): bare,',
+    "prints it; --path reads it from a file in the factory's first folder,",
+    '--store keeps it in the store, --clear reads NEMIA.md in the first',
+    'folder again',
   ],
   spec: INSTRUCTION_SPEC,
   check: instructionCheck,
@@ -202,7 +205,10 @@ type Instructed = FactoryInstruction & { removed?: boolean };
 export const FACTORY_INSTRUCT: Command<Instructed> = {
   name: 'factory instruct',
   usage: '<name> --file <path>|- | --clear',
-  help: ['write the instruction the store keeps for a factory (- for stdin), or', 'remove it with --clear'],
+  help: [
+    'write the instruction the store keeps for a factory (- for stdin), what',
+    'Nemia is to know of it and no step is told, or remove it with --clear',
+  ],
   spec: INSTRUCT_SPEC,
   check: (args) => {
     if (args.clear === true && args.file !== undefined)

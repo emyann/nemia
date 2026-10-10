@@ -154,7 +154,7 @@ holds what every change needs.
 
 What the `create-an-agent` skill, being generic, does not say here:
 
-- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the four layers.
+- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the five layers.
 - A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
   `.claude/skills/` is not found.
 - A checking agent given `Bash` denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows other roles,

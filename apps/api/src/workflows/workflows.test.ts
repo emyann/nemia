@@ -275,6 +275,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
         agent: null,
         instructions: null,
         custom: null,
+        factory: null,
         agentSkills: [],
         policy: 'Review it.',
         addedSkills: [],

@@ -1,5 +1,5 @@
 /**
- * Custom instructions, the second of an agent's four layers: what a person adds to an agent they use without rewriting it, one file per
+ * Custom instructions, the second of an agent's five layers: what a person adds to an agent they use without rewriting it, one file per
  * agent name in their store (`<WF_ROOT>/custom-instructions/<agent>.md`). Held here: the order a step is told its layers in — the agent's
  * instructions, then the custom instructions, then the step's own note — proven with layers that say different things; the freeze at
  * `nemia start`, proven with an edit after it; that the words never touch a key; and the load's refusals, each beside what still starts.

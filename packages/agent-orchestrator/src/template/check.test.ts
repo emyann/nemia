@@ -154,6 +154,21 @@ test('a file outside the layout is refused by name, and so is a folder without i
   );
 });
 
+test("RULES.md at the root is a file of the layout, the factory's rules; another .md there, or RULES.md further down, is outside it", () => {
+  assert.deepEqual(
+    refusalsOf(undefined, (others) => [...others, 'RULES.md']),
+    [],
+  );
+  const refusals = refusalsOf(undefined, (others) => [...others, 'POLICY.md', 'agents/RULES.md']);
+  assertRefused(refusals, 'POLICY.md', [], 'A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root');
+  assertRefused(refusals, 'agents/RULES.md', [], 'outside the template');
+  assert.deepEqual(
+    refusalsOf((docs) => (docs['nemia.yaml'].spec.rules = 'Never push on a Friday.')),
+    [],
+    'the manifest may hold them instead',
+  );
+});
+
 test("a workflow's README and its files that are no .md or .yaml are carried, and a .md that names no step is refused", () => {
   assert.deepEqual(
     refusalsOf(undefined, (others) => [...others, 'workflows/build/README.md', 'workflows/build/mutants.ts']),

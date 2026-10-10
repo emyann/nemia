@@ -33,7 +33,8 @@ const FACTORY_SAYS =
   'nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, ' +
   "schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back " +
   'with nemia factory unschedule <factory> <workflow>, ' +
-  'says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, ' +
+  'writes the rules its agents are told with nemia factory rules <name> --file <path>, ' +
+  "says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, " +
   'and removes one with nemia factory rm <name> (nemia factory --help).';
 const START_SAYS =
   'It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> ' +
@@ -75,6 +76,11 @@ const REFUSALS: Array<[string[], string[], string]> = [
   [['factory', 'hire'], ['f', 'a'], 'nemia factory hire does not take --nope. It takes <factory> <agent>, then --step <workflow>/<step>.'],
   [['factory', 'fire'], ['f'], 'nemia factory fire does not take --nope. It takes <factory>, then --step <workflow>/<step>.'],
   [
+    ['factory', 'rules'],
+    ['f'],
+    "nemia factory rules takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not --nope.",
+  ],
+  [
     ['factory', 'instruction'],
     ['f'],
     "nemia factory instruction takes one factory's name, then --path <path>, --store or --clear, not --nope: nemia factory instruction <name> [--path <path> | --store | --clear].",
@@ -111,6 +117,7 @@ const MISSING: Readonly<Record<string, string>> = {
   'factory hire':
     'nemia factory hire takes the factory, then the agent: nemia factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
   'factory fire': 'nemia factory fire takes the factory first: nemia factory fire <factory> --step <workflow>/<step>. Nothing was fired.',
+  'factory rules': "nemia factory rules takes the factory's name: nemia factory rules <name> [--file <path>|- | --clear].",
   'factory instruction':
     "nemia factory instruction takes the factory's name: nemia factory instruction <name> [--path <path> | --store | --clear].",
   'factory instruct': "nemia factory instruct takes the factory's name: nemia factory instruct <name> --file <path>|- or --clear.",

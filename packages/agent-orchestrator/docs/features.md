@@ -2375,8 +2375,9 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
 - **What she is ships in `packages/agent-orchestrator/nemia/`**: `nemia.md` (her instruction, her allow list of read verbs and her deny
   list: push, a forced branch delete, a merge, a kill by name, a pull request or release by `gh`, `browser_run_code_unsafe`), and her
-  skills: at 5b `recap`, bring-a-gate, `grant-access` and `commission-a-workflow`; card B's (below) are today's. A factory's own rules are its instruction (`NEMIA.md`), which she reads
-  before acting there; this repository's is `NEMIA.md` at its root.
+  skills: at 5b `recap`, bring-a-gate, `grant-access` and `commission-a-workflow`; card B's (below) are today's. A factory's instruction (`NEMIA.md`) is what she reads
+  before acting there, and no step is told it; this repository's is `NEMIA.md` at its root. What every agent hired into a factory is
+  told is the factory's rules, written with `nemia factory rules`.
 
 Her machine, drawn by its code:
 

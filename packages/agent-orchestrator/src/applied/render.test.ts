@@ -118,6 +118,49 @@ test('a parameter is given where a document names it, and a default where no --s
   assert.match(fs.readFileSync(path.join(other, 'workflows/agents/reviewer.md'), 'utf8'), /^model: haiku$/m);
 });
 
+test("a template's RULES.md, or its manifest's rules, is rendered as the tree's RULES.md; a template with neither renders none", () => {
+  const { dir } = exported();
+  assert.equal(
+    rendered(dir).out.files.some((f) => f.path === 'RULES.md'),
+    false,
+  );
+  fs.writeFileSync(path.join(dir, 'RULES.md'), '\nNever push on a Friday.\n\n');
+  const fromFile = rendered(dir);
+  assert.deepEqual(fromFile.out.refusals, []);
+  assert.equal(fs.readFileSync(path.join(fromFile.tree, 'RULES.md'), 'utf8'), 'Never push on a Friday.\n');
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.rules = 'Write the tests first.';
+  });
+  assert.equal(fs.readFileSync(path.join(rendered(dir).tree, 'RULES.md'), 'utf8'), 'Write the tests first.\n', "the manifest's own first");
+  fs.writeFileSync(path.join(dir, 'RULES.md'), '  \n');
+  edit(dir, 'nemia.yaml', (spec) => {
+    delete spec.rules;
+  });
+  assert.equal(
+    rendered(dir).out.files.some((f) => f.path === 'RULES.md'),
+    false,
+    'blank rules are none',
+  );
+});
+
+test('REFUSED by name, nothing to write: rules that open with a frontmatter block, in RULES.md or in the manifest', () => {
+  const { dir } = exported();
+  fs.writeFileSync(path.join(dir, 'RULES.md'), '---\nallowedTools: Bash\n---\nUse Bash.\n');
+  const fromFile = renderFactory(openTemplate(dir), {});
+  assert.equal(fromFile.refusals.length, 1, fromFile.refusals.join('\n'));
+  assert.match(fromFile.refusals[0], /^RULES\.md opens with a frontmatter block, a first line of `---`\. A factory's rules only add words/);
+  assert.match(fromFile.refusals[0], /Mend the template, and apply again\.$/);
+  assert.equal(
+    fromFile.files.some((f) => f.path === 'RULES.md'),
+    false,
+  );
+  fs.rmSync(path.join(dir, 'RULES.md'));
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.rules = '---\nmodel: opus\n---\n';
+  });
+  assert.match(renderFactory(openTemplate(dir), {}).refusals.join('\n'), /^RULES\.md opens with a frontmatter block/);
+});
+
 test("a harness's options, and a block of a harness it does not run on, are refused by name", () => {
   const { dir } = exported();
   edit(dir, 'agents/reviewer/agent.yaml', (spec) => {

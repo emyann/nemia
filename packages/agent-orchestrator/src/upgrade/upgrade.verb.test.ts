@@ -2,8 +2,9 @@
  * A templated factory's upgrade, on disk: `nemia factory plan` writing nothing; `nemia factory upgrade` refusing with nothing written, and
  * writing only the version wanted into the factory's file; the controller merging three ways, only the status written while a conflict
  * waits, then the tree, the base and the status; `nemia factory resolve` writing the person's choices; the tree swapped only where no one
- * wrote it since the merge read it; a pass stopped between its writes; and a run in flight keeping its frozen steps. `WF_ROOT` is set
- * before the import, since the store's modules read it as they load.
+ * wrote it since the merge read it; a pass stopped between its writes; a run in flight keeping its frozen steps; and the factory's
+ * rules, `RULES.md`, carried as any file of the tree is. `WF_ROOT` is set before the import, since the store's modules read it as they
+ * load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate } = await import('../template/template.store.ts');
-const { readFactory } = await import('../runner.ts');
+const { engine, FACTORY_RULES, factoryRules, readFactory, runWith } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { reconcileFactory } = await import('../applied/applied.verb.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
@@ -52,11 +53,15 @@ function edit(dir: string, file: string, change: (spec: Record<string, any>) => 
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
-/** The tests' team exported as a template at 0.1.0, `budget` a parameter of the review step, applied as `name` and rendered once. */
-async function applied(name: string): Promise<{ dir: string; repo: string }> {
+/**
+ * The tests' team exported as a template at 0.1.0, `budget` a parameter of the review step, applied as `name` and rendered once; with
+ * `rules`, the template holds them as its `RULES.md`.
+ */
+async function applied(name: string, rules?: string): Promise<{ dir: string; repo: string }> {
   const repo = repoWithTeam();
   const dir = path.join(scratch('wf-upgrade-template-'), 'team');
   exportTemplate({ dir, from: repo });
+  if (rules !== undefined) fs.writeFileSync(path.join(dir, RULES), rules);
   edit(dir, 'nemia.yaml', (spec) => {
     spec.parameters = { budget: { type: 'number', description: 'dollars for a review' } };
   });
@@ -97,6 +102,9 @@ const textIn = (folder: string, file: string): string => fs.readFileSync(path.jo
 /** The review step's file, as a factory's tree or base holds it. */
 const REVIEW = 'workflows/dev/review.md';
 const README = 'workflows/dev/README.md';
+
+/** A factory's rules, as its tree, its base and its template hold them. */
+const RULES = 'RULES.md';
 
 /** `file` in `folder` with `from` replaced by `to`. */
 const rewrite = (folder: string, file: string, from: string, to: string): void => {
@@ -275,6 +283,65 @@ test('conflicts wait for a choice with only the status written; resolve writes e
   assert.match(textIn(treeDir('clash'), README), /^# dev, both\n/);
   assert.match(textIn(appliedDir('clash'), README), /^# dev, theirs\n/);
   await assert.rejects(resolve(`${README}:1-1`, '--ours'), refusedWith('Conflict', /no upgrade of clash is under way/));
+});
+
+test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('ruled');
+  assert.equal(fs.existsSync(path.join(treeDir('ruled'), RULES)), false, 'the template had none, and the tree has none');
+  released(dir, '0.2.0', 5);
+  fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n');
+  await main(['factory', 'upgrade', 'ruled', '--to', '0.2.0'], NO_ENGINE);
+  const status = reconcileFactory(templated('ruled'));
+  assert.equal(status.version, '0.2.0');
+  assert.equal(status.upgrade, undefined, 'no conflict');
+  assert.equal(textIn(treeDir('ruled'), RULES), 'Never push on a Friday.\n');
+  assert.equal(textIn(appliedDir('ruled'), RULES), 'Never push on a Friday.\n');
+  assert.deepEqual(factoryRules('ruled'), {
+    name: 'ruled',
+    file: path.join(treeDir('ruled'), RULES),
+    words: 'Never push on a Friday.',
+    error: null,
+  });
+});
+
+test('rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a choice', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('both');
+  await runWith(engine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }));
+  assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
+  released(dir, '0.2.0', 5);
+  fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
+  await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], NO_ENGINE);
+  const waiting = reconcileFactory(templated('both'));
+  assert.equal(waiting.version, '0.1.0');
+  assert.deepEqual(waiting.upgrade?.conflicts, [
+    { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
+  ]);
+  assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
+  await main(['factory', 'resolve', 'both', RULES, '--theirs'], NO_ENGINE);
+  const merged = reconcileFactory(templated('both'));
+  assert.equal(merged.version, '0.2.0');
+  assert.equal(merged.upgrade, undefined);
+  assert.equal(textIn(treeDir('both'), RULES), 'Theirs: never push on a Friday.\n');
+});
+
+test('rules changed by the person and by the template on different lines, from a common base, merge by line', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const lines = ['Never push on a Friday.', '', 'Write the tests first.', '', 'Ask before a migration.', ''];
+  const { dir } = await applied('lined', lines.join('\n'));
+  assert.equal(textIn(treeDir('lined'), RULES), lines.join('\n'));
+  rewrite(treeDir('lined'), RULES, 'on a Friday', 'on a Friday, nor on a Monday');
+  released(dir, '0.2.0', 5);
+  rewrite(dir, RULES, 'before a migration', 'before any migration');
+  await main(['factory', 'upgrade', 'lined', '--to', '0.2.0'], NO_ENGINE);
+  const status = reconcileFactory(templated('lined'));
+  assert.equal(status.version, '0.2.0');
+  assert.equal(status.upgrade, undefined, 'no conflict');
+  assert.equal(
+    textIn(treeDir('lined'), RULES),
+    ['Never push on a Friday, nor on a Monday.', '', 'Write the tests first.', '', 'Ask before any migration.', ''].join('\n'),
+  );
 });
 
 test('choices made for another version are not merged, and the next resolve drops them', async (t) => {

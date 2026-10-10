@@ -1,13 +1,15 @@
 /**
  * `nemia template export`'s mapping of today's folders onto a template (`draftOf`): each step's own lines, as its file writes them, onto a
  * workflow's step, its harness keys onto the block of the harness it runs on; each agent onto an agent's folder; each skill a step or an
- * agent names, carried whole; and a factory's hires and instruction onto the manifest and NEMIA.md. Pure: the store reads with the
- * loader's own readers, hands the parts in, and writes what comes back. A key the template has no place for is refused by name.
+ * agent names, carried whole; and a factory's hires, instruction and rules onto the manifest, NEMIA.md and RULES.md. Pure: the store
+ * reads with the loader's own readers, hands the parts in, and writes what comes back. A key the template has no place for is refused by
+ * name.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
+import { FACTORY_RULES_FILE } from '../rules/rules.ts';
 import { API_VERSION, FENCE_KEYS, type Profile, type Step } from './layout.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
@@ -28,12 +30,16 @@ export type AgentSource = { name: string; file: string; agent: Agent; output: st
 /** Where a skill named is: its folder, a place skill nemia ships, or why it is not found (a refusal in the loader's words, or none). */
 export type SkillFound = { dir: string } | 'place' | { refused: string } | undefined;
 
-/** A factory's parts the draft holds: its name, its file, its hires and its instruction's words with the file they were read from. */
+/**
+ * A factory's parts the draft holds: its name, its file, its hires, and its instruction's words and its rules', each with the file they
+ * were read from.
+ */
 export type FactorySource = {
   name: string;
   file: string;
   hires: Readonly<Record<string, string>>;
   instruction: { words: string; file: string } | undefined;
+  rules: { words: string; file: string } | undefined;
 };
 
 /** What `draftOf` reads: the template's name, the workflows, a factory's parts, and the loader's answer for an agent and a skill. */
@@ -261,7 +267,8 @@ function gatherSkills(source: Source, into: Gathered): void {
 
 /**
  * The draft of the template `source.template`: each workflow, the agents its steps are filled by, the skills those agents and steps name
- * (a place skill left out), and the manifest with every hire, a factory's and the steps' own; NEMIA.md from the factory's instruction.
+ * (a place skill left out), and the manifest with every hire, a factory's and the steps' own; NEMIA.md from the factory's instruction,
+ * and RULES.md from its rules.
  * Refused, each by name, nothing to write: a key the template has no place for, a step filled twice, an agent or a skill not found.
  */
 export function draftOf(source: Source): Draft {
@@ -273,10 +280,13 @@ export function draftOf(source: Source): Draft {
   const manifest = documentOf('FactoryTemplate', source.template, undefined, { version: '0.1.0', hires });
   into.files.unshift({ path: 'nemia.yaml', document: manifest });
   into.from.unshift({ part: 'nemia.yaml', from: source.factory?.file ?? 'written here: version 0.1.0, named for its folder' });
-  const instruction = source.factory?.instruction;
-  if (instruction) {
-    into.files.push({ path: 'NEMIA.md', text: `${instruction.words.trim()}\n` });
-    into.from.push({ part: 'NEMIA.md', from: instruction.file });
+  for (const [part, words] of [
+    ['NEMIA.md', source.factory?.instruction],
+    [FACTORY_RULES_FILE, source.factory?.rules],
+  ] as const) {
+    if (!words) continue;
+    into.files.push({ path: part, text: `${words.words.trim()}\n` });
+    into.from.push({ part, from: words.file });
   }
   return { files: into.files, from: into.from, refusals: into.refusals };
 }

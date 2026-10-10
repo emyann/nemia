@@ -2,12 +2,13 @@
  * A checked template rendered into a factory's own folder, in today's format (`renderFactory`): the inverse of `nemia template export`'s
  * `draftOf`. Each workflow's steps become step files (`renderStep`), each agent an agent file (`renderAgent`) with its output schema
  * beside it, each skill's folder is carried as it is, and the manifest's hires and the workflows become the factory's wiring
- * (`factory.json`), its instruction `NEMIA.md`. The tree is laid out as yours is: `workflows/<workflow>/`, `workflows/agents/` and
- * `workflows/skills/`, so today's readers load it unchanged. Pure: the store reads the folder and the files a document names, and writes
- * what comes back. A key today's format has no place for is refused by name, never dropped.
+ * (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is laid out as yours is: `workflows/<workflow>/`,
+ * `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure: the store reads the folder and the files a
+ * document names, and writes what comes back. A key today's format has no place for is refused by name, never dropped.
  */
 import { renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { isMap, type ReadFolder } from '../template/index.ts';
 import { renderStep } from '../workflow/index.ts';
@@ -190,11 +191,22 @@ const specAt = (read: TemplateRead, file: string, params: Params): Spec =>
   substitute((read.folder.documents.get(file) as { spec?: Spec } | null)?.spec ?? {}, params) as Spec;
 
 /**
+ * The factory's rules `rules`, where the template has any, into `RULES.md` of the tree. Refused by name, nothing to write: rules that
+ * open with a frontmatter block (`factoryRulesRefusal`), since they only add words to what an agent is told.
+ */
+function renderRules(rules: string | undefined, out: Rendered): void {
+  if (!rules?.trim()) return;
+  const refused = factoryRulesRefusal(FACTORY_RULES_FILE, rules);
+  if (refused) out.refusals.push(`${refused} Mend the template, and apply again.`);
+  else out.files.push({ path: FACTORY_RULES_FILE, text: `${rules.trim()}\n` });
+}
+
+/**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow and the manifest's hires, and `NEMIA.md` from the manifest's instruction or the template's own. Refused, each by name, nothing
- * to write: what `renderStep` or `renderAgent` refuses, a harness block's `options`, and a block of a harness the step or agent does not
- * run on.
+ * workflow and the manifest's hires, `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md` from its rules, as
+ * `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules` refuses, a harness
+ * block's `options`, and a block of a harness the step or agent does not run on.
  */
 export function renderFactory(read: TemplateRead, params: Params): Rendered {
   const manifest = specAt(read, 'nemia.yaml', params);
@@ -218,6 +230,7 @@ export function renderFactory(read: TemplateRead, params: Params): Rendered {
   }
   const instruction = textOr(manifest.instruction, 'NEMIA.md', read);
   if (instruction !== undefined) out.files.push({ path: 'NEMIA.md', text: `${instruction.trim()}\n` });
+  renderRules(textOr(manifest.rules, FACTORY_RULES_FILE, read), out);
   out.files.push({ path: 'factory.json', text: `${JSON.stringify(out.wiring, null, 2)}\n` });
   return out;
 }

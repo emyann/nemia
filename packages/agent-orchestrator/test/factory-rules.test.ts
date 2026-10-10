@@ -157,6 +157,7 @@ test('an agent told nothing in its file, in a factory with rules, is rendered, i
   assert.equal(rendersAgent(step), true);
   assert.deepEqual(renderedFlags(step, '/r'), { appendSystemPromptFile: '/r/prompt.md' });
   assert.equal(renderedPrompt(step, []), 'Reply in German.\n');
+  assert.equal(briefBody(step), 'Reply in Spanish.', 'its brief is its own note alone');
   assert.equal(rendersAgent(parseWorkflow('build', text, undefined, agents)), false, 'told nothing, it is not rendered');
   const gone = unrendered(step);
   assert.equal(renderedFlags(gone, '/r'), undefined, 'no flag names a file that is not there');

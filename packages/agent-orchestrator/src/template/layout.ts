@@ -49,10 +49,14 @@ export type Metadata = { name: string; description?: string };
 /** Every YAML file of a template but its lock: one document. */
 export type Document<K extends string, S> = { apiVersion: typeof API_VERSION; kind: K; metadata: Metadata; spec: S };
 
-/** The manifest's spec: the content's version, the factory's instruction, its parameters and who fills each `<workflow>/<step>`. */
+/**
+ * The manifest's spec: the content's version, the factory's instruction and its rules, its parameters and who fills each
+ * `<workflow>/<step>`.
+ */
 export type FactorySpec = {
   version: string;
   instruction?: Text;
+  rules?: Text;
   parameters?: Readonly<Record<string, Parameter>>;
   hires: Readonly<Record<string, string>>;
 };
@@ -110,11 +114,11 @@ export function documentFile(file: string, template: string): DocumentFile | und
 const AGENT_FILES = ['agent.yaml', 'instructions.md', 'output.schema.json'];
 
 /** The files a template's root may hold. */
-const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'nemia.lock.yaml'];
+const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'RULES.md', 'nemia.lock.yaml'];
 
 /** The layout, said once for every refusal of a file outside it. */
 const LAYOUT =
-  "A template holds nemia.yaml, NEMIA.md and nemia.lock.yaml at its root; workflows/<workflow>/workflow.yaml, its steps' <step>.md, " +
+  "A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root; workflows/<workflow>/workflow.yaml, its steps' <step>.md, " +
   'README.md and any file that is not .md or .yaml; agents/<agent>/agent.yaml, instructions.md and output.schema.json; ' +
   'skills/<skill>/SKILL.md and anything beside it; and a file a {path:} names';
 
@@ -243,6 +247,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
     fields: {
       version: 'string',
       instruction: 'text',
+      rules: 'text',
       parameters: {
         fields: {},
         rest: { fields: { type: 'string', description: 'string', default: 'any' }, required: ['type', 'description'] },

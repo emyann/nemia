@@ -1,7 +1,7 @@
 /**
  * `nemia template`, its forms entries of the command table, the command line's alone: `check`, which reads a template's folder or
  * archive and refuses every problem it has at once, each at its file and line; `export`, which writes a draft of one from a repository
- * and, with `--factory`, the factory's hires and instruction; `pack`, which writes a checked folder into one archive, and `unpack`,
+ * and, with `--factory`, the factory's hires, instruction and rules; `pack`, which writes a checked folder into one archive, and `unpack`,
  * which writes an archive's folder back. Their handlers answer data, and the CLI prints it.
  */
 import { tried } from '../runtime-client.ts';
@@ -11,6 +11,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { instructionAt, type Factory } from '../factory/factory.ts';
 import { instructionFile, readInstructionAt } from '../factory/instruction.store.ts';
+import { readRules, rulesAt } from '../rules/rules.store.ts';
 import { checkedTemplate, exportTemplate, packTemplate, problemLine, unpackTemplate } from './template.store.ts';
 
 export const TEMPLATE_HELP = `nemia template check <folder|archive>
@@ -19,9 +20,9 @@ nemia template pack <folder> [--out <file>]
 nemia template unpack <archive> <dir>
 
 A factory template is a folder: nemia.yaml, its manifest, with the factory's hires; NEMIA.md, its instruction;
-workflows/<workflow>/workflow.yaml and each step's <step>.md; agents/<agent>/agent.yaml, instructions.md and
-output.schema.json; skills/<skill>/SKILL.md and what is beside it. Each .yaml holds one document, of
-apiVersion nemia.dev/v1alpha1.
+RULES.md, the rules its agents are told; workflows/<workflow>/workflow.yaml and each step's <step>.md;
+agents/<agent>/agent.yaml, instructions.md and output.schema.json; skills/<skill>/SKILL.md and what is beside
+it. Each .yaml holds one document, of apiVersion nemia.dev/v1alpha1.
 
   nemia template check  reads the folder and refuses every problem at once, each at its file and line,
                  sorted by file: a file outside the layout, a document that does not parse, a wrong apiVersion,
@@ -31,8 +32,8 @@ apiVersion nemia.dev/v1alpha1.
                  A folder with none prints that it passes, and the digest of its content. An archive is
                  checked as the folder it holds.
   nemia template export writes a new folder from the repository --from: each workflow of its workflows/ —
-                 with --factory, only those the factory attaches, and its hires and instruction — the agents
-                 their steps name and the skills those agents and steps name, found where a run finds them;
+                 with --factory, only those the factory attaches, and its hires, instruction and rules — the
+                 agents their steps name and the skills those agents and steps name, found where a run finds them;
                  a place skill nemia ships is left out. It prints each part and where it came from, and writes
                  nothing while a key has no place in a template, or the draft does not pass its own check.
   nemia template pack   writes a folder that passes its check into one archive, a gzipped tar of the folder
@@ -96,7 +97,7 @@ const FROM: Flag = {
   takes: 'nemia template export takes the repository to read: --from <repo>',
 };
 
-/** `--factory <name>`: the factory whose attached workflows, hires and instruction the draft holds. */
+/** `--factory <name>`: the factory whose attached workflows, hires, instruction and rules the draft holds. */
 const FACTORY: Flag = {
   flag: '--factory',
   kind: 'name',
@@ -124,8 +125,15 @@ export function instructionOf(factory: Factory): { words: string | null; error: 
   return { ...readInstructionAt(at), file: at.file };
 }
 
-/** The factory named under `--factory`, if one is, with how its instruction is read. */
-const factoryAsked = (name: string | undefined) => (name === undefined ? undefined : { name, instruction: instructionOf });
+/** The rules of `factory`, read where the store keeps them, with the file they are read from. */
+export function factoryRulesOf(factory: Factory): { words: string | null; error: string | null; file: string } {
+  const file = rulesAt(factory);
+  return { ...readRules(file), file };
+}
+
+/** The factory named under `--factory`, if one is, with how its instruction and its rules are read. */
+const factoryAsked = (name: string | undefined) =>
+  name === undefined ? undefined : { name, instruction: instructionOf, rules: factoryRulesOf };
 
 /** `nemia template export`: a draft written, each part and where it came from. */
 const TEMPLATE_EXPORT: Command<Exported> = {

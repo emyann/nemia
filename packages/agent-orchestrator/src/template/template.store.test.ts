@@ -21,11 +21,12 @@ const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
 const { checkTemplateAt, exportTemplate, packTemplate, problemLine, readTemplate, unpackTemplate } = await import('./template.store.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
+const { writeRules } = await import('../rules/rules.store.ts');
 const { main } = await import('../cli/main.ts');
-const { instructionOf } = await import('./template.verb.ts');
+const { factoryRulesOf, instructionOf } = await import('./template.verb.ts');
 
 /** The factory `name`, as `--factory` names it to an export. */
-const asked = (name: string) => ({ name, instruction: instructionOf });
+const asked = (name: string) => ({ name, instruction: instructionOf, rules: factoryRulesOf });
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
@@ -195,6 +196,27 @@ test("with --factory, the draft holds that factory's attached workflows only, it
   assert.equal(said.get('NEMIA.md'), path.join(repo, 'NEMIA.md'));
   assert.equal(said.get('nemia.yaml hires solo/work: implementer'), `${path.join(ROOT, 'factories', 'crew.json')}, its hire`);
   assert.equal(said.get('agents/reviewer/'), undefined, 'an agent only an unattached workflow names is left out');
+});
+
+test("with --factory, the draft holds the factory's rules as RULES.md, read from the store; none where it has none, and rules that do not read refuse it", () => {
+  const repo = factoryOnTeam('ruled');
+  const none = target();
+  exportTemplate({ dir: none, from: repo, factory: asked('ruled') });
+  assert.equal(fs.existsSync(path.join(none, 'RULES.md')), false, 'a factory with no rules writes none');
+  const kept = writeRules({ name: 'ruled' }, 'Never push on a Friday.');
+  const dir = target();
+  const { from } = exportTemplate({ dir, from: repo, factory: asked('ruled') });
+  assert.deepEqual(checkTemplateAt(dir), []);
+  assert.equal(fs.readFileSync(path.join(dir, 'RULES.md'), 'utf8'), 'Never push on a Friday.\n');
+  assert.equal(new Map(from.map(({ part, from: at }) => [part, at])).get('RULES.md'), kept);
+  assert.equal(kept, path.join(ROOT, 'factories', 'ruled', 'RULES.md'));
+  fs.writeFileSync(kept, '---\nmodel: opus\n---\nBe kind.\n');
+  const refused = target();
+  assert.throws(
+    () => exportTemplate({ dir: refused, from: repo, factory: asked('ruled') }),
+    refusedWith('Invalid', /the factory ruled's rules: [^\n]*RULES\.md opens with a frontmatter block/),
+  );
+  assert.equal(fs.existsSync(refused), false);
 });
 
 test('with --factory: a workflow it attaches that the repository lacks, a step hired and filled by its own agent:, and another repository', () => {

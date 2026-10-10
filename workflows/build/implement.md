@@ -6,7 +6,8 @@ agent: ada
 context: 400k
 check: { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && npm test -- --force && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then m=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/mutants.ts" > "$m/mutants.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/mutants.ts, so no mutant can be run; start the run on a base that has it" >&2; false; }; } && node "$m/mutants.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$m"; [ "$c" -eq 0 ]; else echo "wf check: the mutants run only in a run's check, where WF_BASE_REF names the base whose runner judges them"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf '%s\n' "$touched" | grep -Eq '^(apps/(web|api)/|package(-lock)?\.json$|turbo\.json$)'; then npm run e2e; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi
 budget: 40
-skills: effect, shadcn, change-the-board
+skills: effect, shadcn, change-the-board, look
+output: implement.schema.json
 ---
 When the change touches `apps/web`, picture the pages and the states it touches, in light and dark, and at a phone's width where the
 page sets one: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pages <name,…>` pictures the pages named, in both themes,
@@ -16,7 +17,15 @@ The check refuses a change under `apps/web/src` whose `artifacts` names no pictu
 `apps/web/test` asks for none. Run the e2e on the pages the change touches, `npm run e2e -- --pages <name,…>`, never the whole suite
 but to measure it: this step's check runs every page, in workers, outside your session.
 
-When the change touches `apps/web`, load `change-the-board` before `shadcn`: it says where your shell must be for that load.
+When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
+where your shell must be for that load.
+
+**Name your mutants** in the closeout: one per rule or guard the change adds, each a `file`, the text `from` it holds exactly once in
+your committed result, what it becomes `to` (valid code that breaks the rule, never a syntax error), the `test` file that must fail,
+and the exact `name` of one test in it (its whole name, never a part of it: only that test runs) or null. Implement's check applies
+each to a copy of your result and refuses the step when its test still passes, when `from` does not apply, or when the test fails or
+runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
+change that adds no rule, saying why in `noMutants`.
 
 When you start a Claude Code session of your own to measure something, a probe, start it through `node workflows/build/probe.ts start
 <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you. It names the session for the run, runs it in the

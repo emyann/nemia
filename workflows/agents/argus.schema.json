@@ -23,7 +23,7 @@
     },
     "report": {
       "type": "string",
-      "description": "The report, in markdown: what moved between the two periods, with the numbers wf stats gave, a number nothing measured said as not measured, and the corrections proposed."
+      "description": "The report, in markdown: what moved between the two periods, with the numbers `nemia stats` gave, a number nothing measured said as not measured, and the corrections proposed."
     },
     "cards": {
       "type": "array",
@@ -38,7 +38,7 @@
             "description": "The correction: fence, an allow or a deny by name; body, a line in an agent's body; skill, a line in a skill; on-purpose, the refusal is meant and stays."
           },
           "correction": { "type": "string", "description": "The correction itself, exactly: the rule to add, or the line and the file it goes in." },
-          "evidence": { "type": "string", "description": "The numbers behind it, as wf stats gave them for the period and the one before." },
+          "evidence": { "type": "string", "description": "The numbers behind it, as `nemia stats` gave them for the period and the one before." },
           "agent": { "type": "string", "description": "The agent the correction is about, by name; empty when it is about no one agent." },
           "factory": { "type": "string", "description": "The factory the card is started in." },
           "workflow": { "type": "string", "description": "The workflow the card is started on, by name." },

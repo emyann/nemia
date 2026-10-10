@@ -23,9 +23,10 @@
  * does the store's inbox, for a step whose `reads:` names it (`readsMounts`): read-only, in any mode, and to no other step.
  *
  * Agora, the reviewer, asks git's read-only questions by its own allow, whatever the settings say, and runs no git write (`GIT_QUESTIONS`,
- * `GIT_WRITES`, `runs`); every git question its skill names is one that allow reaches (`askedGit`). It is refused the whole suite its
- * round's check already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
- * (`SCOPED_TESTS`).
+ * `GIT_WRITES`, `runs`); every git question its skill names is one that allow reaches (`askedGit`). Its step is refused the whole suite
+ * its round's check already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
+ * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
+ * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
@@ -259,21 +260,25 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
 }
 
 /**
- * The commands a repository skill names: every backticked span `spans` matches (an `npm …` or `npx …` one by default) in its paragraph
- * that starts at `from`, up to the next blank line or numbered item. Throws, naming the skill, when `from` is not in it.
+ * The commands a step's file or a skill's names, `file` by its path from the repository's root: every backticked span `spans` matches (an
+ * `npm …` or `npx …` one by default) in its paragraph that starts at `from`, up to the next blank line or numbered item. Throws, naming
+ * the file, when `from` is not in it.
  */
-function checksOf(skill: string, from: string, spans = /`(np[mx]\s[^`]*)`/g): string[] {
-  const text = fs.readFileSync(path.join(REPO, '.claude', 'skills', skill, 'SKILL.md'), 'utf8');
+function checksOf(file: string, from: string, spans = /`(np[mx]\s[^`]*)`/g): string[] {
+  const text = fs.readFileSync(path.join(REPO, file), 'utf8');
   const start = text.indexOf(from);
-  if (start < 0) throw new Error(`${skill}: no "${from}" to read its checks from; name the line its checks are on, here`);
+  if (start < 0) throw new Error(`${file}: no "${from}" to read its checks from; name the line its checks are on, here`);
   const rest = text.slice(start);
   const end = /\n\s*\n|\n\d+\.\s/.exec(rest)?.index ?? rest.length;
   return [...rest.slice(0, end).matchAll(spans)].map((span) => span[1].replace(/\s+/g, ' '));
 }
 
-/** The commands a step's fence would refuse: reached by no allow of its own or of the settings, or by a deny of its own. */
-function unallowed(step: Step, commands: string[]): string[] {
-  const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? [])];
+/** The settings' allows, which name this repository's commands for every session in it: an agent's own fence names none. */
+const SETTINGS_ALLOWS = SETTINGS.permissions?.allow ?? [];
+
+/** The commands a step's fence would refuse: reached by no allow of its own or of the settings' `allowed`, or by a deny of its own. */
+function unallowed(step: Step, commands: string[], allowed: readonly string[] = SETTINGS_ALLOWS): string[] {
+  const allows = [...(step.allowedTools ?? []), ...allowed];
   return commands.filter((command) => {
     const call = { tool: 'Bash', command } as const;
     return !allows.some((rule) => reaches(rule, call)) || (step.disallowedTools ?? []).some((rule) => reaches(rule, call));
@@ -395,39 +400,42 @@ const shippedStepOf = (agent: string): Step => {
   return found.step;
 };
 
-/** The line of review-a-change that names Agora's checks. */
-const REVIEW_CHECKS = "**Read the suite's verdict; run the cheap checks yourself**";
+/** The line of the build workflow's review that names its checks. */
+const REVIEW_CHECKS = 'Run the typecheck and the lint yourself';
 
-/** Each dontAsk agent whose skill names the checks it runs, with the line those checks are on. */
+/** Each dontAsk agent whose step names the checks it runs, with the step's file and the line those checks are on. */
 const CHECKERS = [
-  { agent: 'seldon', skill: 'write-a-spec', from: 'Run each check bare' },
-  { agent: 'agora', skill: 'review-a-change', from: REVIEW_CHECKS },
-  { agent: 'argus', skill: 'read-the-stats', from: '**Run each read bare**' },
+  { agent: 'seldon', step: 'workflows/build/design.md', from: 'The checks you may run here' },
+  { agent: 'agora', step: 'workflows/build/review.md', from: REVIEW_CHECKS },
+  { agent: 'argus', step: 'workflows/janitor/argus.md', from: '**Run each read bare**' },
 ];
 
-test('every check the skills of Seldon, Agora and Argus name is one their fence allows', () => {
-  for (const { agent, skill, from } of CHECKERS) {
+test('every check the steps of Seldon, Agora and Argus name is one their fence allows', () => {
+  for (const { agent, step: file, from } of CHECKERS) {
     const step = shippedStepOf(agent);
     assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
-    const checks = checksOf(skill, from);
-    assert.ok(checks.length >= 3, `${skill} names its checks: ${checks.join(', ')}`);
-    assert.deepEqual(unallowed(step, checks), [], `${agent}'s fence refuses a check ${skill} names`);
+    const checks = checksOf(file, from);
+    assert.ok(checks.length >= 3, `${file} names its checks: ${checks.join(', ')}`);
+    assert.deepEqual(unallowed(step, checks), [], `${agent}'s fence refuses a check ${file} names`);
   }
 });
 
-test("REFUSED: a skill's check the agent's fence does not allow is named", () => {
-  const seldon = shippedStepOf('seldon');
-  const agora = shippedStepOf('agora');
-  const without = (step: Step, rule: string): Step => ({ ...step, allowedTools: step.allowedTools?.filter((r) => r !== rule) });
-  assert.deepEqual(unallowed(without(seldon, 'Bash(npm run lint)'), checksOf('write-a-spec', 'Run each check bare')), ['npm run lint']);
-  assert.deepEqual(unallowed(without(agora, 'Bash(npx turbo run typecheck --force)'), checksOf('review-a-change', REVIEW_CHECKS)), [
+test("REFUSED: a step's check that neither its fence nor the settings allow is named", () => {
+  const [design, review, janitor] = CHECKERS.map(({ agent, step, from }) => ({ step: shippedStepOf(agent), checks: checksOf(step, from) }));
+  const without = (rule: string): string[] => SETTINGS_ALLOWS.filter((r) => r !== rule);
+  assert.deepEqual(unallowed(design.step, design.checks, without('Bash(npm run lint)')), ['npm run lint']);
+  assert.deepEqual(unallowed(review.step, review.checks, without('Bash(npx turbo run typecheck --force)')), [
     'npx turbo run typecheck --force',
   ]);
-  assert.deepEqual(unallowed(seldon, checksOf('review-a-change', REVIEW_CHECKS)), ['npx turbo run typecheck --force']);
-  assert.deepEqual(unallowed({ ...agora, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']), ['npm run lint'], 'a deny wins');
+  const stats = janitor.checks.filter((check) => check.startsWith('npx nemia stats '));
+  assert.equal(stats.length, 3, janitor.checks.join(', '));
+  assert.deepEqual(unallowed(janitor.step, janitor.checks, without('Bash(npx nemia stats:*)')), stats);
+  assert.deepEqual(unallowed(janitor.step, janitor.checks, without('Bash(npx nemia inbox)')), ['npx nemia inbox']);
+  assert.deepEqual(unallowed(design.step, design.checks, []), design.checks, 'Seldon allows none of them itself');
+  assert.deepEqual(unallowed({ ...review.step, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']), ['npm run lint'], 'a deny wins');
   assert.throws(
-    () => checksOf('write-a-spec', 'Run no check'),
-    (err: Error) => err.message.includes('write-a-spec: no "Run no check"'),
+    () => checksOf('workflows/build/design.md', 'Run no check'),
+    (err: Error) => err.message.includes('workflows/build/design.md: no "Run no check"'),
   );
 });
 
@@ -609,15 +617,15 @@ for (const agent of ['ada', 'otto'])
     assert.deepEqual(editsDenied(none, HARNESS_FILES), [], 'and the trust and user settings with theirs');
   });
 
-/** What a janitor must never do, in the spellings a session types: start, file, queue or drop a card, approve or retry a step, edit. */
-const ACTS: Call[] = [
-  ...['wf start x', 'wf inbox add x', 'wf inbox queue x', 'wf inbox rm x', 'wf approve r s', 'wf retry r s'].flatMap((command) => [
-    { tool: 'Bash', command: `npx ${command}` } as const,
-    { tool: 'Bash', command } as const,
-  ]),
-  { tool: 'Edit' },
-  { tool: 'Write' },
-];
+/** Each verb that acts, typed after the command `cli`: start, file, queue or drop a card, approve or retry a step. */
+const actsBy = (cli: string): Call[] =>
+  ['start x', 'inbox add x', 'inbox queue x', 'inbox rm x', 'approve r s', 'retry r s'].map((verb) => ({
+    tool: 'Bash',
+    command: `${cli} ${verb}`,
+  }));
+
+/** What a janitor must never do, in the spellings a session types: a verb that acts, by the command's name or its alias, or an edit. */
+const ACTS: Call[] = [...['npx nemia', 'nemia', 'npx wf', 'wf'].flatMap(actsBy), { tool: 'Edit' }, { tool: 'Write' }];
 
 /**
  * What of `ACTS` a step could run: in a dontAsk job, each that a rule of its own, of the settings or of a skill allows and none of its
@@ -643,13 +651,13 @@ function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'dis
 }
 
 /**
- * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team whose agent file `edit` rewrote.
- * Fails, saying the agent has no `what`, when the edit changes nothing.
+ * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote the file
+ * `of`, the agent's by default. Fails, saying the agent has no `what`, when the edit changes nothing.
  */
-function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string): Step {
+function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string, of = `agents/${agent}.md`): Step {
   const root = scratch(`wf-fences-${agent}-`);
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const file = path.join(root, 'agents', `${agent}.md`);
+  const file = path.join(root, of);
   const text = fs.readFileSync(file, 'utf8');
   const changed = edit(text);
   assert.notEqual(changed, text, `${agent} has ${what}`);
@@ -731,10 +739,11 @@ test('every shipped dontAsk job given a skill that grants tools is told to read 
   assert.deepEqual(jobs.flatMap(grantingSkillsUnread), []);
 });
 
-test('REFUSED: Seldon or Agora with no line naming shadcn’s SKILL.md to read with Read is named, read from its file as a run reads it', () => {
+test('REFUSED: design or review with no line naming shadcn’s SKILL.md to read with Read is named, read from its file as a run reads it', () => {
   const unread = (text: string): string => text.replace(/read\s+`\.claude\/skills\/shadcn\/SKILL\.md`\s+with\s+Read/, 'read it');
-  assert.deepEqual(grantingSkillsUnread(shippedEdited('seldon', 'build', 'a line naming shadcn’s SKILL.md', unread)), ['design: shadcn']);
-  assert.deepEqual(grantingSkillsUnread(shippedEdited('agora', 'build', 'a line naming shadcn’s SKILL.md', unread)), ['review: shadcn']);
+  const named = 'a line naming shadcn’s SKILL.md';
+  assert.deepEqual(grantingSkillsUnread(shippedEdited('seldon', 'build', named, unread, 'build/design.md')), ['design: shadcn']);
+  assert.deepEqual(grantingSkillsUnread(shippedEdited('agora', 'build', named, unread, 'build/review.md')), ['review: shadcn']);
 });
 
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
@@ -784,34 +793,19 @@ test('REFUSED: a skill that applies to a path no file of the checkout has is nam
   assert.deepEqual(appliesUnmatched(skills, REPO), ['typo: apps/webb/**']);
 });
 
-test('Argus is refused every wf verb that acts and every edit: it runs dontAsk, and no allow reaches one', () => {
+test('Argus is refused every verb that acts and every edit: it runs dontAsk, and no allow reaches one', () => {
   assert.deepEqual(acting(shippedStepOf('argus')), []);
 });
 
-test('REFUSED: Argus allowed every wf verb, the inbox whole or an edit, read from its file as a run reads it, could act', () => {
-  assert.deepEqual(acting(argusAllowed('Bash(npx wf:*)')), [
-    'Bash(npx wf start x)',
-    'Bash(npx wf inbox add x)',
-    'Bash(npx wf inbox queue x)',
-    'Bash(npx wf inbox rm x)',
-    'Bash(npx wf approve r s)',
-    'Bash(npx wf retry r s)',
+test('REFUSED: Argus allowed every verb, the inbox whole or an edit, read from its file as a run reads it, could act', () => {
+  assert.deepEqual(acting(argusAllowed('Bash(npx nemia:*)')), actsBy('npx nemia').map(shown));
+  assert.deepEqual(acting(argusAllowed('Bash(npx wf:*)')), actsBy('npx wf').map(shown));
+  assert.deepEqual(acting(argusAllowed('Bash(nemia stats:*), Bash(nemia inbox:*)')), [
+    'Bash(nemia inbox add x)',
+    'Bash(nemia inbox queue x)',
+    'Bash(nemia inbox rm x)',
   ]);
-  assert.deepEqual(acting(argusAllowed('Bash(npx wf stats:*), Bash(npx wf inbox:*)')), [
-    'Bash(npx wf inbox add x)',
-    'Bash(npx wf inbox queue x)',
-    'Bash(npx wf inbox rm x)',
-  ]);
-  assert.deepEqual(acting(argusAllowed('Bash(wf:*), Edit(**)')), [
-    'Bash(wf start x)',
-    'Bash(wf inbox add x)',
-    'Bash(wf inbox queue x)',
-    'Bash(wf inbox rm x)',
-    'Bash(wf approve r s)',
-    'Bash(wf retry r s)',
-    'Edit',
-    'Write',
-  ]);
+  assert.deepEqual(acting(argusAllowed('Bash(wf:*), Edit(**)')), [...actsBy('wf').map(shown), 'Edit', 'Write']);
   assert.deepEqual(acting({ ...shippedStepOf('argus'), permissionMode: 'auto' }), [
     'argus: not a dontAsk job, so every call no deny names runs',
   ]);
@@ -873,7 +867,7 @@ test("every shipped skill's rules.json reads, and every call that breaks one of 
 test('REFUSED: a call that breaks a shipped rule, allowed to the step given the skill, is named — by its own allow or the settings', () => {
   const [spec] = SHIPPED_RULES.filter(({ skill }) => skill === 'write-a-spec');
   assert.ok(spec, 'write-a-spec declares its rules');
-  const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(npm run lint), Bash(cat:*)');
+  const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(cat:*)');
   assert.deepEqual(unbreakable(seldon, spec.rules), ['design: read-with-read Bash(cat:*)']);
   const cd = [{ id: 'checks-bare', says: 'never cd', breaks: ['Bash(cd:*)'] }];
   const ownDenies = shippedStepOf('seldon').disallowedTools ?? [];
@@ -889,7 +883,7 @@ test('REFUSED: a call that breaks a shipped rule, allowed to the step given the 
   assert.deepEqual(brokenBy('Bash(git -C:*)'), { tool: 'Bash', command: 'git' }, "a denial keeps a command's first word");
   assert.deepEqual(brokenBy('Read(//etc/**)'), { tool: 'Read' });
   assert.deepEqual(brokenBy('Glob'), { tool: 'Glob' });
-  const outside = shippedAllowed('seldon', 'build', 'Agent, Bash(npm run lint), Glob, Read(//home/**)');
+  const outside = shippedAllowed('seldon', 'build', 'Agent, Glob, Read(//home/**)');
   assert.deepEqual(unbreakable(outside, spec.rules), ['design: read-within-reach Glob', 'design: read-within-reach Read']);
   const [review] = SHIPPED_RULES.filter(({ skill }) => skill === 'review-a-change');
   assert.ok(review, 'review-a-change declares its rules');
@@ -967,11 +961,10 @@ function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS,
  * with an argument a session types.
  */
 const askedGit = (from = 'Bash runs only the checks below'): string[] =>
-  checksOf('review-a-change', from, /`(git\s[^`]*)`/g).map((command) => command.replace(/<[^<>]+>/g, '4c8a05b'));
+  checksOf('.claude/skills/review-a-change/SKILL.md', from, /`(git\s[^`]*)`/g).map((command) => command.replace(/<[^<>]+>/g, '4c8a05b'));
 
 /** Agora's step, its agent's `allowedTools` line cut back to what it allowed before git's questions, or replaced by `allowed`. */
-const agoraAllowed = (allowed = 'Agent, Bash(npm run lint), Bash(npx turbo run typecheck --force)'): Step =>
-  shippedAllowed('agora', 'build', allowed);
+const agoraAllowed = (allowed = 'Agent'): Step => shippedAllowed('agora', 'build', allowed);
 
 test("Agora asks each of git's read-only questions by its own allow, whatever the settings say, and is refused every git write", () => {
   const agora = shippedStepOf('agora');
@@ -980,7 +973,7 @@ test("Agora asks each of git's read-only questions by its own allow, whatever th
   assert.deepEqual(runs(agora, GIT_WRITES), [], 'no allow of its own, of the settings or of a skill reaches a write');
 });
 
-test('REFUSED: Agora cut back to its checks asks no git question with no settings read, and allowed git or git branch whole is open to a write', () => {
+test('REFUSED: Agora cut back to its sub-agents asks no git question with no settings read, and allowed git or git branch whole is open to a write', () => {
   assert.deepEqual(runs(agoraAllowed(), GIT_QUESTIONS, {}, []), [], 'the questions are its own allow, not the settings');
   const line = (shippedStepOf('agora').allowedTools ?? []).join(', ');
   assert.deepEqual(runs(agoraAllowed(`${line}, Bash(git:*)`), GIT_WRITES), GIT_WRITES.map(shown));
@@ -1037,7 +1030,7 @@ test("REFUSED: a git question review-a-change names that Agora's own allow does 
   );
   assert.throws(
     () => askedGit('Bash runs no git'),
-    (err: Error) => err.message.includes('review-a-change: no "Bash runs no git"'),
+    (err: Error) => err.message.includes('review-a-change/SKILL.md: no "Bash runs no git"'),
   );
 });
 

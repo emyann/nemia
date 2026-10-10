@@ -38,4 +38,12 @@ Start it after the intake run whose intent it builds: `wf start "<the intent's t
 first step, design, is told the intent under *From run*; the steps after it read the spec.
 
 Design reads `costs` (`reads: costs`): its brief says what the last finished runs of build in its factory cost, per step and whole. Its
-note gives the owner's line, about $80 a run, and asks for the cut and each step's budget from those figures.
+note asks for the cut and each step's budget from those figures; the owner's line for a run is the factory's, given by its rules
+(`nemia factory rules <factory>`), never by this folder.
+
+The agents and their skills are any software factory's, and say nothing of this repository (`team-portable.test.ts`); what is ours is on
+the steps (`build-told.test.ts`). Implement and review each declare their own closeout (`output:`, `implement.schema.json` and
+`review.schema.json` beside them): the mutants are this workflow's check, and review's schema is the reviewer's with `mutants` added.
+Both add `look`, this repository's skill for its board, to the skills design, implement and review are given. Design and review deny
+the build and the e2e on their own `disallowedTools:`, and review the whole suite, which implement's check already ran; the checks
+they do run are named in their notes and allowed by `.claude/settings.json`.

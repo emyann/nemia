@@ -1,12 +1,12 @@
 ---
 title: Factories
-description: A factory names the repositories a body of work is on, the workflows it offers, the agents it hires into their steps, and its instruction.
+description: A factory names the repositories a body of work is on, the workflows it offers, the agents it hires into their steps, its rules and its instruction.
 ---
 
 A factory is a body of work, named. It says which repositories the work is on, which workflows it offers, which agent does each step,
-and what Nemia is to know about it. Every run is started in a factory.
+what every agent at work in it is told, and what Nemia is to know about it. Every run is started in a factory.
 
-**It owns** its repositories, the workflows attached to it, its hires and its instruction.
+**It owns** its repositories, the workflows attached to it, its hires, its rules and its instruction.
 
 **It never touches** a run already started. A run reads its factory once, when it starts, and freezes what it read: a hire or a detach
 afterwards reaches only the runs started after it.
@@ -49,6 +49,20 @@ Runs and cards written before every run had a factory are in the default factory
 workflow, hires no one, and starts nothing. A start that names it is refused (`defaultStartRefusal`). A start that names no factory
 runs in the one whose repository it is typed in.
 
+## Its rules
+
+A factory has rules of its own: its rules and policies, in markdown, told to every agent hired into it. They are one file, kept in your
+store with the factory and never in a repository, `~/.agent-workflows/factories/<name>/RULES.md` (`WF_ROOT`); a factory made from a
+template keeps it in its tree, where a template carries it and an upgrade merges it as text.
+
+- `nemia factory rules <name> --file <path>` writes them, `nemia factory rules <name>` prints them, and `--clear` removes them. The
+  board's page of the factory's settings reads, writes and clears them too.
+- Every step of every run started in the factory is told them, after the agent's custom instructions and before the step's own policy:
+  the third of an agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers). A step on a remote agent is told none.
+- A run reads them once, when it starts, and freezes them (`StepAgent.factoryRules`): an edit reaches only the runs started after it.
+- They only add words. A frontmatter block is refused (`factoryRulesRefusal`): they set no key, give no tool and widen no fence.
+- A factory with none tells nothing, and the default factory keeps none.
+
 ## Its instruction
 
 A factory has one instruction: what Nemia is to know about this body of work, in markdown. By default it is `NEMIA.md` at the root of
@@ -57,11 +71,13 @@ or keep the words in your store instead, for a repository you would rather not w
 
 - [Nemia](/nemia/) reads it before she acts in the factory.
 - The board shows it on the factory's settings page, and the api serves it (`packages/agent-orchestrator/src/factory/instruction.store.ts`).
-- It is not told to a step. What every agent at work in a repository must know belongs in the files the harness reads there,
-  `CLAUDE.md` or `AGENTS.md`: the fourth of an agent's [instruction layers](/agents/#what-an-agent-is-told-four-layers).
+- It is not told to a step. What every agent hired into the factory must know belongs in [its rules](#its-rules), and what holds in
+  one repository in the files the harness reads there, `CLAUDE.md` or `AGENTS.md`: the third and the fifth of an agent's
+  [instruction layers](/agents/#what-an-agent-is-told-five-layers).
 
 ## Sources
 
 This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
-_A factory's instruction_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
-`packages/agent-orchestrator/src/factory/factory.store.ts` and `packages/agent-orchestrator/src/factory/instruction.store.ts`.
+_A factory's instruction_, and _Five layers_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
+`packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts` and
+`packages/agent-orchestrator/src/rules/rules.store.ts`.

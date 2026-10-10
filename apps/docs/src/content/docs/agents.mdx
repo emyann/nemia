@@ -1,6 +1,6 @@
 ---
 title: Agents
-description: Who does a step's work, with its tools, its fence and its skills, and the four layers of what it is told.
+description: Who does a step's work, with its tools, its fence and its skills, and the five layers of what it is told.
 ---
 
 An agent is who does a step's work. A step is a place in a workflow, with its wiring; an agent is what is attached to it, and the run
@@ -65,33 +65,39 @@ A skill is a folder of instructions and files for one kind of work, with a SKILL
 given (`skills`), and a step may add more for its own position, but never take one of the agent's away. A skill is found in a
 `skills` folder beside the agents, or in the repository's `.claude/skills/`; the first place that has the name wins.
 
-On Claude Code, each step's agent is rendered when the run starts: its instructions go after Claude Code's own prompt, and its skills
+On Claude Code, each step's agent is rendered when the run starts: its instructions, your custom instructions and the factory's rules
+go after Claude Code's own prompt, and its skills
 become a plugin of the step's own, `nemia-<agent>`, which the session loads by name.
 
-## What an agent is told: four layers
+## What an agent is told: five layers
 
-What reaches an agent comes in four layers, each written by whoever owns it:
+What reaches an agent comes in five layers, each written by whoever owns it:
 
 1. **Instructions**: the agent's own body, written once in its file. Who it is and how it works, whatever step it does.
 2. **Custom instructions**: what a person adds to an agent they use without rewriting it. They live in your store, one file per agent,
    `~/.agent-workflows/custom-instructions/<agent>.md` (`WF_ROOT`), never in the agent's folder. They only add words: they never widen
    a fence, give a tool, or change the model. They are frozen with the step when the run starts (`StepAgent.customInstructions`).
-3. **The step's policy**: the step's own words and keys. What this place in this process asks of whoever does its work, such as "in
+3. **The factory's rules**: the rules and policies of one factory, told to every agent hired into it, whichever agent and whichever
+   step. One file a factory, kept in your store and never in a repository, `~/.agent-workflows/factories/<name>/RULES.md` (see
+   [Factories](/factories/#its-rules)). They only add words, as custom instructions do, and are frozen with every step when the run
+   starts (`StepAgent.factoryRules`). A factory with none tells nothing, and a step on a remote agent is told none.
+4. **The step's policy**: the step's own words and keys. What this place in this process asks of whoever does its work, such as "in
    this team, also check the build".
-4. **Factory rules**: the files the harness itself reads in the workspace, today `CLAUDE.md` and `AGENTS.md`. They hold for every agent
-   at work there, and for a person too. Nemia composes nothing of them: the harness reads them as it would for anyone.
+5. **The folder's files**: the files the harness itself reads in the folder the agent works in, today `CLAUDE.md` and `AGENTS.md`.
+   They hold for every agent at work there, and for a person too. Nemia composes nothing of them: the harness reads them as it would
+   for anyone.
 
-The words reach the agent in that order, then the task. Where two layers say different things, the later one wins: the step knows the
-process, and the task knows the case.
+The words reach the agent in that order, then the task. Where two layers say different things, the later one wins: the factory knows
+its work, the step knows the process, and the task knows the case.
 
 The run page on the board shows a step's layers apart, as the run froze them (`toldLayers`): the agent's instructions and skills, your
-custom instructions, the step's policy and the skills it adds, then the task.
+custom instructions, the factory's rules where the run froze some, the step's policy and the skills it adds, then the task.
 
 A factory's instruction, `NEMIA.md`, is not one of these layers: it is written for Nemia, and no step is told it (see
 [Factories](/factories/#its-instruction)).
 
 ## Sources
 
-This page is written from `packages/agent-orchestrator/README.md` (_An agent is a node's attachment_, _Four layers_, _An agent rendered
+This page is written from `packages/agent-orchestrator/README.md` (_An agent is a node's attachment_, _Five layers_, _An agent rendered
 for Claude Code_, _What a step may have_, _What a step may not have_), and from
 `packages/agent-orchestrator/src/agents/read.store.ts`.

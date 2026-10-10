@@ -83,8 +83,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
  * - factories/rules.ts — a factory's rules, what every agent hired into it is told, read through `nemia factory rules`'s entry; written
  *   and removed on the routes the table generates from it.
- * - factories/instruction.ts — a factory's instruction, what Nemia is to know of it, read through `nemia factory instruction`'s entry; where it is kept put and
- *   cleared, and the store's text written and cleared, on the routes the table generates from it and `nemia factory instruct`'s.
+ * - factories/instruction.ts — a factory's instruction, what Nemia is to know of it, read through `nemia factory instruction`'s entry;
+ *   where it is kept put and cleared, and the store's text written and cleared, on the routes the table generates from it and
+ *   `nemia factory instruct`'s.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.

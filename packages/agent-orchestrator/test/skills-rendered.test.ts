@@ -16,7 +16,7 @@ import { skillsFor } from '../src/skills/read.store.ts';
 import { appliesOf } from '../src/skills/skills.ts';
 import { briefBody, pluginOf, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
-import { SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
+import { placesOf, SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-skills-rendered-');
 process.env.WF_ROOT = ROOT;
@@ -127,4 +127,77 @@ test("a step whose rendered folder is gone is told every skill whole in its brie
   const ship = loadWorkflows(dir).find((s) => s.name === 'ship')!;
   assert.match(briefBody(unrendered(ship, skillsAgain(ship, skillsFor(dir)))), /--no-commit/);
   assert.doesNotMatch(briefBody(unrendered(ship)), /--no-commit/, 'the fallback before: the promise of skills, and none of them');
+});
+
+/** The order to load shadcn's skill, as a SKILL.md gives it, across line breaks. */
+const LOADS_SHADCN = /load\s+`shadcn`\s+with\s+the\s+Skill\s+tool/i;
+/** The files a step that only reads is sent to, from the repository's root: the vendored skill's text, and the board's facts. */
+const READ_INSTEAD = ['.claude/skills/shadcn/SKILL.md', 'apps/web/components.json', 'apps/web/src/components/ui'];
+
+/**
+ * What breaks in the board's skill `text`, judged against the repository at `root`: an order to load `shadcn` that is missing, or given
+ * before the shell is moved into `apps/web`; a file a reading step is sent to that the text does not name or the root does not hold; and
+ * a `components.json` that is not in `apps/web` alone, which is why the folder matters. Empty when a session at the root is sent right.
+ */
+function boardSkillBreaks(text: string, root: string): string[] {
+  const { body } = splitFrontmatter('SKILL.md', text);
+  const load = LOADS_SHADCN.exec(body);
+  const order = !load
+    ? ['no order to load `shadcn` with the Skill tool']
+    : body.slice(0, load.index).includes('`cd apps/web`')
+      ? []
+      : ['the load of `shadcn` is ordered before `cd apps/web`'];
+  const names = READ_INSTEAD.flatMap((file) => [
+    ...(body.includes(`\`${file}\``) ? [] : [`${file} is not named`]),
+    ...(fs.existsSync(path.join(root, file)) ? [] : [`${file} is not there`]),
+  ]);
+  const folder = fs.existsSync(path.join(root, 'components.json')) ? ['components.json is at the root'] : [];
+  return [...order, ...names, ...folder];
+}
+
+/** The board's skill as it was shipped when a load from the root refused: the load first, the folder after. */
+const LOAD_FIRST = `---
+name: change-the-board
+description: "Any change under apps/web/."
+applies: ["apps/web/**"]
+---
+
+# Change the board
+
+1. **Load \`shadcn\` with the Skill tool now**, before you read or write a component: the board is shadcn's components on React Aria.
+2. **Its CLI runs from \`apps/web\`**, where \`components.json\` is.
+3. **Read \`apps/web/CLAUDE.md\`** before you change a page.
+`;
+
+test("the board's skill, as build's implement step is given it, moves the shell into apps/web before it orders the load of shadcn, and names files that are there", () => {
+  const build = path.join(REPO, 'workflows', 'build');
+  const places = placesOf(build);
+  const step = loadWorkflows(build, places).find((s) => s.name === 'implement')!;
+  const run = { id: 'r-board' };
+  writeAgentFiles(run, [step], skillsFor(build, places));
+  const given = fs.readFileSync(
+    path.join(agentFilesDir(run, 'implement'), pluginOf(step.agent!.name), 'skills', 'change-the-board', 'SKILL.md'),
+    'utf8',
+  );
+  assert.deepEqual(boardSkillBreaks(given, REPO), []);
+  assert.equal(given, fs.readFileSync(path.join(REPO, '.claude', 'skills', 'change-the-board', 'SKILL.md'), 'utf8'));
+
+  const unnamed = READ_INSTEAD.map((file) => `${file} is not named`);
+  assert.deepEqual(boardSkillBreaks(LOAD_FIRST, REPO), ['the load of `shadcn` is ordered before `cd apps/web`', ...unnamed]);
+  assert.deepEqual(boardSkillBreaks(given.replace(LOADS_SHADCN, 'have `shadcn` at hand'), REPO), [
+    'no order to load `shadcn` with the Skill tool',
+  ]);
+  assert.deepEqual(
+    boardSkillBreaks(given, scratch('wf-board-empty-')),
+    READ_INSTEAD.map((file) => `${file} is not there`),
+  );
+  const rooted = scratch('wf-board-rooted-');
+  fs.cpSync(path.join(REPO, 'apps', 'web', 'components.json'), path.join(rooted, 'components.json'));
+  assert.ok(boardSkillBreaks(given, rooted).includes('components.json is at the root'));
+});
+
+test("build's implement step sends its agent to the board's skill before shadcn's", () => {
+  const build = path.join(REPO, 'workflows', 'build');
+  const { body } = splitFrontmatter('implement.md', fs.readFileSync(path.join(build, 'implement.md'), 'utf8'));
+  assert.match(body, /load\s+`change-the-board`\s+before\s+`shadcn`/);
 });

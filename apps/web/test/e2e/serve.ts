@@ -7,11 +7,13 @@
  * One board is served a workspace, in a folder of the machine's temp directory named for the workspace's path (`folderOf`), or in
  * `BOARD_SERVE_DIR` when a test names one. Nothing is written into the workspace.
  *
- * - `serve` prints where a board already served here listens and starts nothing; else it builds the web app into the folder
- *   (`vite build --outDir`), puts back the route tree the build regenerates, refuses when the workspace's `git status` changed over the
- *   build, starts a holder of its own (`hold`) and prints the two lines the holder wrote (`linesOf`): the board's address and the api's.
- * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), writes where it listens
- *   and its pid into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a test), sooner when `stop` asks,
+ * - `serve` prints where a board already served here listens and starts nothing, when that board was built from the tree as it is now
+ *   (`treeOf`, `standsFor`); a board built from another tree is ended first. Else it builds the web app into the folder (`vite build
+ *   --outDir`), puts back the route tree the build regenerates (`keeping`), refuses when the workspace's `git status` changed over the
+ *   build (`changedOver`), starts a holder of its own (`hold`) and prints the two lines the holder wrote (`linesOf`): the board's
+ *   address and the api's.
+ * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), writes where it listens,
+ *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a test), sooner when `stop` asks,
  *   a server dies or a signal comes. On its way out it stops both servers by the handles it kept and removes the folder. A port the
  *   steps given a browser are refused by address (`usable`) is given back and the servers started again, `TRIES` times at most.
  * - `stop` asks the holder to end, by a file in the folder, and waits until its pid is gone. No board served here is no failure.
@@ -41,8 +43,55 @@ const PACE_MS = 200;
 /** How many times the holder starts its servers before it gives up on a port it may use. */
 const TRIES = 3;
 
-/** What the holder writes once it serves: its own pid, and where the board and its api listen. */
-export type ServedBoard = { pid: number; board: string; api: string };
+/** What the holder writes once it serves: its own pid, where the board and its api listen, and the tree the board was built from. */
+export type ServedBoard = { pid: number; board: string; api: string; tree: string };
+
+/**
+ * The tree of the repository `repo` as it is now, as one word: a digest of its commit, of every change to a tracked file since, and of
+ * the name and content of each file git neither tracks nor ignores. Two trees that would build the same board say the same word.
+ */
+export function treeOf(repo: string): string {
+  const git = (...args: string[]): Buffer =>
+    execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 2 ** 30 });
+  const digest = createHash('sha256').update(git('rev-parse', 'HEAD')).update(git('diff', 'HEAD'));
+  const untracked = git('ls-files', '--others', '--exclude-standard', '-z').toString().split('\0').filter(Boolean);
+  for (const file of untracked) {
+    digest.update(`\0${file}\0`);
+    const at = path.join(repo, file);
+    if (fs.statSync(at, { throwIfNoEntry: false })?.isFile()) digest.update(fs.readFileSync(at));
+  }
+  return digest.digest('hex').slice(0, 16);
+}
+
+/** Whether the board `served` is one to open for the tree `tree`: served, and built from that tree. */
+export const standsFor = (served: ServedBoard | undefined, tree: string): boolean => served?.tree === tree;
+
+/**
+ * Runs `run` and leaves the file `file` as it was before: put back, byte for byte, when `run` changed it, whether it returned or threw.
+ *
+ * @returns what `run` returned
+ */
+export function keeping<T>(file: string, run: () => T): T {
+  const kept = fs.readFileSync(file);
+  try {
+    return run();
+  } finally {
+    if (!fs.readFileSync(file).equals(kept)) fs.writeFileSync(file, kept);
+  }
+}
+
+/** What changed between two answers of `git status --porcelain`, a line each: those `after` has that `before` had not, then those gone. */
+export function changedOver(before: string, after: string): string[] {
+  const lines = (status: string): string[] => status.split('\n').filter(Boolean);
+  const had = new Set(lines(before));
+  const has = new Set(lines(after));
+  return [
+    ...lines(after).filter((line) => !had.has(line)),
+    ...lines(before)
+      .filter((line) => !has.has(line))
+      .map((line) => `gone: ${line}`),
+  ];
+}
 
 /** The folder a workspace's served board lives in: under `tmp`, named for a digest of the workspace's path, one a workspace. */
 export const folderOf = (workspace: string, tmp: string): string =>
@@ -68,9 +117,9 @@ export function servedIn(folder: string): ServedBoard | undefined {
   } catch {
     return undefined;
   }
-  const { pid, board, api } = (read ?? {}) as Partial<ServedBoard>;
-  if (typeof pid !== 'number' || typeof board !== 'string' || typeof api !== 'string') return undefined;
-  return alive(pid) ? { pid, board, api } : undefined;
+  const { pid, board, api, tree } = (read ?? {}) as Partial<ServedBoard>;
+  if (typeof pid !== 'number' || typeof board !== 'string' || typeof api !== 'string' || typeof tree !== 'string') return undefined;
+  return alive(pid) ? { pid, board, api, tree } : undefined;
 }
 
 /**
@@ -116,40 +165,41 @@ const status = (): string =>
 
 /**
  * Builds the web app into `dist`, outside the workspace, and leaves the workspace as it was: the route tree the build regenerates is put
- * back, and a `git status` that changed over the build is refused, naming what changed.
+ * back (`keeping`), and a `git status` that changed over the build is refused, naming what changed (`changedOver`).
  */
 function build(dist: string): void {
-  const routes = path.join(WEB, 'src', 'routeTree.gen.ts');
-  const kept = fs.readFileSync(routes);
   const before = status();
   try {
-    execFileSync(process.execPath, [fromNodeModules(path.join('vite', 'bin', 'vite.js')), 'build', '--outDir', dist, '--emptyOutDir'], {
-      cwd: WEB,
-      stdio: 'pipe',
-      timeout: BUILD_MS,
-    });
+    keeping(path.join(WEB, 'src', 'routeTree.gen.ts'), () =>
+      execFileSync(process.execPath, [fromNodeModules(path.join('vite', 'bin', 'vite.js')), 'build', '--outDir', dist, '--emptyOutDir'], {
+        cwd: WEB,
+        stdio: 'pipe',
+        timeout: BUILD_MS,
+      }),
+    );
   } catch (err) {
     const { stdout, stderr } = err as { stdout?: Buffer; stderr?: Buffer };
     throw new Refusal(plain(`the web app did not build, so no board is served:\n${String(stdout ?? '')}${String(stderr ?? '')}`), {
       cause: err,
     });
-  } finally {
-    if (!fs.readFileSync(routes).equals(kept)) fs.writeFileSync(routes, kept);
   }
-  const after = status();
-  if (after !== before) {
-    const had = new Set(before.split('\n'));
-    const changed = after.split('\n').filter((line) => line && !had.has(line));
-    throw new Refusal(
-      `the build changed the workspace, which a served board never does: ${changed.join(', ') || 'a change went'}. Put it back.`,
-    );
-  }
+  const changed = changedOver(before, status());
+  if (changed.length)
+    throw new Refusal(`the build changed the workspace, which a served board never does: ${changed.join(', ')}. Put it back.`);
 }
 
-/** `serve`: says where the board already served here listens, or builds it, starts its holder and says where that one listens. */
+/**
+ * `serve`: says where the board already served here listens when it was built from the tree as it is now; else ends the one built from
+ * another tree, builds the board, starts its holder and says where that one listens.
+ */
 async function serve(dir: string): Promise<void> {
+  const tree = treeOf(REPO);
   const already = servedIn(dir);
-  if (already) return console.log(linesOf(already).join('\n'));
+  if (already && standsFor(already, tree)) return console.log(linesOf(already).join('\n'));
+  if (already) {
+    console.error(`board: the board on ${already.board} was built from another tree: ending it, and building this one`);
+    await ended(dir, already);
+  }
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   build(path.join(dir, 'dist'));
@@ -159,22 +209,22 @@ async function serve(dir: string): Promise<void> {
     cwd: WEB,
     detached: true,
     stdio: ['ignore', out, out],
-    env: { ...process.env, BOARD_SERVE_DIR: dir },
+    env: { ...process.env, BOARD_SERVE_DIR: dir, BOARD_SERVE_TREE: tree },
   });
   fs.closeSync(out);
   holder.unref();
-  let ended: string | undefined;
-  holder.on('exit', (code, signal) => (ended = signal ?? `code ${code}`));
+  let exited: string | undefined;
+  holder.on('exit', (code, signal) => (exited = signal ?? `code ${code}`));
   const said = (): string => (fs.existsSync(log) ? plain(fs.readFileSync(log, 'utf8')).trimEnd() : '') || '(nothing)';
   const served = await awaited(
     () => {
-      if (ended !== undefined) throw new Refusal(`the board's holder ended (${ended}) before it served. What it said:\n${said()}`);
+      if (exited !== undefined) throw new Refusal(`the board's holder ended (${exited}) before it served. What it said:\n${said()}`);
       return servedIn(dir);
     },
     ANSWER_MS,
     () => `the board's holder (pid ${holder.pid}) did not say where it listens within ${ANSWER_MS / 1000} s. What it said:\n${said()}`,
   ).catch((err: unknown) => {
-    if (holder.pid !== undefined && ended === undefined) holder.kill('SIGTERM');
+    if (holder.pid !== undefined && exited === undefined) holder.kill('SIGTERM');
     throw err;
   });
   console.log(linesOf(served).join('\n'));
@@ -196,7 +246,8 @@ async function hold(dir: string): Promise<void> {
     await stopServers();
     at = await startServers(seat, dist);
   }
-  const served: ServedBoard = { pid: process.pid, board: at.base, api: `http://127.0.0.1:${at.apiPort}` };
+  const tree = process.env.BOARD_SERVE_TREE ?? '';
+  const served: ServedBoard = { pid: process.pid, board: at.base, api: `http://127.0.0.1:${at.apiPort}`, tree };
   fs.writeFileSync(path.join(dir, 'served.json.new'), `${JSON.stringify(served)}\n`);
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));
   const holdMs = Number(process.env.BOARD_HOLD_MS) || HOLD_MS;
@@ -213,16 +264,21 @@ async function hold(dir: string): Promise<void> {
   await stopServers();
 }
 
-/** `stop`: asks the holder of the board served here to end, and waits until it has; says so when none is served. */
-async function stop(dir: string): Promise<void> {
-  const served = servedIn(dir);
-  if (!served) return console.log('no board is served from this workspace');
+/** Asks the holder of the board `served` from `dir` to end, by a file in the folder, and resolves once its pid is gone. */
+async function ended(dir: string, served: ServedBoard): Promise<void> {
   fs.writeFileSync(path.join(dir, 'stop'), '');
   await awaited(
     () => !alive(served.pid),
     ANSWER_MS,
     () => `the board's holder (pid ${served.pid}) is still there ${ANSWER_MS / 1000} s after it was asked to stop: \`kill ${served.pid}\``,
   );
+}
+
+/** `stop`: asks the holder of the board served here to end, and waits until it has; says so when none is served. */
+async function stop(dir: string): Promise<void> {
+  const served = servedIn(dir);
+  if (!served) return console.log('no board is served from this workspace');
+  await ended(dir, served);
   console.log(`the board on ${served.board} is stopped`);
 }
 

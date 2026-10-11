@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runningIn, scratch } from '../scratch.ts';
 import { until, WAITED } from '../waits.ts';
-import { servedIn, usable } from './serve.ts';
+import { alive, servedIn, usable } from './serve.ts';
 import { REPO, WEB } from './world.ts';
 
 const SERVE = path.join(import.meta.dirname, 'serve.ts');
@@ -76,6 +76,24 @@ test('a second serve prints the same two lines and starts nothing', async () => 
     runningIn([dir]).map((proc) => proc.pid),
     running,
   );
+});
+
+test('REFUSED: a serve over a board built from another tree ends that board, builds again and serves a new one', WAITED, async (t) => {
+  const old = servedIn(dir);
+  assert.ok(old, 'a board is served');
+  fs.writeFileSync(path.join(dir, 'served.json'), JSON.stringify({ ...old, tree: 'another-tree' }));
+  const again = await board('serve');
+  assert.equal(again.code, 0, again.stderr);
+  assert.match(again.stderr, /was built from another tree: ending it, and building this one/);
+  await until(t, () => !alive(old.pid), `the old holder ${old.pid} is gone`, { everyMs: 100 });
+  const now = servedIn(dir);
+  assert.ok(now && now.pid !== old.pid, 'another holder serves');
+  assert.notEqual(now.tree, 'another-tree');
+  assert.equal(again.stdout, `board on ${now.board}\napi on ${now.api}\n`);
+  assert.match(await (await fetch(`${now.board}/`)).text(), /<title>Nemia<\/title>/);
+  const same = await board('serve');
+  assert.equal(same.stdout, again.stdout, 'and the tree unchanged, it is said again');
+  assert.equal(servedIn(dir)?.pid, now.pid);
 });
 
 test(

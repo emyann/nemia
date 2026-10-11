@@ -52,7 +52,6 @@ gate-questions-refused
 raise-questions
 factories
 inbox-factory
-stats
 factory-start
 factory-tags
 debug-closed
@@ -77,8 +76,6 @@ after-long-title
 workflow-remove
 workflow-remove-refused
 context
-stats-passes
-stats-system
 factory-settings
 factory-settings-none
 step-told

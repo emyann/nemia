@@ -65,7 +65,6 @@ import { useContent } from '@/lib/useContent';
 import { useFrameSize } from '@/lib/useFrameSize';
 import { useNow } from '@/lib/useNow';
 import type { Point } from '@/lib/layout';
-import { RouteLink } from './AgentParts';
 import { CanvasLegend } from './CanvasLegend';
 import { QueueLane } from './QueueLane';
 import { RunNode, type RunFlowNode } from './RunNode';
@@ -548,9 +547,9 @@ const runBar = (run: string): Bar => ({ kind: 'run', run });
 /**
  * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count
  * is the cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is
- * not; the difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, a link to the recent passes on the Stats page
- * (`#passes`) with the last one's breakdown on hover (`passTitle`), once a pass has written it, its time of day said as today's or another
- * day's against a clock read each minute (`useNow`). Nothing until the cap is read; why, when it or the queue cannot be.
+ * not; the difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, text with the pass's breakdown on hover
+ * (`passTitle`), once a pass has written it, its time of day said as today's or another day's against a clock read each minute (`useNow`).
+ * Nothing until the cap is read; why, when it or the queue cannot be.
  */
 function CapLine({ queued, queueError }: { queued: number; queueError: Error | null }) {
   const { data, error } = useQuery(ceilingsQuery);
@@ -576,14 +575,7 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
       {data.pass && (
         <span data-pass={Math.round(data.pass.ms)} title={passTitle(data.pass, now)}>
           {' · '}
-          <RouteLink
-            to="/stats"
-            search={{}}
-            hash="passes"
-            className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600 dark:decoration-neutral-600 dark:hover:decoration-neutral-300"
-          >
-            {passLine(data.pass)}
-          </RouteLink>
+          {passLine(data.pass)}
         </span>
       )}
     </p>

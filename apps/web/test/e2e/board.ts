@@ -7,13 +7,13 @@ import { DIAMOND } from './seed.ts';
 import { API, photographing, store } from './world.ts';
 
 /** The sidebar's sections under All factories, in their order: the Inbox first. */
-export const SECTIONS = ['Inbox', 'Runs', 'Workflows', 'Stats'] as const;
+export const SECTIONS = ['Inbox', 'Runs', 'Workflows'] as const;
 
 /** The sidebar's sections with a factory picked: its Floor first, then the others. */
 export const PICKED_SECTIONS = ['Floor', ...SECTIONS] as const;
 
 /** The pages whose `?factory=` picks a factory; on any other page only the path of a factory's floor or settings does. */
-const LISTINGS = ['/inbox', '/runs', '/workflows', '/stats'];
+const LISTINGS = ['/inbox', '/runs', '/workflows'];
 
 /** The factory `url` picks, as the board reads it: the name of a factory's floor or settings, else a listing's `?factory=`, else none. */
 export const pickedIn = (url: URL): string | null =>

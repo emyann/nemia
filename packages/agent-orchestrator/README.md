@@ -3136,8 +3136,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   the file. `wf passes [--last <n>] [--json]` (`nemia passes`, `src/meter/passes.verb.ts`) reads it: the passes counted in a histogram
   over `PASS_BOUNDS` (10 ms to 5 s, and one bucket past the last), what the time went to, phase by phase on average and heaviest first,
   and the median, the slowest, the journal reads and what the last pass saw (`passHistogram`, `passParts`, `passSummary`); `--last` takes
-  a whole number from 1, and anything else is refused as `Invalid`. The api serves the same at `GET /api/passes` (`?last=<n>`), and the
-  board's Stats page draws it at `#passes`, where the Factory's `a pass takes N ms` links.
+  a whole number from 1, and anything else is refused as `Invalid`. The api serves the same at `GET /api/passes` (`?last=<n>`).
 - **The ticking process keeps Effect metrics of its passes** (`PASS_METRICS`, `recordPassMetrics` in `src/meter/meter.verb.ts`), in
   memory, in the registry of the runtime that ticks: `pass.duration` and `pass.phase.duration` (by `phase`), histograms in ms over
   `PASS_BOUNDS`; `pass.journal_reads`; and the gauges `store.runs`, `sessions.queued` and `sessions.admitted`, as the last pass saw them.

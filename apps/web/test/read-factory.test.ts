@@ -9,7 +9,7 @@ import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { cardQuery, inboxQuery, type InboxCardPage, type InboxEntry } from '../src/lib/api/inbox.ts';
 import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilities.ts';
 import { quotaQuery, type Quota } from '../src/lib/api/quota.ts';
-import { ceilingsQuery, passesQuery, type Ceilings, type PassesRead } from '../src/lib/api/ceilings.ts';
+import { ceilingsQuery, type Ceilings } from '../src/lib/api/ceilings.ts';
 import { daemonQuery, type Daemon } from '../src/lib/api/daemon.ts';
 import {
   clearRules,
@@ -24,18 +24,7 @@ import {
   type FactoryInstruction,
   type FactoryRules,
 } from '../src/lib/api/factories.ts';
-import {
-  capabilities,
-  cardPage,
-  ceilings,
-  codexReach,
-  daemon,
-  inboxEntry,
-  passCost,
-  passesRead,
-  quota,
-  stepReach,
-} from './factory-fixtures.ts';
+import { capabilities, cardPage, ceilings, codexReach, daemon, inboxEntry, passCost, quota, stepReach } from './factory-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -51,7 +40,6 @@ const readCard = cardQuery('x').queryFn as unknown as () => Promise<InboxCardPag
 const readCapabilities = capabilitiesQuery.queryFn as unknown as () => Promise<Capabilities>;
 const readQuota = quotaQuery.queryFn as unknown as () => Promise<Quota>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;
-const readPasses = passesQuery.queryFn as unknown as () => Promise<PassesRead>;
 const readDaemon = daemonQuery.queryFn as unknown as () => Promise<Daemon>;
 const readFactories = factoriesQuery.queryFn as unknown as () => Promise<Factory[]>;
 const readInstruction = factoryInstructionQuery('mill').queryFn as unknown as () => Promise<FactoryInstruction>;
@@ -351,29 +339,6 @@ test('the last pass reads with what it saw, and one an older tick wrote without 
   assert.deepEqual(await readCeilings(), seen);
   answering(t, ceilings());
   assert.equal(Object.hasOwn((await readCeilings()).pass ?? {}, 'runs'), false);
-});
-
-test('the recent passes read back as the api answers them, none kept among them', async (t) => {
-  const none = passesRead({ recent: [], parts: [], summary: null, histogram: passesRead().histogram.map((b) => ({ ...b, count: 0 })) });
-  for (const p of [passesRead(), none]) {
-    answering(t, p);
-    assert.deepEqual(await readPasses(), p);
-  }
-});
-
-test("REFUSED, the recent passes: an answer with no histogram, a part of a phase the board does not know or an older daemon's git, and a pass that saw no runs", async (t) => {
-  answering(t, without(passesRead(), 'histogram'));
-  await assert.rejects(readPasses(), unread('/api/passes', 'histogram', 'is missing'));
-
-  answering(t, passesRead({ parts: [{ phase: 'lint' as never, ms: 1, share: 1 }] }));
-  await assert.rejects(readPasses(), unread('/api/passes', 'parts[0].phase', '"lint", where'));
-
-  answering(t, passesRead({ parts: [{ phase: 'git' as never, ms: 1, share: 1 }] }));
-  await assert.rejects(readPasses(), unread('/api/passes', 'parts[0].phase', '"git", where'));
-
-  const [first, ...rest] = passesRead().recent;
-  answering(t, passesRead({ recent: [without(first, 'runs'), ...rest] }));
-  await assert.rejects(readPasses(), unread('/api/passes', 'recent[0].runs', 'is missing'));
 });
 
 /** A factory's instruction as the api answers it: kept in the store, with words. */

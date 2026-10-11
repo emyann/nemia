@@ -3,19 +3,7 @@
  * (`cardPage`), what the repository offers (`capabilities`, its steps from `stepReach`), the quota (`quota`), the cap and the last pass
  * (`ceilings`) and the daemon (`daemon`). Each takes keys to put over its own.
  */
-import type {
-  Capabilities,
-  Ceilings,
-  Daemon,
-  InboxCardPage,
-  InboxEntry,
-  PassCost,
-  PassesRead,
-  Quota,
-  QuotaWindow,
-  RecentPass,
-  StepReach,
-} from '../src/lib/api.ts';
+import type { Capabilities, Ceilings, Daemon, InboxCardPage, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
 
 /** A queued card whose start the tick tried and did not make: `queued` and `tried` both set. */
 export const inboxEntry = (extra: Partial<InboxEntry> = {}): InboxEntry => ({
@@ -216,55 +204,6 @@ export const passCost = (extra: Partial<PassCost> = {}): PassCost => ({
   spawned: 8,
   overheadMs: 2,
   rested: 4,
-  ...extra,
-});
-
-/** One of the recent passes, of `ms`, all of it in `place` but a millisecond of `records`. */
-export const recentPass = (ms: number, extra: Partial<RecentPass> = {}): RecentPass => ({
-  at: '2026-09-30T05:00:00.000Z',
-  ms,
-  records: 3,
-  rested: 40,
-  reads: 2,
-  runs: 43,
-  tasks: 3,
-  queued: 1,
-  admitted: 2,
-  phases: { records: 1, asks: 0, journals: 0, observe: 0, runtime: 0, place: ms - 1, assess: 0, act: 0 },
-  ...extra,
-});
-
-/** The recent passes as `GET /api/passes` answers them: three, one past the last bound. */
-export const passesRead = (extra: Partial<PassesRead> = {}): PassesRead => ({
-  recent: [recentPass(8), recentPass(40), recentPass(6000)],
-  histogram: [
-    { le: 10, count: 1 },
-    { le: 25, count: 0 },
-    { le: 50, count: 1 },
-    { le: 100, count: 0 },
-    { le: 250, count: 0 },
-    { le: 500, count: 0 },
-    { le: 1000, count: 0 },
-    { le: 2500, count: 0 },
-    { le: 5000, count: 0 },
-    { le: null, count: 1 },
-  ],
-  parts: [
-    { phase: 'place', ms: 2015, share: 6045 / 6048 },
-    { phase: 'records', ms: 1, share: 3 / 6048 },
-  ],
-  summary: {
-    passes: 3,
-    medianMs: 40,
-    slowestMs: 6000,
-    reads: 2,
-    at: '2026-09-30T05:00:00.000Z',
-    runs: 43,
-    tasks: 3,
-    queued: 1,
-    admitted: 2,
-  },
-  bounds: [10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
   ...extra,
 });
 

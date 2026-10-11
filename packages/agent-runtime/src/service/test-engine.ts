@@ -1,18 +1,19 @@
 /**
  * The engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer (`layer`), with no journal, no harness and no
- * pass, for a test of a layer above the runtime. A test settles a task itself (`settle`) and reads back what the engine was asked:
+ * pass, for a test of a layer above the runtime. A test settles a task itself (`settle`), leaving with its end the text its session
+ * printed (`printed`), which `output` then answers stream by stream, and reads back what the engine was asked:
  * each task (`tasks`), every filing by id (`filings`) and by what it was filed with (`specs`), each stop taken (`stopped`), each word
  * said (`said`) and each `forget` call by call (`forgets`); `refuseSay(n)` refuses the next `n` says as the runtime refuses a session
  * not running.
  *
- * It keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say` and `forget`, each answering what the real engine answers over a
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say` and `forget`, each answering what the real engine answers over a
  * harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART` there what this one cannot say. Every other
  * verb dies naming itself. Reached from another package through `agent-runtime/testing` alone, and by no file of a `src`.
  */
 import { Effect, Layer } from 'effect';
 import type { Attempt, Said, State } from '../core/index.ts';
 import { StopRefused, type TaskView } from '../core/engine/index.ts';
-import { Engine, type EngineShape } from './engine.ts';
+import { Engine, ListRefused, listRefusalOf, type EngineShape } from './engine.ts';
 import { ForgetRefused } from './forget.ts';
 import type { TaskSpec } from './options.ts';
 import { OutputRefused } from './output.ts';
@@ -21,9 +22,15 @@ import { SayRefused } from './say.ts';
 /** A task as it was filed: its spec, under the id it was filed with or given. */
 export type TestFiling = TaskSpec & { readonly id: string };
 
+/** The text a session printed, stream by stream: a stream left out printed nothing. */
+export type Printed = { readonly stdout?: string; readonly stderr?: string };
+
+/** What `settle` lays over a task's attempt, field for field, and the text its session printed, kept beside it. */
+export type TestEnd = Partial<Attempt> & { readonly printed?: Printed };
+
 /**
  * A task the stand-in holds: what it was filed with and when, the phase `settle` left it in, whether a stop was asked, what was said to
- * it, and its one attempt, `null` until it starts.
+ * it, its one attempt, `null` until it starts, and the text its session printed.
  */
 export type TestTask = {
   spec: TestFiling;
@@ -32,6 +39,7 @@ export type TestTask = {
   stopRequested: boolean;
   said: Said[];
   attempt: Attempt | null;
+  printed: Printed;
 };
 
 /** How an attempt ended, by the phase its task settled in. */
@@ -135,10 +143,30 @@ export type TestEngine = {
   /**
    * Leaves the task `id` in `phase`, any word: `pending` takes its attempt away; `succeeded`, `failed` and `stopped` settle it and end
    * its attempt; any other word is an attempt in flight. A task stopped before it started settles with no attempt, as the engine
-   * settles one, unless `end` is given. `end` is laid over the attempt, field for field. Throws for a task never filed.
+   * settles one, unless `end` is given. `end` is laid over the attempt, field for field, but its `printed`, the text the session
+   * printed, which the task keeps until a settle gives another. Throws for a task never filed.
    */
-  readonly settle: (id: string, phase: string, end?: Partial<Attempt>) => TestTask;
+  readonly settle: (id: string, phase: string, end?: TestEnd) => TestTask;
 };
+
+/**
+ * `output` over the tasks a stand-in holds: refuses a stream that is neither, a count of bytes that is none and a task not held, as
+ * the engine does and in its order; then the text the task's session printed on `stream`, whole or its last `lastBytes` bytes, and
+ * `undefined` for a task with no attempt or a stream left empty.
+ */
+const outputOf =
+  (tasks: Map<string, TestTask>): EngineShape['output'] =>
+  (id, stream, lastBytes) => {
+    const refuse = (message: string) => Effect.fail(new OutputRefused({ message }));
+    if (stream !== 'stdout' && stream !== 'stderr')
+      return refuse(`\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`);
+    if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0))
+      return refuse(`\`lastBytes: ${String(lastBytes)}\` is not a count of bytes: give a whole number above 0, or none.`);
+    const t = tasks.get(id);
+    if (!t) return refuse(unknown(id));
+    const text = t.attempt ? t.printed[stream] : undefined;
+    return Effect.succeed(text === undefined || lastBytes === undefined ? text : Buffer.from(text).subarray(-lastBytes).toString());
+  };
 
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRefusals: { left: number }) => {
@@ -160,10 +188,18 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
           stopRequested: false,
           said: [],
           attempt: null,
+          printed: {},
         });
         return filed.id;
       }),
     view: (id) => Effect.sync(() => viewOf(id, tasks.get(id))),
+    list: (...args) => {
+      const refused = listRefusalOf(args);
+      if (refused) return Effect.fail(new ListRefused({ message: refused }));
+      const [taskIds] = args;
+      const ids = taskIds === undefined ? [...tasks.keys()] : [...new Set(taskIds)];
+      return Effect.succeed({ views: ids.map((id) => viewOf(id, tasks.get(id))), unreadable: [] });
+    },
     stop: (id) =>
       Effect.gen(function* () {
         const t = tasks.get(id);
@@ -175,7 +211,7 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
       }),
     logs: (id) => Effect.sync(() => (tasks.get(id)?.attempt ? '(the test engine keeps no logs)' : '(no session yet)')),
     feed: () => Effect.succeed({ entries: [], cursor: 0 }),
-    output: (id) => (tasks.has(id) ? Effect.succeed(undefined) : Effect.fail(new OutputRefused({ message: unknown(id) }))),
+    output: outputOf(tasks),
     say: (taskId, text) =>
       Effect.gen(function* () {
         const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
@@ -231,7 +267,6 @@ export const testEngine = (): TestEngine => {
       ...keptOf(held, sayRefusals),
       tick: unkept('tick'),
       admit: unkept('admit'),
-      list: unkept('list'),
       transcript: unkept('transcript'),
       follow: unkept('follow'),
       path: unkept('path'),
@@ -246,11 +281,13 @@ export const testEngine = (): TestEngine => {
       removeBody: unkept('removeBody'),
     }),
   );
-  const settle = (id: string, phase: string, end?: Partial<Attempt>): TestTask => {
+  const settle = (id: string, phase: string, end?: TestEnd): TestTask => {
     const t = held.tasks.get(id);
     if (!t) throw new Error(`the test engine holds no task ${id}: file it before settling it`);
     const unstarted = phase === 'pending' || (phase === 'stopped' && !t.attempt && !end);
-    t.attempt = unstarted ? null : attemptOf(t, phase, end ?? {});
+    const { printed, ...over } = end ?? {};
+    t.attempt = unstarted ? null : attemptOf(t, phase, over);
+    if (printed) t.printed = printed;
     t.phase = phase;
     return t;
   };

@@ -54,7 +54,7 @@ fails a walk and a verb with no walk is named. A test is given the stand-in, and
 `<what>.boundary.test.ts`: `test/stand-ins.test.ts` reads the runtime's, the orchestrator's and the api's test files and refuses git,
 a process, the real place, the real engine and a hand-made engine in any other, against a baseline that only shrinks
 (`test/stand-ins.baseline.ts`), and refuses a stand-in whose contract no boundary test walks whole. The engine's stand-in is the
-runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say` and
+runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say` and
 `forget` by hand, and one table of walks (`packages/agent-runtime/test/engine-walks.ts`) holds it to the real engine, asked of
 `Engine.layer` in `engine-contract.boundary.test.ts` and of the stand-in in `engine-contract.test.ts`; what it cannot say is declared
 there (`APART`), and a runtime test builds the real engine, never the stand-in (`takenBreaks`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a

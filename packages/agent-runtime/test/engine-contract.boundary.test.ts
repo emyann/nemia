@@ -1,8 +1,9 @@
 /**
  * The real engine's side of the engine's contract: every walk of `WALKS` (`engine-walks.ts`) asked of `Engine.layer` over a journal in
- * a scratch folder and a harness that costs nothing, its sessions a map this file moves, with no process. What it says is what the
- * stand-in must say (`engine-contract.test.ts` runs the same walks on `testEngine`). Then that the lists are whole: every verb of the
- * engine is walked or named unkept, each unkept verb is one the engine has, and each difference `APART` declares is one.
+ * a scratch folder and a harness that costs nothing, its sessions a map this file moves and its streams the text a walk's settle was
+ * given, with no process. What it says is what the stand-in must say (`engine-contract.test.ts` runs the same walks on `testEngine`).
+ * Then that the lists are whole: every verb of the engine is walked or named unkept, each unkept verb is one the engine has, and each
+ * difference `APART` declares is one.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,13 +16,22 @@ import { scratch } from './scratch.ts';
 /** The session of a task's first attempt, as the engine names it. */
 const sessionOf = (id: string): string => `ae/${id}/1`;
 
+/** A stream's text as a harness keeps it: whole, or its last `lastBytes` bytes, and `undefined` for none. */
+const tailOf = (text: string | undefined, lastBytes?: number): string | undefined =>
+  text === undefined || lastBytes === undefined ? text : Buffer.from(text).subarray(-lastBytes).toString();
+
 /**
  * A real engine over a store of its own and one harness, `test`, whose sessions `settle` moves: at work after the pass that starts it,
  * ended as asked and read by the pass after, and stopped by the two passes that stop a session and record its end.
  */
 function realSide(): Side {
   const sessions = new Map<string, Sighting>();
-  const harness: RunnerOps = { ...testOps({ sessions }), say: () => Effect.void, output: () => Effect.succeed(undefined) };
+  const printed = new Map<string, NonNullable<End['printed']>>();
+  const harness: RunnerOps = {
+    ...testOps({ sessions }),
+    say: () => Effect.void,
+    output: (name, stream, lastBytes) => Effect.succeed(tailOf(printed.get(name)?.[stream], lastBytes)),
+  };
   const engine = builtEngine(Engine.layer({ root: scratch('ae-engine-walks-'), harnesses: { test: harness }, defaultHarness: 'test' }));
   const pass = () => Effect.runPromise(engine.tick());
   const settle = async (id: string, moved: Moved, end: End = {}): Promise<void> => {
@@ -31,6 +41,7 @@ function realSide(): Side {
       return;
     }
     if (!sessions.has(sessionOf(id))) await pass();
+    if (end.printed) printed.set(sessionOf(id), end.printed);
     if (moved === 'running (working)') return;
     sessions.set(sessionOf(id), {
       ...sessions.get(sessionOf(id))!,

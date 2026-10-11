@@ -5,4 +5,4 @@
  * (`test/contract.test.ts`, `test/layout.test.ts`), and its own files start nothing and name no harness (`test/testing-door.test.ts`).
  */
 export { testEngine } from './service/index.ts';
-export type { TestEngine, TestFiling, TestTask } from './service/index.ts';
+export type { Printed, TestEnd, TestEngine, TestFiling, TestTask } from './service/index.ts';

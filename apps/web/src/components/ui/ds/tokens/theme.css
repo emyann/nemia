@@ -1,0 +1,161 @@
+/* =============================================================================
+   MD3 color scheme — light (:root) and dark (.dark)
+   -----------------------------------------------------------------------------
+   Generated from the project's DESIGN.md by tokens/generate-theme.mjs
+   (`npm run theme:generate`). Never edit this file: edit DESIGN.md and
+   regenerate; `npm run theme:resolve` then refreshes tokens/resolved.json.
+
+   Every role is a finished color (`hsl(...)`) under the `--md-sys-color-*`
+   namespace, mirroring Material's own token names. Finished colors are what
+   Tailwind v4's `@theme inline` mapping (theme.v4.css), `color-mix()`, the
+   shadcn CLI and Claude Design all expect; opacity modifiers such as
+   `bg-primary/8` are applied by Tailwind through color-mix(), so no bare
+   `H S% L%` triplet is needed anywhere.
+
+   The namespace also keeps these roles clear of shadcn's `--primary`,
+   `--secondary`, `--background`… variables, which bridge-shadcn.css defines
+   *from* these when a shadcn component family is present.
+
+   Dark mode is keyed on a `.dark` class on a wrapping element (usually <html>),
+   which is what next-themes produces.
+
+   Both blocks also declare the *ambient content color* — `color:
+   var(--md-sys-color-on-surface)` — which is the one thing here that paints
+   rather than defines. It is what makes the kit's pairing rule work: text
+   inherits `on-surface` by default, and a `bg-<role>` container only has to
+   carry its own `text-on-<role>` to re-color everything inside it. The
+   Typography primitives therefore assert no color of their own. It is declared
+   once per scheme block rather than once on `:root` so that a `.dark` on a
+   *subtree* re-colors that subtree too; an app that wants a different default
+   sets `color` on `<body>`, which wins over an inherited value.
+   ========================================================================== */
+
+:root {
+  color: var(--md-sys-color-on-surface);
+
+  /* Accent roles */
+  --md-sys-color-primary: hsl(216 19% 39%);
+  --md-sys-color-on-primary: hsl(0 0% 100%);
+  --md-sys-color-primary-container: hsl(216 96% 91%);
+  --md-sys-color-on-primary-container: hsl(214 25% 29%);
+  --md-sys-color-secondary: hsl(219 10% 38%);
+  --md-sys-color-on-secondary: hsl(0 0% 100%);
+  --md-sys-color-secondary-container: hsl(224 49% 91%);
+  --md-sys-color-on-secondary-container: hsl(219 14% 29%);
+  --md-sys-color-tertiary: hsl(25 6% 37%);
+  --md-sys-color-on-tertiary: hsl(0 0% 100%);
+  --md-sys-color-tertiary-container: hsl(26 28% 89%);
+  --md-sys-color-on-tertiary-container: hsl(30 7% 27%);
+  --md-sys-color-error: hsl(0 75% 42%);
+  --md-sys-color-on-error: hsl(0 0% 100%);
+  --md-sys-color-error-container: hsl(6 100% 92%);
+  --md-sys-color-on-error-container: hsl(356 100% 29%);
+
+  /* Surfaces */
+  --md-sys-color-background: hsl(231 100% 99%);
+  --md-sys-color-on-background: hsl(214 12% 11%);
+  --md-sys-color-surface: hsl(231 100% 99%);
+  --md-sys-color-on-surface: hsl(214 12% 11%);
+  --md-sys-color-surface-variant: hsl(225 23% 90%);
+  --md-sys-color-on-surface-variant: hsl(218 8% 28%);
+  --md-sys-color-surface-dim: hsl(225 11% 86%);
+  --md-sys-color-surface-bright: hsl(231 100% 99%);
+  --md-sys-color-surface-container-lowest: hsl(0 0% 100%);
+  --md-sys-color-surface-container-low: hsl(233 44% 96%);
+  --md-sys-color-surface-container: hsl(233 27% 94%);
+  --md-sys-color-surface-container-high: hsl(231 17% 92%);
+  --md-sys-color-surface-container-highest: hsl(231 13% 90%);
+  --md-sys-color-surface-tint: hsl(216 19% 39%);
+
+  /* Outlines, shadow, scrim */
+  --md-sys-color-outline: hsl(220 5% 47%);
+  --md-sys-color-outline-variant: hsl(225 11% 79%);
+  --md-sys-color-shadow: hsl(0 0% 0%);
+  --md-sys-color-scrim: hsl(0 0% 0%);
+
+  /* Inverse */
+  --md-sys-color-inverse-surface: hsl(223 7% 19%);
+  --md-sys-color-inverse-on-surface: hsl(233 33% 95%);
+  --md-sys-color-inverse-primary: hsl(216 41% 80%);
+
+  /* Fixed roles */
+  --md-sys-color-primary-fixed: hsl(216 96% 91%);
+  --md-sys-color-on-primary-fixed: hsl(212 63% 12%);
+  --md-sys-color-primary-fixed-dim: hsl(216 41% 80%);
+  --md-sys-color-on-primary-fixed-variant: hsl(214 25% 29%);
+  --md-sys-color-secondary-fixed: hsl(224 49% 91%);
+  --md-sys-color-on-secondary-fixed: hsl(217 30% 12%);
+  --md-sys-color-secondary-fixed-dim: hsl(221 21% 80%);
+  --md-sys-color-on-secondary-fixed-variant: hsl(219 14% 29%);
+  --md-sys-color-tertiary-fixed: hsl(26 28% 89%);
+  --md-sys-color-on-tertiary-fixed: hsl(30 15% 11%);
+  --md-sys-color-tertiary-fixed-dim: hsl(24 13% 78%);
+  --md-sys-color-on-tertiary-fixed-variant: hsl(30 7% 27%);
+}
+
+.dark {
+  color: var(--md-sys-color-on-surface);
+
+  --md-sys-color-primary: hsl(216 41% 80%);
+  --md-sys-color-on-primary: hsl(213 35% 20%);
+  --md-sys-color-primary-container: hsl(214 25% 29%);
+  --md-sys-color-on-primary-container: hsl(216 96% 91%);
+  --md-sys-color-secondary: hsl(221 21% 80%);
+  --md-sys-color-on-secondary: hsl(218 18% 20%);
+  --md-sys-color-secondary-container: hsl(219 14% 29%);
+  --md-sys-color-on-secondary-container: hsl(224 49% 91%);
+  --md-sys-color-tertiary: hsl(24 13% 78%);
+  --md-sys-color-on-tertiary: hsl(27 9% 19%);
+  --md-sys-color-tertiary-container: hsl(30 7% 27%);
+  --md-sys-color-on-tertiary-container: hsl(26 28% 89%);
+  --md-sys-color-error: hsl(6 100% 84%);
+  --md-sys-color-on-error: hsl(357 100% 21%);
+  --md-sys-color-error-container: hsl(356 100% 29%);
+  --md-sys-color-on-error-container: hsl(6 100% 92%);
+
+  --md-sys-color-background: hsl(214 17% 8%);
+  --md-sys-color-on-background: hsl(231 13% 90%);
+  --md-sys-color-surface: hsl(214 17% 8%);
+  --md-sys-color-on-surface: hsl(231 13% 90%);
+  --md-sys-color-surface-variant: hsl(218 8% 28%);
+  --md-sys-color-on-surface-variant: hsl(225 11% 79%);
+  --md-sys-color-surface-dim: hsl(214 17% 8%);
+  --md-sys-color-surface-bright: hsl(223 6% 23%);
+  --md-sys-color-surface-container-lowest: hsl(218 27% 6%);
+  --md-sys-color-surface-container-low: hsl(214 12% 11%);
+  --md-sys-color-surface-container: hsl(214 11% 13%);
+  --md-sys-color-surface-container-high: hsl(218 9% 17%);
+  --md-sys-color-surface-container-highest: hsl(218 7% 21%);
+  --md-sys-color-surface-tint: hsl(216 41% 80%);
+
+  --md-sys-color-outline: hsl(220 6% 58%);
+  --md-sys-color-outline-variant: hsl(218 8% 28%);
+  --md-sys-color-shadow: hsl(0 0% 0%);
+  --md-sys-color-scrim: hsl(0 0% 0%);
+
+  --md-sys-color-inverse-surface: hsl(231 13% 90%);
+  --md-sys-color-inverse-on-surface: hsl(223 7% 19%);
+  --md-sys-color-inverse-primary: hsl(216 19% 39%);
+
+  --md-sys-color-primary-fixed: hsl(216 96% 91%);
+  --md-sys-color-on-primary-fixed: hsl(212 63% 12%);
+  --md-sys-color-primary-fixed-dim: hsl(216 41% 80%);
+  --md-sys-color-on-primary-fixed-variant: hsl(214 25% 29%);
+  --md-sys-color-secondary-fixed: hsl(224 49% 91%);
+  --md-sys-color-on-secondary-fixed: hsl(217 30% 12%);
+  --md-sys-color-secondary-fixed-dim: hsl(221 21% 80%);
+  --md-sys-color-on-secondary-fixed-variant: hsl(219 14% 29%);
+  --md-sys-color-tertiary-fixed: hsl(26 28% 89%);
+  --md-sys-color-on-tertiary-fixed: hsl(30 15% 11%);
+  --md-sys-color-tertiary-fixed-dim: hsl(24 13% 78%);
+  --md-sys-color-on-tertiary-fixed-variant: hsl(30 7% 27%);
+}
+
+/* Typeface. The type scale is set in Inter, as DESIGN.md writes it.
+   `--font-inter` is the hook a host app fills with its own loaded face (Next:
+   `localFont({ variable: "--font-…" })` on <body> wins over this root default
+   by inheritance); without one, the named family resolves to a locally
+   installed or web-loaded face, then the stack behind it. */
+:root {
+  --font-inter: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

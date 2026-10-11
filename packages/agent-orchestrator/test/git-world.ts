@@ -77,4 +77,14 @@ export const gitWorld: World = {
     parents: git(root, 'log', '-1', '--format=%P', rev).split(' ').filter(Boolean),
     message: git(root, 'log', '-1', '--format=%B', rev),
   }),
+  tip: (root, name) => {
+    const ran = spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], { cwd: root, env: GIT_ENV, encoding: 'utf8' });
+    return ran.status === 0 ? ran.stdout.trim() : null;
+  },
+  changes: (checkout) =>
+    execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: checkout, env: GIT_ENV, encoding: 'utf8' })
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.slice(3))
+      .sort(),
 };

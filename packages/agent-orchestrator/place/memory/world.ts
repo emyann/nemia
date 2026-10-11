@@ -52,6 +52,10 @@ export type World = {
   readonly head: (checkout: string) => string;
   /** The parents and the message of the commit `rev` names in `root`. */
   readonly read: (root: string, rev: string) => { readonly parents: readonly string[]; readonly message: string };
+  /** The commit the branch `name` of `root` is at, or null where the repository has no branch of that name. */
+  readonly tip: (root: string, name: string) => string | null;
+  /** The paths `checkout` holds uncommitted, in order: each file added, changed or removed since the commit it is at. */
+  readonly changes: (checkout: string) => readonly string[];
 };
 
 /** A new id for a commit of `held`: forty hexadecimal characters, counted. */

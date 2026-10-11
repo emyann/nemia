@@ -18,6 +18,10 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **The git place's code is `place/git/` (`place.ts`, `git.ts`, `verbs/`), behind one door, `src/place/shipped.store.ts`**
   (`placeBreaks` in `test/boundary.test.ts`): a verb is a generator that yields each git command, so one body answers `ask` (off the
   loop) and `askNow` (`spawnSync`); it reads its request first (`asked.ts`), and a throw is unread in one sentence.
+- **The test place is `place/memory/` (`testPlace()`: a place, its layer, and `world`, a session's and a person's part)**: a test file
+  names it with `const stand = eachTest(testPlace);` and `runOver(runEngine, () => stand().layer)` (`test/placed.ts`), new for each
+  test. Its merge is by file, with no rename, ignore rule, hook, lock or deadline: a test of one keeps `gitPlaceLayer`. A verb's
+  behaviour is a walk in `test/place-walks.ts`, with the one answer both places give.
 - **A git call belongs to the place's code, never to `src`**: `test/git-calls.test.ts` refuses a `'git'` spawn, a call of `git` or
   `gitSays`, a `.git` or `MERGE_HEAD` path, and a `scripts` path handed to a spawn or to `node:path` (`script`: no process a question)
   in `packages/*/src` and `apps/*/src`; `GIT_SITES` is empty, and stays so.

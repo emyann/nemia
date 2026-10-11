@@ -1,8 +1,15 @@
 /**
  * How a test gives its programs a place: `runOver(runWith, layer)` answers a `runWith` whose programs may ask the place, each given
- * `layer`. A test file says its place once, by name, at its head: `const runWith = runOver(runEngine, gitPlaceLayer);`. This file loads
- * no part of the package, so a test that sets its environment before it imports the package still does.
+ * `layer`. A test file says its place once, by name, at its head. The test place, new for each test of the file:
+ *
+ *     const stand = eachTest(testPlace);
+ *     const runWith = runOver(runEngine, () => stand().layer);
+ *
+ * and git, for a file about git: `const runWith = runOver(runEngine, gitPlaceLayer);`. A place is given as its layer, or as a function
+ * that answers it, asked at each run. This file loads no part of the package, so a test that sets its environment before it imports the
+ * package still does.
  */
+import { afterEach, beforeEach } from 'node:test';
 import { Effect, type Layer } from 'effect';
 import type { Engine, EngineService } from '../src/runtime-client.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
@@ -10,20 +17,47 @@ import type { PlaceService } from '../src/place/place.store.ts';
 /** The package's `runWith`, as a test hands it on. */
 type RunWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) => Promise<A>;
 
-/** A `runWith` over `layer`: `program` run over the engine `e`, given the place `layer` holds. */
+/** A place as a test gives it: its layer, or what answers the layer of the test running now. */
+export type Given = Layer.Layer<PlaceService> | (() => Layer.Layer<PlaceService>);
+
+/** The layer `given` names now. */
+const layerOf = (given: Given): Layer.Layer<PlaceService> => (typeof given === 'function' ? given() : given);
+
+/** A `runWith` over `given`: `program` run over the engine `e`, given the place `given` holds then. */
 export const runOver =
-  (runWith: RunWith, layer: Layer.Layer<PlaceService>) =>
+  (runWith: RunWith, given: Given) =>
   <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService | PlaceService>): Promise<A> =>
-    runWith(e, program.pipe(Effect.provide(layer)));
+    runWith(e, program.pipe(Effect.provide(layerOf(given))));
 
-/** A runner over `layer`: `program`, which asks the place and no engine, run given the place `layer` holds. */
+/** A runner over `given`: `program`, which asks the place and no engine, run given the place `given` holds then. */
 export const runGiven =
-  (layer: Layer.Layer<PlaceService>) =>
+  (given: Given) =>
   <A, E>(program: Effect.Effect<A, E, PlaceService>): Promise<A> =>
-    Effect.runPromise(program.pipe(Effect.provide(layer)));
+    Effect.runPromise(program.pipe(Effect.provide(layerOf(given))));
 
-/** `program` given the place `layer` holds, and still to be run. */
+/** `program` given the place `given` holds now, and still to be run. */
 export const givenPlace =
-  (layer: Layer.Layer<PlaceService>) =>
+  (given: Given) =>
   <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
-    Effect.provide(program, layer);
+    Effect.provide(program, layerOf(given));
+
+/**
+ * What `make` makes, new for each test of the file that calls this at its head: the function answers the one made for the test running
+ * now, which its subtests share. It throws outside a test, where none is made. A file whose tests run at once makes its own in each.
+ */
+export function eachTest<A>(make: () => A): () => A {
+  let now: { readonly made: A } | undefined;
+  let depth = 0;
+  beforeEach(() => {
+    if (depth === 0) now = { made: make() };
+    depth += 1;
+  });
+  afterEach(() => {
+    depth -= 1;
+    if (depth === 0) now = undefined;
+  });
+  return () => {
+    if (!now) throw new Error('eachTest: asked outside a test, where nothing is made: ask inside the test that uses it');
+    return now.made;
+  };
+}

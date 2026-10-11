@@ -345,7 +345,10 @@ const writeCustom = (words: string) => {
   fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), words);
 };
 
-/** Her task kept anew: any she has stopped at manual, then the store's level at semi-auto, a fresh task filed, subscribed and at work. Its id. */
+/**
+ * Her task kept anew: any she has stopped at manual, then the store's level at semi-auto, a fresh task filed, subscribed and at work.
+ * Its id.
+ */
 const keptAnew = async (): Promise<string> => {
   withPipao();
   await runWith(e, LEVEL.handler({ level: 'manual' }));

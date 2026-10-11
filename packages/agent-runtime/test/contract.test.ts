@@ -2,9 +2,10 @@
  * Between packages, only the public contract (`docs/architecture.md`, rule 1).
  *
  * Code outside packages/agent-runtime reaches it through `agent-runtime`, its vocabulary through `agent-runtime/vocabulary`, and,
- * from a test alone, the engine's stand-in through `agent-runtime/testing` (`testingBreaches`). That rules out its src/ by any route: a subpath not in its `exports`, a relative path,
- * `import.meta.resolve`, or a path built with path.join. `decide` is exported by no entry. Spawning its `bin/` is its CLI, not an import,
- * and prose that names a file in src/ — a doc comment, a brief in a test — is not a route to it.
+ * from a test alone, the engine's stand-in through `agent-runtime/testing` (`testingBreaches`). That rules out its src/ by any route:
+ * a subpath not in its `exports`, a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by no
+ * entry. Spawning its `bin/` is its CLI, not an import, and prose that names a file in src/ — a doc comment, a brief in a test — is
+ * not a route to it.
  *
  * The scan reads every file git lists outside this package, tracked or not yet added, so a new folder is scanned the day it is made. Turbo
  * caches this package's pass by this package's files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass

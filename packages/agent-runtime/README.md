@@ -2116,6 +2116,7 @@ of pure code sits beside it.
 | file | what |
 |---|---|
 | `src/vocabulary.ts` | the vocabulary door's export list, pure: what `agent-runtime/vocabulary` gives |
+| `src/testing.ts` | the testing entry's export list: what `agent-runtime/testing` gives a test of a layer above, the engine's stand-in |
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
@@ -2196,6 +2197,7 @@ of pure code sits beside it.
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `say.ts`'s `SayRefused` and `SayUnsent`, and the core's) |
+| `src/service/test-engine.ts` | the engine's stand-in, `testEngine()`: the `Engine` service kept by hand in a layer, with what it was asked to read back and `settle` to move a task; it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say` and `forget`, held to the real engine by `test/engine-walks.ts` |
 | `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |

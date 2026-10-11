@@ -1,7 +1,8 @@
 /**
  * A step's metrics (`step.ts`, `recordStepMetrics`): the facts read off the tasks a pass saw settle, recorded by the five attributes
  * alone, and a fact whose attributes carry a run's id refused; the waits — a session's queue, a check's run, a gate's wait — equal to what
- * the timeline and `nemia stats` say of the same records, each a histogram by the five and a span with its run and try. The tick that
+ * the timeline and `nemia stats` say of the same records, each a histogram by the five and a span with its run and try; and the calls a
+ * harness denied a session (`deniedCalls`), one per call of each ended attempt past the run's mark, each a span and no metric. The tick that
  * hands them over is proven on a store in `test/step-metrics.test.ts` and `test/wait-metrics.test.ts`.
  */
 import { test } from 'node:test';
@@ -13,6 +14,7 @@ import type { TaskSpend } from '../status/status.ts';
 import {
   boundedAttributes,
   checkWait,
+  deniedCalls,
   gateWaits,
   queueWait,
   roundsGranted,
@@ -20,11 +22,12 @@ import {
   settledWaits,
   stepAttributes,
   type FactReads,
+  type DeniedFact,
   type FactView,
   type StepFact,
   type WaitFact,
 } from './step.ts';
-import { recordStepMetrics, WAIT_SPANS } from './meter.verb.ts';
+import { DENIED_SPAN, DENIED_SPAN_KEYS, recordStepMetrics, WAIT_SPANS } from './meter.verb.ts';
 import { gateWaitOf, timeline } from '../timeline/index.ts';
 
 const WORK = { name: 'work', agent: { name: 'ada' } } as Workflow;
@@ -100,11 +103,11 @@ test("REFUSED: attributes that carry a run's id or a task's are not a step's", (
   }
 });
 
-test('the facts of the tasks that settled: a session with its cost, tokens, time and denials, a check by its verdict', () => {
+test('the facts of the tasks that settled: a session with its cost, tokens and time, a check by its verdict', () => {
   const facts = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check', 'r-2-work']), reads());
   const attrs = (outcome: string) => ({ factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada', outcome });
   assert.deepEqual(facts, [
-    { metric: 'try', attributes: attrs('blocked'), costUsd: 1.25, inputTokens: 1200, outputTokens: 300, ms: 300_000, denied: 2 },
+    { metric: 'try', attributes: attrs('blocked'), costUsd: 1.25, inputTokens: 1200, outputTokens: 300, ms: 300_000 },
     { metric: 'check', attributes: attrs('refused') },
   ]);
 });
@@ -147,7 +150,11 @@ test('a session that settled with a cost records its cost once, by the five attr
   assert.deepEqual(Object.keys(cost[0].attributes ?? {}).sort(), ['agent', 'factory', 'outcome', 'step', 'workflow']);
   const count = (id: string) => (snapshot.find((m) => m.id === id)!.state as { count: number }).count;
   assert.equal(count('step.tries'), 1);
-  assert.equal(count('step.denied'), 2);
+  assert.equal(
+    snapshot.some((m) => m.id === 'step.denied'),
+    false,
+    'a denied call is no metric',
+  );
   assert.equal(count('step.tokens.input'), 1200);
   assert.equal(count('step.duration'), 1);
   assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {}))));
@@ -390,4 +397,127 @@ test('a wait is recorded into its histogram by the five attributes, and as a spa
     spans.every((s) => s.parent._tag === 'None'),
     'each a root of its own',
   );
+});
+
+/** An attempt that began at `hm` of `DAY`, was denied `denials`, and ended a minute later as `ended`, or runs still with none. */
+const deniedAttempt = (hm: string, denials: Array<{ tool: string; what?: string }>, ended: string | null = 'done') => ({
+  startedAt: `${DAY}T${hm}:00.000Z`,
+  spawnedAt: `${DAY}T${hm}:00.000Z`,
+  endedAt: ended === null ? null : `${DAY}T${hm}:59.000Z`,
+  reason: null,
+  usage: null,
+  ended,
+  denials,
+});
+
+/** A task's view of `attempts`, not settled: a task held open between its turns. */
+const turns = (...attempts: ReturnType<typeof deniedAttempt>[]): FactView => ({ state: { brief: 'Do it.', settled: null, attempts } });
+
+const BASH = { tool: 'Bash', what: 'git push' };
+const DENIED_RUN = { ...RUN, deniedCounted: [] } as Run;
+const DENIED_VIEWS = new Map([
+  ['r-1-work-try2', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], 'blocked'), deniedAttempt('10:10', [BASH, BASH]))],
+  ['r-1-work-try2-check', turns(deniedAttempt('10:20', [{ tool: 'Read' }]))],
+]);
+const callOf = (d: { tool: string; what?: string }) => (d.what ? `${d.tool}(${d.what})` : d.tool);
+/** What `deniedCalls` gives of `run` over `views`, each as its task, attempt, tool, call and time. */
+const denied = (run: Run, views: ReadonlyMap<string, FactView> = DENIED_VIEWS) =>
+  deniedCalls(run, [WORK, REVIEW], views, callOf).map((f) => [f.task, f.attempt, f.tool, f.call, f.at.slice(11, 19)]);
+
+test('each call of each ended attempt is one denied fact, in order, a call denied twice two, whatever the attempt signed', () => {
+  assert.deepEqual(denied(DENIED_RUN), [
+    ['r-1-work-try2', 1, 'Glob', 'Glob', '10:00:59'],
+    ['r-1-work-try2', 2, 'Bash', 'Bash(git push)', '10:10:59'],
+    ['r-1-work-try2', 2, 'Bash', 'Bash(git push)', '10:10:59'],
+  ]);
+  const [fact] = deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf);
+  assert.deepEqual(fact.attributes, { factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada' }, "the step's labels, no outcome");
+  assert.equal(fact.run, 'r-1');
+});
+
+test("REFUSED: an attempt still running, one before its task's mark, a check's task and a record with no deniedCounted give no fact", () => {
+  const running = new Map([['r-1-work-try2', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], null))]]);
+  assert.deepEqual(denied(DENIED_RUN, running), [], 'counted once its attempt ends, never while it runs');
+  const marked = { ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 1 }] } as Run;
+  assert.deepEqual(
+    denied(marked).map(([, attempt]) => attempt),
+    [2, 2],
+    'the first attempt is counted already',
+  );
+  assert.deepEqual(denied({ ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] } as Run), []);
+  assert.equal(
+    denied(DENIED_RUN).some(([task]) => task === 'r-1-work-try2-check'),
+    false,
+    "a check's task is never read",
+  );
+  assert.deepEqual(denied(RUN), [], 'a record written before the tick counted denials');
+});
+
+test("a task that is the step's and one of its tries' is read once", () => {
+  const held = {
+    ...DENIED_RUN,
+    steps: { work: { status: 'running', taskId: 'r-1-work', tries: [{ taskId: 'r-1-work' }] } },
+  } as unknown as Run;
+  const views = new Map([['r-1-work', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], 'blocked'))]]);
+  assert.deepEqual(denied(held, views), [['r-1-work', 1, 'Glob', 'Glob', '10:00:59']]);
+});
+
+test("a denied call is recorded as a span at its attempt's end with its run, task, tool and call, and into no metric", async () => {
+  const spans: Tracer.NativeSpan[] = [];
+  const tracer = Tracer.make({
+    span(options) {
+      const span = new Tracer.NativeSpan(options);
+      spans.push(span);
+      return span;
+    },
+  });
+  const registry = new Map();
+  const facts = deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf);
+  await Effect.runPromise(recordStepMetrics(facts).pipe(Effect.withTracer(tracer), Effect.provideService(Metric.MetricRegistry, registry)));
+  const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+  assert.deepEqual(
+    snapshot.filter((m) => m.id.startsWith('step.')),
+    [],
+    'no metric of a step',
+  );
+  const calls = spans.filter((s) => s.name === DENIED_SPAN);
+  assert.equal(calls.length, 3);
+  const last = calls[2];
+  assert.deepEqual(Object.fromEntries(last.attributes), {
+    run: 'r-1',
+    task: 'r-1-work-try2',
+    tool: 'Bash',
+    call: 'Bash(git push)',
+    factory: 'nemia',
+    workflow: 'build',
+    step: 'work',
+    agent: 'ada',
+  });
+  assert.deepEqual(
+    [...last.attributes.keys()].filter((key) => !['factory', 'workflow', 'step', 'agent'].includes(key)),
+    [...DENIED_SPAN_KEYS],
+  );
+  const at = BigInt(Date.parse('2026-10-06T10:10:59.000Z')) * 1_000_000n;
+  assert.deepEqual([last.status.startTime, last.status._tag === 'Ended' ? last.status.endTime : null], [at, at]);
+  assert.ok(
+    calls.every((s) => s.parent._tag === 'None'),
+    'each a root of its own',
+  );
+});
+
+test("REFUSED: a denied call whose attributes carry a task's id is recorded nowhere", async () => {
+  const fact: DeniedFact = {
+    metric: 'denied',
+    attributes: { factory: 'nemia', step: 'work', task: 'r-1-work' },
+    run: 'r-1',
+    task: 'r-1-work',
+    tool: 'Glob',
+    call: 'Glob',
+    at: '2026-10-06T10:00:59.000Z',
+    attempt: 1,
+  };
+  await assert.rejects(recorded([fact]), (err: Error) => {
+    assert.match(err.message, /carries the attribute "task"/);
+    return true;
+  });
 });

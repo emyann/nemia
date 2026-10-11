@@ -72,7 +72,16 @@ import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { RunPlace } from '../place/place.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
-import { gateWaits, roundsGranted, settledFacts, settledWaits, type StepFact, type WaitFact } from '../meter/index.ts';
+import {
+  deniedCalls,
+  gateWaits,
+  roundsGranted,
+  settledFacts,
+  settledWaits,
+  type DeniedFact,
+  type StepFact,
+  type WaitFact,
+} from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
@@ -232,8 +241,8 @@ export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
  * have, a line it refused, an `npm ci` that ran or failed), each try and each round filed and on whose word, a blocked session the engine
  * was asked to stop for a try, and an ask file that cannot be read. `looped` names the looping steps whose loop this pass took round again.
  * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass was handed as settled since the pass
- * before (`PassRead`'s `settled`) with the waits they ended, each round granted, and each gate wait not timed before (`timedGates`); absent
- * where there is none.
+ * before (`PassRead`'s `settled`) with the waits they ended, each round granted, each gate wait not timed before (`timedGates`), and each
+ * denied call not counted before (`countedDenials`); absent where there is none.
  * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
@@ -306,7 +315,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   pass, and a worktree cut for it stays for `nemia rm` to find. A step's files directory is made before its brief names it, and again for
  *   its check, for a step filed without one.
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
- * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it (`timedGates`).
+ * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it (`timedGates`),
+ *   and each session's attempts whose denied calls it hands them as counted (`deniedCounted`, `countedDenials`).
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`BranchReader.shipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
@@ -357,7 +367,7 @@ export const advancePass = Effect.fn('advancePass')(
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
     const settled = settledOf(run, reads, pass?.settled);
-    const gated = timedGates(run, reads);
+    const marked = [...timedGates(run, reads), ...countedDenials(run, reads)];
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
@@ -373,11 +383,11 @@ export const advancePass = Effect.fn('advancePass')(
     const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
-      Boolean(tips || heldFirst || handed.marked || landing.landed || gated.length);
+      Boolean(tips || heldFirst || handed.marked || landing.landed || marked.length);
     if (wrote) runStore.runs.rewrite(run);
     runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
-    const done = { filed, checked, tried, looped, notes, feed, facts: [...settled, ...roundsGranted(run, steps, looped), ...gated] };
+    const done = { filed, checked, tried, looped, notes, feed, facts: [...settled, ...roundsGranted(run, steps, looped), ...marked] };
     return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
   },
   (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
@@ -406,6 +416,21 @@ function settledOf(run: Run, r: PassReads, settled: ReadonlySet<string> | undefi
 function timedGates(run: Run, r: PassReads): WaitFact[] {
   const facts = gateWaits(run, r.steps, r.views);
   run.gatesTimed?.push(...facts.map((f) => ({ step: f.attributes.step, try: f.try })));
+  return facts;
+}
+
+/**
+ * The calls the run's sessions were denied that the tick has not counted yet (`deniedCalls`), off this pass's views, each session's
+ * attempts marked counted on the run (`deniedCounted`) through the last one read, for the record this pass writes. The metrics record
+ * them after that write, as they do a gate's wait (`timedGates`): a call is counted once at most, a restart between passes included.
+ */
+function countedDenials(run: Run, r: PassReads): DeniedFact[] {
+  const facts = deniedCalls(run, r.steps, r.views, denialText);
+  for (const { task, attempt } of facts) {
+    const mark = run.deniedCounted?.find((c) => c.task === task);
+    if (mark) mark.attempts = Math.max(mark.attempts, attempt);
+    else run.deniedCounted?.push({ task, attempts: attempt });
+  }
   return facts;
 }
 

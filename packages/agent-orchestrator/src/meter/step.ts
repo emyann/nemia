@@ -2,11 +2,13 @@
  * What a pass records of each step in the process's metrics (`STEP_METRICS`, `meter.verb.ts`): a try or a check that settled, a round a
  * loop was granted or ran out of, each with the attributes a series is kept by — the factory, the workflow, the step, its agent and the
  * outcome, and nothing else (`boundedAttributes`): a run's or a task's id would make a series of every run. And how long a step waited
- * outside its sessions once the wait ended (`WaitFact`): a session in the queue, its check's run, and a person at its gate.
+ * outside its sessions once the wait ended (`WaitFact`): a session in the queue, its check's run, and a person at its gate. And each call
+ * a harness denied one of its sessions (`DeniedFact`), which is no metric: a span of its own, with its run, its task and its tool.
  *
  * Pure: the tick hands it the run, the tasks the feed said settled since its last read (`settledIn`), and what the pass already read of
  * them; it reads nothing more, and nothing is carried from one pass to the next. A gate is timed on the first pass that reads its approval
- * and does not find it among those the tick has timed (`gatesTimed`).
+ * and does not find it among those the tick has timed (`gatesTimed`), and a denied call is counted on the first pass that reads its attempt
+ * ended and past those the tick has counted (`deniedCounted`).
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
@@ -59,10 +61,10 @@ export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: 
 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
- * measured, how long it ran and the calls its harness denied it; a check that settled (`check`); a round its loop was granted or ran out
- * of (`round`); a wait outside the step's sessions that ended (`WaitFact`). `attributes` are `stepAttributes`, the outcome among
- * them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a check; `granted` or `exhausted` for a
- * round.
+ * measured and how long it ran; a check that settled (`check`); a round its loop was granted or ran out of (`round`); a wait outside the
+ * step's sessions that ended (`WaitFact`); a call its harness denied one of its sessions (`DeniedFact`). `attributes` are
+ * `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a
+ * check; `granted` or `exhausted` for a round.
  */
 export type StepFact =
   | {
@@ -72,15 +74,22 @@ export type StepFact =
       inputTokens?: number;
       outputTokens?: number;
       ms: number;
-      denied: number;
     }
   | { metric: 'check' | 'round'; attributes: Record<string, string> }
-  | WaitFact;
+  | WaitFact
+  | DeniedFact;
 
-/** The engine's view of a task, as far as a fact reads it: its attempts, a check's with its exit code, its usage, and when it was filed. */
-export type FactView = TaskClock & {
-  state: { attempts: ReadonlyArray<AttemptClock & { exitCode?: number | null }>; filedAt?: string };
-};
+/** A call a harness denied a session, as the engine keeps it on the attempt: the tool, and what of it where the harness said. */
+export type DeniedCall = { tool: string; what?: string };
+
+/**
+ * The engine's view of a task, as far as a fact reads it: its attempts, a check's with its exit code and a session's with the calls it was
+ * denied, its usage, and when it was filed.
+ */
+export type FactView = TaskClock & { state: { attempts: readonly FactAttempt[]; filedAt?: string } };
+
+/** One attempt of a task, as far as a fact reads it: its clock, a check's exit code, and the calls a session's harness denied it. */
+type FactAttempt = AttemptClock & { exitCode?: number | null; denials?: readonly DeniedCall[] };
 
 /** What a pass already read, that a step's facts are read off: the views of the run's tasks, their spend, the closeouts, each status. */
 export type FactReads = {
@@ -125,7 +134,6 @@ function tryFact(run: Run, step: Workflow, taskId: string, view: FactView, reads
     ...(usage?.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
     ...(usage?.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
     ms: ranMs(view),
-    denied: spend?.denied?.length ?? 0,
   };
 }
 
@@ -241,5 +249,62 @@ export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyM
     return [
       { metric: 'wait', wait: 'gate', attributes: stepAttributes(run, step, 'approved'), run: run.id, try: a.try, from, to: a.at, ms },
     ];
+  });
+}
+
+/**
+ * One call a harness denied a step's session, for a span of its own and no metric: the step's four labels (`stepKeys`, no outcome: a call is
+ * denied whatever its try comes to), the run, the session's task, the tool denied and the call as a permission rule names it
+ * (`Skill(look)`), when its attempt ended (`at`), and which attempt of the task that was, from 1.
+ */
+export type DeniedFact = {
+  metric: 'denied';
+  attributes: Record<string, string>;
+  run: string;
+  task: string;
+  tool: string;
+  call: string;
+  at: string;
+  attempt: number;
+};
+
+/**
+ * Each call the sessions of `run` were denied that the tick has not counted (`deniedCounted`), off `views`: every denial of every attempt
+ * that ended, one per call, a call denied twice being two, as `nemia stats` counts them (`deniedCallsOf`) — whatever the attempt's turn
+ * signed and whatever came of its try. Each session's task is read once, a check's never; an attempt before its task's mark, and one
+ * still running, give none: a later pass counts the running one once it ends. None on a record with no `deniedCounted`, written before
+ * the tick counted denials.
+ *
+ * @param callOf The call as a permission rule names it, in the runtime's words.
+ */
+export function deniedCalls(
+  run: Run,
+  steps: readonly Workflow[],
+  views: ReadonlyMap<string, FactView>,
+  callOf: (denial: DeniedCall) => string,
+): DeniedFact[] {
+  const counted = run.deniedCounted;
+  if (!counted) return [];
+  return steps.flatMap((step) => {
+    const sessions = triesOf(run.steps[step.name] ?? { status: 'pending' }).filter((t) => !t.check);
+    const attributes = { ...stepKeys(run, step) };
+    return sessions.flatMap(({ taskId }) => {
+      const from = counted.find((c) => c.task === taskId)?.attempts ?? 0;
+      const attempts: readonly FactAttempt[] = views.get(taskId)?.state.attempts ?? [];
+      return attempts.flatMap((a, i): DeniedFact[] => {
+        if (i < from || a.ended === null || a.ended === undefined) return [];
+        const at = a.endedAt ?? a.startedAt;
+        return (a.denials ?? []).map((d) => ({
+          metric: 'denied',
+          attributes,
+          run: run.id,
+          task: taskId,
+          tool: d.tool,
+          call: callOf(d),
+          at,
+          attempt: i + 1,
+        }));
+      });
+    });
   });
 }

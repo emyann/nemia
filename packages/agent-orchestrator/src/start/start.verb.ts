@@ -310,6 +310,7 @@ type Told = Pick<
   | 'factory'
   | 'mounts'
   | 'gatesTimed'
+  | 'deniedCounted'
 >;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
@@ -382,7 +383,7 @@ export function leftOutMounts(run: Run): string[] {
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, and `mounts`
  * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts. No gate of it is
- * timed yet (`gatesTimed`).
+ * timed yet (`gatesTimed`), and no denied call counted (`deniedCounted`).
  */
 function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
   const after = opts.after ?? [];
@@ -403,6 +404,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),
     gatesTimed: [],
+    deniedCounted: [],
   };
 }
 

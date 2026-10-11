@@ -139,7 +139,6 @@ async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> 
 }
 
 const answerOf = (pass: Pass, id: string) => pass.runs.find((a) => a.run.id === id);
-const rests = (pass: Pass, id: string, status: string) => answerOf(pass, id)?.status === status && answerOf(pass, id)?.feed.atRest === true;
 
 /**
  * One sweep over what `pass` answered of the runs `ids`, in that order, with what it logged and what it asked of the place: refused

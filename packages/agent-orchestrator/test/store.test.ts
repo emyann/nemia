@@ -13,9 +13,7 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { nameFor, type Sighting, type TaskSpec, type TaskView, Engine as RuntimeEngine, StopRefused, ForgetRefused } from 'agent-runtime';
-import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
+import { type TaskSpec, type TaskView, StopRefused, ForgetRefused } from 'agent-runtime';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
@@ -35,12 +33,11 @@ import type { BranchReader } from '../src/branches/branches.store.ts';
 import { verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { TEAM_DEV } from './team.ts';
-import { decideScreen } from './screens.ts';
 import { isRepositoryRun, shownNote, shownStatus, SIGNOFF } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
-import { plainEngine } from './promised.ts';
-import { givenPlace, runGiven, runOver } from './placed.ts';
+import { eachTest, givenPlace, runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
 import { placeOver, unreadBy } from './place-over.ts';
@@ -81,13 +78,55 @@ const {
   startPlan,
   stepsOf,
   runWith: runEngine,
-  gitPlaceLayer,
-  shippedGitPlace,
   standingLiveOf,
 } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const placed = givenPlace(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const world = () => stand().world;
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
+/** `program` given the place of the test running now, and still to be run. */
+const placed = <A, E, R>(program: EffectOf<A, E, R>) => givenPlace(() => stand().layer)(program);
+const { main: cli } = await import('../src/cli/main.ts');
+/** `nemia`, as a person types it, over the test's place. */
+const main = (argv: string[], e?: Engine) => cli(argv, e, undefined, stand().place);
+
+/** The paths `checkout` holds uncommitted, a line each. */
+const uncommitted = (checkout: string): string => world().changes(checkout).join('\n');
+
+/** Every commit the commit `rev` names in `root` follows, itself first, a merge's first parent before its second. */
+const commitsOf = (root: string, rev: string): string[] => {
+  const seen: string[] = [];
+  const next = [world().tip(root, rev) ?? rev];
+  while (next.length) {
+    const at = next.shift()!;
+    if (seen.includes(at)) continue;
+    seen.push(at);
+    next.push(...world().read(root, at).parents);
+  }
+  return seen;
+};
+
+/** The first line of the message of each commit `rev` follows in `root`, itself first: the commit the checkout is at, given none. */
+const subjects = (root: string, rev = world().head(root)): string[] =>
+  commitsOf(root, rev).map((id) => world().read(root, id).message.split('\n')[0]);
+
+/** How many commits `tip` holds in `root` that `base` does not. */
+const ahead = (root: string, base: string, tip: string): number => {
+  const below = commitsOf(root, base);
+  return commitsOf(root, tip).filter((id) => !below.includes(id)).length;
+};
+
+/** `branch` merged into `repo`'s checkout and committed under `message`, as a person merges a result by hand. */
+const mergedByHand = (repo: string, branch: string, message: string): void => {
+  world().stage(repo, branch);
+  world().commit(repo, message);
+};
+
+/** The workspace `wt` and the branch `branch` of `repo` taken away, as a person removes a worktree and deletes its branch. */
+const droppedByHand = (repo: string, wt: string, branch: string): void => {
+  const outcome = stand().place.askNow('remove', { repo, workspaces: [wt], branches: [branch] });
+  assert.deepEqual('answer' in outcome && [outcome.answer.removed, outcome.answer.deleted], [[wt], [branch]]);
+};
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
@@ -298,10 +337,7 @@ test('a step whose task the engine no longer has is unknown, not queued — canc
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  world().repository(repo, {});
   return repo;
 };
 
@@ -375,8 +411,6 @@ test('a run reads the workflow it froze at `nemia start` — the folder edited a
     "the deleted step is still the run's",
   );
 });
-
-const gitOut = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
 /**
  * An engine board a test settles by hand. It keeps what each task was filed with — so a view carries
@@ -693,8 +727,8 @@ test('a FAILED step is handed off: what it left is committed where the run can s
   settle(`${run.id}-implement`, 'failed');
 
   await runWith(e, advanceRun(readRun(run.id)));
-  assert.equal(gitOut(run.repo, 'status', '--porcelain'), '');
-  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^implement: hand off/);
+  assert.equal(uncommitted(run.repo), '');
+  assert.match(subjects(run.repo)[0], /^implement: hand off/);
 });
 
 test('REFUSED at shipped defaults: a hand-off the place refuses is not marked done — the notes say why, the work stays uncommitted, and the next pass asks again', async () => {
@@ -711,10 +745,10 @@ test('REFUSED at shipped defaults: a hand-off the place refuses is not marked do
     assert.equal(readRun(run.id).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
     assert.equal(place.asked(), pass, `pass ${pass}: the place was asked`);
   }
-  assert.match(gitOut(run.repo, 'status', '--porcelain'), /half-done\.txt/, 'the work is where the step left it');
+  assert.match(uncommitted(run.repo), /half-done\.txt/, 'the work is where the step left it');
   await runWith(e, advanceRun(readRun(run.id)));
   assert.equal(readRun(run.id).steps.implement.handedOff, `${run.id}-implement`, 'the shipped place commits it, and the mark is made');
-  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^implement: hand off/);
+  assert.match(subjects(run.repo)[0], /^implement: hand off/);
 });
 
 test("nothing is committed for a step once its check is filed — the suite's litter stays off the branch", async () => {
@@ -726,14 +760,14 @@ test("nothing is committed for a step once its check is filed — the suite's li
 
   await runWith(e, advanceRun(readRun(run.id)));
   assert.match(
-    gitOut(run.repo, 'show', '--name-only', '--format=', 'HEAD'),
+    world().changed(run.repo, world().head(run.repo)).join('\n'),
     /feature\.txt/,
     'the pass hands off the work, then files the check on that tree',
   );
 
   fs.writeFileSync(path.join(run.repo, 'coverage.out'), 'litter\n');
   await runWith(e, advanceRun(readRun(run.id)));
-  assert.match(gitOut(run.repo, 'status', '--porcelain'), /coverage\.out/, 'left untracked');
+  assert.match(uncommitted(run.repo), /coverage\.out/, 'left untracked');
 });
 
 test('cancelling stops a running check — from the verb, and again from every pass', async () => {
@@ -828,32 +862,24 @@ test("an unchecked step's hand-off stops once the step after it works in the sam
 
   await runWith(e, advanceRun(readRun(run.id)));
   assert.match(
-    gitOut(run.repo, 'log', '-1', '--format=%s'),
+    subjects(run.repo)[0],
     /^implement: hand off/,
     'the pass hands implement off, then files review in the same checkout, as an inheriting follower would be',
   );
 
   fs.writeFileSync(path.join(run.repo, 'half-reviewed.txt'), 'wip\n');
   await runWith(e, advanceRun(readRun(run.id)));
-  assert.match(
-    gitOut(run.repo, 'status', '--porcelain'),
-    /half-reviewed\.txt/,
-    "review's work in progress is not committed under implement's name",
-  );
+  assert.match(uncommitted(run.repo), /half-reviewed\.txt/, "review's work in progress is not committed under implement's name");
 
   settle(`${run.id}-review`, 'succeeded', SIGNED);
   await runWith(e, advanceRun(readRun(run.id)));
-  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^review: hand off/, 'the pass hands review off, then files its check');
+  assert.match(subjects(run.repo)[0], /^review: hand off/, 'the pass hands review off, then files its check');
 
   fs.writeFileSync(path.join(run.repo, 'coverage.out'), 'litter\n');
   await runWith(e, advanceRun(readRun(run.id)));
   await runWith(e, advanceRun(readRun(run.id)));
-  assert.match(gitOut(run.repo, 'status', '--porcelain'), /coverage\.out/, 'left untracked — by implement as well as by review');
-  assert.doesNotMatch(
-    gitOut(run.repo, 'log', '--format=%s'),
-    /implement: hand off[\s\S]*implement: hand off/,
-    'implement was handed off once',
-  );
+  assert.match(uncommitted(run.repo), /coverage\.out/, 'left untracked — by implement as well as by review');
+  assert.doesNotMatch(subjects(run.repo).join('\n'), /implement: hand off[\s\S]*implement: hand off/, 'implement was handed off once');
 });
 
 /** A strict `findings` schema, as the tests' team's `test/fixtures/team/agents/review.schema.json` has it. */
@@ -1055,7 +1081,7 @@ test("a declared file in the step's files directory counts when it is there, is 
   ];
 
   assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(declared)),
+    missingArtifacts(stand().place, readRun(run.id), 'implement', declaring(declared)),
     [
       { path: path.join(files, 'never-written.png'), why: 'missing' },
       { path: path.join(files, 'shots'), why: 'missing' },
@@ -1092,7 +1118,7 @@ test("an absolute path outside the step's files directory is refused, and never 
     (method) => t.mock.method(fs, method as 'statSync'),
   );
   assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(outside)),
+    missingArtifacts(stand().place, readRun(run.id), 'implement', declaring(outside)),
     outside.map((p) => ({ path: p, why: 'outside' })),
     'every one is a file that exists, which looking would have found',
   );
@@ -1103,218 +1129,15 @@ test("an absolute path outside the step's files directory is refused, and never 
 
   fs.symlinkSync(secret, path.join(files, 'link.txt'));
   assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])),
+    missingArtifacts(stand().place, readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])),
     [{ path: path.join(files, 'link.txt'), why: 'missing' }],
     'a link inside the directory that leads out is as outside as where it leads',
   );
   assert.deepEqual(artifactFiles(run, 'implement'), [], 'and is not listed');
 });
 
-/**
- * A main checkout with npm workspaces: `packages/x`, a lockfile npm wrote, committed; then, as a person's
- * checkout has them, gitignored things — a `node_modules` written by hand (`x` linked, `third` main's
- * own, npm's `.package-lock.json`), so no registry is asked. npm's record of what it installed is what the
- * lockfile named, as npm would leave it; the run reads the disk instead.
- */
-const aNodeRepo = (include?: string): string => {
-  const repo = fs.mkdtempSync(path.join(ROOT, 'node-repo-'));
-  const put = (rel: string, text: string) => {
-    fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true });
-    fs.writeFileSync(path.join(repo, rel), text);
-  };
-  put('package.json', JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }));
-  put('packages/x/package.json', JSON.stringify({ name: 'x', version: '1.0.0' }));
-  put('packages/x/index.js', "module.exports = 'x';\n");
-  put('.gitignore', 'node_modules\n.env.local\nconfig/local/\nescape\n');
-  if (include !== undefined) put('.worktreeinclude', include);
-  execFileSync('npm', ['install', '--package-lock-only', '--offline', '--no-audit', '--no-fund'], { cwd: repo, stdio: 'ignore' });
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
-  put('node_modules/third/index.js', "module.exports = 'third';\n");
-  fs.copyFileSync(path.join(repo, 'package-lock.json'), path.join(repo, 'node_modules', '.package-lock.json'));
-  fs.symlinkSync('../packages/x', path.join(repo, 'node_modules', 'x'));
-  return repo;
-};
-
 /** `nemia start` as a person types it: worktrees, the default. */
 const isolated = async (repo: string) => await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
-
-test("a step's worktree gets what .worktreeinclude lists from the main checkout — a file, a directory — and a node_modules of its own, never a copy", async () => {
-  const repo = aNodeRepo(
-    ['# what a worktree needs', '/.env.local', 'config/local/', 'node_modules', 'missing.txt', 'escape', 'notes.txt', ''].join('\n'),
-  );
-  fs.writeFileSync(path.join(repo, '.env.local'), 'TOKEN=main\n');
-  fs.writeFileSync(path.join(repo, 'notes.txt'), 'TOKEN=main\n');
-  fs.mkdirSync(path.join(repo, 'config/local/deeper'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'config/local/deeper/a.json'), '{"from":"main"}\n');
-  const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
-  fs.writeFileSync(path.join(outside, 'secret'), "not the step's\n");
-  fs.symlinkSync(outside, path.join(repo, 'escape'));
-
-  const run = await isolated(repo);
-  fs.appendFileSync(path.join(repo, '.worktreeinclude'), `../${path.basename(outside)}/secret\n`);
-  const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
-  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'), 'a worktree, as shipped');
-
-  assert.equal(
-    fs.readFileSync(path.join(wt, '.env.local'), 'utf8'),
-    'TOKEN=main\n',
-    "a listed file arrives, `/.env.local` anchored at the root as Claude Code's gitignore syntax writes it",
-  );
-  assert.equal(
-    fs.readFileSync(path.join(wt, 'config/local/deeper/a.json'), 'utf8'),
-    '{"from":"main"}\n',
-    'a listed directory arrives, whole',
-  );
-  assert.ok(!fs.existsSync(path.join(wt, 'escape')), 'a listed path that leads out of the repository through a link is not copied');
-  assert.ok(!fs.existsSync(path.join(wt, '..', path.basename(outside))), 'nor one that climbs out');
-  assert.ok(
-    !fs.existsSync(path.join(wt, 'notes.txt')),
-    "nor one git does not ignore: copied, the hand-off's `git add -A` would commit it onto the run's branch",
-  );
-  assert.equal(gitOut(wt, 'status', '--porcelain'), '', 'so the cut leaves nothing for the hand-off to commit');
-
-  assert.ok(
-    fs.lstatSync(path.join(wt, 'node_modules')).isDirectory(),
-    "`node_modules` was listed, and is not a copy: a directory of the worktree's own",
-  );
-  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isDirectory());
-  assert.equal(
-    fs.statSync(path.join(wt, 'node_modules/third/index.js')).ino,
-    fs.statSync(path.join(repo, 'node_modules/third/index.js')).ino,
-    "main's packages are hardlinked into it",
-  );
-  assert.equal(
-    fs.realpathSync(path.join(wt, 'node_modules/x')),
-    fs.realpathSync(path.join(wt, 'packages/x')),
-    'its workspace package is its own',
-  );
-  assert.ok(!fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')), "without the file npm keeps for main's tree");
-
-  assert.deepEqual(
-    pass.notes,
-    [
-      'implement: .worktreeinclude: skipped missing.txt — not in the main checkout',
-      `implement: .worktreeinclude: refused "../${path.basename(outside)}/secret" is outside the repository`,
-      'implement: .worktreeinclude: refused "escape" leads outside the repository',
-      'implement: .worktreeinclude: refused "notes.txt" is not gitignored — the hand-off would commit it',
-    ],
-    'a line appended after `nemia start`, which would have refused it, is refused by the cut too',
-  );
-  assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
-});
-
-test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async (t) => {
-  const run = await isolated(aNodeRepo());
-  t.mock.method(fs, 'linkSync', () => {
-    throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
-  });
-  const { e } = board();
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
-  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
-  assert.deepEqual(pass.notes, [
-    "implement: node_modules: main's packages linked, not hardlinked — EXDEV: cross-device link not permitted, link 'a' -> 'b'; a fenced step's reads under it leave its worktree and are denied",
-  ]);
-});
-
-test('nemia start refuses a .worktreeinclude line outside the repository, by name, before a run is written', async () => {
-  const repo = aNodeRepo('/.env.local\n../x\nC:\\x\n.git/hooks\n');
-  const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
-  await assert.rejects(
-    () => isolated(repo),
-    (err: Error & { exitCode?: number }) => {
-      assert.match(err.message, /"\.\.\/x" is outside the repository/);
-      assert.match(err.message, /"C:\\x" is absolute/);
-      assert.match(err.message, /"\.git\/hooks" is git's own/);
-      assert.match(err.message, /fix or remove those lines/);
-      assert.doesNotMatch(err.message, /\.env\.local/, 'a leading / is the root of the repository, and nothing to refuse');
-      assert.equal(err.exitCode, 2);
-      return true;
-    },
-  );
-  assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
-  assert.ok(
-    await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false })),
-    '--no-worktree cuts nothing and copies nothing, so it has nothing to refuse',
-  );
-  assert.ok(
-    isolated(aNodeRepo('# for claude --worktree\n/.env.local\n/config/local/\n')),
-    'a file written for Claude Code, anchored lines and all, starts a run',
-  );
-});
-
-test('a worktree whose lockfile asks for what the main checkout has not installed gets its own tree from npm ci before the step is filed, and the step is told why', async () => {
-  const repo = aNodeRepo();
-  fs.mkdirSync(path.join(repo, 'packages/y'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
-  fs.writeFileSync(path.join(repo, 'packages/y/index.js'), "module.exports = 'y';\n");
-  execFileSync('npm', ['install', '--package-lock-only', '--offline', '--no-audit', '--no-fund'], { cwd: repo, stdio: 'ignore' });
-  for (const args of [
-    ['add', '-A'],
-    ['commit', '-q', '-m', 'add y'],
-  ]) {
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  }
-  assert.ok(
-    !fs.existsSync(path.join(repo, 'node_modules/y')),
-    'main has not installed y: it landed in the lockfile, committed, and nobody has run `npm install` in main since',
-  );
-  assert.match(
-    fs.readFileSync(path.join(repo, 'node_modules/.package-lock.json'), 'utf8'),
-    /node_modules\/y/,
-    "though npm's record of main's tree says it has, after --package-lock-only",
-  );
-
-  const run = await isolated(repo);
-  const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
-  assert.equal(
-    fs.readFileSync(path.join(wt, 'package-lock.json'), 'utf8'),
-    fs.readFileSync(path.join(repo, 'package-lock.json'), 'utf8'),
-    'the lockfiles agree, byte for byte, and are ahead of the tree links would point at',
-  );
-  assert.deepEqual(pass.filed, ['implement']);
-  assert.ok(fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')), 'npm installed a tree here');
-  assert.equal(
-    fs.realpathSync(path.join(wt, 'node_modules/y')),
-    fs.realpathSync(path.join(wt, 'packages/y')),
-    'with the package the lockfile names',
-  );
-  assert.ok(!fs.existsSync(path.join(wt, 'node_modules/third')), "and nothing of main's in it");
-  assert.deepEqual(pass.notes, [
-    'implement: node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed',
-  ]);
-
-  const brief = tasks.get(`${run.id}-implement`)!.spec.brief;
-  const at = brief.indexOf('## Where to look');
-  assert.ok(at >= 0 && brief.indexOf('`npm ci`', at) > at, 'told under Where to look');
-  assert.ok(brief.indexOf('`npm ci`', at) < brief.indexOf('## When you are finished'), 'before the closeout, which stays last');
-});
-
-test('a pass that dies after cutting a worktree does not wedge every pass after it', async () => {
-  const run = await isolated(aNodeRepo());
-  const { e, filings } = board();
-  const dying = promised({
-    ...(e as object),
-    file: async () => {
-      throw new Error('the tick died here');
-    },
-  });
-  await assert.rejects(runWith(dying, advanceRun(readRun(run.id))), /the tick died here/);
-  const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
-  assert.ok(fs.existsSync(path.join(wt, '.git')), 'the worktree and its branch were made');
-
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  assert.deepEqual([pass.filed, filings], [['implement'], [`${run.id}-implement`]]);
-  assert.equal(readRun(run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
-});
 
 /** The package's place whose `verb` answers `outcome`, each call counted in `asked`, as the layer a pass is given it by. */
 function placeAnswering<V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOutcome<V>) {
@@ -1323,11 +1146,11 @@ function placeAnswering<V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOut
     asked += 1;
     return outcome;
   };
-  return { layer: PlaceTag.layer(placeOver(shippedGitPlace, { [verb]: answer })), asked: () => asked };
+  return { layer: PlaceTag.layer(placeOver(stand().place, { [verb]: answer })), asked: () => asked };
 }
 
 test('REFUSED at shipped defaults: a make that answers a workspace other than the one it was asked for is read as not heard — the step is not filed, the notes say both, its record holds no workspace, and the next pass asks again', async () => {
-  const run = await isolated(aNodeRepo());
+  const run = await isolated(aRepo());
   const elsewhere = scratch('wf-store-elsewhere-');
   const place = placeAnswering('make', { answer: { workspace: elsewhere, branch: 'b', conflicts: [], notes: [] } });
   const { e, filings } = board();
@@ -1347,7 +1170,7 @@ test('REFUSED at shipped defaults: a make that answers a workspace other than th
 });
 
 test('a make the place refuses, or that is not heard, files nothing and leaves no workspace or branch on the record, saying why', async () => {
-  const run = await isolated(aNodeRepo());
+  const run = await isolated(aRepo());
   const { e, filings } = board();
   const outcomes: Array<[PlaceOutcome<'make'>, string]> = [
     [{ refused: 'no room' }, 'the place refused: no room'],
@@ -1659,7 +1482,6 @@ test("a step named for another step's try is refused at `nemia start`, before an
 });
 
 test('`nemia retry` takes one way to try, and `--model` with a name — anything else is refused before a run is read', async () => {
-  const { main } = await import('../src/cli/main.ts');
   for (const [flags, pattern] of [
     [['--fresh', '--recheck'], /pick one of --nudge, --fresh, --model <m>, --recheck/],
     [['--model'], /--model takes the model/],
@@ -2190,7 +2012,6 @@ test('`nemia round` refuses a round still running, a round the run files itself 
   await assert.rejects(runWith(b.e, roundRun(run.id, 'review')), refusedWith(/was cancelled at /));
   assert.deepEqual(roundAsksOf(run.id), []);
 
-  const { main } = await import('../src/cli/main.ts');
   await assert.rejects(
     main(['round', 'no-such-run', 'review', 'again']),
     refusedWith(/^nemia round takes the run and, when the run has more than one loop, the step/),
@@ -2716,115 +2537,6 @@ test("a run's first steps are every step that waits on nothing: two roots with n
   assert.deepEqual(momentaOf(b, run.id), { left: 0, right: 0, join: 1 });
 });
 
-test("a fan-in whose two parents wrote one file differently is filed told the path its place's make left conflicted and the place's words for seeing it; a clean one is told of no conflict", async () => {
-  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'left.md'), '---\nplace: git\n---\nthe left half\n');
-  fs.writeFileSync(path.join(dir, 'right.md'), '---\nplace: git\n---\nthe right half\n');
-  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\nplace: git\n---\njoin them\n');
-  const joined = async (left: [string, string], right: [string, string]) => {
-    const run = await runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
-    const b = board();
-    assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed.sort(), ['left', 'right']);
-    for (const [step, [file, text]] of [
-      ['left', left],
-      ['right', right],
-    ] as const) {
-      fs.writeFileSync(path.join(readRun(run.id).steps[step].workspace!, file), text);
-      b.settle(`${run.id}-${step}`, 'succeeded', SIGNED);
-    }
-    for (let pass = 1; !b.tasks.has(`${run.id}-join`); pass++) {
-      assert.ok(pass <= 3, `join is filed within three passes: ${JSON.stringify(readRun(run.id).steps)}`);
-      await runWith(b.e, advanceRun(readRun(run.id)));
-    }
-    return b.tasks.get(`${run.id}-join`)!.spec.brief;
-  };
-  const conflicted = await joined(['flag.ts', 'export const flag = 1;\n'], ['flag.ts', 'export const flag = 2;\n']);
-  assert.match(conflicted, /work of left and right has been merged/);
-  assert.match(conflicted, /The merge left conflicts, and they are yours to resolve[^\n]*\n\n- flag\.ts\n\n`git status` shows them\./);
-  const clean = await joined(['left.ts', 'export const left = 1;\n'], ['right.ts', 'export const right = 1;\n']);
-  assert.match(clean, /work of left and right has been merged/);
-  assert.doesNotMatch(clean, /conflict|`git status` shows them/i, 'a merge that left none is told of none');
-});
-
-/** The engine's store, in memory, as its own tests keep one. */
-const memoryJournal = (): AsyncJournal => {
-  const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
-  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
-  return {
-    async append(taskId, event) {
-      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
-      feed.push({ taskId, event });
-    },
-    async read(taskId) {
-      return [...(tasks.get(taskId) ?? [])];
-    },
-    async list() {
-      return [...tasks.keys()].sort();
-    },
-    async feed(after) {
-      return { entries: feed.slice(after), cursor: feed.length };
-    },
-  };
-};
-
-/** A harness that starts whatever it is asked to, and remembers the order: every session at work. */
-const startsInOrder = (sessions: Map<string, Sighting>): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-  },
-  async observe() {
-    return new Map(sessions);
-  },
-  async stop() {},
-  async logs() {
-    return '';
-  },
-});
-
-test("REFUSED without the momentum: at a ceiling of one, the runtime admits a run's next step before a newer run's first step filed ahead of it — and, with no priority, the newer run", async () => {
-  const a = await started(folder());
-  const b = await started(folder());
-  const filedBy = board();
-  await runWith(filedBy.e, advanceRun(readRun(a.id)));
-  await runWith(filedBy.e, advanceRun(readRun(b.id)));
-  filedBy.settle(`${a.id}-implement`, 'succeeded', SIGNED);
-  assert.deepEqual(
-    (await runWith(filedBy.e, advanceRun(readRun(a.id)))).filed,
-    ['review'],
-    "run a's implement has ended; run b has filed its implement; a's review is filed after it, a pass later",
-  );
-  const newer = filedBy.tasks.get(`${b.id}-implement`)!.spec;
-  const next = filedBy.tasks.get(`${a.id}-review`)!.spec;
-
-  const admitted = async (weigh: (spec: typeof next) => typeof next) => {
-    const sessions = new Map<string, Sighting>();
-    const e = plainEngine(
-      RuntimeEngine.layer({
-        journal: asyncStore(memoryJournal()),
-        harnesses: { claude: asyncOps(startsInOrder(sessions)) },
-        defaultHarness: 'claude',
-        maxConcurrent: 1,
-      }),
-    );
-    const as = (spec: typeof next) => ({ ...weigh(spec), harness: 'claude', queued: true }) as Parameters<Engine['file']>[0];
-    await Effect.runPromise(e.file(as(newer)));
-    await new Promise((r) => setTimeout(r, 5));
-    await Effect.runPromise(e.file(as(next)));
-    await Effect.runPromise(e.tick());
-    assert.deepEqual([...sessions.keys()], [], 'nothing starts on the pass that admits it');
-    await Effect.runPromise(e.tick());
-    return [...sessions.keys()];
-  };
-  assert.deepEqual(
-    await admitted((spec) => spec),
-    [nameFor(`${a.id}-review`, 1)],
-    'the two filings queued in the order they were filed, as the orchestrator filed them, one slot: the next pass starts the run in ' +
-      "flight's next step, filed later",
-  );
-  const unweighed = ({ priority: _, ...spec }: typeof next) => spec;
-  assert.deepEqual(await admitted(unweighed), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
-});
-
 test('a step with `background: true` and `remote: true` reaches `e.file` with both — on its first filing, a try `retries:` files, and a try `nemia retry` asks for — and its check, and a step without the lines, with neither', async () => {
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nbackground: true\nremote: true', 'failed', 1);
   const both = (id: string) => [tasks.get(id)!.spec.config?.background, tasks.get(id)!.spec.config?.claude?.remoteControl];
@@ -3277,7 +2989,6 @@ test('REFUSED: `nemia retry` with an empty --message, or --message on --recheck 
     'a message to a step whose check did not finish is not refused: it did not sign off blocked, and a person may have something to say',
   );
 
-  const { main } = await import('../src/cli/main.ts');
   for (const [flags, pattern] of [
     [
       ['--message', ''],
@@ -3305,7 +3016,6 @@ test('REFUSED: `nemia retry` with an empty --message, or --message on --recheck 
 });
 
 test('REFUSED: `nemia accept` with no --message, or an empty one — exit 2, in whole sentences that name the run and the step; the CLI refuses before it reads a run', async () => {
-  const { main } = await import('../src/cli/main.ts');
   for (const [flags, sentence] of [
     [
       [],
@@ -3322,7 +3032,6 @@ test('REFUSED: `nemia accept` with no --message, or an empty one — exit 2, in 
 
 test('`nemia retry --message` takes the next argument as the answer whatever it starts with — an answer about a flag names it — and `--message=<answer>` too', async (t) => {
   t.mock.method(console, 'log', () => {});
-  const { main } = await import('../src/cli/main.ts');
   const asked = async (...flags: string[]) => {
     const { run, e } = await throughCheck('check: npm test', 'stopped');
     await main(['retry', run.id, 'implement', ...flags], e);
@@ -3378,14 +3087,6 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['implement']);
 });
 
-/** Git in a checkout, as a person types it there. */
-const gitIn = (cwd: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-
 /** A workflow of one step, `implement`: its branch is the run's result. */
 const oneStep = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
@@ -3412,8 +3113,7 @@ const aParent = async (
   const wt = readRun(run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
-    gitIn(wt, 'add', '-A');
-    gitIn(wt, 'commit', '-q', '-m', `add ${work}`);
+    world().commit(wt, `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   return { run, wt, branch: `wf/${run.id}/implement` };
@@ -3438,8 +3138,7 @@ test("REFUSED at shipped defaults: a run whose parent has not shipped files noth
     );
   }
   fs.writeFileSync(path.join(p.wt, 'parent.txt'), 'parent.txt\n');
-  gitIn(p.wt, 'add', '-A');
-  gitIn(p.wt, 'commit', '-q', '-m', 'add parent.txt');
+  world().commit(p.wt, 'add parent.txt');
   assert.deepEqual(
     (await runWith(c.e, advanceRun(readRun(child.id)))).filed,
     [],
@@ -3459,8 +3158,8 @@ test("REFUSED at shipped defaults: a run whose parent has not shipped files noth
     '`nemia decide` says the same, and offers nothing else',
   );
 
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the parent', p.branch);
-  const tip = gitIn(repo, 'rev-parse', 'HEAD');
+  mergedByHand(repo, p.branch, 'Merge the parent');
+  const tip = world().head(repo);
   assert.equal(
     (await runWith(c.e, decideRun(p.run.id))).decision.kind,
     'running',
@@ -3484,7 +3183,7 @@ test("REFUSED at shipped defaults: a run whose parent has not shipped files noth
     'parent.txt\n',
     "so the child's worktree has the parent's work",
   );
-  assert.equal(gitIn(now.steps.implement.workspace!, 'rev-parse', 'HEAD'), tip);
+  assert.equal(world().head(now.steps.implement.workspace!), tip);
 });
 
 test("REFUSED before review, now shipped: a parent whose step signs off with nothing to commit has shipped, as its own `nemia decide` says — its child's next tick files the roots, and `nemia start --after` it is not refused", async () => {
@@ -3501,7 +3200,7 @@ test("REFUSED before review, now shipped: a parent whose step signs off with not
 
   c.settle(`${p.run.id}-implement`, 'succeeded', SIGNED);
   assert.equal(
-    gitIn(repo, 'rev-list', '--count', `${p.run.baseRef}..${p.branch}`),
+    String(ahead(repo, p.run.baseRef, p.branch)),
     '0',
     'it found the work already done, and signed off with nothing past its base',
   );
@@ -3520,7 +3219,7 @@ test("REFUSED before review, now shipped: a parent merged and then its branch de
   const p = await aParent(repo, c, { work: 'parent.txt' });
   assert.equal(readRun(p.run.id).tips, undefined, 'not recorded while it ran');
   await runWith(c.e, advanceRun(readRun(p.run.id)));
-  const tip = gitIn(repo, 'rev-parse', p.branch);
+  const tip = world().tip(repo, p.branch);
   assert.deepEqual(
     readRun(p.run.id).tips,
     { [p.branch]: tip },
@@ -3528,11 +3227,10 @@ test("REFUSED before review, now shipped: a parent merged and then its branch de
   );
   const early = await runPlaced(startRun({ brief: 'the early child', repo, workflowDir: folder(), after: [p.run.id] }));
   const late = await runPlaced(startRun({ brief: 'the late child', repo, workflowDir: folder(), after: [p.run.id] }));
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the parent', p.branch);
+  mergedByHand(repo, p.branch, 'Merge the parent');
   assert.deepEqual((await runWith(c.e, advanceRun(readRun(early.id)))).filed, ['implement']);
 
-  gitIn(repo, 'worktree', 'remove', '--force', p.wt);
-  gitIn(repo, 'branch', '-q', '-d', p.branch);
+  droppedByHand(repo, p.wt, p.branch);
   assert.deepEqual(
     await runWith(c.e, parentNow(p.run.id)),
     { record: readRun(p.run.id), shipped: true },
@@ -3567,9 +3265,8 @@ test("the diamond's D, after B and C: B merged and its branch deleted while C is
   const cc = await aParent(repo, c, { work: 'c.txt', signed: false });
   const d = await runPlaced(startRun({ brief: 'd, after b and c', repo, workflowDir: folder(), after: [b.run.id, cc.run.id] }));
   await runWith(c.e, advanceRun(readRun(b.run.id)));
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge B', b.branch);
-  gitIn(repo, 'worktree', 'remove', '--force', b.wt);
-  gitIn(repo, 'branch', '-q', '-d', b.branch);
+  mergedByHand(repo, b.branch, 'Merge B');
+  droppedByHand(repo, b.wt, b.branch);
   const filings = [...c.filings];
   for (let pass = 0; pass < 2; pass++) {
     const r = await runWith(c.e, advanceRun(readRun(d.id)));
@@ -3586,7 +3283,7 @@ test("the diamond's D, after B and C: B merged and its branch deleted while C is
   );
 
   c.settle(`${cc.run.id}-implement`, 'succeeded', SIGNED);
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge C', cc.branch);
+  mergedByHand(repo, cc.branch, 'Merge C');
   const r = await runWith(c.e, advanceRun(readRun(d.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []], 'C signed off, and a person shipped it');
   const wt = readRun(d.id).steps.implement.workspace!;
@@ -3605,13 +3302,9 @@ test('REFUSED at shipped defaults: a parent dropped unmerged after its tip was r
   const child = await runPlaced(
     startRun({ brief: 'the child of work that is gone', repo, workflowDir: folder(), after: [dropped.run.id, unseen.run.id] }),
   );
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the unseen parent', unseen.branch);
-  for (const [p, how] of [
-    [dropped, '-D'],
-    [unseen, '-d'],
-  ] as const) {
-    gitIn(repo, 'worktree', 'remove', '--force', p.wt);
-    gitIn(repo, 'branch', '-q', how, p.branch);
+  mergedByHand(repo, unseen.branch, 'Merge the unseen parent');
+  for (const p of [dropped, unseen]) {
+    droppedByHand(repo, p.wt, p.branch);
   }
   assert.ok(readRun(dropped.run.id).tips?.[dropped.branch], 'the dropped parent had its tip recorded');
   const filings = [...c.filings];
@@ -3658,7 +3351,7 @@ test('REFUSED at shipped defaults: a run whose parent was cancelled files nothin
     const r = await runWith(c.e, advanceRun(readRun(child.id)));
     assert.deepEqual([r.filed, c.filings, r.waiting], [[], filings, [{ run: p.run.id, cancelledAt: at }]]);
   }
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the cancelled parent', p.branch);
+  mergedByHand(repo, p.branch, 'Merge the cancelled parent');
   assert.equal(
     (await runWith(c.e, decideRun(p.run.id))).decision.kind,
     'cancelled',
@@ -3670,7 +3363,6 @@ test('REFUSED at shipped defaults: a run whose parent was cancelled files nothin
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(['ls', child.id], c.e);
   const ls = printed.join('\n');
   assert.match(ls, new RegExp(`^   implement +waiting on ${escaped(p.run.id)} \\(cancelled\\) *$`, 'm'));
@@ -3698,91 +3390,6 @@ test('REFUSED at shipped defaults: a run whose parent was cancelled files nothin
     'a person resolves it: the child called off waits on nothing, and files nothing',
   );
   assert.deepEqual([(await runWith(c.e, advanceRun(readRun(child.id)))).filed, c.filings], [[], filings]);
-});
-
-test("REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, another repository's run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>", async (t) => {
-  const repo = aRepo();
-  const b = board();
-  const p = await aParent(repo, b, { work: 'parent.txt' });
-  const other = await aParent(aRepo(), b, { work: 'other.txt' });
-  const called = await aParent(repo, b, { work: 'called.txt' });
-  markCancelled(called.run.id);
-  const direct = await runPlaced(startRun({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false }));
-  const before = runsWritten();
-  const starting =
-    (...after: string[]) =>
-    async () =>
-      await runPlaced(startRun({ brief: 'a child', repo, workflowDir: folder(), after }));
-
-  await assert.rejects(starting('no-such-run-zz9z'), refusedWith(/^--after no-such-run-zz9z: the store has no run no-such-run-zz9z\./));
-  await assert.rejects(starting(p.run.id, p.run.id), refusedWith(new RegExp(`^--after ${escaped(p.run.id)} is given twice`)));
-  await assert.rejects(
-    starting(other.run.id),
-    refusedWith(
-      new RegExp(
-        `^--after ${escaped(other.run.id)}: ${escaped(other.run.id)} works on ${escaped(other.run.repo)}, and this run on ${escaped(repo)}\\.`,
-      ),
-    ),
-  );
-  await assert.rejects(
-    starting(called.run.id),
-    refusedWith(/was cancelled at .*, and a cancelled run never ships, so this run would wait for ever\./),
-  );
-  await assert.rejects(starting(direct.id), refusedWith(/\(--no-worktree\), so it has no result branch to ship/));
-  gitIn(repo, 'checkout', '-q', '-b', 'elsewhere');
-  await assert.rejects(
-    starting(p.run.id),
-    refusedWith(new RegExp(`ships onto ${escaped(p.run.branch)}, and this run would start from elsewhere`)),
-  );
-  gitIn(repo, 'checkout', '-q', p.run.branch);
-  assert.equal(runsWritten(), before, 'no run written');
-
-  const { main } = await import('../src/cli/main.ts');
-  const typed = (...flags: string[]) => main(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags]);
-  await assert.rejects(typed('--after'), refusedWith(/^--after takes the run this one waits on, by its id/));
-  await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
-  await assert.rejects(typed('--after', p.run.id, '--after', p.run.id), refusedWith(/is given twice/));
-  await assert.rejects(typed('--after='), refusedWith(/^--after takes the run this one waits on, by its id/));
-  await assert.rejects(
-    typed('--afer', p.run.id),
-    refusedWith(
-      /^nemia start does not take --afer\. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId>/,
-    ),
-  );
-  await assert.rejects(typed('-a', p.run.id), refusedWith(/^nemia start does not take -a\./));
-  await assert.rejects(typed('--repo', repo), refusedWith(/^nemia start takes --repo once/));
-  await assert.rejects(
-    typed('--after', p.run.id, p.run.id),
-    refusedWith(new RegExp(`^nemia start takes one brief, and ${escaped(p.run.id)} is a second\\.`)),
-  );
-  assert.equal(
-    runsWritten(),
-    before,
-    'nor by the CLI: dropped, any of these would start a run that waits on nothing, or on the wrong repository, and the tick would file it',
-  );
-
-  const printed: string[] = [];
-  t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  const second = await aParent(repo, b, { work: 'second.txt' });
-  await typed('--after', p.run.id, `--after=${second.run.id}`);
-  const id = printed[0].split(' ')[0];
-  assert.deepEqual(readRun(id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
-  assert.match(
-    printed.join('\n'),
-    new RegExp(
-      `^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until nemia decide says each has shipped onto ${escaped(p.run.branch)}$`,
-      'm',
-    ),
-  );
-  printed.length = 0;
-  await typed();
-  assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${printed[0].split(' ')[0]}.json`), 'utf8')), 'after'),
-    false,
-    'without --after the record is what it was',
-  );
 });
 
 test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `nemia retry` and `nemia round` name it and say to delete it, never to wait for an ask no pass honours", async () => {
@@ -3837,11 +3444,11 @@ test("REFUSED at shipped defaults: a one-step run whose step failed with nothing
   c.settle(`${p.run.id}-implement`, 'failed');
   await runWith(c.e, advanceRun(readRun(p.run.id)));
   assert.equal(
-    gitIn(repo, 'rev-list', '--count', `${p.run.baseRef}..${p.branch}`),
+    String(ahead(repo, p.run.baseRef, p.branch)),
     '0',
     'its own pass had nothing to hand off, and recorded its tip: nothing past its base',
   );
-  assert.equal(gitIn(repo, 'merge-base', '--is-ancestor', p.branch, p.run.branch), '', 'and so on the base branch, as git reads it');
+  assert.ok(commitsOf(repo, p.run.branch).includes(world().tip(repo, p.branch)!), 'and so on the base branch, as its place reads it');
   const d = (await runWith(c.e, decideRun(p.run.id))).decision;
   assert.deepEqual(
     d.kind === 'awaiting' && [d.outcome, d.failed, d.branches],
@@ -3859,7 +3466,7 @@ test("REFUSED at shipped defaults: a one-step run whose step failed with nothing
   c.settle(`${q.run.id}-implement`, 'failed');
   const before = await runWith(c.e, decideRun(q.run.id));
   assert.deepEqual(before.decision.kind === 'awaiting' && before.decision.outcome, 'failed', 'not merged yet: decided');
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the work of a failed step', q.branch);
+  mergedByHand(repo, q.branch, 'Merge the work of a failed step');
   assert.deepEqual(
     (await runWith(c.e, decideRun(q.run.id))).decision,
     { kind: 'shipped', branches: [q.branch] },
@@ -3894,7 +3501,6 @@ test('REFUSED before, now accepted at shipped defaults: `nemia retry` on a step 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(['retry', run.id, 'implement'], e);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2'], '`nemia retry`, as a person types it, asks');
   assert.equal(
@@ -3970,7 +3576,6 @@ test('a step whose harness blocked its session says what the harness waits for �
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   const decided = async () => {
     printed.length = 0;
     await main(['decide', run.id], b.e);
@@ -3998,52 +3603,6 @@ test('a step whose harness blocked its session says what the harness waits for �
   assert.doesNotMatch(await decided(), /answer it in Claude Code/, 'no word, no line');
 });
 
-test('a step whose job was denied a call says so — on `nemia ls` beside its line and on `nemia decide` under it — and its status is unchanged', async (t) => {
-  const run = await started(folder());
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const taskId = `${run.id}-implement`;
-  b.denials.set(taskId, [
-    { tool: 'Skill', what: 'look' },
-    { tool: 'Bash', what: 'pytest' },
-    { tool: 'Skill', what: 'look' },
-  ]);
-  b.settle(taskId, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const printed: string[] = [];
-  t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  const { main } = await import('../src/cli/main.ts');
-  const printedBy = async (...args: string[]) => {
-    printed.length = 0;
-    await main(args, b.e);
-    return printed.join('\n');
-  };
-
-  const [implement, review] = (await runWith(b.e, list(b.e, readRun(run.id)))).steps;
-  assert.deepEqual(
-    [implement.status, shownNote(implement)],
-    ['unverified · done', 'denied: Skill(look), Bash(pytest)'],
-    'each call once, and the status as it was',
-  );
-  assert.equal(review.note, undefined, 'a step denied nothing says nothing');
-  assert.match(
-    await printedBy('ls'),
-    /^ {3}implement +unverified · done +master {2}· denied: Skill\(look\), Bash\(pytest\)$/m,
-    '`nemia ls`: after the branch, unpadded',
-  );
-  const decided = await runWith(b.e, decideRun(run.id));
-  assert.deepEqual(decided.denied, { implement: 'denied: Skill(look), Bash(pytest)' });
-  b.settle(`${run.id}-review`, 'succeeded', SIGNED);
-  assert.match(
-    await printedBy('decide', run.id),
-    /\n {2}implement\n(?: {4}.*\n)*? {4}denied: Skill\(look\), Bash\(pytest\)\n/,
-    '`nemia decide`: under the step',
-  );
-  assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
-});
-
 test('a step that says `denials: fail`, denied a call, is stopped: nothing after it filed, `nemia decide` names the rule for `allowedTools:` and offers `--fresh`, whose try is told what was denied — and a clean try hands on', async (t) => {
   const run = await started(folder('denials: fail'));
   const b = board();
@@ -4058,7 +3617,6 @@ test('a step that says `denials: fail`, denied a call, is stopped: nothing after
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   const printedBy = async (...args: string[]) => {
     printed.length = 0;
     await main(args, b.e);
@@ -4096,7 +3654,6 @@ test('REFUSED at shipped defaults: `nemia retry` on a step whose session still w
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
-  const { main } = await import('../src/cli/main.ts');
   b.settle(`${run.id}-implement`, 'running');
   await assert.rejects(
     main(['retry', run.id, 'implement'], b.e),
@@ -4150,7 +3707,6 @@ test('`nemia plan` on the diamond starts four runs, parents first, each `after` 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(['plan', plan, '--repo', repo], b.e);
 
   assert.equal(runsWritten(), before + 4, 'four runs, and no file of the plan');
@@ -4201,7 +3757,6 @@ test("REFUSED at shipped defaults, before the first `start()`: `nemia plan` on a
     'b.md': cardText(`workflow: ${broken}\nafter: a`, 'the second card'),
   }));
   const before = runsWritten();
-  const { main } = await import('../src/cli/main.ts');
   const planned = () => main(['plan', plan, '--repo', repo], b.e);
   await assert.rejects(
     planned(),
@@ -4245,7 +3800,6 @@ test('REFUSED by name: `nemia plan` with --after, --workflows or --no-worktree �
   const b = board();
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
   const before = runsWritten();
-  const { main } = await import('../src/cli/main.ts');
   const typed = (...flags: string[]) => main(['plan', plan, ...flags], b.e);
   await assert.rejects(
     typed('--repo', repo, '--after', 'r-xyz'),
@@ -4281,7 +3835,6 @@ test("`nemia start --workflows <name>` starts the repository's workflow of that 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(['start', 'a brief', '--workflows', 'flagship', '--repo', repo], b.e);
   assert.equal(readRun(printed[0].split(' ')[0]).workflowDir, dir);
   const before = runsWritten();
@@ -4293,22 +3846,6 @@ test("`nemia start --workflows <name>` starts the repository's workflow of that 
       ),
     ),
   );
-  assert.equal(runsWritten(), before);
-});
-
-test("REFUSED: nemia plan of a card on the repository whose .worktreeinclude its place's open refuses, before any run is written", async () => {
-  const repo = aRepo();
-  fs.writeFileSync(path.join(repo, '.worktreeinclude'), '../x\n');
-  const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the root') }));
-  const before = runsWritten();
-  await assert.rejects(runPlaced(startPlan({ dir: plan, repo })), (err: Error & { exitCode?: number }) => {
-    assert.equal(
-      err.message,
-      `${path.join(repo, '.worktreeinclude')}: "../x" is outside the repository. Each line is a gitignored path inside the repository, relative to its root — fix or remove that line.`,
-    );
-    assert.equal(err.exitCode, 2);
-    return true;
-  });
   assert.equal(runsWritten(), before);
 });
 
@@ -4357,7 +3894,7 @@ test("a run that waited on runs has its roots filed with `## From run <parent>` 
   assert.doesNotMatch(c.tasks.get(`${p.run.id}-implement`)!.spec.brief, /## From run/, 'a run without `after` is given none');
 
   const child = await runPlaced(startRun({ brief: 'Show the flag', repo, workflowDir: folder(), after: [p.run.id, q.run.id] }));
-  for (const parent of [p, q]) gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
+  for (const parent of [p, q]) mergedByHand(repo, parent.branch, `Merge ${parent.run.id}`);
   const r = await runWith(c.e, advanceRun(readRun(child.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
   const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
@@ -4388,7 +3925,7 @@ test('REFUSED to fail the filing: a parent whose closeout cannot be read — a f
   const garbled = await aParent(repo, c, { work: 'garbled.txt', signed: false });
   c.settle(`${garbled.run.id}-implement`, 'failed', 'not json {');
   for (const parent of [lost, garbled]) {
-    gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
+    mergedByHand(repo, parent.branch, `Merge ${parent.run.id}`);
     assert.deepEqual((await runWith(c.e, decideRun(parent.run.id))).decision, { kind: 'shipped', branches: [parent.branch] });
   }
   const child = await runPlaced(
@@ -4441,7 +3978,7 @@ test('REFUSED to wait on context: a run after one run and handed another waits f
     [[], [{ run: waited.run.id }]],
     'waiting on the run it waits on, never the one it reads',
   );
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${waited.run.id}`, waited.branch);
+  mergedByHand(repo, waited.branch, `Merge ${waited.run.id}`);
   const r = await runWith(c.e, advanceRun(readRun(child.id)));
   assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
   const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
@@ -4460,7 +3997,6 @@ test('`nemia concluded` prints the section the tick hands a run started with `--
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(['concluded', source.run.id], c.e);
   const child = await runPlaced(startRun({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] }));
   await runWith(c.e, advanceRun(readRun(child.id)));
@@ -4484,7 +4020,6 @@ test("`nemia say` hands the words to the step's current task through the engine'
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   const recordOf = () => fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
   const record = recordOf();
   const beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
@@ -4548,7 +4083,6 @@ test("REFUSED: `nemia say` on a step the run does not have, a step not filed, a 
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   const taskId = `${run.id}-implement`;
-  const { main } = await import('../src/cli/main.ts');
   const asked: string[] = [];
   const e = {
     ...b.e,
@@ -4722,7 +4256,6 @@ test("REFUSED before, now in order: `nemia start` on `plan → implement ⇄ rev
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(['start', 'plan the flag', '--workflows', plannedFolder(), '--repo', repo], b.e);
   const [id, said] = printed[0].split('  ');
   assert.equal(said, '3 step(s): plan → implement → review');
@@ -4793,7 +4326,6 @@ test("`nemia decide` prints each step in the order the steps run — on a record
     );
     b.settle(`${run.id}-${name}`, 'succeeded', SIGNED);
   }
-  const { main } = await import('../src/cli/main.ts');
   const sections = async () => {
     const out: string[] = [];
     const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -4842,7 +4374,6 @@ test("`nemia start --input` copies each file into the run's own inputs/, freezes
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   await main(
     [
       'start',
@@ -4864,7 +4395,7 @@ test("`nemia start --input` copies each file into the run's own inputs/, freezes
   assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
   assert.equal(fs.readFileSync(path.join(dir, 'mock.png'), 'utf8'), 'png bytes');
   assert.ok(printed.includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed.join('\n'));
-  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }), '', 'nothing written into the workspace');
+  assert.equal(uncommitted(repo), '', 'nothing written into the workspace');
 
   const line = `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${dir}\`: \`mock.png\`, \`brief notes.md\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
   await runWith(b.e, advanceRun(readRun(id)));
@@ -4929,7 +4460,6 @@ test('REFUSED at `nemia start`, before a run is written: an --input that is not 
   );
   assert.equal(runsWritten(), before, 'no run written, and no inputs directory');
 
-  const { main } = await import('../src/cli/main.ts');
   const typed = (...flags: string[]) =>
     main(['start', 'a run with files', '--workflows', folder(), '--repo', repo, '--no-worktree', ...flags]);
   await assert.rejects(typed('--input'), refusedWith(/^--input takes a file to hand the run's steps: nemia start <brief> --input <file>/));
@@ -4959,8 +4489,7 @@ test('REFUSED at shipped defaults: a file a step names through a folder a harnes
     fs.mkdirSync(path.dirname(path.join(run.repo, file)), { recursive: true });
     fs.writeFileSync(path.join(run.repo, file), `# ${file}\n`);
   }
-  gitIn(run.repo, 'add', '-A');
-  gitIn(run.repo, 'commit', '-q', '-m', 'the step, with a skill of its own');
+  world().commit(run.repo, 'the step, with a skill of its own');
   const named = ['.claude/skills/x/SKILL.md', 'notes/x.md'];
   b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
 
@@ -4980,171 +4509,9 @@ test('REFUSED at shipped defaults: a file a step names through a folder a harnes
   );
   assert.equal(fs.readFileSync(path.join(files, 'notes', 'x.md'), 'utf8'), '# notes/x.md\n', 'a file anywhere else is handed over');
   assert.ok(!fs.existsSync(path.join(files, '.claude')), 'nothing under the configuration folder reaches the files directory');
-  assert.deepEqual(missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)), [
+  assert.deepEqual(missingArtifacts(stand().place, readRun(run.id), 'implement', declaring(named)), [
     { path: '.claude/skills/x/SKILL.md', why: 'configuration' },
   ]);
-});
-
-test("a file `artifacts` names from the workspace root is collected into the step's files directory when the step hands off, before its check is filed — again, only what changed, after a pass that died — and read from there; an absolute path in the directory is read where it is", async () => {
-  const run = await started(folder('check: npm test'));
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const files = artifactsDir(run, 'implement');
-  fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
-  fs.mkdirSync(path.join(run.repo, '.e2e'));
-  fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
-  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response\n');
-  fs.writeFileSync(path.join(files, 'trace.zip'), 'zip');
-  const named = ['RESPONSE.md', './.e2e/shot.png', path.join(files, 'trace.zip')];
-  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
-
-  const diesFilingTheCheck = {
-    ...b.e,
-    file: (spec: Parameters<typeof b.e.file>[0]) => (spec.id?.endsWith('-check') ? Effect.die(new Error('the pass died')) : b.e.file(spec)),
-  } as typeof b.e;
-  await assert.rejects(runWith(diesFilingTheCheck, advanceRun(readRun(run.id))), /the pass died/);
-  assert.equal(
-    fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'),
-    '# response\n',
-    'a file for the branch, collected by the pass that handed off and died filing the check',
-  );
-  assert.equal(fs.readFileSync(path.join(files, '.e2e', 'shot.png'), 'utf8'), 'png', 'a file git ignores, which never reaches the branch');
-
-  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response, amended\n');
-  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(
-    [pass.checked, pass.notes],
-    [['implement'], [`implement: collected RESPONSE.md into ${files}`]],
-    'the next pass collects again, only what changed since, and files the check',
-  );
-  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
-  assert.equal(fs.readFileSync(path.join(files, 'trace.zip'), 'utf8'), 'zip', 'an absolute path in the directory, where it is');
-  assert.deepEqual(missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)), []);
-  assert.deepEqual(
-    artifactFiles(run, 'implement')
-      .map((f) => path.relative(files, f.path))
-      .sort(),
-    ['.e2e/shot.png', 'RESPONSE.md', 'trace.zip'],
-  );
-
-  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# rewritten while the check ran\n');
-  assert.deepEqual(
-    (await runWith(b.e, advanceRun(readRun(run.id)))).notes,
-    [],
-    "once its check is filed, the workspace is the check's: nothing more is collected",
-  );
-  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
-});
-
-test('REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — the closeout that names them is not accepted, and `nemia decide` names each', async (t) => {
-  const run = await started(folder());
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const secret = path.join(path.dirname(run.repo), `secret-${run.id}.txt`);
-  fs.writeFileSync(secret, "not a step's to name\n");
-  fs.mkdirSync(path.join(run.repo, 'shots'));
-  fs.writeFileSync(path.join(run.repo, 'shots', 'a.png'), 'png');
-  fs.symlinkSync(secret, path.join(run.repo, 'leak.txt'));
-  const climbs = `../${path.basename(secret)}`;
-  b.settle(`${run.id}-implement`, 'succeeded', declaring([climbs, 'never-written.md', 'shots', 'leak.txt']));
-
-  const spies = [
-    'existsSync',
-    'statSync',
-    'lstatSync',
-    'realpathSync',
-    'readFileSync',
-    'openSync',
-    'accessSync',
-    'readdirSync',
-    'copyFileSync',
-    'cpSync',
-  ].map((method) => t.mock.method(fs, method as 'statSync'));
-  const looked = () =>
-    spies
-      .flatMap((spy) => spy.mock.calls.flatMap((call) => call.arguments.slice(0, 2).filter((a) => typeof a === 'string')))
-      .filter((p) => path.resolve(p) === secret);
-  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-  const named = [climbs, 'never-written.md', 'shots', 'leak.txt'];
-  assert.deepEqual(
-    [pass.filed, pass.tried, pass.notes],
-    [
-      [],
-      ['implement'],
-      [
-        `implement: its closeout named ${named.join(', ')}, which the run does not have — not accepted`,
-        'implement: try 2 — a nudge to sign off, once a round',
-      ],
-    ],
-    'nothing collected, review not filed, and the step asked again',
-  );
-  assert.deepEqual(artifactFiles(run, 'implement'), []);
-  assert.deepEqual(looked(), [], 'the file outside the workspace is neither opened, stat-ed nor resolved by the tick');
-
-  b.settle(`${run.id}-implement-try2`, 'succeeded', declaring(named));
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).tried, [], 'once a round: it waits on a person');
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    out.push(args.map(String).join(' '));
-  });
-  const { main } = await import('../src/cli/main.ts');
-  try {
-    await main(['decide', run.id], b.e);
-  } finally {
-    log.mock.restore();
-  }
-  const lines = out.join('\n').split('\n');
-  const at = lines.indexOf("    implement's closeout named files the run does not have:");
-  assert.ok(at >= 0, lines.join('\n'));
-  assert.deepEqual(lines.slice(at + 1, at + 6), [
-    `      - \`${climbs}\`: it leads out of the workspace, so it was not read.`,
-    '      - `never-written.md`: nothing is at that path in the workspace.',
-    '      - `shots`: it is a directory, and a closeout names each file.',
-    '      - `leak.txt`: it leads out of the workspace, so it was not read.',
-    `      it writes each where its brief says, or takes the name off: nemia retry ${run.id} implement`,
-  ]);
-  assert.deepEqual(looked(), [], 'nor by nemia decide');
-});
-
-test('REFUSED at shipped defaults: a copy is never written through a link a step made in its files directory — on the way to it, or in its place — what the link leads to is left as it was, and `nemia decide` names the file not collected, though it is on the branch', async () => {
-  const run = await started(folder('check: npm test'));
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const files = artifactsDir(run, 'implement');
-  const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
-  fs.writeFileSync(path.join(elsewhere, 'shot.png'), 'what was there');
-  fs.writeFileSync(path.join(elsewhere, 'report.md'), 'what was there');
-  fs.symlinkSync(elsewhere, path.join(files, 'shots'));
-  fs.symlinkSync(path.join(elsewhere, 'report.md'), path.join(files, 'report.md'));
-  fs.mkdirSync(path.join(run.repo, 'shots'));
-  fs.writeFileSync(path.join(run.repo, 'shots', 'shot.png'), 'png');
-  fs.writeFileSync(path.join(run.repo, 'report.md'), '# report\n');
-  const named = ['shots/shot.png', 'report.md'];
-  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
-
-  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual([pass.checked, pass.notes], [['implement'], []], 'its check filed, and nothing collected');
-  assert.deepEqual(
-    Object.fromEntries(fs.readdirSync(elsewhere).map((f) => [f, fs.readFileSync(path.join(elsewhere, f), 'utf8')])),
-    {
-      'report.md': 'what was there',
-      'shot.png': 'what was there',
-    },
-    'the links the step made in its files directory are never written through',
-  );
-  assert.equal(
-    execFileSync('git', ['cat-file', '-t', `${run.branch}:report.md`], { cwd: run.repo, encoding: 'utf8' }).trim(),
-    'blob',
-    'handed off, the files are on the branch',
-  );
-  assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)),
-    [
-      { path: 'shots/shot.png', why: 'not collected' },
-      { path: 'report.md', why: 'not collected' },
-    ],
-    "the run reads a step's files from its directory, and says what it did not collect",
-  );
 });
 
 test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async (t) => {
@@ -5154,7 +4521,6 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
   t.mock.method(console, 'log', () => {});
-  const { main } = await import('../src/cli/main.ts');
   await main(['retry', run.id, 'implement'], b.e);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -5187,7 +4553,6 @@ test('REFUSED before, now honoured at shipped defaults: `nemia retry` on a step 
   b.settle(taskId, 'needs-human' as TaskPhase);
   const e = recordingStops(b);
   t.mock.method(console, 'log', () => {});
-  const { main } = await import('../src/cli/main.ts');
   await main(['retry', run.id, 'implement'], e);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -5250,7 +4615,6 @@ test("`nemia start <card>.md` starts the card's body — its id from the body, i
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   const startedBy = async (...argv: string[]) => {
     printed.length = 0;
     await main(['start', ...argv], b.e);
@@ -5302,85 +4666,6 @@ test("`nemia start <card>.md` starts the card's body — its id from the body, i
     (await startedBy(brief, '--repo', repo, '--workflows', dev)).brief,
     '---\nA brief that opens with a rule.',
     'and so is one that opens with a rule and never closes it',
-  );
-});
-
-test('REFUSED before, now read as it was: a run from before collection — its step past hand-off, its worktree still there, its files on the branch and none in its files directory — has nothing missing, and no pass collects it; a file on no branch still reads not collected', async () => {
-  const run = await started(folder('check: npm test'));
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const files = artifactsDir(run, 'implement');
-  fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
-  fs.mkdirSync(path.join(run.repo, '.e2e'));
-  fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
-  fs.mkdirSync(path.join(run.repo, 'docs'));
-  fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
-  gitIn(run.repo, 'add', '-A');
-  gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
-  const record = readRun(run.id);
-  record.steps.implement = { ...record.steps.implement, check: { taskId: `${run.id}-implement-check` } };
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
-  b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md', '.e2e/shot.png']));
-  fs.rmSync(files, { recursive: true, force: true });
-
-  assert.equal(
-    execFileSync('git', ['cat-file', '-t', `${run.branch}:docs/RESPONSE.md`], { cwd: run.repo, encoding: 'utf8' }).trim(),
-    'blob',
-    'as a run from before collection left it: its files on the branch, its check filed, and nothing in its files directory',
-  );
-  assert.ok(fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'the worktree is still there');
-  assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
-    [{ path: '.e2e/shot.png', why: 'not collected' }],
-    'the branch has RESPONSE.md; a file git ignores is on no branch',
-  );
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).notes, [], 'past hand-off, so no pass collects it');
-  assert.deepEqual(artifactFiles(run, 'implement'), [], 'the branch is where the run reads it');
-});
-
-test("`nemia decide` of a run whose declared file is only on its branch says nothing is missing — the place says the branch has it — and, where the place's report is not heard, that whether it has it is not known, never that it is not there", async (t) => {
-  const run = await started(folder());
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  fs.mkdirSync(path.join(run.repo, 'docs'));
-  fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
-  gitIn(run.repo, 'add', '-A');
-  gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
-  b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md']));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  fs.rmSync(path.join(run.repo, 'docs'), { recursive: true });
-  fs.rmSync(artifactsDir(run, 'implement'), { recursive: true, force: true });
-  b.settle(`${run.id}-review`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'a person' });
-  const { main } = await import('../src/cli/main.ts');
-  const flagged = async (): Promise<string[]> => {
-    const out: string[] = [];
-    const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-      out.push(args.map(String).join(' '));
-    });
-    try {
-      await main(['decide', run.id], b.e);
-    } finally {
-      log.mock.restore();
-    }
-    const lines = out.join('\n').split('\n');
-    return lines.slice(lines.indexOf('  implement')).filter((l) => l.startsWith('    !! '));
-  };
-
-  assert.ok(!fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'nowhere but on the branch');
-  assert.deepEqual(await flagged(), [], 'the place says the branch has it: it is there');
-
-  const before = process.env.PATH;
-  process.env.PATH = scratch('wf-artifacts-no-git-');
-  let unheard: string[];
-  try {
-    unheard = await flagged();
-  } finally {
-    process.env.PATH = before;
-  }
-  assert.equal(unheard.length, 1, unheard.join('\n'));
-  assert.match(
-    unheard[0],
-    /^ {4}!! declared and not collected, and whether its branch has it is not known: docs\/RESPONSE\.md {2}— the place's report was not heard: /,
   );
 });
 
@@ -5557,7 +4842,6 @@ test('a step blocked under its cap takes a `--budget` above it at shipped defaul
 });
 
 test("REFUSED past a budget in a loop at shipped defaults: review's `again: true` files no round while implement is over its budget — `nemia round` is refused without `--budget`, and with one files the round, the cap on implement's record", async (t) => {
-  const { main } = await import('../src/cli/main.ts');
   const run = await started(looped('', 'budget: 3\n'));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -5628,7 +4912,6 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
 });
 
 test('REFUSED by the CLI before a run is read: `nemia retry --budget` with no amount, a word, 0, a unit, twice, or with --recheck — and `--budget=<amount>` is read', async () => {
-  const { main } = await import('../src/cli/main.ts');
   const { e } = board();
   const cases: Array<[string[], RegExp | string]> = [
     [
@@ -5692,12 +4975,13 @@ test('a nudge past a budget is told why its last try ended on its own work — h
   assert.doesNotMatch(brief, /The last try ended `over budget`/);
 });
 
-const worktreesOf = (repo: string) =>
-  gitIn(repo, 'worktree', 'list', '--porcelain')
-    .split('\n')
-    .filter((l) => l.startsWith('worktree '))
-    .map((l) => l.slice('worktree '.length));
-const hasBranch = (repo: string, branch: string) => gitIn(repo, 'branch', '--list', branch) !== '';
+/** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
+const worktreesOf = (repo: string): string[] => {
+  const outcome = stand().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), prefix: 'wf/', base: 'main' });
+  assert.ok('answer' in outcome, `the inventory of ${repo} was expected, not ${JSON.stringify(outcome)}`);
+  return outcome.answer.workspaces.map((w) => w.path);
+};
+const hasBranch = (repo: string, branch: string) => world().tip(repo, branch) !== null;
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 /** `nemia rm`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
@@ -5705,7 +4989,6 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
     printed.push(a.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   try {
     await main(['rm', ...args], e);
     return { printed, error: undefined };
@@ -5793,50 +5076,6 @@ test('REFUSED at shipped defaults: a check a pass filed and died before writing 
   assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
 });
 
-test("REFUSED at shipped defaults: a locked worktree — git will not remove it, and neither does `nemia rm`: the run is held, its record, files and branch kept, exit 2, with the command that unlocks it; unlocked, `nemia rm` again finishes. A directory in the run's own that git does not know is held the same way", async (t) => {
-  const repo = aRepo();
-  const b = board();
-  const locked = await aParent(repo, b, { work: 'locked.txt' });
-  gitIn(repo, 'worktree', 'lock', '--reason', 'a person holds it', locked.wt);
-  markCancelled(locked.run.id);
-
-  const held = await rmTyped(t, b.e, locked.run.id);
-  assert.deepEqual(
-    [held.error?.exitCode, held.error?.message],
-    [2, `nemia rm: ${locked.run.id} not forgotten — its line above says why, and what to do.`],
-  );
-  assert.deepEqual(held.printed, [
-    `${locked.run.id}  not forgotten: ${locked.wt} is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: nemia rm ${locked.run.id} again then.`,
-  ]);
-  assert.ok(fs.existsSync(path.join(locked.wt, 'locked.txt')) && worktreesOf(repo).includes(locked.wt));
-  assert.ok(readRun(locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
-
-  gitIn(repo, 'worktree', 'unlock', locked.wt);
-  assert.equal((await runWith(b.e, forgetRun(locked.run.id))).kind, 'forgotten');
-  assert.ok(!worktreesOf(repo).includes(locked.wt) && !under('runs', `${locked.run.id}.cancelled`) && hasBranch(repo, locked.branch));
-
-  const stray = await aParent(repo, b, { work: 'stray.txt' });
-  const odd = path.join(ROOT, 'worktrees', stray.run.id, 'notes');
-  fs.mkdirSync(odd);
-  fs.writeFileSync(path.join(odd, 'mine.txt'), 'mine\n');
-  const f = await runWith(b.e, forgetRun(stray.run.id));
-  assert.equal(
-    forgetLineOf(f),
-    `${stray.run.id}  not forgotten: ${odd} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: nemia rm ${stray.run.id} again then.`,
-  );
-  assert.ok(
-    fs.existsSync(path.join(odd, 'mine.txt')) && under('runs', `${stray.run.id}.json`),
-    "something in the run's directory that git does not list is never deleted behind git's back",
-  );
-  fs.rmSync(odd, { recursive: true });
-  const finished = await runWith(b.e, forgetRun(stray.run.id));
-  assert.deepEqual(
-    [finished.kind, finished.removed, finished.gone],
-    ['forgotten', [], [stray.wt]],
-    'its worktree was already gone, and that is normal',
-  );
-});
-
 test("REFUSED at shipped defaults: `nemia rm --delete-branches` never deletes a branch its hand-off just committed onto — the inventory read it merged, at its base, before the step's work was committed there — and says it kept it, not merged", async () => {
   const repo = aRepo();
   const b = board();
@@ -5849,7 +5088,7 @@ test("REFUSED at shipped defaults: `nemia rm --delete-branches` never deletes a 
     [p.branch],
   );
   assert.ok(hasBranch(repo, p.branch), 'the branch with the work the hand-off committed is kept');
-  assert.equal(gitIn(repo, 'show', '--name-only', '--format=', p.branch), 'left.txt');
+  assert.equal(world().changed(repo, p.branch).join('\n'), 'left.txt');
   assert.match(forgetLineOf(forgot), new RegExp(`kept ${escaped(p.branch)}: not merged into ${escaped(p.run.branch)}`));
 });
 
@@ -5857,7 +5096,7 @@ test("`nemia rm --delete-branches` deletes a branch merged into its run's base a
   const repo = aRepo();
   const b = board();
   const merged = await aParent(repo, b, { work: 'merged.txt' });
-  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge it', merged.branch);
+  mergedByHand(repo, merged.branch, 'Merge it');
   const unmerged = await aParent(repo, b, { work: 'unmerged.txt' });
   const forced = await aParent(repo, b, { work: 'forced.txt' });
   const base = merged.run.branch;
@@ -5887,7 +5126,10 @@ test("`nemia rm --delete-branches` deletes a branch merged into its run's base a
   assert.deepEqual(three.printed, [
     `${direct.id}  forgotten: no worktrees, it worked in ${repo} itself; removed runs/${direct.id}.json, runs/${direct.id}/; no branch of its own${FORGOT_ONE}`,
   ]);
-  assert.ok(hasBranch(repo, base) && fs.existsSync(path.join(repo, '.git')), 'the base branch and the repository are where they were');
+  assert.ok(
+    hasBranch(repo, base) && world().head(repo) === world().tip(repo, base),
+    'the base branch and the repository are where they were',
+  );
 
   const kept = await aParent(repo, b, { work: 'kept.txt' });
   const refused = async (args: string[], pattern: RegExp) => {
@@ -6020,63 +5262,6 @@ test('a run whose tasks the engine no longer knows is forgotten; so is a record 
   assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
 });
 
-/**
- * A pass held inside `npm ci`, after it has cut its first step's worktree and before it files the step: a main checkout with a lockfile its
- * worktree does not have, and an `npm` first on PATH that waits to be let go. `release` lets it go, and answers with what the pass did.
- */
-const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: string) => {
-  const repo = aRepo();
-  fs.writeFileSync(path.join(repo, 'package-lock.json'), '{}\n');
-  const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
-  const started = path.join(bin, 'started');
-  const let_go = path.join(bin, 'release');
-  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\n: > '${started}'\nwhile [ ! -e '${let_go}' ]; do sleep 0.02; done\n`, {
-    mode: 0o755,
-  });
-  const PATH = process.env.PATH;
-  process.env.PATH = `${bin}${path.delimiter}${PATH}`;
-  t.after(() => {
-    process.env.PATH = PATH;
-    fs.writeFileSync(let_go, '');
-  });
-  const run = await runPlaced(startRun({ brief, repo, workflowDir: folder() }));
-  const pass = runWith(b.e, advanceRun(readRun(run.id)));
-  while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
-  const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
-  assert.ok(worktreesOf(repo).includes(wt), 'the pass has cut the worktree, and not filed the step');
-  return {
-    run,
-    repo,
-    wt,
-    release: () => {
-      fs.writeFileSync(let_go, '');
-      return pass;
-    },
-  };
-};
-
-test("REFUSED at shipped defaults: a pass that read a run before `nemia cancel` and is still cutting its step's worktree — `npm ci`, a minute — files nothing once the run is called off and forgotten under it: no session on the board, no record, no worktree made again", async (t) => {
-  const b = board();
-  const { run, release } = await heldInNpmCi(t, b, 'called off while it is cut');
-  assert.deepEqual((await runWith(b.e, cancelRun(run.id))).plan, { kind: 'cancel', stop: [] }, 'nothing in flight to stop');
-  assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
-  await release();
-
-  assert.deepEqual(b.filings, [], 'the step is not filed into a worktree that is gone');
-  assert.ok(!under('runs', `${run.id}.json`) && !under('runs', run.id) && !under('worktrees', run.id), 'nothing of the run made again');
-});
-
-test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `nemia cancel` lands files no session for it — the worktree it cut stays, and `nemia rm` then forgets the run, with nothing in flight", async (t) => {
-  const b = board();
-  const { run, wt, release } = await heldInNpmCi(t, b, 'cancelled while it is cut');
-  await runWith(b.e, cancelRun(run.id));
-  const pass = await release();
-  assert.deepEqual([pass.filed, b.filings, b.stopped], [[], [], []], 'nothing filed, so nothing to stop');
-  assert.equal(readRun(run.id).steps.implement.taskId, null);
-  const forgot = await runWith(b.e, forgetRun(run.id));
-  assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
-});
-
 test('REFUSED at shipped defaults: a step a pass filed and died before writing down, on a run then cancelled — `nemia rm` finds it on the engine, in flight, and says a tick stops it; the next tick does, and once it has settled the run is forgotten', async () => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'filed and never written down', repo: aRepo(), workflowDir: folder() }));
@@ -6096,44 +5281,8 @@ test('REFUSED at shipped defaults: a step a pass filed and died before writing d
   assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
 });
 
-test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-commit hook refusing a failed step's code — holds the run in the hook's own words with a safe way on, not git's --force; the work stays, staged. A hook that speaks on stdout alone is heard too, and once a person has committed it, `nemia rm` again forgets the run", async () => {
-  const repo = aRepo();
-  const b = board();
-  const p = await aParent(repo, b, { signed: true });
-  fs.writeFileSync(path.join(p.wt, 'flag.ts'), 'export const flag: any = 1;\n');
-  const hook = path.join(repo, '.git', 'hooks', 'pre-commit');
-  fs.writeFileSync(
-    hook,
-    '#!/bin/sh\necho "lint: flag.ts:1 unexpected any" >&2\necho "husky - pre-commit script failed (code 1)" >&2\nexit 1\n',
-    { mode: 0o755 },
-  );
-
-  const held = await runWith(b.e, forgetRun(p.run.id));
-  assert.equal(
-    forgetLineOf(held),
-    `${p.run.id}  not forgotten: ${p.wt} holds what implement left uncommitted, and the hand-off could not commit it — lint: flag.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${p.wt} commit), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
-  );
-  assert.equal(gitIn(p.wt, 'status', '--porcelain'), 'A  flag.ts', 'the work is where it was, staged');
-  assert.ok(worktreesOf(repo).includes(p.wt) && under('runs', `${p.run.id}.json`));
-
-  fs.writeFileSync(hook, '#!/bin/sh\necho "secret scan: a token in flag.ts"\nexit 1\n', { mode: 0o755 });
-  assert.equal(
-    (await runWith(b.e, forgetRun(p.run.id))).left[0].uncommitted,
-    'secret scan: a token in flag.ts',
-    'a hook that speaks on stdout alone: git hands it on as its own stderr',
-  );
-  fs.writeFileSync(hook, '#!/bin/sh\nexit 3\n', { mode: 0o755 });
-  assert.equal((await runWith(b.e, forgetRun(p.run.id))).left[0].uncommitted, 'it exited 1', "one that says nothing: git's exit status");
-
-  fs.rmSync(hook);
-  gitIn(p.wt, 'commit', '-q', '-m', 'the flag, committed by a person');
-  const forgot = await runWith(b.e, forgetRun(p.run.id));
-  assert.deepEqual([forgot.kind, forgot.handedOff], ['forgotten', []]);
-  assert.equal(gitIn(repo, 'log', '-1', '--format=%s', p.branch), 'the flag, committed by a person');
-});
-
 /** The package's place whose `inventory` is not heard, in `said`, as a place that cannot read its repository answers. */
-const placeUnread = (said: string) => PlaceTag.layer(placeOver(shippedGitPlace, { inventory: () => unreadBy('inventory', said) }));
+const placeUnread = (said: string) => PlaceTag.layer(placeOver(stand().place, { inventory: () => unreadBy('inventory', said) }));
 
 test("REFUSED at shipped defaults: a place whose inventory is not heard refuses `nemia rm` as not read, never as nothing to remove — its worktree with the step's work, its branch, its record and its cancellation are all still there, and no task is written down to forget", async () => {
   const repo = aRepo();
@@ -6150,46 +5299,10 @@ test("REFUSED at shipped defaults: a place whose inventory is not heard refuses 
     `its place's inventory of what it left in ${repo} was not heard — the inventory broke; nothing was touched, as nothing says what is there: nemia rm ${p.run.id} again once the place reads it`,
   );
   assert.ok(fs.existsSync(path.join(p.wt, 'uncommitted.txt')) && worktreesOf(repo).includes(p.wt), 'the worktree and its work stay');
-  assert.equal(gitIn(repo, 'branch', '--list', p.branch).replace(/^[*+ ]+/, ''), p.branch, 'the branch stays');
+  assert.ok(hasBranch(repo, p.branch), 'the branch stays');
   assert.ok(under('runs', `${p.run.id}.json`) && under('runs', `${p.run.id}.cancelled`), 'the record and its cancellation stay');
   assert.ok(!under('forgetting', `${p.run.id}.json`), 'no task written down to forget');
   assert.equal((await runWith(b.e, forgetRun(p.run.id))).kind, 'forgotten', 'the shipped place reads it, and the run is forgotten');
-});
-
-test('REFUSED at shipped defaults: a worktree on no branch — its session stopped with HEAD detached, a commit made there — is held and named with its commit, not removed with the commit on no branch; put on a branch, `nemia rm` again forgets the run and the branch keeps the commit. One detached, clean, at a commit on a branch loses nothing, and is removed', async () => {
-  const repo = aRepo();
-  const b = board();
-  const p = await aParent(repo, b, { work: 'first.txt' });
-  gitIn(p.wt, 'checkout', '-q', '--detach');
-  fs.writeFileSync(path.join(p.wt, 'rebased.txt'), 'rebased\n');
-  gitIn(p.wt, 'add', '-A');
-  gitIn(p.wt, 'commit', '-q', '-m', 'made on no branch');
-  const sha = gitIn(p.wt, 'rev-parse', 'HEAD');
-
-  const held = await runWith(b.e, forgetRun(p.run.id));
-  assert.equal(
-    forgetLineOf(held),
-    `${p.run.id}  not forgotten: ${p.wt} is on no branch — its HEAD is detached at ${sha.slice(0, 7)}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${p.wt} switch -c <branch>, or finish or abort what left it there), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
-  );
-  assert.ok(worktreesOf(repo).includes(p.wt) && gitIn(p.wt, 'rev-parse', 'HEAD') === sha, 'the worktree, and its commit, where they were');
-
-  gitIn(p.wt, 'checkout', '-q', '--detach', p.branch);
-  fs.writeFileSync(path.join(p.wt, 'more.txt'), 'more\n');
-  assert.deepEqual(
-    (await runWith(b.e, forgetRun(p.run.id))).left.map((l) => l.detached),
-    [gitIn(p.wt, 'rev-parse', 'HEAD')],
-    'uncommitted work beside it, at a commit that is on a branch: a hand-off would still commit onto no branch',
-  );
-  fs.rmSync(path.join(p.wt, 'more.txt'));
-  gitIn(p.wt, 'checkout', '-q', sha);
-  gitIn(p.wt, 'switch', '-q', '-c', 'keep-the-rebase');
-  assert.equal((await runWith(b.e, forgetRun(p.run.id))).kind, 'forgotten');
-  assert.equal(gitIn(repo, 'rev-parse', 'keep-the-rebase'), sha);
-
-  const q = await aParent(repo, b, { work: 'clean.txt' });
-  gitIn(q.wt, 'checkout', '-q', '--detach');
-  const forgot = await runWith(b.e, forgetRun(q.run.id));
-  assert.deepEqual([forgot.kind, forgot.removed, forgot.handedOff], ['forgotten', [q.wt], []]);
 });
 
 test("REFUSED at shipped defaults: `nemia rm` on a name that is a live run's id plus the suffix of one of its files — `<id>.json`, `<id>.cancelled`, `<id>.asks`, as `ls runs/` gives them — exit 2, saying the id to give; its record, cancellation and asks stay. Nor does a run with no record take a live run's check logs: `nemia rm <id>-implement` leaves `<id>-implement-check.stderr`, nor a run's whose record does not read", async (t) => {
@@ -6278,7 +5391,7 @@ test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before
   await pass;
 
   assert.ok(!under('runs', run.id), 'no files directory without a record');
-  assert.equal(gitIn(repo, 'status', '--porcelain'), '?? later.txt', "and nothing of a person's checkout committed under the step's name");
+  assert.equal(uncommitted(repo), 'later.txt', "and nothing of a person's checkout committed under the step's name");
 });
 
 test("`nemia rm`'s program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
@@ -6866,224 +5979,6 @@ test("the views' programs say in their types what they need and what they refuse
     v.Effect.runPromise(v.filingsRead()),
   ];
   assert.deepEqual([typed.length, infallible.length, cannotFail.length, typeof unprovided], [6, 1, 2, 'function']);
-});
-
-/**
- * `nemia decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and
- * `<root>`.
- */
-const whole = (t: TestContext, e: Engine, run: RepositoryRun): Promise<string[]> =>
-  decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
-
-test('the whole screen of a run from an inbox card, given a file, whose step its harness waits on and is told a word, and then denied a call', async (t) => {
-  const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.txt');
-  fs.writeFileSync(given, 'read me\n');
-  const run = repositoryRunOf(
-    await runPlaced(
-      startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(), isolate: false, from: { inbox: 'card-7' }, inputs: [given] }),
-    ),
-  );
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const taskId = `${run.id}-implement`;
-  b.tasks.get(taskId)!.phase = 'running';
-  b.waiting.set(taskId, 'a permission prompt: Bash(npm test)');
-  b.said.set(taskId, [{ at: '2026-09-14T16:01:00.000Z', attempt: 1, text: 'mind the lockfile' }]);
-  assert.deepEqual(await whole(t, b.e, run), [
-    '<id>  add a flag',
-    '  from inbox card card-7',
-    '  inputs  notes.txt  —  in <root>/runs/<id>/inputs',
-    '',
-    '  still running: implement',
-    '  implement: waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/<id>-implement/1',
-    '  nothing to decide yet',
-  ]);
-  b.denials.set(taskId, [{ tool: 'Bash', what: 'npm test' }]);
-  b.settle(taskId, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  b.settle(`${run.id}-review`, 'succeeded', SIGNED);
-  assert.deepEqual(await whole(t, b.e, run), [
-    '<id>  add a flag',
-    '  from inbox card card-7',
-    '  inputs  notes.txt  —  in <root>/runs/<id>/inputs',
-    '',
-    '  UNVERIFIED: implement, review  — no check: declared; only its own word says it worked',
-    '',
-    '  touched  master',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    harness  waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/<id>-implement/1',
-    '    denied: Bash(npm test)',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '    said to try 1, at 2026-09-14T16:01:00.000Z:',
-    '    ```text',
-    '    mind the lockfile',
-    '    ```',
-    '    did it',
-    '',
-    '  review',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued —  ran —  wall not known',
-    '',
-    '  master',
-    '',
-    '  worked directly on master; nothing to merge; the base was <base>',
-    '  read it    git -C <repo> diff <base>...master',
-  ]);
-});
-
-test('the whole screen of a step its harness ended at its budget', async (t) => {
-  const run = await started(folder());
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  b.settle(`${run.id}-implement`, 'failed', undefined, undefined, 'budget');
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(await whole(t, b.e, run), [
-    '<id>  add a flag',
-    '',
-    '  BUDGET EXHAUSTED, waiting on you: implement  — its harness ended its session at its budget:; nothing after it ran',
-    '',
-    '  once more, on the next tick:',
-    '    implement: budget exhausted. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-    '',
-    '  touched  master',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued —  ran —  wall not known',
-    '',
-  ]);
-});
-
-test('the whole screen of a step that says `denials: fail`, denied a call', async (t) => {
-  const run = await started(folder('denials: fail'));
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  b.denials.set(`${run.id}-implement`, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
-  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(await whole(t, b.e, run), [
-    '<id>  add a flag',
-    '',
-    '  DENIED, waiting on you: implement  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run',
-    '',
-    '  once more, on the next tick:',
-    "    implement: denied — its harness denied its try a call, and denials: fail passes none on. For a new run, add Edit(//tmp/w/notes.md) to the folder's allowedTools:, which allows it. This run's allowedTools: is frozen at nemia start, so a try of it is denied the same again. A new session, told to do without it:  nemia retry <id> implement --fresh  (or continue its session: nemia retry <id> implement)",
-    '',
-    '  touched  master',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    denied: Write(/tmp/w/notes.md)',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued —  ran —  wall not known',
-    '',
-  ]);
-});
-
-test('the whole screen of a step whose closeout does not read, never nudged', async (t) => {
-  const run = await started(folder());
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  b.stated.set(`${run.id}-implement`, true);
-  b.settle(`${run.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(await whole(t, b.e, run), [
-    '<id>  add a flag',
-    '',
-    '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
-    '',
-    '  once more, on the next tick:',
-    '    implement: unsigned. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-    '',
-    '  touched  master',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '    closeout unreadable — unparseable: Unexpected end of JSON input',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued —  ran —  wall not known',
-    '',
-  ]);
-});
-
-test('the whole screen of a run whose every step passed its check', async (t) => {
-  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
-  const run = await started(dir);
-  const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  b.logs.set(`${run.id}-implement-check`, '# pass 1\n');
-  b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(await whole(t, b.e, run), [
-    '<id>  add a flag',
-    '',
-    '  every step verified',
-    '',
-    '  touched  master',
-    '    nothing — the branch changed no file against the base',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    check  true  →  exit 0 ✓',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1        filed not known  settled before it spawned  used not measured',
-    '              try 1 check  filed not known  settled before it spawned',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued —  ran —  wall not known',
-    '',
-    '  master',
-    '',
-    '  worked directly on master; nothing to merge; the base was <base>',
-    '  read it    git -C <repo> diff <base>...master',
-  ]);
 });
 
 /** The start program, its face, and what a test of either reads. Imported at the call, as `WF_ROOT` is read when the store loads. */

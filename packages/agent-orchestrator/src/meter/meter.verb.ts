@@ -7,7 +7,7 @@ import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
-import { boundedAttributes, type StepFact, type Wait, type WaitFact } from './step.ts';
+import { boundedAttributes, type DeniedFact, type StepFact, type Wait, type WaitFact } from './step.ts';
 
 /**
  * The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a
@@ -168,10 +168,10 @@ export const GATE_BOUNDS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_20
 /**
  * The metrics of a step, each by the attributes of `stepAttributes` alone: what its settled sessions cost (`step.cost`, USD, where
  * measured), their tokens (`step.tokens.input`, `step.tokens.output`, where measured) and their time (`step.duration`, ms); the sessions
- * by how they ended (`step.tries`), the checks by their verdict (`step.checks`), the rounds granted and run out of (`step.rounds`), and
- * the calls a harness denied (`step.denied`); and the waits outside its sessions (`WaitFact`): a session's in the queue
- * (`step.queue.duration`), its check's run by verdict (`step.check.duration`), both over `WAIT_BOUNDS`, and a person's at its gate
- * (`step.gate.wait`, over `GATE_BOUNDS`), each in ms. Each counter only grows, so a collector reads it as one.
+ * by how they ended (`step.tries`), the checks by their verdict (`step.checks`) and the rounds granted and run out of (`step.rounds`);
+ * and the waits outside its sessions (`WaitFact`): a session's in the queue (`step.queue.duration`), its check's run by verdict
+ * (`step.check.duration`), both over `WAIT_BOUNDS`, and a person's at its gate (`step.gate.wait`, over `GATE_BOUNDS`), each in ms. Each
+ * counter only grows, so a collector reads it as one. A call a harness denied is none of them: it is a span (`DENIED_SPAN`).
  */
 export const STEP_METRICS = {
   cost: Metric.counter('step.cost', { description: "a step's settled sessions' cost, in USD", incremental: true }),
@@ -181,7 +181,6 @@ export const STEP_METRICS = {
   tries: Metric.counter('step.tries', { description: "a step's sessions settled, by outcome", incremental: true }),
   checks: Metric.counter('step.checks', { description: "a step's checks settled, by verdict", incremental: true }),
   rounds: Metric.counter('step.rounds', { description: "a loop's rounds granted or exhausted", incremental: true }),
-  denied: Metric.counter('step.denied', { description: "the calls a step's harness denied its sessions", incremental: true }),
   queue: Metric.histogram('step.queue.duration', {
     description: "a step's session's wait from its filing to its spawn, in ms",
     boundaries: WAIT_BOUNDS,
@@ -205,6 +204,37 @@ const WAIT_METRICS = { queue: STEP_METRICS.queue, check: STEP_METRICS.check, gat
 /** A time in ms since the epoch, as a span's clock reads it: ns. */
 const nanos = (at: string): bigint => BigInt(Date.parse(at)) * 1_000_000n;
 
+/** The span each call a harness denied a step's session is traced as, its name the one a dashboard counts. */
+export const DENIED_SPAN = 'step.denied';
+
+/**
+ * The keys a denied call's span carries beside its step's four labels: its run, its session's task, the tool denied and the call as a
+ * permission rule names it, none of which a metric is kept by.
+ */
+export const DENIED_SPAN_KEYS = ['run', 'task', 'tool', 'call'] as const satisfies ReadonlyArray<keyof DeniedFact>;
+
+/**
+ * A span named `name` from `from` to `to`, a root of its own trace, carrying `own` and then `attributes`, refused if one of those is not a
+ * step's (`boundedAttributes`): what it says spans passes or belongs to none, so no pass's span is its parent.
+ */
+const rootSpan = (name: string, from: string, to: string, own: Record<string, string | number>, attributes: Record<string, string>) =>
+  Effect.gen(function* () {
+    const bounded = boundedAttributes(attributes);
+    const tracer = yield* Effect.tracer;
+    const span = tracer.span({
+      name,
+      parent: Option.none(),
+      annotations: Context.empty(),
+      links: [],
+      startTime: nanos(from),
+      kind: 'internal',
+      root: true,
+      sampled: true,
+    });
+    for (const [key, value] of Object.entries({ ...own, ...bounded })) span.attribute(key, value);
+    span.end(nanos(to), Exit.void);
+  });
+
 /**
  * One wait into its histogram (`WAIT_METRICS`), by its step's attributes alone, and into a span of its own (`WAIT_SPANS`) from when it
  * began to when it ended, a root of its own trace, carrying its run and its try (`WAIT_SPAN_KEYS`) beside those attributes: a wait spans
@@ -213,30 +243,29 @@ const nanos = (at: string): bigint => BigInt(Date.parse(at)) * 1_000_000n;
 const recordWait = (fact: WaitFact): Effect.Effect<void> =>
   Effect.gen(function* () {
     yield* into(WAIT_METRICS[fact.wait], fact.attributes, fact.ms);
-    const tracer = yield* Effect.tracer;
-    const span = tracer.span({
-      name: WAIT_SPANS[fact.wait],
-      parent: Option.none(),
-      annotations: Context.empty(),
-      links: [],
-      startTime: nanos(fact.from),
-      kind: 'internal',
-      root: true,
-      sampled: true,
-    });
-    for (const key of WAIT_SPAN_KEYS) span.attribute(key, fact[key]);
-    for (const [key, value] of Object.entries(fact.attributes)) span.attribute(key, value);
-    span.end(nanos(fact.to), Exit.void);
+    const own = Object.fromEntries(WAIT_SPAN_KEYS.map((key) => [key, fact[key]]));
+    yield* rootSpan(WAIT_SPANS[fact.wait], fact.from, fact.to, own, fact.attributes);
   });
+
+/**
+ * One denied call into a span of its own (`DENIED_SPAN`), a root of its own trace, at the moment its attempt ended, carrying its run, its
+ * task, its tool and its call (`DENIED_SPAN_KEYS`) beside its step's labels; into no metric, which could carry none of the four.
+ */
+const recordDenied = (fact: DeniedFact): Effect.Effect<void> =>
+  rootSpan(DENIED_SPAN, fact.at, fact.at, Object.fromEntries(DENIED_SPAN_KEYS.map((key) => [key, fact[key]])), fact.attributes);
 
 /** `value` into `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
 const into = <In, Out>(metric: Metric.Metric<In, Out>, attributes: Record<string, string>, value: In) =>
   Metric.update(Metric.withAttributes(metric, boundedAttributes(attributes)), value);
 
-/** One fact into the metrics: a session's tally, cost, tokens, time and denials; a check's or a round's count; a wait (`recordWait`). */
+/**
+ * One fact into the metrics: a session's tally, cost, tokens and time; a check's or a round's count; a wait (`recordWait`); a denied call,
+ * into its span alone (`recordDenied`).
+ */
 function recordFact(fact: StepFact): Effect.Effect<void> {
   const { attributes } = fact;
   if (fact.metric === 'wait') return recordWait(fact);
+  if (fact.metric === 'denied') return recordDenied(fact);
   if (fact.metric !== 'try') return into(fact.metric === 'check' ? STEP_METRICS.checks : STEP_METRICS.rounds, attributes, 1);
   return Effect.all(
     [
@@ -245,13 +274,12 @@ function recordFact(fact: StepFact): Effect.Effect<void> {
       ...(fact.costUsd !== undefined ? [into(STEP_METRICS.cost, attributes, fact.costUsd)] : []),
       ...(fact.inputTokens !== undefined ? [into(STEP_METRICS.input, attributes, fact.inputTokens)] : []),
       ...(fact.outputTokens !== undefined ? [into(STEP_METRICS.output, attributes, fact.outputTokens)] : []),
-      ...(fact.denied ? [into(STEP_METRICS.denied, attributes, fact.denied)] : []),
     ],
     { discard: true },
   );
 }
 
-/** The facts a pass read of its runs' steps, each recorded once into the step's metrics (`STEP_METRICS`). */
+/** The facts a pass read of its runs' steps, each recorded once: into the step's metrics (`STEP_METRICS`), a denied call into its span. */
 export const recordStepMetrics = Effect.fn('recordStepMetrics')(function* (facts: readonly StepFact[]) {
   for (const fact of facts) yield* recordFact(fact);
 });

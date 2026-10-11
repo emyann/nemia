@@ -1,7 +1,7 @@
 {
   "uid": "nemia-steps",
   "title": "Steps",
-  "description": "Each step's tokens and denied calls, from what the daemon records when a step settles; where its time goes is on Time.",
+  "description": "Each step's tokens from what the daemon records when a step settles, and the calls its sessions were denied, their tool errors and their failed skill loads, for one run's session and across runs; where its time goes is on Time.",
   "tags": [
     "nemia"
   ],
@@ -136,6 +136,48 @@
         },
         "sort": 1,
         "hide": 0
+      },
+      {
+        "name": "run",
+        "label": "Run",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "tempo"
+        },
+        "query": {
+          "type": 1,
+          "label": "run",
+          "refId": "TempoDatasourceVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0,
+        "description": "The run One run's session reads."
+      },
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "tempo"
+        },
+        "query": {
+          "type": 1,
+          "label": "task",
+          "refId": "TempoDatasourceVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0,
+        "description": "One session of the run, by the runtime's task: a try, or a round.",
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
       }
     ]
   },
@@ -158,16 +200,16 @@
     {
       "id": 1,
       "type": "text",
-      "title": "Where a step's time goes",
+      "title": "What this page reads",
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 3
+        "h": 7
       },
       "options": {
         "mode": "markdown",
-        "content": "Where a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
+        "content": "**Denied calls** are the daemon's own `step.denied` spans, in Tempo: one for each call a harness denied a session, counted when its attempt ends, whatever the try came to, with its `tool` and its `call` as a permission rule names it (`Skill(look)`, `Bash(git push)`): the count a run's page shows. A run started before the daemon counted them has none. **Tool errors** are the sessions' own `tool_result` events with `success=\"false\"`, in Loki, by `tool_name`: a command that exited non-zero, a file that is not there, a pattern refused. **Failed skill loads** are those of the `Skill` tool: a skill that was called and whose loading failed, its name in `tool_parameters` where the event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports nothing, and is **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.\n\n**One run's session** reads the `Run` and `Session` picked above; **Across runs** the factory, workflow, step and agent. Errors and skill loads are counted for sessions that export telemetry alone: a Claude Code step of a daemon given an endpoint, never a Codex step. Tempo answers 7 days back at most.\n\nWhere a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
       }
     },
     {
@@ -181,7 +223,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 3,
+        "y": 7,
         "w": 12,
         "h": 9
       },
@@ -241,7 +283,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 3,
+        "y": 7,
         "w": 12,
         "h": 9
       },
@@ -301,8 +343,8 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 12,
-        "w": 12,
+        "y": 16,
+        "w": 24,
         "h": 8
       },
       "targets": [
@@ -352,31 +394,45 @@
       }
     },
     {
-      "id": 5,
+      "id": 6,
+      "type": "row",
+      "title": "One run's session",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
       "type": "bargauge",
       "title": "Denied calls",
-      "description": "step.denied: the calls a step's harness denied.",
+      "description": "The step.denied spans over the range: each call a harness denied, counted once its attempt ended. By call, for the run and session picked.",
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "tempo",
+        "uid": "tempo"
       },
       "gridPos": {
-        "x": 12,
-        "y": 12,
-        "w": 12,
-        "h": 8
+        "x": 0,
+        "y": 25,
+        "w": 8,
+        "h": 9
       },
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "tempo",
+            "uid": "tempo"
           },
           "refId": "A",
-          "expr": "sum by (factory, workflow, step, agent) (increase(step_denied_total{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range]))",
-          "legendFormat": "{{workflow}} / {{step}} · {{agent}}",
-          "instant": true,
-          "range": false
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"step.denied\" && span.run=\"$run\" && span.task=~\"$session\"} | count_over_time() by (span.tool, span.call)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
         }
       ],
       "fieldConfig": {
@@ -386,7 +442,8 @@
           "min": 0,
           "color": {
             "mode": "continuous-BlPu"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -395,10 +452,80 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "top",
+        "namePlacement": "left",
         "sizing": "manual",
-        "minVizHeight": 36,
-        "maxVizHeight": 36,
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^\\{span\\.call=\"(.*)\", span\\.tool=\"(.*)\"\\}$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Tool errors",
+      "description": "The sessions' tool_result events that failed over the range, by tool. For the run and session picked.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 25,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "expr": "sum by (step, tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | run=\"$run\" | task=~\"$session\" [$__range]))",
+          "legendFormat": "{{step}} · {{tool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -411,6 +538,326 @@
           "values": false
         }
       }
+    },
+    {
+      "id": 9,
+      "type": "bargauge",
+      "title": "Failed skill loads",
+      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A skill that is not there exports nothing. For the run and session picked.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 25,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "expr": "sum by (step, tool_parameters) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | run=\"$run\" | task=~\"$session\" [$__range]))",
+          "legendFormat": "{{step}} · {{tool_parameters}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Across runs",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Denied calls, across runs",
+      "description": "The step.denied spans over the range: each call a harness denied, counted once its attempt ended. By step, agent and tool.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 8,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"step.denied\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\"} | count_over_time() by (span.workflow, span.step, span.agent, span.tool)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^\\{span\\.agent=\"(.*)\", span\\.step=\"(.*)\", span\\.tool=\"(.*)\", span\\.workflow=\"(.*)\"\\}$",
+            "renamePattern": "$4 / $2 · $1 · $3"
+          }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Tool errors, across runs",
+      "description": "The sessions' tool_result events that failed over the range, by tool. By factory, workflow, step and agent.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 35,
+        "w": 8,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "expr": "sum by (factory, workflow, step, agent, tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" [$__range]))",
+          "legendFormat": "{{workflow}} / {{step}} · {{agent}} · {{tool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "bargauge",
+      "title": "Failed skill loads, across runs",
+      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A skill that is not there exports nothing. By step and agent.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 35,
+        "w": 8,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "expr": "sum by (workflow, step, agent, tool_parameters) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" [$__range]))",
+          "legendFormat": "{{workflow}} / {{step}} · {{agent}} · {{tool_parameters}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Denied calls, each",
+      "description": "The latest step.denied spans of these steps: which call, in which run.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"step.denied\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\"} | select(span.run, span.workflow, span.step, span.agent, span.tool, span.call)",
+          "limit": 50,
+          "spss": 50,
+          "tableType": "spans"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Trace Service": true,
+              "Trace Name": true,
+              "traceIdHidden": true,
+              "Name": true,
+              "Duration": true
+            },
+            "indexByName": {}
+          }
+        }
+      ]
     }
   ]
 }

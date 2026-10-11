@@ -166,6 +166,12 @@ type RunBase = {
    */
   gatesTimed?: Array<{ step: string; try: number }>;
   /**
+   * The sessions whose denied calls the tick has handed the metrics (`deniedCalls`), by task: how many of its attempts, from the first, are
+   * counted. Written by the pass that counts them, so a pass after a restart, which reads the same attempts, counts none again. `[]` on a
+   * run started with it; absent on a record written before it, whose denied calls are never counted.
+   */
+  deniedCounted?: Array<{ task: string; attempts: number }>;
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has

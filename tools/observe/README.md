@@ -87,8 +87,9 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 
 - **System** — every metric the daemon and the api export, from Prometheus: a pass's time, its phases and its journal reads; the runs in
   the store, the sessions queued and admitted, the oldest one's wait and the machine's load; the api's reads by route; each step's cost,
-  tokens, time, tries, checks, rounds and denied calls over the range, by factory, workflow, step and agent; the feed's readers, the
-  subscriptions and Nemia's keeper. Below them, **Profiles**: the CPU and the heap in use from Pyroscope, by stack, over the dashboard's
+  tokens, time, tries, checks and rounds over the range, by factory, workflow, step and agent; the feed's readers, the subscriptions and
+  Nemia's keeper. Its **Denied calls** is no metric: it counts the `step.denied` spans from Tempo, by step, agent and tool, as **Steps**
+  does. Below them, **Profiles**: the CPU and the heap in use from Pyroscope, by stack, over the dashboard's
   range and its `Service`, for a daemon started with the preload. A flame graph sums every pass in its range: read it beside **Passes**
   over the same range, which the links at the top keep.
 - **Passes** — a pass's time from the `pass` spans (TraceQL metrics), its phases from `pass.phase.duration` (the phases are not spans),
@@ -99,7 +100,23 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 - **A run** — pick a run: its filings (the runtime's `file` spans, one for each session a step filed), the runtime's appends to its
   journals with their task and kind, and its logs, by step. The orchestrator's `fileReady`, `fileTries`, `fileRounds` and `fileChecks`
   spans carry no run: they are a pass's phases, under its `advancePass`.
-- **Steps** — tokens and denied calls by step and agent. Its note links to **Time** for the steps and the range it shows.
+- **Steps** — tokens by step and agent, and what went wrong in a step's sessions, twice: for **one run's session** (pick a run, and a
+  session, `task`, as **Time** does) and **across runs** (by factory, workflow, step and agent). Its note says what each reads and
+  links to **Time** for the steps and the range it shows.
+  - **Denied calls** count the daemon's `step.denied` spans (TraceQL metrics, `count_over_time()`): one span for each call a harness
+    denied a session, made when its attempt ends, whatever its try came to, so the number is the one a run's page shows. For one run
+    by `tool` and `call`, the call as a permission rule names it (`Skill(md3-spec)`, `Bash(npm run md3)`); across runs by workflow,
+    step, agent and `tool`; and **Denied calls, each**, a table of the latest spans with their run and call. A span has no first sample
+    to lose, and what is counted is marked on the run's record, so a daemon started again counts none twice.
+  - **Tool errors** count the sessions' own `tool_result` events with `success="false"`, from Loki, by `tool_name`: a command that
+    exited non-zero, a file that is not there, a pattern the search refused.
+  - **Failed skill loads** are those errors of the `Skill` tool: a skill that was called and whose loading failed (measured: a skill
+    whose own shell command failed), by `tool_parameters`, which names the skill where the event carries its inputs
+    (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports no event and no span, and is **not measured**; a skill a
+    session was refused is a denied call, `Skill(<name>)`.
+  - Their limits: Tempo answers 7 days back at most; errors and skill loads are counted for sessions that export telemetry alone (a
+    Claude Code step of a daemon given an endpoint, never a Codex step); a run started before the daemon counted denied calls has
+    none, and the daemon must run the code that counts them.
 - **Time** — where a step's time goes. **One run's step**, from Tempo: pick a run (and a session, `task`), and its turns' time is the sum of
   their leaves — the model (`claude_code.llm_request`), each tool by name, Bash by its command's head — beside the turns' own length, with
   **Other** the turns' time no leaf covers, so the bars add up to the turns; the time waiting on a permission is shown as part of the
@@ -154,6 +171,19 @@ is counted once, as its Agent tool.
   span that began up to a day before it arrived (`live_store.wal`; its default, 2 minutes, left a turn of five minutes out though a
   search found it). A drill-down reaches 7 days back (`max_duration`).
 
+## Counting a session's errors
+
+Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
+
+- **A tool's error is counted from Loki, not Tempo.** The errored span, `claude_code.tool.execution` with `status=error`, carries no
+  `tool_name`; its parent `claude_code.tool` carries it and no error status. TraceQL's join of the two (`{… status=error} < {name=
+  "claude_code.tool"}`) answered for 68 of 174 errored spans, though each one's parent was in its trace, so it is no count. The
+  session's `tool_result` event carries `tool_name` and `success` itself: 176 over the same days.
+- **A failed skill load is a `tool_result` of `Skill` with `success="false"`**: 15, each a skill whose own shell command failed as it
+  loaded. A `Skill` call for a skill that is not there exported nothing: no `tool_decision`, no `tool_result`, no span.
+- **The harness's own `tool_decision` events (`decision="reject"`) are not what Denied calls counts**: it counts what the runtime
+  journals of a job's denials, the list a run's page shows.
+
 ## The names, as measured
 
 Read off a daemon exporting to this stack (2026-10-06), and a step's session (2026-10-07):
@@ -166,12 +196,17 @@ Read off a daemon exporting to this stack (2026-10-06), and a step's session (20
 - **Tempo**: the resource attribute `service.name`; the span attributes `run`, `step`, `task`, `kind` and `attempt`, as `span.run` and so
   on. An `append` made outside a filing (a session's end) carries its task and kind but no run. Two spans are named `tick`: the
   orchestrator's tick and the runtime engine's tick inside it, so a query on `name="tick"` mixes them. Read a pass from `pass`. A step's
-  waits are spans of their own, `step.queue`, `step.check` and `step.gate`, with `run`, `try` and the step's attributes. A session's
+  waits are spans of their own, `step.queue`, `step.check` and `step.gate`, with `run`, `try` and the step's attributes, and so is each
+  call a harness denied, `step.denied`, with `run`, `task`, `tool`, `call` and the step's `factory`, `workflow`, `step` and `agent`. A
+  session's
   spans carry `tool_name`, `full_command` (with `NEMIA_TOOL_DETAILS=1`), `bash_command_class`, `agent_id`, and the labels it was started
   with: `run`, `step`, `task`, `factory`, `workflow` and `agent`.
 - **Loki**: one stream label, `service_name`; the logs' annotations (`run`, `step`, `word`) and the collector's fields (`trace_id`,
   `span_id`, `severity_text`, `detected_level`) are structured metadata, filtered as `| run="…"`. The daemon exports what it logs at
-  `Info`.
+  `Info`. A step's session files its own events under `claude-code` (measured 2026-10-11, Claude Code 2.1.296): `event_name`
+  (`tool_result`, `tool_decision`, `skill_activated`…), and on a `tool_result` `success`, `tool_name`, `error_type` and, with
+  `NEMIA_TOOL_DETAILS=1`, `tool_parameters` and `error`, beside the labels it was started with (`run`, `step`, `task`, `factory`,
+  `workflow`, `agent`).
 - **Pyroscope**: one label of ours, `service_name`, the profiler's `appName`. The profile types: `wall:wall:nanoseconds:wall:nanoseconds`,
   `wall:samples:count:wall:nanoseconds`, `wall:cpu:nanoseconds:wall:nanoseconds` (the CPU time collected beside the wall samples),
   `memory:inuse_objects:count:inuse_space:bytes` and `memory:inuse_space:bytes:inuse_space:bytes`.

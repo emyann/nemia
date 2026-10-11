@@ -3148,16 +3148,22 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   (`settledFacts`, `src/meter/step.ts`): `step.cost` (USD, where measured), `step.tokens.input` and `step.tokens.output` (where
   measured), and `step.duration` (ms, over a minute to two hours) of a session that settled; `step.tries` by how the session ended
   (`done`, `blocked`, `failed`, `stopped`); `step.checks` by the check's verdict (`passed`, `refused`, `unfinished`); `step.rounds`,
-  `granted` on the pass that files a round and `exhausted` on the settle that leaves its loop out of rounds; `step.denied`, the calls the
-  session's harness denied. Each is kept by `factory`, `workflow` (the folder's name), `step`, `agent` (`none` for none) and `outcome`,
+  `granted` on the pass that files a round and `exhausted` on the settle that leaves its loop out of rounds. Each is kept by `factory`, `workflow` (the folder's name), `step`, `agent` (`none` for none) and `outcome`,
   and by nothing else: a fact that carries another key, a run's id or a task's, is refused (`boundedAttributes`). A run answered from the
   memo of runs at rest records nothing again, and a daemon restarted reads the feed from its end, so a settle is counted once, and one
   that happened while no daemon read the feed is not counted.
+- **A call a harness denied a session is a span, `step.denied`, and no metric** (`DENIED_SPAN`, `deniedCalls` in `src/meter/step.ts`): one
+  for each denial of each attempt that ended, a call denied twice being two, whatever the attempt's turn signed and whatever came of its
+  try, as `nemia stats` counts them. It is a root of its own trace, at the moment its attempt ended, and carries `run`, `task` (the
+  session's task in the runtime), `tool`, `call` (the call as a permission rule names it, `Skill(look)`: a command's own words leave for
+  the collector with it) and the step's `factory`, `workflow`, `step` and `agent`. What is counted is marked on the run record
+  (`deniedCounted`, each session's attempts from the first), by the pass that counts, before the span is made: a daemon restarted
+  counts none twice, one that dies between the two loses that pass's, and a run started before the mark existed counts none.
 - **Their names in Prometheus**, through an OTLP collector, measured on the side Grafana: `pass_duration_bucket` (`_count`, `_sum`),
   `pass_phase_duration_bucket`, `pass_journal_reads_bucket`; the gauges with `_ratio`, the unit `1` the exporter gives one with none
   (`store_runs_ratio`, `sessions_queued_ratio`, `sessions_admitted_ratio`, `admission_wait_ratio`, `machine_load_ratio`); the counters
   with `_total` (`step_cost_total`, `step_tokens_input_total`, `step_tokens_output_total`, `step_tries_total`, `step_checks_total`,
-  `step_rounds_total`, `step_denied_total`); and `step_duration_bucket`.
+  `step_rounds_total`); and `step_duration_bucket`.
 - **The system's series are kept as rollups**, so what the recent passes say outlives the ring (`src/series/`). Each pass also keeps among
   the recent its oldest queued session's wait since it was filed (`waitMs`), the machine's load (the one-minute load average over the
   cores), the checks it filed, by factory, workflow, step and agent, and the quota the daemon last read; the daemon asks each harness

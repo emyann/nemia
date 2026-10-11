@@ -41,7 +41,7 @@ const folder = <code className="font-mono text-xs">workflows/</code>;
  * nowhere — several repositories and none named, no such factory, a file that does not read — why, with the way out (`Unplaced`).
  */
 function WorkflowsPage() {
-  const address = Route.useSearch();
+  const address = pagePlaceOf(Route.useSearch());
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: factories } = useQuery(factoriesQuery);
   const navigate = useNavigate();

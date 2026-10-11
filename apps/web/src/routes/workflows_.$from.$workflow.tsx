@@ -63,7 +63,9 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
  */
 function WorkflowPage() {
   const { from, workflow: name } = Route.useParams();
-  const { build: building = false, ...address } = Route.useSearch();
+  const search = Route.useSearch();
+  const building = search.build ?? false;
+  const address = pagePlaceOf(search);
   const { data: factories } = useQuery(factoriesQuery);
   const where = listPlace(address, factories ?? []);
   if (where.kind === 'every') return <Everywhere from={from} name={name} address={address} building={building} factories={factories} />;

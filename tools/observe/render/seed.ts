@@ -219,6 +219,7 @@ const DAEMON: ServiceSeed = {
     bySteps('step.check.duration', 'histogram', [
       [IMPLEMENT, 'passed', 480_000],
       [IMPLEMENT, 'refused', 300_000],
+      [REVIEW, 'passed', 200_000],
     ]),
     bySteps('step.gate.wait', 'histogram', [
       [IMPLEMENT, 'done', 60_000],

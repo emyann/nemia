@@ -5,48 +5,65 @@ import { FactoryTags } from '../components/FactoryTag';
 import { FavoriteStar } from '../components/FavoriteStar';
 import { Markdown } from '../components/Markdown';
 import { NewWorkflow } from '../components/NewWorkflow';
-import { FromBadge, YoursFolder } from '../components/WorkflowParts';
-import { factoriesQuery, storeQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
-import { factorySearch, offeredIn, workflowFactories } from '../lib/factories';
+import { FromBadge, Unplaced, YoursFolder } from '../components/WorkflowParts';
+import { factoriesQuery, storeQuery, workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '../lib/api';
+import { listPlace, pagePlaceOf, workflowFactories } from '../lib/factories';
+import { loadWorkflowsIn } from '../lib/placed';
+
+const LINK = 'underline underline-offset-2';
+
+/** The way out of a factory's list: the Workflows page with no factory picked. */
+const everyFactory = (
+  <Link to="/workflows" search={{}} replace className={LINK}>
+    Show every factory&apos;s
+  </Link>
+);
 
 export const Route = createFileRoute('/workflows')({
-  validateSearch: factorySearch,
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(workflowsQuery),
-      context.queryClient.ensureQueryData(storeQuery),
-      context.queryClient.prefetchQuery(factoriesQuery),
-    ]),
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps }) => Promise.all([loadWorkflowsIn(context.queryClient, deps), context.queryClient.ensureQueryData(storeQuery)]),
   component: WorkflowsPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
-      Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
+      Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?{' '}
+      {everyFactory}.
     </p>
   ),
 });
 
-const where = <code className="font-mono text-xs">workflows/</code>;
+const folder = <code className="font-mono text-xs">workflows/</code>;
 
 /**
- * Every workflow the repository carries, then yours: a card each, linked to its page — and yours made on the board, the one just made
- * opened on its page in its builder. With a factory picked in the address, `?factory=<name>`, only those it offers (`offeredIn`); one that
- * is in none says so, and how to show every factory's.
+ * The workflows of the address's place (`listPlace`), a card each, linked to its page — and yours made on the board, the one just made
+ * opened on its page in its builder. With no factory picked, or the default one, every workflow the repository carries, then yours; with
+ * a factory picked, `?factory=<name>`, what the api lists in it on its repository, from the folders the api names; and where it lists
+ * nowhere — several repositories and none named, no such factory, a file that does not read — why, with the way out (`Unplaced`).
  */
 function WorkflowsPage() {
-  const { data: all } = useSuspenseQuery(workflowsQuery);
+  const address = pagePlaceOf(Route.useSearch());
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: factories } = useQuery(factoriesQuery);
-  const { factory } = Route.useSearch();
   const navigate = useNavigate();
-  const workflows = all.filter(offeredIn(factory, factories));
+  const where = listPlace(address, factories ?? []);
 
   return (
     <article className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-neutral-500">
-          A workflow is a folder of steps: this repository's under {where}, and yours under <YoursFolder />. Starting a run writes its
-          record and files nothing: the daemon — this api, or the command line's — files its steps. Each has its page; yours are built
-          there.
+          A workflow is a folder of steps:{' '}
+          {where.kind === 'every' ? (
+            <>
+              this repository&apos;s under {folder}, and yours under <YoursFolder />.
+            </>
+          ) : (
+            <>
+              here, those the factory <span className="font-mono">{where.kind === 'in' ? where.place.factory : where.factory}</span> offers
+              — its own, and those of yours, under <YoursFolder />, that it attaches.
+            </>
+          )}{' '}
+          Starting a run writes its record and files nothing: the daemon — this api, or the command line&apos;s — files its steps. Each has
+          its page; yours are built there.
         </p>
         <NewWorkflow
           folder={store.workflows}
@@ -55,37 +72,92 @@ function WorkflowsPage() {
           }
         />
       </div>
-      {workflows.length === 0 && all.length > 0 && (
-        <p data-filtered-out className="text-sm text-neutral-500">
-          No workflow is in the factory <span className="font-mono">{factory}</span>.{' '}
-          <Link to="/workflows" search={{}} replace className="underline underline-offset-2">
-            Show every factory&apos;s
+      {where.kind === 'every' && <Every address={address} />}
+      {where.kind === 'in' && <InFactory place={where.place} address={address} />}
+      <Unplaced
+        where={where}
+        back={everyFactory}
+        onRepo={(repo, name) => (
+          <Link to="/workflows" search={{ ...address, repo }} className={`font-mono ${LINK}`}>
+            {name}
           </Link>
-          .
-        </p>
-      )}
-      {workflows.map((workflow) => (
-        <WorkflowCard key={`${workflow.from}:${workflow.name}`} workflow={workflow} factory={factory} />
-      ))}
-      {all.length === 0 && (
-        <p className="text-sm text-neutral-500">
-          No workflows. Add a folder of steps under {where} in the repository —{' '}
-          <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under <YoursFolder />.
-        </p>
-      )}
+        )}
+      />
     </article>
   );
 }
 
 /**
- * A workflow's card, compact: its name, linked to its page, which holds the rest — its README, its graph, its steps and a start, and for
- * one of yours its builder; its star, which puts it under Favorites, shown for one that does not read too; where it is read from; the
- * factories it is in (`workflowFactories`), each linked to its floor — nothing while they are unread or for one in none; its step count
- * and its description; or, for one that does not read, a line saying so. Its page is reached in `factory`, the one the list is narrowed to.
+ * Every workflow read with no factory, each tagged with the factories it is in (`workflowFactories`), linked to their floors — nothing
+ * while they are unread or for one in none; or, with none at all, how one is added.
  */
-function WorkflowCard({ workflow, factory }: { workflow: WorkflowListing; factory: string | undefined }) {
-  const { name, from, description, steps, error } = workflow;
+function Every({ address }: { address: PagePlace }) {
+  const { data: all } = useSuspenseQuery(workflowsQuery);
   const { data: factories } = useQuery(factoriesQuery);
+  return (
+    <>
+      {all.map((workflow) => (
+        <WorkflowCard
+          key={`${workflow.from}:${workflow.name}`}
+          workflow={workflow}
+          address={address.factory ? { factory: address.factory } : {}}
+          tags={workflowFactories(workflow, factories ?? [])}
+        />
+      ))}
+      {all.length === 0 && (
+        <p className="text-sm text-neutral-500">
+          No workflows. Add a folder of steps under {folder} in the repository —{' '}
+          <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under <YoursFolder />.
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * The workflows the api lists in `place`, a factory on one of its repositories, each tagged with that factory alone and reached at
+ * `address`, the page's own; or, where the api lists none there, that no workflow is in the factory, and how to show every factory's.
+ */
+function InFactory({ place, address }: { place: Place; address: PagePlace }) {
+  const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
+  return (
+    <>
+      {listed.length === 0 && (
+        <p data-filtered-out className="text-sm text-neutral-500">
+          No workflow is in the factory <span className="font-mono">{place.factory}</span>. {everyFactory}.
+        </p>
+      )}
+      {listed.map((workflow) => (
+        <WorkflowCard
+          key={`${workflow.from}:${workflow.name}`}
+          workflow={workflow}
+          address={address}
+          tags={[place.factory]}
+          factory={place.factory}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * A workflow's card, compact: its name, linked to its page at `address`, which holds the rest — its README, its graph, its steps and a
+ * start, and for one of yours its builder; its star, which puts it under Favorites, shown for one that does not read too; where it is
+ * read from, in `factory` when the list is a named factory's; the factories in `tags`, each linked to its floor; its step count and its
+ * description; or, for one that does not read, a line saying so.
+ */
+function WorkflowCard({
+  workflow,
+  address,
+  tags,
+  factory,
+}: {
+  workflow: WorkflowListing;
+  address: PagePlace;
+  tags: readonly string[];
+  factory?: string;
+}) {
+  const { name, from, description, steps, error } = workflow;
   return (
     <section
       aria-label={`Workflow ${name}`}
@@ -97,15 +169,15 @@ function WorkflowCard({ workflow, factory }: { workflow: WorkflowListing; factor
           <RouteLink
             to="/workflows/$from/$workflow"
             params={{ from, workflow: name }}
-            search={factory ? { factory } : {}}
+            search={address}
             className="rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-100"
           >
             {name}
           </RouteLink>
         </h2>
         <FavoriteStar favorite={{ kind: 'workflow', from, workflow: name }} name={from === 'yours' ? `${name} (yours)` : name} />
-        <FromBadge from={from} />
-        <FactoryTags names={workflowFactories(workflow, factories ?? [])} linked />
+        <FromBadge from={from} factory={factory} />
+        <FactoryTags names={tags} linked />
         {!error && (
           <span className="text-xs text-neutral-500">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}

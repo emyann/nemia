@@ -128,13 +128,20 @@ export const placeQuery = (place?: Place | null): string =>
 
 /**
  * The workflows a factory offers on one of its repositories, read with its hires: each says what they leave `unfilled`, and each step the
- * agent `hired` into it. Keyed apart from `workflowsQuery`, which the builder drafts from: a builder never reads this one.
+ * agent `hired` into it. Keyed apart from `workflowsQuery`, which the builder drafts from: a builder never reads this one. Read by a
+ * factory's start, and by the Workflows page, a workflow's page and a step's bar reached in a factory (`workflowsInQuery`).
  */
 export const factoryWorkflowsQuery = (place: Place) =>
   queryOptions({
     queryKey: ['factory-workflows', place.factory, place.repo],
     queryFn: () => get(`/api/workflows${placeQuery(place)}`, Schema.mutable(Schema.Array(WorkflowListingSchema))),
   });
+
+/**
+ * The list of workflows read in `place`: `workflowsQuery` for none, `factoryWorkflowsQuery` in a factory on one of its repositories, each
+ * under its own key, so a page and a factory's start share one read.
+ */
+export const workflowsInQuery = (place: Place | null) => (place === null ? workflowsQuery : factoryWorkflowsQuery(place));
 
 /** Mirrors `RecentRun` in apps/api/src/step/step.ts: one of a step's newest runs, and whether the step was filed in it. */
 export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };

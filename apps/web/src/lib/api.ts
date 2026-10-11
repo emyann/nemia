@@ -32,6 +32,7 @@ export {
   startRun,
   stepQuery,
   workflowNameOf,
+  workflowsInQuery,
   workflowsQuery,
 } from './api/workflows.ts';
 export * from './api/builder.ts';

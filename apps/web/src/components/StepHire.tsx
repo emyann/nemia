@@ -84,6 +84,12 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
   );
 }
 
+/**
+ * Whose a workflow that is not yours is, read in the page's factory: the factory's in a named one, where its folder may be the factory's
+ * own, and this repository's with none.
+ */
+const whose = (page: Pick<WorkflowStepPage, 'factory'>): string => (page.factory === null ? "this repository's" : "the factory's");
+
 /** The agents beside the step's workflow, to pick one from, and Hire; or that there is none to pick. */
 function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: boolean; onHire: (agent: string) => void }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -91,7 +97,7 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
   if (agents.length === 0)
     return (
       <p data-hire-none className="text-xs text-neutral-500">
-        {page.from === 'yours' ? 'None of your agents reads' : "None of this repository's agents reads"}, so there is no agent to hire into
+        {page.from === 'yours' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into
         this step in {page.factory}.
       </p>
     );
@@ -145,7 +151,7 @@ function NewAgent({ page, where }: { page: WorkflowStepPage; where: 'page' | 'ro
   if (where === 'row') return null;
   return (
     <p data-new-agent-repo className="text-xs text-neutral-500">
-      A new agent for this repository's workflow is added through a card on the{' '}
+      A new agent for {whose(page)} workflow is added through a card on the{' '}
       <RouteLink to="/inbox" className={LINK}>
         Inbox
       </RouteLink>

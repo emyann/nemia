@@ -3,13 +3,15 @@
  * whole width and the bottom bar stays in view. It is as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge
  * or with the arrow keys on it, and the whole width of a narrow screen. Its Close button and Escape close it (`useBar`), and closing it
  * gives the focus back to what held it before. Beside Close, its Open button visits the page of what it shows, for everything that has one
- * (`barOpens`).
+ * (`barOpens`), read in the place the page under it is read in, the address's `factory` and `repo`.
  */
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
+import { useSearch } from '@tanstack/react-router';
 import { XIcon } from 'lucide-react';
 import { Button, LinkButton } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { BAR_MIN, BAR_STEP, barOpens, barValue, escapeDoes } from '@/lib/bar';
+import { pagePlaceOf } from '@/lib/factories';
 import { useBar, useBarWidth } from '@/lib/useBar';
 import { routeLink } from './routeLink';
 
@@ -125,7 +127,8 @@ export function FloatingBar({
   children: ReactNode;
 }) {
   const { open, close } = useBar();
-  const page = open ? barOpens(open) : null;
+  const place = pagePlaceOf(useSearch({ strict: false }));
+  const page = open ? barOpens(open, place) : null;
   const [width, setWidth, most] = useBarWidth();
   const narrow = useIsMobile();
   const bar = useRef<HTMLElement>(null);

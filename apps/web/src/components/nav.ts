@@ -93,6 +93,9 @@ export function sectionLink(section: Section, factory: string | undefined): Sect
   return { to: section.to, search: factory === undefined ? {} : { factory } };
 }
 
+/** `search` without its `repo`. */
+const withoutRepo = ({ repo: _repo, ...kept }: Record<string, unknown>): Record<string, unknown> => kept;
+
 /** Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Home. */
 export type PickTarget =
   | { to: Listing; search: Record<string, unknown> }
@@ -103,14 +106,16 @@ export type PickTarget =
 
 /**
  * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
- * other key of its search kept and `factory` set or dropped; on a workflow's page or a step's, the same page read in the picked factory,
- * on the repository it reads, its `repo` dropped with the factory it was of; on a factory's own page, its floor or its settings, the
- * picked factory's floor, or Home for All factories; on any other page, the picked factory's floor, and nowhere for All factories, which
- * that page already shows.
+ * other key of its search kept and `factory` set or dropped — and on Workflows alone its `repo` dropped too, which is there the
+ * repository of the factory left, where on Stats it is the page's own filter; on a workflow's page or a step's, the same page read in the
+ * picked factory, on the repository it reads, its `repo` dropped likewise; on a factory's own page, its floor or its settings, the picked
+ * factory's floor, or Home for All factories; on any other page, the picked factory's floor, and nowhere for All factories, which that
+ * page already shows.
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
   if (isListing(path)) {
-    const { factory: _dropped, ...kept } = search;
+    const { factory: _dropped, ...rest } = search;
+    const kept = path === '/workflows' ? withoutRepo(rest) : rest;
     return { to: path, search: factory === undefined ? kept : { ...kept, factory } };
   }
   const page = workflowPageAt(path);

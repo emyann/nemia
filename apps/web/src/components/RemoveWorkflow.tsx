@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { removeWorkflow, workflowsQuery, type WorkflowListing } from '../lib/api';
+import { removeWorkflow, type WorkflowListing } from '../lib/api';
 import { forgetFavorite } from '../lib/useFavorites';
+import { rereadWorkflows } from '../lib/placed';
 
 /**
  * Remove, on a workflow of yours, asked twice: the first press asks, saying what goes — the folder, its steps and every file in it, and its
@@ -20,7 +21,7 @@ export function RemoveWorkflow({ workflow, onRemoved }: { workflow: WorkflowList
     onSuccess: async () => {
       forgetFavorite({ kind: 'workflow', from: 'yours', workflow: name });
       await onRemoved?.();
-      await queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true });
+      await rereadWorkflows(queryClient);
     },
   });
   if (!asking)

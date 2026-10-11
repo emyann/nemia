@@ -1,41 +1,61 @@
 /**
  * The frame's floating bar for a step of a workflow: what its node on the workflow's canvas says, in a bar beside it — what it runs on,
- * its keys, and the steps it waits on — read from the workflows the Workflows page lists. Its page, which Open visits, has what it is told
- * and its keys explained.
+ * its keys, and the steps it waits on — read from the workflows listed in the place the page under it is read in, the address's `factory`
+ * and `repo` (`listPlace`). Its page, which Open visits, has what it is told and its keys explained.
  */
 import { useQuery } from '@tanstack/react-query';
-import { workflowsQuery, type WorkflowListing } from '@/lib/api';
+import { useSearch } from '@tanstack/react-router';
+import { factoriesQuery, workflowsInQuery, type WorkflowListing } from '@/lib/api';
+import { fromWord, listPlace, pagePlaceOf, type ListPlace } from '@/lib/factories';
 import { FloatingBar } from './FloatingBar';
 import { runsOn, specLines } from './StepNode';
 
-/** Where a workflow is read from, as its card on the Workflows page tags it. */
-const fromWord = (from: 'repo' | 'yours'): string => (from === 'yours' ? 'yours' : 'this repository');
-
 /**
  * The bar for the step `step` of the workflow `workflow` read from `from`, titled by the step's name, saying whose workflow it is under the
- * title. While the workflows are read it says so; a read that failed, and a workflow or a step the api lists none by, are each said in the
- * bar, which stays open until a person closes it.
+ * title. In a named factory it shows the folder the api lists there, never another of the same name. While the factories or the workflows
+ * are read it says so; a read that failed, a factory that lists nowhere, and a workflow or a step the api lists none by, are each said in
+ * the bar, which stays open until a person closes it.
  */
 export function SpecBar({ from, workflow, step }: { from: 'repo' | 'yours'; workflow: string; step: string }) {
-  const workflows = useQuery(workflowsQuery);
-  const listing = workflows.data?.find((w) => w.from === from && w.name === workflow);
+  const address = pagePlaceOf(useSearch({ strict: false }));
+  const factories = useQuery(factoriesQuery);
+  const where: ListPlace | null =
+    listPlace(address, []).kind === 'every' ? { kind: 'every' } : factories.data ? listPlace(address, factories.data) : null;
+  const listed = where?.kind === 'every' || where?.kind === 'in';
+  const workflows = useQuery({ ...workflowsInQuery(where?.kind === 'in' ? where.place : null), enabled: listed });
+  const listing = listed ? workflows.data?.find((w) => w.from === from && w.name === workflow) : undefined;
   return (
     <FloatingBar
       title={<span className="break-all">{step}</span>}
       description={
         <span className="break-all">
-          a step of <span className="font-mono">{workflow}</span> · {fromWord(from)}
+          a step of <span className="font-mono">{workflow}</span> · {fromWord(from, address.factory)}
         </span>
       }
     >
       <div data-spec-bar={`${from}/${workflow}/${step}`} className="space-y-5">
         {listing ? (
           <SpecBody listing={listing} step={step} />
+        ) : where && !listed ? (
+          <Nowhere where={where} />
         ) : (
-          <Unread workflow={workflow} error={workflows.error} read={workflows.data !== undefined} />
+          <Unread workflow={workflow} error={factories.error ?? workflows.error} read={listed && workflows.data !== undefined} />
         )}
       </div>
     </FloatingBar>
+  );
+}
+
+/** What the bar holds where the address's factory lists no workflows: why, or that it reads on one of its repositories, none named. */
+function Nowhere({ where }: { where: ListPlace }) {
+  return (
+    <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
+      {where.kind === 'refused'
+        ? where.why
+        : where.kind === 'pick'
+          ? `The factory ${where.factory} works on ${where.repos.length} repositories, and its workflows are read on one: pick it on the page.`
+          : null}
+    </p>
   );
 }
 

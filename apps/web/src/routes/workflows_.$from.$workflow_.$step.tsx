@@ -4,7 +4,7 @@ import { Skills } from '../components/AgentParts';
 import { StepHire } from '../components/StepHire';
 import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/StepParts';
 import { stepQuery } from '../lib/api';
-import { pagePlaceOf } from '../lib/factories';
+import { fromWord, pagePlaceOf } from '../lib/factories';
 
 /**
  * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own, not inside the
@@ -52,7 +52,7 @@ function StepPage() {
                 : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
             }`}
           >
-            {page.from === 'yours' ? 'yours' : 'this repository'}
+            {fromWord(page.from, place.factory)}
           </span>
         </div>
         <StepAgent page={page} />

@@ -455,10 +455,10 @@ test("REFUSED: an attempt still running, one before its task's mark, a check's t
 });
 
 test("what a pass hands over once comes with the run's marks moved past it, and a record without a mark keeps none", () => {
-  const first = onceFacts({ ...GATED, steps: DENIED_RUN.steps, deniedCounted: [] } as Run, [WORK, REVIEW], DENIED_VIEWS, callOf);
+  const first = onceFacts({ ...GATED, steps: DENIED_RUN.steps, deniedCounted: [] }, [WORK, REVIEW], DENIED_VIEWS, callOf);
   assert.equal(first.facts.length, 3);
   assert.deepEqual(first.marks, { gatesTimed: [], deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] });
-  const again = onceFacts({ ...DENIED_RUN, ...first.marks } as Run, [WORK, REVIEW], DENIED_VIEWS, callOf);
+  const again = onceFacts({ ...DENIED_RUN, ...first.marks }, [WORK, REVIEW], DENIED_VIEWS, callOf);
   assert.deepEqual(again, { facts: [], marks: first.marks }, 'REFUSED: nothing handed over twice');
   const gate = onceFacts(GATED, [PLAN, BUILD], GATED_VIEWS, callOf);
   assert.deepEqual([gate.facts.length, gate.marks], [1, { gatesTimed: [{ step: 'plan', try: 1 }] }], 'no deniedCounted, none made');

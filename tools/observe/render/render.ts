@@ -9,8 +9,8 @@
  *  3. Starts a throwaway copy of the stack from this checkout's `tools/observe` (`stack.ts`): a container of its own name, on loopback
  *     ports Docker picks, with no named volume. Never the live stack.
  *  4. Posts the fake telemetry to it and waits until each store answers (`seed.ts`).
- *  5. Opens each dashboard in headless Chromium and writes, into `--out` (else `$WF_ARTIFACTS`, else `.observe/` at the root),
- *     `dashboard-<name>.png` and `dashboard-<name>.txt`, the text of every panel (`panels.ts`).
+ *  5. Opens each dashboard in headless Chromium and writes, into `--out` (else the directory `WF_ARTIFACTS` names, else `.observe/`
+ *     at the root), `dashboard-<name>.png` and `dashboard-<name>.txt`, the text of every panel (`panels.ts`).
  *  6. Removes the container by its name and lets the slot go: when it ends, on a signal, and on any error. With `--hold`, it hands the
  *     container to a reaper instead, which removes it after the seconds asked, and prints where Grafana listens and each dashboard's
  *     address (`hold.ts`); `--stop <name>` removes a held stack sooner.
@@ -49,7 +49,10 @@ async function pictured(browser: Browser, grafana: string, dashboards: readonly 
   return files;
 }
 
-/** Start the stack `name` of the plan's checkout, seed it, and picture `dashboards`; then hold it when the plan says so. Whether it is held. */
+/**
+ * Start the stack `name` of the plan's checkout, seed it, and picture `dashboards`; then hold it when the plan says so. Whether it is
+ * held.
+ */
 async function rendered(plan: Plan, name: string, dashboards: readonly Named[], say: (line: string) => void): Promise<boolean> {
   const compose = yaml.load(fs.readFileSync(path.join(plan.observe, 'compose.yaml'), 'utf8')) as Compose;
   start(runArgv(compose, plan.observe, name));

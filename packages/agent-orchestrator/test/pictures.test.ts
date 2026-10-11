@@ -1,7 +1,8 @@
 /**
  * The build workflow's pictures rule (`workflows/build/pictures.ts`): implement's check refuses a change under `apps/web/src` whose
  * closeout's `artifacts` names no picture, an image file that is there, and says the command that takes them; and a change under
- * `tools/observe` that a dashboard reads whose `artifacts` names no `dashboard-<name>.png` and `dashboard-<name>.txt` of it. Driven as the check drives
+ * `tools/observe` that a dashboard reads whose `artifacts` names no `dashboard-<name>.png` and `dashboard-<name>.txt` of it. Driven as
+ * the check drives
  * it, `node pictures.ts <closeout>` in a committed scratch repository whose base is `WF_BASE_REF`, a bounded subprocess; and the shipped
  * check of `workflows/build/implement.md` is run whole, as frozen, with `npm` stubbed, so the clause is proven wired and not only written.
  */

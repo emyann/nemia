@@ -384,7 +384,10 @@ export async function post(otlp: string, seed: readonly ServiceSeed[] = SEED): P
 /** What a render opens every dashboard on: the range in milliseconds since the epoch, and the seeded run and session. */
 export type Picks = { from: number; to: number; run: string; session: string };
 
-/** The picks of a seed stamped `seededAt` and looked at `now`: a quarter of an hour before the stamp to now, the seeded run, every session. */
+/**
+ * The picks of a seed stamped `seededAt` and looked at `now`: a quarter of an hour before the stamp to now, the seeded run, every
+ * session.
+ */
 export const picks = (seededAt: number, now: number): Picks => ({ from: seededAt - 15 * 60_000, to: now, run: RUN, session: '$__all' });
 
 /** How long `arrived` waits for each store, in seconds. */

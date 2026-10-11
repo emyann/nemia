@@ -27,7 +27,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   file. A verb's
   behaviour is a walk in `test/place-walks.ts`, with the one answer both places give.
 - **A person's hand on a repository is on the handle (`World`, `place/memory/world.ts`)**: `staged`, `takeBack`, `putBack` beside
-  `stage` and `commit`, each walked on both places, `gitWorld` (`test/git-world.ts`) its git side; a test reads no `.git` path.
+  `stage` and `commit`, and `changed`, the paths a commit changed, each walked on both places, `gitWorld` (`test/git-world.ts`) its
+  git side; a test reads no `.git` path.
 - **A test names its engine with `const engine = eachTest(testEngine);` (`agent-runtime/testing`) and `engineOf(engine().layer)`**:
   `settle(id, phase, end)` takes what the attempt ended with as an object (`{ closeout, exitCode }`), and a `say` or a `stop` is
   refused as the runtime refuses it (say to a task settled `running` first).
@@ -38,7 +39,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `gitSays`, a `.git` or `MERGE_HEAD` path, and a `scripts` path handed to a spawn or to `node:path` (`script`: no process a question)
   in `packages/*/src` and `apps/*/src`; `GIT_SITES` is empty, and stays so.
 - **`place.spawned` counts git processes, `place.calls` questions** (`countSpawn` in the git place's runner, `meteredPlace`); a standing
-  is keyed by repository and base branch, the place no part of the key.
+  is keyed by repository and base branch, the place no part of the key. A test place counts no question until a test wraps it in
+  `meteredPlace` (`src/tick/rest-store.test.ts`), and starts no process: an equality on `spawned` belongs to a boundary file.
 - **A harness's word or a team name in `src` or `bin` is refused by `test/words.test.ts`**, which holds today's per file
   (`HARNESS_WORDS`, `TEAM_NAMES`, each naming its card or move): lower a count in the commit that removes one, and add none.
 - **The command is `nemia` in every printed word; a `wf` said in `src` or `bin` is refused by `test/cli-name.test.ts`**, but a value

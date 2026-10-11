@@ -12,7 +12,7 @@
  * A change under `tools/observe` that a dashboard reads owes the same of its dashboards, rendered on a throwaway stack
  * (`tools/observe/render/render.ts`): each `tools/observe/dashboards/<name>.json` it changed owes `dashboard-<name>.png` and
  * `dashboard-<name>.txt`, both named and there by the same rule; any other path there but `README.md` and `profile/` (`UNREAD`), one
- * such pair at least.
+ * such pair at least. A dashboard's picture is no picture of a page: a change that touches both owes both.
  *
  * Prints what it counted and exits 0 when neither was touched or what is owed is named. Exits 1, on stderr, when a page was touched and
  * no picture is named, or a dashboard's pair is missing, naming what was touched, the command to run and each entry that did not count
@@ -35,6 +35,9 @@ const UNREAD = ['tools/observe/README.md', 'tools/observe/profile/'];
 /** Where a dashboard's file is, and the two files a render writes of the dashboard `name`. */
 const DASHBOARDS = 'tools/observe/dashboards/';
 const pairOf = (name: string): [string, string] => [`dashboard-${name}.png`, `dashboard-${name}.txt`];
+
+/** A file a render writes of a dashboard, by its name: never a picture of one of the board's pages. */
+const OF_A_DASHBOARD = /^dashboard-.+\.png$/i;
 
 /** The extensions a picture has, lower case. */
 const IMAGES = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'];
@@ -172,9 +175,16 @@ function dashboardsNamed(owed: ReturnType<typeof dashboardsOwed>, artifacts: rea
   );
 }
 
-/** The pictures among `artifacts`; refuses when the work touched `pages` and none is one. */
+/** Why the named `entry` is no picture of a page, or undefined when it is one: a picture that is not a render's of a dashboard. */
+function notOfAPage(entry: unknown, files: string | undefined, workspace: string): string | undefined {
+  const why = notAPicture(entry, files, workspace);
+  if (why !== undefined || !OF_A_DASHBOARD.test(path.basename(String(entry)))) return why;
+  return 'a picture of a dashboard, not of a page';
+}
+
+/** The pictures of a page among `artifacts`; refuses when the work touched `pages` and none is one. */
 function picturesNamed(pages: readonly string[], artifacts: readonly unknown[], files: string | undefined): string[] {
-  const named = artifacts.map((entry) => [entry, notAPicture(entry, files, process.cwd())] as const);
+  const named = artifacts.map((entry) => [entry, notOfAPage(entry, files, process.cwd())] as const);
   const counted = named.filter(([, why]) => why === undefined).map(([entry]) => String(entry));
   if (!counted.length) throw noPicture(pages, named.map(([entry, why]) => [String(entry), String(why)] as const), files);
   return counted;

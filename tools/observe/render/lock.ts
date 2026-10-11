@@ -21,15 +21,18 @@ export const stopCommand = (name: string): string => `node tools/observe/render/
 /** Where the lock is. */
 export const lockFile = (): string => process.env.NEMIA_RENDER_LOCK || path.join(os.tmpdir(), 'nemia-render.lock');
 
-/** The lock as it is on disk, or undefined when there is none or it does not read. */
-export function locked(): Lock | undefined {
+/** The lock the file at `file` holds, or undefined when there is none or it does not read. */
+function lockAt(file: string): Lock | undefined {
   try {
-    const lock = JSON.parse(fs.readFileSync(lockFile(), 'utf8')) as Partial<Lock>;
+    const lock = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Lock>;
     return typeof lock.pid === 'number' && typeof lock.name === 'string' ? (lock as Lock) : undefined;
   } catch {
     return undefined;
   }
 }
+
+/** The lock as it is on disk, or undefined when there is none or it does not read. */
+export const locked = (): Lock | undefined => lockAt(lockFile());
 
 /** Whether a process `pid` is there, one of another user's included. */
 function alive(pid: number): boolean {
@@ -49,22 +52,41 @@ const holderOf = (lock: Lock): string =>
 
 /**
  * Take a lock no live process holds out of the way: moved aside first, so two renders that both read it stale cannot both drop it,
- * and its container removed by the name it records. A file that turns out to be another's fresh lock is put back.
+ * then read where it was moved. One a live process holds, taken between the read and the move, is put back; any other is dropped,
+ * and the container it records removed by that name.
  */
-function dropStale(stale: Lock | undefined): void {
+function dropStale(): void {
   const aside = `${lockFile()}.stale-${process.pid}`;
   try {
     fs.renameSync(lockFile(), aside);
   } catch {
     return;
   }
-  const moved = fs.readFileSync(aside, 'utf8');
-  if (stale !== undefined && moved !== JSON.stringify(stale)) {
-    fs.renameSync(aside, lockFile());
-    return;
+  const moved = lockAt(aside);
+  try {
+    if (moved !== undefined && alive(moved.pid)) fs.linkSync(aside, lockFile());
+  } finally {
+    fs.rmSync(aside, { force: true });
   }
-  fs.rmSync(aside, { force: true });
-  if (stale !== undefined && NAME.test(stale.name)) remove(stale.name);
+  if (moved !== undefined && !alive(moved.pid) && NAME.test(moved.name)) remove(moved.name);
+}
+
+/**
+ * Put the lock there with `text` in it, in one step: written to a file of this process's own and linked to the lock's path, so the
+ * lock is never there without its content and another render never reads one half written. False when a lock is there already.
+ */
+function placed(text: string): boolean {
+  const own = `${lockFile()}.own-${process.pid}`;
+  fs.writeFileSync(own, text);
+  try {
+    fs.linkSync(own, lockFile());
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    return false;
+  } finally {
+    fs.rmSync(own, { force: true });
+  }
 }
 
 /**
@@ -75,15 +97,10 @@ export async function take(name: string, waitSeconds: number): Promise<void> {
   const began = performance.now();
   const mine = JSON.stringify({ pid: process.pid, name } satisfies Lock);
   for (;;) {
-    try {
-      fs.writeFileSync(lockFile(), mine, { flag: 'wx' });
-      return;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    }
+    if (placed(mine)) return;
     const lock = locked();
     if (lock === undefined || !alive(lock.pid)) {
-      dropStale(lock);
+      dropStale();
       continue;
     }
     if (performance.now() - began >= waitSeconds * 1000)

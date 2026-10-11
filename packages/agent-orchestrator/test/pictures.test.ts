@@ -270,6 +270,11 @@ test('REFUSED: a page and a dashboard both changed, with the pictures of one alo
   const page = pictures(repo, [closeoutFile([path.join(files, 'x-dark.png')])], env);
   assert.equal(page.code, 1, page.out);
   assert.ok(page.err.includes('dashboard-steps.txt'), page.err);
+  const pair = rendered(files, 'steps', 'png', 'txt');
+  const board = pictures(repo, [closeoutFile(pair)], env);
+  assert.equal(board.code, 1, `a dashboard's picture is no picture of the page:\n${board.out}`);
+  assert.ok(board.err.includes(`  ${pair[0]}: a picture of a dashboard, not of a page`), board.err);
+  assert.ok(board.err.includes('npm run e2e -- --photos --pages'), board.err);
   const both = pictures(repo, [closeoutFile([path.join(files, 'x-dark.png'), ...rendered(files, 'steps', 'png', 'txt')])], env);
   assert.equal(both.code, 0, both.err);
 });

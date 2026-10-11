@@ -151,6 +151,17 @@ test('one render at a time: a second is refused at its bound naming the holder, 
   assert.equal(locked()?.name, 'nemia-render-3-third0');
 });
 
+test('a lock is there whole or not at all: one that does not read is taken with no container removed, and nothing of the taking is left', async () => {
+  fresh();
+  fs.writeFileSync(lockFile(), '{"pid":');
+  await take('nemia-render-4-fourth', 0);
+  assert.deepEqual(locked(), { pid: process.pid, name: 'nemia-render-4-fourth' });
+  assert.deepEqual(calls(), [], 'a lock that names no container removes none');
+  const left = fs.readdirSync(path.dirname(lockFile())).filter((file) => file.startsWith(`${path.basename(lockFile())}.`));
+  assert.deepEqual(left, [], 'no file of the taking is left beside the lock');
+  assert.equal(fs.statSync(lockFile()).nlink, 1);
+});
+
 test('REFUSED: a hold of no seconds, of more than half an hour, of a fraction or of a word', () => {
   assert.equal(boundOf(undefined), 600);
   assert.equal(boundOf('1800'), 1800);

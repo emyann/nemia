@@ -172,7 +172,7 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/test/supervisor.test.ts': ['git', 'process', 'place', 'hand'],
   'packages/agent-orchestrator/test/telemetry-nesting.test.ts': ['git', 'process', 'place', 'engine'],
   'packages/agent-orchestrator/test/test-costs.test.ts': ['process'],
-  'packages/agent-orchestrator/test/tick-program.test.ts': ['git', 'process', 'place', 'engine'],
+  'packages/agent-orchestrator/test/tick-program.test.ts': ['git', 'process', 'place', 'engine', 'hand'],
   'packages/agent-orchestrator/test/timeline-spans.test.ts': ['git', 'process', 'place', 'engine'],
   'packages/agent-orchestrator/test/unloaded-folder.test.ts': ['git', 'process', 'place', 'engine'],
   'packages/agent-orchestrator/test/unreadable-journal.test.ts': ['git', 'process', 'place', 'engine'],

@@ -8,7 +8,8 @@
  * - **`place`**: the real place named, a value of `REAL_PLACE` bound from one of its modules, or any value from `place/git`;
  * - **`engine`**: the real engine named, `engine` of `REAL_ENGINE`, or `layer` called on the runtime's `Engine`;
  * - **`hand`**: an engine made by hand, `promised`, a tag of `ENGINE_TAGS` asked `of` or handed to a layer of `GIVERS` or to
- *   `provideService`, or an object literal said to be of a type of `ENGINE_TYPES`.
+ *   `provideService`, or an object literal said to be of a type of `ENGINE_TYPES`, by an assertion, an annotation or the return type
+ *   of the function that returns it.
  *
  * A name is read through its binding (`bindingsOf`), never as a bare word: a static import, an `export … from`, and a dynamic import
  * destructured or kept whole. A module is named by its package or by its path from the repository root (`moduleOf`).
@@ -264,12 +265,37 @@ function gives(call: ts.CallExpression, read: Read): boolean {
   return GIVERS.includes(name) && root !== undefined && isOf(read.bindings.get(root), LAYER);
 }
 
-/** The node an assertion or a declaration says is of a type, with that type. */
-function typed(node: ts.Node): { readonly value: ts.Expression; readonly type: ts.TypeNode } | undefined {
-  if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return { value: node.expression, type: node.type };
-  if (ts.isVariableDeclaration(node) && node.type && node.initializer) return { value: node.initializer, type: node.type };
-  return undefined;
+/** A value said to be of a type. */
+type Typed = { readonly value: ts.Expression; readonly type: ts.TypeNode };
+
+/** What a function's body returns: an arrow's expression, or the value of each `return` of its block, a function inside it left out. */
+function returnedBy(body: ts.Node): ts.Expression[] {
+  if (!ts.isBlock(body)) return ts.isExpression(body) ? [body] : [];
+  const values: ts.Expression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node) && node.expression) values.push(node.expression);
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
+  return values;
 }
+
+/**
+ * The values `node` says are of a type, each with that type: an assertion's, a declaration's under its annotation, and what a function
+ * returns under its return type.
+ */
+function typed(node: ts.Node): Typed[] {
+  if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return [{ value: node.expression, type: node.type }];
+  if (ts.isVariableDeclaration(node) && node.type && node.initializer) return [{ value: node.initializer, type: node.type }];
+  const type = ts.isFunctionLike(node) ? node.type : undefined;
+  const body = ts.isFunctionLike(node) && 'body' in node ? node.body : undefined;
+  return type && body ? returnedBy(body).map((value) => ({ value, type })) : [];
+}
+
+/** The argument of a call that gives a service which names the service: the first, or the second where the program comes first. */
+const tagGiven = (call: ts.CallExpression): ts.Expression | undefined =>
+  calleeName(call) === 'provideService' && call.arguments.length === 3 ? call.arguments[1] : call.arguments[0];
 
 /** One clause of the rule: its name, the kind it measures, and whether a node of a file is a site of it. */
 export type Clause = { readonly name: string; readonly kind: Kind; readonly matches: (node: ts.Node, read: Read) => boolean };
@@ -306,17 +332,18 @@ export const CLAUSES: readonly Clause[] = [
     name: 'engine-given',
     kind: 'hand',
     matches: (node, read) => {
-      if (!ts.isCallExpression(node) || !node.arguments[0] || !gives(node, read)) return false;
-      const given = refOf(node.arguments[0], read);
-      return ENGINE_TAGS.some((tag) => valueOf(given, tag));
+      const named = ts.isCallExpression(node) && gives(node, read) ? tagGiven(node) : undefined;
+      const given = named && refOf(named, read);
+      return ENGINE_TAGS.some((tag) => valueOf(given || undefined, tag));
     },
   },
   {
     name: 'engine-literal',
     kind: 'hand',
     matches: (node, read) => {
-      const said = typed(node);
-      return said !== undefined && ts.isObjectLiteralExpression(unwrapped(said.value)) && isOf(typeRefOf(said.type, read), ENGINE_TYPES);
+      return typed(node).some(
+        (said) => ts.isObjectLiteralExpression(unwrapped(said.value)) && isOf(typeRefOf(said.type, read), ENGINE_TYPES),
+      );
     },
   },
 ];

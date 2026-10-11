@@ -76,11 +76,15 @@ const PLANTS: Readonly<Record<string, readonly string[]>> = {
     "import { Layer } from 'effect';\nimport { Engine } from 'agent-runtime';\nLayer.succeed(Engine)(fake);\n",
     "import { Effect } from 'effect';\nimport { EngineService } from '../src/runtime-client.ts';\nprogram.pipe(Effect.provideService(EngineService, fake));\n",
     "import * as Layer from 'effect/Layer';\nimport { Engine } from '../../../apps/api/src/store.ts';\nLayer.sync(\n  Engine,\n  make,\n);\n",
+    "import { Effect } from 'effect';\nimport { EngineService } from '../src/runtime-client.ts';\nEffect.provideService(\n  program,\n  EngineService,\n  fake,\n);\n",
   ],
   'engine-literal': [
     "import type { Engine } from '../src/runtime-client.ts';\nconst e = { view } as unknown as Engine;\n",
     "import type { EngineShape } from 'agent-runtime';\nconst e: EngineShape = {\n  view,\n};\n",
     "import type * as rt from 'agent-runtime';\nconst e = { view } satisfies rt.Engine;\n",
+    "import type { Engine } from '../src/runtime-client.ts';\nconst failing = (err: unknown): Engine => ({\n  ...e,\n  tick,\n});\n",
+    "import type { Engine } from '../src/runtime-client.ts';\nfunction fake(): Engine {\n  if (plain) return e;\n  return { view };\n}\n",
+    "import type { Engine } from 'agent-orchestrator';\nconst fakes = { make(): Engine { return { view }; } };\n",
   ],
 };
 
@@ -97,6 +101,10 @@ const WORDS = [
   "import { Layer } from 'effect';\nimport { PlaceService } from '../src/place/place.store.ts';\nLayer.succeed(PlaceService)(place);\n",
   "import { Effect } from 'effect';\nimport { Engine } from 'agent-runtime';\nEffect.succeed(Engine);\n",
   "import type { Engine } from '../src/runtime-client.ts';\nconst e = made() as Engine;\nconst f = { view } as Other;\n",
+  "import type { Engine } from '../src/runtime-client.ts';\nexport const promised = (fake: object): Engine => Object.fromEntries(entries) as unknown as Engine;\n",
+  "import type { Engine } from '../src/runtime-client.ts';\nfunction made(): Engine {\n  const inner = () => ({ view });\n  return wrap(inner());\n}\n",
+  "import type { Engine } from '../src/runtime-client.ts';\nconst later = async (): Promise<Engine> => ({ view });\nconst other = (): Other => ({ view });\n",
+  "import { Effect } from 'effect';\nimport { EngineService } from '../src/runtime-client.ts';\nEffect.provideService(EngineService, PlaceService, place);\n",
   "execFileSync('npm', ['run', 'git']);\nexecSync('npx gitlab');\n",
 ];
 

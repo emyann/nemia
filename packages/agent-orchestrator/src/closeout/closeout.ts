@@ -250,13 +250,14 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
       ? [
           '- `artifacts`: files you wrote for someone else to read, such as `note.md`. The run keeps each one you',
           '  name when you finish, so the steps after you and the person who decides receive it. A file you list',
-          '  that does not exist is reported as missing.',
+          '  that the run does not then have refuses this closeout: you are asked again, told which.',
         ]
       : [
           '- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this',
           '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
           '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
-          '  **not** a reason to block. A file you list that does not exist is reported as missing.',
+          '  **not** a reason to block. A file you list that the run does not then have refuses this closeout:',
+          '  you are asked again, told which.',
         ]),
     '- `needs`: when blocked, what a person has to settle; otherwise `null`.',
     ...(declared

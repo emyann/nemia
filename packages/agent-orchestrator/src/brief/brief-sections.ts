@@ -65,6 +65,11 @@ export type RetryBriefing = {
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
+  /**
+   * The files the last try's closeout named that the run did not have, when that is why it is tried again: each a line that names the
+   * file, says why and gives a near name that is there (`lackLines`).
+   */
+  lacks?: readonly string[];
   /** What the last try's sessions were denied, in the runtime's words (`deniedOf`), when that is why it is tried again: `denied`. */
   denied?: readonly string[];
   /** What the person who asked for this try said with it (`nemia retry --message`), as they wrote it. */
@@ -127,6 +132,24 @@ export const SIGNOFF = [
   'finished, finish it first and then sign off. If it cannot be finished, sign off anyway, saying what stops it.',
 ].join('\n');
 
+/**
+ * What a try is told when its last closeout named files the run did not have (`RetryBriefing.lacks`): that the closeout was not accepted
+ * and what that held back, each file with why, and the two ways to answer — write the file, or take its name off.
+ */
+const lacksSaid = (lacks: readonly string[]): string =>
+  [
+    'The closeout of the last try named, in `artifacts`, files the run does not have. The run did not accept it: its check was not run,',
+    'and nothing that waits on this step started.',
+    '',
+    ...lacks,
+    '',
+    'For each, either write the file where this brief says a file for the steps after you goes, and name it as it is written, or take',
+    'its name off `artifacts`. The rest of your work stands: change nothing else, and sign off again.',
+  ].join('\n');
+
+/** What the run's own nudge tells the session it continues: the files its closeout lacked (`lacksSaid`), else `SIGNOFF`. */
+const signoffSaid = (r: RetryBriefing): string => (r.lacks?.length ? lacksSaid(r.lacks) : SIGNOFF);
+
 /** Who filed a try the store's pause stopped (`by: 'pause'`): the run, once resumed, and no person. */
 const PAUSED_WHO =
   'The store was paused at once (`nemia pause --now`), which stopped this session before it signed off; once resumed, the run filed this try itself.';
@@ -152,6 +175,29 @@ const whoOf = (step: Workflow, r: RetryBriefing): string => {
   return `A person asked for this try: \`nemia retry ${modeWord(r)}${budget}${message}\`${raised}${below}.`;
 };
 
+/** Why a step is tried again, by how its last try ended on its own work (`RetryBriefing.status`), as its try's brief says it. */
+const WHY_ENDED: Partial<Record<StepStatus, string>> = {
+  'failed (check)': "After the last try signed off, the run executed this step's check, and it did not pass.",
+  unsigned:
+    'The last try ended without the closeout the run asked for, or without a field its `output:` declares, so nothing that waits on this step started.',
+  blocked: 'The last try signed off `blocked`. What it needed may have been settled since.',
+  failed: "The last try's session ended `failed` before it signed off.",
+  stopped: "The last try's session was stopped before it signed off.",
+  'budget exhausted': "The last try's session was ended by its harness at this step's budget, before it signed off.",
+  denied:
+    'The last try signed off, and its harness had denied it a call on the way: this step declares `denials: fail`, so nothing that waits on it started and its check did not run.' +
+    ' This try runs with the same permissions, and the same call will be denied again: do the work without it, or sign off `blocked` and say in `needs` what you cannot do without it.',
+  'awaiting approval':
+    "The last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below. When you sign off again, it waits there again.",
+};
+
+/**
+ * Why a step is tried again, as `retrySection` opens with it: the files its closeout named that the run did not have (`lacksSaid`), where
+ * that is why it reads `unsigned`, else the sentence of how its last try ended (`WHY_ENDED`).
+ */
+const whyEnded = (r: RetryBriefing): string =>
+  r.status === 'unsigned' && r.lacks?.length ? lacksSaid(r.lacks) : (WHY_ENDED[r.status] ?? `The last try ended \`${r.status}\`.`);
+
 /**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
@@ -167,30 +213,17 @@ const whoOf = (step: Workflow, r: RetryBriefing): string => {
  * travels: it is evidence the run gathered, not an account. So does what the session was denied, as data.
  *
  * A budget a person raised is said beside why the last try ended, never in its place. The run's own sign-off nudge to a
- * session it continues is `SIGNOFF` alone, in place of why and who; a new session is told as any try is. A try sent
+ * session it continues is `SIGNOFF` alone, in place of why and who — or, where the closeout it gave named files the run did
+ * not have, those files and what to do about each (`lacksSaid`), which any other try of such a step is told as its why; a new session is told as any try is. A try sent
  * back from an ending that stopped on the base branch is told why in the ending's terms, then what it said
  * (`endingSection`).
  */
 export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false): string {
-  const why: Partial<Record<StepStatus, string>> = {
-    'failed (check)': "After the last try signed off, the run executed this step's check, and it did not pass.",
-    unsigned:
-      'The last try ended without the closeout the run asked for, or without a field its `output:` declares, so nothing that waits on this step started.',
-    blocked: 'The last try signed off `blocked`. What it needed may have been settled since.',
-    failed: "The last try's session ended `failed` before it signed off.",
-    stopped: "The last try's session was stopped before it signed off.",
-    'budget exhausted': "The last try's session was ended by its harness at this step's budget, before it signed off.",
-    denied:
-      'The last try signed off, and its harness had denied it a call on the way: this step declares `denials: fail`, so nothing that waits on it started and its check did not run.' +
-      ' This try runs with the same permissions, and the same call will be denied again: do the work without it, or sign off `blocked` and say in `needs` what you cannot do without it.',
-    'awaiting approval':
-      "The last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below. When you sign off again, it waits there again.",
-  };
   const pastBudget =
     r.pastCap && r.status !== 'budget exhausted'
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
       : [];
-  if (r.by === 'signoff' && r.resumed) return ['', `## Try ${r.try}`, '', SIGNOFF, ...saidSection(r.said)].join('\n');
+  if (r.by === 'signoff' && r.resumed) return ['', `## Try ${r.try}`, '', signoffSaid(r), ...saidSection(r.said)].join('\n');
   const who = whoOf(step, r);
   const where = r.resumed
     ? "This is the last try's session, continued. Finish the work, then sign off again."
@@ -202,7 +235,7 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
   const said = r.ending
     ? `You signed off, and the work went on to ${r.ending.step}, which a person approved: it acts on ${r.ending.onto} in the repository's own checkout, and it stopped there — \`${r.ending.status}\` — without doing what it was approved for. ` +
       `A person sent the work back to you rather than ship it again: what they object to is below, then what ${r.ending.step} said.`
-    : (why[r.status] ?? `The last try ended \`${r.status}\`.`);
+    : whyEnded(r);
   const denied =
     r.status === 'denied' && r.denied?.length ? ['', '## What your session was denied', '', ...fenced(r.denied.join('\n'), 'text')] : [];
   return [

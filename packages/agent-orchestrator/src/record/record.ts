@@ -281,7 +281,8 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   waiting          not filed
  *   running          filed, and not settled — or a task the engine cannot find
  *   blocked          it signed off `blocked`: it finished its session, not the work
- *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares
+ *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares, or its closeout
+ *                    named a file the run did not have (`StepRecord.lacks`)
  *   checking         signed off, and its `check:` is due or running
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
@@ -395,7 +396,24 @@ export type StepRecord = {
    * for each try.
    */
   landed?: Landed;
+  /**
+   * The files a closeout of the step named that the run did not have, each with the task that named it: read off the disk by the tick on
+   * the pass that first read the task settled (`filesDue`). The step whose current task named one reads `unsigned` (`lackedOf`): a
+   * closeout the run does not accept. Gone with the try, as `handedOff` is.
+   */
+  lacks?: LackedFile[];
 };
+
+/**
+ * A file the closeout of task `taskId` named that the run did not have when the step signed off, and why, in a word of a declared file
+ * that is missing (`MissingArtifact`, artifacts.ts) — one of those the step can answer, by writing the file where its brief says or
+ * taking the name off (`REFUSING`). The record is decoded by its shape, so `why` is text here, and worded by `lackWords`.
+ */
+export type LackedFile = { taskId: string; path: string; why: string };
+
+/** The files the closeout of the task a step is on named that the run did not have (`StepRecord.lacks`): none of any other task's. */
+export const lackedOf = (record: StepRecord | undefined): LackedFile[] =>
+  (record?.lacks ?? []).filter((file) => file.taskId === record?.taskId);
 
 /**
  * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to

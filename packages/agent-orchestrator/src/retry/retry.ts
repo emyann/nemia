@@ -41,7 +41,7 @@ import {
   budgetWord,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
-import { retriesSpent, signoffsSpent, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
+import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { filedDenies, landedWords } from '../ending/ending.ts';
@@ -249,6 +249,10 @@ export const pauseAsksVoid = (
  * a statement given, which a reminder to give one would not mend — and a `done` whose end says nothing of a statement. Nor is a step
  * over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
+ * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is nudged the same way, under the same one
+ * nudge a round (`signoffDue`): its session continued, told each file, why, and to write it or take the name off. One that names a file
+ * the run does not have again stays `unsigned`, on a person.
+ *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
  *
@@ -327,7 +331,7 @@ export function retriesDue(
       retriesSpent(record) < (step.retries ?? 0)
     ) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
-    } else if (status === 'unsigned' && askedCloseout(record.taskId) === 'unsigned' && signoffsSpent(record) < 1) {
+    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId))) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'signoff' });
     }
   }

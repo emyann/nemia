@@ -6986,7 +6986,7 @@ test('the whole screen of a step whose closeout does not read, never nudged', as
   assert.deepEqual(await whole(t, b.e, run), [
     '<id>  add a flag',
     '',
-    '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
+    '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
     '',
     '  once more, on the next tick:',
     '    implement: unsigned. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',

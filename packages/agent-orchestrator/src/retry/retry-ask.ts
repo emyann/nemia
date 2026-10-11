@@ -4,7 +4,7 @@
  * them. Pure; what reads a step's standing to judge a try — `retryable` and `retriesDue` — is `retry.ts`'s, and `retryRefusal`
  * `retry-refusal.ts`'s.
  */
-import { tryOf, type Run, type StepRecord } from '../record/record.ts';
+import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 
 /**
@@ -145,6 +145,14 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
   return spent;
 };
 
+/**
+ * Whether the run nudges an `unsigned` step itself, once a round (`signoffsSpent`): its session ended without the closeout it was asked
+ * for (`asked`, the engine's word), or its closeout named a file the run did not have (`lackedOf`). Not a closeout short of a declared
+ * field alone, which a reminder would not mend.
+ */
+export const signoffDue = (record: StepRecord, asked: CloseoutAsked): boolean =>
+  (asked === 'unsigned' || lackedOf(record).length > 0) && signoffsSpent(record) < 1;
+
 /** How a try was asked for, as a person typed it: `--nudge`, `--fresh`, `--model <m>`, `--recheck`. */
 export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
@@ -165,7 +173,7 @@ const askedWord = (r: Retry): string =>
  * its place — the re-filed step's task, or for a recheck the same task, with its check still to file. Pure.
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
-  const { check, tries = [], handedOff: _, landed: __, ...rest } = record;
+  const { check, tries = [], handedOff: _, landed: __, lacks: ___, ...rest } = record;
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),
@@ -209,7 +217,8 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => {
   if (r.by === 'ask') return askedNote(r);
-  if (r.by === 'signoff') return `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`;
+  if (r.by === 'signoff')
+    return `try ${r.try} due — a nudge to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;
   if (r.by === 'pause') return pausedNote(r);
   return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
 };

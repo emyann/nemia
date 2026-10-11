@@ -27,6 +27,8 @@ import {
   inputsDir,
   inputsNote,
   isRepositoryRun,
+  lackLines,
+  lackedOf,
   lessonLine,
   missingArtifacts,
   namesInOrder,
@@ -255,6 +257,21 @@ function printShipped(run: Decided['run'], branches: string[], head: string, ste
   console.log(`${head}\n\n  shipped — ${branches.join(', ')} is already on ${run.branch}${never}`);
 }
 
+/**
+ * Under `UNSIGNED`, for a step whose closeout named files the run did not have (`lackedOf`): each file, why, and a near name its files
+ * directory holds (`lackLines`), then what answers it. Nothing for a step unsigned for another reason.
+ */
+function lackedLines(run: Decided['run'], name: string): string[] {
+  const lacked = lackedOf(run.steps[name]);
+  if (!lacked.length) return [];
+  const there = artifactFiles(run, name).map((file) => file.path);
+  return [
+    `${name}'s closeout named ${lacked.length === 1 ? 'a file' : 'files'} the run does not have:`,
+    ...lackLines(lacked, artifactsDir(run, name), there).map((line) => `  ${line}`),
+    `  it writes each where its brief says, or takes the name off: nemia retry ${run.id} ${name}`,
+  ];
+}
+
 /** The verdicts on the work: failed and unfinished checks, unsigned steps, unverified ones, and failed ones. */
 function printRefusals(run: Decided['run'], decision: Awaiting): void {
   if (decision.failedCheck.length)
@@ -267,8 +284,9 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
     );
   if (decision.unsigned.length)
     console.log(
-      `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (nudged to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran`,
+      `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (nudged to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran`,
     );
+  for (const line of decision.unsigned.flatMap((name) => lackedLines(run, name))) console.log(`    ${line}`);
   if (decision.unverified.length)
     console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
   if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (nemia logs ${run.id} <step>)`);

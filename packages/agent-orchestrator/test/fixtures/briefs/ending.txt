@@ -39,6 +39,8 @@ not collected and not committed — it stays in a person's checkout, and `nemia 
 the workspace root as `not collected`. Name each file by its absolute path in that directory; a directory is
 not collected, nor a file that is not there.
 
+A closeout that names a file the run does not then have is refused: nothing that waits on you starts, and you are asked again, told each such name.
+
 ## When you are finished
 
 Your final answer is a structured closeout, and it is how this run knows you are done. The session
@@ -51,7 +53,8 @@ asks you for it in the required shape when you finish — in Claude Code, by cal
 - `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this
   workspace: when you finish, the run commits whatever you left, so the next step receives it.
   Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is
-  **not** a reason to block. A file you list that does not exist is reported as missing.
+  **not** a reason to block. A file you list that the run does not then have refuses this closeout:
+  you are asked again, told which.
 - `needs`: when blocked, what a person has to settle; otherwise `null`.
 - `message`: what this step declares (`output: shipper.schema.json`), in the shape the session
   asks for. It is handed, as data, to a step that reads it; your `summary` is not. A closeout

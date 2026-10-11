@@ -21,7 +21,7 @@ import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, holdsOf, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
-import { handOffDue } from '../workspace/workspace.ts';
+import { filesDue, handOffDue } from '../workspace/workspace.ts';
 import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
 import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
@@ -31,7 +31,7 @@ import type { Closeout } from '../closeout/closeout.ts';
 import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
 import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { collectArtifacts } from '../artifacts/artifacts.store.ts';
+import { collectArtifacts, filesLacked } from '../artifacts/artifacts.store.ts';
 import {
   headsFor,
   headsNow,
@@ -300,6 +300,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   session's attempts whose denied calls it hands them as counted (`deniedCounted`), both by `markedOnce`. A gate approved on a try
  *   that answered an earlier try's session is timed only while `runTimed` is `false`, which `markedOnce` reads before `timedOnce`
  *   writes it.
+ * - reads the files each step that just signed off named in its closeout, once, and keeps those the run does not have (`readFiles`),
+ *   so the step reads `unsigned` before any check of it is filed.
  * - marks each task whose settle it hands the metrics as counted (`settlesCounted`, `settledOnce`), on the pass that first reads it
  *   settled.
  * - hands the metrics the run's timeline on the first pass that reads it over with nothing in flight, and marks it (`runTimed`,
@@ -345,6 +347,7 @@ export const advancePass = Effect.fn('advancePass')(
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
     const place = yield* PlaceService;
     const handed = yield* withinEffect('act', handOffAll(run, reads, place));
+    const lacking = readFiles(run, reads);
     const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
     const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
     const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
@@ -363,7 +366,7 @@ export const advancePass = Effect.fn('advancePass')(
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
     const feed = wordFeed(run, reads, assessed, admission, checkout);
 
-    const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
+    const notes: string[] = [...askNotes, ...handed.collected, ...lacking, ...landing.notes, ...liftNotes, ...closeNotes];
     const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
     const { tried, rechecked } = yield* fileTries(f, assessed.retry);
     const looped = yield* fileRounds(f, assessed.round);
@@ -373,7 +376,8 @@ export const advancePass = Effect.fn('advancePass')(
     const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
-      Boolean(tips || heldFirst || handed.marked || landing.landed || marked.length || timed || settled.marks.settlesCounted);
+      Boolean(tips || heldFirst || handed.marked || lacking.length || landing.landed || marked.length || timed) ||
+      Boolean(settled.marks.settlesCounted);
     if (wrote) runStore.runs.rewrite(run);
     runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
@@ -502,6 +506,23 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: P
   }
   return { collected, marked };
 });
+
+/**
+ * Read off the disk the files each step due it named in its closeout (`filesDue`), after the pass collected them (`handOffAll`) and
+ * before it judges the run, and keep on the step's record each the run does not have (`StepRecord.lacks`), which unsigns the step:
+ * answers with a note for each such step. The same write keeps the settle of its task as counted, so no later pass reads it again.
+ */
+function readFiles(run: Run, r: PassReads): string[] {
+  const notes: string[] = [];
+  for (const name of filesDue(r.steps, run, r.phaseOf, r.signedOff)) {
+    const record = run.steps[name];
+    const lacked = filesLacked(run, name, r.signedOff(name)).map((file) => ({ taskId: record.taskId!, ...file }));
+    if (!lacked.length) continue;
+    run.steps[name] = { ...record, lacks: lacked };
+    notes.push(`${name}: its closeout named ${lacked.map((file) => file.path).join(', ')}, which the run does not have — not accepted`);
+  }
+  return notes;
+}
 
 /**
  * What `place` did with `step`'s hand-off of `workspace`, its `handoff` asked off the event loop, as a commit hook may take minutes:

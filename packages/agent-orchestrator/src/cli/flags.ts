@@ -44,7 +44,7 @@ what, who may drive it, for how long and for how much. Everything else the agent
 
   nemia ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
   · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
-  output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
+  output: declares, or naming a file the run does not have) · BLOCKED · rounds exhausted (asked for another round on the last)
   · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
   it on the run's word) · budget exhausted (its harness ended its session at its budget:)
   · denied (its harness denied its try a call, and the step says denials: fail: nothing after it is filed)

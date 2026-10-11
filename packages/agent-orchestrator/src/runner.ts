@@ -295,6 +295,8 @@ export type { StepMoment } from './following/following.ts';
 export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
+export { lackLines } from './artifacts/artifacts.ts';
+export { lackedOf } from './record/record.ts';
 export { branchStandings, parentRecord, resultBranches, type BranchReader } from './branches/branches.store.ts';
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';

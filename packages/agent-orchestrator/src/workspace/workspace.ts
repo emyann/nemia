@@ -20,11 +20,12 @@
  *   prompt. A hardlink is no path anywhere else: every file's path is inside the worktree, and no data
  *   is copied.
  *
- * The same file says where a step works (`workspacePlan`, `givenPlan`) and which finished steps hand their work off on a pass
- * (`handOffDue`).
+ * The same file says where a step works (`workspacePlan`, `givenPlan`), which finished steps hand their work off on a pass
+ * (`handOffDue`), and which have the files their closeout named read (`filesDue`).
  */
 import path from 'node:path';
 import type { Workflow } from '../step/step.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
@@ -285,6 +286,32 @@ export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskI
         ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace),
     )
     .map(([name]) => name);
+}
+
+/**
+ * The steps whose closeout's files a pass reads off the disk now (`filesLacked` in artifacts.store.ts), each once: a step on a local
+ * harness whose task settled `succeeded`, whose closeout names a file, and whose record holds nothing read of that task
+ * (`StepRecord.lacks`) — on the pass that first reads the task settled, which the run's mark of the settles it has counted
+ * (`Run.settlesCounted`) does not hold yet and holds from the write that keeps what was read. So a task an earlier pass read settled is
+ * never read back into a refusal: not one settled under a tick that read no files, whose record has no such mark or holds the task, nor
+ * one whose check or follower has run since and may have removed a file. None of a pruned run, whose files may be gone.
+ */
+export function filesDue(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => { artifacts: readonly string[] } | undefined,
+): string[] {
+  const counted = run.settlesCounted;
+  if (run.pruned || !counted) return [];
+  return steps
+    .filter((step) => !isRemoteHarness(step.harness))
+    .filter(({ name }) => {
+      const taskId = run.steps[name]?.taskId;
+      if (!taskId || counted.includes(taskId) || phaseOf(taskId) !== 'succeeded') return false;
+      return !run.steps[name].lacks?.some((file) => file.taskId === taskId) && Boolean(closeoutOf(name)?.artifacts.length);
+    })
+    .map(({ name }) => name);
 }
 
 /** Every step that waits on `name`, directly or through another. */

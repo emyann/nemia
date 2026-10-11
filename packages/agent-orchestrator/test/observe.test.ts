@@ -156,8 +156,11 @@ type Target = {
   legendFormat?: string;
 };
 
-/** A panel's transformation, as far as the checker reads it: a `sortBy`'s fields among its options. */
-type Transformation = { id: string; options?: { sort?: { field?: string }[] } };
+/**
+ * A panel's transformation, as far as the checker reads it: a `sortBy`'s fields among its options, and a `renameByRegex`'s pattern and
+ * what it renames a match to.
+ */
+type Transformation = { id: string; options?: { sort?: { field?: string }[]; regex?: string; renamePattern?: string } };
 
 /**
  * A panel of a dashboard, as far as the checker reads it: of a bar gauge, in `reduceOptions`, whether it draws a bar for each row its
@@ -939,7 +942,44 @@ test("Timeline reads a finished run's timeline by the values the code gives, for
   assert.ok(queries.length > 0 && queries.every((q) => traceNames(q.text).spans.includes(TIMELINE_SPAN)), 'every panel reads the span');
   const asked = (key: string) => [...new Set(queries.flatMap((q) => askedOf(q.text, key)))].sort();
   assert.deepEqual(asked('of'), [...TIMELINE_OF].sort(), 'each kind of row is drawn');
-  assert.deepEqual(asked('part'), ['cost', 'queued', 'ran', 'tries', 'wall'], "the run's check and gate are drawn by its part, unasked");
+  assert.deepEqual(
+    asked('part'),
+    ['cost', 'queued', 'ran', 'tries', 'wall'],
+    "the run's check, gate and answer are drawn by its part, unasked",
+  );
+});
+
+/** The parts a run's own rows have, as the code names them: every part but a session's time at work, its cost and a step's tries. */
+const RUN_PARTS = TIMELINE_PARTS.filter((part) => part !== 'ran' && part !== 'cost' && part !== 'tries');
+
+/**
+ * The name the panel titled `title` of `dashboard` draws each of a run's parts under: the series Tempo answers for it, by its part,
+ * through the panel's `renameByRegex` transformations, in their order.
+ */
+function runBarNames(dashboard: Dashboard, title: string): Record<string, string> {
+  const renames = (dashboard.panels.find((p) => p.title === title)?.transformations ?? []).filter((x) => x.id === 'renameByRegex');
+  const named = (series: string) =>
+    renames.reduce((name, x) => name.replace(new RegExp(x.options?.regex ?? '$^'), x.options?.renamePattern ?? ''), series);
+  return Object.fromEntries(RUN_PARTS.map((part) => [part, named(`{span.part="${part}"}`)]));
+}
+
+test('A run: wall and waiting names each part of a run the code gives that is a wait as waiting, and a part it leaves out is refused', () => {
+  const names = runBarNames(dashboardTitled('Timeline'), 'A run: wall and waiting');
+  assert.deepEqual(names, {
+    wall: 'wall',
+    queued: 'waiting: queue',
+    check: 'waiting: check',
+    gate: 'waiting: gate',
+    answer: 'waiting: answer',
+  });
+  assert.deepEqual(Object.keys(names).sort(), [...RUN_PARTS].sort(), "every part of a run's rows is named");
+  const without = dashboardTitled('Timeline');
+  const rename = without.panels
+    .find((p) => p.title === 'A run: wall and waiting')
+    ?.transformations?.find((x) => x.options?.regex?.includes('answer'));
+  assert.ok(rename?.options?.regex, 'a rename that names the answer');
+  rename.options.regex = rename.options.regex.replace('|answer', '');
+  assert.equal(runBarNames(without, 'A run: wall and waiting').answer, 'answer', 'REFUSED: a rename without it draws a bare answer');
 });
 
 test('REFUSED: a Timeline query for a part or a kind the code gives none of, one of every workflow or factory, and a choice of several', () => {

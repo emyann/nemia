@@ -169,7 +169,8 @@ wf stats --json                            # what GET /api/stats answers
 - **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
   ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
-  non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval.
+  non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval; for a try
+  that answered an earlier try's session, from the end of that answer's turn (`gateWaitOf`).
 - **A landing check that passed in more than half its deadline is named**, with what to do: measure
   the passing landing checks again, then change `LANDING_CHECK_DEADLINE_SECONDS` and its JSDoc
   (`src/check/check.ts`). A landing check is the check of a step the run lands on (`workspace: main`
@@ -3181,8 +3182,10 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   counts none twice, one that dies between the two loses that pass's, and a run started before the mark existed counts none.
 - **A finished run's timeline is spans, `run.timeline`, and no metric** (`TIMELINE_SPAN`, `timelineFacts` in `src/meter/step.ts`): one
   for each number of the timeline its page shows (`timelineRows` in `src/timeline/rows.ts`): a try's time queued, its time at work and
-  its cost, its check's two times, a step's tries, a round's wall time, and the run's wall time with its time queued, in its checks and
-  at its gates. Each is a root of its own trace, of no length, at the moment it is made, and carries `value`, `of`, `part` and `row` (a
+  its cost, its check's two times, a step's tries, a round's wall time, and the run's wall time with its time queued, in its checks,
+  at its gates and waiting on a person's answer to a step that signed off blocked (`answer`, `answerWaitOf` in `src/timeline/turns.ts`:
+  from the end of the turn that asked to the first spawn of the turn the answer started). A try that answered an earlier try's session
+  has no row of its own but in the step's tries: the session's time and cost are on the try that filed it. Each is a root of its own trace, of no length, at the moment it is made, and carries `value`, `of`, `part` and `row` (a
   step's place in the workflow and its name, so the rows sort into the workflow's order), its `run`, its `try` where it has one, and
   `factory`, `workflow` and `outcome` (`succeeded` or `cancelled`), with `step` and `agent` on a step's rows. They are made once, on the
   first pass that reads the run over with nothing in flight, off every try's view (`everyTryOf`, read on that pass alone), and the run

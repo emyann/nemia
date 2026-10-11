@@ -1,7 +1,7 @@
 {
   "uid": "nemia-timeline",
   "title": "Timeline",
-  "description": "A workflow's timeline, averaged over its runs that ended in the range: each step's time queued and at work with its check under it, its tries and its cost, each round's wall time, and the run's wall time beside its waits.",
+  "description": "A workflow's timeline, averaged over its runs that ended in the range: each step's sessions, their time queued and at work with its check under it, its tries and what a session cost, each round's wall time, and the run's wall time beside its waits.",
   "tags": [
     "nemia"
   ],
@@ -116,7 +116,7 @@
       "id": 1,
       "type": "bargauge",
       "title": "Ran, mean",
-      "description": "How long a try's session ran, and under each step how long its check ran: the mean over every try of every run counted.",
+      "description": "How long a step's session ran, and under each step how long its check ran: the mean over every session of every run counted. A try that answered an earlier try's session is a turn of that session, and in its time.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -211,7 +211,7 @@
       "id": 2,
       "type": "bargauge",
       "title": "Queued, mean",
-      "description": "How long a try's session, and its check, waited from its filing to its spawn: the mean over every try of every run counted.",
+      "description": "How long a step's session, and its check, waited from its filing to its spawn: the mean over every session of every run counted.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -306,7 +306,7 @@
       "id": 3,
       "type": "bargauge",
       "title": "Tries a run",
-      "description": "How many tries a step takes in a run, on average: its rounds and its retries, the first included.",
+      "description": "How many tries a step takes in a run, on average: its rounds, its retries and each answer a person gave its session, the first included. A try that answered a session is counted here, and adds no row of its own to the other panels.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -400,8 +400,8 @@
     {
       "id": 4,
       "type": "bargauge",
-      "title": "Cost a try",
-      "description": "What a try's session cost, on average, where its harness measured it.",
+      "title": "Cost a session",
+      "description": "What a step's session cost, on average, where its harness measured it: a session a person answered cost all its turns, counted once.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -591,7 +591,7 @@
       "id": 6,
       "type": "bargauge",
       "title": "A run: wall and waiting",
-      "description": "A run's wall time, first filing to last end, beside what of it was waiting: queued for a slot, in its checks, and at its gates.",
+      "description": "A run's wall time, first filing to last end, beside what of it was waiting: queued for a slot, in its checks, at its gates, and for a person's answer to a step that signed off blocked.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -667,7 +667,7 @@
         {
           "id": "renameByRegex",
           "options": {
-            "regex": "^(check|gate)$",
+            "regex": "^(check|gate|answer)$",
             "renamePattern": "waiting: $1"
           }
         },
@@ -762,7 +762,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Each bar is a mean over the runs of this workflow that **ended in the range**, succeeded or called off, as the pick says: a run still\ngoing, or stopped at a gate nobody answered, is not counted yet. The numbers are the ones a run's page shows in its Timeline, handed over\nonce when the run ends (the `run.timeline` spans), so a range holding one run shows that run.\n\n- **Queued** and **Ran** are per try: a step's row is its session, the row under it its check. A step that took three tries a run\n  spent three times its bar; **Tries a run** says how many.\n- **A round's wall** is from the first filing of a round of a loop to its last end: its sessions, its checks and its queues.\n- **A run** sets its wall time beside what of it was waiting: in the queue, in its checks, and at its gates for a person.\n\nTempo answers seven days back, and a run is counted at the moment the daemon read it over, not when it ended."
+        "content": "Each bar is a mean over the runs of this workflow that **ended in the range**, succeeded or called off, as the pick says: a run still\ngoing, or stopped at a gate nobody answered, is not counted yet. The numbers are the ones a run's page shows in its Timeline, handed over\nonce when the run ends (the `run.timeline` spans), so a range holding one run shows that run.\n\n- **Queued**, **Ran** and **Cost a session** are per session: a step's row is its session, the row under it its check. A step\n  whose every try ran a session of its own spent as many times its bar as **Tries a run** says.\n- **A step a person answered** ran one session: when it signs off blocked and is answered, the answer is a try more and a turn of\n  the same session. Its **Ran** and its cost are that session's, every turn of it, once; **Tries a run** counts each answer.\n- **A round's wall** is from the first filing of a round of a loop to its last end: its sessions, its checks and its queues.\n- **A run** sets its wall time beside what of it was waiting: in the queue, in its checks, at its gates for a person, and for a\n  person's answer (`waiting: answer`): from a turn that signed off blocked to the spawn of the turn the answer started, the pass\n  that heard it and its wait for a slot included. Work sent back from a gate with words is in neither wait.\n\nTempo answers seven days back, and a run is counted at the moment the daemon read it over, not when it ended. A run already counted\nkeeps the numbers it sent: none is sent again, so a run counted before a number was added has none of it."
       }
     }
   ]

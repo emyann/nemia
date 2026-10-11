@@ -48,7 +48,7 @@ export const stepReach = (extra: Partial<StepReach> = {}): StepReach => ({
     permissionMode: 'dontAsk',
     sandbox: null,
     effort: 'high',
-    mcp: null,
+    mcp: [],
   },
   tools: {
     from: 'measured',

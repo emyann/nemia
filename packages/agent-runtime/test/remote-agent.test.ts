@@ -288,6 +288,13 @@ test('the engine refuses a remote agent it could never reach, whose address carr
   assert.match(err.message, /`credentials` is a function/);
 });
 
+test("a task that says which of its checkout's servers it loads is refused on a remote agent, which loads its operator's", async () => {
+  const { e } = engineOn(await serve());
+  const err = await refusal(() => Effect.runPromise(e.file(task({ config: { checkoutMcp: [] } }))));
+  assert.equal(err._tag, 'FileRefused', err.message);
+  assert.match(err.message, /the `remote` harness is a remote A2A agent, .*takes no harness arguments: take `checkoutMcp` out of `config`/);
+});
+
 test('a task that carries harness arguments is refused on a remote agent, before anything is journalled', async () => {
   const s = await serve();
   const { e, root } = engineOn(s);

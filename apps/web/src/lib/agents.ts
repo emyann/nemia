@@ -2,7 +2,7 @@ import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm, RunStatus, RunSum
 import { remoteRefuses } from './builder.ts';
 
 /**
- * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, harnessPrompt): the order an
+ * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, harnessPrompt, mcp): the order an
  * agent's file writes them.
  */
 export const ROLE_KEYS: readonly AgentRoleKey[] = [
@@ -37,7 +37,8 @@ export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
 /**
  * An agent's form as it is being edited: each field as typed, `''` for a key unset. `schemaText` is the result schema's text, read from the
  * file its `output:` names, and `schemaWas` what that file held when read — a schema is sent with a save only when it changed. `skills` —
- * the skills its sessions are given, by name, which its card is generated from — and `harnessPrompt` are its own lines as typed. None of
+ * the skills its sessions are given, by name, which its card is generated from — `harnessPrompt` and `mcp`, the MCP servers its sessions
+ * load, are its own lines as typed. None of
  * those is a role key.
  */
 export type AgentForm = {
@@ -50,6 +51,7 @@ export type AgentForm = {
   schemaWas: { file: string; text: string } | null;
   skills: string;
   harnessPrompt: string;
+  mcp: string;
 };
 
 /** A form for a new agent, or for the agent `listing` as it reads. */
@@ -65,6 +67,7 @@ export function formOf(listing: AgentListing | null): AgentForm {
     schemaWas: listing?.schema ?? null,
     skills: listing?.skills ?? '',
     harnessPrompt: listing?.harnessPrompt ?? '',
+    mcp: listing?.mcp ?? '',
   };
 }
 
@@ -90,6 +93,7 @@ export function draftOf(form: AgentForm): AgentDraft {
     description: form.description.trim() || null,
     skills: form.skills.trim() || null,
     harnessPrompt: form.harnessPrompt.trim() || null,
+    mcp: form.mcp.trim() || null,
     keys,
     body: form.body,
     ...(changed ? { schema: { file: keys.output!, text: form.schemaText } } : {}),

@@ -133,33 +133,19 @@ export function AgentForm({
           {choice('remote')}
           {text('tools')}
           {text('disallowedTools')}
+          <Field
+            label="MCP servers"
+            hint="mcp: — the servers its sessions load, by the names the checkout's .mcp.json gives them, comma-separated. Empty, they load none."
+            value={form.mcp}
+            onChange={(mcp) => setForm((f) => ({ ...f, mcp }))}
+            readOnly={readOnly}
+            mono
+            placeholder={listing ? undefined : 'playwright'}
+          />
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3">
-        <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Result schema</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field
-            label="Schema file"
-            hint={`output: — a JSON Schema beside the agent. Pasting one with no file names it ${schemaFileFor(form.name)}.`}
-            value={form.keys.output}
-            onChange={(v) => setKey('output', v)}
-            readOnly={readOnly}
-            mono
-            placeholder={listing ? undefined : schemaFileFor(form.name)}
-          />
-          <Field
-            className="sm:col-span-2"
-            label="Its fields"
-            hint="What the closeout of each node that names it declares, for a node that reads it with input:. Empty, it declares none."
-            value={form.schemaText}
-            onChange={(schemaText) => setForm((f) => ({ ...f, schemaText }))}
-            readOnly={readOnly}
-            mono
-            area="min-h-24"
-          />
-        </div>
-      </fieldset>
+      <ResultSchema form={form} setForm={setForm} listing={listing} readOnly={readOnly} />
 
       <fieldset className="space-y-4">
         <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What its sessions are told</legend>
@@ -240,6 +226,49 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
       )}
       <p className="text-xs text-muted-foreground">{how} To change it, change its skills.</p>
     </div>
+  );
+}
+
+/**
+ * The result schema the agent's nodes declare: the file its `output:` names, beside the agent, and the schema's text, pasted. Each field
+ * sets its line of `form` through `setForm`.
+ */
+function ResultSchema({
+  form,
+  setForm,
+  listing,
+  readOnly,
+}: {
+  form: Form;
+  setForm: Dispatch<SetStateAction<Form>>;
+  listing: AgentListing | null;
+  readOnly: boolean;
+}) {
+  return (
+    <fieldset className="space-y-3">
+      <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Result schema</legend>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field
+          label="Schema file"
+          hint={`output: — a JSON Schema beside the agent. Pasting one with no file names it ${schemaFileFor(form.name)}.`}
+          value={form.keys.output}
+          onChange={(output) => setForm((f) => ({ ...f, keys: { ...f.keys, output } }))}
+          readOnly={readOnly}
+          mono
+          placeholder={listing ? undefined : schemaFileFor(form.name)}
+        />
+        <Field
+          className="sm:col-span-2"
+          label="Its fields"
+          hint="What the closeout of each node that names it declares, for a node that reads it with input:. Empty, it declares none."
+          value={form.schemaText}
+          onChange={(schemaText) => setForm((f) => ({ ...f, schemaText }))}
+          readOnly={readOnly}
+          mono
+          area="min-h-24"
+        />
+      </div>
+    </fieldset>
   );
 }
 

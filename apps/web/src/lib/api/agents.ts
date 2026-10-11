@@ -74,6 +74,8 @@ export type AgentListing = {
   skills: string | null;
   /** What becomes of Claude Code's own prompt: `keep`, `no-coding` or `replace`, as the api reads it; null for none, which is `keep`. */
   harnessPrompt: string | null;
+  /** The MCP servers its sessions load, as its `mcp:` line writes them: `playwright, docs`. Null where it names none. */
+  mcp: string | null;
   /** The skills it gives, one row each in its order: where a start finds it and what it costs a turn, or why none is found. */
   given: GivenSkill[];
   source: string;
@@ -103,6 +105,7 @@ const AgentListingSchema = Schema.Struct({
   cardError: Schema.NullOr(Schema.String),
   skills: Schema.NullOr(Schema.String),
   harnessPrompt: Schema.NullOr(Schema.String),
+  mcp: Schema.NullOr(Schema.String),
   given: Schema.mutable(Schema.Array(GivenSkillSchema)),
   source: Schema.String,
   version: Schema.String,
@@ -142,8 +145,8 @@ export const agentQuery = (from: string, name: string) =>
 
 /**
  * An agent as a write sends it: its name, description, the skills it gives and its harness prompt — each null for none — the role keys it
- * sets, one unset as null, its instructions, and a result schema pasted for it. `skills` and `harnessPrompt` are the agent's own lines, as
- * `description` is. Its card is generated from its skills, and nothing sends it.
+ * sets, one unset as null, its instructions, and a result schema pasted for it. `skills`, `harnessPrompt` and `mcp` are the agent's
+ * own lines, as `description` is. Its card is generated from its skills, and nothing sends it.
  */
 export type AgentDraft = {
   name: string;
@@ -151,6 +154,7 @@ export type AgentDraft = {
   description: string | null;
   skills: string | null;
   harnessPrompt: string | null;
+  mcp: string | null;
   keys: Partial<Record<AgentRoleKey, string | null>>;
   body: string;
   schema?: SchemaFile;

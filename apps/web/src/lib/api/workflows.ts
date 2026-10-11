@@ -24,7 +24,8 @@ import {
  * resolved; `own` is what a step with an agent sets itself, null for a step with none; `hired` is the agent the factory the listing is in
  * hires into it, which `spec.agent` then names too — null for a step it hires no one into, and in the default factory. `layers` is what
  * a run of a step with an agent would be told, by layer — the agent's instructions, your custom instructions, the step's policy — null for
- * a step with none.
+ * a step with none. `mcp` is the MCP servers its sessions load, as its agent names them: empty where it names none or the step has no
+ * agent.
  */
 export type ListedStep = {
   name: string;
@@ -33,10 +34,11 @@ export type ListedStep = {
   own: StepOwn | null;
   hired: string | null;
   layers: StepLayers | null;
+  mcp: string[];
 };
 
-/** A step as the builder puts it back: a listed step without `hired` and `layers`, which no step file writes. */
-export type StepWritten = Omit<ListedStep, 'hired' | 'layers'>;
+/** A step as the builder puts it back: a listed step without `hired`, `layers` and `mcp`, which no step file writes. */
+export type StepWritten = Omit<ListedStep, 'hired' | 'layers' | 'mcp'>;
 
 /**
  * Mirrors `StepOwn` in apps/api/src/workflows/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its
@@ -58,6 +60,7 @@ const ListedStepSchema = Schema.Struct({
   own: Schema.NullOr(StepOwnSchema),
   hired: Schema.NullOr(Schema.String),
   layers: Schema.NullOr(StepLayersSchema),
+  mcp: Schema.mutable(Schema.Array(Schema.String)),
 }) satisfies Schema.Schema<ListedStep>;
 
 /**

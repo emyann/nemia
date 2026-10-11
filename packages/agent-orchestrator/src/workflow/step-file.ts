@@ -23,6 +23,7 @@ import {
   budgetOf,
   checkOf,
   composedRefusal,
+  serversRefusal,
   contextOf,
   contextText,
   countOf,
@@ -157,13 +158,15 @@ export function parseWorkflow(
       ...(sessionSkills.length && { skills: sessionSkills }),
       ...(added && { addedSkills: added }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
+      mcp: agent.mcp ?? [],
     },
   };
 }
 
 /**
  * Refuses step `name`, resolved as `step` from its own lines `own` and its agent `agent`: a fence key that would widen the agent's
- * (`fenceRefusal`), a composition the harness cannot take (`composedRefusal`), and, given the places' `skills`, a skill none of them has.
+ * (`fenceRefusal`), a composition the harness cannot take (`composedRefusal`, `serversRefusal`), and, given the places' `skills`, a
+ * skill none of them has.
  * Each is asked of the agent's skills, then of those the step adds (`skills:`), the step's own fence for them asked by
  * `addedSkillsRefusal`: a skill the agent's fence cannot load.
  */
@@ -176,7 +179,8 @@ function agentStepRefusal(
 ): void {
   const loosened = fenceRefusal(name, agent, own, step);
   if (loosened !== undefined) refuse(loosened);
-  const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.harnessPrompt, step);
+  const by = `${name}: \`agent: ${agent.name}\``;
+  const composed = composedRefusal(by, agent.skills, agent.harnessPrompt, step) ?? serversRefusal(by, agent.mcp, step);
   if (composed !== undefined) refuse(composed);
   if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);
   if (own.skills === undefined || !step.skills) return;

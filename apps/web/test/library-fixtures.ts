@@ -58,6 +58,7 @@ export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   cardError: null,
   skills: 'review-a-change',
   harnessPrompt: null,
+  mcp: null,
   given: [
     {
       name: 'review-a-change',
@@ -157,6 +158,7 @@ export const workflow = (extra: Partial<WorkflowListing> = {}): WorkflowListing 
       own: { keys: ['workspace', 'slot', 'gate'], body: 'Land it.' },
       hired: null,
       layers: null,
+      mcp: [],
     },
   ],
   graph: { roots: ['ship'], edges: [{ from: 'review', to: 'ship', kind: 'after' }] },

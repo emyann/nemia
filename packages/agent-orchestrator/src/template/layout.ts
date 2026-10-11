@@ -67,6 +67,8 @@ export type AgentSpec = {
   description: string;
   instructions?: Text;
   skills?: readonly string[];
+  /** The MCP servers of the checkout its sessions load, by name. */
+  mcp?: readonly string[];
   output?: { path: string };
   harness?: string;
 } & { readonly [harness: string]: unknown };
@@ -264,6 +266,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
       description: 'string',
       instructions: 'text',
       skills: 'strings',
+      mcp: 'strings',
       output: { fields: { path: 'string' }, required: ['path'] },
       harness: 'string',
       ...BLOCKS,

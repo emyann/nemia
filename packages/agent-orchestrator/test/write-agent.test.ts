@@ -69,6 +69,7 @@ const draftOf = (agent: Agent): AgentDraft => ({
   role: agent.role,
   description: agent.description,
   skills: agent.skills?.join(', '),
+  mcp: agent.mcp?.join(', '),
   keys: agent.keys,
   body: agent.body,
 });
@@ -77,6 +78,7 @@ const plain = (agent: Agent) => ({
   role: agent.role,
   description: agent.description,
   skills: agent.skills,
+  ...(agent.mcp && { mcp: agent.mcp }),
   keys: agent.keys,
   body: agent.body,
 });

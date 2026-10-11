@@ -327,7 +327,7 @@ function marked(ready: Sized, now: string): Marked {
  * that mark lists is dropped. The worktrees `removed` are added, or every worktree this prune listed once none of them stands on disk,
  * whoever removed them and whatever the place answered; the time moves only when this prune removed one; the files' bytes `freed`
  * are added to those gone before. A prune that removed nothing, with a worktree it listed still standing or none listed, leaves the
- * mark as it reads without it: gone on a run never pruned, as it was on one that was.
+ * mark as it reads without it (`takenBack`): gone on a run never pruned, as it was on one that was.
  */
 function settle(r: Marked, removed: Pruning['worktrees'], freed: number | undefined): void {
   const current = runStore.runs.pruned(r.run.id);
@@ -337,7 +337,17 @@ function settle(r: Marked, removed: Pruning['worktrees'], freed: number | undefi
   const went = gone ? r.worktrees : removed;
   const at = removed.length ? r.now : (theirs?.at ?? r.now);
   if (went.length || freed !== undefined) runStore.runs.prune(r.run.id, markWith(theirs, went, freed, at, r.now));
-  else if (untouched) runStore.runs.prune(r.run.id, theirs);
+  else if (untouched) runStore.runs.prune(r.run.id, takenBack(r));
+}
+
+/**
+ * The mark a prune that removed nothing puts back over its own: the one the file held before it, unless that one lists no worktree
+ * and no files while this prune listed worktrees, which stand. Such a mark is another prune's own, put there before its removal, and
+ * says nothing went: restored, it would leave a run nothing was removed from reading pruned once both prunes are over.
+ */
+function takenBack(r: Marked): Pruned | undefined {
+  const empty = r.base !== undefined && !r.base.worktrees.length && !r.base.artifacts;
+  return empty && r.worktrees.length > 0 ? undefined : r.base;
 }
 
 /** The mark `theirs` at `at`, with the worktrees `went` it does not list yet, and the files' bytes `freed` at `now` over those before. */
@@ -440,23 +450,22 @@ export type Listed =
 /** One run of many after its turn: what its removal did, or what its judgement says now; or what either failed with. */
 export type Turned = { readonly id: string; readonly pruning: Pruning } | { readonly id: string; readonly failed: unknown };
 
-/**
- * One run judged and, when ready, sized, a failure of either caught as its own answer. With `forgets`, a run pruned before with
- * nothing listed has what is left of it forgotten (`forgetGone`), as `prune` does under `yes`.
- */
-const listedOne = Effect.fnUntraced(function* (id: string, flags: { unmerged?: boolean; artifacts?: boolean }, forgets: boolean) {
+/** A run of many as `listedOne` answers it: with what is left of one pruned before with nothing listed (`left`), still to forget. */
+type ListedOne = Listed & { readonly left?: Left };
+
+/** One run judged and, when ready, sized, a failure of either caught as its own answer; nothing is touched. */
+const listedOne = Effect.fnUntraced(function* (id: string, flags: { unmerged?: boolean; artifacts?: boolean }) {
   const exit = yield* Effect.exit(
     Effect.gen(function* () {
       const judged = yield* judging(id, flags);
       if ('ready' in judged) {
         const ready = yield* sized(judged.ready);
-        return { id, pruning: prunableOf(ready), ready } satisfies Listed;
+        return { id, pruning: prunableOf(ready), ready } satisfies ListedOne;
       }
-      if (forgets && judged.left) yield* forgetGone(judged.left);
-      return { id, pruning: judged.pruning } satisfies Listed;
+      return { id, pruning: judged.pruning, ...(judged.left ? { left: judged.left } : {}) } satisfies ListedOne;
     }),
   );
-  const listed: Listed = Exit.isSuccess(exit) ? exit.value : { id, failed: Cause.squash(exit.cause) };
+  const listed: ListedOne = Exit.isSuccess(exit) ? exit.value : { id, failed: Cause.squash(exit.cause) };
   return listed;
 });
 
@@ -471,7 +480,7 @@ export const judgingMany = Effect.fn('prune.judgingMany')(function* (
   ids: readonly string[],
   flags: { unmerged?: boolean; artifacts?: boolean } = {},
 ) {
-  return yield* Effect.forEach(ids, (id) => listedOne(id, flags, false), { concurrency: PRUNE_A_TURN });
+  return yield* Effect.forEach(ids, (id) => listedOne(id, flags), { concurrency: PRUNE_A_TURN });
 });
 
 /**
@@ -489,13 +498,56 @@ export const freedByRepo = Effect.fn('prune.freedByRepo')(function* (ready: read
 });
 
 /**
+ * What is left of the runs of one turn that were pruned before with nothing listed (`forgetGone`), one at a time: git's list is asked
+ * pruned once a repository, and not at all in a repository of `asked`, where the turn's own `remove` pruned it; then each run's
+ * folder of worktrees goes, once empty.
+ */
+const forgottenGone = Effect.fnUntraced(function* (lefts: readonly Left[], asked: ReadonlySet<string>) {
+  const pruned = new Set(asked);
+  for (const left of lefts) {
+    if (pruned.has(left.run.repo)) dropEmpty(left.within);
+    else yield* forgetGone(left);
+    pruned.add(left.run.repo);
+  }
+});
+
+/**
+ * One turn of `freeingMany`: its runs judged again, side by side, unless `yes`; those ready removed by one `remove` a repository
+ * (`freedByRepo`); what is left of those pruned meanwhile forgotten after it (`forgottenGone`); and what was done with each, in the
+ * turn's order.
+ */
+const turned = Effect.fnUntraced(function* (
+  turn: readonly ListedOne[],
+  { yes, ...flags }: { unmerged: boolean; artifacts: boolean; yes: boolean },
+) {
+  const judged = yes ? turn : yield* Effect.forEach(turn, (l) => listedOne(l.id, flags), { concurrency: PRUNE_A_TURN });
+  const groups = yield* freedByRepo(
+    judged.flatMap((l) => ('ready' in l && l.ready ? [l.ready] : [])),
+    PRUNE_A_TURN,
+  );
+  yield* forgottenGone(
+    judged.flatMap((l) => ('left' in l && l.left ? [l.left] : [])),
+    new Set(groups.map(({ group }) => group[0].run.repo)),
+  );
+  const done = new Map<string, Turned>();
+  for (const { group, exit } of groups) {
+    group.forEach((r, k) => {
+      const id = r.run.id;
+      done.set(id, Exit.isSuccess(exit) ? { id, pruning: exit.value[k] } : { id, failed: Cause.squash(exit.cause) });
+    });
+  }
+  return judged.map((l): Turned => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));
+});
+
+/**
  * Remove the runs a listing found ready (`judgingMany`), in turns of `PRUNE_A_TURN` runs in the listing's order, one turn after
  * another, so a repository's removals never run two at once and one `remove` carries a few runs' worktrees. Within a turn the runs of
  * one repository go by one `remove` (`freedByRepo`), repositories side by side.
  *
  * With `yes`, the command line's own, each run is removed on the listing's judgement: it is judged once. Without it a person answered
  * a prompt since the listing, so each run of a turn is judged and sized again just before that turn's removal, side by side; one no
- * longer ready answers its refusal, or that nothing is left, and is not removed.
+ * longer ready answers its refusal, or that nothing is left, and is not removed. What git still lists of a run freed meanwhile is
+ * forgotten after the turn's removal, one repository at a time.
  *
  * @param listed What `judgingMany` answered; a run with no `ready` is left alone.
  * @param told Called once a turn, as it ends, with what was done with each of its runs, in the listing's order.
@@ -507,28 +559,15 @@ export const freeingMany = Effect.fn('prune.freeingMany')(function* (
   told: (turn: readonly Turned[]) => void = () => {},
 ) {
   const ready = listed.filter((l) => 'ready' in l && l.ready !== undefined);
-  const all: Turned[] = [];
-  for (let from = 0; from < ready.length; from += PRUNE_A_TURN) {
-    const turn = ready.slice(from, from + PRUNE_A_TURN);
-    const judged = yes
-      ? turn
-      : yield* Effect.forEach(turn, (l) => listedOne(l.id, { unmerged, artifacts }, true), { concurrency: PRUNE_A_TURN });
-    const groups = yield* freedByRepo(
-      judged.flatMap((l) => ('ready' in l && l.ready ? [l.ready] : [])),
-      PRUNE_A_TURN,
-    );
-    const done = new Map<string, Turned>();
-    for (const { group, exit } of groups) {
-      group.forEach((r, k) => {
-        const id = r.run.id;
-        done.set(id, Exit.isSuccess(exit) ? { id, pruning: exit.value[k] } : { id, failed: Cause.squash(exit.cause) });
-      });
-    }
-    const said = judged.map((l): Turned => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));
-    told(said);
-    all.push(...said);
-  }
-  return all;
+  const turns = Array.from({ length: Math.ceil(ready.length / PRUNE_A_TURN) }, (_, k) =>
+    ready.slice(k * PRUNE_A_TURN, (k + 1) * PRUNE_A_TURN),
+  );
+  const said = yield* Effect.forEach(
+    turns,
+    (turn) => turned(turn, { unmerged, artifacts, yes }).pipe(Effect.tap((done) => Effect.sync(() => told(done)))),
+    { concurrency: 1 },
+  );
+  return said.flat();
 });
 
 /**

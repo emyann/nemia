@@ -1215,3 +1215,77 @@ test(
     assert.deepEqual(told, [ids.slice(0, PRUNE_A_TURN), ids.slice(PRUNE_A_TURN)]);
   },
 );
+
+test(
+  'the mark of a never-pruned run two prunes overlap on, neither removing anything: no mark is left, whichever ends first',
+  WAITED,
+  async (t) => {
+    const b = board();
+    const { run, wt } = await aFinished(b, { merged: true });
+    const refusing = placeOver(shippedGitPlace, {
+      remove: (request) => ({
+        answer: {
+          removed: [],
+          left: request.workspaces.map((at) => ({ path: at, said: 'contains untracked files' })),
+          deleted: [],
+          kept: [],
+        },
+      }),
+    });
+    const held = placeHeld(refusing, 'remove');
+    const judged = await runEngine(b.e, judging(run.id).pipe(Effect.provide(PlaceService.layer(held.place))));
+    assert.ok('ready' in judged, 'ready to prune');
+    const ready = await runWith(b.e, sized(judged.ready));
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    for (const ends of ['first', 'last'] as const) {
+      const one = runWith(b.e, freeing([ready]));
+      await until(t, () => held.waiting() >= 1, 'the first removal asked', { bell: held.bell });
+      t.mock.timers.tick(1000);
+      const other = runWith(b.e, freeing([ready]));
+      await until(t, () => held.waiting() >= 2, 'the second removal asked', { bell: held.bell });
+      assert.ok(under('runs', `${run.id}.pruned`), 'marked while its removals are asked');
+      held.letGo(ends);
+      await (ends === 'first' ? one : other);
+      held.letGo();
+      const done = [...(await one), ...(await other)];
+      assert.deepEqual(
+        done.map((d) => [d.worktrees.length, d.left.length]),
+        [
+          [0, 1],
+          [0, 1],
+        ],
+        'neither removed anything',
+      );
+      assert.ok(fs.existsSync(wt), 'the worktree stands');
+      assert.equal(readRun(run.id).pruned, undefined, `the ${ends} to ask ended first: the run is not marked`);
+    }
+  },
+);
+
+test('after a prompt, runs freed since the listing say nothing is left, and git forgets them by the `remove` their turn asks of their repository, or by one of nothing a repository where it asks none', async () => {
+  const b = board();
+  const asked: Asked = [];
+  const place = PlaceService.layer(counting(shippedGitPlace, asked));
+  const beside = await finishedIn(b, [aRepo()], 3);
+  const listed = await runWith(b.e, judgingMany(beside.ids));
+  for (const id of beside.ids.slice(0, 2)) assert.equal((await runWith(b.e, prune(id, { yes: true }))).kind, 'pruned');
+  const done = await runEngine(b.e, freeingMany(listed, { yes: false }).pipe(Effect.provide(place)));
+  assert.deepEqual(kindsOf(done), ['nothing', 'nothing', 'pruned']);
+  assert.deepEqual(
+    removes(asked).map((r) => r.workspaces),
+    [[beside.wts.get(beside.ids[2])]],
+    "one remove in the repository, the ready run's: it prunes what git lists of the two already gone",
+  );
+
+  const alone = await finishedIn(b, [aRepo()], 2);
+  const gone = await runWith(b.e, judgingMany(alone.ids));
+  for (const id of alone.ids) assert.equal((await runWith(b.e, prune(id, { yes: true }))).kind, 'pruned');
+  asked.length = 0;
+  const left = await runEngine(b.e, freeingMany(gone, { yes: false }).pipe(Effect.provide(place)));
+  assert.deepEqual(kindsOf(left), ['nothing', 'nothing']);
+  assert.deepEqual(
+    removes(asked).map((r) => r.workspaces),
+    [[]],
+    'one remove of nothing for the two runs of the repository, never one a run',
+  );
+});

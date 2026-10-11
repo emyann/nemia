@@ -53,8 +53,8 @@ export type HeldPlace<V extends PlaceVerb> = {
   readonly waiting: () => number;
   /** The most asks of the verb ever in flight at once: come in, and not answered yet. */
   readonly most: () => number;
-  /** Let the ask that came in last go on to `place`; nothing, when none waits. */
-  readonly letGo: () => void;
+  /** Let one waiting ask go on to `place`, the one that came in last, or `first`; nothing, when none waits. */
+  readonly letGo: (which?: 'last' | 'first') => void;
 };
 
 /**
@@ -92,6 +92,6 @@ export function placeHeld<V extends PlaceVerb>(place: Place, verb: V): HeldPlace
     requests: requests as PlaceRequests[V][],
     waiting: () => held.length,
     most: () => most,
-    letGo: () => held.pop()?.(),
+    letGo: (which = 'last') => (which === 'first' ? held.shift() : held.pop())?.(),
   };
 }

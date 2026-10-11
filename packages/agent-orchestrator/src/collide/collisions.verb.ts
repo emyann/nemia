@@ -8,7 +8,7 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import { runStore } from '../record/files.store.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
-import { placeDirOf, trialMerges } from '../place/place.store.ts';
+import { trialMerges, type Place } from '../place/place.store.ts';
 import { collisionsOf, othersInFlight, trialsOf, type Collisions, type Theirs } from './collide.ts';
 
 const ahead = (standings: readonly BranchStanding[]): string[] => standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
@@ -19,14 +19,20 @@ const ahead = (standings: readonly BranchStanding[]): string[] => standings.filt
  * Undefined, asking nothing, for a folder run, a run without worktrees, or one with no branch ahead of its base. Fails with a refusal a
  * read threw; dies of anything else (`tried`).
  */
-export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader) =>
-  tried(() => collisionsRead(run, ending, standings, git));
+export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader, place: Place) =>
+  tried(() => collisionsRead(run, ending, standings, git, place));
 
-function collisionsRead(run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader): Collisions | undefined {
+function collisionsRead(
+  run: Run,
+  ending: string,
+  standings: readonly BranchStanding[],
+  git: BranchReader,
+  place: Place,
+): Collisions | undefined {
   const ours = ahead(standings);
   if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
   const theirs: Theirs[] = othersInFlight(run, runStore.runs.list()).flatMap((other) =>
     ahead(standingsOf(other, git)).map((branch) => ({ run: other.id, branch })),
   );
-  return collisionsOf(run, ending, ours, theirs, trialMerges(run.repo, trialsOf(run.branch, ours, theirs), placeDirOf(run)));
+  return collisionsOf(run, ending, ours, theirs, trialMerges(run.repo, trialsOf(run.branch, ours, theirs), place));
 }

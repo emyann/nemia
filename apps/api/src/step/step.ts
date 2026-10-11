@@ -17,7 +17,6 @@ import {
   Missing,
   readFactories,
   runStore,
-  runWith,
   skillsFor,
   unattachedRefusal,
 } from 'agent-orchestrator';
@@ -27,6 +26,7 @@ import type { AgentSkill, SkillsFound, Workflow } from 'agent-orchestrator/workf
 import { sourceOf, type SkillSource } from '../agents/skills.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { agentSkillsOf, folderOf, keyRows, placesOf, stepSourceOf, type KeyRow, type WorkflowSource } from '../workflows/workflows.ts';
+import { runPlaced } from '../store.ts';
 
 /** How many of a step's runs its page lists, newest first. */
 export const RECENT_RUNS = 5;
@@ -213,7 +213,7 @@ const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
  *   into it, with those it can (`hiring`).
  */
 export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
-  served(c, async ({ e, env, repo, home, factory }) => {
+  served(c, async ({ e, placeService, env, repo, home, factory }) => {
     const { from, name, step: asked } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
       return c.json(
@@ -228,14 +228,14 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     const folder = folderOf(name, from, repo, home, factory?.tree);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
     const args = { from, name, step: asked, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-    const { step: found, steps } = (await runWith(e, STEP.handler(args, undefined, home))) as { step: Workflow | null; steps: string[] };
+    const { step: found, steps } = (await runPlaced(placeService, e, STEP.handler(args, undefined, home))) as { step: Workflow | null; steps: string[] };
     if (!found) {
       return c.json({ error: `No step '${asked}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
     }
     const places = placesOf(repo, home);
     const layers = toldLayers(found, null);
     const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-    const agents = async () => ((await runWith(e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
+    const agents = async () => ((await runPlaced(placeService, e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
     return c.json({
       workflow: name,
       from,

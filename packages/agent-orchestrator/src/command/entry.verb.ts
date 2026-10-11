@@ -3,6 +3,7 @@
  * serves alone and runs itself, with no handler (`Ran`).
  */
 import type { Effect } from 'effect';
+import type { PlaceService } from '../place/place.store.ts';
 import type { EngineService } from '../runtime-client.ts';
 import type { Conflict, Missing, Refusal } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
@@ -34,7 +35,7 @@ export type Kept = {
  * once, hands none of. `note` is what the CLI says of the data on stderr, beside what it prints.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Effect.Effect<D, Refusal, EngineService>;
+  handler(args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService>;
   print(data: D, args: Args): readonly string[];
   note?(data: D, args: Args): readonly string[];
   readonly apiKeys?: readonly (keyof D & string)[];

@@ -61,7 +61,7 @@ import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, cutNotes, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
-import { RunPlace } from '../place/place.store.ts';
+import { PlaceService } from '../place/place.store.ts';
 import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
@@ -189,8 +189,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     out.rechecked.push(r.step);
     return;
   }
-  const landing = placeTold(run, step, notes, undefined, f.heads?.());
-  if (!landing) return;
+  const landing = placeTold(run, step, yield* PlaceService, f.heads?.());
   const answers = answersHeld(f, r, step, record);
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
   if (closeRefused) {
@@ -366,8 +365,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
-  const landing = placeTold(run, target, notes, undefined, f.heads?.());
-  if (!landing) return;
+  const landing = placeTold(run, target, yield* PlaceService, f.heads?.());
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
   const refused = yield* closeFirst(f, r.target, record.taskId);
@@ -527,13 +525,12 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
   const filed: string[] = [];
-  const dirOf = yield* RunPlace;
+  const placed = yield* PlaceService;
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
-    const landing = placeTold(run, step, f.notes, undefined, f.heads?.());
-    if (!landing) continue;
-    const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, dirOf));
+    const landing = placeTold(run, step, placed, f.heads?.());
+    const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, placed));
     f.notes.push(...cutNotes(name, made));
     if (!('cut' in made)) continue;
     const place = made.cut;

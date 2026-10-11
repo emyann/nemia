@@ -2,7 +2,7 @@ import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, leaseRelease, runningRelease, VERSION } from 'agent-orchestrator';
+import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, VERSION } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -50,8 +50,8 @@ const RELEASE = leaseRelease(runningRelease());
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
  * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
- * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), and the hub the feed's lines are published to as the
- * process's daemon writes them (`feedHubLayer`).
+ * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the
+ * process's daemon writes them (`feedHubLayer`), and the git place (`gitPlaceLayer`).
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
   Layer.mergeAll(
@@ -63,6 +63,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     ReadMemo.live,
     Followings.live,
     feedHubLayer(),
+    gitPlaceLayer,
   );
 
 /**
@@ -157,7 +158,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>
-      served(c, async ({ e, env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { e, env, home, asker: mcp }))),
+      served(c, async ({ e, placeService, env, repo, home, mcp }) =>
+        c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp })),
+      ),
     )
     .route('/', factories)
     .route('/', factoryRules)
@@ -173,12 +176,12 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', inbox)
     .route('/', runs)
     .route('/', stats)
-    .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
-    .get('/api/passes', (c) => served(c, async ({ e }) => c.json(await passesOf(e, c.req.query('last')))))
-    .get('/api/series', (c) => served(c, async ({ e, memo }) => c.json(await seriesOf(e, c.req.query('range'), memo.series))))
+    .get('/api/ceilings', (c) => served(c, async ({ e, placeService, env }) => c.json(await ceilingsOf(e, placeService, env))))
+    .get('/api/passes', (c) => served(c, async ({ e, placeService }) => c.json(await passesOf(e, placeService, c.req.query('last')))))
+    .get('/api/series', (c) => served(c, async ({ e, placeService, memo }) => c.json(await seriesOf(e, placeService, c.req.query('range'), memo.series))))
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
-    .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
-    .get('/api/pause/now', (c) => served(c, async ({ e }) => c.json(await pauseNowOf(e))))
+    .get('/api/pause', (c) => served(c, async ({ e, placeService }) => c.json(await pauseOf(e, placeService))))
+    .get('/api/pause/now', (c) => served(c, async ({ e, placeService }) => c.json(await pauseNowOf(e, placeService))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>
       served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => engineRead('quota', e.quota('claude')) }))),

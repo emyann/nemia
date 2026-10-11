@@ -15,13 +15,12 @@ import {
   type Positional,
   type Route,
   routeList,
-  runWith,
 } from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator';
 import { decodeBody, NotBlank } from '../body.ts';
 import { type Refusal, refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
-import { findRun, noSuchRun, taskOfStep } from '../store.ts';
+import { findRun, noSuchRun, taskOfStep, runPlaced } from '../store.ts';
 import { EXTENSIONS, type FoldAt } from './extend.ts';
 import { type Named, type RouteWords, WORDS } from './words.ts';
 
@@ -223,7 +222,7 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const args = servedRepo(command, read.args, s);
-      const data = await runWith(s.e, command.handler(args, s.env, s.home));
+      const data = await runPlaced(s.placeService, s.e, command.handler(args, s.env, s.home));
       const refusal = command.apiRefusal?.(data, args);
       if (refusal) throw refusal;
       return c.json(answerOf(command, data), at.status);

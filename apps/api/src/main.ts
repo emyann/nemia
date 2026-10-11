@@ -17,6 +17,7 @@ import {
   currentRelease,
   DEFAULT_EVERY_MS,
   FeedHub,
+  PlaceService,
   HOME,
   holdUrl,
   runMain,
@@ -40,6 +41,7 @@ let port: number;
 let ticks: boolean;
 let e: Engine['Service'];
 let hub: (typeof FeedHub)['Service'];
+let place: PlaceService['Service'];
 const running = runningRelease();
 try {
   const trial = trialRefusal(running, currentRelease(), HOME, process.env);
@@ -49,6 +51,7 @@ try {
   const services = await runtime.context();
   e = Context.get(services, Engine);
   hub = Context.get(services, FeedHub);
+  place = Context.get(services, PlaceService);
 } catch (err) {
   fail(err);
 }
@@ -90,5 +93,8 @@ else
       repo: repoOf(process.env, running),
       holder: 'api',
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
-    }).pipe(Effect.scoped, Effect.provideService(FeedHub, hub), Effect.provide(telemetryLayer(process.env))),
+    }).pipe(Effect.scoped, Effect.provideService(FeedHub, hub),
+      Effect.provideService(PlaceService, place!),
+      Effect.provide(telemetryLayer(process.env)),
+    ),
   ).catch(fail);

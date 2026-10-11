@@ -26,7 +26,6 @@ import {
   type AgentSchema,
   type AgentWritten,
   type CardRead,
-  runWith,
   repoWriteRefusal,
   untriedOf,
   type Untried,
@@ -38,6 +37,8 @@ import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
 import { givenSkills, type GivenSkill } from './skills.ts';
 import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
+import { runPlaced } from '../store.ts';
+import type { PlaceService } from 'agent-orchestrator';
 
 export type { AgentUser } from 'agent-orchestrator';
 
@@ -283,8 +284,8 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  */
 export const agents = new Hono<ApiEnv>()
   .get('/api/agents', (c) =>
-    served(c, async ({ e, env, repo, home, factory }) => {
-      const { agents: read } = (await runWith(e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
+    served(c, async ({ e, placeService, env, repo, home, factory }) => {
+      const { agents: read } = (await runPlaced(placeService, e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
       const listings = read.map((one) => listingOf(one, repo, home));
       const answer: LibraryAgent[] = inFactory(
         listings,
@@ -296,23 +297,23 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .get('/api/agents/sources', (c) =>
-    served(c, async ({ e, env, home }) => {
+    served(c, async ({ e, placeService, env, home }) => {
       const at = c.req.query('path');
-      return c.json(await runWith(e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
+      return c.json(await runPlaced(placeService, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
     }),
   )
   .get('/api/agents/:from/:name', (c) =>
-    served(c, async ({ e, env, repo, home }) => {
+    served(c, async ({ e, placeService, env, repo, home }) => {
       const { from, name } = c.req.param();
       const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const { agent } = (await runWith(e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as { agent: AgentReading | null };
+      const { agent } = (await runPlaced(placeService, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as { agent: AgentReading | null };
       if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       return c.json(listingOf(agent, repo, home));
     }),
   )
   .get('/api/agents/:from/:name/card', (c) =>
-    served(c, async ({ e, env, repo, home }) => {
+    served(c, async ({ e, placeService, env, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `GET /api/agents/${from}/${name}/card`;
       const place = placeOf(from, name, route, repo, home);
@@ -320,7 +321,7 @@ export const agents = new Hono<ApiEnv>()
       const agent = loadAgents(place.dir).get(name);
       if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-      const { card } = (await runWith(e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
+      const { card } = (await runPlaced(placeService, e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
       return c.json({
         card,
         servedOverA2A: false,
@@ -329,7 +330,7 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .post('/api/agents/:from', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const { from } = c.req.param();
       const route = `POST /api/agents/${from}`;
       const refused = refusedBeforeReading(
@@ -346,12 +347,12 @@ export const agents = new Hono<ApiEnv>()
       const place = placeOf(from, read.body.name, route, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
       const given = draftOf(read.body, read.body.name);
-      const answer = await saved(e, { from, repo, home }, given, 201);
+      const answer = await saved(e, placeService, { from, repo, home }, given, 201);
       return c.json(answer.body, answer.status);
     }),
   )
   .put('/api/agents/:from/:name', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/agents/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -374,12 +375,12 @@ export const agents = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
       const given = draftOf(read.body, read.body.name ?? name);
-      const answer = await saved(e, { from, repo, home }, { ...given, version, name }, 200);
+      const answer = await saved(e, placeService, { from, repo, home }, { ...given, version, name }, 200);
       return c.json(answer.body, answer.status);
     }),
   )
   .post('/api/agents/:from/:name/try', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `POST /api/agents/${from}/${name}/try`;
       const refused = refusedBeforeReading(
@@ -407,12 +408,12 @@ export const agents = new Hono<ApiEnv>()
           `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['brief']))}.`,
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      const run = (await runWith(e, TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home))) as AgentTried;
+      const run = (await runPlaced(placeService, e, TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home))) as AgentTried;
       return c.json({ id: run.id } satisfies AgentTried, 201);
     }),
   )
   .delete('/api/agents/:from/:name', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `DELETE /api/agents/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -435,7 +436,7 @@ export const agents = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
-      return c.json(await runWith(e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
+      return c.json(await runPlaced(placeService, e, REMOVE.handler({ from, name, version, repo }, undefined, home)));
     }),
   );
 
@@ -448,7 +449,7 @@ type AgentAt = { from: string; repo: string; home: string };
  * answers by its kind, and any other error.
  */
 async function saved(
-  e: Engine['Service'],
+  e: Engine['Service'], placeService: PlaceService['Service'],
   { from, repo, home }: AgentAt,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
   ok: 200 | 201,
@@ -461,7 +462,7 @@ async function saved(
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  const done = (await runWith(e, WRITE.handler(args, undefined, home))) as AgentWritten;
+  const done = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as AgentWritten;
   return {
     body: { agent: listedAgent('yours', done.dir, done.agent.name, repo, home)!, written: done.written, removed: done.removed },
     status: ok,

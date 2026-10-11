@@ -7,7 +7,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitSays, isDirectory, refused, serve, strings, text } from './contract.ts';
+import { gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The commits MERGE_HEAD names in `checkout`, none when no merge is in progress. */
 function mergeHeads(checkout: string, file: string): string[] {
@@ -20,18 +21,17 @@ function mergeHeads(checkout: string, file: string): string[] {
     .filter(Boolean);
 }
 
-serve((request) => {
-  const checkout = text(request, 'checkout');
-  const tips = strings(request, 'tips');
-  const file = isDirectory(checkout) ? gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
+/** The verb's body. */
+export function* status({ checkout, tips }: PlaceRequests['status']): Asking<Reply<'status'>> {
+  const file = isDirectory(checkout) ? yield* gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
   if (file === undefined) return refused(`${checkout} is not a git repository, so no merge can be staged there`);
   const heads = mergeHeads(checkout, file);
   const shas = new Set(Object.values(tips));
   const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
-  const missing = Object.entries(tips)
-    .filter(([, sha]) => !heads.includes(sha) && gitSays(checkout, ['merge-base', '--is-ancestor', sha, 'HEAD']) === undefined)
-    .map(([branch]) => branch);
-  const head = gitSays(checkout, ['rev-parse', '--verify', '--quiet', 'HEAD']);
-  const conflicted = Boolean(gitSays(checkout, ['ls-files', '--unmerged']));
+  const missing: string[] = [];
+  for (const [branch, sha] of Object.entries(tips))
+    if (!heads.includes(sha) && (yield* gitSays(checkout, ['merge-base', '--is-ancestor', sha, 'HEAD'])) === undefined) missing.push(branch);
+  const head = yield* gitSays(checkout, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+  const conflicted = Boolean(yield* gitSays(checkout, ['ls-files', '--unmerged']));
   return { merging, conflicted, missing, ...(head ? { head } : {}) };
-});
+}

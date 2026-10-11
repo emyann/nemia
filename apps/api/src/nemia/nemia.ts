@@ -3,8 +3,9 @@
  * from `nemia level` (`PUT /api/level`, commands/routes.ts).
  */
 import { Hono } from 'hono';
-import { COMMANDS, runWith } from 'agent-orchestrator';
+import { COMMANDS } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
+import { runPlaced } from '../store.ts';
 
 /** `nemia level`'s entry of the package's table, whose bare read the api serves by hand. */
 const LEVEL = COMMANDS.find((c) => c.name === 'level')!;
@@ -32,15 +33,15 @@ const AUTO = COMMANDS.find((c) => c.name === 'auto')!;
  *   a file of rules that does not read. Its writes, `PUT` and `DELETE /api/auto/:name/rules/:id`, confirm a rule and drop one.
  */
 export const nemia = new Hono<ApiEnv>()
-  .get('/api/level', (c) => served(c, async ({ e }) => c.json(await runWith(e, LEVEL.handler({})))))
-  .get('/api/nemia/memory', (c) => served(c, async ({ e }) => c.json(await runWith(e, MEMORY.handler({})))))
+  .get('/api/level', (c) => served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, LEVEL.handler({})))))
+  .get('/api/nemia/memory', (c) => served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, MEMORY.handler({})))))
   .get('/api/nemia/memory/:fact', (c) =>
-    served(c, async ({ e }) => c.json(await runWith(e, MEMORY.handler({ fact: c.req.param('fact') })))),
+    served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, MEMORY.handler({ fact: c.req.param('fact') })))),
   )
   .get('/api/auto/:name', (c) =>
-    served(c, async ({ e, home }) => {
+    served(c, async ({ e, placeService, home }) => {
       const wrong = AUTO.check?.({ name: c.req.param('name') });
       if (wrong) return c.json({ error: wrong }, 400);
-      return c.json(await runWith(e, AUTO.handler({ name: c.req.param('name') }, undefined, home)));
+      return c.json(await runPlaced(placeService, e, AUTO.handler({ name: c.req.param('name') }, undefined, home)));
     }),
   );

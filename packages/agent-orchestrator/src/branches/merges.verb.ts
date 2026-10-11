@@ -1,23 +1,24 @@
 /** The merge check (`mergesOf`) and its entry in the command table (`MERGES`), served on the api alone. */
+import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { isRepositoryRun } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
-import { placeDirOf, trialMerges } from '../place/place.store.ts';
+import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
 
 /**
- * Whether each of `branches` merges onto the base branch of the run `runId` (`StandingMerge`), keyed by branch, by the place's trial
+ * Whether each of `branches` merges onto the base branch of the run `runId` (`StandingMerge`), keyed by branch, by `place`'s trial
  * merges (`trialMerges`); none for a run that is not a repository run, which has no base to merge onto. Throws `Missing` for a run the
  * store does not have.
  */
-export function mergesOf(runId: string, branches: readonly string[]): Record<string, StandingMerge> {
+export function mergesOf(place: Place, runId: string, branches: readonly string[]): Record<string, StandingMerge> {
   const run = runStore.runs.read(runId);
   if (!isRepositoryRun(run)) return {};
   const { trials } = trialMerges(
     run.repo,
     branches.map((branch) => ({ onto: run.branch, branch })),
-    placeDirOf(run),
+    place,
   );
   return Object.fromEntries(
     branches.map((branch, i) => {
@@ -49,6 +50,10 @@ export const MERGES: Command<Record<string, StandingMerge>> = {
     side: 'api',
     why: "the board's decision says whether each branch ahead still merges onto its base; nemia decide leaves a trial merge to the person",
   },
-  handler: (args) => tried(() => mergesOf(String(args.runId ?? ''), Array.isArray(args.branches) ? args.branches : [])),
+  handler: (args) =>
+    Effect.gen(function* () {
+      const place = yield* PlaceService;
+      return yield* tried(() => mergesOf(place, String(args.runId ?? ''), Array.isArray(args.branches) ? args.branches : []));
+    }),
   print: () => [],
 };

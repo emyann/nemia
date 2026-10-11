@@ -1,5 +1,5 @@
 /**
- * A repository run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, through `runPlaceVerbAsync`) and read
+ * A repository run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, asked off the event loop) and read
  * back only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
@@ -29,8 +29,7 @@ import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.
 import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
 import { countSpawn } from '../meter/tally.store.ts';
-import { runPlaceVerbAsync } from '../place/place-async.store.ts';
-import { readPlaceJson } from '../place/place.store.ts';
+import type { Place } from '../place/place.store.ts';
 import type { PlaceRequests } from '../place/place.ts';
 
 /**
@@ -337,35 +336,20 @@ function madeAt(made: string, at: string): boolean {
 }
 
 /**
- * What the place in `dirOf(run)` answers when asked to cut `request` (`make`, off the event loop): the workspace it made, or why there is
- * none, in words for the run's log — its refusal, why it was not heard, a place `dirOf` will not name, or an answer that names a workspace
- * other than `at`, which is read as unread: a step is never filed where nobody cut it.
+ * What `place` answers when asked to cut `request` (`make`, off the event loop): the workspace it made, or why there is none, in words
+ * for the run's log — its refusal, why it was not heard, or an answer that names a workspace other than `at`, which is read as unread: a
+ * step is never filed where nobody cut it.
  */
-const madeBy = Effect.fn('madeBy')(function* (run: RepositoryRun, dirOf: (run: RepositoryRun) => string, request: PlaceRequests['make']) {
-  let dir: string;
-  try {
-    dir = dirOf(run);
-  } catch (err) {
-    return uncut((err as Error).message);
-  }
-  const outcome = yield* runPlaceVerbAsync(dir, 'make', request);
+const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceRequests['make']) {
+  const outcome = yield* place.ask('make', request);
   if ('refused' in outcome) return uncut(`the place refused: ${outcome.refused}`);
   if ('unread' in outcome) return uncut(`the place's make was not heard: ${outcome.unread.said}; asked again on the next pass`);
   if (!madeAt(outcome.answer.workspace, request.at))
     return uncut(
       `the place's make answered ${outcome.answer.workspace}, where it was asked for ${request.at}: read as not heard, and asked again on the next pass`,
     );
-  return { made: outcome.answer, dir } as const;
+  return { made: outcome.answer } as const;
 });
-
-/** How the place in `dir` says to see a merge's conflicts (`say.conflicts`), or nothing where its `place.json` does not read. */
-function conflictsSaid(dir: string): string {
-  try {
-    return readPlaceJson(dir).say.conflicts;
-  } catch {
-    return '';
-  }
-}
 
 /**
  * The workspace a step runs in, made real: `{ cut }`, or `{ uncut }` with why, for the run's log, when the place made none.
@@ -378,7 +362,7 @@ function conflictsSaid(dir: string): string {
  * any other step from running beside it.
  *
  * `inherit` costs nothing — the step continues where the last one left off. `fork` and `merge` are cut by the run's place, its `make` asked
- * off the event loop (`runPlaceVerbAsync`) from the place `dirOf` names, for a workspace of their own at
+ * off the event loop of `place`, for a workspace of their own at
  * `<HOME>/worktrees/<run>/<step>` on `wf/<run>/<step>`, merged with the line of work of each other step a merge waits on: what stops two
  * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
@@ -388,7 +372,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   run: Run,
   steps: readonly Workflow[],
   step: Workflow,
-  dirOf: (run: RepositoryRun) => string,
+  place: Place,
 ) {
   const plan = workspacePlan(steps, step);
   const cut = (made: Cut): CutOutcome => ({ cut: made });
@@ -403,7 +387,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
     const parent = of(plan.from);
     return cut({ workspace: parent.workspace, branch: parent.branch, notes: [] });
   }
-  const asked = yield* madeBy(run, dirOf, {
+  const asked = yield* madeBy(place, {
     repo: run.repo,
     at: path.join(HOME, 'worktrees', run.id, step.name),
     name: `wf/${run.id}/${step.name}`,
@@ -416,7 +400,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   return cut({
     workspace: made.workspace,
     branch: made.branch,
-    ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: conflictsSaid(asked.dir) } } : {}),
+    ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: place.declared.say.conflicts } } : {}),
     deps,
     notes: [...made.notes, ...depsNotes(deps)],
   });

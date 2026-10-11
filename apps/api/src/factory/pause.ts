@@ -3,8 +3,10 @@
  * board's bottom bar says (`GET /api/pause`, app.ts); and what a pause at once would stop, with what it costs: what the board's confirm
  * says (`GET /api/pause/now`).
  */
-import { COMMANDS, type Interrupt, type Paused, runWith } from 'agent-orchestrator';
+import { COMMANDS, type Interrupt, type Paused } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
+import { runPlaced } from '../store.ts';
+import type { PlaceService } from 'agent-orchestrator';
 
 /** The package's read of the pause (`pausedRead`), through its entry of the command table, served on the api alone. */
 const PAUSED = COMMANDS.find((c) => c.name === 'paused')!;
@@ -21,7 +23,7 @@ export type PauseNowRead = { interrupts: Interrupt[]; cost: string };
  * The store's pause or null, each task still finishing under it, each landing it holds with its merge staged in its checkout
  * (MERGE_HEAD), and each other check it holds, read through `e`.
  */
-export const pauseOf = async (e: Engine['Service']): Promise<Paused> => (await runWith(e, PAUSED.handler({}))) as Paused;
+export const pauseOf = async (e: Engine['Service'], placeService: PlaceService['Service']): Promise<Paused> => (await runPlaced(placeService, e, PAUSED.handler({}))) as Paused;
 
 /** Each task a pause at once would stop now, read through `e` and never stored, and what an interrupted step costs. */
-export const pauseNowOf = async (e: Engine['Service']): Promise<PauseNowRead> => (await runWith(e, PAUSE_NOW.handler({}))) as PauseNowRead;
+export const pauseNowOf = async (e: Engine['Service'], placeService: PlaceService['Service']): Promise<PauseNowRead> => (await runPlaced(placeService, e, PAUSE_NOW.handler({}))) as PauseNowRead;

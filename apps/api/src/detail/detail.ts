@@ -86,6 +86,7 @@ import { type TaskPart, toldOf } from './told.ts';
 import { decideLine, stepCommands, type StepCommands } from './commands.ts';
 import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
+import type { PlaceService } from 'agent-orchestrator';
 
 /**
  * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person
@@ -538,7 +539,7 @@ export type LastSaid = Map<string, { cursor: string; line: string | null }>;
  * not its whole conversation again (`said`); a cursor the engine refuses, of a transcript replaced since, is read again from the start. A
  * read's cache, and nothing is decided by it: a fresh app reads from the start.
  */
-async function lastLineOf(e: Engine['Service'], view: TaskView, said: LastSaid): Promise<string | null> {
+async function lastLineOf(e: Engine['Service'], placeService: PlaceService['Service'], view: TaskView, said: LastSaid): Promise<string | null> {
   const key = `${view.id}#${view.state.attempts.length}`;
   const read = (after?: string) => engineRead('transcript', e.transcript(view.id, after)).catch(() => undefined);
   let from = said.get(key);
@@ -619,11 +620,14 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
  * timeline's rounds are of the loops of the steps the run is judged by. Read through the app's engine and root, what it read before kept in
  * its `memo`.
  */
-export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'home' | 'memo'>): Promise<RunDetail | { unjudged: string }> {
+export async function detail(
+  run: Run,
+  { e, placeService, home, memo }: Pick<Served, 'e' | 'placeService' | 'home' | 'memo'>,
+): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const { views, read } = await judgedOn(e, run, names, workflows);
+  const { views, read } = await judgedOn(e, placeService, run, names, workflows);
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;
   const steps = judgedSteps(run, workflows);
@@ -685,7 +689,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
           spec: step ? specOf(step) : null,
           filed: filedOf(run.steps[name], views),
           body: step?.body ?? null,
-          ...toldOf(run, name, source, views),
+          ...toldOf(run, name, source, views, placeService),
           taskId,
           workspace: run.steps[name]?.workspace ?? null,
           ...filesOf(run, name),
@@ -694,7 +698,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
           roundDue: judged.roundDue.has(name),
           commands: stepCommands(run.id, name),
           ...needs,
-          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
+          lastLine: needs.blockedByHarness ? await lastLineOf(e, placeService, views.get(taskId!)!, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],

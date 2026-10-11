@@ -1,90 +1,27 @@
 /**
- * A place skill's verbs, run and heard (`place.ts` holds the contract): `runPlaceVerb` runs one verb's script from a skill's folder and
- * decodes what it prints into one of three outcomes, and `readPlaceJson` decodes the skill's `place.json`. What a script prints is read
- * by a schema per answer, each held to its type in `place.ts`: a field missing or of another type is no answer, and a field the contract
- * does not name is dropped. `openPlace` is a start's use of a place, and `placeDirOf` the one answer to where a run's place runs from.
+ * The place a program is given (`place.ts` holds the contract): `PlaceService`, the service every caller asks, with no default, so a
+ * program that asks the place and is given none does not compile; what a caller reads through it (`readRunPlace`, `openPlace`,
+ * `trialMerges`); and what an implementation that runs processes shares: the stop of a process group at a deadline (`stopGroup`), and
+ * the words of an ask that was not heard (`stoppedWords`, `threwWords`).
  */
-import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { Context, Result, Schema, SchemaIssue } from 'effect';
-import {
-  PLACE_CONTRACT,
-  PLACE_DEADLINE_MS,
-  PLACE_VERBS,
-  type Changes,
-  type HandedOff,
-  type Inventory,
-  type Landed,
-  type Made,
-  missingVerbsRefusal,
-  unknownHoleRefusal,
-  unknownHoles,
-  type Opened,
-  type PlaceAnswers,
-  type PlaceDeclared,
-  type PlaceOutcome,
-  type PlaceRequests,
-  type PlaceVerb,
-  type Removed,
-  type Exported,
-  type Sealed,
-  type Standing,
-  type Status,
-  type Trials,
-  type Unread,
+import { Context, type Effect, Layer, Schema } from 'effect';
+import type {
+  Inventory,
+  Opened,
+  PlaceDeclared,
+  PlaceOutcome,
+  PlaceRequests,
+  PlaceVerb,
+  Standing,
+  Trials,
+  Unread,
 } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { PLACE_SKILLS, skillVersion } from '../skills/read.store.ts';
 import type { RepositoryRun } from '../record/record.ts';
-import { countSpawn, within } from '../meter/tally.store.ts';
 
-const Strings = Schema.Array(Schema.String);
 const Count = Schema.NullOr(Schema.Int);
 
-const OpenedSchema = Schema.Struct({
-  repo: Schema.String,
-  baseRef: Schema.String,
-  branch: Schema.String,
-  staged: Schema.optionalKey(Schema.String),
-}) satisfies Schema.Schema<Opened>;
-
-const MadeSchema = Schema.Struct({
-  workspace: Schema.String,
-  branch: Schema.String,
-  conflicts: Strings,
-  notes: Strings,
-}) satisfies Schema.Schema<Made>;
-
-const HandedOffSchema = Schema.Struct({ commit: Schema.NullOr(Schema.String) }) satisfies Schema.Schema<HandedOff>;
-
-const ChangedFileSchema = Schema.Struct({
-  path: Schema.String,
-  from: Schema.optionalKey(Schema.String),
-  status: Schema.String,
-  added: Count,
-  removed: Count,
-});
-
-const TrialMergeSchema = Schema.Union([
-  Schema.Struct({ clean: Schema.Literal(true) }),
-  Schema.Struct({ clean: Schema.Literal(false), conflicts: Strings }),
-  Schema.Struct({ unknown: Schema.String }),
-]);
-
-const ChangesSchema = Schema.Struct({
-  at: Schema.Struct({
-    baseRef: Schema.String,
-    onto: Schema.NullOr(Schema.String),
-    tips: Schema.Record(Schema.String, Schema.String),
-  }),
-  files: Schema.Record(Schema.String, Schema.Array(ChangedFileSchema)),
-  diffs: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String)),
-  present: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Literals(['file', 'directory', 'absent']))),
-  atBase: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
-}) satisfies Schema.Schema<Changes>;
-
-/** What `standing` answers (`Standing`), as `heard` decodes it, and as `standing.json` keeps each answer (`standing.store.ts`). */
+/** What `standing` answers (`Standing`), as `standing.json` keeps each answer (`standing.store.ts`). */
 export const StandingSchema = Schema.Struct({
   heads: Schema.Record(Schema.String, Schema.String),
   branches: Schema.Array(
@@ -98,116 +35,7 @@ export const StandingSchema = Schema.Struct({
   ),
 }) satisfies Schema.Schema<Standing>;
 
-const TrialsSchema = Schema.Struct({
-  at: Schema.Record(Schema.String, Schema.NullOr(Schema.String)),
-  trials: Schema.Array(TrialMergeSchema),
-}) satisfies Schema.Schema<Trials>;
-
-const StatusSchema = Schema.Struct({
-  merging: Schema.Literals(['ours', 'other', 'none']),
-  conflicted: Schema.Boolean,
-  missing: Strings,
-  head: Schema.optionalKey(Schema.String),
-}) satisfies Schema.Schema<Status>;
-
-const LandedSchema = Schema.Union([
-  Schema.Struct({ commit: Schema.String }),
-  Schema.Struct({ aborted: Schema.Literal(true) }),
-]) satisfies Schema.Schema<Landed>;
-
-const InventorySchema = Schema.Struct({
-  workspaces: Schema.Array(
-    Schema.Struct({
-      path: Schema.String,
-      step: Schema.optionalKey(Schema.String),
-      branch: Schema.optionalKey(Schema.String),
-      head: Schema.optionalKey(Schema.String),
-      detached: Schema.Boolean,
-      locked: Schema.optionalKey(Schema.String),
-      prunable: Schema.Boolean,
-      clean: Schema.NullOr(Schema.Boolean),
-      onBranch: Schema.Boolean,
-      changes: Schema.optionalKey(Strings),
-    }),
-  ),
-  branches: Schema.Array(Schema.Struct({ branch: Schema.String, merged: Schema.Boolean })),
-}) satisfies Schema.Schema<Inventory>;
-
-const RemovedSchema = Schema.Struct({
-  removed: Strings,
-  left: Schema.Array(Schema.Struct({ path: Schema.String, said: Schema.String })),
-  deleted: Strings,
-  kept: Schema.Array(Schema.Struct({ branch: Schema.String, said: Schema.String })),
-}) satisfies Schema.Schema<Removed>;
-
-const ExportedSchema = Schema.Struct({ commit: Schema.String }) satisfies Schema.Schema<Exported>;
-
-const SealedSchema = Schema.Struct({ removed: Schema.Boolean }) satisfies Schema.Schema<Sealed>;
-
-/** Each verb's answer, as its schema decodes it. */
-const ANSWERS: { readonly [V in PlaceVerb]: Schema.Codec<PlaceAnswers[V], unknown> } = {
-  open: OpenedSchema,
-  make: MadeSchema,
-  handoff: HandedOffSchema,
-  report: ChangesSchema,
-  standing: StandingSchema,
-  trial: TrialsSchema,
-  status: StatusSchema,
-  land: LandedSchema,
-  inventory: InventorySchema,
-  remove: RemovedSchema,
-  export: ExportedSchema,
-  seal: SealedSchema,
-};
-
-const RefusedSchema = Schema.Struct({ refused: Schema.String });
-
-const PlaceDeclaredSchema = Schema.Struct({
-  v: Schema.Literal(PLACE_CONTRACT),
-  verbs: Schema.Array(Schema.Literals(PLACE_VERBS)),
-  denyWhileLanding: Strings,
-  say: Schema.Struct({
-    look: Strings,
-    readResult: Schema.String,
-    ship: Schema.String,
-    drop: Schema.String,
-    conflicts: Schema.String,
-    unlock: Schema.String,
-    stage: Schema.String,
-    attach: Schema.String,
-    commit: Schema.String,
-    inspect: Schema.String,
-    orphans: Schema.String,
-    results: Strings,
-    merge: Schema.String,
-    mergeUncommitted: Schema.String,
-    showMerge: Schema.String,
-    lastMerge: Schema.String,
-  }),
-}) satisfies Schema.Schema<PlaceDeclared>;
-
-/** The most of a script's words kept in `said`, and of a value quoted in it. */
-const SAID_LINES = 4;
-const QUOTED = 60;
-
-/** A value quoted into a sentence, cut at `QUOTED` characters. */
-const quoted = (text: string): string => (text.length > QUOTED ? `${text.slice(0, QUOTED)}…` : text);
-
-/** The first field a value does not decode at, and why: `` `a.b` is missing `` or `` `a.b` is "x", where string is expected ``. */
-function firstWrong(value: unknown, error: Schema.SchemaError): string {
-  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
-  const keys = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
-  const found = keys.reduce<unknown>(
-    (at, key) => (typeof at === 'object' && at !== null ? (at as Record<PropertyKey, unknown>)[key] : undefined),
-    value,
-  );
-  const where = keys.length ? `\`${keys.map(String).join('.')}\`` : 'the whole';
-  const message = first?.message ?? 'is not the contract';
-  if (message === 'Missing key') return `${where} is missing`;
-  return `${where} is ${quoted(JSON.stringify(found) ?? 'undefined')}, where ${message.replace(/^Expected /, '').replace(/ \| undefined$/, '')} is expected`;
-}
-
-/** How long a script's process group, stopped at its deadline, is given to end on SIGTERM before it is killed. */
+/** How long a process group, stopped at its deadline, is given to end on SIGTERM before it is killed. */
 export const STOP_GRACE_MS = 2000;
 
 /** How often a stopped group is asked whether it has ended. */
@@ -241,14 +69,17 @@ function emptied(pgid: number): boolean {
  * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
  * there after `STOP_GRACE_MS`, SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill. Never throws.
  */
-function stopGroup(pgid: number): boolean {
+export function stopGroup(pgid: number): boolean {
   if (!signalGroup(pgid, 'SIGTERM') || emptied(pgid)) return false;
   signalGroup(pgid, 'SIGKILL');
   emptied(pgid);
   return true;
 }
 
-/** The last lines a script wrote on stderr, joined for one line, or the empty string. */
+/** The most of a process's words kept in `said`. */
+const SAID_LINES = 4;
+
+/** The last lines a process wrote on stderr, joined for one line, or the empty string. */
 function lastLines(stderr: string): string {
   return stderr
     .split('\n')
@@ -259,230 +90,87 @@ function lastLines(stderr: string): string {
 }
 
 /**
- * How a verb's script ended, as either runner read it: its exit status or the signal that ended it, what it printed, the error that kept
- * it from running, whether it was stopped at its deadline, and whether a process it started outlived SIGTERM there and was killed.
+ * Why a verb stopped at its deadline of `deadlineMs` gave no answer: that it was stopped, whether a process it started outlived SIGTERM
+ * and was `killed`, and the last lines the process running then wrote on `stderr`.
  */
-export type PlaceRan = {
-  readonly status: number | null;
-  readonly signal: NodeJS.Signals | null;
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly error?: Error;
-  readonly timedOut: boolean;
-  readonly killed: boolean;
-};
-
-/** Why a finished script gave no answer, or undefined when it exited 0 and its stdout is to be read. */
-function unheard(ran: PlaceRan, deadlineMs: number): string | undefined {
-  const words = lastLines(ran.stderr);
-  const tail = words ? `: ${words}` : '';
-  const kill = ran.killed
+export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string): string {
+  const words = lastLines(stderr);
+  const kill = killed
     ? `, and a process it started outlived SIGTERM for ${STOP_GRACE_MS / 1000} s and was killed, so a lock it held may be left`
     : '';
-  if (ran.timedOut) return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${tail}`;
-  if (ran.error) return `it could not be run: ${ran.error.message}`;
-  if (ran.signal) return `it was ended by ${ran.signal}${tail}`;
-  if (ran.status !== 0) return words || `it exited ${ran.status ?? 'with no status'}`;
-  return undefined;
+  return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${words ? `: ${words}` : ''}`;
 }
 
-/** What a script that exited 0 printed, read as the verb's answer or a refusal; the reason it reads as neither, as a string. */
-function heard<V extends PlaceVerb>(verb: V, stdout: string): { readonly answer: PlaceAnswers[V] } | { readonly refused: string } | string {
-  let printed: unknown;
-  try {
-    printed = JSON.parse(stdout);
-  } catch {
-    return stdout.trim() ? `its answer is not JSON: ${quoted(stdout.trim())}` : 'it printed no answer';
-  }
-  const refused = Schema.decodeUnknownResult(RefusedSchema)(printed);
-  if (Result.isSuccess(refused)) return { refused: refused.success.refused };
-  const schema: Schema.Codec<PlaceAnswers[V], unknown> = ANSWERS[verb];
-  const answer = Schema.decodeUnknownResult(schema)(printed);
-  if (Result.isSuccess(answer)) return { answer: answer.success };
-  return `its answer does not read as ${verb}'s: ${firstWrong(printed, answer.failure)}`;
-}
+/** Why `verb` gave no answer when the place threw answering it: the verb, and what was thrown. */
+export const threwWords = (verb: PlaceVerb, threw: unknown): string =>
+  `${verb} threw before it answered: ${threw instanceof Error ? threw.message : String(threw)}`;
 
 /** `verb` unread, with why and now. */
-const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unread } => ({
+export const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unread } => ({
   unread: { verb, said, at: new Date().toISOString() },
 });
 
-/** What a run of `verb`'s script is: the script, what it is handed on stdin, its deadline and its environment. */
-export type PlaceAsk = { readonly script: string; readonly input: string; readonly deadlineMs: number; readonly env: NodeJS.ProcessEnv };
+/** What an ask may say beside its request: another deadline than the verb's own (`PLACE_DEADLINE_MS`), in milliseconds. */
+export type AskOptions = { readonly deadlineMs?: number };
 
 /**
- * How `verb` of the place in `skillDir` is run (`runPlaceVerb`): its script, `request` with `v` added, the verb's deadline
- * (`PLACE_DEADLINE_MS`) unless `deadlineMs` says another, and `env`, this process's when none is given. Unread when there is no script.
+ * What a place answers: what it declares of itself, and its verbs, asked two ways. `ask` leaves the event loop free while the place
+ * works, for a verb that may take long, as `make` may; `askNow` holds the process until it is answered. Either answers the verb's
+ * outcome and never fails or throws for what the place did: its answer, its refusal in its own words, or unread. A place keeps nothing
+ * between two questions.
  */
-export function placeAsk<V extends PlaceVerb>(
-  skillDir: string,
-  verb: V,
-  request: PlaceRequests[V],
-  options: { readonly deadlineMs?: number; readonly env?: NodeJS.ProcessEnv },
-): PlaceAsk | { readonly unread: Unread } {
-  const script = path.join(skillDir, 'scripts', `${verb}.ts`);
-  if (!fs.existsSync(script)) return unreadNow(verb, `the place has no script for ${verb}: ${script} is not there`);
-  return {
-    script,
-    input: JSON.stringify({ ...request, v: PLACE_CONTRACT }),
-    deadlineMs: options.deadlineMs ?? PLACE_DEADLINE_MS[verb],
-    env: options.env ?? process.env,
-  };
+export type Place = {
+  readonly declared: PlaceDeclared;
+  readonly ask: <V extends PlaceVerb>(verb: V, request: PlaceRequests[V], options?: AskOptions) => Effect.Effect<PlaceOutcome<V>>;
+  readonly askNow: <V extends PlaceVerb>(verb: V, request: PlaceRequests[V], options?: AskOptions) => PlaceOutcome<V>;
+};
+
+/**
+ * The place a program asks: given by whoever runs the program, where it is composed — the daemon, a command, the api, a test — and by
+ * nothing else. It has no default: a program that asks it and is given none does not compile.
+ */
+export class PlaceService extends Context.Service<PlaceService, Place>()('orchestrator/PlaceService') {
+  /** `place` as the layer that gives it to a program. */
+  static readonly layer = (place: Place): Layer.Layer<PlaceService> => Layer.succeed(PlaceService)(PlaceService.of(place));
 }
 
-/** The outcome of `verb` as its script ran (`PlaceRan`): its decoded answer, its refusal, or unread with why. */
-export function outcomeOf<V extends PlaceVerb>(verb: V, ran: PlaceRan, deadlineMs: number): PlaceOutcome<V> {
-  const why = unheard(ran, deadlineMs);
-  if (why !== undefined) return unreadNow(verb, why);
-  const answer = heard(verb, ran.stdout);
-  return typeof answer === 'string' ? unreadNow(verb, answer) : answer;
-}
+/** A started repository run's place as `nemia rm` and `nemia prune` read it: the place, its `say`, and what its inventory read. */
+export type RunPlaceRead = { readonly place: Place; readonly say: PlaceDeclared['say']; readonly inventory: Inventory };
 
 /**
- * Run `verb` of the place skill in `skillDir`: `node <skillDir>/scripts/<verb>.ts` in `skillDir`, `request` on stdin with `v` added, within
- * the verb's deadline (`PLACE_DEADLINE_MS`) unless `deadlineMs` says another, in `env` (this process's when none is given). It holds this
- * process until the script ends: a verb that may take long, as `make` may, is run by `runPlaceVerbAsync` (`place-async.store.ts`).
- *
- * Returns the verb's decoded answer; `{ refused }` when the script refused at exit 0; or `{ unread }`, with its last stderr lines or the
- * reason, for anything else — no script, a non-zero exit, a signal, the deadline passed, or a stdout that does not decode. Never throws for
- * what the script did. The script leads a process group of its own; past its deadline it is killed, and what it started (git, git's hooks
- * and filters) is sent SIGTERM, so git takes its locks away, then SIGKILL after `STOP_GRACE_MS`. A process that leaves the group is not
- * stopped. A script started is counted in the pass's `place` phase, its process and its time; a verb with no script starts nothing.
- */
-export function runPlaceVerb<V extends PlaceVerb>(
-  skillDir: string,
-  verb: V,
-  request: PlaceRequests[V],
-  options: { readonly deadlineMs?: number; readonly env?: NodeJS.ProcessEnv } = {},
-): PlaceOutcome<V> {
-  const asked = placeAsk(skillDir, verb, request, options);
-  if ('unread' in asked) return asked;
-  const spawned: SpawnSyncOptionsWithStringEncoding & { readonly detached: boolean } = {
-    cwd: skillDir,
-    input: asked.input,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    timeout: asked.deadlineMs,
-    killSignal: 'SIGKILL',
-    maxBuffer: 256 * 1024 * 1024,
-    env: asked.env,
-    detached: true,
-  };
-  const { ran, timedOut, killed } = within('place', () => {
-    countSpawn();
-    const ran = spawnSync(process.execPath, [asked.script], spawned);
-    const timedOut = ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT';
-    return { ran, timedOut, killed: timedOut && ran.pid > 0 && stopGroup(ran.pid) };
-  });
-  return outcomeOf(
-    verb,
-    { status: ran.status, signal: ran.signal, stdout: ran.stdout ?? '', stderr: ran.stderr ?? '', error: ran.error, timedOut, killed },
-    asked.deadlineMs,
-  );
-}
-
-/**
- * The place skill in `skillDir` as its `place.json` declares it, decoded strictly. Refuses (`Invalid`, naming the file and the fix) a
- * file that is not there or not JSON, one whose first wrong field does not read as contract `v` 1 — an unknown verb, a `say` key missing —
- * a declared verb with no script in `scripts/`, and a `say` template naming a hole the code does not fill for its key (`unknownHoles`).
- */
-export function readPlaceJson(skillDir: string): PlaceDeclared {
-  const file = path.join(skillDir, 'place.json');
-  const fix = `write it as contract v ${PLACE_CONTRACT} has it: { "v", "verbs", "denyWhileLanding", "say" }`;
-  if (!fs.existsSync(file)) throw new Invalid({ message: `${file} is not there, and a place skill declares itself in it: ${fix}` });
-  let raw: unknown;
-  try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (err) {
-    throw new Invalid({ message: `${file} is not JSON (${(err as Error).message}): ${fix}` });
-  }
-  const decoded = Schema.decodeUnknownResult(PlaceDeclaredSchema)(raw);
-  if (Result.isFailure(decoded))
-    throw new Invalid({ message: `${file} does not read as a place's declaration: ${firstWrong(raw, decoded.failure)}; ${fix}` });
-  const scriptless = decoded.success.verbs.filter((verb) => !fs.existsSync(path.join(skillDir, 'scripts', `${verb}.ts`)));
-  if (scriptless.length)
-    throw new Invalid({
-      message: `${file} declares ${scriptless.join(', ')}, and scripts/ has no ${scriptless.map((v) => `${v}.ts`).join(', ')}: add the script, or take the verb off \`verbs\``,
-    });
-  const [unknown] = unknownHoles(decoded.success.say);
-  if (unknown) throw new Invalid({ message: unknownHoleRefusal(file, unknown.key, unknown.hole) });
-  return decoded.success;
-}
-
-/** The name a record gives the package's place (`placeSkill.skill`): the one `place: git` resolves to. */
-export const SHIPPED_PLACE_SKILL = 'git';
-
-/** The git place the package ships, run where a record names no place skill of its own. */
-export const SHIPPED_PLACE = path.join(PLACE_SKILLS, SHIPPED_PLACE_SKILL);
-
-/**
- * The directory a repository run's place verbs run from: the package's place (`SHIPPED_PLACE`) for a record that names none and for one
- * that names `SHIPPED_PLACE_SKILL`. Refuses (`Invalid`) a record that names another skill, which this nemia does not ship.
- */
-export function placeDirOf(run: Pick<RepositoryRun, 'id' | 'placeSkill'>): string {
-  const skill = run.placeSkill?.skill;
-  if (skill === undefined || skill === SHIPPED_PLACE_SKILL) return SHIPPED_PLACE;
-  throw new Invalid({
-    message: `run ${run.id} names the place skill ${skill}, and this nemia ships only ${SHIPPED_PLACE_SKILL}: read its store with the nemia that started it`,
-  });
-}
-
-/** Where a run's place verbs run from once it is started (`nemia rm`, `nemia prune`): `placeDirOf`, unless a layer gives another. */
-export const RunPlace = Context.Reference<(run: Pick<RepositoryRun, 'id' | 'placeSkill'>) => string>('orchestrator/RunPlace', {
-  defaultValue: () => placeDirOf,
-});
-
-/**
- * A started repository run's place as `nemia rm` and `nemia prune` read it: where its verbs run, its `say`, and what its inventory read.
- */
-export type RunPlaceRead = { readonly dir: string; readonly say: PlaceDeclared['say']; readonly inventory: Inventory };
-
-/**
- * What the place in `placeDir` reads the repository run left (`inventory`): its worktrees inside `under` and its branches under `wf/<id>/`,
- * merged or not into its base branch, with the place's `say` (`readPlaceJson`, which refuses one that does not read) — or the outcome
- * that is no answer: refused, or not heard. Never an empty inventory in its place.
+ * What `place` reads the repository run left (`inventory`): its worktrees inside `under` and its branches under `wf/<id>/`, merged or
+ * not into its base branch, with the place's `say` — or the outcome that is no answer: refused, or not heard. Never an empty inventory
+ * in its place.
  */
 export function readRunPlace(
   run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
-  placeDir: string,
+  place: Place,
   under: string,
 ): RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }> {
-  const say = readPlaceJson(placeDir).say;
-  const read = runPlaceVerb(placeDir, 'inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch });
-  return 'answer' in read ? { dir: placeDir, say, inventory: read.answer } : read;
+  const read = place.askNow('inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch });
+  return 'answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read;
 }
 
-/** What `openPlace` answers: the repository `open` read, and the place skill it ran, as a record names it. */
-export type OpenedPlace = { readonly opened: Opened; readonly placeSkill: { readonly skill: string; readonly version: string } };
-
 /**
- * A repository run's place, opened at `nemia start` on `root`: the skill in `skillDir` read (`readPlaceJson`), every verb of `needed`
- * declared, its version taken (`skillVersion`), and its `open` verb run, told whether the run cuts worktrees (`isolate`). Refuses
- * (`Invalid`) a `place.json` that does not read or leaves out a verb of `needed` (`missingVerbsRefusal`), a folder with no SKILL.md, and an
- * `open` that refuses, in its own words. An `open` that is not heard is no refusal: it throws a plain `Error`, with why, so a queued card
- * is tried again.
+ * A repository run's place, opened at `nemia start` on `root`: `place` asked its `open` verb, told whether the run cuts worktrees
+ * (`isolate`). Refuses (`Invalid`) an `open` that refuses, in its own words. An `open` that is not heard is no refusal: it throws a plain
+ * `Error`, with why, so a queued card is tried again.
  */
-export function openPlace(skillDir: string, root: string, needed: readonly PlaceVerb[], isolate: boolean): OpenedPlace {
-  const declared = readPlaceJson(skillDir);
-  const missing = missingVerbsRefusal(path.join(skillDir, 'place.json'), declared, needed);
-  if (missing) throw new Invalid({ message: missing });
-  const version = skillVersion(skillDir);
-  if (version === null)
-    throw new Invalid({ message: `${skillDir} has no SKILL.md, so it is no skill to run a place from: write its SKILL.md there` });
-  const outcome = runPlaceVerb(skillDir, 'open', { root, isolate });
+export function openPlace(place: Place, root: string, isolate: boolean): Opened {
+  const outcome = place.askNow('open', { root, isolate });
   if ('refused' in outcome) throw new Invalid({ message: outcome.refused });
   if ('unread' in outcome) throw new Error(`the place's open was not heard: ${outcome.unread.said}. Nothing was started: start it again`);
-  return { opened: outcome.answer, placeSkill: { skill: SHIPPED_PLACE_SKILL, version } };
+  return outcome.answer;
 }
 
 /**
- * Whether each `{ onto, branch }` of `trials` merges in `repo`, as the place in `skillDir` answers its `trial` verb: each base's commit
+ * Whether each `{ onto, branch }` of `trials` merges in `repo`, as `place` answers its `trial` verb: each base's commit
  * now, and each trial in the order asked. Asks nothing for no trial. A refusal, an unread outcome, or an answer with another count of
  * trials than asked is never a verdict: every trial is then `{ unknown }` in words that say why, and every base's commit null.
  */
-export function trialMerges(repo: string, trials: readonly { readonly onto: string; readonly branch: string }[], skillDir: string): Trials {
+export function trialMerges(repo: string, trials: readonly { readonly onto: string; readonly branch: string }[], place: Place): Trials {
   if (!trials.length) return { at: {}, trials: [] };
-  const outcome = runPlaceVerb(skillDir, 'trial', { repo, trials });
+  const outcome = place.askNow('trial', { repo, trials });
   if ('answer' in outcome && outcome.answer.trials.length === trials.length) return outcome.answer;
   const unknown =
     'refused' in outcome

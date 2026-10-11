@@ -4,6 +4,7 @@
  * store resumed once the service's daemon has completed its first pass. A pause a person put stands as it was. `nemia service install
  * --take-over`, `nemia upgrade` and `nemia service restart` run it.
  */
+import type { PlaceService } from '../place/place.store.ts';
 import { Effect, Schedule } from 'effect';
 import { daemonLine, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Finishing, Pause } from '../pause/pause.ts';
@@ -19,7 +20,7 @@ export type TakeoverHost = {
   readonly signal: (pid: number) => void;
   readonly pause: (said: { why?: string; by?: string }) => Pause;
   readonly resume: () => Pause;
-  readonly landings: () => Effect.Effect<readonly Finishing[], Refusal, EngineService>;
+  readonly landings: () => Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService>;
   readonly say: (line: string) => void;
   readonly pollMs: number;
   readonly waitMs: number;
@@ -72,7 +73,7 @@ const pauseFor = (pid: number, host: TakeoverHost, by: string) =>
   });
 
 /** Waits until no landing check runs, naming each once as it is first seen; no deadline but the person's ^C. */
-const landed = (host: TakeoverHost): Effect.Effect<readonly Finishing[], Refusal, EngineService> => {
+const landed = (host: TakeoverHost): Effect.Effect<readonly Finishing[], Refusal, EngineService | PlaceService> => {
   const named = new Set<string>();
   const read = Effect.tap(host.landings(), (landings) =>
     Effect.sync(() => {

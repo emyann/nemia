@@ -41,6 +41,7 @@ import { engineWord, phaseOfView } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { mergeStaged, statusMemo } from '../place/landing.store.ts';
+import { PlaceService } from '../place/place.store.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
 
@@ -107,7 +108,7 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
     assess(steps, on, phaseOf, closeoutReader(views, run), closeoutsAsked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
   const assessed = assessOf(run);
   const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, git);
-  const memo = statusMemo(headsOver(git));
+  const memo = statusMemo(headsOver(git), yield* PlaceService);
   const checkout = how.checkout
     ? yield* checkoutHold(e, run, steps, { standing: Effect.succeed(how.checkout) }, process.env, memo)
     : undefined;
@@ -174,7 +175,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
   const reads: Read[] = [];
   const standing = yield* standingSnapshot();
   const git = standingReader(standing);
-  const memo = statusMemo(headsOver(git));
+  const memo = statusMemo(headsOver(git), yield* PlaceService);
   if (runs.length) {
     const viewed = viewedOnce(e);
     const held = yield* runSlots(viewed, runId ? runStore.runs.list() : runs, process.env, passParents(git));
@@ -266,10 +267,10 @@ const checkDue = (run: Run): boolean =>
  * in its checkout (`mergeStaged`, asked once a run), read as `nemia ls` reads it, and each other with a check due (`checkDue`), read
  * without asking git where its branches stand. A run a task journal of which does not read (`unreadableJournal`), or whose unfrozen
  * folder does not load (`stepsOrNone`), is left out, as the tick leaves it unjudged; any other failure throws. Where the branches stand
- * is read through `git`, and the checkouts asked of `placeDir` where it is given, else of each run's own place.
+ * is read through `git`, and the checkouts asked of the place the program was given.
  */
-const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[], git: BranchReader, placeDir?: string) {
-  const memo = statusMemo(headsOver(git), placeDir);
+const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[], git: BranchReader) {
+  const memo = statusMemo(headsOver(git), yield* PlaceService);
   const holding = runs.flatMap((run) => {
     if (mergeStaged(run, stepsOrNone(run), memo)) return [{ run, how: { git } satisfies ReadingHow, staged: () => true }];
     return checkDue(run) ? [{ run, how: { git, standings: () => [] } satisfies ReadingHow, staged: () => false }] : [];
@@ -290,10 +291,9 @@ const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[
 
 /**
  * Each check among `runs` the pause holds (`heldOf`), a landing with its merge staged among them, as the tick's pass says it, where the
- * branches stand read through `git`, asking `placeDir` where it is given, else each run's own place.
+ * branches stand read through `git`.
  */
-export const heldRead = (e: Engine, runs: readonly Run[], git: BranchReader, placeDir?: string) =>
-  Effect.map(holdingReads(e, runs, git, placeDir), heldAmong);
+export const heldRead = (e: Engine, runs: readonly Run[], git: BranchReader) => Effect.map(holdingReads(e, runs, git), heldAmong);
 
 /**
  * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`)

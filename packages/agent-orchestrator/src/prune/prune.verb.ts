@@ -1,6 +1,6 @@
 /**
  * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is
- * touched, and removing through the run's place (`runPlaceVerb`); and what `nemia rm` shares with it — a path as git names a worktree
+ * touched, and removing through the place it is given; and what `nemia rm` shares with it — a path as git names a worktree
  * (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
  * (`runtime-client.ts`); it never stops anything.
  */
@@ -18,7 +18,7 @@ import { decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, runWorktrees, type AskName } from '../forget/forget.ts';
 import { HOME, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { readRunPlace, RunPlace, runPlaceVerb, type RunPlaceRead } from '../place/place.store.ts';
+import { PlaceService, readRunPlace, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { shippedOf, standingsOf } from '../branches/branches.store.ts';
 import { checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
@@ -56,7 +56,7 @@ export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: 
  * rendered (`agents/`), the check logs and the engine's journals, each small and each read by `nemia decide` or the board — which say the
  * files were removed where they would list them, as the api's file route does (410).
  *
- * What the run left is read first by its place (`inventory`, from the place `RunPlace` names): one refused or not heard is no answer,
+ * What the run left is read first by its place (`inventory`): one refused or not heard is no answer,
  * never an empty one, and the prune is refused in those words (`inventoryUnread`), touching nothing.
  *
  * Read as `nemia rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run,
@@ -95,7 +95,7 @@ const pruning = Effect.fn('prune')(function* (
 
   const within = resolved(path.join(HOME, 'worktrees', id));
   const steps = frozenSteps(run);
-  const place = readRunPlace(run, (yield* RunPlace)(run), within);
+  const place = readRunPlace(run, yield* PlaceService, within);
   if (!('inventory' in place))
     return { id, kind: 'refused', refusal: inventoryUnread('prune', id, run.repo, place), ...none } satisfies Pruning;
   const listed = placeWorktrees(run, steps, within, place).filter((w) => !(w.prunable && w.locked === undefined));
@@ -147,7 +147,7 @@ function nothingLeft(run: RepositoryRun, place: RunPlaceRead, { yes, artifacts }
   const nothing = !artifacts
     ? worktrees
     : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
-  if (yes && run.pruned) runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: [], branches: [] });
+  if (yes && run.pruned) place.place.askNow('remove', { repo: run.repo, workspaces: [], branches: [] });
   return { id: run.id, kind: 'nothing', nothing, worktrees: [], left: [] };
 }
 
@@ -164,6 +164,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   const judged: Pick<PruneFacts, 'decided' | 'held' | 'owed'> = { decided: undefined, held: null, owed: [] };
   if (!steps) return judged;
   const git = yield* standingLive([run]);
+  const placed = yield* PlaceService;
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const { asks, rounds } = runStore.asks.read(run.id);
   const reader = closeoutReader(views, run);
@@ -195,7 +196,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
       askAt,
       standings,
       'prune',
-      merging(run, steps, statusMemo(headsOver(git))),
+      merging(run, steps, statusMemo(headsOver(git), placed)),
       pruneAgain(run.id, flags),
     ),
     owed: handOffOwed(steps, run, phaseOf),
@@ -266,7 +267,7 @@ function removeAll(
 
 /** The place's `remove` of `worktrees`: those it removed, and those it left, in git's words, or every one, when it did not answer. */
 function removeWorktrees(run: RepositoryRun, place: RunPlaceRead, worktrees: ReadonlyArray<{ path: string; bytes: number }>) {
-  const outcome = runPlaceVerb(place.dir, 'remove', { repo: run.repo, workspaces: worktrees.map((w) => w.path), branches: [] });
+  const outcome = place.place.askNow('remove', { repo: run.repo, workspaces: worktrees.map((w) => w.path), branches: [] });
   if (!('answer' in outcome)) {
     const said = unansweredWords(outcome);
     return { removed: [], left: worktrees.map((w): Pruning['left'][number] => ({ path: w.path, unread: said })) };

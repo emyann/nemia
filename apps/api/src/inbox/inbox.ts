@@ -31,12 +31,12 @@ import {
   readInbox,
   runStore,
   type InboxListing,
-  runWith,
 } from 'agent-orchestrator';
 import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
+import { runPlaced } from '../store.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
@@ -194,8 +194,8 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
  */
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
-    served(c, async ({ e }) => {
-      const { cards } = await runWith(e, INBOX.handler({}));
+    served(c, async ({ e, placeService }) => {
+      const { cards } = await runPlaced(placeService, e, INBOX.handler({}));
       return c.json(listInbox(cards));
     }),
   )
@@ -203,8 +203,8 @@ export const inbox = new Hono<ApiEnv>()
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    return served(c, async ({ e }) => {
-      const { card, source } = (await runWith(e, CARD.handler({ name }))) as { card: InboxListing; source: string };
+    return served(c, async ({ e, placeService }) => {
+      const { card, source } = (await runPlaced(placeService, e, CARD.handler({ name }))) as { card: InboxListing; source: string };
       const [entry] = listInbox([card]);
       const keys =
         entry.error === null
@@ -218,14 +218,14 @@ export const inbox = new Hono<ApiEnv>()
     });
   })
   .post('/api/inbox', (c) =>
-    served(c, async ({ e, repo, home }) => {
+    served(c, async ({ e, placeService, repo, home }) => {
       const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, FILE_BODY, `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.`, fileWords);
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const asked = filingOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-      const { card, file } = await runWith(e, INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo }));
+      const { card, file } = await runPlaced(placeService, e, INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo }));
       return c.json(
         { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
         201,

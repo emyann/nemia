@@ -17,7 +17,7 @@ import type { Standing } from '../place/place.ts';
  * One repository, place and base branch as a pass read where its branches stand: the place's answer, or why there is none — the place
  * refused or was not heard — in words, and when it was read.
  */
-export type StoodRead = { readonly repo: string; readonly place: string; readonly base: string; readonly at: string } & (
+export type StoodRead = { readonly repo: string; readonly base: string; readonly at: string } & (
   | { readonly answer: Standing }
   | { readonly unread: string }
 );
@@ -30,7 +30,7 @@ export const standingFile = (): string => path.join(HOME, 'standing.json');
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
-const Where = { repo: Schema.String, place: Schema.String, base: Schema.String, at: Schema.String };
+const Where = { repo: Schema.String, base: Schema.String, at: Schema.String };
 
 const StoodReadSchema = Schema.Union([
   Schema.StructWithRest(Schema.Struct({ ...Where, answer: StandingSchema }), Rest),

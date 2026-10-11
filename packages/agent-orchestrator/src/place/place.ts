@@ -1,10 +1,10 @@
 /**
- * The contract between the orchestrator and a place skill (the git-out design, *The seam* and *The contracts*): the
- * verbs a place answers, the request each is handed, the answer each gives, and what the skill's `place.json` declares. Types and constants
- * alone: `place.store.ts` runs a verb's script and decodes what it prints into these.
+ * The contract between the orchestrator and a place (the git-out design, *The seam* and *The contracts*): the verbs a place answers, the
+ * request each is handed, the answer each gives, and what a place declares of itself. Types and constants alone: `place.store.ts` holds
+ * the service a caller asks.
  *
- * A verb is run as `node <skill>/scripts/<verb>.ts`, one JSON request on stdin carrying `v` (`PLACE_CONTRACT`), and has one of three
- * outcomes (`PlaceOutcome`): its answer, a refusal the place words itself, or unread, when it gave neither in time.
+ * A verb is a question asked of the place the program was given, and has one of three outcomes (`PlaceOutcome`): its answer, a refusal the
+ * place words itself, or unread, when it gave neither in time.
  */
 
 /** The verbs a place may answer, in the order a run meets them. */
@@ -26,10 +26,7 @@ export const PLACE_VERBS = [
 /** A verb a place may answer. */
 export type PlaceVerb = (typeof PLACE_VERBS)[number];
 
-/** The version of the contract, carried as `v` on every request and in `place.json`. */
-export const PLACE_CONTRACT = 1;
-
-/** How long a verb's script may take before it is unread, in milliseconds: two minutes, and ten for `make`, whose fan-in merge is slow. */
+/** How long a verb may take before it is unread, in milliseconds: two minutes, and ten for `make`, whose fan-in merge is slow. */
 export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   open: 120_000,
   make: 600_000,
@@ -188,7 +185,7 @@ export type PlaceAnswers = {
   readonly seal: Sealed;
 };
 
-/** Each verb's request, as the code hands it: `v` is added by the runner. */
+/** Each verb's request, as the code hands it. */
 export type PlaceRequests = {
   readonly open: { readonly root: string; readonly isolate: boolean };
   readonly make: {
@@ -229,7 +226,7 @@ export type PlaceRequests = {
   readonly seal: { readonly tree: string };
 };
 
-/** A verb that gave no answer: which, the last words its script said or why it was not heard, and when, as an ISO time. */
+/** A verb that gave no answer: which, the place's words on why it was not heard, and when, as an ISO time. */
 export type Unread = { readonly verb: PlaceVerb; readonly said: string; readonly at: string };
 
 /** A verb's outcome: its answer, the place's refusal in its own words, or unread. Unread is never a verdict: the verb is asked again. */
@@ -238,7 +235,7 @@ export type PlaceOutcome<V extends PlaceVerb> =
   | { readonly refused: string }
   | { readonly unread: Unread };
 
-/** The keys of `place.json`'s `say`: the sentences the code prints that name a place's own commands, as templates with `{name}` holes. */
+/** The keys of a place's `say`: the sentences the code prints that name a place's own commands, as templates with `{name}` holes. */
 export const PLACE_SAYS = [
   'look',
   'readResult',
@@ -258,7 +255,7 @@ export const PLACE_SAYS = [
   'lastMerge',
 ] as const;
 
-/** A key of `place.json`'s `say`. */
+/** A key of a place's `say`. */
 export type SayKey = (typeof PLACE_SAYS)[number];
 
 /** The keys of `say` that are a list of lines, each line a template: the others are one line. */
@@ -292,13 +289,8 @@ export type PlaceSay = { readonly [K in (typeof SAY_LISTS)[number]]: readonly st
   readonly [K in Exclude<SayKey, (typeof SAY_LISTS)[number]>]: string;
 };
 
-/**
- * What a place skill's `place.json` declares: the contract's version, the verbs its scripts answer, the tools a landing session is denied,
- * and the sentences the code prints for it (`PlaceSay`).
- */
+/** What a place declares of itself: the tools a landing session is denied, and the sentences the code prints for it (`PlaceSay`). */
 export type PlaceDeclared = {
-  readonly v: typeof PLACE_CONTRACT;
-  readonly verbs: readonly PlaceVerb[];
   readonly denyWhileLanding: readonly string[];
   readonly say: PlaceSay;
 };
@@ -331,18 +323,7 @@ export const SKILL_SECTIONS = { read: 'Read what changed', merge: 'Merge the bas
 export const skillSaid = (section: keyof typeof SKILL_SECTIONS): string => `as your place's skill says under *${SKILL_SECTIONS[section]}*`;
 
 /**
- * Why the place declared in `file` cannot serve a run: the verbs of `needed` its `declared` verbs leave out, each named, with the fix.
- * Undefined when it declares every one. Pure.
- */
-export function missingVerbsRefusal(file: string, declared: PlaceDeclared, needed: readonly PlaceVerb[]): string | undefined {
-  const missing = needed.filter((verb) => !declared.verbs.includes(verb));
-  if (!missing.length) return undefined;
-  const which = missing.join(', ');
-  return `${file} does not declare ${which}, which this workflow's run asks of its place: add ${missing.length === 1 ? 'the verb' : 'each verb'} to \`verbs\` with its script in scripts/, or start a workflow that asks no ${which} of it`;
-}
-
-/**
- * A `say` template of `place.json` filled: each `{name}` hole `holes` names replaced by its value, and any other text — a hole it does not
+ * A `say` template of a place filled: each `{name}` hole `holes` names replaced by its value, and any other text — a hole it does not
  * name, a `<branch>` left for a person — as written. Pure.
  */
 export const sayFilled = (template: string, holes: Readonly<Record<string, string>>): string =>

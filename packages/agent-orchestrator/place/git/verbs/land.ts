@@ -6,25 +6,23 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Malformed, failedWords, git, gitSays, isDirectory, refused, serve, text } from './contract.ts';
+import { failedWords, git, gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import type { PlaceRequests } from '../../../src/place/place.ts';
 
-serve((request) => {
-  const checkout = text(request, 'checkout');
-  const act = text(request, 'act');
-  if (act !== 'commit' && act !== 'abort')
-    throw new Malformed(`the request's \`act\` is ${JSON.stringify(act)}, where commit or abort is asked`);
-  const message = act === 'commit' ? text(request, 'message') : '';
-  const file = isDirectory(checkout) ? gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
+/** The verb's body. */
+export function* land(request: PlaceRequests['land']): Asking<Reply<'land'>> {
+  const { checkout, act } = request;
+  const file = isDirectory(checkout) ? yield* gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
   if (file === undefined) return refused(`${checkout} is not a git repository, so there is no merge to ${act}`);
   if (!fs.existsSync(path.resolve(checkout, file))) return refused(`no merge is in progress in ${checkout}, so there is none to ${act}`);
   try {
-    if (act === 'abort') {
-      git(checkout, ['merge', '--abort']);
+    if (request.act === 'abort') {
+      yield* git(checkout, ['merge', '--abort']);
       return { aborted: true };
     }
-    git(checkout, ['commit', '-F', '-'], message);
-    return { commit: git(checkout, ['rev-parse', 'HEAD']) };
+    yield* git(checkout, ['commit', '-F', '-'], request.message);
+    return { commit: yield* git(checkout, ['rev-parse', 'HEAD']) };
   } catch (err) {
     return refused(failedWords(err));
   }
-});
+}

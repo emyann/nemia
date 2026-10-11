@@ -45,7 +45,6 @@ import {
   headsFor,
   headsNow,
   NOTHING_READ,
-  placeReader,
   standingLive,
   standingNow,
   standingReader,
@@ -71,8 +70,7 @@ import {
 } from '../views/views.verb.ts';
 import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
-import { RunPlace } from '../place/place.store.ts';
-import { runPlaceVerbAsync } from '../place/place-async.store.ts';
+import { PlaceService, type Place } from '../place/place.store.ts';
 import { onceFacts, roundsGranted, settledFacts, settledWaits, timelineFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
@@ -350,13 +348,13 @@ export const advancePass = Effect.fn('advancePass')(
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
-    const handed = yield* withinEffect('act', handOffAll(run, reads, yield* RunPlace));
-    const placeOf = yield* placeReader;
-    const heads = headsOf(run, handed.marked ? undefined : pass?.standing, placeOf);
-    const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, placeOf)));
+    const place = yield* PlaceService;
+    const handed = yield* withinEffect('act', handOffAll(run, reads, place));
+    const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
+    const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
     const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
     const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
-    const from = pass ? { read: pass, slot } : { standing: standingNow(runStore.runs.list()) };
+    const from = pass ? { read: pass, slot } : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo);
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
@@ -492,16 +490,16 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassR
 /**
  * Hand off every step owed it (`handOffOwed`) while the run is there, and collect what each named: answers with the notes collecting said,
  * and with why a hand-off was not made, and whether a hand-off was marked on the record. A repository run's step is handed off by its
- * place's `handoff`, from the place `dirOf` names, and marked only on its answer: one refused or not heard is asked again on the next pass.
+ * `handoff`, asked of `place`, and marked only on its answer: one refused or not heard is asked again on the next pass.
  */
-const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, dirOf: (run: RepositoryRun) => string) {
+const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: Place) {
   let marked = false;
   const collected: string[] = [];
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
     if (!runStore.runs.exists(run.id)) continue;
     const record = run.steps[name];
     const unhanded = isRepositoryRun(run)
-      ? yield* handedOffBy(run, dirOf, record.workspace!, name)
+      ? yield* handedOffBy(place, record.workspace!, name)
       : folderPlace(runsDir()).handOff(run, name);
     if (unhanded === undefined) {
       run.steps[name] = { ...record, handedOff: record.taskId! };
@@ -513,22 +511,11 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, dirOf: (
 });
 
 /**
- * What the place `dirOf` names did with `step`'s hand-off of `workspace`, its `handoff` asked off the event loop, as a commit hook may
- * take minutes: undefined once it answered, else why not, in words.
+ * What `place` did with `step`'s hand-off of `workspace`, its `handoff` asked off the event loop, as a commit hook may take minutes:
+ * undefined once it answered, else why not, in words.
  */
-const handedOffBy = Effect.fnUntraced(function* (
-  run: RepositoryRun,
-  dirOf: (run: RepositoryRun) => string,
-  workspace: string,
-  step: string,
-) {
-  let dir: string;
-  try {
-    dir = dirOf(run);
-  } catch (err) {
-    return `not handed off — ${(err as Error).message}`;
-  }
-  const outcome = yield* runPlaceVerbAsync(dir, 'handoff', { workspace, step, why: '' });
+const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string, step: string) {
+  const outcome = yield* place.ask('handoff', { workspace, step, why: '' });
   if ('answer' in outcome) return undefined;
   return `not handed off — ${'refused' in outcome ? `the place refused: ${outcome.refused}` : `the place's handoff was not heard: ${outcome.unread.said}`}; asked again on the next pass`;
 });
@@ -661,14 +648,14 @@ const readsOthers = (run: Run): boolean => waitedOn(run).length > 0 || (!hasStar
 
 /**
  * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`standing`, `headsFor`),
- * undefined where it did not, or asked of its place now (`headsNow`, through `placeOf`) where no pass read them (`advanceRun`) or the run
+ * undefined where it did not, or asked of its place now (`headsNow`, of `place`) where no pass read them (`advanceRun`) or the run
  * committed a hand-off since (`handOffAll`).
  */
-const headsOf = (run: Run, standing: PassStanding | undefined, placeOf: PassStanding['placeOf']): Heads => {
+const headsOf = (run: Run, standing: PassStanding | undefined, place: Place): Heads => {
   let read: { heads: Readonly<Record<string, string>> | undefined } | undefined;
   return () => {
     if (!isRepositoryRun(run)) return undefined;
-    read ??= { heads: standing ? headsFor(standing, run) : headsNow(run, placeOf) };
+    read ??= { heads: standing ? headsFor(standing, run) : headsNow(run, place) };
     return read.heads;
   };
 };

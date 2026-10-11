@@ -38,7 +38,6 @@ import {
   type Factory,
   type FolderLoaded,
   type Places,
-  runWith,
 } from 'agent-orchestrator';
 import {
   contextText,
@@ -55,6 +54,8 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
+import { runPlaced } from '../store.ts';
+import type { PlaceService } from 'agent-orchestrator';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
 export type WorkflowSource = 'repo' | 'yours';
@@ -252,8 +253,8 @@ const LIST = COMMANDS.find((c) => c.name === 'workflows list')!;
  * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows list`, by
  * folder.
  */
-export const loadedOf = async (e: Engine['Service'], dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
-  (await runWith(e, LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home))) as Record<
+export const loadedOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
+  (await runPlaced(placeService, e, LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home))) as Record<
     string,
     FolderLoaded
   >;
@@ -263,7 +264,7 @@ export const loadedOf = async (e: Engine['Service'], dirs: readonly string[], re
  * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
  * factory, which steps its hires leave unfilled.
  */
-export async function listWorkflows(e: Engine['Service'], repo: string, home: string, factory?: Factory): Promise<WorkflowListing[]> {
+export async function listWorkflows(e: Engine['Service'], placeService: PlaceService['Service'], repo: string, home: string, factory?: Factory): Promise<WorkflowListing[]> {
   const folders = unshadowed(
     sourcesOf(repo, home, factory?.tree).flatMap(({ from, dir }) =>
       foldersIn(dir)
@@ -274,6 +275,7 @@ export async function listWorkflows(e: Engine['Service'], repo: string, home: st
   );
   const loaded = await loadedOf(
     e,
+    placeService,
     folders.map((f) => f.dir),
     repo,
     home,
@@ -553,8 +555,9 @@ export function agentSkillsOf(step: Workflow, dir: string, places: Places): Agen
  * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run
  * did not look at.
  */
-async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
-  const started = await runWith(
+async function cardStarted(e: Engine['Service'], placeService: PlaceService['Service'], asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
+  const started = await runPlaced(
+    placeService,
     e,
     START_ENTRY.handler({
       card: asked.card,
@@ -610,10 +613,10 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */
 export const workflows = new Hono<ApiEnv>()
-  .get('/api/workflows', (c) => served(c, async ({ e, repo, home, factory }) => c.json(await listWorkflows(e, repo, home, factory))))
+  .get('/api/workflows', (c) => served(c, async ({ e, placeService, repo, home, factory }) => c.json(await listWorkflows(e, placeService, repo, home, factory))))
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
-    served(c, async ({ e, repo, home, factory }) => {
+    served(c, async ({ e, placeService, repo, home, factory }) => {
       const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
@@ -622,12 +625,13 @@ export const workflows = new Hono<ApiEnv>()
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       const named = c.req.query('factory') === DEFAULT_FACTORY ? DEFAULT_FACTORY : factory?.name;
       if (asked.card !== undefined) {
-        const started = await cardStarted(e, asked, repo, named);
+        const started = await cardStarted(e, placeService, asked, repo, named);
         c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
         return c.json(started, 201);
       }
       const found = factory ? { factory, repo } : startFactory(named, repo, '?factory=<name>');
-      const { id } = await runWith(
+      const { id } = await runPlaced(
+        placeService,
         e,
         START_ENTRY.handler({
           brief: asked.brief,

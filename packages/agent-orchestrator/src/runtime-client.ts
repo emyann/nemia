@@ -202,7 +202,7 @@ export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineServ
  */
 export const over =
   (e: Engine) =>
-  <A, E>(program: Effect.Effect<A, E, EngineService>): Effect.Effect<A, E> =>
+  <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, EngineService>> =>
     Effect.provideService(program, EngineService, e);
 
 /**

@@ -12,11 +12,11 @@ import {
   type FactoryCondition,
   type FactoryListing,
   type Hires,
-  runWith,
   type ScheduleListed,
 } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 import { type ApiEnv, served } from '../layer.ts';
+import { runPlaced } from '../store.ts';
 
 /**
  * The lines a person types for a factory, built off the table: a workflow attached to it, its file removed and filed again, and a workflow
@@ -134,8 +134,8 @@ const answerOf = (listing: FactoryListing, listed: readonly ScheduleListed[]): F
  *   has, in the entry's one answer. Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
-  served(c, async ({ e, env, running }) => {
-    const listed = await runWith(e, FACTORY.handler({}));
+  served(c, async ({ e, placeService, env, running }) => {
+    const listed = await runPlaced(placeService, e, FACTORY.handler({}));
     return c.json([
       {
         name: DEFAULT_FACTORY,

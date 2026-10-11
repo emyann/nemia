@@ -19,6 +19,7 @@ import {
   type RestingMemo,
   restingMemo,
   type RunSummary,
+  PlaceService,
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
@@ -66,8 +67,11 @@ export class ReadMemo extends Context.Service<
   }));
 }
 
-/** Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`). */
-export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | ReadMemo | Followings;
+/**
+ * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place
+ * the package's programs ask (`PlaceService`).
+ */
+export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | ReadMemo | Followings | PlaceService;
 
 /** The runtime an app runs its handlers on, built once from its layer. */
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
@@ -76,7 +80,8 @@ export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
 export type ApiEnv = { Variables: { runtime: ApiRuntime } };
 
 /**
- * The services as a handler reads them, each under the name the helpers it calls take it by, and where the request is answered
+ * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program asks,
+ * given with `runPlaced`), and where the request is answered
  * (`placeFor`, factories/place.ts): `repo`, the repository it is answered on, and `factory`, the factory it names, none for the default.
  */
 export type Served = {
@@ -85,6 +90,7 @@ export type Served = {
   repo: string;
   factory: Factory | undefined;
   e: Engine['Service'];
+  placeService: PlaceService['Service'];
   home: string;
   mcp: McpAsker['Service'];
   quota: QuotaAsker['Service'];
@@ -126,6 +132,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         env,
         running,
         e: yield* Engine,
+        placeService: yield* PlaceService,
         home: yield* StoreRoot,
         mcp: yield* McpAsker,
         quota: yield* QuotaAsker,

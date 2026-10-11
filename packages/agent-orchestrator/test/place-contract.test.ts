@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { testPlace } from '../place/memory/index.ts';
 import { PLACE_VERBS, type PlaceAnswers, type PlaceVerb } from '../src/place/place.ts';
 import { placeOver, type OwnVerbs } from './place-over.ts';
+import { scratch } from './scratch.ts';
 import { failing, unwalked, walksOn, WALKS, type Side } from './place-walks.ts';
 
 for (const [name, walk] of walksOn(testPlace)) test(name, walk);
@@ -65,4 +66,13 @@ test('REFUSED: a verb with no walk — one added to the place, and one whose wal
   assert.deepEqual(unwalked(PLACE_VERBS, WALKS), [], 'every verb of the place is walked');
   assert.deepEqual(unwalked([...PLACE_VERBS, 'mirror'], WALKS), ['mirror']);
   assert.deepEqual(unwalked(PLACE_VERBS, { ...WALKS, land: [] }), ['land']);
+});
+
+test("the test place's commits are told apart by their first seven characters, as a screen that shortens an id tells git's", () => {
+  const { world } = testPlace();
+  const root = scratch('wf-place-ids-');
+  const ids = [world.repository(root, { 'a.txt': 'one\n' })];
+  for (let n = 0; n < 40; n++) ids.push(world.branch(root, 'main', { 'a.txt': `${n}\n` }));
+  assert.equal(new Set(ids.map((id) => id.slice(0, 7))).size, ids.length);
+  assert.ok(ids.every((id) => /^[0-9a-f]{40}$/.test(id)));
 });

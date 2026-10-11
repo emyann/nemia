@@ -1,8 +1,9 @@
 /**
  * The handle a test holds on what its test place holds (`World` in `world.ts`): `worldOf(held)` makes a repository, commits a checkout's
- * work, puts a commit on a branch, stages a merge or takes one back, puts a branch back on an older commit, tags, and reads a commit, the paths it changed, a
- * branch's tip, the merge staged in a checkout and what a checkout holds uncommitted, each in memory and in the directories the verbs
- * read. It throws on what a test got wrong — a directory that is no checkout, a name that is no commit — in words that say which.
+ * work, puts a commit on a branch, stages a merge or takes one back, puts a branch back on an older commit, tags, and reads a commit, the
+ * paths it changed, a branch's tip, the merge staged in a checkout and what a checkout holds uncommitted, each in memory and in the
+ * directories the verbs read. It throws on what a test got wrong — a directory that is no checkout, a name that is no commit — in words
+ * that say which.
  */
 import { checkoutAt, commitMade, committed, headOf, mergedIn, putBackOn, resolved, takenBack, treeOf, type Found } from './acts.ts';
 import { isDirectory, readTree, real, writeChanges } from './disk.ts';

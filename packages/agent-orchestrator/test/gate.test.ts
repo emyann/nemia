@@ -98,7 +98,10 @@ const approveByHand = (id: string, step: string, n: number, held: unknown = { st
 
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
 
-/** What `main` printed, line by line: given no engine, it is handed one of its own, which it is to file on, stop, say to or forget from nothing. */
+/**
+ * What `main` printed, line by line: given no engine, it is handed one of its own, which it is to file on, stop, say to or forget from
+ * nothing.
+ */
 const printedBy = async (
   t: { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } },
   argv: string[],

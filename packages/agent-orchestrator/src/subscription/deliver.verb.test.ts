@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
-import { board } from '../../test/engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { bell, until, WAITED } from '../../test/waits.ts';
 import { isRunLine } from '../feed/feed.ts';
 
@@ -41,7 +41,7 @@ const hanging = new Set<string>();
 const toldBell = bell();
 
 const e = {
-  ...engineOf(board().layer),
+  ...engineOf(testEngine().layer),
   say: (task: string, text: string) =>
     Effect.suspend(() => {
       asked.set(task, [...(asked.get(task) ?? []), text]);

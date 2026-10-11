@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { board } from '../../test/engine-board.ts';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-admit-');
 process.env.WF_ROOT = ROOT;
@@ -22,7 +23,7 @@ const { writeLevel } = await import('../nemia/level.store.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
 const { confirmedFile, dropRule } = await import('../auto/auto.store.ts');
 
-const fake = board();
+const fake = testEngine();
 const e = engineOf(fake.layer);
 
 /** Writes the run `id`'s record, started in `factory`, or in none, its steps `workflow` filed as `steps` say. */
@@ -76,8 +77,10 @@ test('REFUSED: a floor that is no level', () => {
 });
 
 /** Puts on the board a task settled as it succeeded, with `closeout` and its exit code. */
-const settled = (id: string, closeout?: unknown, exitCode = 0) =>
-  fake.tasks.set(id, { spec: { id, brief: '' }, phase: 'succeeded', closeout, exitCode });
+const settled = (id: string, closeout?: unknown, exitCode = 0) => {
+  Effect.runSync(e.file({ id, brief: `the task ${id}`, cwd: ROOT }));
+  fake.settle(id, 'succeeded', { ...(closeout === undefined ? {} : { closeout }), exitCode });
+};
 
 for (const name of ['auto', 'semi']) addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
 writeFactoryLevel('auto', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'auto', until: '2099-01-01T00:00:00.000Z' } });

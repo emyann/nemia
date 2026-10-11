@@ -7,14 +7,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Engine, EngineRefused, StopRefused } from 'agent-runtime';
-import { board } from './engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-runtime-client-');
 const { asked, engineOf, runWith } = await import('../src/runtime-client.ts');
 
 test('a runtime refusal read through asked rejects with exit code 2, its message led by the verb', async () => {
-  const e = engineOf(board().layer);
+  const e = engineOf(testEngine().layer);
   const refused = Object.assign(e, { stop: () => Effect.fail(new StopRefused({ message: 'task t-1 has settled' })) });
   const err = await runWith(refused, asked('stop', refused.stop('t-1'))).then(
     () => assert.fail('the refusal was read as a success'),
@@ -26,7 +26,7 @@ test('a runtime refusal read through asked rejects with exit code 2, its message
 });
 
 test('a failure of the runtime that is no refusal is thrown as it was, with no exit code and no verb', async () => {
-  const e = engineOf(board().layer);
+  const e = engineOf(testEngine().layer);
   const lost = new Error('the journal is gone');
   const broken = Object.assign(e, { stop: () => Effect.fail(lost as never) });
   const err = await runWith(broken, asked('stop', broken.stop('t-1'))).then(
@@ -57,7 +57,7 @@ test('REFUSED: a program run through runWith says no Info line, and still says i
   for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const)
     t.mock.method(console, method, (...args: unknown[]) => void said.push(args.map(String).join(' ')));
   await runWith(
-    engineOf(board().layer),
+    engineOf(testEngine().layer),
     Effect.gen(function* () {
       yield* Effect.logInfo('a feed line, said by the daemon alone');
       yield* Effect.logWarning('a warning a command must not swallow');

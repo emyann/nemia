@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { scratch } from '../../test/scratch.ts';
-import { board } from '../../test/engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { runOver } from '../../test/placed.ts';
 
 process.env.WF_ROOT = scratch('wf-nemia-reach-');
@@ -27,7 +27,7 @@ const ATTACH = `${DEFAULT_HARNESS} attach 01234567`;
 
 /** An engine whose view of her task is filed, settled where `settled`, with the bridge `bridge` where one is given. */
 const engineWith = (bridge: TaskView['bridge'], settled: string | null = null) => ({
-  ...engineOf(board().layer),
+  ...engineOf(testEngine().layer),
   view: (id: string) =>
     Effect.succeed({
       id,

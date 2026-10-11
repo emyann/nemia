@@ -20,8 +20,10 @@
  * falls back on, and for nothing a test asks of it.
  *
  * `JUDGED` says the kinds refused in each package: all five above the runtime, `git` and `process` in it, where the engine is the
- * package's own code. `reachBreaks` holds a measure to a baseline that only shrinks, and `contractBreaks` holds each stand-in of
- * `STAND_INS` to the file that walks its contract on the real thing. Run as a program, `node test/stand-ins.ts`, it prints the
+ * package's own code. A boundary test earns its name by any of the five, judged in its package or not (`Reach.named`), so the
+ * runtime's walk of its real engine is one. `reachBreaks` holds a measure to a baseline that only shrinks, `contractBreaks` holds each
+ * stand-in of `STAND_INS` to the file that walks its contract on the real thing, and `takenBreaks` keeps a stand-in out of the tests
+ * of the package that builds the real one. Run as a program, `node test/stand-ins.ts`, it prints the
  * baseline the repository measures.
  */
 import fs from 'node:fs';
@@ -78,8 +80,13 @@ const GIT_PLACE = `${O}/place/git/`;
 /** The real engine, as the client builds it. */
 const REAL_ENGINE: Names = { modules: [...ENTRY, `${O}/src/runtime-client.ts`], names: ['engine'] };
 
-/** The runtime's engine service, whose `layer` builds the real engine. */
-const RUNTIME_ENGINE: Names = { modules: ['agent-runtime'], names: ['Engine'] };
+const R = 'packages/agent-runtime';
+
+/** The runtime's engine service, whose `layer` builds the real engine: by the package's name, and by its files for its own tests. */
+const RUNTIME_ENGINE: Names = {
+  modules: ['agent-runtime', `${R}/src/index.ts`, `${R}/src/service/index.ts`, `${R}/src/service/engine.ts`],
+  names: ['Engine'],
+};
 
 /** The services an engine is given by: the runtime's, the orchestrator's and the api's. */
 const ENGINE_TAGS: readonly Names[] = [
@@ -379,8 +386,11 @@ const isHelper = (module: string): boolean => HELPER.test(module) && !module.end
 /** A site, with the file that holds it. */
 export type Located = Site & { readonly file: string };
 
-/** What a test file reaches: the kinds judged in its package, in the order of `KINDS`, and each site, its own or a helper's. */
-export type Reach = { readonly kinds: readonly Kind[]; readonly sites: readonly Located[] };
+/**
+ * What a test file reaches: the kinds judged in its package, in the order of `KINDS`, each site of them, its own or a helper's, and
+ * every kind it names, judged there or not (`named`).
+ */
+export type Reach = { readonly kinds: readonly Kind[]; readonly sites: readonly Located[]; readonly named: readonly Kind[] };
 
 /** How a measure is taken: under which clauses, and whether helpers are followed. */
 export type Measuring = { readonly clauses?: readonly Clause[]; readonly follow?: boolean };
@@ -401,17 +411,19 @@ export function reachOver(read: (file: string) => string | undefined, { clauses 
   return (file: string): Reach => {
     const judged = JUDGED[packageOf(file) ?? O];
     const seen = new Set<string>();
-    const sites: Located[] = [];
+    const every: Located[] = [];
     const visit = (at: string): void => {
       if (seen.has(at)) return;
       seen.add(at);
       const one = own(at);
       if (!one) return;
-      sites.push(...one.sites.filter((s) => judged.includes(s.kind)).map((s) => ({ ...s, file: at })));
+      every.push(...one.sites.map((s) => ({ ...s, file: at })));
       if (follow) one.loaded.filter(isHelper).forEach(visit);
     };
     visit(file);
-    return { kinds: KINDS.filter((kind) => sites.some((s) => s.kind === kind)), sites };
+    const sites = every.filter((s) => judged.includes(s.kind));
+    const kindsIn = (found: readonly Located[]): Kind[] => KINDS.filter((kind) => found.some((s) => s.kind === kind));
+    return { kinds: kindsIn(sites), sites, named: kindsIn(every) };
   };
 }
 
@@ -437,7 +449,8 @@ export type Baseline = Readonly<Record<string, readonly Kind[]>>;
 
 /** What a test file that reaches the real thing is told to do. */
 export const FIX =
-  'give the test a stand-in, by the line `const stand = eachTest(testPlace);` (test/placed.ts); where the real thing is its whole ' +
+  'give the test a stand-in, by the line `const stand = eachTest(testPlace);` for a place and `const engine = eachTest(testEngine);` ' +
+  'for an engine (test/placed.ts; testEngine of agent-runtime/testing); where the real thing is its whole ' +
   'subject, or the stand-in does not model what it needs, write it in a file named <what>.boundary.test.ts; never add it to ' +
   'test/stand-ins.baseline.ts, which only shrinks';
 
@@ -480,7 +493,7 @@ export function reachBreaks(measured: ReadonlyMap<string, Reach>, baseline: Base
   const out: string[] = [];
   for (const [file, reach] of measured) {
     if (!isBoundary(file)) out.push(...newReach(file, reach, baseline[file]));
-    else if (!reach.kinds.length)
+    else if (!reach.named.length)
       out.push(`${file} is named a boundary test and reaches nothing real: drop ${BOUNDARY.slice(0, -8)} from its name`);
   }
   for (const [file, listed] of Object.entries(baseline)) out.push(...looseEntry(file, listed, measured.get(file), exists));
@@ -532,14 +545,17 @@ export const baselineOf = (measured: ReadonlyMap<string, Reach>): Baseline =>
   );
 
 /**
- * A stand-in the packages hold, and the contract it owes: the folder of its code, the name that makes one, the table of walks both
- * sides run with the function that tells them, the test file that runs them on the stand-in, the boundary test that runs them on
- * the real thing, and the kind that real thing is.
+ * A stand-in the packages hold, and the contract it owes: the folder of its code, the name that makes one and the modules a test
+ * imports it from, the table of walks both sides run with the function that tells them, the test file that runs them on the
+ * stand-in, the boundary test that runs them on the real thing, and the kind that real thing is. `home`, where it has one, is the
+ * package whose own tests build the real thing (`build`), and name the stand-in in its contract's files alone.
  */
 export type StandIn = {
   readonly name: string;
   readonly folder: string;
   readonly made: string;
+  readonly from: readonly string[];
+  readonly home?: { readonly package: string; readonly build: string };
   readonly walks: { readonly file: string; readonly told: string };
   readonly own: string;
   readonly real: string;
@@ -552,10 +568,22 @@ export const STAND_INS: readonly StandIn[] = [
     name: 'the test place',
     folder: `${O}/place/memory`,
     made: 'testPlace',
+    from: [`${O}/place/memory`, `${O}/place/memory/index.ts`],
     walks: { file: `${O}/test/place-walks.ts`, told: 'walksOn' },
     own: `${O}/test/place-contract.test.ts`,
     real: `${O}/test/git-place.boundary.test.ts`,
     kind: 'place',
+  },
+  {
+    name: 'the test engine',
+    folder: `${R}/src/service`,
+    made: 'testEngine',
+    from: ['agent-runtime/testing', `${R}/src/testing.ts`, `${R}/src/service/index.ts`, `${R}/src/service/test-engine.ts`],
+    home: { package: R, build: 'Engine.layer(…)' },
+    walks: { file: `${R}/test/engine-walks.ts`, told: 'walksOn' },
+    own: `${R}/test/engine-contract.test.ts`,
+    real: `${R}/test/engine-contract.boundary.test.ts`,
+    kind: 'engine',
   },
 ];
 
@@ -625,13 +653,45 @@ export function contractBreaks(standIn: StandIn, read: (file: string) => string 
   if (!isBoundary(standIn.real)) out.push(`${standIn.real} walks the real thing and is no boundary test: name it <what>${BOUNDARY}`);
   if (real !== undefined && !reachIn(standIn.real, real).some((site) => site.kind === standIn.kind))
     out.push(`${standIn.real} is ${standIn.name}'s real side and names no real ${standIn.kind}: walk the real thing there`);
-  const makes: Names = { modules: [standIn.folder, `${standIn.folder}/index.ts`], names: [standIn.made] };
-  if (own !== undefined && ![...bindingsOf(standIn.own, own).values()].some((bound) => valueOf(bound, makes)))
+  if (own !== undefined && !takes(standIn, standIn.own, own))
     out.push(
       `${standIn.own} is ${standIn.name}'s own side and does not import ${standIn.made} of ${standIn.folder}: walk the stand-in there`,
     );
   return out;
 }
+
+/** Whether the text `text` of `file` binds the value that makes `standIn`, from one of the modules a test imports it from. */
+const takes = (standIn: StandIn, file: string, text: string): boolean =>
+  [...bindingsOf(file, text).values()].some((bound) => valueOf(bound, { modules: standIn.from, names: [standIn.made] }));
+
+/**
+ * Why `file`, a test or a helper of tests, may not take a stand-in it takes, each a sentence naming the fix: a file of the package
+ * that builds the real thing (`home`) tests the real one, and only the files of the stand-in's contract name it there.
+ */
+export function takenBreaks(file: string, text: string, standIns: readonly StandIn[] = STAND_INS): string[] {
+  return standIns
+    .filter((s) => s.home !== undefined && file.startsWith(`${s.home.package}/`) && ![s.own, s.real, s.walks.file].includes(file))
+    .filter((s) => takes(s, file, text))
+    .map(
+      (s) =>
+        `${file} takes ${s.made}, the stand-in of what ${s.home?.package} builds itself: build the real one there, ${s.home?.build}; ` +
+        `only its contract names ${s.made} (${s.own}, ${s.real})`,
+    );
+}
+
+/** Every file of tests under `root` that `takenBreaks` reads: each test file, and each helper flat in a package's `test/`. */
+export const testAndHelperFilesOf = (root: string): string[] =>
+  [
+    ...testFilesOf(root),
+    ...PACKAGES.flatMap((pkg) =>
+      fs.existsSync(path.join(root, pkg, 'test'))
+        ? fs
+            .readdirSync(path.join(root, pkg, 'test'))
+            .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+            .map((f) => `${pkg}/test/${f}`)
+        : [],
+    ),
+  ].sort();
 
 /** The measure of every test file under `root`, by its path. */
 export function measureOf(root: string): Map<string, Reach> {

@@ -13,7 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
 import type { TaskPhase } from '../src/run.ts';
-import { board as engineBoard } from './engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
@@ -77,10 +77,15 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
   return dir;
 };
 
-/** The engine board (`test/engine-board.ts`), and the engine the controllers take over it, as `nemia` builds one over the runtime. */
+/**
+ * The engine's stand-in (`testEngine`), the engine the controllers take over it, as `nemia` builds one over the runtime, and `settle`
+ * taking what the attempt ended with as its closeout and its exit code.
+ */
 const board = () => {
-  const b = engineBoard();
-  return { ...b, e: engineOf(b.layer) };
+  const b = testEngine();
+  const settle = (id: string, phase: string, closeout?: unknown, exitCode?: number) =>
+    b.settle(id, phase, { ...(closeout === undefined ? {} : { closeout }), ...(exitCode === undefined ? {} : { exitCode }) });
+  return { ...b, settle, e: engineOf(b.layer) };
 };
 
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };

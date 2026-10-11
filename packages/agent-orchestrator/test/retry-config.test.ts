@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { board as engineBoard } from './engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { runGiven, runOver } from './placed.ts';
 
@@ -40,7 +40,7 @@ async function failed() {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nimplement it\n');
   const run = await runPlaced(startRun({ brief: 'the flag', repo: aRepo(), workflowDir: dir, isolate: false }));
-  const b = engineBoard();
+  const b = testEngine();
   const e = engineOf(b.layer);
   await runWith(e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'failed');

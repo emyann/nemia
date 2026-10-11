@@ -86,7 +86,7 @@ const CLAUDE_SERVICE = 'claude-code';
 /**
  * The fields of a session's log events in Loki a dashboard reads beside a run's and a step's, as measured (`tools/observe/README.md`,
  * *Counting a session's errors*): the event's name (`tool_result`), whether the tool succeeded, the tool and its parameters, and the
- * labels the session was started with.
+ * labels the session was started with. A failed skill load's skill is no field: it is read out of `tool_parameters`, a text.
  */
 const CLAUDE_LOG_FIELDS = ['event_name', 'success', 'tool_name', 'tool_parameters', 'task', 'factory', 'workflow', 'agent'];
 
@@ -159,7 +159,8 @@ type Transformation = { id: string; options?: { sort?: { field?: string }[] } };
 
 /**
  * A panel of a dashboard, as far as the checker reads it: of a bar gauge, in `reduceOptions`, whether it draws a bar for each row its
- * query answers (`values`) or one for each field, and how many rows at most (`limit`); and the name it gives each bar, `displayName`.
+ * query answers (`values`) or one for each field, and how many rows at most (`limit`); where it writes a bar's name, `namePlacement`,
+ * above the bar (`top`) or beside it; and the name it gives each bar, `displayName`.
  */
 type Panel = {
   type: string;
@@ -167,7 +168,7 @@ type Panel = {
   datasource?: { uid?: string };
   targets?: Target[];
   panels?: Panel[];
-  options?: { content?: string; reduceOptions?: { values?: boolean; limit?: number } };
+  options?: { content?: string; namePlacement?: string; reduceOptions?: { values?: boolean; limit?: number } };
   fieldConfig?: { defaults?: { displayName?: string } };
   transformations?: Transformation[];
 };
@@ -384,13 +385,19 @@ function traceNames(query: string): { spans: string[]; attributes: string[]; res
   return { spans, attributes, resources };
 }
 
+/** The labels a LogQL query makes for itself, each with its template as written: one for each stage that formats a label. */
+const templatesMade = (query: string): Map<string, string> =>
+  new Map(
+    [...query.matchAll(/\|\s*label_format\s+([A-Za-z_]\w*)\s*=\s*"((?:[^"\\]|\\.)*)"/g)].map(([, label, template]) => [label, template]),
+  );
+
 /**
- * The labels a LogQL query makes for itself, each with the fields its template names: one for each stage that formats a label, a field
- * being a `.word` inside the template's double braces, as `{{.step}}` and `{{ if .workflow }}` both name one.
+ * The labels a LogQL query makes for itself (`templatesMade`), each with the fields its template names, a field being a `.word` inside
+ * the template's double braces, as `{{.step}}` and `{{ if .workflow }}` both name one.
  */
 function labelsMade(query: string): Map<string, string[]> {
   const made = new Map<string, string[]>();
-  for (const [, label, template] of query.matchAll(/\|\s*label_format\s+([A-Za-z_]\w*)\s*=\s*"((?:[^"\\]|\\.)*)"/g))
+  for (const [label, template] of templatesMade(query))
     made.set(
       label,
       [...template.matchAll(/\{\{((?:[^}]|\}(?!\}))*)\}\}/g)].flatMap(([, body]) =>
@@ -461,6 +468,19 @@ const lokiTargets = (panel: Panel): Target[] =>
 /** The bar gauges of `dashboard` with a query sent to Loki, in the dashboard's order. */
 const lokiGauges = (dashboard: Dashboard): Panel[] =>
   allPanels(dashboard.panels).filter((p) => p.type === 'bargauge' && lokiTargets(p).length > 0);
+
+/** The bar gauges of `dashboard`, in the dashboard's order. */
+const barGauges = (dashboard: Dashboard): Panel[] => allPanels(dashboard.panels).filter((p) => p.type === 'bargauge');
+
+/**
+ * The titles of the bar gauges of `dashboard` that do not write a bar's name above it (`namePlacement`): beside its bar a name gets a
+ * share of the panel's width and is cut there (as measured, `tools/observe/README.md`, *Counting a session's errors*), and a gauge
+ * that says nothing is left to Grafana's own choice, which may put it beside.
+ */
+const namesBeside = (dashboard: Dashboard): string[] =>
+  barGauges(dashboard)
+    .filter((p) => p.options?.namePlacement !== 'top')
+    .map((p) => p.title ?? '');
 
 /** The text a variable's query names: a PromQL query as written, a Tempo tag-values query as the `span.` key whose values it reads. */
 const variableText = (query: unknown): string => {
@@ -873,9 +893,14 @@ const STEP_PICKS = ['factory', 'workflow', 'step', 'agent'];
  * What one counting query of a dashboard counts of a step's sessions, read off its text: the calls they were denied (the daemon's
  * `DENIED_SPAN`), their tool errors (the sessions' failed `tool_result` events) or, of those, their failed skill loads; for what —
  * the run and session picked (`run`), the steps picked across runs (`across`), or neither, which is `unscoped`; and whether it says the
- * tool, by counting by it, or by a label made from it (`labelsMade`), or, for a skill load, by asking for the `Skill` tool alone.
+ * tool, by counting by it, or by a label made from it (`labelsMade`), or, for a skill load, by asking for the `Skill` tool alone; and
+ * whether a skill load says its skill, by counting by a label whose template (`templatesMade`) reads `SKILL_KEY` out of the tool's
+ * parameters, and not by the parameters' raw text.
  */
-type Counted = { what: 'denied' | 'errors' | 'skills'; scope: 'run' | 'across' | 'unscoped'; tool: boolean };
+type Counted = { what: 'denied' | 'errors' | 'skills'; scope: 'run' | 'across' | 'unscoped'; tool: boolean; skill: boolean };
+
+/** The key of a `Skill` call's parameters that holds the skill's name, as measured (`{"skill_name":"…"}`). */
+const SKILL_KEY = 'skill_name';
 
 /** Each query of `dashboard` that counts denied calls, tool errors or failed skill loads (`Counted`), in the dashboard's order. */
 function countedOf(dashboard: Dashboard): Counted[] {
@@ -898,14 +923,19 @@ function countedOf(dashboard: Dashboard): Counted[] {
     const tool =
       skills ||
       (denied ? /\bby\s*\([^)]*span\.tool\b/.test(q.text) : countedBy(q.text).some((l) => (made.get(l) ?? [l]).includes('tool_name')));
-    return [{ what: denied ? 'denied' : skills ? 'skills' : 'errors', scope, tool }];
+    const skill =
+      skills &&
+      countedBy(q.text)
+        .map((l) => templatesMade(q.text).get(l) ?? '')
+        .some((template) => /\.tool_parameters\b/.test(template) && template.includes(SKILL_KEY));
+    return [{ what: denied ? 'denied' : skills ? 'skills' : 'errors', scope, tool, skill }];
   });
 }
 
 /** `Counted`, each in a word, sorted. */
 const countedWords = (dashboard: Dashboard): string[] =>
   countedOf(dashboard)
-    .map((c) => `${c.what} ${c.scope}${c.tool ? ' by tool' : ''}`)
+    .map((c) => `${c.what} ${c.scope}${c.skill ? ' by skill' : c.tool ? ' by tool' : ''}`)
     .sort();
 
 const STEPS_COUNTED = [
@@ -913,11 +943,14 @@ const STEPS_COUNTED = [
   'denied run by tool',
   'errors across by tool',
   'errors run by tool',
-  'skills across by tool',
-  'skills run by tool',
+  'skills across by skill',
+  'skills run by skill',
 ];
 
-test("Steps counts denied calls, tool errors and failed skill loads by tool, for one run's session and across runs", () => {
+/** The reading of a skill's name out of a `Skill` call's parameters, as Steps' template holds it. */
+const SKILL_READ = '{{ regexReplaceAll \\"^.*skill_name[^a-zA-Z0-9_]+([-a-zA-Z0-9_:./]+).*$\\" .tool_parameters \\"${1}\\" }}';
+
+test("Steps counts denied calls and tool errors by tool, and failed skill loads by skill, for one run's session and across runs", () => {
   assert.deepEqual(countedWords(dashboardTitled('Steps')), STEPS_COUNTED);
   assert.deepEqual(countedWords(dashboardTitled('System')), ['denied across by tool'], "System's Denied calls reads the same spans");
   for (const d of [dashboardTitled('Steps'), dashboardTitled('System')])
@@ -925,7 +958,7 @@ test("Steps counts denied calls, tool errors and failed skill loads by tool, for
       assert.equal(q.text.includes('denied'), false, `${d.title}: no counter of denied calls is read: ${q.text}`);
 });
 
-test('REFUSED: a count that drops its session, one of its four choices, or its tool', () => {
+test('REFUSED: a count that drops its session, one of its four choices, its tool, or its skill', () => {
   const changed = (datasource: string, from: string, to: string) => countedWords(withQuery(dashboardTitled('Steps'), datasource, from, to));
   const without = (word: string, instead: string) => [...STEPS_COUNTED.filter((w) => w !== word), instead].sort();
   assert.deepEqual(changed('tempo', ' && span.task=~"$session"', ''), without('denied run by tool', 'denied unscoped by tool'));
@@ -935,6 +968,50 @@ test('REFUSED: a count that drops its session, one of its four choices, or its t
   assert.deepEqual(changed('loki', ' | workflow=~"$workflow"', ''), without('errors across by tool', 'errors unscoped by tool'));
   assert.deepEqual(changed('tempo', 'by (span.tool, span.call)', 'by (span.call)'), without('denied run by tool', 'denied run'));
   assert.deepEqual(changed('loki', ' · {{.tool_name}}', ''), without('errors run by tool', 'errors run'));
+  assert.deepEqual(changed('loki', SKILL_READ, '{{.tool_parameters}}'), without('skills run by skill', 'skills run by tool'));
+  assert.deepEqual(changed('loki', `${SKILL_READ}" [`, '{{.step}}" ['), without('skills run by skill', 'skills run by tool'));
+});
+
+const STEPS_BARS = [
+  'Input tokens',
+  'Output tokens',
+  'Denied calls',
+  'Tool errors',
+  'Failed skill loads',
+  'Denied calls, across runs',
+  'Tool errors, across runs',
+  'Failed skill loads, across runs',
+];
+
+test('Steps names each bar above it', () => {
+  assert.deepEqual(
+    barGauges(dashboardTitled('Steps')).map((p) => p.title),
+    STEPS_BARS,
+  );
+  assert.deepEqual(namesBeside(dashboardTitled('Steps')), []);
+});
+
+test("REFUSED: a bar of Steps named beside it, or left to Grafana's choice", () => {
+  const TITLE = 'Failed skill loads';
+  const besideWith = (change: (panel: Panel) => void): string[] => {
+    const steps = dashboardTitled('Steps');
+    const panel = barGauges(steps).find((p) => p.title === TITLE);
+    assert.ok(panel?.options, `Steps has no ${TITLE}`);
+    change(panel);
+    return namesBeside(steps);
+  };
+  assert.deepEqual(
+    besideWith((p) => (p.options!.namePlacement = 'left')),
+    [TITLE],
+  );
+  assert.deepEqual(
+    besideWith((p) => (p.options!.namePlacement = 'auto')),
+    [TITLE],
+  );
+  assert.deepEqual(
+    besideWith((p) => delete p.options!.namePlacement),
+    [TITLE],
+  );
 });
 
 /** The tag each of a dashboard's `run` and `session` variables reads its values from, and what the session's All stands for. */

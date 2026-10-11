@@ -39,12 +39,16 @@ const WHOLE_SUITE = [
 /** What a step given the browser denies itself: the unsafe tool its agent denies, and the live board's ports, in the tab or a new one. */
 const BROWSER_FENCE = [
   'mcp__playwright__browser_run_code_unsafe',
+  ...['console_messages', 'evaluate', 'network_request', 'network_requests', 'snapshot', 'take_screenshot'].map(
+    (tool) => `mcp__playwright__browser_${tool}(filename:*)`,
+  ),
   'mcp__playwright__browser_navigate(url:*:8787*)',
   'mcp__playwright__browser_navigate(url:*:5173*)',
   'mcp__playwright__browser_tabs(url:*:8787*)',
   'mcp__playwright__browser_tabs(url:*:5173*)',
 ];
 const NO_LIVE_BOARD = 'Never the live board on :8787 or :5173, which your fence refuses by address.';
+const NO_FILENAME = 'Give no browser tool a `filename`, which your fence refuses';
 const STOP_BOARD = 'Run `npm run board:stop` before you sign off.';
 
 const TOLD: Told[] = [
@@ -57,6 +61,7 @@ const TOLD: Told[] = [
       "the owner's line for a run, which this factory's rules give",
       'To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill',
       NO_LIVE_BOARD,
+      NO_FILENAME,
       STOP_BOARD,
     ],
     adds: ['shadcn', 'look'],
@@ -92,6 +97,7 @@ const TOLD: Told[] = [
       'say in your closeout what you opened and what it showed',
       'The pictures are enough for a change of layout or of words that they show.',
       NO_LIVE_BOARD,
+      NO_FILENAME,
       STOP_BOARD,
     ],
     adds: ['shadcn', 'look'],
@@ -200,7 +206,8 @@ test('REFUSED: design or review told no more to open a served board, when the pi
   assert.deepEqual(cut('review', /The pictures are enough for a change of layout\s+or of words that they show\. /), [
     'build/review: says "The pictures are enough for a change of layout or of words that they show."',
   ]);
-  assert.deepEqual(cut('review', / Run `npm run board:stop`\s+before you sign off\./), [`build/review: says "${STOP_BOARD}"`]);
+  assert.deepEqual(cut('review', / Run\s+`npm run board:stop` before you sign off\./), [`build/review: says "${STOP_BOARD}"`]);
+  assert.deepEqual(cut('review', /Give no browser tool a\s+`filename`, which your fence refuses/), [`build/review: says "${NO_FILENAME}"`]);
   assert.deepEqual(cut('review', /\*\*Open the change when a picture cannot show it\*\*/), [
     'build/review: says "**Open the change when a picture cannot show it**: when it changes what a page does when pressed, typed into or hovered, or a state no picture shows."',
   ]);

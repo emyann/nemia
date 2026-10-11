@@ -148,7 +148,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **A step's fence is one word per harness**: Claude Code's `permissionMode`, Codex's `sandbox` (in the orchestrator today: `modeOf` in
   `former/former.ts`, filed through `agent-orchestrator/test/rendering.test.ts`).
 - **A deny `mcp__<server>__<tool>(param:glob)` on `--disallowedTools` refuses a call whose parameter the glob covers, compared as
-  written, and no other** (2.1.296, `url:*:8787*`); a tool denied bare is not in the session at all, so it is never listed as a denial.
+  written, and no other** (2.1.296, `url:*:8787*`); `(filename:*)` refuses every call that gives the parameter and none that omits
+  it. A tool denied bare is not in the session at all, so it is never listed as a denial. Such a rule in an allow list is unmeasured.
 - **An idle `--remote-control` session lists `blocked`, `idle`, with a `pid` and no `waitingFor`; a `stopped` row lists no `pid`**:
   `held` is the `pid` (`ourRow`). `--bg` needs a trusted `cwd`, and words `say` sends reach the model framed as a peer's, not
   the person's.

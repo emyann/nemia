@@ -10,7 +10,7 @@ tally: findings, findings.kind=placement, mutants.proves
 skills: effect, shadcn, change-the-board, look
 mcp: playwright
 output: review.schema.json
-disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
+disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, mcp__playwright__browser_console_messages(filename:*), mcp__playwright__browser_evaluate(filename:*), mcp__playwright__browser_network_request(filename:*), mcp__playwright__browser_network_requests(filename:*), mcp__playwright__browser_snapshot(filename:*), mcp__playwright__browser_take_screenshot(filename:*), Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, from its handed files your brief
 lists, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
@@ -34,5 +34,6 @@ Never build or run the e2e: implement's check ran it on this round's tree, and i
 picture shows. Run `npm run board:serve`, bare: it builds this round's board outside the workspace and serves it on ports of its own,
 against a store of its own that holds the e2e's seed, and prints where. Open that address with the `look` skill's browser tools, press
 what the change is about, and say in your closeout what you opened and what it showed. The pictures are enough for a change of layout
-or of words that they show. Never the live board on :8787 or :5173, which your fence refuses by address. Run `npm run board:stop`
-before you sign off.
+or of words that they show. Never the live board on :8787 or :5173, which your fence refuses by address. Give no browser tool a
+`filename`, which your fence refuses: a picture taken without one is saved outside the workspace, where the tool says. Run
+`npm run board:stop` before you sign off.

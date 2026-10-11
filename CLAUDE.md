@@ -165,7 +165,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence.
 - A checking step given the browser (design, review) serves the change with `npm run board:serve` and ends it with `npm run board:stop`,
   each allowed by exact name and named in its note (`BOARD_CHECKS`); its agent allows the browser's tools by name, never the server
-  whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test).
+  whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test). Agent and
+  step both deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a relative one is written into the workspace.
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 

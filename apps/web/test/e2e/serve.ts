@@ -13,9 +13,10 @@
  *   build (`changedOver`), starts a holder of its own (`hold`) and prints the two lines the holder wrote (`linesOf`): the board's
  *   address and the api's.
  * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), writes where it listens,
- *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a test), sooner when `stop` asks,
- *   a server dies or a signal comes. On its way out it stops both servers by the handles it kept and removes the folder. A port the
- *   steps given a browser are refused by address (`usable`) is given back and the servers started again, `TRIES` times at most.
+ *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a
+ *   test), sooner when `stop` asks, a server dies or a signal comes. On its way out it stops both servers by the handles it kept and
+ *   removes the folder. A port the steps given a browser are refused by address (`usable`) is given back and the servers started
+ *   again, `TRIES` times at most.
  * - `stop` asks the holder to end, by a file in the folder, and waits until its pid is gone. No board served here is no failure.
  *
  * Exits 1, saying what to do next, when the build fails or changes the workspace, the holder does not say where it listens, or it does

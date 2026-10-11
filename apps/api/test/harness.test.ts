@@ -151,7 +151,7 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file run un
     [
       "import fs from 'node:fs';",
       "import { test } from 'node:test';",
-      "const address = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null;",
+      'const address = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null;',
       "test('probe', () => fs.writeFileSync(process.env.PROBE_OUT, JSON.stringify({ address })));",
       '',
     ].join('\n'),

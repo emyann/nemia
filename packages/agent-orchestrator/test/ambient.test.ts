@@ -145,7 +145,7 @@ function runExporter(seated: boolean, expected: string) {
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
       `import { otlpOf } from '${TELEMETRY}';`,
-      "const seen = { address: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null, exports: otlpOf(process.env)?.url ?? null };",
+      'const seen = { address: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null, exports: otlpOf(process.env)?.url ?? null };',
       `test('the collector', () => assert.deepEqual(seen, ${expected}));`,
       '',
     ].join('\n'),

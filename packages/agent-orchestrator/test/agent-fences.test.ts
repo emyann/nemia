@@ -469,7 +469,10 @@ test('the matcher splits a command into the parts Claude Code matches, strips th
     ['true', 'X=http://localhost:4318 timeout 5 true'],
     'a deny is matched against a part as typed too',
   );
-  assert.ok(deniedPartsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)), 'so a deny of an address reaches an assignment');
+  assert.ok(
+    deniedPartsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)),
+    'so a deny of an address reaches an assignment',
+  );
   assert.ok(!partsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)), 'and an allow of it reaches nothing an assignment says');
   assert.deepEqual(deniedPartsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
 });
@@ -1463,7 +1466,10 @@ test("REFUSED: a deny read against the unwrapped part alone leaves the collector
   const denies = shippedStepOf('ada').disallowedTools ?? [];
   for (const call of assigned) {
     assert.ok(!partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))), `${shown(call)}, unwrapped, names no port`);
-    assert.ok(deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))), `${shown(call)}, as typed, does`);
+    assert.ok(
+      deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))),
+      `${shown(call)}, as typed, does`,
+    );
   }
 });
 

@@ -68,36 +68,40 @@ const settled = (t: Waiter, id: string) => {
   );
 };
 
-test("REFUSED: a check's command that starts an exporting process posts nothing to the daemon's collector, and told it by name it posts", WAITED, async (t) => {
-  assert.equal(sessionTelemetryOf(process.env)?.endpoint, COLLECTOR, 'the engine is given the collector, as the daemon is');
-  const workspace = scratch('wf-check-export-ws-');
-  const id = await Effect.runPromise(
-    e.file({
-      id: 'r-1-implement-check',
-      harness: 'check',
-      cwd: workspace,
-      brief: 'the check',
-      deadlineSeconds: 60,
-      config: {
-        command: checkArgv(exporting('span-of-the-check')),
-        env: { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: workspace, WF_ARTIFACTS: workspace },
-        niceness: CHECK_NICENESS,
-      },
-    }),
-  );
-  assert.equal(await settled(t, id), 'succeeded', (await Effect.runPromise(e.output(id, 'stderr'))) ?? '');
-  assert.equal(await Effect.runPromise(e.output(id, 'stdout')), 'collector: none\n', 'the process the check started is told of none');
-  assert.deepEqual(naming('span-of-the-check'), [], 'and nothing of it reached the collector');
+test(
+  "REFUSED: a check's command that starts an exporting process posts nothing to the daemon's collector, and told it by name it posts",
+  WAITED,
+  async (t) => {
+    assert.equal(sessionTelemetryOf(process.env)?.endpoint, COLLECTOR, 'the engine is given the collector, as the daemon is');
+    const workspace = scratch('wf-check-export-ws-');
+    const id = await Effect.runPromise(
+      e.file({
+        id: 'r-1-implement-check',
+        harness: 'check',
+        cwd: workspace,
+        brief: 'the check',
+        deadlineSeconds: 60,
+        config: {
+          command: checkArgv(exporting('span-of-the-check')),
+          env: { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: workspace, WF_ARTIFACTS: workspace },
+          niceness: CHECK_NICENESS,
+        },
+      }),
+    );
+    assert.equal(await settled(t, id), 'succeeded', (await Effect.runPromise(e.output(id, 'stderr'))) ?? '');
+    assert.equal(await Effect.runPromise(e.output(id, 'stdout')), 'collector: none\n', 'the process the check started is told of none');
+    assert.deepEqual(naming('span-of-the-check'), [], 'and nothing of it reached the collector');
 
-  const told = spawn('sh', ['-c', exporting('span-told-by-name')], {
-    cwd: workspace,
-    env: { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: COLLECTOR },
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
-  let said = '';
-  told.stdout.on('data', (chunk: Buffer) => (said += chunk.toString('utf8')));
-  const [code] = (await new Promise((exited) => told.once('close', (...how) => exited(how)))) as [number | null];
-  assert.equal(code, 0);
-  assert.equal(said, `collector: ${COLLECTOR}\n`);
-  assert.deepEqual(naming('span-told-by-name'), ['/v1/traces'], 'the same process, told the address by name, posts its span');
-});
+    const told = spawn('sh', ['-c', exporting('span-told-by-name')], {
+      cwd: workspace,
+      env: { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: COLLECTOR },
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    let said = '';
+    told.stdout.on('data', (chunk: Buffer) => (said += chunk.toString('utf8')));
+    const code = await new Promise<number | null>((exited) => told.once('close', (exit) => exited(exit)));
+    assert.equal(code, 0);
+    assert.equal(said, `collector: ${COLLECTOR}\n`);
+    assert.deepEqual(naming('span-told-by-name'), ['/v1/traces'], 'the same process, told the address by name, posts its span');
+  },
+);

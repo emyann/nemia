@@ -1319,6 +1319,42 @@ test('every git question review-a-change names is one Agora asks by its own allo
   assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
 });
 
+/** The line of the build workflow's review that says how the reviewer asks whether the branch holds its base. */
+const HOLDS_BASE_NOTE = '**Say whether the branch holds the base**';
+
+/** The git questions the build workflow's review names in that paragraph of its note. */
+const askedOfTheBase = (): string[] => checksOf('workflows/build/review.md', HOLDS_BASE_NOTE, /`(git\s[^`]*)`/g);
+
+test("every git question review's note asks of the base is one Agora asks by its own allow", () => {
+  const asked = askedOfTheBase();
+  assert.ok(asked.length >= 6, `review's note names its questions of the base: ${asked.join(', ')}`);
+  const calls = asked.map((command) => ({ tool: 'Bash', command }) as const);
+  assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
+});
+
+test("REFUSED: a question of the base that Agora's own allow does not reach is named", () => {
+  const line = (shippedStepOf('agora').allowedTools ?? []).filter((rule) => rule !== 'Bash(git merge-base:*)').join(', ');
+  const calls = askedOfTheBase().map((command) => ({ tool: 'Bash', command }) as const);
+  const reached = runs(agoraAllowed(line), calls, {}, []);
+  assert.deepEqual(
+    calls.map(shown).filter((call) => !reached.includes(call)),
+    ['Bash(git merge-base --is-ancestor main-worktree/HEAD HEAD)'],
+  );
+  assert.deepEqual(runs(shippedStepOf('agora'), [{ tool: 'Bash', command: 'git worktree list' }], {}, []), []);
+});
+
+/** The denies of a step's fence that reach the merge of the base into its own branch, as its note types it. */
+const deniesMerge = (step: Step): string[] =>
+  (step.disallowedTools ?? []).filter((rule) => reaches(rule, { tool: 'Bash', command: 'git merge main-worktree/HEAD' }));
+
+test('implement merges the base into its branch by no allow, and no deny of its fence reaches the merge', () => {
+  const ada = shippedStepOf('ada');
+  assert.equal(ada.permissionMode, 'auto');
+  assert.deepEqual(deniesMerge(ada), []);
+  const fenced = { ...ada, disallowedTools: [...(ada.disallowedTools ?? []), 'Bash(git merge:*)', 'Bash(git:*)'] };
+  assert.deepEqual(deniesMerge(fenced), ['Bash(git merge:*)', 'Bash(git:*)']);
+});
+
 /** The line of the build workflow's implement that names the render of a checkout's dashboards. */
 const RENDER_NOTE = 'When the change touches `tools/observe`';
 

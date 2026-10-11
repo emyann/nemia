@@ -51,6 +51,27 @@ const NO_LIVE_BOARD = 'Never the live board on :8787 or :5173, which your fence 
 const NO_FILENAME = 'Give no browser tool a `filename`, which your fence refuses';
 const STOP_BOARD = 'Run `npm run board:stop` before you sign off.';
 
+/** What implement is told of the base: to merge it into its branch before it signs off, and what it runs and measures again after. */
+const MERGES_THE_BASE = [
+  '**Merge the base before you sign off**',
+  '`git merge main-worktree/HEAD`',
+  'Then run again the tests of what the merge touched',
+  'Measure again whatever your change wrote by a measure, a baseline or a count that only shrinks',
+  'Try your mutants again on the merged result',
+  'never your branch into the base',
+  'merge the commit it names and no other',
+];
+
+/** What review is told of the base: to say whether the branch holds it, and when a branch behind is a finding that sends the work back. */
+const HOLDS_THE_BASE = [
+  '**Say whether the branch holds the base**',
+  '`git merge-base --is-ancestor main-worktree/HEAD HEAD`',
+  'that the branch holds it or how many commits it lacks',
+  'is a finding with `again: true` only where the base moved under the change',
+  'Any other branch behind is no finding',
+  'read the change alone with `git diff main-worktree/HEAD...HEAD`',
+];
+
 const TOLD: Told[] = [
   {
     workflow: 'build',
@@ -72,6 +93,7 @@ const TOLD: Told[] = [
     workflow: 'build',
     step: 'implement',
     says: [
+      ...MERGES_THE_BASE,
       "load `shadcn` for the board's components",
       '**Name your mutants** in the closeout: one per rule or guard the change adds',
       'Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit.',
@@ -88,6 +110,7 @@ const TOLD: Told[] = [
     workflow: 'build',
     step: 'review',
     says: [
+      ...HOLDS_THE_BASE,
       SHADCN_READ,
       "Implement's check ran the whole test suite on this round's tree, forced",
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',
@@ -226,6 +249,16 @@ test('REFUSED: design or review told no more to open a served board, when the pi
   assert.deepEqual(cut('review', /, mcp__playwright__browser_navigate\(url:\*:8787\*\)/), [
     'build/review: denies mcp__playwright__browser_navigate(url:*:8787*)',
   ]);
+});
+
+test('REFUSED: implement told no more to merge the base, or review to say whether the branch holds it, is named', () => {
+  const cut = (step: string, sentence: string): string[] =>
+    untold(
+      'build',
+      shippedEdited('build', step, (text) => text.replace(across(sentence), '')),
+    );
+  for (const sentence of MERGES_THE_BASE) assert.deepEqual(cut('implement', sentence), [`build/implement: says "${sentence}"`]);
+  for (const sentence of HOLDS_THE_BASE) assert.deepEqual(cut('review', sentence), [`build/review: says "${sentence}"`]);
 });
 
 type Schema = { properties: Record<string, unknown>; required: string[] };

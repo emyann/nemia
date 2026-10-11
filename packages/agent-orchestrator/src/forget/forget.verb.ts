@@ -35,7 +35,8 @@ import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standi
 import { statusMemo } from '../place/landing.store.ts';
 import { merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
+import { adoptChecks, adoptRounds, adoptTries, unrecordedSteps } from '../tick/advance.verb.ts';
+import { closeWaitingTasks } from '../tick/held.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { engineForgetting, forgetTasks } from '../forgetting/forgetting.verb.ts';
 import { forgettingOf, uncountedWords, type EngineForgetting } from '../forgetting/forgetting.ts';

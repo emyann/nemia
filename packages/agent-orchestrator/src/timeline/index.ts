@@ -3,3 +3,5 @@ export { firstFiledAt, runStartedAt, signedAndHeld, taskUsage, timeline, timelin
 export type { AttemptClock, SlotWait, TaskClock, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline.ts';
 export { atWork, gateWaitOf, ranMs, runTokens, tryEndOf } from './took.ts';
 export type { AtWork, RunTokens } from './took.ts';
+export { TIMELINE_OF, TIMELINE_PARTS, timelineRows } from './rows.ts';
+export type { TimelineRow } from './rows.ts';

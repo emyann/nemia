@@ -1,11 +1,13 @@
 /**
  * A person's verbs a pass or `nemia cancel` asks of the engine for a task it read — stop it (`stopAsked`), close it (`closeHeld`), answer
- * it (`answerHeld`) — each an Effect that succeeds with undefined once asked, and with the engine's refusal in its words where it refused:
+ * it (`answerHeld`), close every task of a run that waits for a word (`closeWaitingTasks`) — each an Effect that succeeds with undefined once asked, and with the engine's refusal in its words where it refused:
  * the task moved since it was read, so a refusal is a note, not a failure. A controller, reaching the runtime through the client
  * (`runtime-client.ts`).
  */
 import { Cause, Effect, Exit } from 'effect';
-import { asked, type Engine } from '../runtime-client.ts';
+import { asked, type Engine, type TaskView } from '../runtime-client.ts';
+import type { Run } from '../record/record.ts';
+import { waitsForWord } from '../views/views-words.ts';
 
 /**
  * Undefined once the engine's verb `verb`, `ask`, succeeds; the message of what it refused with (`asked`: an error whose `exitCode` is 2);
@@ -44,4 +46,21 @@ export const closeHeld = Effect.fn('closeHeld')(function* (e: Engine, taskId: st
  */
 export const answerHeld = Effect.fn('answerHeld')(function* (e: Engine, taskId: string, text: string, budgetUsd: number | undefined) {
   return yield* refusedWords('answer', e.answer(taskId, text, budgetUsd === undefined ? {} : { config: { budgetUsd } }));
+});
+
+/**
+ * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `nemia cancel`, `nemia rm` — at once
+ * rather than on the next pass. A close is no stop: nothing is running, and the engine settles the task as it signed. Only a step's current
+ * task can wait: a try or a round filed as a task of its own closed the one before it. What the engine refuses is returned, worded, and a
+ * cancelled run's next pass closes it again (the sweep in `advancePass`).
+ */
+export const closeWaitingTasks = Effect.fn('closeWaitingTasks')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>) {
+  const waits = waitsForWord(views);
+  const refused: string[] = [];
+  for (const [name, { taskId }] of Object.entries(run.steps)) {
+    if (!taskId || !waits(taskId)) continue;
+    const said = yield* closeHeld(e, taskId);
+    if (said) refused.push(`${name}: ${said}`);
+  }
+  return refused;
 });

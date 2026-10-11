@@ -665,7 +665,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 518, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 517, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

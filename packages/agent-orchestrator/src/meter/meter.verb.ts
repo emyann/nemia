@@ -7,7 +7,7 @@ import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
-import { boundedAttributes, type DeniedFact, type StepFact, type Wait, type WaitFact } from './step.ts';
+import { boundedAttributes, type DeniedFact, type StepFact, type TimelineFact, type Wait, type WaitFact } from './step.ts';
 
 /**
  * The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a
@@ -254,18 +254,39 @@ const recordWait = (fact: WaitFact): Effect.Effect<void> =>
 const recordDenied = (fact: DeniedFact): Effect.Effect<void> =>
   rootSpan(DENIED_SPAN, fact.at, fact.at, Object.fromEntries(DENIED_SPAN_KEYS.map((key) => [key, fact[key]])), fact.attributes);
 
+/** The span each number of a finished run's timeline is traced as, its name the one a dashboard averages. */
+export const TIMELINE_SPAN = 'run.timeline';
+
+/**
+ * The keys a timeline number's span carries beside its attributes: its run, its try on a try's and a check's row, what it is a number of,
+ * its row's name, which number and its value, none of which a metric is kept by.
+ */
+export const TIMELINE_SPAN_KEYS = ['run', 'try', 'of', 'row', 'part', 'value'] as const satisfies ReadonlyArray<keyof TimelineFact>;
+
+/**
+ * One number of a run's timeline into a span of its own (`TIMELINE_SPAN`), a root of its own trace and of no length, at the moment it is
+ * recorded, carrying what the fact has of `TIMELINE_SPAN_KEYS` beside its attributes; into no metric, which could carry no row.
+ */
+const recordTimeline = (fact: TimelineFact): Effect.Effect<void> =>
+  Effect.suspend(() => {
+    const now = new Date().toISOString();
+    const own = Object.fromEntries(TIMELINE_SPAN_KEYS.flatMap((key) => (fact[key] === undefined ? [] : [[key, fact[key]]])));
+    return rootSpan(TIMELINE_SPAN, now, now, own, fact.attributes);
+  });
+
 /** `value` into `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
 const into = <In, Out>(metric: Metric.Metric<In, Out>, attributes: Record<string, string>, value: In) =>
   Metric.update(Metric.withAttributes(metric, boundedAttributes(attributes)), value);
 
 /**
  * One fact into the metrics: a session's tally, cost, tokens and time; a check's or a round's count; a wait (`recordWait`); a denied call,
- * into its span alone (`recordDenied`).
+ * into its span alone (`recordDenied`); a number of a run's timeline, into its span alone (`recordTimeline`).
  */
 function recordFact(fact: StepFact): Effect.Effect<void> {
   const { attributes } = fact;
   if (fact.metric === 'wait') return recordWait(fact);
   if (fact.metric === 'denied') return recordDenied(fact);
+  if (fact.metric === 'timeline') return recordTimeline(fact);
   if (fact.metric !== 'try') return into(fact.metric === 'check' ? STEP_METRICS.checks : STEP_METRICS.rounds, attributes, 1);
   return Effect.all(
     [
@@ -279,7 +300,10 @@ function recordFact(fact: StepFact): Effect.Effect<void> {
   );
 }
 
-/** The facts a pass read of its runs' steps, each recorded once: into the step's metrics (`STEP_METRICS`), a denied call into its span. */
+/**
+ * The facts a pass read of its runs' steps, each recorded once: into the step's metrics (`STEP_METRICS`), a denied call and a number of
+ * a run's timeline each into its span.
+ */
 export const recordStepMetrics = Effect.fn('recordStepMetrics')(function* (facts: readonly StepFact[]) {
   for (const fact of facts) yield* recordFact(fact);
 });

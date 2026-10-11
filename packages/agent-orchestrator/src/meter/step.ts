@@ -3,7 +3,8 @@
  * loop was granted or ran out of, each with the attributes a series is kept by — the factory, the workflow, the step, its agent and the
  * outcome, and nothing else (`boundedAttributes`): a run's or a task's id would make a series of every run. And how long a step waited
  * outside its sessions once the wait ended (`WaitFact`): a session in the queue, its check's run, and a person at its gate. And each call
- * a harness denied one of its sessions (`DeniedFact`), which is no metric: a span of its own, with its run, its task and its tool.
+ * a harness denied one of its sessions (`DeniedFact`), which is no metric: a span of its own, with its run, its task and its tool. And, once
+ * a run is over, each number of its timeline (`TimelineFact`), a span of its own too.
  *
  * Pure: the tick hands it the run, the tasks the feed said settled since its last read (`settledIn`), and what the pass already read of
  * them; it reads nothing more, and nothing is carried from one pass to the next. A gate is timed on the first pass that reads its approval
@@ -20,7 +21,16 @@ import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import type { SpendOf } from '../status/status.ts';
 import { hasGate } from '../status/status.ts';
-import { gateWaitOf, ranMs, taskUsage, timeline, type AttemptClock, type TaskClock } from '../timeline/index.ts';
+import {
+  gateWaitOf,
+  ranMs,
+  taskUsage,
+  timeline,
+  timelineRows,
+  type AttemptClock,
+  type TaskClock,
+  type TimelineRow,
+} from '../timeline/index.ts';
 
 /** The only attributes a step's metric carries: a series for each, never one for each run. */
 export const STEP_ATTRIBUTE_KEYS: readonly string[] = ['factory', 'workflow', 'step', 'agent', 'outcome'];
@@ -44,13 +54,18 @@ export function boundedAttributes(attributes: Readonly<Record<string, string>>):
 /** The four labels a step is known by, beside a run or an outcome: the factory, the workflow, the step and its agent. */
 export type StepKeys = { factory: string; workflow: string; step: string; agent: string };
 
+/** The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder. */
+const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKeys, 'factory' | 'workflow'> => ({
+  factory: run.factory ?? DEFAULT_FACTORY,
+  workflow: path.basename(run.workflowDir),
+});
+
 /**
  * The labels of `step` in `run`, the one source of both its metrics' attributes and its sessions' labels: the run's factory or the
  * default, its workflow's folder, the step, and its agent or `none`.
  */
 export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: Workflow): StepKeys => ({
-  factory: run.factory ?? DEFAULT_FACTORY,
-  workflow: path.basename(run.workflowDir),
+  ...runKeys(run),
   step: step.name,
   agent: step.agent?.name ?? 'none',
 });
@@ -62,8 +77,8 @@ export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
  * measured and how long it ran; a check that settled (`check`); a round its loop was granted or ran out of (`round`); a wait outside the
- * step's sessions that ended (`WaitFact`); a call its harness denied one of its sessions (`DeniedFact`). `attributes` are
- * `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a
+ * step's sessions that ended (`WaitFact`); a call its harness denied one of its sessions (`DeniedFact`); a number of its run's timeline
+ * once the run is over (`TimelineFact`). `attributes` are `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a
  * check; `granted` or `exhausted` for a round.
  */
 export type StepFact =
@@ -77,7 +92,8 @@ export type StepFact =
     }
   | { metric: 'check' | 'round'; attributes: Record<string, string> }
   | WaitFact
-  | DeniedFact;
+  | DeniedFact
+  | TimelineFact;
 
 /** A call a harness denied a session, as the engine keeps it on the attempt: the tool, and what of it where the harness said. */
 export type DeniedCall = { tool: string; what?: string };
@@ -331,5 +347,51 @@ export function deniedCalls(
         }));
       });
     });
+  });
+}
+
+/**
+ * One number of a run's timeline once the run is over (`TimelineRow`), for a span of its own and no metric: what it is a number of
+ * (`of`), its row's name, which number (`part`) and its value, the run, and the try on a try's and a check's row. `attributes` are the
+ * step's with the run's outcome on a try's, a check's and a step's row; the factory, the workflow and that outcome alone on a round's and
+ * the run's, which are no step's.
+ */
+export type TimelineFact = {
+  metric: 'timeline';
+  attributes: Record<string, string>;
+  run: string;
+  of: TimelineRow['of'];
+  row: string;
+  part: TimelineRow['part'];
+  value: number;
+  try?: number;
+};
+
+/**
+ * Each number of `run`'s timeline as a fact (`TimelineFact`), off `views`, which must hold every try's task and check, each filed when its
+ * view says (`filedAt`): the rows `timelineRows` gives of the `timeline` the run's page reads. `outcome` is how the run ended. Null while
+ * a task of the run is in flight, whose numbers are not the run's yet; `[]` for a run nothing was filed of.
+ */
+export function timelineFacts(
+  run: Run,
+  steps: readonly Workflow[],
+  views: ReadonlyMap<string, FactView>,
+  outcome: string,
+): TimelineFact[] | null {
+  const filed = new Map([...views].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
+  const tl = timeline(run, views, filed, steps);
+  if (tl.run.inFlight > 0) return null;
+  return timelineRows(run, tl, steps).map((r): TimelineFact => {
+    const step = steps.find((s) => s.name === r.step);
+    return {
+      metric: 'timeline',
+      attributes: step ? stepAttributes(run, step, outcome) : boundedAttributes({ ...runKeys(run), outcome }),
+      run: run.id,
+      of: r.of,
+      row: r.row,
+      part: r.part,
+      value: r.value,
+      ...(r.try === null ? {} : { try: r.try }),
+    };
   });
 }

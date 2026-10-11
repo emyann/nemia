@@ -78,6 +78,7 @@ const runBase = {
   slotHeldAt: Schema.optional(Schema.String),
   gatesTimed: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number })))),
   deniedCounted: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ task: Schema.String, attempts: Schema.Number })))),
+  runTimed: Schema.optional(Schema.Boolean),
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
   steps: Schema.Record(Schema.String, StepRecordSchema),
@@ -387,9 +388,7 @@ export const fileNames = (dir: string): string[] | undefined => {
  * The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named
  * as one that cannot be read as one.
  */
-export function readApprovals(id: string): { approvals: Approval[]; notes: string[] } {
-  return within('asks', () => readApprovalsNow(id));
-}
+export const readApprovals = (id: string): { approvals: Approval[]; notes: string[] } => within('asks', () => readApprovalsNow(id));
 
 function readApprovalsNow(id: string, names = fileNames(asksDir(id))): { approvals: Approval[]; notes: string[] } {
   const approvals: Approval[] = [];

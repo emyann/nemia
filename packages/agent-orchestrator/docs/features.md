@@ -2227,7 +2227,7 @@ which code served the board. What was built, in `src/release/`:
 Measured on this repository: the export takes about 1 s and 20 MB, `npm ci` 7 s and 848 MB, the build 7 s, the typecheck 9 s and the
 suite about 2 min; a release is about 850 MB. With no `.git` the suite fails 21 tests, hence the empty `git init`. Tested in
 `src/release/release.test.ts`, `release.store.test.ts`, `upgrade.verb.test.ts` (over scratch repositories with a fixture package and a
-fake machine), `test/cli-trial.test.ts`, `src/daemon/daemon.store.test.ts` (the lease's `release`), `apps/api/test/main.test.ts` and
+fake machine), `test/cli-trial.boundary.test.ts`, `src/daemon/daemon.store.test.ts` (the lease's `release`), `apps/api/test/main.test.ts` and
 `apps/web/test/footer.test.ts`. Still to come: a git-free export, a walk of the tag's tree for the six helpers that read `.git`, so a
 release holds no repository at all.
 

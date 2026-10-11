@@ -81,16 +81,27 @@ const FENCED_HARNESSES: readonly string[] = ['claude', 'claude-detached'];
  */
 export type Untried = { why: string; copy: string | null };
 
-/** The agent `untriedOf` judges: its place, its name, its file, its keys as written, and the result schema's file beside it. */
+/**
+ * The agent `untriedOf` judges: its place, its name, its file, its keys as written, its `mcp:` line as written, and the result schema's
+ * file beside it.
+ */
 export type TriedAgent = {
   from: 'repo' | 'yours';
   name: string;
   file: string;
   keys: { harness?: string; remote?: string } & FencedKeys;
+  mcp?: string | null;
   schemaFile: string | null;
 };
 
-/** Why the agent cannot be tried (`Untried`) in the store `home`, or null. */
+/** Why the agent `name`, whose `mcp:` line is written `line`, cannot be tried: a try has no checkout to load a server from. */
+const serversUntried = (name: string, line: string): string =>
+  `${name} names MCP servers (\`mcp: ${line}\`), which a session loads from its checkout's \`.mcp.json\`, and a try runs with no repository, in a folder of its own, which has none. Delete the line to try it, and name the server on the step that needs it: a step's own \`mcp:\` adds to its agent's.`;
+
+/**
+ * Why the agent cannot be tried (`Untried`) in the store `home`, or null: an agent of the repository's, a reserved name, a harness or a
+ * mode a try cannot fence, a bridged session, or MCP servers it names (`mcp`), which a try has no checkout to load from.
+ */
 export function untriedOf(agent: TriedAgent, home: string): Untried | null {
   if (agent.from === 'repo') {
     const into = yourAgentsDir(home);
@@ -121,6 +132,7 @@ export function untriedOf(agent: TriedAgent, home: string): Untried | null {
       copy: null,
     };
   }
+  if (agent.mcp) return { why: serversUntried(agent.name, agent.mcp), copy: null };
   const fence = tryFence(agent.name, agent.keys);
   return typeof fence === 'string' ? { why: fence, copy: null } : null;
 }

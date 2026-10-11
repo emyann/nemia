@@ -7,10 +7,11 @@
  * gets `_bucket`, `_count` and `_sum`, a gauge `_ratio`, a counter that only grows `_total` and any other counter nothing. The spans,
  * their attributes and the logs' annotations come from a pass of the tick traced over the runtime's engine as the client builds it
  * (`engineOf`), the orchestrator's own `Effect.fn` names, the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`) and a
- * denied call's (`DENIED_SPAN`, `DENIED_SPAN_KEYS`), each with its step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the
- * attributes each `Metric.withAttributes` gives. What a step's Claude Code session sends, its spans and its log events, and what Tempo's
- * span metrics write, are no code of ours: they are listed as measured, dated, and the span metrics' dimensions and the collector's
- * `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
+ * denied call's (`DENIED_SPAN`, `DENIED_SPAN_KEYS`), each with its step's attributes, and a finished run's timeline's (`TIMELINE_SPAN`,
+ * `TIMELINE_SPAN_KEYS`), whose `of` and `part` a query may ask only for a value the code gives (`TIMELINE_OF`, `TIMELINE_PARTS`); the
+ * labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives. What a step's Claude Code session sends, its
+ * spans and its log events, and what Tempo's span metrics write, are no code of ours: they are listed as measured, dated, and the span
+ * metrics' dimensions and the collector's `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
  *
  * The fake telemetry a render shows the dashboards over (`tools/observe/render/seed.ts`) is held the same way: every name it sends is one
  * the code emits or a measured one (`seedUnknown`), and every panel is met by it, with two series where it draws series, or listed as
@@ -41,8 +42,9 @@ delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, WAIT_SPAN_KEYS, WAIT_SPANS } =
+const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN, TIMELINE_SPAN_KEYS, WAIT_SPAN_KEYS, WAIT_SPANS } =
   await import('../src/meter/meter.verb.ts');
+const { TIMELINE_OF, TIMELINE_PARTS } = await import('../src/timeline/index.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
@@ -178,12 +180,23 @@ type Panel = {
   transformations?: Transformation[];
 };
 
+/** A dashboard's variable, as far as the checker reads it: what it asks, and whether it may hold every value or several. */
+type Variable = {
+  name: string;
+  type: string;
+  query?: unknown;
+  current?: { value?: unknown };
+  datasource?: { uid?: string };
+  includeAll?: boolean;
+  multi?: boolean;
+};
+
 /** A dashboard, as far as the checker reads it. */
 type Dashboard = {
   uid: string;
   title: string;
   panels: Panel[];
-  templating?: { list: { name: string; type: string; query?: unknown; current?: { value?: unknown }; datasource?: { uid?: string } }[] };
+  templating?: { list: Variable[] };
 };
 
 /** Every `.ts` file under `dir`, its tests left out. */
@@ -334,6 +347,7 @@ const KNOWN: Known = {
     ...TRACED.spans,
     ...Object.values(WAIT_SPANS),
     DENIED_SPAN,
+    TIMELINE_SPAN,
     ...[...SOURCE_TEXT.matchAll(/Effect\.fn\(\s*'([^']+)'/g)].map(([, name]) => name),
     ...CLAUDE_SPANS,
   ]),
@@ -341,6 +355,7 @@ const KNOWN: Known = {
     ...TRACED.attributes,
     ...WAIT_SPAN_KEYS,
     ...DENIED_SPAN_KEYS,
+    ...TIMELINE_SPAN_KEYS,
     ...STEP_ATTRIBUTE_KEYS,
     ...CLAUDE_SPAN_ATTRIBUTES,
     ...COLLECTOR_ATTRIBUTES,
@@ -643,7 +658,7 @@ test('REFUSED: an image by tag, a short digest, and a port the daemon exports to
 });
 
 test("each dashboard parses, has its own uid, and points at the image's datasources", () => {
-  assert.deepEqual([...DASHBOARDS.values()].map((d) => d.title).sort(), ['A run', 'Passes', 'Steps', 'System', 'Time']);
+  assert.deepEqual([...DASHBOARDS.values()].map((d) => d.title).sort(), ['A run', 'Passes', 'Steps', 'System', 'Time', 'Timeline']);
   assert.equal(new Set([...DASHBOARDS.values()].map((d) => d.uid)).size, DASHBOARDS.size);
   for (const [file, d] of DASHBOARDS) {
     assert.equal(
@@ -833,6 +848,8 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
     ['Steps', 'loki', '{{.tool_name}}', '{{.tool}}', 'tool'],
     ['Steps', 'loki', '{{ if .workflow }}', '{{ if .workflows }}', 'workflows'],
     ['Steps', 'loki', 'sum by (name)', 'sum by (named)', 'named'],
+    ['Timeline', 'tempo', `name="${TIMELINE_SPAN}"`, 'name="run.timelines"', 'run.timelines'],
+    ['Timeline', 'tempo', 'by (span.row)', 'by (span.rows)', 'rows'],
   ];
   for (const [title, datasource, from, to, named] of cases)
     assert.deepEqual(unknownNames(withQuery(dashboardTitled(title), datasource, from, to), KNOWN), [named], `${title}: ${to}`);
@@ -889,6 +906,70 @@ test('System charts every metric the code exports', () => {
   system.panels = keep(system.panels);
   assert.deepEqual(unchartedMetrics(system), ['step.rounds']);
   assert.equal(METRICS.has(DENIED_SPAN), false, 'a denied call is a span, and no metric to chart');
+});
+
+/** The values a TraceQL query asks of the span attribute `key`, each alternative of a regex its own. */
+const askedOf = (query: string, key: string): string[] =>
+  [...query.matchAll(new RegExp(`\\bspan\\.${key}\\s*(?:=~|!~|!=|=)\\s*"([^"]*)"`, 'g'))].flatMap(([, v]) => v.split('|'));
+
+/**
+ * What would make `dashboard` read a finished run's timeline (`TIMELINE_SPAN`) wrong, each said in a line: a query of it asking its `of`
+ * or its `part` for a value the code gives none of (`TIMELINE_OF`, `TIMELINE_PARTS`), which would draw nothing and say so nowhere; a
+ * query not held to the one factory and the one workflow picked, whose rows would be averaged with those of another workflow, or of a
+ * workflow of the same name in another factory; and a `factory` or a `workflow` choice that may hold more than one.
+ */
+function timelineFaults(dashboard: Dashboard): string[] {
+  const queries = queriesOf(dashboard).filter((q) => q.datasource === 'tempo' && traceNames(q.text).spans.includes(TIMELINE_SPAN));
+  if (queries.length === 0) return [];
+  const strange = (key: string, known: readonly string[]) =>
+    queries.flatMap((q) =>
+      askedOf(q.text, key)
+        .filter((v) => !known.includes(v))
+        .map((v) => `span.${key}="${v}" is no ${key} of a timeline`),
+    );
+  const one = ['factory', 'workflow'];
+  const loose = one.flatMap((name) =>
+    queries.filter((q) => !q.text.includes(`span.${name}="$${name}"`)).map((q) => `not held to one ${name}: ${q.text}`),
+  );
+  const picks = one.flatMap((name) => {
+    const pick = dashboard.templating?.list.find((v) => v.name === name);
+    return pick?.includeAll === false && pick.multi === false ? [] : [`its ${name} choice may hold more than one ${name}`];
+  });
+  return [...new Set([...strange('of', TIMELINE_OF), ...strange('part', TIMELINE_PARTS), ...loose, ...picks])];
+}
+
+test("Timeline reads a finished run's timeline by the values the code gives, for one workflow of one factory at a time", () => {
+  for (const [file, d] of DASHBOARDS) assert.deepEqual(timelineFaults(d), [], file);
+  const queries = queriesOf(dashboardTitled('Timeline')).filter((q) => q.datasource === 'tempo');
+  assert.ok(queries.length > 0 && queries.every((q) => traceNames(q.text).spans.includes(TIMELINE_SPAN)), 'every panel reads the span');
+  const asked = (key: string) => [...new Set(queries.flatMap((q) => askedOf(q.text, key)))].sort();
+  assert.deepEqual(asked('of'), [...TIMELINE_OF].sort(), 'each kind of row is drawn');
+  assert.deepEqual(asked('part'), ['cost', 'queued', 'ran', 'tries', 'wall'], "the run's check and gate are drawn by its part, unasked");
+});
+
+test('REFUSED: a Timeline query for a part or a kind the code gives none of, one of every workflow or factory, and a choice of several', () => {
+  const timeline = () => dashboardTitled('Timeline');
+  assert.deepEqual(timelineFaults(withQuery(timeline(), 'tempo', 'span.part="ran"', 'span.part="run"')), [
+    'span.part="run" is no part of a timeline',
+  ]);
+  assert.deepEqual(timelineFaults(withQuery(timeline(), 'tempo', 'span.of=~"try|check"', 'span.of=~"try|checks"')), [
+    'span.of="checks" is no of of a timeline',
+  ]);
+  const every = withQuery(timeline(), 'tempo', 'span.workflow="$workflow"', 'span.workflow=~".*"');
+  assert.equal(timelineFaults(every).length, 1);
+  assert.match(timelineFaults(every)[0], /^not held to one workflow: /);
+  const allFactories = withQuery(timeline(), 'tempo', 'span.factory="$factory"', 'span.factory=~"$factory"');
+  assert.equal(timelineFaults(allFactories).length, 1);
+  assert.match(timelineFaults(allFactories)[0], /^not held to one factory: /);
+  for (const name of ['factory', 'workflow']) {
+    for (const key of ['includeAll', 'multi'] as const) {
+      const several = timeline();
+      const pick = several.templating?.list.find((v) => v.name === name);
+      assert.ok(pick, `Timeline picks a ${name}`);
+      pick[key] = true;
+      assert.deepEqual(timelineFaults(several), [`its ${name} choice may hold more than one ${name}`], `${name}: ${key} alone`);
+    }
+  }
 });
 
 /** The four choices a step is picked by across runs, each a variable of the dashboards and a label of a session. */

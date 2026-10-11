@@ -66,6 +66,7 @@ export const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   slot: 'choice',
   agent: 'choice',
   skills: 'list',
+  mcp: 'list',
   harness: 'choice',
   model: 'text',
   effort: 'harness-word',

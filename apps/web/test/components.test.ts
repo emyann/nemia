@@ -1091,6 +1091,7 @@ const unset: WorkflowStepSpec = {
   slot: null,
   agent: null,
   skills: [],
+  mcp: [],
   permissionMode: null,
   sandbox: null,
   tools: null,

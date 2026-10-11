@@ -8,7 +8,7 @@
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
-import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
+import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
 import { FACTORY_RULES_FILE } from '../rules/rules.ts';
 import { API_VERSION, FENCE_KEYS, type Profile, type Step } from './layout.ts';
 
@@ -70,6 +70,7 @@ const COUNTED = ['rounds', 'retries', 'deadlineSeconds'] as const;
 const PLACED = new Set<string>([
   'agent',
   'skills',
+  'mcp',
   'harness',
   'after',
   'input',
@@ -137,6 +138,7 @@ function stepOf(step: StepSource, hired: AgentSource | undefined): Step {
   const overrides: Record<string, unknown> = {};
   if (step.keys.harness !== undefined) overrides.harness = step.keys.harness;
   if (step.keys.skills !== undefined) overrides.skills = skillNamesOf(step.file, step.keys.skills);
+  if (step.keys.mcp !== undefined) overrides.mcp = serverNamesOf(step.file, step.keys.mcp);
   const block = blockOf(step.file, step.keys, harness);
   if (block) overrides[harness] = block;
   return { name: step.name, ...wiringOf(step), ...(Object.keys(overrides).length ? { overrides } : {}) };

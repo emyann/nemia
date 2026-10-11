@@ -33,6 +33,7 @@ import {
   outputOf,
   remoteOf,
   rulesOf,
+  serverNamesOf,
   skillNamesOf,
   writableNamesOf,
   readsNamesOf,
@@ -122,6 +123,7 @@ export function parseWorkflow(
       refuse(
         `${name}: \`skills: ${meta.skills}\` adds skills to the step's agent, and this step has none. Name one — \`agent: <name>\` — whose skills these add to, or delete the line.`,
       );
+    if (meta.mcp !== undefined) refuse(agentlessServers(name, meta.mcp));
     refuseUnwritable(step, undefined);
     return step;
   }
@@ -158,15 +160,23 @@ export function parseWorkflow(
       ...(sessionSkills.length && { skills: sessionSkills }),
       ...(added && { addedSkills: added }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
-      mcp: agent.mcp ?? [],
+      mcp: sessionServers(agent, step),
     },
   };
 }
+
+/** The refusal of an `mcp:` line, written as `line`, on step `name`, which has no agent whose servers it would add to. */
+const agentlessServers = (name: string, line: string): string =>
+  `${name}: \`mcp: ${line}\` adds MCP servers to the step's agent's, and this step has none. Name one — \`agent: <name>\` — whose servers these add to, or delete the line.`;
+
+/** The MCP servers a session of `step` loads: those its agent `agent` names, then those the step's own `mcp:` line adds, each once. */
+const sessionServers = (agent: Agent, step: Workflow): string[] => [...new Set([...(agent.mcp ?? []), ...(step.mcp ?? [])])];
 
 /**
  * Refuses step `name`, resolved as `step` from its own lines `own` and its agent `agent`: a fence key that would widen the agent's
  * (`fenceRefusal`), a composition the harness cannot take (`composedRefusal`, `serversRefusal`), and, given the places' `skills`, a
  * skill none of them has.
+ * The servers are asked of the agent's line, then of the step's own (`mcp:`).
  * Each is asked of the agent's skills, then of those the step adds (`skills:`), the step's own fence for them asked by
  * `addedSkillsRefusal`: a skill the agent's fence cannot load.
  */
@@ -180,7 +190,10 @@ function agentStepRefusal(
   const loosened = fenceRefusal(name, agent, own, step);
   if (loosened !== undefined) refuse(loosened);
   const by = `${name}: \`agent: ${agent.name}\``;
-  const composed = composedRefusal(by, agent.skills, agent.harnessPrompt, step) ?? serversRefusal(by, agent.mcp, step);
+  const composed =
+    composedRefusal(by, agent.skills, agent.harnessPrompt, step) ??
+    serversRefusal(by, agent.mcp, step) ??
+    serversRefusal(name, step.mcp, step);
   if (composed !== undefined) refuse(composed);
   if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);
   if (own.skills === undefined || !step.skills) return;
@@ -297,6 +310,7 @@ export function stepFrom(
     slot: slotOf(name, meta.slot),
     body,
     skills: skillNamesOf(name, meta.skills),
+    mcp: serverNamesOf(name, meta.mcp),
     harness,
     model: meta.model,
     effort: wordOf(name, 'effort', meta.effort, harness),
@@ -371,7 +385,17 @@ export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<Ste
  * The keys whose empty list says what no line says: nothing to wait on, to read, to deny, to add. Not `tools:`, where none reads as every
  * tool to one person.
  */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'writable', 'reads', 'skills', 'disallowedTools', 'allowedTools', 'tally'];
+const EMPTY_IS_UNSET: readonly StepKey[] = [
+  'after',
+  'input',
+  'writable',
+  'reads',
+  'skills',
+  'mcp',
+  'disallowedTools',
+  'allowedTools',
+  'tally',
+];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as

@@ -172,6 +172,12 @@ type RunBase = {
    */
   deniedCounted?: Array<{ task: string; attempts: number }>;
   /**
+   * Whether the tick has handed the run's timeline to the metrics (`timelineFacts`): `false` on a run started with it, `true` once the
+   * pass that read the run over, with nothing of it in flight, has written it, so a pass after a restart hands none again. Absent on a
+   * record written before it, whose timeline is never handed over.
+   */
+  runTimed?: boolean;
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has

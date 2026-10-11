@@ -640,7 +640,7 @@ test('a step reaches the servers its agent names and no other: none for a step w
   assert.deepEqual(steps['dev/lost'].mcp[1], {
     server: 'ghost',
     tools: null,
-    why: "The checkout's .mcp.json declares no server named ghost: a session of this step is refused at its start. Declare the server there, or take the name off the agent's `mcp:` line.",
+    why: "The checkout's .mcp.json declares no server named ghost: a session of this step is refused at its start. Declare the server there, or take the name off the `mcp:` line that names it, the step's or its agent's.",
   });
 });
 
@@ -656,6 +656,32 @@ test('a server an agent names that the settings do not enable is still a row of 
   assert.equal(one.mcp.length, 1, JSON.stringify(one.mcp));
   assert.deepEqual([one.mcp[0].server, one.mcp[0].tools], ['other', null]);
   assert.match(one.mcp[0].why ?? '', /^Not enabled by .*enabledMcpjsonServers.* A session of this step loads it all the same: /);
+  assert.ok(
+    one.mcp[0].why?.endsWith(" an `mcp:` line, its own or its agent's, names it, and the settings are not asked."),
+    one.mcp[0].why ?? '',
+  );
+});
+
+test('a server a step names itself, over an agent that names none, is a row of that step alone; and in dontAsk, with nothing allowed, each of its tools is not allowed', async () => {
+  const repo = repoWith({
+    '.claude/settings.json': { enabledMcpjsonServers: ['fixture'] },
+    '.mcp.json': { mcpServers: { fixture: fixture() } },
+    'workflows/dev/named.md': '---\nplace: git\nagent: quiet\npermissionMode: dontAsk\nmcp: fixture\n---\nDo it.\n',
+    'workflows/dev/unnamed.md': '---\nplace: git\nagent: quiet\npermissionMode: dontAsk\n---\nDo it.\n',
+    'workflows/agents/quiet.md': '---\nharness: claude\n---\nYou work.\n',
+  });
+  const { 'dev/named': named, 'dev/unnamed': unnamed } = await claudeStepsOf(repo);
+  assert.deepEqual([unnamed.fence.mcp, unnamed.mcp], [[], []], 'the step that names none loads none');
+  assert.deepEqual([named.fence.mcp, named.mcp.map((s) => s.server)], [['fixture'], ['fixture']]);
+  assert.deepEqual(
+    named.mcp[0].tools?.map((t: { name: string; allowed: boolean }) => [t.name, t.allowed]),
+    [
+      ['echo', false],
+      ['wipe', false],
+    ],
+    'loading a server allows none of its tools',
+  );
+  assert.deepEqual(named.allowed, unnamed.allowed, 'naming it allows nothing the other step is not allowed');
 });
 
 test("a step without `tools:` gets the harness's own set — what was measured, with its date and version and never claimed current, and what was only inferred marked so — and every skill, with Skill in it", async () => {

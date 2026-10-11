@@ -89,7 +89,10 @@ test('what export writes reads back as it was written, a long line whole, and a 
   const ship = path.join(repo, 'workflows', 'dev', 'ship.md');
   fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: .*$/m, `check: ${long}`));
   const review = path.join(repo, 'workflows', 'dev', 'review.md');
-  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\neffort: low\nskills: review-a-change'));
+  fs.writeFileSync(
+    review,
+    fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\neffort: low\nskills: review-a-change\nmcp: docs'),
+  );
   const dir = target();
   exportTemplate({ dir, from: repo });
   assert.deepEqual(checkTemplateAt(dir), []);
@@ -98,7 +101,7 @@ test('what export writes reads back as it was written, a long line whole, and a 
   assert.ok(fs.readFileSync(path.join(dir, 'workflows/dev/workflow.yaml'), 'utf8').includes(`check: "${long.replace(/"/g, '\\"')}"`));
   assert.deepEqual(steps.get('ship'), { name: 'ship', after: ['review'], place: 'git', workspace: 'main', gate: true, check: long });
   assert.equal(steps.get('implement')?.overrides, undefined, 'a step with no harness key of its own writes no overrides');
-  assert.deepEqual(steps.get('review')?.overrides, { skills: ['review-a-change'], claude: { effort: 'low' } });
+  assert.deepEqual(steps.get('review')?.overrides, { skills: ['review-a-change'], mcp: ['docs'], claude: { effort: 'low' } });
   assert.deepEqual(steps.get('review'), {
     name: 'review',
     after: ['implement'],
@@ -106,7 +109,7 @@ test('what export writes reads back as it was written, a long line whole, and a 
     budget: 20,
     loop: 'implement',
     rounds: 3,
-    overrides: { skills: ['review-a-change'], claude: { effort: 'low' } },
+    overrides: { skills: ['review-a-change'], mcp: ['docs'], claude: { effort: 'low' } },
   });
 });
 

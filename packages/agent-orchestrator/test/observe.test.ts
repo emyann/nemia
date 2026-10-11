@@ -159,7 +159,7 @@ type Transformation = { id: string; options?: { sort?: { field?: string }[] } };
 
 /**
  * A panel of a dashboard, as far as the checker reads it: of a bar gauge, in `reduceOptions`, whether it draws a bar for each row its
- * query answers (`values`) or one for each field, and how many rows at most (`limit`).
+ * query answers (`values`) or one for each field, and how many rows at most (`limit`); and the name it gives each bar, `displayName`.
  */
 type Panel = {
   type: string;
@@ -168,6 +168,7 @@ type Panel = {
   targets?: Target[];
   panels?: Panel[];
   options?: { content?: string; reduceOptions?: { values?: boolean; limit?: number } };
+  fieldConfig?: { defaults?: { displayName?: string } };
   transformations?: Transformation[];
 };
 
@@ -383,14 +384,34 @@ function traceNames(query: string): { spans: string[]; attributes: string[]; res
   return { spans, attributes, resources };
 }
 
-/** The stream labels and the fields a LogQL query names: those it filters on, and those it counts by. */
+/**
+ * The labels a LogQL query makes for itself, each with the fields its template names: one for each stage that formats a label, a field
+ * being a `.word` inside the template's double braces, as `{{.step}}` and `{{ if .workflow }}` both name one.
+ */
+function labelsMade(query: string): Map<string, string[]> {
+  const made = new Map<string, string[]>();
+  for (const [, label, template] of query.matchAll(/\|\s*label_format\s+([A-Za-z_]\w*)\s*=\s*"((?:[^"\\]|\\.)*)"/g))
+    made.set(
+      label,
+      [...template.matchAll(/\{\{((?:[^}]|\}(?!\}))*)\}\}/g)].flatMap(([, body]) =>
+        [...body.matchAll(/(?<![\w.])\.([A-Za-z_]\w*)/g)].map(([, field]) => field),
+      ),
+    );
+  return made;
+}
+
+/**
+ * The stream labels and the fields a LogQL query names: those it filters on, those the templates of its made labels read, and those
+ * it counts by, but a label the query makes for itself (`labelsMade`).
+ */
 function logNames(query: string): string[] {
+  const made = labelsMade(query);
   const text = query.replace(/"(?:[^"\\]|\\.)*"/g, '""');
   const stream = /\{([^}]*)\}/.exec(text);
   const labels = [...(stream?.[1] ?? '').matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)/g)].map(([, l]) => l);
   const fields = [...text.slice(stream ? stream.index + stream[0].length : 0).matchAll(/\|\s*([A-Za-z_]\w*)\s*(?:=~|!~|!=|=|>|<)/g)];
   const grouped = [...text.matchAll(/\b(?:by|without)\s*\(([^)]*)\)/g)].flatMap(([, list]) => list.split(',').map((l) => l.trim()));
-  return [...labels, ...fields.map(([, f]) => f), ...grouped.filter(Boolean)];
+  return [...labels, ...fields.map(([, f]) => f), ...[...made.values()].flat(), ...grouped.filter((l) => l && !made.has(l))];
 }
 
 /** The labels a LogQL query counts by: its first, outermost `by (…)` list. */
@@ -405,7 +426,8 @@ const countedBy = (query: string): string[] =>
  * title, for every bar gauge whose query is sent to Loki (as measured, `tools/observe/README.md`, *Counting a session's errors*).
  * Grafana hands the gauge an instant query's answer as one table, a row for each series: a gauge that does not read each row
  * (`values`) reduces the table to one value; a count by several labels names a bar by every label's value; a `legendFormat` is never
- * drawn; a gauge with no `limit` draws only the first rows; and a range query's last point is not the range's count.
+ * drawn; a gauge with no `limit` draws only the first rows; a table of one row draws its bar with no name unless the gauge's
+ * `displayName` reads the row's label; and a range query's last point is not the range's count.
  */
 function lokiGaugeFaults(dashboard: Dashboard): string[] {
   const faults: string[] = [];
@@ -418,6 +440,9 @@ function lokiGaugeFaults(dashboard: Dashboard): string[] {
     }
     if (p.options?.reduceOptions?.values !== true) faults.push(`${p.title}: reduces Loki's table to one value`);
     if (typeof p.options?.reduceOptions?.limit !== 'number') faults.push(`${p.title}: no limit on the rows it draws`);
+    const labels = [...new Set(lokiTargets(p).flatMap((t) => countedBy(t.expr ?? '')))];
+    if (!labels.some((l) => p.fieldConfig?.defaults?.displayName === `\${__data.fields.${l}}`))
+      faults.push(`${p.title}: a bar not named by its row's label, nameless when the table has one row`);
   }
   return faults;
 }
@@ -430,7 +455,8 @@ const profileLabelsOf = (selector: string): [string, string][] =>
 const allPanels = (panels: Panel[]): Panel[] => panels.flatMap((p) => [p, ...allPanels(p.panels ?? [])]);
 
 /** The targets of `panel` sent to Loki: by their own datasource, else the panel's. */
-const lokiTargets = (panel: Panel): Target[] => (panel.targets ?? []).filter((t) => (t.datasource?.uid ?? panel.datasource?.uid) === 'loki');
+const lokiTargets = (panel: Panel): Target[] =>
+  (panel.targets ?? []).filter((t) => (t.datasource?.uid ?? panel.datasource?.uid) === 'loki');
 
 /** The bar gauges of `dashboard` with a query sent to Loki, in the dashboard's order. */
 const lokiGauges = (dashboard: Dashboard): Panel[] =>
@@ -657,6 +683,81 @@ test('a bar gauge over Loki reads each row of an instant query, named by one lab
   );
 });
 
+test("REFUSED: a bar gauge that reduces Loki's table to one value, counts by several labels, keeps a legendFormat, reads a range, sets no limit, or names no row", () => {
+  const TITLE = 'Tool errors, across runs';
+  const faultsWith = (change: (panel: Panel, target: Target) => void): string[] => {
+    const steps = dashboardTitled('Steps');
+    const panel = lokiGauges(steps).find((p) => p.title === TITLE);
+    const target = panel?.targets?.[0];
+    assert.ok(panel?.options?.reduceOptions && panel.fieldConfig?.defaults && target?.expr, `Steps has no ${TITLE}`);
+    change(panel, target);
+    return lokiGaugeFaults(steps);
+  };
+  const ONE_VALUE = `${TITLE}: reduces Loki's table to one value`;
+  const SEVERAL = `${TITLE}: counts by workflow, name, not by one label`;
+  const LEGEND = `${TITLE}: a legendFormat, which Grafana never draws here`;
+  const RANGE = `${TITLE}: a range query, whose last point is not the range's count`;
+  const NO_LIMIT = `${TITLE}: no limit on the rows it draws`;
+  const NAMELESS = `${TITLE}: a bar not named by its row's label, nameless when the table has one row`;
+  assert.deepEqual(
+    faultsWith(() => {}),
+    [],
+  );
+  assert.deepEqual(
+    faultsWith((p) => (p.options!.reduceOptions!.values = false)),
+    [ONE_VALUE],
+  );
+  assert.deepEqual(
+    faultsWith((p) => delete p.options!.reduceOptions!.values),
+    [ONE_VALUE],
+  );
+  assert.deepEqual(
+    faultsWith((_, t) => (t.expr = t.expr!.replace('sum by (name)', 'sum by (workflow, name)'))),
+    [SEVERAL],
+  );
+  assert.deepEqual(
+    faultsWith((_, t) => (t.expr = t.expr!.replace('sum by (name) ', 'sum '))),
+    [`${TITLE}: counts by no label, not by one label`, NAMELESS],
+  );
+  assert.deepEqual(
+    faultsWith((_, t) => (t.legendFormat = '{{name}}')),
+    [LEGEND],
+  );
+  assert.deepEqual(
+    faultsWith((_, t) => (t.queryType = 'range')),
+    [RANGE],
+  );
+  assert.deepEqual(
+    faultsWith((_, t) => delete t.queryType),
+    [RANGE],
+  );
+  assert.deepEqual(
+    faultsWith((p) => delete p.options!.reduceOptions!.limit),
+    [NO_LIMIT],
+  );
+  assert.deepEqual(
+    faultsWith((p) => delete p.fieldConfig!.defaults!.displayName),
+    [NAMELESS],
+  );
+  assert.deepEqual(
+    faultsWith((p) => (p.fieldConfig!.defaults!.displayName = '${__data.fields.step}')),
+    [NAMELESS],
+  );
+  const shipped = faultsWith((p, t) => {
+    t.expr = t.expr!.replace('sum by (name)', 'sum by (factory, workflow, step, agent, tool_name)');
+    t.legendFormat = '{{workflow}} / {{step}} · {{agent}} · {{tool_name}}';
+    p.options!.reduceOptions = { values: false };
+    delete p.fieldConfig!.defaults!.displayName;
+  });
+  assert.deepEqual(shipped, [
+    `${TITLE}: counts by factory, workflow, step, agent, tool_name, not by one label`,
+    LEGEND,
+    ONE_VALUE,
+    NO_LIMIT,
+    NAMELESS,
+  ]);
+});
+
 /** The values a dashboard's PromQL queries ask of the pass's `phase` label, each alternative of a regex its own. */
 const phasesAsked = (dashboard: Dashboard): string[] =>
   queriesOf(dashboard)
@@ -704,7 +805,9 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
     ['Steps', 'tempo', 'span.call', 'span.text', 'text'],
     ['System', 'tempo', 'span.tool', 'span.tol', 'tol'],
     ['Steps', 'loki', '| success=', '| succeeded=', 'succeeded'],
-    ['Steps', 'loki', 'by (step, tool_name)', 'by (step, tool)', 'tool'],
+    ['Steps', 'loki', '{{.tool_name}}', '{{.tool}}', 'tool'],
+    ['Steps', 'loki', '{{ if .workflow }}', '{{ if .workflows }}', 'workflows'],
+    ['Steps', 'loki', 'sum by (name)', 'sum by (named)', 'named'],
   ];
   for (const [title, datasource, from, to, named] of cases)
     assert.deepEqual(unknownNames(withQuery(dashboardTitled(title), datasource, from, to), KNOWN), [named], `${title}: ${to}`);
@@ -770,7 +873,7 @@ const STEP_PICKS = ['factory', 'workflow', 'step', 'agent'];
  * What one counting query of a dashboard counts of a step's sessions, read off its text: the calls they were denied (the daemon's
  * `DENIED_SPAN`), their tool errors (the sessions' failed `tool_result` events) or, of those, their failed skill loads; for what —
  * the run and session picked (`run`), the steps picked across runs (`across`), or neither, which is `unscoped`; and whether it says the
- * tool, by counting by it or, for a skill load, by asking for the `Skill` tool alone.
+ * tool, by counting by it, or by a label made from it (`labelsMade`), or, for a skill load, by asking for the `Skill` tool alone.
  */
 type Counted = { what: 'denied' | 'errors' | 'skills'; scope: 'run' | 'across' | 'unscoped'; tool: boolean };
 
@@ -791,7 +894,10 @@ function countedOf(dashboard: Dashboard): Counted[] {
           ? 'across'
           : 'unscoped';
     const skills = errors && /\|\s*tool_name\s*=\s*"Skill"/.test(q.text);
-    const tool = skills || new RegExp(`\\bby\\s*\\([^)]*${denied ? 'span\\.tool\\b' : '\\btool_name\\b'}`).test(q.text);
+    const made = labelsMade(q.text);
+    const tool =
+      skills ||
+      (denied ? /\bby\s*\([^)]*span\.tool\b/.test(q.text) : countedBy(q.text).some((l) => (made.get(l) ?? [l]).includes('tool_name')));
     return [{ what: denied ? 'denied' : skills ? 'skills' : 'errors', scope, tool }];
   });
 }
@@ -828,7 +934,7 @@ test('REFUSED: a count that drops its session, one of its four choices, or its t
   assert.deepEqual(changed('tempo', ' && span.agent=~"$agent"', ''), without('denied across by tool', 'denied unscoped by tool'));
   assert.deepEqual(changed('loki', ' | workflow=~"$workflow"', ''), without('errors across by tool', 'errors unscoped by tool'));
   assert.deepEqual(changed('tempo', 'by (span.tool, span.call)', 'by (span.call)'), without('denied run by tool', 'denied run'));
-  assert.deepEqual(changed('loki', 'by (step, tool_name)', 'by (step)'), without('errors run by tool', 'errors run'));
+  assert.deepEqual(changed('loki', ' · {{.tool_name}}', ''), without('errors run by tool', 'errors run'));
 });
 
 /** The tag each of a dashboard's `run` and `session` variables reads its values from, and what the session's All stands for. */

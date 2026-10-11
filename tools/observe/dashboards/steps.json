@@ -501,12 +501,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (step, tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | run=\"$run\" | task=~\"$session\" [$__range]))",
-          "legendFormat": "{{step}} · {{tool_name}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}} · {{.tool_name}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -535,7 +535,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -562,12 +563,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (step, tool_parameters) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | run=\"$run\" | task=~\"$session\" [$__range]))",
-          "legendFormat": "{{step}} · {{tool_parameters}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}} · {{.tool_parameters}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -596,7 +597,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -689,7 +691,7 @@
       "id": 12,
       "type": "bargauge",
       "title": "Tool errors, across runs",
-      "description": "The sessions' tool_result events that failed over the range, by tool. By factory, workflow, step and agent.",
+      "description": "The sessions' tool_result events that failed over the range, by tool. By factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -708,12 +710,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (factory, workflow, step, agent, tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" [$__range]))",
-          "legendFormat": "{{workflow}} / {{step}} · {{agent}} · {{tool_name}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }} · {{.tool_name}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -742,7 +744,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -750,7 +753,7 @@
       "id": 13,
       "type": "bargauge",
       "title": "Failed skill loads, across runs",
-      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A skill that is not there exports nothing. By step and agent.",
+      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A skill that is not there exports nothing. By step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -769,12 +772,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (workflow, step, agent, tool_parameters) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" [$__range]))",
-          "legendFormat": "{{workflow}} / {{step}} · {{agent}} · {{tool_parameters}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }} · {{.tool_parameters}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -803,7 +806,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },

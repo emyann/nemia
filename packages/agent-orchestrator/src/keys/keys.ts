@@ -475,6 +475,33 @@ export function composedRefusal(
   return undefined;
 }
 
+/**
+ * Why the MCP servers an agent names (`mcp:`) cannot reach the sessions of a step that runs as `step` does, or `undefined`: a step run by
+ * a remote agent, which is filed no configuration and loads what its operator gave it. `named` says whose, as `composedRefusal`'s.
+ */
+export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<Workflow, 'harness'>): string | undefined {
+  if (!mcp?.length || !isRemoteHarness(step.harness)) return undefined;
+  return `${named}: \`mcp: ${mcp.join(', ')}\` names servers of the checkout's \`.mcp.json\` for the sessions a run starts here, and \`harness: ${step.harness}\` is a remote A2A agent, which loads the servers its operator configured and none of ours. Delete the line, or run the step on a harness of this machine.`;
+}
+
+/** An MCP server's name, as a `.mcp.json` keys one: letters, digits, `-` and `_`. */
+export const SERVER_NAME = /^[\w-]+$/;
+
+/** `mcp:` as the server names it lists, refused in `file`'s name unless each is a server's name (`SERVER_NAME`), once. */
+export function serverNamesOf(file: string, written: string | undefined): string[] | undefined {
+  if (written === undefined) return undefined;
+  const named = `${file}: \`mcp: ${written}\``;
+  const shape =
+    "Each is a server's name in the checkout's `.mcp.json` — letters, digits, - and _ — comma-separated: `mcp: playwright, docs`. Delete the line for an agent whose sessions load no server.";
+  const names = written.split(',').map((s) => s.trim());
+  if (!names.length || names.includes('')) refuse(`${named} ${written.trim() ? 'has an empty name' : 'names no server'}. ${shape}`);
+  const odd = names.find((n) => !SERVER_NAME.test(n));
+  if (odd) refuse(`${named} has \`${odd}\`, which is not a server's name. ${shape}`);
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
+  return names;
+}
+
 /** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as a harness names one. */
 export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 

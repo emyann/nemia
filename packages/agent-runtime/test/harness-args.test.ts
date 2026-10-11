@@ -354,7 +354,10 @@ test('a niceness is a whole number from 0 to 19: anything else is refused, and s
 test('checkoutMcp is a list of server names, none twice and none the task gives itself: anything else is refused, saying what one is', () => {
   for (const bad of ['playwright', [''], ['a', 3], ['a b'], { a: true }, null]) {
     const says = argsRefusalOf({ ...task, config: { checkoutMcp: bad } } as never) ?? '';
-    assert.match(says, /^`checkoutMcp: .*` is not a list of server names\. Give the names .*\[\] for none, or leave it out for the whole file\.$/);
+    assert.match(
+      says,
+      /^`checkoutMcp: .*` is not a list of server names\. Give the names .*\[\] for none, or leave it out for the whole file\.$/,
+    );
   }
   assert.equal(
     argsRefusalOf({ ...task, config: { checkoutMcp: ['a', 'b', 'a'] } }),

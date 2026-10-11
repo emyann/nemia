@@ -1,7 +1,7 @@
 /**
  * A task's MCP servers, as Claude Code is handed them: what the engine refuses of a task's `mcp`, the checkout's own
- * `.mcp.json` and the entries a task picks of it, the task's config written to a file, and the flags that load those and nothing else. And as Codex is
- * handed them: the server names an operator's Codex config already has, and a task's servers as its `mcp_servers` table.
+ * `.mcp.json` and the entries a task picks of it, the task's config written to a file, and the flags that load those and nothing
+ * else. And as Codex is handed them: the server names an operator's Codex config already has, and a task's servers as its `mcp_servers` table.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -102,7 +102,9 @@ export const pickedCheckoutMcp = (cwd: string, names: readonly string[]): Record
     throw new Error(`${file} is not valid JSON (${(e as Error).message}), and ${asked} names servers of it. Fix the file.`, { cause: e });
   }
   if (!isMap(servers)) {
-    throw new Error(`${file} has no \`mcpServers\` map, and ${asked} names servers of it. Declare them there, or take the names off the task.`);
+    throw new Error(
+      `${file} has no \`mcpServers\` map, and ${asked} names servers of it. Declare them there, or take the names off the task.`,
+    );
   }
   const absent = names.filter((name) => !Object.hasOwn(servers, name));
   if (absent.length) {

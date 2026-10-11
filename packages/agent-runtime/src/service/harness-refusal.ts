@@ -37,8 +37,8 @@ import { isClaude, isRemote, isSpec, type HarnessConfig, type TaskSpec } from '.
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `RunnerOps` brought as its own is the consumer's: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a
- * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission` and `checkoutMcp`, and asked nothing here: its own `refuses`, if it has
- * one, is asked by `file` through the `Runner`.
+ * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission` and `checkoutMcp`, and asked nothing here: its own
+ * `refuses`, if it has one, is asked by `file` through the `Runner`.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (!Object.hasOwn(harnesses, spec.harness)) {

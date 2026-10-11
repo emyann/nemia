@@ -11,6 +11,10 @@
  * The server is spawned as Claude Code spawns the entry, in the session's cwd, speaking JSON-RPC on stdio; listing its tools launches no
  * browser, so that test costs nothing and needs no install.
  *
+ * A step's session loads only the servers its agent's `mcp:` line names: started on a fake `claude` that records its argv, a session of an
+ * agent that names none is named no MCP config in a checkout that has one, and every shipped step given the `look` skill is filled by an
+ * agent that names `playwright`.
+ *
  * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money. It files a task at shipped defaults:
  * the engine's built-in harnesses, `claude` first, asked for a background session, with no `mcp` on the task, so the only servers it can
  * have are the ones the checkout's `.mcp.json` names. A settled session stays in the harness's registry, so the test stops and removes
@@ -27,9 +31,13 @@ import type { TaskView } from 'agent-runtime';
 import { Effect } from 'effect';
 import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
+import { parseAgent, parseWorkflow } from '../src/workflow.ts';
+import { filedConfig } from '../src/filed/filed.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { placesOf, shippedFolders } from './team.ts';
 import { plainEngine } from './promised.ts';
-import { until } from './waits.ts';
+import { until, WAITED } from './waits.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -225,6 +233,122 @@ test('the server starts as configured, from the repository root, and offers brow
     child.removeAllListeners('exit');
     child.kill();
   }
+});
+
+/** The steps of the folder `dir` given the `look` skill whose agent's file names no `playwright`: each a session that could not look. */
+const blindLookers = (dir: string, places = placesOf(dir)): string[] =>
+  loadWorkflows(dir, places)
+    .filter((step) => step.agent?.skills?.includes('look') && !step.agent.mcp?.includes('playwright'))
+    .map((step) => `${path.basename(dir)}/${step.name}`);
+
+test('every shipped step given the look skill is filled by an agent that names playwright, whose tools the skill uses', () => {
+  const lookers = shippedFolders().flatMap((dir) => loadWorkflows(dir, placesOf(dir)).filter((s) => s.agent?.skills?.includes('look')));
+  assert.ok(lookers.length > 0, 'a step of this repository is given look');
+  assert.deepEqual(
+    shippedFolders().flatMap((dir) => blindLookers(dir)),
+    [],
+  );
+  const root = scratch('wf-mcp-look-');
+  fs.mkdirSync(path.join(root, 'agents'));
+  fs.mkdirSync(path.join(root, 'dev'));
+  fs.mkdirSync(path.join(root, 'skills', 'look'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'skills', 'look', 'SKILL.md'), '---\nname: look\ndescription: Looks.\n---\nLook.\n');
+  fs.writeFileSync(path.join(root, 'agents', 'sighted.md'), '---\nmcp: playwright\n---\nYou look.\n');
+  fs.writeFileSync(path.join(root, 'agents', 'blind.md'), '---\nmcp: docs\n---\nYou look.\n');
+  for (const agent of ['sighted', 'blind'])
+    fs.writeFileSync(path.join(root, 'dev', `${agent}.md`), `---\nplace: git\nagent: ${agent}\nskills: look\n---\nLook.\n`);
+  assert.deepEqual(
+    blindLookers(path.join(root, 'dev'), {}),
+    ['dev/blind'],
+    'a step given look whose agent names another server is refused',
+  );
+});
+
+/** A fake `claude` in a new folder, first on PATH while `f` runs: it writes the argv of the session it is started for to `args`. */
+const withFakeClaude = async <T>(f: (args: string) => Promise<T>): Promise<T> => {
+  const bin = scratch('wf-mcp-bin-');
+  const args = path.join(bin, 'args');
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    ['#!/bin/sh', 'case "$1" in', '  agents) echo "[]" ;;', `  *) printf '%s\\n' "$@" > '${args}'; exit 1 ;;`, 'esac', ''].join('\n'),
+    { mode: 0o755 },
+  );
+  const prev = process.env.PATH;
+  process.env.PATH = `${bin}:${prev}`;
+  try {
+    return await f(args);
+  } finally {
+    process.env.PATH = prev;
+  }
+};
+
+/** The MCP configs Claude Code is named on the argv `args`: every value after `--mcp-config` up to the next flag. */
+const mcpConfigsOf = (args: string[]): string[] => {
+  const at = args.indexOf('--mcp-config');
+  if (at === -1) return [];
+  const rest = args.slice(at + 1);
+  const end = rest.findIndex((a) => a.startsWith('-'));
+  return end === -1 ? rest : rest.slice(0, end);
+};
+
+/**
+ * The argv Claude Code is started with for the first session of a step filled by an agent whose file has the lines `agent`, in a checkout
+ * whose `.mcp.json` names the servers `repo` and `other`: the step resolved and frozen as a start does, filed as the tick files it.
+ */
+const sessionArgv = async (t: Parameters<typeof until>[0], agent: string): Promise<{ cwd: string; args: string[] }> => {
+  const cwd = scratch('wf-mcp-checkout-');
+  fs.writeFileSync(
+    path.join(cwd, '.mcp.json'),
+    JSON.stringify({ mcpServers: { repo: { command: 'repo-server' }, other: { command: 'o' } } }),
+  );
+  const scout = parseAgent('scout', `---\n${agent}---\nYou look.\n`);
+  const step = parseWorkflow('look', '---\nplace: git\nagent: scout\n---\nLook.\n', undefined, new Map([['scout', scout]]));
+  const config = filedConfig(
+    step,
+    [step],
+    { gates: [] },
+    {
+      model: undefined,
+      budgetUsd: undefined,
+      runArtifacts: scratch('wf-mcp-artifacts-'),
+      inbox: scratch('wf-mcp-inbox-'),
+      own: {},
+      landingDenied: () => [],
+    },
+  );
+  return withFakeClaude(async (args) => {
+    const e = plainEngine(EngineService.layer({ root: scratch('wf-mcp-root-'), harnesses: { claude: 'claude' } }));
+    const id = await Effect.runPromise(e.file({ brief: 'b', cwd, harness: 'claude', config }));
+    await until(
+      t,
+      async () => {
+        if ((await Effect.runPromise(e.view(id))).state.settled) return true;
+        await Effect.runPromise(e.tick());
+        return false;
+      },
+      'the fake Claude Code task settled',
+      { everyMs: 50 },
+    );
+    return { cwd, args: fs.readFileSync(args, 'utf8').replace(/\n$/, '').split('\n') };
+  });
+};
+
+test(
+  'a session of an agent that names no server, in a checkout whose .mcp.json names one, is started with none loaded',
+  WAITED,
+  async (t) => {
+    const { args } = await sessionArgv(t, 'description: Looks.\n');
+    assert.deepEqual(mcpConfigsOf(args), [], "no MCP config is named, the checkout's least of all");
+    assert.ok(args.includes('--strict-mcp-config'), 'and strict, so nothing loads in its place');
+  },
+);
+
+test("a session of an agent that names one of its checkout's servers is started with that one alone", WAITED, async (t) => {
+  const { cwd, args } = await sessionArgv(t, 'mcp: repo\n');
+  const configs = mcpConfigsOf(args);
+  assert.equal(configs.length, 1, JSON.stringify(configs));
+  assert.notEqual(configs[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
+  assert.deepEqual(JSON.parse(fs.readFileSync(configs[0], 'utf8')), { mcpServers: { repo: { command: 'repo-server' } } });
 });
 
 const live = process.env.AE_LIVE === '1';

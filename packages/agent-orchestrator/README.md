@@ -383,7 +383,7 @@ rounds: 3
 ```
 
 Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
-`output` — and three of its own, `description:`, `skills:` and `harnessPrompt:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+`output` — and its own, `role:`, `description:`, `skills:`, `harnessPrompt:` and `mcp:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
@@ -556,6 +556,13 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   sees the frozen copy once, and a call to the bare name is refused (*"Skill look is disabled for model invocation in skillOverrides
   settings"*, Claude Code 2.1.285). An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session
   calls `nemia-<agent>:look`, the one it is listed.
+- `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
+  A session loads the servers its agent names and no other: an agent with no line loads none, and neither does a step with no agent.
+  The run hands the runtime the names alone (`checkoutMcp`), which reads those entries from the session's checkout when it starts it; a
+  name that file does not declare refuses the session at its start, saying so. A Codex step is handed the same entries as
+  `-c mcp_servers=…`. Loading a server allows none of its tools: the agent's fence still decides. Refused at load: a line that names
+  no server, an empty name, a name twice, and any name on a step a remote agent runs, which loads what its operator configured. A
+  step has no `mcp:` line of its own. A run started before the key keeps the whole file on its later tries.
 - `harnessPrompt:` — what becomes of the harness's own prompt, Claude Code's system prompt. `keep`, or no line, keeps it and appends
   the instructions after it; `no-coding` does too, less Claude Code's coding instructions, through an output style in the plugin that
   says `keep-coding-instructions: false`, chosen by its namespaced name in `--settings` (a bare name is echoed and not applied, F16,
@@ -593,8 +600,8 @@ wrote it, never its agent's, and the board's step form shows it as a plain list.
 A subagent Claude Code's `/agents` wizard wrote into `.claude/agents/` runs as it is: its `name`, `description`, `tools` and `model`
 are the run's keys, and its `color` is read and ignored (`CLAUDE_CODE_IGNORED`) — it colours a name in Claude Code and holds nothing
 back — and is not written back by the board's save. Claude Code's keys that change what a session may do or has, which a run does not
-carry to its sessions, are refused by name, each with what does that in a run (`maxTurns`, `mcpServers`, `hooks`, `memory`,
-`isolation`), and so is `model: inherit`, since a step's session has no conversation to take a model from.
+carry to its sessions, are refused by name, each with what does that in a run (`maxTurns`, `mcpServers`, for which the `mcp:` line
+names the checkout's servers, `hooks`, `memory`, `isolation`), and so is `model: inherit`, since a step's session has no conversation to take a model from.
 
 Refused at load, each in the name of the agent or of the step that names it (`composedRefusal`, `autoRefusal`): a skill no place has,
 naming each place looked in; skills with no `Skill` in the step's `tools:` or with `Skill` in its `disallowedTools:`, since a skill a
@@ -632,7 +639,7 @@ Review the change in this workspace as a second engineer would.
 `tools:` is the harness's tool names, comma-separated, and they are the only tools the session has.
 Claude Code is given exactly the list as `--tools`, where a tool not on it does not exist for the
 session — not `--allowedTools`, where an unapproved one is still there to try. The list names Claude
-Code's built-in tools; the servers of the checkout's `.mcp.json` are not on it. Refused at load: a line
+Code's built-in tools; the servers its agent names of the checkout's `.mcp.json` (`mcp:`) are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
 `Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex, the orchestrator's own rule, since the runtime
 takes the list there and Codex ignores it. Codex has no tool list, only

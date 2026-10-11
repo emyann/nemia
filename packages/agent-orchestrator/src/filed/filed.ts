@@ -15,9 +15,9 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * an ending's read of the run's artifacts folder (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start),
  * writable where the step's `writable:` names one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): the
  * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`,
- * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs; the key left out with none, and the harness's
- * own arguments (`own`) last. The runtime judges no budget: `budgetUsd` is the harness's own cap, and whether the step went over is this
- * package's (`ownStatus`). Pure.
+ * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs; the key left out with none, the servers of
+ * the checkout its sessions load (`checkoutMcpOf`), and the harness's own arguments (`own`) last. The runtime judges no budget:
+ * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
   step: Workflow,
@@ -43,6 +43,7 @@ export const filedConfig = <Own extends object>(
   background: step.background,
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...folders(filedFolders(step, steps, t))]),
+  ...checkoutMcpOf(step),
   ...t.own,
 });
 
@@ -93,6 +94,13 @@ export const inputsMounts = (
   steps: readonly Pick<Workflow, 'place'>[],
   dir: string | undefined,
 ): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
+
+/**
+ * The MCP servers of its checkout a step's sessions load, as a config holds them: the names its frozen agent gives (`StepAgent.mcp`),
+ * none for a step with no agent, and no key for an agent frozen before it named any, whose sessions load the whole file as they did.
+ */
+const checkoutMcpOf = (step: Pick<Workflow, 'agent'>): { checkoutMcp?: string[] } =>
+  step.agent === undefined ? { checkoutMcp: [] } : step.agent.mcp === undefined ? {} : { checkoutMcp: step.agent.mcp };
 
 /** `mounts` as a config holds them: the key, or none for no folder. */
 const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { mounts } : {});

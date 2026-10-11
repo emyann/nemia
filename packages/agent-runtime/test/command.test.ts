@@ -232,7 +232,7 @@ test('command, env and niceness are refused on Codex, Claude Code and a remote a
   }
 });
 
-test("checkoutMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it", async () => {
+test('checkoutMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it', async () => {
   const root = scratch('ae-command-');
   const harnesses = { codex, claude: 'claude', command: commandHarness } as const;
   const engine = builtEngine(EngineService.layer({ root, harnesses }));

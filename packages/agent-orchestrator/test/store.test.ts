@@ -5369,29 +5369,75 @@ test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before
   await runWith(b.e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(repo, 'notes.md'), 'notes\n');
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, artifacts: ['notes.md'] });
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.ok(under('runs', run.id, 'artifacts', 'implement', 'notes.md'), 'collected, as a step with no check is on every pass');
 
   let release!: () => void;
   const gate = new Promise<void>((r) => {
     release = r;
   });
+  let reading!: () => void;
+  const read = new Promise<void>((r) => {
+    reading = r;
+  });
   const slow = {
     ...b.e,
     view: (id: string) =>
-      Effect.flatMap(
-        Effect.promise(() => gate),
-        () => b.e.view(id),
+      Effect.tap(b.e.view(id), () =>
+        Effect.promise(() => {
+          reading();
+          return gate;
+        }),
       ),
   };
   const pass = runWith(slow, advanceRun(readRun(run.id)));
+  await read;
   assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
   fs.writeFileSync(path.join(repo, 'later.txt'), "a person's edit, after the run was forgotten\n");
   release();
   await pass;
 
   assert.ok(!under('runs', run.id), 'no files directory without a record');
-  assert.equal(uncommitted(repo), 'later.txt', "and nothing of a person's checkout committed under the step's name");
+  assert.equal(
+    uncommitted(repo),
+    'later.txt\nnotes.md',
+    "and nothing of a person's checkout committed under the step's name: the step's file and the person's edit, as they were left",
+  );
+  assert.deepEqual(subjects(repo), ['base']);
+});
+
+test('REFUSED at shipped defaults: a pass that read a run before it was cancelled and `nemia rm` forgot it files no step of it afterwards — a follower due by what the pass read stays unfiled', async () => {
+  const repo = aRepo();
+  const b = board();
+  const dir = oneStep();
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
+  const run = await runPlaced(startRun({ brief: 'cancelled and forgotten with a follower due', repo, workflowDir: dir }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  let reading!: () => void;
+  const read = new Promise<void>((r) => {
+    reading = r;
+  });
+  const slow = {
+    ...b.e,
+    view: (id: string) =>
+      Effect.tap(b.e.view(id), () =>
+        Effect.promise(() => {
+          reading();
+          return gate;
+        }),
+      ),
+  };
+  const pass = runWith(slow, advanceRun(readRun(run.id)));
+  await read;
+  await runWith(b.e, cancelRun(run.id));
+  assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
+  release();
+  assert.deepEqual((await pass).filed, [], 'nothing filed for a run with no record');
+  assert.deepEqual(b.filings, [`${run.id}-implement`]);
 });
 
 test("`nemia rm`'s program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {

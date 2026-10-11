@@ -214,9 +214,9 @@ const whyEnded = (r: RetryBriefing): string =>
  *
  * A budget a person raised is said beside why the last try ended, never in its place. The run's own sign-off nudge to a
  * session it continues is `SIGNOFF` alone, in place of why and who — or, where the closeout it gave named files the run did
- * not have, those files and what to do about each (`lacksSaid`), which any other try of such a step is told as its why; a new session is told as any try is. A try sent
- * back from an ending that stopped on the base branch is told why in the ending's terms, then what it said
- * (`endingSection`).
+ * not have, those files and what to do about each (`lacksSaid`), which any other try of such a step is told as its why; a
+ * new session is told as any try is. A try sent back from an ending that stopped on the base branch is told why in the
+ * ending's terms, then what it said (`endingSection`).
  */
 export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false): string {
   const pastBudget =

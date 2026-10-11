@@ -1,11 +1,12 @@
 /**
  * Files a step leaves for the steps after it and for the person who decides: what its brief says of them (`artifactsContract`), where a
- * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), and the lines that list them
- * (`artifactLines`). Pure: `artifacts.store.ts` copies them.
+ * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), the lines that list them
+ * (`artifactLines`), which steps have the files their closeout named read (`filesDue`), and what a missing one is said as
+ * (`lackLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
 import { CONFIG_FOLDERS, configFolderIn } from 'agent-runtime/vocabulary';
-import { filesPrunedWords, type Mount, type Pruned } from '../record/record.ts';
+import { filesPrunedWords, type Mount, type Pruned, type Run, type TaskPhase } from '../record/record.ts';
 import { sandboxed, upstreamOf } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -223,10 +224,10 @@ export const REFUSING: ReadonlySet<MissingArtifact['why']> = new Set([
 /** Why the run does not have a file a closeout named, said of that one file to the step that named it: `why` as `REFUSING` holds it. */
 export function lackWords(why: string, dir: string): string {
   const words: Record<string, string> = {
-    'not there': 'nothing is at that path in your workspace',
+    'not there': 'nothing is at that path in the workspace',
     missing: `it is not a file in \`${dir}\``,
     directory: 'it is a directory, and a closeout names each file',
-    escapes: 'it leads out of your workspace, so it was not read',
+    escapes: 'it leads out of the workspace, so it was not read',
     outside: `it is an absolute path outside \`${dir}\`, so it was not read`,
     configuration: `it passes through ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}, a folder a harness reads as its own configuration, so it was not handed over`,
   };
@@ -279,3 +280,29 @@ export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: re
   const upstream = upstreamOf(steps, step.name);
   return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
 };
+
+/**
+ * The steps whose closeout's files a pass reads off the disk now (`filesLacked` in artifacts.store.ts), each once: a step on a local
+ * harness whose task settled `succeeded`, whose closeout names a file, and whose record holds nothing read of that task
+ * (`StepRecord.lacks`) — on the pass that first reads the task settled, which the run's mark of the settles it has counted
+ * (`Run.settlesCounted`) does not hold yet and holds from the write that keeps what was read. So a task an earlier pass read settled is
+ * never read back into a refusal: not one settled under a tick that read no files, whose record has no such mark or holds the task, nor
+ * one whose check or follower has run since and may have removed a file. None of a pruned run, whose files may be gone.
+ */
+export function filesDue(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => { artifacts: readonly string[] } | undefined,
+): string[] {
+  const counted = run.settlesCounted;
+  if (run.pruned || !counted) return [];
+  return steps
+    .filter((step) => !isRemoteHarness(step.harness))
+    .filter(({ name }) => {
+      const taskId = run.steps[name]?.taskId;
+      if (!taskId || counted.includes(taskId) || phaseOf(taskId) !== 'succeeded') return false;
+      return !run.steps[name].lacks?.some((file) => file.taskId === taskId) && Boolean(closeoutOf(name)?.artifacts.length);
+    })
+    .map(({ name }) => name);
+}

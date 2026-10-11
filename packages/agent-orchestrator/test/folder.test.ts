@@ -120,6 +120,9 @@ const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
 
 const SIGNED = { outcome: 'done', summary: 'wrote it', artifacts: ['note.md'], needs: null };
 
+/** A closeout that names no file: a step that wrote no `note.md` names none, since a named file the run does not have refuses it. */
+const WROTE_NONE = { ...SIGNED, artifacts: [] };
+
 /** Just enough engine: what each task is doing and how it signed off, and every task's spec as it was filed. */
 const board = () => {
   const tasks = new Map<
@@ -491,7 +494,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   fs.writeFileSync(path.join(work, 'b', 'side-b.md'), '# b\n');
   fs.symlinkSync(path.join(ROOT, 'somewhere'), path.join(work, 'b', 'out'));
 
-  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   const c = path.join(work, 'c');
   assert.equal(tasks.get(`${run.id}-c`)!.spec.cwd, c, 'a fan-in gets a folder of its own');
@@ -513,7 +516,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
     "nor a parent's own given/, which is its parents' work and not its own: what this step waits on is what that step made",
   );
 
-  settle(`${run.id}-c`, 'succeeded', SIGNED);
+  settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['d']);
   assert.equal(tasks.get(`${run.id}-d`)!.spec.cwd, c, 'd continues c where it left off');
   assert.equal(
@@ -618,10 +621,10 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
   await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(work, 'a', 'keep.md'), '# kept\n');
   fs.writeFileSync(path.join(work, 'a', 'gone.md'), '# only the first time\n');
-  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   assert.deepEqual(fs.readdirSync(givenA).sort(), ['gone.md', 'keep.md'], 'what a had made when c was first filed');
-  settle(`${run.id}-c`, 'succeeded', SIGNED);
+  settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
 
   const record = readRun(run.id);
   record.steps.c = sentBack(record.steps.c);
@@ -648,7 +651,7 @@ test("a parent's regular file called `given` is its work, and reaches the step a
   const work = path.join(ROOT, 'runs', run.id, 'work');
   await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(work, 'b', 'given'), 'what b was given to understand\n');
-  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
   assert.equal(
     fs.readFileSync(path.join(work, 'c', 'given', 'from', 'b', 'given'), 'utf8'),
@@ -664,9 +667,9 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   const work = path.join(ROOT, 'runs', run.id, 'work');
   await runWith(e, advanceRun(readRun(run.id)));
   fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');
-  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['c']);
-  settle(`${run.id}-c`, 'succeeded', SIGNED);
+  settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
 
   const outside = path.join(ROOT, 'outside-the-run');
   fs.mkdirSync(path.join(outside, 'from', 'a'), { recursive: true });

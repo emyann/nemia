@@ -332,6 +332,8 @@ const PINNED: Record<string, string[]> = {
     'setInstruction',
     'setSchedule',
     'signoffsSpent',
+    'lackLines',
+    'lackedOf',
     'sizeOf',
     'skillDirIn',
     'skillFolders',

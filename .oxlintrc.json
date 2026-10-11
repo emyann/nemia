@@ -651,8 +651,8 @@
     {
       "files": ["packages/agent-orchestrator/src/status/status.ts"],
       "rules": {
-        "complexity": ["error", { "max": 39 }],
-        "sonarjs/cognitive-complexity": ["error", 28]
+        "complexity": ["error", { "max": 35 }],
+        "sonarjs/cognitive-complexity": ["error", 26]
       }
     },
     {

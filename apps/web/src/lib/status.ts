@@ -125,7 +125,8 @@ export const stateMeaning: Record<StepState, string> = {
     'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap on a try or a round',
   'budget-exhausted':
     'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap on a try',
-  unsigned: 'unsigned: it ended without the closeout it was asked for',
+  unsigned:
+    "unsigned: the run did not accept its closeout — it gave none, left out a field its output: declares, or named a file the run does not have; the CLI's decide says which",
   denied:
     "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
   failed: 'failed: its session failed',

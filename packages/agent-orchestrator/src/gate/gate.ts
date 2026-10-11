@@ -150,7 +150,7 @@ export function approvalRefusal(
     running: `${name} has not signed off yet: it is still running. ${then}`,
     checking: `${name} has signed off, and its check is still due or running: a gated step is verified first, then held. Approve it once its check has passed (nemia ls ${run.id}).`,
     blocked: `${name} has not signed off its work: it signed off blocked, so there is nothing to approve. Answer it: nemia retry ${run.id} ${name} --message "<answer>".`,
-    unsigned: `${name} has not signed off: it ended without a closeout the run accepts — none, one short of a field its output: declares, or one naming a file the run does not have (nemia decide ${run.id}) — so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
+    unsigned: `${name} has not signed off: it ended without its closeout, or with one the run does not accept — short of a field its output: declares, or naming a file the run does not have (nemia decide ${run.id}) — so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
     'failed (check)': `${name} has not passed its check, so its work is not verified and there is nothing to approve. See what the check said: nemia decide ${run.id}.`,
     failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
     stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,

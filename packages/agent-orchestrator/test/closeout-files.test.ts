@@ -31,12 +31,11 @@ const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { advanceRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
 const { readRun, rewriteRun, artifactsDir } = await import('../src/record/record.store.ts');
-const { filesDue } = await import('../src/workspace/workspace.ts');
 const { nextTry } = await import('../src/retry/index.ts');
 const { roundFiled } = await import('../src/round/round.ts');
 const { sentBack } = await import('../src/status/status.ts');
 const { lackedOf } = await import('../src/record/record.ts');
-const { nearName } = await import('../src/artifacts/artifacts.ts');
+const { filesDue, nearName } = await import('../src/artifacts/artifacts.ts');
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);

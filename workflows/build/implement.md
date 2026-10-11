@@ -35,6 +35,16 @@ each to a copy of your result and refuses the step when its test still passes, w
 runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
 change that adds no rule, saying why in `noMutants`.
 
+**Merge the base before you sign off**, on every try: the base moves while you work, and the landing's check runs the whole suite on
+the merged tree. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+`main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
+says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
+what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.
+Measure again whatever your change wrote by a measure, a baseline or a count that only shrinks: the number was true of the tree before
+the merge. Try your mutants again on the merged result, and say in your summary the commit you merged, or that git answered
+`Already up to date`. You merge the base into your branch, never your branch into the base. On a try whose brief is headed `## Merge`,
+merge the commit it names and no other.
+
 When you start a Claude Code session of your own to measure something, a probe, start it through `node workflows/build/probe.ts start
 <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you. It names the session for the run, runs it in the
 machinery's trusted folder (`$WF_ROOT/probes`), and tells the person no action is needed; pass `--settings` rather than edit a folder's

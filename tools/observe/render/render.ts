@@ -12,8 +12,8 @@
  *  5. Opens each dashboard in headless Chromium and writes, into `--out` (else the directory `WF_ARTIFACTS` names, else `.observe/`
  *     at the root), `dashboard-<name>.png` and `dashboard-<name>.txt`, the text of every panel (`panels.ts`).
  *  6. Removes the container by its name and lets the slot go: when it ends, on a signal, and on any error. With `--hold`, it hands the
- *     container to a reaper instead, which removes it after the seconds asked, and prints where Grafana listens and each dashboard's
- *     address (`hold.ts`); `--stop <name>` removes a held stack sooner.
+ *     container to a reaper instead, which removes it after the seconds asked, and prints where Grafana listens, where its collector
+ *     listens, for a probe to export to, and each dashboard's address (`hold.ts`); `--stop <name>` removes a held stack sooner.
  *
  * It needs `docker` and Playwright's Chromium. Exits 2 on a refusal that names the fix, 1 on a render that failed.
  */
@@ -75,7 +75,7 @@ async function rendered(plan: Plan, name: string, dashboards: readonly Named[], 
   }
   if (plan.hold === undefined) return false;
   const until = handOver(name, plan.hold);
-  for (const line of heldLines(name, until, ports.grafana, dashboards, at)) say(line);
+  for (const line of heldLines(name, until, ports.grafana, ports.otlp, dashboards, at)) say(line);
   return true;
 }
 

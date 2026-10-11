@@ -37,6 +37,22 @@ It then exports its spans, its logs and its metrics there, filed under the servi
 dashboards' `Service` variable picks it. The packages' README says what the daemon exports (`packages/agent-orchestrator/README.md`,
 *What the daemon says*).
 
+Only the live daemon is pointed here: a probe (a scratch daemon, a post by hand, a measurement) goes to a throwaway stack held with `node tools/observe/render/render.ts --hold`, at the collector address it prints as `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+Nothing a step or a check starts for itself inherits the address. The runtime hands each session it starts the collector, for the
+session's own events, and takes the telemetry out of every other child's environment, a check's command among them (`withoutTelemetry`;
+`agent-orchestrator/test/check-export.boundary.test.ts`); Claude Code passes none of it to a session's Bash; a daemon a command starts
+is given the store and the login's basics (`daemonEnv`); and the suite's seats drop it (`test/ambient.ts`, the api's `test/harness.ts`,
+the e2e's `apiEnvOf`), so a test exports only to a collector it made. What reached this stack from a step was sent by name, and the
+build workflow's implement and land steps are now refused a typed command that names `:4318` or `:4317` (`LIVE_COLLECTOR` in
+`agent-orchestrator/test/agent-fences.test.ts`); an address written into a script file is not reached by that rule.
+
+What probes left here before that (the factories `probe`, `probe-eo38-first`, `probe-eo38-lived` and `measure`, the runs `r-probe-1`
+and `r-probe-2`) ages out by itself, counted from their last post, read as 2026-10-11 and not measured: a factory list holds the label
+values inside the dashboard's range, so a probe's name leaves a 24-hour view a day after its last sample and a 7-day view by
+2026-10-18; Tempo answers 7 days back, so their denied calls leave the panels by 2026-10-18, and are deleted with their traces on
+2026-10-25 (14 days); their metrics are deleted on 2027-01-09 (90 days), and a range that reaches back that far lists them until then.
+
 Add `NEMIA_TOOL_DETAILS=1` beside it for each session's tool spans to say their inputs too — a Bash call's command, a file's path, an
 error's words — which then stay in this machine's Tempo and Loki. **Time** reads Bash by its command's head only then: without it, a
 Bash call is `Bash: (no command)`.
@@ -190,7 +206,8 @@ node tools/observe/render/render.ts --stop <name>
   seconds (600), and is refused naming the holder. The lock is a file in the system's temp directory; one left by a process that is
   gone is stale, and the next render removes the container it names first.
 - **Held for a browser** (`render/hold.ts`, `render/reap.ts`): `--hold` writes the same files, then leaves the stack up, 600 seconds
-  unless told and 1800 at most, and prints where Grafana listens and each dashboard's address. A detached reaper removes the container
+  unless told and 1800 at most, and prints where Grafana listens, where its collector listens (the `OTEL_EXPORTER_OTLP_ENDPOINT` of a
+  probe, which exports to this stack and never the live one) and each dashboard's address. A detached reaper removes the container
   by its name when the time ends, counted on a monotonic clock; `--stop <name>` removes it sooner, and refuses any name but a held
   render's. A held stack holds the one slot: stop it when done.
 

@@ -10,7 +10,9 @@
  * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
  * `WF_DEFAULT_FACTORY_STARTS=1`, so a start made in a scratch repository no factory holds, or of a card that names no factory, goes to the
  * default factory: a test of the refusal those starts meet as shipped deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
- * a test spawns, or a command that ticks it types, starts no daemon of this checkout.
+ * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the api
+ * is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of a
+ * collector it made itself.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -50,6 +52,7 @@ process.env.WF_MAX_RUNS = 'set-it-in-the-test';
 process.env.WF_MAX_CONCURRENT = 'set-it-in-the-test';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
+delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
 fs.writeFileSync(registry, '[]');
 fs.writeFileSync(calls, '');

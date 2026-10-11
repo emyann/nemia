@@ -169,14 +169,15 @@ test('REFUSED: a hold of no seconds, of more than half an hour, of a fraction or
     assert.ok(refused(() => boundOf(arg)).includes(`--hold ${arg}: a stack is held a whole number of seconds from 1 to 1800`), arg);
 });
 
-test('a hold says its container, how to stop it, where Grafana listens and each dashboard at the address its picture was taken at', () => {
+test('a hold says its container, how to stop it, where Grafana listens, its collector as a probe is given it, and each dashboard at its address', () => {
   const picks = { from: 1000, to: 2000, run: 'r-1', session: 's-1' };
   const name = 'nemia-render-7-abc123';
-  const lines = heldLines(name, new Date(0), 'http://127.0.0.1:5', [{ name: 'steps', uid: 'nemia-steps' }], picks);
+  const lines = heldLines(name, new Date(0), 'http://127.0.0.1:5', 'http://127.0.0.1:6', [{ name: 'steps', uid: 'nemia-steps' }], picks);
   assert.deepEqual(lines, [
     `held: ${name}, until 1970-01-01T00:00:00.000Z`,
     `stop it with: node tools/observe/render/render.ts --stop ${name}`,
     'Grafana listens on http://127.0.0.1:5 (no login)',
+    'its collector listens on http://127.0.0.1:6 (OTLP/HTTP); point a probe at it with OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:6',
     `steps  ${addressOf('http://127.0.0.1:5', 'nemia-steps', picks)}`,
   ]);
   const address = new URL(addressOf('http://127.0.0.1:5', 'nemia-steps', picks));

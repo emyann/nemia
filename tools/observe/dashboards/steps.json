@@ -209,7 +209,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Denied calls** are the daemon's own `step.denied` spans, in Tempo: one for each call a harness denied a session, counted when its attempt ends, whatever the try came to, with its `tool` and its `call` as a permission rule names it (`Skill(look)`, `Bash(git push)`): the count a run's page shows. A run started before the daemon counted them has none. **Tool errors** are the sessions' own `tool_result` events with `success=\"false\"`, in Loki, by `tool_name`: a command that exited non-zero, a file that is not there, a pattern refused. **Failed skill loads** are those of the `Skill` tool: a skill that was called and whose loading failed, its name in `tool_parameters` where the event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports nothing, and is **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.\n\n**One run's session** reads the `Run` and `Session` picked above; **Across runs** the factory, workflow, step and agent. Errors and skill loads are counted for sessions that export telemetry alone: a Claude Code step of a daemon given an endpoint, never a Codex step. Tempo answers 7 days back at most.\n\nWhere a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
+        "content": "**Denied calls** are the daemon's own `step.denied` spans, in Tempo: one for each call a harness denied a session, counted when its attempt ends, whatever the try came to, with its `tool` and its `call` as a permission rule names it (`Skill(look)`, `Bash(git push)`): the count a run's page shows. A run started before the daemon counted them has none. **Tool errors** are the sessions' own `tool_result` events with `success=\"false\"`, in Loki, by `tool_name`: a command that exited non-zero, a file that is not there, a pattern refused. **Failed skill loads** are those of the `Skill` tool: a skill that was called and whose loading failed, each bar named by its skill, read out of `tool_parameters` where the event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports nothing, and is **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.\n\n**One run's session** reads the `Run` and `Session` picked above; **Across runs** the factory, workflow, step and agent. Errors and skill loads are counted for sessions that export telemetry alone: a Claude Code step of a daemon given an endpoint, never a Codex step. Tempo answers 7 days back at most.\n\nWhere a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
       }
     },
     {
@@ -418,8 +418,8 @@
       "gridPos": {
         "x": 0,
         "y": 25,
-        "w": 8,
-        "h": 9
+        "w": 24,
+        "h": 8
       },
       "targets": [
         {
@@ -452,10 +452,10 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "minVizHeight": 22,
-        "maxVizHeight": 22,
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -488,9 +488,9 @@
         "uid": "loki"
       },
       "gridPos": {
-        "x": 8,
-        "y": 25,
-        "w": 8,
+        "x": 0,
+        "y": 33,
+        "w": 12,
         "h": 9
       },
       "targets": [
@@ -501,12 +501,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (step, tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | run=\"$run\" | task=~\"$session\" [$__range]))",
-          "legendFormat": "{{step}} · {{tool_name}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}} · {{.tool_name}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -522,10 +522,10 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "minVizHeight": 22,
-        "maxVizHeight": 22,
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -535,7 +535,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -543,15 +544,15 @@
       "id": 9,
       "type": "bargauge",
       "title": "Failed skill loads",
-      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A skill that is not there exports nothing. For the run and session picked.",
+      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A bar is named by its skill where the event carries its inputs. A skill that is not there exports nothing. For the run and session picked.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
-        "x": 16,
-        "y": 25,
-        "w": 8,
+        "x": 12,
+        "y": 33,
+        "w": 12,
         "h": 9
       },
       "targets": [
@@ -562,12 +563,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (step, tool_parameters) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | run=\"$run\" | task=~\"$session\" [$__range]))",
-          "legendFormat": "{{step}} · {{tool_parameters}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}} · {{ regexReplaceAll \\\"^.*skill_name[^a-zA-Z0-9_]+([-a-zA-Z0-9_:./]+).*$\\\" .tool_parameters \\\"${1}\\\" }}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -583,10 +584,10 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "minVizHeight": 22,
-        "maxVizHeight": 22,
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -596,7 +597,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -607,7 +609,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 42,
         "w": 24,
         "h": 1
       },
@@ -624,7 +626,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 43,
         "w": 8,
         "h": 10
       },
@@ -659,10 +661,10 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "minVizHeight": 22,
-        "maxVizHeight": 22,
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -689,14 +691,14 @@
       "id": 12,
       "type": "bargauge",
       "title": "Tool errors, across runs",
-      "description": "The sessions' tool_result events that failed over the range, by tool. By factory, workflow, step and agent.",
+      "description": "The sessions' tool_result events that failed over the range, by tool. By factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
         "x": 8,
-        "y": 35,
+        "y": 43,
         "w": 8,
         "h": 10
       },
@@ -708,12 +710,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (factory, workflow, step, agent, tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" [$__range]))",
-          "legendFormat": "{{workflow}} / {{step}} · {{agent}} · {{tool_name}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }} · {{.tool_name}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -729,10 +731,10 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "minVizHeight": 22,
-        "maxVizHeight": 22,
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -742,7 +744,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -750,14 +753,14 @@
       "id": 13,
       "type": "bargauge",
       "title": "Failed skill loads, across runs",
-      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A skill that is not there exports nothing. By step and agent.",
+      "description": "The Skill tool's failed results over the range: a skill called whose loading failed. A bar is named by its skill where the event carries its inputs. A skill that is not there exports nothing. By step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
         "x": 16,
-        "y": 35,
+        "y": 43,
         "w": 8,
         "h": 10
       },
@@ -769,12 +772,12 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (workflow, step, agent, tool_parameters) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" [$__range]))",
-          "legendFormat": "{{workflow}} / {{step}} · {{agent}} · {{tool_parameters}}"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Skill\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }} · {{ regexReplaceAll \\\"^.*skill_name[^a-zA-Z0-9_]+([-a-zA-Z0-9_:./]+).*$\\\" .tool_parameters \\\"${1}\\\" }}\" [$__range]))"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "${__data.fields.name}",
           "unit": "short",
           "decimals": 0,
           "min": 0,
@@ -790,10 +793,10 @@
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
-        "namePlacement": "left",
+        "namePlacement": "top",
         "sizing": "manual",
-        "minVizHeight": 22,
-        "maxVizHeight": 22,
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
         "text": {
           "titleSize": 12,
           "valueSize": 14
@@ -803,7 +806,8 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "limit": 100,
+          "values": true
         }
       }
     },
@@ -818,7 +822,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 45,
+        "y": 53,
         "w": 24,
         "h": 9
       },

@@ -221,7 +221,16 @@ test("REFUSED: workflows — a start whose removed is a word; a card's start res
   assert.deepEqual(await startRun({ ...asked, card: 'c' }), { id: 'r', removed: false, why: 'locked' });
 });
 
-const agentDraft: AgentDraft = { name: 'ada', role: null, description: null, skills: null, harnessPrompt: null, keys: {}, body: '' };
+const agentDraft: AgentDraft = {
+  name: 'ada',
+  role: null,
+  description: null,
+  skills: null,
+  harnessPrompt: null,
+  mcp: null,
+  keys: {},
+  body: '',
+};
 
 test('REFUSED: agents — a save answered with an empty agent is unread, not saved; a refusal keeps its users and status', async (t) => {
   answering(t, { agent: {}, written: [], removed: [] }, 201);

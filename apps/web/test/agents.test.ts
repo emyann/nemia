@@ -44,6 +44,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   cardError: null,
   skills: null,
   harnessPrompt: null,
+  mcp: null,
   given: [],
   source: '',
   version: 'v1',
@@ -173,6 +174,21 @@ test("an agent's card is generated, never sent: no draft carries it, or any name
   assert.equal(draft.skills, 'write-a-note', 'what it is generated from travels: the skills it gives');
   assert.equal(edited(formOf(saying()), saying()), false);
   assert.equal(edited(formOf(saying()), { ...saying(), card: [] }), false, 'a card generated otherwise since is not something typed');
+});
+
+test('the MCP servers an agent names are its own line: read as written, sent trimmed, and emptied sent unset', () => {
+  const read = listing({ mcp: 'playwright, docs' });
+  const form = formOf(read);
+  assert.equal(form.mcp, 'playwright, docs');
+  assert.equal(edited(form, read), false);
+  assert.equal(draftOf(form).mcp, 'playwright, docs');
+  assert.equal('mcp' in draftOf(form).keys, false, 'no role key: a step that names the agent does not inherit it');
+  form.mcp = '  playwright ';
+  assert.equal(draftOf(form).mcp, 'playwright');
+  assert.equal(edited(form, read), true);
+  form.mcp = ' ';
+  assert.equal(draftOf(form).mcp, null);
+  assert.equal(formOf(null).mcp, '', 'a new agent names none');
 });
 
 test('the skills an agent gives and its harness prompt are its own lines: read as written, sent trimmed, and emptied sent unset', () => {

@@ -23,8 +23,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/index.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
-import { writeMcpConfig } from '../mcp.ts';
+import { RunnerError, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
+import { sessionMcp, writeMcpConfig } from '../mcp.ts';
 import { forgetFiles } from '../forget.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { readTranscript } from '../transcript.ts';
@@ -136,6 +136,12 @@ export type HarnessSpec = {
    */
   commandArgs?: true;
   /**
+   * The harness can leave the checkout's `.mcp.json` out of a session, whole or but for the entries a task's `config.checkoutMcp`
+   * names, and loads those it names. Absent: `file()` refuses a task that carries it rather than start a session with servers it
+   * did not ask for, or without those it did.
+   */
+  checkoutMcp?: true;
+  /**
    * The modes of a task's `config.mounts` this harness holds, and `command` renders: `readOnly`, a folder the session can read and
    * not write; `writable`, one it can write too. Absent, or a mode left out: `file()` refuses a task with such a mount rather than
    * start a session that would not see the folder, or could write where it was told it may only read.
@@ -180,10 +186,15 @@ export type HarnessIO = {
   closeoutFile?: string;
   /** Directories to treat as trusted for this run. Codex loads a project's rules only when trusted. */
   trustedDirs?: string[];
-  /** Present when the task named MCP servers: its `mcp`, written as an MCP config (`{"mcpServers": …}`). */
+  /**
+   * Present when the session has MCP servers of the task's: its `mcp` and the entries its `checkoutMcp` picks, written as an MCP
+   * config (`{"mcpServers": …}`).
+   */
   mcpConfigFile?: string;
   /** The checkout's own `.mcp.json`, when there is one. Found by a spec's `prepare`, which reads the disk. */
   checkoutMcpConfig?: string;
+  /** The entries a task's `checkoutMcp` picked from its checkout's `.mcp.json`, for a harness that takes servers as arguments. */
+  pickedMcp?: Record<string, McpServer>;
   /** `ionice -c3` runs on this machine, so a command can be put in the idle IO class. Found by a spec's `prepare`. */
   idleIo?: true;
 };
@@ -721,7 +732,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
             io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
           }
-          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), r.config?.mcp);
+          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), sessionMcp(r.cwd, r.config));
           if (mcpConfigFile) io = { ...io, mcpConfigFile };
           io = { ...io, ...spec.prepare?.(r) };
           const { cmd, args, env } = spec.command(r, io);

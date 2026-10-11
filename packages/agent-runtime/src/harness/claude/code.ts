@@ -121,8 +121,12 @@ export const CLAUDE_INIT_START: StartEvent = { event: { type: 'system', subtype:
 /** How `claude -p --output-format json`'s start decodes: the one object it prints, as it exits, a `result`, and its `session_id`. */
 export const CLAUDE_RESULT_START: StartEvent = { event: { type: 'result' }, id: 'session_id' };
 
-/** The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. */
+/**
+ * The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. None for a task that
+ * says which of its servers it loads (`checkoutMcp`): those are in the task's own config file, and the checkout's is left out.
+ */
 export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
+  if (r.config?.checkoutMcp) return {};
   const found = checkoutMcpConfig(r.cwd);
   return found ? { checkoutMcpConfig: found } : {};
 };
@@ -150,6 +154,7 @@ export const claudeDetached: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
+  checkoutMcp: true,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
   callAdmission: true,
@@ -204,6 +209,7 @@ export const claudeJob: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
+  checkoutMcp: true,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
   callAdmission: true,

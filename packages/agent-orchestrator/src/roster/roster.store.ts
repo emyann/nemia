@@ -153,6 +153,7 @@ export function agentRead(from: AgentPlace, dir: string, name: string, { repo, h
     cardError,
     skills: agent.skills?.join(', ') ?? null,
     harnessPrompt: agent.harnessPrompt ?? null,
+    mcp: agent.mcp?.join(', ') ?? null,
     source,
   };
 }

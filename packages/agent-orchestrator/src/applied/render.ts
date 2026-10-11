@@ -154,7 +154,7 @@ function renderAgentOf(name: string, spec: Spec, read: TemplateRead, out: Render
   const harness = typeof spec.harness === 'string' ? spec.harness : DEFAULT_HARNESS;
   const keys: Record<string, string> = blockKeys(
     where,
-    blocksOf(spec, ['role', 'description', 'instructions', 'skills', 'output', 'harness']),
+    blocksOf(spec, ['role', 'description', 'instructions', 'skills', 'mcp', 'output', 'harness']),
     harness,
     out.refusals,
   );
@@ -169,6 +169,7 @@ function renderAgentOf(name: string, spec: Spec, read: TemplateRead, out: Render
     role: String(spec.role),
     description: String(spec.description),
     skills: spec.skills === undefined ? null : lineOf(spec.skills),
+    mcp: spec.mcp === undefined ? null : lineOf(spec.mcp),
     keys,
     body: textOr(spec.instructions, `agents/${name}/instructions.md`, read) ?? '',
   };

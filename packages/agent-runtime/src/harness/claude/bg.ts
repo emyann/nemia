@@ -33,7 +33,7 @@ import { CLAUDE_DEFAULT_MODE, claudeAllowArgs, claudeDenyArgs, claudeFlagsOf, cl
 import { admittedFlags } from './admission.ts';
 import { telemeteredFlags } from './telemetry.ts';
 import { withoutTelemetry } from '../telemetry.ts';
-import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
+import { checkoutMcpConfig, claudeMcpArgs, sessionMcp, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn } from '../../core/engine/tally.ts';
 import type { Monotonic } from '../../core/clock.ts';
@@ -392,7 +392,10 @@ const spawnUnder =
   (r) =>
     Effect.tryPromise({
       try: async () => {
-        const mcpArgs = claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFileOf(root, r.name), r.config?.mcp)]);
+        const mcpArgs = claudeMcpArgs([
+          r.config?.checkoutMcp ? undefined : checkoutMcpConfig(r.cwd),
+          writeMcpConfig(mcpFileOf(root, r.name), sessionMcp(r.cwd, r.config)),
+        ]);
         await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);
         clearSighting(quietFileOf(root, r.name));
         return mcpArgs;

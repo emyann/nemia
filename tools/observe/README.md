@@ -111,9 +111,18 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   - **Tool errors** count the sessions' own `tool_result` events with `success="false"`, from Loki, by `tool_name`: a command that
     exited non-zero, a file that is not there, a pattern the search refused.
   - **Failed skill loads** are those errors of the `Skill` tool: a skill that was called and whose loading failed (measured: a skill
-    whose own shell command failed), by `tool_parameters`, which names the skill where the event carries its inputs
-    (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports no event and no span, and is **not measured**; a skill a
-    session was refused is a denied call, `Skill(<name>)`.
+    whose own shell command failed), by skill: its name is read out of `tool_parameters` in the query (`regexReplaceAll`), where the
+    event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports no event and no span, and is
+    **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.
+  - Tool errors and Failed skill loads draw one bar for each series, at most 100, named in the query itself (`label_format name=…`,
+    `sum by (name)`): Grafana draws no legend for an instant Loki query (*Counting a session's errors*). For one run a bar is `<step> ·
+    <tool>`; across runs `<workflow> / <step> · <agent> · <tool>`, and `unlabelled / <step> · <tool>` for the events of sessions
+    exported before they carried their factory, workflow and agent: they stay counted, so the bars add up to Loki's count, and are
+    read only while Factory, Workflow and Agent are all All. A failed skill load is `<step> · <skill>` (`implement ·
+    nemia-ada:shadcn`), and one whose event carries no inputs has nothing after its `·`.
+  - Every bar's name is written above its bar (`namePlacement: "top"`), where it gets the panel's width. One run's Denied calls,
+    named by a whole call, takes the page's width; the others are half or a third of it. A name longer than its panel is still cut:
+    Grafana's bar gauge wraps none, and **Denied calls, each** lists the calls in a table.
   - Their limits: Tempo answers 7 days back at most; errors and skill loads are counted for sessions that export telemetry alone (a
     Claude Code step of a daemon given an endpoint, never a Codex step); a run started before the daemon counted denied calls has
     none, and the daemon must run the code that counts them.
@@ -132,8 +141,12 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log field
 the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler does not
 send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, a server-side expression reading a
-query its panel has not, and a Timeline query that asks a row's `of` or `part` for a value the code gives none of or is not held to the one
-factory and the one workflow picked, and a Timeline factory or workflow choice that may hold several. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
+query its panel has not, and a bar gauge over Loki that would draw one nameless bar: one that does not read each row of an instant
+query, counts by more than one label, keeps a `legendFormat`, sets no limit, or does not name a bar by its row's label; a bar gauge
+of Steps that does not write a bar's name above it, and a failed skill load counted by its raw inputs, not by its skill; a Timeline
+query that asks a row's `of` or `part` for a value the code gives none of or is not held to the one factory and the one workflow
+picked, and a Timeline factory or workflow choice that may hold several. What a session sends and what the span metrics write are no
+code of ours: the test lists them as measured below.
 `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.
@@ -188,6 +201,32 @@ Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
   loaded. A `Skill` call for a skill that is not there exported nothing: no `tool_decision`, no `tool_result`, no span.
 - **The harness's own `tool_decision` events (`decision="reject"`) are not what Denied calls counts**: it counts what the runtime
   journals of a job's denials, the list a run's page shows.
+- **A bar gauge over an instant Loki query reads a table, not series** (Grafana 13.2.2, read off rendered pages of a scratch
+  dashboard): the server answers a frame for each series, and Grafana's Loki datasource merges them in the browser into one table, a
+  row for each series, its labels as columns beside one `Value`. The `legendFormat` is never drawn.
+  - As a gauge is made (`reduceOptions.values: false`, `lastNotNull`), it reduces the column to its last row: `Tool errors, across
+    runs`, 21 series adding up to 177, drew one nameless bar reading 1.
+  - With `values: true` it draws a bar for each row, named by every label's value joined by a space in column order, a missing label
+    drawn as `0`. So the query makes one label (`| label_format name="…"`) and counts `by (name)`: the 21 bars then read Loki's own
+    counts (25, 67, 20, …, 177 in all), and Failed skill loads' two read 4 and 11.
+  - A table of one row draws its bar with no name, unless the gauge's `displayName` reads the row (`${__data.fields.name}`): a run
+    with one failed skill load drew a bare `1` without it, and `implement · {"skill_name":"nemia-ada:shadcn"}` with it.
+  - With `values: true` and no `limit`, the first 25 rows are drawn and the rest dropped without a word: of 109 series, 25 bars; with
+    `limit: 100`, 100.
+  - Loki's template evaluates an `if`: `{{ if .workflow }}…{{ else }}unlabelled / {{.step}}{{ end }}` named 10 of the 21 series
+    `unlabelled`, events with no `workflow`.
+  - A range query cut to one point (`maxDataPoints: 1`) keeps the legend's names but miscounts: a series read 2 where Loki counts 67,
+    its last point not being evaluated at the range's end.
+  - The bars come in the order Loki answers.
+  - A name beside its bar (`namePlacement: "left"`) is cut at a share of the panel: in a panel a third of the page wide, `implement ·
+    {"skill_name":"nemi…`. Above its bar (`top`) it gets the panel's width less its padding, read off a scratch page 1600 pixels wide
+    with the side menu docked: 363 pixels in a panel 8 columns wide, 557 in 12, 1140 in 24, at about 6 pixels a character (`build /
+    design · seldon · mcp__playwright__browser_navigate`, 59 characters, took 351). Of 43 bars none was cut (`scrollWidth` against
+    `clientWidth`); an across-runs name past about 61 characters would be, in its third of the page.
+  - Loki reads a skill's name out of `tool_parameters` in a template:
+    `{{ regexReplaceAll "^.*skill_name[^a-zA-Z0-9_]+([-a-zA-Z0-9_:./]+).*$" .tool_parameters "${1}" }}` answered `implement ·
+    nemia-ada:shadcn` where the raw text was `implement · {"skill_name":"nemia-ada:shadcn"}`, and left an event with no inputs as it
+    was; the counts did not move (4 and 11). Grafana sends `${1}` as written, having no variable of that name.
 
 ## A workflow's timeline
 

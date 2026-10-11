@@ -143,3 +143,5 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
   source rings or at a pace, given `WAITED`; `DEADLINES` refuses a hand-written deadline.
 - A component that draws a `routeLink` renders under `RouterContextProvider` over a memory-history router (`components.test.ts`); the
   markup spells React's props (`readOnly=""`).
+- A package program the e2e runs from a string (`PASS` in `test/e2e/world.ts`) is read by no typecheck: after changing what a package's
+  program requires, run `npm run e2e -- --pages runs`, which seeds through it.

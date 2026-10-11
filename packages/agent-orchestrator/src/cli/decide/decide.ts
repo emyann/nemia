@@ -18,8 +18,7 @@ import {
   checkoutLine,
   decideRun,
   runWith,
-  shipped,
-  shippedGitPlace,
+  type Place,
   dueNote,
   fromNote,
   holdAdvice,
@@ -53,7 +52,7 @@ import {
   waitWord,
 } from '../../runner.ts';
 import type { BranchChanges, CheckReport, DecideCommand, Decided, RepositoryRun } from '../../runner.ts';
-import { HELP, usage, type Engine } from '../flags.ts';
+import { HELP, placedIn, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
 
@@ -131,14 +130,14 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
  * at most. The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base
  * branch itself (`--no-worktree`), and a folder run is offered `nemia rm` alone.
  */
-export async function decideVerb(rest: string[], e: Engine): Promise<void> {
+export async function decideVerb(rest: string[], e: Engine, place: Place): Promise<void> {
   if (rest.includes('--help')) return console.log(DECIDE_HELP);
   if (!rest[0]) return console.log(HELP);
   if (rest[0].startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const decided = await runWith(e, shipped(decideRun(rest[0]))).catch(async (err: unknown) => {
-    const unjudged = await runWith(e, shipped(unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide')));
+  const decided = await runWith(e, placedIn(place, decideRun(rest[0]))).catch(async (err: unknown) => {
+    const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide')));
     throw unjudged ? new Error(unjudged.said) : err;
   });
   const { run } = decided;
@@ -152,9 +151,9 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   printRefusals(run, decision);
   printStops(decided, decision, out.heldOut);
   const git = isRepositoryRun(run) ? run : undefined;
-  const changes = git ? changesRead(git, decision.branches, steps, sensitive) : undefined;
+  const changes = git ? changesRead(place, git, decision.branches, steps, sensitive) : undefined;
   if (changes) printTouched(changes.toRead, sensitive);
-  for (const name of namesInOrder(run, steps)) printStep(decided, name, steps);
+  for (const name of namesInOrder(run, steps)) printStep(decided, name, steps, place);
   printTotals(decided);
   if (changes) printBranches(changes.results);
   printStanding(decided, decision, git);
@@ -320,6 +319,7 @@ function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], 
  * check-affecting ones by default: the branches to read (`branchesToRead`) and the result branches.
  */
 function changesRead(
+  place: Place,
   git: RepositoryRun,
   branches: string[],
   steps: Steps,
@@ -330,7 +330,7 @@ function changesRead(
     namesInOrder(git, steps).map((name) => git.steps[name].branch),
     git.isolate ? git.branch : undefined,
   );
-  const read = changesOf(shippedGitPlace, git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
+  const read = changesOf(place, git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
   const of = (branch: string) => read.find((c) => c.branch === branch)!;
   return { toRead: toRead.map(of), results: branches.map(of) };
 }
@@ -351,7 +351,7 @@ function printTouched(touched: BranchChanges[], sensitive: string[] | undefined)
 }
 
 /** A step's block, for a step with a closeout, a check or a task: its head, its check, its tries and its closeout. */
-function printStep(d: Decided, name: string, steps: Steps): void {
+function printStep(d: Decided, name: string, steps: Steps, place: Place): void {
   const c = d.closeouts[name];
   const check = d.checks[name];
   if (!c && !check && !d.run.steps[name]?.taskId) return;
@@ -359,7 +359,7 @@ function printStep(d: Decided, name: string, steps: Steps): void {
   printStepHead(d, name, step, steps);
   if (check) printCheck(check);
   printTries(d, name);
-  if (c) printCloseout(d, name, step, steps, c);
+  if (c) printCloseout(d, name, step, steps, c, place);
 }
 
 /** A step's name, blocked or not, with its try; then its gate, its acceptance, what its harness waits for and what it was denied. */
@@ -399,18 +399,20 @@ function printTries({ used, costs, timeline, answers, said }: Decided, name: str
 }
 
 /** A step's closeout: its summary, its output's fields, its needs and how to answer them, and its files — or why it does not read. */
-function printCloseout({ run, answering }: Decided, name: string, step: Steps[number] | undefined, steps: Steps, c: Closeout): void {
+function printCloseout(
+  { run, answering }: Decided,
+  name: string,
+  step: Steps[number] | undefined,
+  steps: Steps,
+  c: Closeout,
+  place: Place,
+): void {
   if ('error' in c) return console.log(`    closeout unreadable — ${c.error}`);
   if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
   for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
   if (c.needs) console.log(`    needs: ${c.needs}`);
   if (answering[name]) console.log(`    ${answering[name]}`);
-  const files = artifactLines(
-    artifactsDir(run, name),
-    missingArtifacts(shippedGitPlace, run, name, c),
-    artifactFiles(run, name),
-    run.pruned,
-  );
+  const files = artifactLines(artifactsDir(run, name), missingArtifacts(place, run, name, c), artifactFiles(run, name), run.pruned);
   for (const line of files) console.log(`    ${line}`);
 }
 

@@ -9,20 +9,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
 import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
 import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
-import { runGiven } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-custom-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/runner.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
@@ -51,10 +51,7 @@ const at = (told: string, text: string): number => {
 /** A git repository with one commit, for a start. */
 function aRepo(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 }
 

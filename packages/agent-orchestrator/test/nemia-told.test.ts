@@ -16,7 +16,8 @@ import { Effect } from 'effect';
 import { nameFor } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from './waits.ts';
-import { runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-nemia-told-');
 process.env.WF_ROOT = ROOT;
@@ -30,8 +31,8 @@ const { nemiaDir, promptFile } = await import('../src/nemia/level.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
 const { DEFAULT_HARNESS } = await import('../src/harness/harness.ts');
 const { engine, runWith: runEngine } = await import('../src/runtime-client.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 
 /** The inbox her session is registered with: a Unix socket that keeps every line it reads, and closes its end once the sender has. */
 const inbox = async () => {

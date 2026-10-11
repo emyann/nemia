@@ -21,7 +21,8 @@ import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { until, WAITED } from '../../test/waits.ts';
-import { runGiven } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runGiven } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;
@@ -29,12 +30,14 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runPlaced = runGiven(() => stand().layer);
 const { parseDaemonFile, parsePassCost, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
   await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
-const { main } = await import('../cli/main.ts');
+const { main: cli } = await import('../cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
 const FILE = path.join(ROOT, 'daemon.json');
 

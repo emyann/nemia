@@ -24,10 +24,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { nameFor, fold } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
+import { testPlace } from '../place/memory/index.ts';
 import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-restart-');
@@ -35,9 +35,11 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { engine, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { engine, startRun, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const place = testPlace();
+const stand = () => place;
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { rewriteRun } = await import('../src/record/record.store.ts');
 
@@ -135,10 +137,7 @@ const solo = (() => {
 })();
 const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; then: 'retries' }> }) => {
   const repo = scratch('wf-restart-repo-');
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
   assert.ok(rewriteRun({ ...readRun(run.id), steps: { solo: record } }));
   return run.id;

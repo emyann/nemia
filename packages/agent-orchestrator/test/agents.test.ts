@@ -6,7 +6,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -23,13 +22,14 @@ import {
 import { loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { scratch } from './scratch.ts';
-import { runGiven } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
 const { startRun, writeWorkflow } = await import('../src/runner.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runPlaced = runGiven(() => stand().layer);
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
 /** A folder of workflows under a fresh directory, each file written from `files`, by its path from the folder. */
@@ -602,12 +602,9 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
 
 test('nemia start freezes the resolved steps on the run: an agent edited after the start changes no step of the run', async () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   const dir = workflows({ 'agents/implementer.md': IMPLEMENTER, 'dev/build.md': '---\nplace: git\nagent: implementer\n---\nBuild it.\n' });
   const run = await runPlaced(startRun({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false }));
   fs.writeFileSync(path.join(dir, 'agents', 'implementer.md'), '---\nmodel: haiku\n---\nSomething else.\n');
@@ -632,12 +629,9 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
 
 test("`nemia start` names each node's agent beside it — by the agent's name, not the step's — and a node with no agent by its name alone", async (t) => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   const dir = workflows({
     'agents/coder.md': IMPLEMENTER,
     'agents/critic.md': '---\nharness: claude\n---\nFind what is wrong.\n',
@@ -650,7 +644,7 @@ test("`nemia start` names each node's agent beside it — by the agent's name, n
     printed.push(args.map(String).join(' '));
   });
   const { main } = await import('../src/cli/main.ts');
-  await main(['start', 'build it', '--workflows', path.join(dir, 'dev'), '--repo', repo], {} as never);
+  await main(['start', 'build it', '--workflows', path.join(dir, 'dev'), '--repo', repo], {} as never, undefined, stand().place);
   const [id, said] = printed[0].split('  ');
   assert.ok(id, printed.join('\n'));
   assert.equal(said, '3 step(s): build (coder) → judge (critic) → wrap');

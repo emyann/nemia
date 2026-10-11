@@ -5,9 +5,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME, Invalid, loadWorkflows, runWith, shipped, TABLE, templatedTree, type Args, type Command } from '../runner.ts';
+import { HOME, Invalid, loadWorkflows, runWith, TABLE, type Place, templatedTree, type Args, type Command } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
-import { usage, type Engine } from './flags.ts';
+import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The table's entry named `name`. */
 const entryOf = (name: string): Command => TABLE.find((c) => c.name === name) as Command;
@@ -44,8 +44,8 @@ function handedOf(command: Command, args: Args): Args {
 }
 
 /** The entry `command` run in the store on the arguments `asked`, its paths left out (`handedOf`), and the lines it says printed. */
-async function ran(command: Command, asked: Args, e: Engine): Promise<void> {
-  const data = await runWith(e, shipped(command.handler(handedOf(command, asked), undefined, HOME)));
+async function ran(command: Command, asked: Args, e: Engine, place: Place): Promise<void> {
+  const data = await runWith(e, placedIn(place, command.handler(handedOf(command, asked), undefined, HOME)));
   for (const line of command.print(data, asked)) console.log(line);
 }
 
@@ -69,20 +69,20 @@ function schemaBeside(file: string, text: string): string | undefined {
  * `nemia agents write`'s runner: the agent's file `--file` names read into its draft (`agentDraftOf`), named by the file, with the result
  * schema its `output:` names read beside it (`schemaBeside`).
  */
-export async function agentsWriteRun(args: Args, e: Engine): Promise<void> {
+export async function agentsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = entryOf('agents write');
   const file = pathOf(args, 'file', command, "the agent's file to write, named <name>.md");
   const text = textOf(file, command);
   const draft = readOf(file, () => agentDraftOf(path.basename(file, '.md'), text, (named) => besideOf(file, named)));
   const schema = schemaBeside(file, text);
-  await ran(command, { ...args, draft: JSON.stringify(draft), ...(schema !== undefined && { schema }) }, e);
+  await ran(command, { ...args, draft: JSON.stringify(draft), ...(schema !== undefined && { schema }) }, e, place);
 }
 
 /**
  * `nemia skills write`'s runner: the SKILL.md `--file` names read into its form (`skillDraftOf`), the skill named by its `name:`, else by
  * its folder; refused where a skill named to change (`<name>`) is not the file's.
  */
-export async function skillsWriteRun(args: Args, e: Engine): Promise<void> {
+export async function skillsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = entryOf('skills write');
   const file = pathOf(args, 'file', command, "the skill's SKILL.md to write");
   const text = textOf(file, command);
@@ -90,7 +90,7 @@ export async function skillsWriteRun(args: Args, e: Engine): Promise<void> {
   if (typeof args.name === 'string' && args.name !== name)
     usage(`nemia skills write was asked to change ${args.name}, and ${path.resolve(file)} is the skill ${name}: name the skill it is.`);
   const change = readOf(file, () => skillDraftOf(file, name, text));
-  await ran(command, { ...args, change: JSON.stringify(change) }, e);
+  await ran(command, { ...args, change: JSON.stringify(change) }, e, place);
 }
 
 /**
@@ -98,7 +98,7 @@ export async function skillsWriteRun(args: Args, e: Engine): Promise<void> {
  * and in yours (`loadWorkflows`), or in the tree written for the place `factory` (`templatedTree`), into the steps the builder sends, and
  * its README where it has one.
  */
-export async function workflowsWriteRun(args: Args, e: Engine): Promise<void> {
+export async function workflowsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = entryOf('workflows write');
   const folder = pathOf(args, 'folder', command, 'the draft folder whose steps and README to write');
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
@@ -112,5 +112,5 @@ export async function workflowsWriteRun(args: Args, e: Engine): Promise<void> {
     draft: JSON.stringify(steps),
     ...(readme !== undefined && { readme: textOf(path.join(folder, readme), command) }),
   };
-  await ran(command, asked, e);
+  await ran(command, asked, e, place);
 }

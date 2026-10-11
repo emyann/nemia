@@ -7,7 +7,7 @@
  * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
  * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`
  * views none of them: every `claude agents` call a pass makes is the runtime's observe, which asks it only for a session expected that
- * is not a job (`agents-calls.test.ts` has a run's steps, a background session and a restart).
+ * is not a job (`agents-calls.boundary.test.ts` has a run's steps, a background session and a restart).
  *
  * An admitted task starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each case ticks
  * once to admit and once to start.
@@ -20,15 +20,17 @@ import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
-import { runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-pool-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { engine, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const { engine, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 
 /** The fakes, their gates, and the count of `claude agents` calls. */
 const fakes = () => {

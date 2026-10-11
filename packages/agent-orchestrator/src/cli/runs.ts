@@ -21,7 +21,7 @@ import {
   runStore,
   runsForgetting,
   runWith,
-  shipped,
+  type Place,
   sizeOf,
   TABLE,
   type Args,
@@ -29,7 +29,7 @@ import {
   type Pruning,
   type Turned,
 } from '../runner.ts';
-import { HELP, usage, confirmed, type Engine } from './flags.ts';
+import { HELP, placedIn, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (the many positional of `RM`, and of `nemia prune`). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
@@ -38,9 +38,9 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  * One run `nemia rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that
  * is a failure other than a refusal.
  */
-async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
+async function rmOne(e: Engine, place: Place, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
-    const data = await runWith(e, shipped(RM.handler({ ...args, runId: id })));
+    const data = await runWith(e, placedIn(place, RM.handler({ ...args, runId: id })));
     for (const line of RM.print(data, args)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -53,13 +53,13 @@ async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean
  * `nemia rm`: each run forgotten, judged on its own, a line each, a refusal included; once every run has had its say, it fails naming those
  * not forgotten, exit 2, or 1 when one failed otherwise.
  */
-export async function rmVerb(args: Args, e: Engine): Promise<void> {
+export async function rmVerb(args: Args, e: Engine, place: Place): Promise<void> {
   const ids = idsOf(args);
   if (!ids.length) return console.log(HELP);
   const notForgotten: string[] = [];
   let failed = false;
   for (const id of ids) {
-    const one = await rmOne(e, id, args);
+    const one = await rmOne(e, place, id, args);
     if (one.kept) notForgotten.push(id);
     failed ||= one.failed;
   }
@@ -99,11 +99,12 @@ function refusedNamed(tally: PruneTally): void {
 /** Each of `ids` judged for `nemia prune`, side by side, nothing removed; a run it cannot judge is said and tallied, in the order named. */
 async function judged(
   e: Engine,
+  place: Place,
   ids: readonly string[],
   flags: { unmerged: boolean; artifacts: boolean },
   tally: PruneTally,
 ): Promise<readonly Listed[]> {
-  const listed = await runWith(e, shipped(judgingMany(ids, flags)));
+  const listed = await runWith(e, placedIn(place, judgingMany(ids, flags)));
   for (const l of listed) if ('failed' in l) notPrunedLine(l.id, l.failed, tally);
   return listed;
 }
@@ -113,11 +114,11 @@ async function judged(
  * on its finding: one count over all of them, which reads the engine's feed once. A run it could not count, and a count that fails, are
  * said, and cost only their lines.
  */
-async function withEngine(e: Engine, found: Pruning[]): Promise<Pruning[]> {
+async function withEngine(e: Engine, place: Place, found: Pruning[]): Promise<Pruning[]> {
   const asked = found.filter((p) => p.kind === 'prunable' || p.kind === 'nothing').map((p) => p.id);
   if (!asked.length) return found;
   try {
-    const { counted, uncounted } = await runWith(e, shipped(runsForgetting(asked)));
+    const { counted, uncounted } = await runWith(e, placedIn(place, runsForgetting(asked)));
     for (const { text } of uncounted) console.log(text);
     return found.map((p) => (counted.has(p.id) ? { ...p, engine: counted.get(p.id)! } : p));
   } catch (err) {
@@ -172,16 +173,17 @@ async function removing(
  * (`judgingMany`), a run that could not be judged first; those ready are removed a turn at a time, each turn said as it ends
  * (`freeingMany`): on the listing's judgement under `--yes`, judged again after a person's y.
  */
-export async function pruneVerb(args: Args, e: Engine): Promise<void> {
+export async function pruneVerb(args: Args, e: Engine, place: Place): Promise<void> {
   const ids = idsOf(args);
   const unmerged = args.unmerged === true;
   const yes = args.yes === true;
   const artifacts = args.artifacts === true;
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const listed = await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
+  const listed = await judged(e, place, named ? ids : runStore.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
   const found = await withEngine(
     e,
+    place,
     listed.flatMap((l) => ('failed' in l ? [] : [l.pruning])),
   );
   printFound(found, named, tally);
@@ -194,7 +196,13 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   const total = sizeOf(prunable.reduce((sum, p) => sum + pruningBytes(p), 0));
   console.log(`${prunable.length} run${prunable.length > 1 ? 's' : ''} to prune, ${total} in all`);
   if (!(await removing(prunable, named, { unmerged, yes, artifacts }))) return refusedNamed(tally);
-  await runWith(e, shipped(freeingMany(listed, { unmerged, artifacts, yes }, (turn) => saidTurn(turn, tally))));
+  await runWith(
+    e,
+    placedIn(
+      place,
+      freeingMany(listed, { unmerged, artifacts, yes }, (turn) => saidTurn(turn, tally)),
+    ),
+  );
   return refusedNamed(tally);
 }
 
@@ -219,36 +227,36 @@ const withWords = (args: Args, command: string): Args =>
  * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
  * store, and what the entry says of them printed.
  */
-export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
+export async function agentsCustomRun(args: Args, e: Engine, place: Place): Promise<void> {
   const asked = withWords(args, AGENTS_CUSTOM.name);
-  const data = await runWith(e, shipped(AGENTS_CUSTOM.handler(asked, undefined, HOME)));
+  const data = await runWith(e, placedIn(place, AGENTS_CUSTOM.handler(asked, undefined, HOME)));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
+export async function factoryInstructRun(args: Args, e: Engine, place: Place): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
-  const data = await runWith(e, shipped(FACTORY_INSTRUCT.handler(asked, undefined, HOME)));
+  const data = await runWith(e, placedIn(place, FACTORY_INSTRUCT.handler(asked, undefined, HOME)));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia factory rules`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function factoryRulesRun(args: Args, e: Engine): Promise<void> {
+export async function factoryRulesRun(args: Args, e: Engine, place: Place): Promise<void> {
   const asked = withWords(args, FACTORY_RULES.name);
-  const data = await runWith(e, shipped(FACTORY_RULES.handler(asked, undefined, HOME)));
+  const data = await runWith(e, placedIn(place, FACTORY_RULES.handler(asked, undefined, HOME)));
   for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia auto propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function autoProposeRun(args: Args, e: Engine): Promise<void> {
+export async function autoProposeRun(args: Args, e: Engine, place: Place): Promise<void> {
   const asked = withWords(args, AUTO_PROPOSE.name);
-  const data = await runWith(e, shipped(AUTO_PROPOSE.handler(asked, undefined, HOME)));
+  const data = await runWith(e, placedIn(place, AUTO_PROPOSE.handler(asked, undefined, HOME)));
   for (const line of AUTO_PROPOSE.print(data, asked)) console.log(line);
 }
 
@@ -256,9 +264,9 @@ export async function autoProposeRun(args: Args, e: Engine): Promise<void> {
  * `nemia admit`'s runner: the call read on stdin, decided against the table (`admitted`) under the floor `--at-least` gives, and the answer
  * printed as JSON, or nothing.
  */
-export async function admitRun(args: Args, e: Engine): Promise<void> {
+export async function admitRun(args: Args, e: Engine, place: Place): Promise<void> {
   const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[2]) : undefined;
   const auto = typeof args.auto === 'string' ? args.auto : undefined;
-  const answer = await runWith(e, shipped(admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto)));
+  const answer = await runWith(e, placedIn(place, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto)));
   if (answer !== undefined) console.log(JSON.stringify(answer));
 }

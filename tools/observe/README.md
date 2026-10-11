@@ -189,7 +189,7 @@ node tools/observe/render/render.ts --stop <name>
 Who runs it: the build workflow's implement step, whose check refuses a change under `tools/observe` a dashboard reads without the
 picture and the text of each dashboard it changed (`workflows/build/pictures.ts`). Design and review are refused the command and
 Docker (`RENDERS` in `agent-orchestrator/test/agent-fences.test.ts`); review reads the files. It needs `docker` and Playwright's
-Chromium (`npx playwright install chromium`), and is never run by the suite: `agent-orchestrator/test/observe-render.test.ts` holds it
+Chromium (`npx playwright install chromium`), and is never run by the suite: `agent-orchestrator/test/observe-render.boundary.test.ts` holds it
 on a stub `docker`.
 
 What it waits for, each bounded at 180 s and none a length of time: the container's own health, Grafana listing the dashboards, then

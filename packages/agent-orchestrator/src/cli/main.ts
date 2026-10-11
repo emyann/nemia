@@ -32,8 +32,9 @@ import {
   runMain,
   tickRun,
   runWith,
-  shipped,
-  gitPlaceLayer,
+  shippedGitPlace,
+  PlaceService,
+  type Place,
   telemetryLayer,
   up,
   waitWord,
@@ -51,7 +52,7 @@ import {
   liveDemandHost,
   type DemandHost,
 } from '../runner.ts';
-import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
+import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
@@ -158,11 +159,11 @@ function tickLines(pass: Pass): Pass {
  * `nemia tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is
  * refused, with no way to force it. A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
-async function tickVerb(args: Args, e: Engine): Promise<void> {
+async function tickVerb(args: Args, e: Engine, place: Place): Promise<void> {
   const stats = args.stats === true;
   const held = storeRefusal('tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
-  const { cost } = tickLines(await runWith(e, shipped(tickRun({ repo: path.resolve('.') }))));
+  const { cost } = tickLines(await runWith(e, placedIn(place, tickRun({ repo: path.resolve('.') }))));
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;
 }
@@ -189,7 +190,7 @@ function upStats(): void {
  * said through the process's telemetry (`telemetryLayer`) and its feed's lines published to its live readers (`feedHubLayer`). A queued
  * card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
-function upVerb(args: Args, e: Engine): void | Promise<void> {
+function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   if (args.stats === true) return upStats();
   const asked = everyOf(typeof args.every === 'string' ? args.every : undefined);
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
@@ -206,7 +207,9 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
       if (took) console.log(`   ${took}`);
     });
   const daemon = up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken });
-  return runMain(daemon.pipe(Effect.scoped, Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), gitPlaceLayer))));
+  return runMain(
+    daemon.pipe(Effect.scoped, Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), PlaceService.layer(place)))),
+  );
 }
 
 /** `nemia watch`: the feed's lines as they come, from a cursor, and the store's liveness, until it is stopped (`watching`). */
@@ -227,7 +230,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
  * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; and `nemia admit`, whose
  * runner reads the call on stdin: handed its arguments once read and checked.
  */
-export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
+export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
   ['up', upVerb],
   ['watch', watchVerb],
@@ -253,7 +256,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
  * started where none ticks the store (`ensureDaemon`, over `demand`); then handed to its runner (`RUNS`) where it has one, else to its
  * handler, and the lines it prints of the answer printed.
  */
-async function commanded(command: Command | Ran, rest: string[], e: Engine, demand: () => DemandHost): Promise<void> {
+async function commanded(command: Command | Ran, rest: string[], e: Engine, demand: () => DemandHost, place: Place): Promise<void> {
   if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual);
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
@@ -261,8 +264,8 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
   if (wrong) usage(wrong);
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
   const runner = RUNS.get(command.name);
-  if (runner || command.handler === undefined) return runner!(args, e);
-  const data = await runWith(e, shipped(command.handler(args)));
+  if (runner || command.handler === undefined) return runner!(args, e, place);
+  const data = await runWith(e, placedIn(place, command.handler(args)));
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);
 }
@@ -287,7 +290,12 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
  * command that ticks starts the daemon on (`ensureDaemon`), which a test hands; else the live one. Refused (`Conflict`) before any command
  * but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
  */
-export async function main(argv: string[], given?: Engine, demand: () => DemandHost = liveDemandHost): Promise<void> {
+export async function main(
+  argv: string[],
+  given?: Engine,
+  demand: () => DemandHost = liveDemandHost,
+  place: Place = shippedGitPlace,
+): Promise<void> {
   const named = namedIn(argv);
   if (named === undefined) return console.log(HELP);
   const exempt = named.name === 'version' || named.rest.includes('--help');
@@ -295,8 +303,8 @@ export async function main(argv: string[], given?: Engine, demand: () => DemandH
   if (trial !== null) throw new Conflict({ message: trial });
   const e = given ?? engine();
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
-  if (command) return commanded(command, named.rest, e, demand);
-  return VERBS.get(named.name)!(named.rest, e);
+  if (command) return commanded(command, named.rest, e, demand, place);
+  return VERBS.get(named.name)!(named.rest, e, place);
 }
 
 /** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */

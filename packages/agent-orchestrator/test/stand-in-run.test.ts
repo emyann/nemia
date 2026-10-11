@@ -1,7 +1,7 @@
 /**
- * A whole run on the test place: `implement → ship` from `startRun` to landed, as `ship.test.ts` walks it on git, with the session's
- * commit and the shipper's staged merge done through the place's handle (`world`), and no git process started. A `git` planted first on
- * `PATH` before the package is imported records every call it is given, and its record is read empty.
+ * A whole run on the test place: `implement → ship` from `startRun` to landed, as `landing-walk.boundary.test.ts` walks it on git, with
+ * the session's commit and the shipper's staged merge done through the place's handle (`world`), and no git process started. A `git`
+ * planted first on `PATH` before the package is imported records every call it is given, and its record is read empty.
  *
  * The engine is the runtime's stand-in, new for each test as the place is (`eachTest`), which the last two tests show.
  *

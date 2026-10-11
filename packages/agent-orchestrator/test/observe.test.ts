@@ -24,12 +24,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import yaml from 'js-yaml';
 import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
+import { testPlace } from '../place/memory/index.ts';
 import { runGiven } from './placed.ts';
 import { SEED, UNSEEDED, type ServiceSeed, type SpanSeed } from '../../../tools/observe/render/seed.ts';
 
@@ -41,8 +41,9 @@ process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const place = testPlace();
+const stand = () => place;
+const runPlaced = runGiven(() => stand().layer);
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN, TIMELINE_SPAN_KEYS, WAIT_SPAN_KEYS, WAIT_SPANS } =
@@ -281,9 +282,7 @@ const ancestorsOf = (span: Tracer.AnySpan): Tracer.AnySpan[] =>
  */
 async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<string>; annotations: Set<string>; shared: Set<string> }> {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   const folder = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(folder, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
   const e = engineOf(

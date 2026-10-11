@@ -8,11 +8,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { Run } from '../record/record.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { runGiven } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runGiven } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -22,11 +22,13 @@ process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, startRun, startFromInbox } = await import('../runner.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../record/record.store.ts');
 const { runStore } = await import('../record/files.store.ts');
-const { main } = await import('../cli/main.ts');
+const { main: cli } = await import('../cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
 /** No verb here asks the engine anything. */
 const NO_ENGINE = promised({});
@@ -59,10 +61,7 @@ const emptyInbox = () => fs.rmSync(INBOX, { recursive: true, force: true });
 /** A repository with one commit, so a start has a base to record — and a workflow of one step under its workflows/ for each name. */
 const aRepoWith = (...workflows: string[]): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   for (const name of workflows) {
     fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
     fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `---\nplace: git\n---\nimplement it, on ${name}\n`);

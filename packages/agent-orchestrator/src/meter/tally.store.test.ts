@@ -10,12 +10,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { Run } from '../record/record.ts';
 import { PHASES, type PassCost } from './meter.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { runGiven, runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-meter-');
 const RUNS = path.join(ROOT, 'runs');
@@ -25,9 +25,10 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { lastPassCost, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { lastPassCost, startRun, tickRun, runWith: runEngine } = await import('../runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { EngineService } = await import('../runtime-client.ts');
 const { recentFile, recentPasses } = await import('../daemon/daemon.store.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
@@ -122,10 +123,7 @@ const emptyStore = () => {
 
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 
@@ -464,7 +462,7 @@ test("a pass's metrics go into the registry of whoever runs it: its time, each p
     Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
   await own(
     tickRun({}).pipe(
-      Effect.provide(gitPlaceLayer),
+      Effect.provide(stand().layer),
       Effect.provide(EngineService.layer(fake({ queued: ['t-q', 't-r'], running: { claude: 3 } }))),
     ),
   );

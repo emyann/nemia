@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -23,11 +24,13 @@ const {
   FACTORY_INSTRUCTION,
   factoryInstruction,
   runWith: runEngine,
-  gitPlaceLayer,
 } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 const { readInstructionAt, writeInstructionText } = await import('./instruction.store.ts');
-const { main } = await import('../cli/main.ts');
+const { main: cli } = await import('../cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
 /** No verb here asks the engine anything. */
 const NO_ENGINE = promised({});

@@ -60,7 +60,7 @@ runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view
 there (`APART`), and a runtime test builds the real engine, never the stand-in (`takenBreaks`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a
 place is no longer a skill's `scripts/<verb>.ts` declared by a `place.json` and run as a process a question, so a team cannot bring
 one as files; another place is code that implements `PlaceService`, given as a layer where the program is composed. *A place frozen
-per run*: a run copies no place and its record names none (`test/start-place.test.ts`), so a run in flight is answered by the place
+per run*: a run copies no place and its record names none (`test/start-place.boundary.test.ts`), so a run in flight is answered by the place
 of the process that asks, the release installed, and a change to the place reaches it at the next restart.
 
 **A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `then: 'round'` (`roundIn`,
@@ -278,7 +278,9 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 A place's code (`place/<name>/`, the git place's `place.ts`, `git.ts` and `verbs/`) is none of the four, and stands beside `src`: it
 imports node's built-ins, `effect`, its own files, and what a place is (`src/place/place.ts`, `src/place/place.store.ts`), and one file
 of `src` alone imports it, `src/place/shipped.store.ts`, which gives it as a layer (`gitPlaceLayer`); every other file asks the place it
-is given (`PlaceService`). `placeBreaks` in the same test holds both.
+is given (`PlaceService`). `placeBreaks` in the same test holds both. The CLI's `main` is handed its place as it is handed its engine,
+the git place where it is handed none, and each command gives its program that one: `test/cli-place.test.ts` refuses a file of
+`src/cli` that names the git place.
 
 A file in src or bin that no kind names fails the suite. `packages/agent-orchestrator/test/layout.test.ts` holds the
 folders: at most six source files in one, no folder named `utils`, `helpers`, `common`, `shared` or `misc`, no two

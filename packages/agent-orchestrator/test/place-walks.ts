@@ -153,6 +153,35 @@ const OPEN: readonly Walk[] = [
 
 const MAKE: readonly Walk[] = [
   {
+    name: "a branch's tip is the commit it is at: a cut's is the commit it was cut from, and a branch the repository lacks has none",
+    walk: (side, area) => {
+      const { root, base } = repoIn(side, area);
+      const before = side.world.tip(root, 'wf/r/one');
+      const { name } = cut(side, area, root, 'one');
+      const work = side.world.branch(root, 'work', { 'b.txt': 'two\n' });
+      return {
+        base,
+        before,
+        work,
+        main: side.world.tip(root, 'main'),
+        cut: side.world.tip(root, name),
+        onWork: side.world.tip(root, 'work'),
+        none: side.world.tip(root, 'gone'),
+        commit: side.world.tip(root, base),
+      };
+    },
+    says: {
+      base: 'commit-1',
+      before: null,
+      commit: null,
+      cut: 'commit-1',
+      main: 'commit-1',
+      none: null,
+      onWork: 'commit-2',
+      work: 'commit-2',
+    },
+  },
+  {
     name: 'a cut is a directory at `at`, on a new branch at the commit it was cut from, holding its files',
     walk: (side, area) => {
       const { root, base } = repoIn(side, area, { 'a.txt': 'one\n', 'dir/in.txt': 'x\n' });
@@ -282,6 +311,21 @@ const MAKE: readonly Walk[] = [
 ];
 
 const HANDOFF: readonly Walk[] = [
+  {
+    name: 'a workspace holds uncommitted what a step left in it, by path in order, and nothing once it is handed off',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area, { 'a.txt': 'one\n', 'gone.txt': 'bye\n' });
+      const { at } = cut(side, area, root, 'one');
+      const clean = side.world.changes(at);
+      fs.writeFileSync(path.join(at, 'new.txt'), 'new\n');
+      fs.writeFileSync(path.join(at, 'a.txt'), 'changed\n');
+      fs.rmSync(path.join(at, 'gone.txt'));
+      const left = side.world.changes(at);
+      side.place.askNow('handoff', { workspace: at, step: 'one', why: '' });
+      return { clean, left, handedOff: side.world.changes(at), checkout: side.world.changes(root) };
+    },
+    says: { checkout: [], clean: [], handedOff: [], left: ['a.txt', 'gone.txt', 'new.txt'] },
+  },
   {
     name: 'a clean workspace hands off nothing',
     walk: (side, area) => {

@@ -12,9 +12,12 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A file in `src/<feature>/` says its kind by its name**: `x.store.ts`, `x.verb.ts`, else pure; only a top-level file is listed in
   `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
 - **The place is a service with no default (`PlaceService`, `src/place/place.store.ts`)**: a controller asks it (`yield* PlaceService`),
-  a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon, the CLI
-  (`runWith(e, shipped(program))`) and the api, `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A
-  program given none does not compile. A test answers a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
+  a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon and the api,
+  `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A program given none does not compile. A test answers
+  a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
+- **`main` is handed its place as its engine and its demand host, the git place where it is handed none** (`src/cli/main.ts`), and
+  each command gives it to its program (`placedIn`, `src/cli/flags.ts`): a test that types a command hands the test's,
+  `main(argv, e, undefined, stand().place)`, and `test/cli-place.test.ts` refuses a file of `src/cli` that names the git place.
 - **The git place's code is `place/git/` (`place.ts`, `git.ts`, `verbs/`), behind one door, `src/place/shipped.store.ts`**
   (`placeBreaks` in `test/boundary.test.ts`): a verb is a generator that yields each git command, so one body answers `ask` (off the
   loop) and `askNow` (`spawnSync`); it reads its request first (`asked.ts`), and a throw is unread in one sentence.
@@ -138,12 +141,12 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: the place's `standing` lists again without it (pinned in
-  `test/standing.test.ts` against git asked one branch at a time).
+  `test/standing.boundary.test.ts` against git asked one branch at a time).
 - **The tick reads git through one `standing` a repository, place and base a pass** (`passStanding`, `standingReader`): a question it
   did not ask is `unread`, never asked again, so a new git read in the pass belongs in the ask (`asksOf`), held by
-  `test/pass-reads.test.ts`.
+  `test/pass-reads.boundary.test.ts`.
 - **The pass tells `standing` what it last read of each branch (`known`, `StandingMemo`)**: a `baseRef` is listed only for a branch told
-  nothing, so a column added to the listing comes back on every pass unless the hint covers it (`test/standing.test.ts`).
+  nothing, so a column added to the listing comes back on every pass unless the hint covers it (`test/standing.boundary.test.ts`).
 - **Only the tick writes `standing.json`**: a reader off the tick (`nemia ls`, the board's list) reads it (`standingSnapshot`), and a
   person's one-off verb asks the place live (`standingNow`, `standingLive`); neither runs git through a reader of its own.
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).

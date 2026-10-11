@@ -15,17 +15,21 @@ import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
-import { runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-remote-step-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { engine, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const { engine, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
-const { main } = await import('../src/cli/main.ts');
+const { main: cli } = await import('../src/cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
 type Engine = ReturnType<typeof engine>;
 

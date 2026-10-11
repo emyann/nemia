@@ -18,12 +18,12 @@ import {
   startFactory,
   startPlan,
   runWith,
-  shipped,
+  type Place,
   workflowAt,
   workflowFolder,
   type Args,
 } from '../runner.ts';
-import { usage, type Engine } from './flags.ts';
+import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -93,11 +93,11 @@ function briefArgs(arg: string, args: Args): Args {
 }
 
 /** `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it. */
-export async function startRun(args: Args, e: Engine): Promise<void> {
+export async function startRun(args: Args, e: Engine, place: Place): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
   const card = inboxNameAt(arg);
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
-  const data = await runWith(e, shipped(START.handler(asked)));
+  const data = await runWith(e, placedIn(place, START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);
 }
 
@@ -105,10 +105,13 @@ export async function startRun(args: Args, e: Engine): Promise<void> {
  * `nemia plan`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here would be
  * (`placeOfStart`); a card that did not start stops the rest, and fails with what it was told.
  */
-export async function planRun(args: Args, e: Engine): Promise<void> {
+export async function planRun(args: Args, e: Engine, place: Place): Promise<void> {
   const { factory, repo } = placeOfStart(args);
   const plan = { dir: path.resolve(textOf(args, 'folder') ?? ''), repo: path.resolve(repo) };
-  const { started, stopped, folderOf } = await runWith(e, shipped(startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })));
+  const { started, stopped, folderOf } = await runWith(
+    e,
+    placedIn(place, startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })),
+  );
   for (const line of planLines(started)) console.log(line);
   if (stopped) {
     const told = planStopped({ card: stopped.card, why: stopped.error.message, rest: stopped.rest }, started, { ...plan, folderOf });
@@ -121,7 +124,7 @@ export async function planRun(args: Args, e: Engine): Promise<void> {
  * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is
  * typed (`workflowAt`); a directory is refused.
  */
-export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
+export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<void> {
   const idea = textOf(args, 'idea') ?? '';
   const at = fs.statSync(idea, { throwIfNoEntry: false });
   if (at?.isDirectory())
@@ -137,16 +140,16 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
     workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()),
     repo: repo === undefined ? undefined : path.resolve(repo),
   };
-  const data = await runWith(e, shipped(INBOX_ADD.handler(asked)));
+  const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked)));
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`).
  */
-export async function inboxQueueRun(args: Args, e: Engine): Promise<void> {
+export async function inboxQueueRun(args: Args, e: Engine, place: Place): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };
-  const data = await runWith(e, shipped(INBOX_QUEUE.handler(asked)));
+  const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked)));
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

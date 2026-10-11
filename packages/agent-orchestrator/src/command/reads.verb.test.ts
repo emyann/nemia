@@ -19,15 +19,16 @@ import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
 import { promised } from '../../test/promised.ts';
-import { runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-reads-');
 process.env.WF_ROOT = ROOT;
 const { FEED, LOGS, SHOW, STATS } = await import('./reads.verb.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
 function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {

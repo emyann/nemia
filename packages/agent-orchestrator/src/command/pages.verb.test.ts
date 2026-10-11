@@ -6,17 +6,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { runGiven, runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-pages-');
 process.env.WF_ROOT = ROOT;
 const { RUN, STEP_ARTIFACT, STEP_FILE } = await import('./pages.verb.ts');
-const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { startRun, runWith: runEngine } = await import('../runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 
 /** No read here asks the engine anything. */
 const NO_ENGINE = promised({});
@@ -31,11 +32,9 @@ const oneStep = (): string => {
 /** A repository with one commit on main. */
 const aRepo = (): string => {
   const repo = scratch('wf-pages-repo-');
-  const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
-  git('add', '-A');
-  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   return repo;
 };
 

@@ -8,11 +8,11 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
 import { promised } from './promised.ts';
-import { runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-schedule-');
 
@@ -20,11 +20,14 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { addFactory, attachWorkflow, setSchedule, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const { addFactory, attachWorkflow, setSchedule, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
-const { main } = await import('../src/cli/main.ts');
+const { main: cli } = await import('../src/cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 const { filesStore } = await import('../src/record/files.store.ts');
 
 /** A fake runtime whose tasks are all `pending` once filed: a run started stays in flight, and nothing it files is ever admitted. */
@@ -59,10 +62,7 @@ const runtime = () => {
 /** A repository with one commit and the tests' team under `workflows/`, so a factory's run has a base and a folder. */
 const aTeamRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
   return repo;
 };

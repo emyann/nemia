@@ -1,10 +1,11 @@
 /**
  * The handle a test holds on what its test place holds (`World` in `world.ts`): `worldOf(held)` makes a repository, commits a checkout's
- * work, puts a commit on a branch, stages a merge, tags and reads a commit, each in memory and in the directories the verbs read. It
- * throws on what a test got wrong — a directory that is no checkout, a name that is no commit — in words that say which.
+ * work, puts a commit on a branch, stages a merge, tags, and reads a commit, a branch's tip and what a checkout holds uncommitted, each
+ * in memory and in the directories the verbs read. It throws on what a test got wrong — a directory that is no checkout, a name that is
+ * no commit — in words that say which.
  */
-import { checkoutAt, commitMade, committed, headOf, mergedIn, resolved, type Found } from './acts.ts';
-import { isDirectory, real, writeChanges } from './disk.ts';
+import { checkoutAt, commitMade, committed, headOf, mergedIn, resolved, treeOf, type Found } from './acts.ts';
+import { isDirectory, readTree, real, writeChanges } from './disk.ts';
 import { commitAt, type Held, type Repository, type Tree, type World } from './world.ts';
 
 /** The checkout at `dir`, which the place holds. */
@@ -53,6 +54,13 @@ function branch(held: Held, root: string, name: string, files: Readonly<Record<s
   return commitMade(held, repo, name, after, [base], `on ${name}`);
 }
 
+/** The paths of the checkout at `dir` whose file is not as the commit it is at has it, in order. */
+function changes(held: Held, dir: string): string[] {
+  const { repo, checkout } = found(held, dir);
+  const [at, has] = [treeOf(repo, checkout), readTree(checkout.dir)];
+  return [...new Set([...Object.keys(at), ...Object.keys(has)])].filter((file) => at[file] !== has[file]).sort();
+}
+
 /** The handle on `held`. */
 export function worldOf(held: Held): World {
   return {
@@ -78,5 +86,7 @@ export function worldOf(held: Held): World {
       const { parents, message } = repo.commits.get(idOf(repo, rev))!;
       return { parents, message };
     },
+    tip: (root, name) => found(held, root).repo.branches.get(name) ?? null,
+    changes: (checkout) => changes(held, checkout),
   };
 }

@@ -253,7 +253,8 @@ test('any other file a dashboard reads owes one pair at least, a removed dashboa
   const env = { WF_BASE_REF: removed.base, WF_ARTIFACTS: files };
   assert.equal(pictures(removed.repo, [closeoutFile([])], env).code, 1, 'a removed dashboard owes a render of those left');
   assert.equal(pictures(removed.repo, [closeoutFile(pair)], env).code, 0);
-  for (const work of [{ 'tools/observe/README.md': '# x\n' }, { 'tools/observe/profile/preload.ts': 'export {};\n' }]) {
+  const unread: Record<string, string>[] = [{ 'tools/observe/README.md': '# x\n' }, { 'tools/observe/profile/preload.ts': 'export {};\n' }];
+  for (const work of unread) {
     const { repo, base } = workOn(work);
     const r = pictures(repo, [closeoutFile([])], { WF_BASE_REF: base, WF_ARTIFACTS: files });
     assert.equal(r.code, 0, r.err);

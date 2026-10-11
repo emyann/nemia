@@ -1237,7 +1237,8 @@ test('REFUSED: a query the seed does not meet, a panel left with one series, an 
     ...said,
     logs: said.logs.filter((log) => log.attributes.step !== 'review' && log.attributes.tool_name === 'Bash'),
   }));
-  assert.ok(unmet(dashboardTitled('Steps'), 'steps', oneStep).includes('Tool errors: one series by step, tool_name'));
+  const few = unmet(dashboardTitled('Steps'), 'steps', oneStep).filter((why) => why.startsWith('Tool errors: one series by '));
+  assert.equal(few.length, 1, 'one step and one tool leave Tool errors one series');
   assert.deepEqual(unmet(dashboardTitled('System'), 'system', SEED, []), [
     'CPU, over the range: nothing sent to pyroscope',
     'Heap in use, over the range: nothing sent to pyroscope',

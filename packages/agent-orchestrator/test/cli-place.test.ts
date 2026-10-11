@@ -3,7 +3,8 @@
  * `nemia rm`, typed in this process over the test place, on a repository git never made. No file of `src/cli` names the git place but
  * `main`, once, as the place it takes when it is handed none (`placeNamed`), which holds the commands this file does not type.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads. The file sets what its starts depend on itself: a run on a
+ * repository no factory holds goes to the default factory (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +20,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
+process.env.WF_DEFAULT_FACTORY_STARTS = '1';
+process.env.NEMIA_DAEMON_START = 'off';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { main } = await import('../src/cli/main.ts');

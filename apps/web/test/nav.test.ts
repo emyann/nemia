@@ -5,14 +5,14 @@ import { PLACE_TABS, pickedOf, pickTo, RAIL, sectionLink, sectionOf, SECTIONS, t
 /** The section labelled `label`. */
 const section = (label: string) => SECTIONS.find((item) => item.label === label)!;
 
-test("the sidebar's sections are the factory's Floor, then the Inbox, Runs, Workflows and Stats, in that order", () => {
+test("the sidebar's sections are the factory's Floor, then the Inbox, Runs and Workflows, in that order", () => {
   assert.deepEqual(
     SECTIONS.map((item) => item.label),
-    ['Floor', 'Inbox', 'Runs', 'Workflows', 'Stats'],
+    ['Floor', 'Inbox', 'Runs', 'Workflows'],
   );
   assert.deepEqual(
     SECTIONS.map((item) => item.to),
-    ['/factories/$factory', '/inbox', '/runs', '/workflows', '/stats'],
+    ['/factories/$factory', '/inbox', '/runs', '/workflows'],
   );
 });
 
@@ -28,6 +28,7 @@ test("each page lights one section — a factory's floor the Floor, a run and it
   assert.deepEqual(lit('/'), [], 'Home is in the rail, not the sections');
   assert.deepEqual(lit('/agents'), [], 'Agents is in the rail, not the sections');
   assert.deepEqual(lit('/nowhere'), []);
+  assert.deepEqual(lit('/stats'), [], 'refused: Stats is no section');
   assert.deepEqual(lit('/factories/'), [], 'refused: a floor names its factory');
   assert.deepEqual(lit('/factories/x/y'), [], "refused: nothing under a floor is the floor's");
   for (const path of ['/runsx', '/factoriesx', '/statsx', '/inboxes', '/workflowsx/repo'])
@@ -103,7 +104,6 @@ test("the picked factory is read from the address alone: the name of a factory's
   assert.equal(pickedOf('/factories/nemia/settings', {}), 'nemia', "a factory's settings pick it, as its floor does");
   assert.equal(pickedOf('/factories/nemia/other', {}), undefined, "refused: no other page under a floor is the factory's own");
   assert.equal(pickedOf('/runs', { factory: 'hiring' }), 'hiring');
-  assert.equal(pickedOf('/stats', { factory: 'hiring', period: '90d' }), 'hiring');
   assert.equal(pickedOf('/workflows', { factory: 'hiring' }), 'hiring');
   assert.equal(pickedOf('/inbox', { factory: 'hiring' }), 'hiring');
   assert.equal(pickedOf('/runs', {}), undefined);
@@ -114,14 +114,14 @@ test("the picked factory is read from the address alone: the name of a factory's
   assert.equal(pickedOf('/workflows/yours/w/review', { factory: 'hiring' }), 'hiring', "and a step's page");
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev', '/workflows/repo/dev/review'])
     assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
-  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/'])
+  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/stats'])
     assert.equal(pickedOf(path, { factory: 'hiring' }), undefined, `refused: ${path} reads no ?factory=, which its route keeps none of`);
 });
 
 test("a section's link carries the picked factory, and none under All factories; the Floor is drawn only with a factory picked", () => {
   assert.equal(sectionLink(section('Floor'), undefined), null);
   assert.deepEqual(sectionLink(section('Floor'), 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
-  for (const label of ['Inbox', 'Runs', 'Workflows', 'Stats']) {
+  for (const label of ['Inbox', 'Runs', 'Workflows']) {
     const { to } = section(label);
     assert.deepEqual(sectionLink(section(label), 'nemia'), { to, search: { factory: 'nemia' } });
     assert.deepEqual(
@@ -133,9 +133,9 @@ test("a section's link carries the picked factory, and none under All factories;
 });
 
 test("a pick on a section's page stays there, keeping its other keys; on a factory's floor or settings it opens the picked one's floor, or Home; elsewhere it opens the picked one's floor, or stays", () => {
-  const search = { period: '90d', agent: 'ada', factory: 'hiring' };
-  assert.deepEqual(pickTo('/stats', search, 'nemia'), { to: '/stats', search: { period: '90d', agent: 'ada', factory: 'nemia' } });
-  assert.deepEqual(pickTo('/stats', search, undefined), { to: '/stats', search: { period: '90d', agent: 'ada' } });
+  const search = { bar: 'start', factory: 'hiring' };
+  assert.deepEqual(pickTo('/runs', search, 'nemia'), { to: '/runs', search: { bar: 'start', factory: 'nemia' } });
+  assert.deepEqual(pickTo('/runs', search, undefined), { to: '/runs', search: { bar: 'start' } });
   assert.deepEqual(pickTo('/runs', {}, 'nemia'), { to: '/runs', search: { factory: 'nemia' } });
   assert.deepEqual(
     pickTo('/workflows', { factory: 'a', repo: '/x' }, 'b'),
@@ -143,13 +143,12 @@ test("a pick on a section's page stays there, keeping its other keys; on a facto
     'refused: the repository of the factory left rides to no other',
   );
   assert.deepEqual(pickTo('/workflows', { factory: 'a', repo: '/x' }, undefined), { to: '/workflows', search: {} });
-  const filtered = { repo: '/code/app', agent: 'ada' };
+  assert.equal(pickTo('/stats', { factory: 'a' }, undefined), null, "refused: /stats is no section's page, and stays as any other");
   assert.deepEqual(
-    pickTo('/stats', filtered, 'nemia'),
-    { to: '/stats', search: { ...filtered, factory: 'nemia' } },
-    "refused: on Stats, repo is the page's own filter, and a pick keeps it",
+    pickTo('/stats', {}, 'nemia'),
+    { to: '/factories/$factory', params: { factory: 'nemia' } },
+    "refused: /stats is no section's page, and a pick there opens the floor",
   );
-  assert.deepEqual(pickTo('/stats', { ...filtered, factory: 'a' }, undefined), { to: '/stats', search: filtered });
   assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
   assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
   assert.deepEqual(pickTo('/factories/nemia/settings', {}, undefined), { to: '/' }, "All factories leaves a factory's settings for Home");

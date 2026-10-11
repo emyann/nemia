@@ -245,10 +245,10 @@ function ServerRow({ server }: { server: McpServer }) {
   );
 }
 
-/** The tools of the listed servers that `rule` is the one to refuse, by server. */
 /** The servers a step's fence names, as its line reads: the names, or that it names none and so loads none. */
 const serversNamed = (names: readonly string[]): string => names.join(', ') || 'none named: its sessions load no server';
 
+/** The tools of the listed servers that `rule` is the one to refuse, by server. */
 const refusedBy = (mcp: Capabilities['mcp'], rule: string): string[] =>
   mcp.flatMap((server) => (server.tools ?? []).filter((tool) => tool.denied === rule).map((tool) => `${server.name} · ${tool.name}`));
 

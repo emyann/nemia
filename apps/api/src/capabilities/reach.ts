@@ -262,9 +262,23 @@ export function reachOf(
     .flatMap((w) => w.steps.map(({ name, spec, mcp }) => stepReach(capabilities, w, name, spec, mcp)));
 }
 
+/** A row for each server `named` that the checkout's `.mcp.json` does not declare (`declared`): no tools, and why. */
+const undeclared = (named: readonly string[], declared: Capabilities['mcp']): NonNullable<StepReach['mcp']> =>
+  named
+    .filter((name) => !declared.some((server) => server.name === name))
+    .map((server) => ({
+      server,
+      tools: null,
+      why: `The checkout's .mcp.json declares no server named ${server}: a session of this step is refused at its start. Declare the server there, or take the name off the agent's \`mcp:\` line.`,
+    }));
+
+/** What follows why a named server's tools are not listed, where the settings do not enable it: a step's session loads it by its name. */
+const LOADED_ANYWAY = " A session of this step loads it all the same: its agent's `mcp:` line names it, and the settings are not asked.";
+
 /**
- * The servers a step's sessions load, each with the tools it listed as the step's rules leave them: those the checkout enables among the
- * ones its agent names (`named`), then a row for each name the checkout does not declare (`undeclared`).
+ * The servers a step's sessions load, each with the tools it listed as the step's rules leave them: those the checkout declares among the
+ * ones its agent names (`named`), enabled by the settings or not — one the api did not ask says why, and that it is loaded — then a row
+ * for each name the checkout does not declare (`undeclared`).
  */
 function serversReached(
   servers: Capabilities['mcp'],
@@ -272,7 +286,7 @@ function serversReached(
   rules: { deny: string[]; ask: string[]; denied: DeniedRule[]; asked: DeniedRule[]; allow: string[] },
 ): NonNullable<StepReach['mcp']> {
   const loaded = servers
-    .filter((server) => server.enabled && named.includes(server.name))
+    .filter((server) => named.includes(server.name))
     .map((server) => ({
       server: server.name,
       tools:
@@ -286,7 +300,7 @@ function serversReached(
             allowed: rule === null && asking === null && denyingRule(rules.allow, server.name, tool.name) !== null,
           };
         }) ?? null,
-      why: server.tools ? null : (server.error ?? server.notAsked ?? 'It did not list its tools.'),
+      why: server.tools ? null : `${server.error ?? server.notAsked ?? 'It did not list its tools.'}${server.enabled ? '' : LOADED_ANYWAY}`,
     }));
   return [...loaded, ...undeclared(named, servers)];
 }
@@ -305,16 +319,6 @@ function serversReached(
  *   that denies what asks (in `dontAsk`, or a job) denies it. A deny naming Bash whole has taken the tool, and an ask rule naming it whole
  *   makes every command ask. `git`'s read-only forms are not listed, so only a rule of every `git` command is known to take them.
  */
-/** A row for each server `named` that the checkout's `.mcp.json` does not declare (`declared`): no tools, and why. */
-const undeclared = (named: readonly string[], declared: Capabilities['mcp']): NonNullable<StepReach['mcp']> =>
-  named
-    .filter((name) => !declared.some((server) => server.name === name))
-    .map((server) => ({
-      server,
-      tools: null,
-      why: `The checkout's .mcp.json declares no server named ${server}: a session of this step is refused at its start. Declare the server there, or take the name off the agent's \`mcp:\` line.`,
-    }));
-
 function stepReach(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflow: WorkflowListing,

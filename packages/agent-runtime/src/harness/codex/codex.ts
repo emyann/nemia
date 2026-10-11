@@ -72,6 +72,32 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
   return undefined;
 };
 
+/** A session's servers as Codex's one `mcp_servers` override, or no argument when it has none. */
+const codexMcpArgs = (mcp: Record<string, McpServer>): string[] =>
+  Object.keys(mcp).length ? ['-c', `mcp_servers=${codexMcpServers(mcp)}`] : [];
+
+/** Why Codex cannot connect to one of these servers, or `undefined`: an SSE server, which it has no transport for. */
+const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefined => {
+  const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
+  return sse
+    ? `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`
+    : undefined;
+};
+
+/**
+ * The entries a task's `checkoutMcp` picks from its checkout's `.mcp.json`, as servers Codex can be handed, or `undefined` for a
+ * task that names none. Refused: an entry not in the shape a task's own `mcp` takes (`mcpRefuses`), which Codex's table cannot
+ * say, and an SSE server.
+ */
+const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => {
+  const names = r.config?.checkoutMcp;
+  if (!names?.length) return undefined;
+  const picked = pickedCheckoutMcp(r.cwd, names);
+  const refused = mcpRefuses(picked) ?? sseRefusal(picked as Record<string, McpServer>);
+  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(r.cwd, '.mcp.json')}, picked by \`checkoutMcp\`.`);
+  return picked as Record<string, McpServer>;
+};
+
 /**
  * Codex, through `codex exec`. Its argv, in order:
  *
@@ -109,32 +135,6 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
  * Its worker keeps stdout apart (`streams`), so a session is followed live (`follow`): its state, then its rollout's events as Codex
  * writes them, each message whole (`codexPartials`), its stdout decoded as it comes.
  */
-/** A session's servers as Codex's one `mcp_servers` override, or no argument when it has none. */
-const codexMcpArgs = (mcp: Record<string, McpServer>): string[] =>
-  Object.keys(mcp).length ? ['-c', `mcp_servers=${codexMcpServers(mcp)}`] : [];
-
-/** Why Codex cannot connect to one of these servers, or `undefined`: an SSE server, which it has no transport for. */
-const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefined => {
-  const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
-  return sse
-    ? `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`
-    : undefined;
-};
-
-/**
- * The entries a task's `checkoutMcp` picks from its checkout's `.mcp.json`, as servers Codex can be handed, or `undefined` for a
- * task that names none. Refused: an entry not in the shape a task's own `mcp` takes (`mcpRefuses`), which Codex's table cannot
- * say, and an SSE server.
- */
-const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => {
-  const names = r.config?.checkoutMcp;
-  if (!names?.length) return undefined;
-  const picked = pickedCheckoutMcp(r.cwd, names);
-  const refused = mcpRefuses(picked) ?? sseRefusal(picked as Record<string, McpServer>);
-  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(r.cwd, '.mcp.json')}, picked by \`checkoutMcp\`.`);
-  return picked as Record<string, McpServer>;
-};
-
 export const codex: HarnessSpec = {
   name: 'codex',
   codexArgs: true,

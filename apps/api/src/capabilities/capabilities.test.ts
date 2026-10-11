@@ -644,6 +644,20 @@ test('a step reaches the servers its agent names and no other: none for a step w
   });
 });
 
+test('a server an agent names that the settings do not enable is still a row of its step, with why its tools are not listed and that it is loaded', async () => {
+  const repo = repoWith({
+    '.claude/settings.json': { enabledMcpjsonServers: ['fixture'] },
+    '.mcp.json': { mcpServers: { fixture: fixture(), other: fixture() } },
+    'workflows/dev/one.md': '---\nplace: git\nagent: one\n---\nDo it.\n',
+    'workflows/agents/one.md': '---\nharness: claude\nmcp: other\n---\nYou work.\n',
+  });
+  const one = (await claudeStepsOf(repo))['dev/one'];
+  assert.deepEqual(one.fence.mcp, ['other']);
+  assert.equal(one.mcp.length, 1, JSON.stringify(one.mcp));
+  assert.deepEqual([one.mcp[0].server, one.mcp[0].tools], ['other', null]);
+  assert.match(one.mcp[0].why ?? '', /^Not enabled by .*enabledMcpjsonServers.* A session of this step loads it all the same: /);
+});
+
 test("a step without `tools:` gets the harness's own set — what was measured, with its date and version and never claimed current, and what was only inferred marked so — and every skill, with Skill in it", async () => {
   const body = (await served(stepsRepo())).body;
   assert.deepEqual(

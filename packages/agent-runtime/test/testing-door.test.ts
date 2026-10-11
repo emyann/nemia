@@ -15,7 +15,8 @@ const PKG = path.join(import.meta.dirname, '..');
 const DOOR_FILES = ['src/testing.ts', 'src/service/test-engine.ts'];
 
 /** What a door file may import for a value: Effect, a file of the engine's service, and the face of the core's engine. */
-const allowed = (target: string): boolean => target === 'effect' || /^src\/service\/[^/]+\.ts$/.test(target) || target === 'src/core/engine/index.ts';
+const allowed = (target: string): boolean =>
+  target === 'effect' || /^src\/service\/[^/]+\.ts$/.test(target) || target === 'src/core/engine/index.ts';
 
 /** Every module `text` imports for a value: a type-only import, or braces of `type` names only, is erased and left out. */
 function valueImports(text: string): string[] {
@@ -69,7 +70,11 @@ test('REFUSED: a door file that imports a module of node, a harness, A2A or anot
   assert.deepEqual(doorBreaches(planting('src/testing.ts', "export { testOps } from './harness/index.ts';")), [
     `src/testing.ts imports src/harness/index.ts: ${why}`,
   ]);
-  assert.deepEqual(doorBreaches(planting(made, "import type { Sighting } from '../core/domain.ts';")), [], 'not refused: a type-only import');
+  assert.deepEqual(
+    doorBreaches(planting(made, "import type { Sighting } from '../core/domain.ts';")),
+    [],
+    'not refused: a type-only import',
+  );
   assert.deepEqual(doorBreaches(planting(made, "import { type RunnerOps } from '../harness/seam.ts';")), [], 'nor braces of types');
 });
 

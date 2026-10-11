@@ -714,7 +714,7 @@ const make = (options: EngineOptions) =>
 
 /**
  * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, failing with `EngineRefused` for what
- * `optionsRefusalOf` refuses; a test provides its own with `Layer.succeed(Engine)(Engine.of({ ... }))`. The default harness,
+ * `optionsRefusalOf` refuses; a test of a layer above takes the stand-in, `testEngine` of `agent-runtime/testing`. The default harness,
  * `defaultHarness` or else the first, takes a task that names none, and answers `logs`, `transcript` and `say` for a task whose
  * harness this engine does not have, whose `view` asks no harness.
  */

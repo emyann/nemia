@@ -81,7 +81,8 @@ holds what every change needs.
 - **An optional field added to a returned type is dropped by every caller that rebuilds the answer field by field.** Grep for each
   place that spreads or rebuilds the type, and give the new fact one writer.
 - **A test is given a stand-in, and the real thing is asked by name.** A new test file writes `const stand = eachTest(testPlace);`
-  (`packages/agent-orchestrator/test/placed.ts`). A file whose whole subject is git, a process, the real place or the real engine, or
+  (`packages/agent-orchestrator/test/placed.ts`), and for an engine `const engine = eachTest(testEngine);` (`testEngine` from
+  `agent-runtime/testing`, held to the real engine by `packages/agent-runtime/test/engine-walks.ts`). A file whose whole subject is git, a process, the real place or the real engine, or
   that needs what the stand-in does not model, is named `<what>.boundary.test.ts` (the suffix; `test/boundary.test.ts`, the layer
   kinds, is another word). `packages/agent-orchestrator/test/stand-ins.test.ts` refuses the rest in the runtime, the orchestrator and
   the api, against `test/stand-ins.baseline.ts`, which only shrinks, and refuses a stand-in whose contract no boundary test walks.
@@ -95,7 +96,8 @@ holds what every change needs.
   into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Four rules hold the layers, each a test** (`docs/architecture.md`):
-  - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/vocabulary`; `agent-orchestrator`,
+  - *Between packages, only the public contract*: `agent-runtime`, `agent-runtime/vocabulary` and, for a test file alone,
+    `agent-runtime/testing` (the engine's stand-in; `packages/agent-runtime/test/contract.test.ts` refuses it in a `src`); `agent-orchestrator`,
     `agent-orchestrator/run` and `agent-orchestrator/workflow` — never a subpath outside `exports`, a relative path,
     `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`). The packages' entries are Effect, and the api is the
     system's public interface.

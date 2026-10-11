@@ -423,9 +423,17 @@ test('REFUSED: a test of the runtime that takes the stand-in of the engine it bu
   ];
   for (const from of ['../src/testing.ts', '../src/service/index.ts', '../src/service/test-engine.ts', 'agent-runtime/testing']) {
     assert.deepEqual(takenBreaks(file, `import { testEngine } from '${from}';\ntestEngine();\n`), refused, from);
-    assert.deepEqual(takenBreaks(`${R}/test/helper.ts`, `const { testEngine: made } = await import('${from}');\n`).length, 1, 'a helper too');
+    assert.deepEqual(
+      takenBreaks(`${R}/test/helper.ts`, `const { testEngine: made } = await import('${from}');\n`).length,
+      1,
+      'a helper too',
+    );
   }
-  assert.deepEqual(takenBreaks(`${R}/src/service/x.test.ts`, "import { testEngine } from './test-engine.ts';\n").length, 1, 'beside the code');
+  assert.deepEqual(
+    takenBreaks(`${R}/src/service/x.test.ts`, "import { testEngine } from './test-engine.ts';\n").length,
+    1,
+    'beside the code',
+  );
   for (const own of [engine.own, engine.real, engine.walks.file])
     assert.deepEqual(takenBreaks(own, "import { testEngine } from '../src/testing.ts';\n"), [], `not refused: ${own}`);
   assert.deepEqual(takenBreaks(file, "import type { TestEngine } from '../src/testing.ts';\n"), [], 'a type');
@@ -433,21 +441,30 @@ test('REFUSED: a test of the runtime that takes the stand-in of the engine it bu
   assert.deepEqual(takenBreaks(file, "import { Engine } from '../src/index.ts';\nEngine.layer({ root });\n"), [], 'the real engine');
   for (const above of [`${T}/x.test.ts`, 'apps/api/test/x.test.ts'])
     assert.deepEqual(takenBreaks(above, "import { testEngine } from 'agent-runtime/testing';\n"), [], `a layer above takes it: ${above}`);
-  assert.deepEqual(takenBreaks(file, "import { testEngine } from '../src/testing.ts';\n", [{ ...engine, home: undefined }]), [], 'no home, no rule');
+  assert.deepEqual(
+    takenBreaks(file, "import { testEngine } from '../src/testing.ts';\n", [{ ...engine, home: undefined }]),
+    [],
+    'no home, no rule',
+  );
 });
 
 test('no test of the runtime takes the stand-in of its own engine but its contract, which does', () => {
   const files = testAndHelperFilesOf(ROOT);
   const [, engine] = STAND_INS;
-  for (const file of [engine.own, engine.walks.file, `${R}/test/engine.ts`, `${T}/placed.ts`]) assert.ok(files.includes(file), `the scan reads ${file}`);
-  assert.deepEqual(takenBreaks(engine.own, repository(engine.own) ?? '', [{ ...engine, own: 'elsewhere' }]).length, 1, 'its own side takes it');
+  for (const file of [engine.own, engine.walks.file, `${R}/test/engine.ts`, `${T}/placed.ts`])
+    assert.ok(files.includes(file), `the scan reads ${file}`);
+  assert.deepEqual(
+    takenBreaks(engine.own, repository(engine.own) ?? '', [{ ...engine, own: 'elsewhere' }]).length,
+    1,
+    'its own side takes it',
+  );
   assert.deepEqual(
     files.flatMap((file) => takenBreaks(file, repository(file) ?? '')),
     [],
   );
 });
 
-test("a boundary test of the runtime earns its name by the real engine alone, which is judged in no runtime test; one that names nothing real is still refused", () => {
+test('a boundary test of the runtime earns its name by the real engine alone, which is judged in no runtime test; one that names nothing real is still refused', () => {
   const real = "import { Engine } from '../src/index.ts';\nEngine.layer({ root });\n";
   const boundary = `${R}/test/x.boundary.test.ts`;
   const reach = reachOf(boundary, over({ [boundary]: real }));

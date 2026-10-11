@@ -303,10 +303,7 @@ const SAY: readonly Walk[] = [
       await settle('a', 'running (working)');
       return [await asked(engine.say('a', 'hello')), (await Effect.runPromise(engine.view('a'))).state.said];
     },
-    says: [
-      { at: '<time>', attempt: 1, text: 'hello', after: null },
-      [{ at: '<time>', attempt: 1, text: 'hello', after: null }],
-    ],
+    says: [{ at: '<time>', attempt: 1, text: 'hello', after: null }, [{ at: '<time>', attempt: 1, text: 'hello', after: null }]],
   },
 ];
 
@@ -399,7 +396,12 @@ export const walksOn = (sideOf: () => Side): (readonly [name: string, body: () =
  * One thing the stand-in cannot say as the engine does: what it is, why, the sequence that shows it, and what the stand-in answers,
  * as `told` tells it. The stand-in's side proves the answer; the real engine's proves it answers otherwise.
  */
-export type Apart = { readonly name: string; readonly why: string; readonly walk: (side: Side) => Promise<unknown>; readonly standIn: unknown };
+export type Apart = {
+  readonly name: string;
+  readonly why: string;
+  readonly walk: (side: Side) => Promise<unknown>;
+  readonly standIn: unknown;
+};
 
 /** What the stand-in does not hold of the engine: a test that needs one of these needs the real engine, in a boundary file. */
 export const APART: readonly Apart[] = [

@@ -12,7 +12,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
-import type { TaskPhase } from '../src/run.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
@@ -585,7 +584,7 @@ test("REFUSED at shipped defaults: a wordless `nemia retry` taken while a gated 
   const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
   const { e, tasks, filings, stopped, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-plan`, 'needs-human' as TaskPhase);
+  settle(`${run.id}-plan`, 'needs-human');
   const { ask, stopFirst } = await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge' }, { stopBlocked: true }));
   assert.deepEqual([ask.try, ask.message, stopFirst], [2, undefined, true], 'a wordless try of a blocked session is allowed');
 

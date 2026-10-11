@@ -198,7 +198,15 @@ const flatBreaches = (files: readonly string[]): string[] =>
 
 test('REFUSED: a source file flat in src/ that is not an entry', () => {
   assert.deepEqual(
-    flatBreaches(['src/facade.ts', 'src/index.ts', 'src/vocabulary.ts', 'src/testing.ts', 'src/runner.ts', 'src/core/domain.ts', 'src/harness/claude/bg.ts']),
+    flatBreaches([
+      'src/facade.ts',
+      'src/index.ts',
+      'src/vocabulary.ts',
+      'src/testing.ts',
+      'src/runner.ts',
+      'src/core/domain.ts',
+      'src/harness/claude/bg.ts',
+    ]),
     [
       "src/facade.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts, src/testing.ts do — put it in its feature's folder",
       "src/runner.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts, src/testing.ts do — put it in its feature's folder",
@@ -217,7 +225,9 @@ function standInBreaches(file: string, text: string): string[] {
   if (Object.values(STAND_IN).includes(file) || isTest(file)) return [];
   const why = 'the stand-in is for tests alone — a file that runs asks the `Engine` service, and whoever runs it gives the real one';
   const targets = importsIn(text).map(({ spec }) => resolved(file, spec));
-  const out = [STAND_IN.entry, STAND_IN.made].filter((target) => targets.includes(target)).map((target) => `${file} imports ${target}: ${why}`);
+  const out = [STAND_IN.entry, STAND_IN.made]
+    .filter((target) => targets.includes(target))
+    .map((target) => `${file} imports ${target}: ${why}`);
   if (new RegExp(`\\b${STAND_IN.name}\\b`).test(withoutComments(text))) out.push(`${file} names ${STAND_IN.name}: ${why}`);
   return out;
 }
@@ -238,7 +248,11 @@ test("REFUSED: a file of src or bin that takes the engine's stand-in, by its ent
     `src/index.ts names testEngine: ${why}`,
   ]);
   for (const own of Object.values(STAND_IN).slice(0, 3)) assert.deepEqual(standInBreaches(own, "export { testEngine } from './x.ts';"), []);
-  assert.deepEqual(standInBreaches('src/service/x.test.ts', "import { testEngine } from './test-engine.ts';"), [], 'a test beside the code');
+  assert.deepEqual(
+    standInBreaches('src/service/x.test.ts', "import { testEngine } from './test-engine.ts';"),
+    [],
+    'a test beside the code',
+  );
   assert.deepEqual(standInBreaches('src/service/engine.ts', ' * A test takes `testEngine` of `agent-runtime/testing`.'), [], 'prose');
 });
 

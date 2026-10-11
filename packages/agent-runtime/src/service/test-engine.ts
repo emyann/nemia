@@ -82,7 +82,13 @@ const stateOf = (id: string, t: TestTask): State => ({
 const viewOf = (id: string, t: TestTask | undefined): TaskView => {
   if (!t) return { id, state: blank(id), phase: 'pending', sessionId: null, admission: 'queued' };
   const waits = t.spec.queued === true && !t.attempt && outcomeOf(t.phase) === null;
-  return { id, state: stateOf(id, t), phase: t.phase, sessionId: t.attempt ? sessionOf(id) : null, ...(waits ? { admission: 'queued' } : {}) };
+  return {
+    id,
+    state: stateOf(id, t),
+    phase: t.phase,
+    sessionId: t.attempt ? sessionOf(id) : null,
+    ...(waits ? { admission: 'queued' } : {}),
+  };
 };
 
 /**
@@ -108,7 +114,9 @@ const attemptOf = (t: TestTask, phase: string, end: Partial<Attempt>): Attempt =
 
 /** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
 const unkept = (verb: string) => () =>
-  Effect.die(new Error(`the test engine keeps no \`${verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`));
+  Effect.die(
+    new Error(`the test engine keeps no \`${verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`),
+  );
 
 /** The words the engine refuses a task it holds nothing of with. */
 const unknown = (id: string): string => `\`${id}\` is not a task on this board.`;
@@ -145,7 +153,14 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
         const filed: TestFiling = { ...spec, id: spec.id ?? `t-${filings.length + 1}` };
         filings.push(filed.id);
         specs.push(filed);
-        tasks.set(filed.id, { spec: filed, phase: 'pending', filedAt: new Date().toISOString(), stopRequested: false, said: [], attempt: null });
+        tasks.set(filed.id, {
+          spec: filed,
+          phase: 'pending',
+          filedAt: new Date().toISOString(),
+          stopRequested: false,
+          said: [],
+          attempt: null,
+        });
         return filed.id;
       }),
     view: (id) => Effect.sync(() => viewOf(id, tasks.get(id))),
@@ -153,7 +168,8 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
       Effect.gen(function* () {
         const t = tasks.get(id);
         if (!t) return yield* Effect.fail(new StopRefused({ message: unknown(id) }));
-        if (settledIn(id)) return yield* Effect.fail(new StopRefused({ message: `\`${id}\` has settled (${t.phase}): there is nothing left to stop.` }));
+        if (settledIn(id))
+          return yield* Effect.fail(new StopRefused({ message: `\`${id}\` has settled (${t.phase}): there is nothing left to stop.` }));
         t.stopRequested = true;
         stopped.push(id);
       }),
@@ -165,7 +181,8 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
         const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
         const t = tasks.get(taskId);
         if (!t) return yield* refuse(unknown(taskId));
-        if (settledIn(taskId)) return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);
+        if (settledIn(taskId))
+          return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);
         if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`);
         if (sayRefusals.left > 0) {
           sayRefusals.left -= 1;
@@ -183,7 +200,10 @@ const keptOf = (held: Omit<TestEngine, 'layer' | 'refuseSay' | 'settle'>, sayRef
         for (const id of taskIds)
           if (!settledIn(id))
             return yield* Effect.fail(
-              new ForgetRefused({ taskId: id, message: tasks.has(id) ? `${id} has not settled: stop it first` : `no task ${id} in this store` }),
+              new ForgetRefused({
+                taskId: id,
+                message: tasks.has(id) ? `${id} has not settled: stop it first` : `no task ${id} in this store`,
+              }),
             );
         if (yes) for (const id of taskIds) tasks.delete(id);
         return { forgotten: yes, tasks: taskIds.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })) };

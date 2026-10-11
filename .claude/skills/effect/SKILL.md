@@ -81,8 +81,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `.pipe(Layer.provide(inner))` (`engineOf` in `packages/agent-orchestrator/src/runtime-client.ts`).
 - A test is given a stand-in as a layer, and hands no implementation of its own for what is outside the process: the place is
   `testPlace()`'s layer (`packages/agent-orchestrator/place/memory`), and a new test file that makes an engine by hand
-  (`Layer.succeed(Tag)(Tag.of({ ... }))`, `promised`) is refused by `packages/agent-orchestrator/test/stand-ins.test.ts`. `board` in
-  `packages/agent-orchestrator/test/engine-board.ts` is the hand-made engine today's listed tests keep, a verb it does not keep an
+  (`Layer.succeed(Tag)(Tag.of({ ... }))`, `promised`) is refused by `packages/agent-orchestrator/test/stand-ins.test.ts`. An engine is the
+  runtime's stand-in, `testEngine()` of `agent-runtime/testing` (`const engine = eachTest(testEngine);`), a verb it does not keep an
   `Effect.die` naming itself.
 
 ## Verbs

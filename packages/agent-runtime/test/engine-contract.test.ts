@@ -7,7 +7,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit } from 'effect';
-import type { EngineShape } from '../src/index.ts';
 import { testEngine } from '../src/testing.ts';
 import { builtEngine } from './engine.ts';
 import { APART, apartOn, failing, UNKEPT, unwalked, WALKS, walksOn, type Kept, type Side } from './engine-walks.ts';
@@ -39,7 +38,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
 function lying(verb: Kept, lie: (answer: Answer) => Answer): Side {
   const side = standIn();
   const truly = side.engine[verb] as (...args: unknown[]) => Answer;
-  return { ...side, engine: { ...side.engine, [verb]: (...args: unknown[]) => lie(truly(...args)) } as EngineShape };
+  return { ...side, engine: { ...side.engine, [verb]: (...args: unknown[]) => lie(truly(...args)) } };
 }
 
 for (const verb of Object.keys(WALKS) as Kept[])
@@ -47,7 +46,11 @@ for (const verb of Object.keys(WALKS) as Kept[])
     assert.deepEqual(await failing(verb, standIn), [], 'the stand-in says every walk');
     const failed = await failing(verb, () => lying(verb, LIES[verb]));
     assert.ok(failed.length > 0, `no walk of ${verb} caught the lie`);
-    assert.deepEqual(await failing(verb, () => lying(verb, (answer) => answer)), [], 'and a wrapped one that tells the truth passes them all');
+    assert.deepEqual(
+      await failing(verb, () => lying(verb, (answer) => answer)),
+      [],
+      'and a wrapped one that tells the truth passes them all',
+    );
   });
 
 test('REFUSED: a verb with no walk — one added to the engine, and one whose walks were taken away — is named', () => {
@@ -56,7 +59,14 @@ test('REFUSED: a verb with no walk — one added to the engine, and one whose wa
   assert.deepEqual(unwalked(verbs), [], 'every verb of the engine is walked or named unkept');
   assert.deepEqual(unwalked([...verbs, 'mirror']), ['mirror']);
   assert.deepEqual(unwalked(verbs, { ...WALKS, stop: [] }), ['stop']);
-  assert.deepEqual(unwalked(verbs, WALKS, UNKEPT.filter((verb) => verb !== 'tick')), ['tick']);
+  assert.deepEqual(
+    unwalked(
+      verbs,
+      WALKS,
+      UNKEPT.filter((verb) => verb !== 'tick'),
+    ),
+    ['tick'],
+  );
 });
 
 for (const verb of UNKEPT)

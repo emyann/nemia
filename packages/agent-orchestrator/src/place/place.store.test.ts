@@ -123,6 +123,11 @@ test('a verb that threw says so in one sentence, naming the verb and what was th
   assert.equal(threwWords('land', 'a string'), 'land threw before it answered: a string');
 });
 
+test('what was thrown is said on one line, its last four lines and no more', () => {
+  const thrown = new Error('Command failed: git x\nhint: one\n\n  hint: two\nhint: three\nfatal: four\n');
+  assert.equal(threwWords('remove', thrown), 'remove threw before it answered: hint: one / hint: two / hint: three / fatal: four');
+});
+
 test("sayFilled fills each hole it is handed, and leaves a hole it is not, and a person's `<branch>`, as written", () => {
   assert.equal(
     sayFilled('git -C {repo} worktree unlock {path}', { repo: '/r', path: '/w/{repo}' }),

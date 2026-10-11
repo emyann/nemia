@@ -92,9 +92,9 @@ export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string
   return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${words ? `: ${words}` : ''}`;
 }
 
-/** Why `verb` gave no answer when the place threw answering it: the verb, and what was thrown. */
+/** Why `verb` gave no answer when the place threw answering it: the verb, and the last lines of what was thrown, on one line. */
 export const threwWords = (verb: PlaceVerb, threw: unknown): string =>
-  `${verb} threw before it answered: ${threw instanceof Error ? threw.message : String(threw)}`;
+  `${verb} threw before it answered: ${lastLines(threw instanceof Error ? threw.message : String(threw))}`;
 
 /** `verb` unread, with why and now. */
 export const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unread } => ({

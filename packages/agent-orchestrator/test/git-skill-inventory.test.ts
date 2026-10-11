@@ -154,7 +154,12 @@ test('REFUSED as unread, never as nothing to remove: an inventory of a directory
   const plain = scratch('wf-git-inventory-plain-');
   const outcome = run('inventory', { repo: plain, under: path.join(plain, 'x'), prefix: 'wf/x/', base: 'main' });
   assert.ok(!('answer' in outcome), `no answer, empty or not: ${JSON.stringify(outcome)}`);
-  assert.match(unreadOf(outcome), /not a git repository/);
+  assert.equal(
+    unreadOf(outcome),
+    'inventory threw before it answered: Command failed: git worktree list --porcelain / ' +
+      'fatal: not a git repository (or any of the parent directories): .git',
+    'one line: the command, and what git said',
+  );
 });
 
 test('inventory and remove are unread for a request they cannot read', () => {

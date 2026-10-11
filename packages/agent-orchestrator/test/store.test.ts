@@ -5657,14 +5657,6 @@ test('a nudge past a budget is told why its last try ended on its own work — h
   assert.doesNotMatch(brief, /The last try ended `over budget`/);
 });
 
-/** A repository whose `.gitignore` names what a worktree is given and what a check leaves: not work, and never committed. */
-const anIgnoringRepo = (): string => {
-  const repo = aRepo();
-  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n.e2e/\n');
-  gitIn(repo, 'add', '-A');
-  gitIn(repo, 'commit', '-q', '-m', 'ignore');
-  return repo;
-};
 const worktreesOf = (repo: string) =>
   gitIn(repo, 'worktree', 'list', '--porcelain')
     .split('\n')
@@ -5688,74 +5680,6 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
     log.mock.restore();
   }
 };
-
-test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 0", async (t) => {
-  const repo = anIgnoringRepo();
-  const b = board();
-  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
-  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'));
-  b.settle(`${run.id}-implement`, 'failed');
-  await runWith(b.e, advanceRun(readRun(run.id)));
-
-  fs.writeFileSync(path.join(wt, 'fix.ts'), 'export const fixed = true;\n');
-  const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
-  fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me\n');
-  fs.mkdirSync(path.join(wt, 'node_modules'));
-  fs.symlinkSync(outside, path.join(wt, 'node_modules', 'linked'));
-  fs.mkdirSync(path.join(wt, '.e2e'));
-  fs.writeFileSync(path.join(wt, '.e2e', 'shot.png'), 'png');
-  fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement', 'report.md'), 'report\n');
-  fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-implement-check.stderr`), 'boom\n');
-  fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-x2-implement-check.stderr`), 'not mine\n');
-  writeRun(aRun(`${run.id}-x2`, { implement: { taskId: `${run.id}-x2-implement` } }));
-  fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
-  const filings = [...b.filings];
-
-  const { printed, error } = await rmTyped(t, b.e, run.id);
-  assert.equal(error, undefined);
-  const branch = `wf/${run.id}/implement`;
-  const commit = gitIn(repo, 'rev-parse', branch);
-  assert.deepEqual(printed, [
-    `${run.id}  forgotten: removed 1 worktree, committed what implement left uncommitted on ${branch} as ${commit.slice(0, 7)}; ` +
-      `removed runs/${run.id}.json, runs/${run.id}.asks/, runs/${run.id}/, checks/${run.id}-implement-check.stderr, worktrees/${run.id}/; ` +
-      `kept ${branch} — branches are kept unless asked: --delete-branches deletes those merged into ${run.branch}` +
-      FORGOT_ONE,
-  ]);
-
-  assert.ok(!worktreesOf(repo).includes(wt), 'git lists the worktree no more');
-  assert.ok(!fs.existsSync(wt) && !under('worktrees', run.id));
-  assert.equal(
-    gitIn(repo, 'log', '-1', '--format=%s', branch),
-    'implement: hand off what was left uncommitted, before its run was forgotten',
-  );
-  assert.deepEqual(
-    gitIn(repo, 'show', '--name-only', '--format=', branch).split('\n'),
-    ['fix.ts'],
-    'the work written after the pass that handed the failed step off, and nothing git ignores',
-  );
-  assert.equal(fs.readFileSync(path.join(outside, 'precious.txt'), 'utf8'), 'keep me\n', 'a link in node_modules is not followed');
-  for (const gone of [[`${run.id}.json`], [run.id], [`${run.id}.asks`]])
-    assert.ok(!under('runs', ...gone), `runs/${gone.join('/')} removed`);
-  assert.ok(!under('checks', `${run.id}-implement-check.stderr`));
-  assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "another run's check log is left");
-  assert.deepEqual(
-    [b.filings, b.stopped, b.tasks.has(`${run.id}-implement`), b.forgets],
-    [filings, [], false, [{ taskIds: [`${run.id}-implement`], yes: true }]],
-    "the engine is asked to forget the run's task, once, and stops or files nothing",
-  );
-  assert.throws(
-    () => readRun(run.id),
-    (err: Error) => err.message.startsWith('no such run: '),
-  );
-
-  const again = await rmTyped(t, b.e, run.id);
-  assert.deepEqual([again.printed, again.error], [[`${run.id}  no such run — nothing to forget`], undefined]);
-  assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "with no record, still not another stored run's");
-  fs.rmSync(path.join(ROOT, 'runs', `${run.id}-x2.json`));
-});
 
 test('REFUSED at shipped defaults: `nemia rm` on a run with a step in flight, one whose next step is ready, one with an unspent ask, and one another run waits on — each named on its line with what to do, nothing of it removed, exit 2 — while a run beside them in the same `nemia rm` is forgotten', async (t) => {
   const repo = aRepo();

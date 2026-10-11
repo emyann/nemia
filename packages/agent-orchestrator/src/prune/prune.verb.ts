@@ -1,12 +1,14 @@
 /**
  * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is
- * touched (`judging`), and removing through the place it is given (`freeing`); and what `nemia rm` shares with it — a path as git names
- * a worktree (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
- * (`runtime-client.ts`); it never stops anything.
+ * touched (`judging`), and removing through the place it is given (`freeing`); many runs at once, judged side by side
+ * (`judgingMany`) and removed a few runs a turn with one removal a repository (`freeingMany`, `freedByRepo`); and what `nemia rm`
+ * shares with it — a path as git names a worktree (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching
+ * the runtime through the client (`runtime-client.ts`); it never stops anything.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { isDeepStrictEqual } from 'node:util';
+import { Cause, Effect, Exit } from 'effect';
 import { EngineService, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import type { MergeState } from '../ending/ending.ts';
@@ -78,10 +80,18 @@ export const prune = Effect.fn('prune')(function* (
     return judged.pruning;
   }
   const ready = yield* sized(judged.ready);
-  const { run, worktrees, files } = ready;
-  if (!yes) return { id: run.id, kind: 'prunable', worktrees, ...(files ? { artifacts: files } : {}), left: [] } satisfies Pruning;
+  if (!yes) return prunableOf(ready);
   const [pruned] = yield* freeing([ready]);
   return pruned;
+});
+
+/** A run ready to prune as a listing says it: each worktree and its files with what removing them frees, nothing touched. */
+export const prunableOf = ({ run, worktrees, files }: Sized): Pruning => ({
+  id: run.id,
+  kind: 'prunable',
+  worktrees,
+  ...(files ? { artifacts: files } : {}),
+  left: [],
 });
 
 /** A run `judging` found ready to prune: the run as judged, its place, its folder of worktrees, each worktree listed, and its files. */
@@ -287,31 +297,75 @@ function pruneFact(run: RepositoryRun, place: RunPlaceRead, w: Held): PruneFacts
   return { path: w.path, ...hold, ...(changes.length ? { changes } : {}), fix };
 }
 
-/** The marker a prune of `run` writes at `now`: with the worktrees `removed` after those gone before, and its files' bytes `freed`. */
-function markerOf(run: RepositoryRun, worktrees: readonly unknown[], now: string) {
-  const at = worktrees.length || !run.pruned ? now : run.pruned.at;
-  const before = run.pruned?.worktrees ?? [];
-  const filesBefore = run.pruned?.artifacts;
-  const marker = (removed: Pruned['worktrees'], freed: number | undefined): Pruned => ({
-    at,
-    worktrees: [...before, ...removed],
-    ...(freed !== undefined
-      ? { artifacts: { at: now, bytes: (filesBefore?.bytes ?? 0) + freed } }
+/** A run being pruned, marked: when, the mark its file held before (`base`), and the mark this prune put over it (`mine`). */
+type Marked = Sized & { readonly now: string; readonly base: Pruned | undefined; readonly mine: Pruned };
+
+/**
+ * Mark `ready` pruned at `now`, before anything of it is removed: over the mark its file holds then, read here and never off the
+ * judgement, every worktree that mark lists kept, and its files counted as gone when they are to go. The read and the write are one
+ * stretch nothing else of this process runs in.
+ */
+function marked(ready: Sized, now: string): Marked {
+  const base = runStore.runs.pruned(ready.run.id);
+  const filesBefore = base?.artifacts;
+  const mine: Pruned = {
+    at: ready.worktrees.length || !base ? now : base.at,
+    worktrees: base?.worktrees ?? [],
+    ...(ready.files
+      ? { artifacts: { at: now, bytes: (filesBefore?.bytes ?? 0) + ready.files.bytes } }
       : filesBefore
         ? { artifacts: filesBefore }
         : {}),
-  });
-  return { at, marker };
+  };
+  runStore.runs.prune(ready.run.id, mine);
+  return { ...ready, now, base, mine };
 }
 
 /**
- * Prune runs of one repository, each judged ready and sized: each marked pruned first (`runStore.runs.prune`), its files counted as
- * gone when they are to go, so that a pass or the api reading it while its worktrees go reads it pruned and files nothing (`advance`);
- * then one `remove` asked of the place with every worktree of every run — never forced, so a file that turned up since it was read is
- * git's refusal and not a loss — which prunes git's list once; then, a run at a time, `worktrees/<id>` once it is empty, its files under
- * `--artifacts`, removed and never followed, what would not go said and counted out of what was freed, and the marker written again
- * with what was removed. The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on
- * a run never pruned before, as it was on one that was.
+ * Write the mark of `r` once its removal is over, on the file as it reads then, in one stretch: the mark without this prune is what
+ * the file held before it (`base`) while the file still holds this prune's own, else what another prune wrote since. No worktree
+ * that mark lists is dropped. The worktrees `removed` are added, or every worktree this prune listed once none of them stands on disk,
+ * whoever removed them and whatever the place answered; the time moves only when this prune removed one; the files' bytes `freed`
+ * are added to those gone before. A prune that removed nothing, with a worktree it listed still standing or none listed, leaves the
+ * mark as it reads without it (`takenBack`): gone on a run never pruned, as it was on one that was.
+ */
+function settle(r: Marked, removed: Pruning['worktrees'], freed: number | undefined): void {
+  const current = runStore.runs.pruned(r.run.id);
+  const untouched = isDeepStrictEqual(current, r.mine);
+  const theirs = untouched ? r.base : current;
+  const gone = r.worktrees.length > 0 && r.worktrees.every((w) => !fs.existsSync(w.path));
+  const went = gone ? r.worktrees : removed;
+  const at = removed.length ? r.now : (theirs?.at ?? r.now);
+  if (went.length || freed !== undefined) runStore.runs.prune(r.run.id, markWith(theirs, went, freed, at, r.now));
+  else if (untouched) runStore.runs.prune(r.run.id, takenBack(r));
+}
+
+/**
+ * The mark a prune that removed nothing puts back over its own: the one the file held before it, unless that one lists no worktree
+ * and no files while this prune listed worktrees, which stand. Such a mark is another prune's own, put there before its removal, and
+ * says nothing went: restored, it would leave a run nothing was removed from reading pruned once both prunes are over.
+ */
+function takenBack(r: Marked): Pruned | undefined {
+  const empty = r.base !== undefined && !r.base.worktrees.length && !r.base.artifacts;
+  return empty && r.worktrees.length > 0 ? undefined : r.base;
+}
+
+/** The mark `theirs` at `at`, with the worktrees `went` it does not list yet, and the files' bytes `freed` at `now` over those before. */
+function markWith(theirs: Pruned | undefined, went: Pruning['worktrees'], freed: number | undefined, at: string, now: string): Pruned {
+  const before = theirs?.worktrees ?? [];
+  const held = new Set(before.map((w) => w.path));
+  const files = freed === undefined ? theirs?.artifacts : { at: now, bytes: (theirs?.artifacts?.bytes ?? 0) + freed };
+  return { at, worktrees: [...before, ...went.filter((w) => !held.has(w.path))], ...(files ? { artifacts: files } : {}) };
+}
+
+/**
+ * Prune runs of one repository, each judged ready and sized: each marked pruned first (`marked`), its files counted as gone when they
+ * are to go, so that a pass or the api reading it while its worktrees go reads it pruned and files nothing (`advance`); then one
+ * `remove` asked of the place with every worktree of every run — never forced, so a file that turned up since it was read is git's
+ * refusal and not a loss — which prunes git's list once; then, a run at a time, `worktrees/<id>` once it is empty, its files under
+ * `--artifacts`, removed and never followed, what would not go said and counted out of what was freed, and the mark written again
+ * with what was removed (`settle`), on the file as it reads then: a prune of the same run by another process meanwhile loses no
+ * worktree of its mark to this one.
  *
  * @param ready The runs to prune, all of one repository and one place: the first's are asked.
  * @returns What was done with each, in the order given.
@@ -319,35 +373,34 @@ function markerOf(run: RepositoryRun, worktrees: readonly unknown[], now: string
 export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Sized[]) {
   if (!ready.length) return [];
   const now = new Date().toISOString();
-  const marked = ready.map((r) => ({ ...r, ...markerOf(r.run, r.worktrees, now) }));
-  for (const r of marked) runStore.runs.prune(r.run.id, r.marker([], r.files?.bytes));
+  const all = ready.map((r) => marked(r, now));
   const [{ run, place }] = ready;
   const outcome = yield* place.place.ask('remove', {
     repo: run.repo,
     workspaces: ready.flatMap((r) => r.worktrees.map((w) => w.path)),
     branches: [],
   });
-  return yield* Effect.forEach(marked, (r) => finished(r, outcome));
+  return yield* Effect.forEach(all, (r) => finished(r, outcome));
 });
 
 /**
  * One marked run after the place's `remove` answered `outcome`: its folder of worktrees once empty, its files under `--artifacts`, and
- * its marker written again with what went, or taken back when nothing did.
+ * its mark written again with what went, or taken back when nothing did (`settle`).
  */
-const finished = Effect.fnUntraced(function* (r: Sized & ReturnType<typeof markerOf>, outcome: PlaceOutcome<'remove'>) {
+const finished = Effect.fnUntraced(function* (r: Marked, outcome: PlaceOutcome<'remove'>) {
   const { removed, left } = removedOf(r, outcome);
   dropEmpty(r.within);
   const files = r.files ? yield* removeFiles(r.run.id, r.files) : undefined;
   if (files?.left) left.push(files.left);
   const filesWent = files !== undefined && (files.freed > 0 || !files.left);
-  runStore.runs.prune(r.run.id, !removed.length && !filesWent ? r.run.pruned : r.marker(removed, filesWent ? files.freed : undefined));
+  settle(r, removed, filesWent ? files.freed : undefined);
   const done: Pruning = {
     id: r.run.id,
     kind: 'pruned',
     worktrees: removed,
     ...(filesWent ? { artifacts: { path: r.files!.path, bytes: files.freed } } : {}),
     left,
-    at: r.at,
+    at: r.mine.at,
     ...(r.unmerged ? { unmerged: true as const } : {}),
   };
   return done;
@@ -381,6 +434,140 @@ const removeFiles = Effect.fnUntraced(function* (id: string, kept: { path: strin
   if (why === null) return { freed: kept.bytes };
   const still = (yield* freedBytes([kept.path]))[0];
   return { freed: Math.max(0, kept.bytes - still), left: { path: kept.path, files: why } satisfies Pruning['left'][number] };
+});
+
+/** The most runs `nemia prune` judges at once, and the most one turn of its removal carries: the daemon's sweep takes as many. */
+export const PRUNE_A_TURN = 4;
+
+/**
+ * One run of many as its judgement answered: what a listing says of it (`pruning`), with the run sized when it is ready (`ready`); or
+ * what the judgement failed with (`failed`), a refusal or anything else, as it was thrown.
+ */
+export type Listed =
+  | { readonly id: string; readonly pruning: Pruning; readonly ready?: Sized }
+  | { readonly id: string; readonly failed: unknown };
+
+/** One run of many after its turn: what its removal did, or what its judgement says now; or what either failed with. */
+export type Turned = { readonly id: string; readonly pruning: Pruning } | { readonly id: string; readonly failed: unknown };
+
+/** A run of many as `listedOne` answers it: with what is left of one pruned before with nothing listed (`left`), still to forget. */
+type ListedOne = Listed & { readonly left?: Left };
+
+/** One run judged and, when ready, sized, a failure of either caught as its own answer; nothing is touched. */
+const listedOne = Effect.fnUntraced(function* (id: string, flags: { unmerged?: boolean; artifacts?: boolean }) {
+  const exit = yield* Effect.exit(
+    Effect.gen(function* () {
+      const judged = yield* judging(id, flags);
+      if ('ready' in judged) {
+        const ready = yield* sized(judged.ready);
+        return { id, pruning: prunableOf(ready), ready } satisfies ListedOne;
+      }
+      return { id, pruning: judged.pruning, ...(judged.left ? { left: judged.left } : {}) } satisfies ListedOne;
+    }),
+  );
+  const listed: ListedOne = Exit.isSuccess(exit) ? exit.value : { id, failed: Cause.squash(exit.cause) };
+  return listed;
+});
+
+/**
+ * Judge many runs for a prune, touching nothing: each as `judging` judges one and sized when ready (`sized`), `PRUNE_A_TURN` of them
+ * side by side. A run whose judgement fails costs its own answer alone.
+ *
+ * @param ids The runs, by id.
+ * @returns One answer a run, in the order of `ids` whatever order they ended in.
+ */
+export const judgingMany = Effect.fn('prune.judgingMany')(function* (
+  ids: readonly string[],
+  flags: { unmerged?: boolean; artifacts?: boolean } = {},
+) {
+  return yield* Effect.forEach(ids, (id) => listedOne(id, flags), { concurrency: PRUNE_A_TURN });
+});
+
+/**
+ * Runs judged ready, removed by one `remove` a repository (`freeing`), `bound` repositories side by side: the runs are grouped by
+ * their repository, in the order each is first met.
+ *
+ * @returns Each group with how its removal ended: what was done with each of its runs, in the group's order, or why it failed.
+ */
+export const freedByRepo = Effect.fn('prune.freedByRepo')(function* (ready: readonly Sized[], bound: number) {
+  const byRepo = new Map<string, Sized[]>();
+  for (const r of ready) byRepo.set(r.run.repo, [...(byRepo.get(r.run.repo) ?? []), r]);
+  return yield* Effect.forEach([...byRepo.values()], (group) => Effect.exit(freeing(group)).pipe(Effect.map((exit) => ({ group, exit }))), {
+    concurrency: bound,
+  });
+});
+
+/**
+ * What is left of the runs of one turn that were pruned before with nothing listed (`forgetGone`), one at a time: git's list is asked
+ * pruned once a repository, and not at all in a repository of `asked`, where the turn's own `remove` pruned it; then each run's
+ * folder of worktrees goes, once empty.
+ */
+const forgottenGone = Effect.fnUntraced(function* (lefts: readonly Left[], asked: ReadonlySet<string>) {
+  const pruned = new Set(asked);
+  for (const left of lefts) {
+    if (pruned.has(left.run.repo)) dropEmpty(left.within);
+    else yield* forgetGone(left);
+    pruned.add(left.run.repo);
+  }
+});
+
+/**
+ * One turn of `freeingMany`: its runs judged again, side by side, unless `yes`; those ready removed by one `remove` a repository
+ * (`freedByRepo`); what is left of those pruned meanwhile forgotten after it (`forgottenGone`); and what was done with each, in the
+ * turn's order.
+ */
+const turned = Effect.fnUntraced(function* (
+  turn: readonly ListedOne[],
+  { yes, ...flags }: { unmerged: boolean; artifacts: boolean; yes: boolean },
+) {
+  const judged = yes ? turn : yield* Effect.forEach(turn, (l) => listedOne(l.id, flags), { concurrency: PRUNE_A_TURN });
+  const groups = yield* freedByRepo(
+    judged.flatMap((l) => ('ready' in l && l.ready ? [l.ready] : [])),
+    PRUNE_A_TURN,
+  );
+  yield* forgottenGone(
+    judged.flatMap((l) => ('left' in l && l.left ? [l.left] : [])),
+    new Set(groups.map(({ group }) => group[0].run.repo)),
+  );
+  const done = new Map<string, Turned>();
+  for (const { group, exit } of groups) {
+    group.forEach((r, k) => {
+      const id = r.run.id;
+      done.set(id, Exit.isSuccess(exit) ? { id, pruning: exit.value[k] } : { id, failed: Cause.squash(exit.cause) });
+    });
+  }
+  return judged.map((l): Turned => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));
+});
+
+/**
+ * Remove the runs a listing found ready (`judgingMany`), in turns of `PRUNE_A_TURN` runs in the listing's order, one turn after
+ * another, so a repository's removals never run two at once and one `remove` carries a few runs' worktrees. Within a turn the runs of
+ * one repository go by one `remove` (`freedByRepo`), repositories side by side.
+ *
+ * With `yes`, the command line's own, each run is removed on the listing's judgement: it is judged once. Without it a person answered
+ * a prompt since the listing, so each run of a turn is judged and sized again just before that turn's removal, side by side; one no
+ * longer ready answers its refusal, or that nothing is left, and is not removed. What git still lists of a run freed meanwhile is
+ * forgotten after the turn's removal, one repository at a time.
+ *
+ * @param listed What `judgingMany` answered; a run with no `ready` is left alone.
+ * @param told Called once a turn, as it ends, with what was done with each of its runs, in the listing's order.
+ * @returns What every turn told, in order.
+ */
+export const freeingMany = Effect.fn('prune.freeingMany')(function* (
+  listed: readonly Listed[],
+  { unmerged = false, artifacts = false, yes = false }: { unmerged?: boolean; artifacts?: boolean; yes?: boolean } = {},
+  told: (turn: readonly Turned[]) => void = () => {},
+) {
+  const ready = listed.filter((l) => 'ready' in l && l.ready !== undefined);
+  const turns = Array.from({ length: Math.ceil(ready.length / PRUNE_A_TURN) }, (_, k) =>
+    ready.slice(k * PRUNE_A_TURN, (k + 1) * PRUNE_A_TURN),
+  );
+  const said = yield* Effect.forEach(
+    turns,
+    (turn) => turned(turn, { unmerged, artifacts, yes }).pipe(Effect.tap((done) => Effect.sync(() => told(done)))),
+    { concurrency: 1 },
+  );
+  return said.flat();
 });
 
 /**

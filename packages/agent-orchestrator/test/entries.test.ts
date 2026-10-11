@@ -267,6 +267,8 @@ const PINNED: Record<string, string[]> = {
     'preloads',
     'procStartOf',
     'provisionDeps',
+    'freeingMany',
+    'judgingMany',
     'prune',
     'pruneLines',
     'pruneRefusal',

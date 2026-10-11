@@ -3,7 +3,7 @@
 Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped
 (`restartPolicy: 'Always'` with `background: true`, README *A long-lived session*). It owns how a session runs: the task's command,
 mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. `decide` (`src/core/domain.ts`) is the whole judgement,
-pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the second, the
+pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the only doors, with `src/testing.ts` for tests (`test/contract.test.ts`); the second, the
 harnesses' words, `HARNESS_CHOICES`, `fenceReach`, `unruledIn` and `configFolderIn`, loads no Effect and no I/O
 (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
 down is in `docs/architecture.md`, *Who owns what*.
@@ -71,6 +71,9 @@ down is in `docs/architecture.md`, *Who owns what*.
   the new one, and test the verb through the `Engine` service.
 - **A verb is written once, on the `Engine` service** (`src/service/engine.ts`); `test/verb-refusals.test.ts` pins the verbs (`VERBS`)
   and proves each verb's refusal a tagged error, worded by `refusalWords`.
+- **The engine's stand-in is `testEngine()` (`src/service/test-engine.ts`, given by `agent-runtime/testing` to tests of the layers
+  above)**, held to `Engine.layer` by `test/engine-walks.ts`: a verb added to `EngineShape` gets a walk there or a place in `UNKEPT`,
+  and a runtime test builds the real engine, never the stand-in.
 - **A test that sets `CLAUDE_CONFIG_DIR` (or another env read at load) before a dynamic import of `src`** imports
   `test/promise-runner.ts` and `test/engine.ts` dynamically too: their static import loads `src` first.
 - **Node's type stripping refuses a parameter property** (`constructor(private readonly ops)`): declare the field and assign it.

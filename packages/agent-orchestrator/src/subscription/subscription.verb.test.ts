@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { scratch } from '../../test/scratch.ts';
-import { board } from '../../test/engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-subscribe-');
 process.env.WF_ROOT = ROOT;
@@ -30,7 +30,7 @@ const TASKS: Record<string, Partial<TaskView['state']>> = {
 
 /** An engine whose `view` answers `TASKS`, and a task never filed with no `filedAt`, as the fold of an empty journal has none. */
 const e = {
-  ...engineOf(board().layer),
+  ...engineOf(testEngine().layer),
   view: (id: string) => Effect.succeed({ id, phase: 'pending', state: { settled: null, ...TASKS[id] } } as unknown as TaskView),
 };
 

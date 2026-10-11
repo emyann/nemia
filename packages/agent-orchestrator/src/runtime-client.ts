@@ -146,9 +146,9 @@ export const engine = (): Engine => {
 
 /**
  * The engine the controllers use over `layer`'s `Engine` service, built once at the call and kept for the process, with every filing
- * `queued`: `engine()` over the store's runtime, a test over a layer of its own (`test/engine-board.ts`). Refused — throws an `Error` whose
- * `exitCode` is 2, led by `engine` (`refusalWords`) — when the layer fails with the runtime's `EngineRefused`; any other failure to build
- * it is thrown as it is.
+ * `queued`: `engine()` over the store's runtime, a test over the runtime's stand-in (`testEngine`, from `agent-runtime/testing`).
+ * Refused — throws an `Error` whose `exitCode` is 2, led by `engine` (`refusalWords`) — when the layer fails with the runtime's
+ * `EngineRefused`; any other failure to build it is thrown as it is.
  */
 export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine => {
   const built = Effect.runSyncExit(

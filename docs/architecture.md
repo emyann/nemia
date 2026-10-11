@@ -8,7 +8,7 @@ broken. This page says what the tests hold; the tests are the rules.
 
 | Layer | Owns | Public contract |
 |---|---|---|
-| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'` with `background: true`, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
+| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'` with `background: true`, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in, for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
@@ -53,7 +53,11 @@ has the one answer both places must give,
 fails a walk and a verb with no walk is named. A test is given the stand-in, and one that reaches the real thing says so by its name,
 `<what>.boundary.test.ts`: `test/stand-ins.test.ts` reads the runtime's, the orchestrator's and the api's test files and refuses git,
 a process, the real place, the real engine and a hand-made engine in any other, against a baseline that only shrinks
-(`test/stand-ins.baseline.ts`), and refuses a stand-in whose contract no boundary test walks whole. Two things are given up on purpose. *A team's own place as a folder of scripts*: a
+(`test/stand-ins.baseline.ts`), and refuses a stand-in whose contract no boundary test walks whole. The engine's stand-in is the
+runtime's, `testEngine()` behind `agent-runtime/testing`: it keeps `file`, `view`, `stop`, `logs`, `feed`, `output`, `say` and
+`forget` by hand, and one table of walks (`packages/agent-runtime/test/engine-walks.ts`) holds it to the real engine, asked of
+`Engine.layer` in `engine-contract.boundary.test.ts` and of the stand-in in `engine-contract.test.ts`; what it cannot say is declared
+there (`APART`), and a runtime test builds the real engine, never the stand-in (`takenBreaks`). Two things are given up on purpose. *A team's own place as a folder of scripts*: a
 place is no longer a skill's `scripts/<verb>.ts` declared by a `place.json` and run as a process a question, so a team cannot bring
 one as files; another place is code that implements `PlaceService`, given as a layer where the program is composed. *A place frozen
 per run*: a run copies no place and its record names none (`test/start-place.test.ts`), so a run in flight is answered by the place
@@ -217,8 +221,10 @@ both for an app; `wf stats` and `wf ls` keep none, and the api's tests read ever
 ## The rules
 
 **1. Between packages, only the public contract.** Code outside packages/agent-runtime reaches it through
-`agent-runtime`, and its vocabulary through `agent-runtime/vocabulary`, alone. That rules out its src/ by any route: a subpath not in its `exports`,
-a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by neither entry. The apps
+`agent-runtime`, and its vocabulary through `agent-runtime/vocabulary`, alone; a test file, and no file of a `src` or a `bin`, may also
+import `agent-runtime/testing`, the engine's stand-in (`testingBreaches` in the runtime's `contract.test.ts`). That rules out its src/ by
+any route: a subpath not in its `exports`, a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported
+by no entry, and the stand-in by the testing entry alone. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`,
 and `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk, and the
 refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
@@ -289,7 +295,9 @@ harness reads as its own configuration in a mounted folder (`configFolderIn`), w
 (`VOCABULARY` in test/boundary.test.ts).
 
 **Inside the runtime, folders by feature**, held by path in `packages/agent-runtime/test/layout.test.ts`. The entries,
-`src/index.ts` and the vocabulary door `src/vocabulary.ts`, are the only files flat in `src/`; each re-exports by name. `core/` is the judgement
+`src/index.ts`, the vocabulary door `src/vocabulary.ts` and the testing entry `src/testing.ts`, are the only files flat in `src/`; each
+re-exports by name. The testing entry gives `testEngine()` (`src/service/test-engine.ts`, beside `Engine`), which no file of `src` or
+`bin` takes, and whose own files import Effect and the engine service alone (`test/testing-door.test.ts`). `core/` is the judgement
 (`domain.ts`, `session.ts`, `lifecycle.ts`) and `core/engine/` its shell (the engine, filing, the journal, the memo, the tally);
 `harness/` is the seam (`seam.ts`, `args.ts`) and each harness's driver beneath it (`claude/`, `codex/`, `detached/`); `a2a/` is
 the one place the A2A SDK is imported; `service/` is the engine as an Effect service, and `cli/` the `ae`

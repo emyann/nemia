@@ -28,6 +28,8 @@ import {
   reachOver,
   sizes,
   STAND_INS,
+  takenBreaks,
+  testAndHelperFilesOf,
   testFilesOf,
   unlisted,
   type Baseline,
@@ -88,6 +90,11 @@ const PLANTS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
+/** A test given the engine's stand-in through the runtime's testing entry, as a test of the orchestrator or the api writes it. */
+const ENGINE_LINE =
+  "import { testEngine } from 'agent-runtime/testing';\nimport { eachTest } from './placed.ts';\n" +
+  "const { engineOf } = await import('../src/runtime-client.ts');\nconst engine = eachTest(testEngine);\nconst e = () => engineOf(engine().layer);\n";
+
 /** Words that name the real thing and reach nothing: each must measure no site. */
 const WORDS = [
   "const said = \"execFileSync('git', ['status']); import('node:child_process')\";\n",
@@ -98,6 +105,7 @@ const WORDS = [
   "import type { ChildProcess } from 'node:child_process';\nimport { type Worker } from 'node:worker_threads';\n",
   "import type { gitPlaceLayer, engine } from '../src/runner.ts';\nimport type { gitPlace } from '../place/git/place.ts';\n",
   "import { testPlace } from '../place/memory/index.ts';\nimport { eachTest } from './placed.ts';\nconst stand = eachTest(testPlace);\n",
+  ENGINE_LINE,
   "import { Layer } from 'effect';\nimport { PlaceService } from '../src/place/place.store.ts';\nLayer.succeed(PlaceService)(place);\n",
   "import { Effect } from 'effect';\nimport { Engine } from 'agent-runtime';\nEffect.succeed(Engine);\n",
   "import type { Engine } from '../src/runtime-client.ts';\nconst e = made() as Engine;\nconst f = { view } as Other;\n",
@@ -195,7 +203,8 @@ test('REFUSED: a test file with no boundary name that runs git, starts a child, 
   }
   assert.deepEqual(breaksOf({ [`${T}/x.test.ts`]: FIXTURES[2].text }), [
     `${T}/x.test.ts reaches place (${T}/x.test.ts:1) and is no boundary test: give the test a stand-in, by the line ` +
-      '`const stand = eachTest(testPlace);` (test/placed.ts); where the real thing is its whole subject, or the stand-in does not ' +
+      '`const stand = eachTest(testPlace);` for a place and `const engine = eachTest(testEngine);` for an engine (test/placed.ts; ' +
+      'testEngine of agent-runtime/testing); where the real thing is its whole subject, or the stand-in does not ' +
       'model what it needs, write it in a file named <what>.boundary.test.ts; never add it to test/stand-ins.baseline.ts, which only shrinks',
   ]);
 });
@@ -384,10 +393,106 @@ test('REFUSED: a new test file that reaches the real thing, in each package, and
   const listed = Object.entries(REAL_REACH).find(([file, kinds]) => file.startsWith(T) && !kinds.includes('engine'));
   assert.ok(listed, 'a listed file of the orchestrator does not name the real engine');
   const [file, kinds] = listed;
-  const more: Reach = { kinds: [...kinds, 'engine'], sites: [{ kind: 'engine', clause: 'real-engine', line: 1, file }] };
+  const sites = [{ kind: 'engine', clause: 'real-engine', line: 1, file }] as const;
+  const more: Reach = { kinds: [...kinds, 'engine'], sites, named: [...kinds, 'engine'] };
   assert.deepEqual(reachBreaks(new Map([...found, [file, more]]), REAL_REACH, onDisk), [
     `${file} reaches engine (${file}:1), which its entry does not list: an entry gains no kind; ${FIX}`,
   ]);
+});
+
+const R = 'packages/agent-runtime';
+
+test("the engine's stand-in, taken through the testing entry, measures nothing in the orchestrator and the api; an engine made by hand beside it is still refused", () => {
+  for (const file of [`${T}/x.test.ts`, 'packages/agent-orchestrator/src/a/x.verb.test.ts', 'apps/api/test/x.test.ts']) {
+    assert.deepEqual(reachOf(file, over({ [file]: ENGINE_LINE })).sites, [], file);
+    assert.deepEqual(breaksOf({ [file]: ENGINE_LINE }), [], file);
+    const beside = `${ENGINE_LINE}import { Layer } from 'effect';\nimport { Engine } from 'agent-runtime';\nLayer.succeed(Engine)(Engine.of({ view }));\n`;
+    assert.deepEqual(reachOf(file, over({ [file]: beside })).kinds, ['hand'], file);
+    assert.deepEqual(breaksOf({ [file]: beside }), [`${file} reaches hand (${file}:8) and is no boundary test: ${FIX}`]);
+  }
+  assert.match(FIX, /`const engine = eachTest\(testEngine\);`/, 'the fix names the line a test writes for an engine');
+});
+
+test('REFUSED: a test of the runtime that takes the stand-in of the engine it builds, by the entry, its file or the face; the contract names it', () => {
+  const [, engine] = STAND_INS;
+  assert.equal(engine.made, 'testEngine');
+  const file = `${R}/test/x.test.ts`;
+  const refused = [
+    `${file} takes testEngine, the stand-in of what ${R} builds itself: build the real one there, Engine.layer(…); ` +
+      `only its contract names testEngine (${engine.own}, ${engine.real})`,
+  ];
+  for (const from of ['../src/testing.ts', '../src/service/index.ts', '../src/service/test-engine.ts', 'agent-runtime/testing']) {
+    assert.deepEqual(takenBreaks(file, `import { testEngine } from '${from}';\ntestEngine();\n`), refused, from);
+    assert.deepEqual(
+      takenBreaks(`${R}/test/helper.ts`, `const { testEngine: made } = await import('${from}');\n`).length,
+      1,
+      'a helper too',
+    );
+  }
+  assert.deepEqual(
+    takenBreaks(`${R}/src/service/x.test.ts`, "import { testEngine } from './test-engine.ts';\n").length,
+    1,
+    'beside the code',
+  );
+  for (const own of [engine.own, engine.real, engine.walks.file])
+    assert.deepEqual(takenBreaks(own, "import { testEngine } from '../src/testing.ts';\n"), [], `not refused: ${own}`);
+  assert.deepEqual(takenBreaks(file, "import type { TestEngine } from '../src/testing.ts';\n"), [], 'a type');
+  assert.deepEqual(takenBreaks(file, "import { testEngine } from './elsewhere.ts';\n"), [], 'another binding');
+  assert.deepEqual(takenBreaks(file, "import { Engine } from '../src/index.ts';\nEngine.layer({ root });\n"), [], 'the real engine');
+  for (const above of [`${T}/x.test.ts`, 'apps/api/test/x.test.ts'])
+    assert.deepEqual(takenBreaks(above, "import { testEngine } from 'agent-runtime/testing';\n"), [], `a layer above takes it: ${above}`);
+  assert.deepEqual(
+    takenBreaks(file, "import { testEngine } from '../src/testing.ts';\n", [{ ...engine, home: undefined }]),
+    [],
+    'no home, no rule',
+  );
+});
+
+test('no test of the runtime takes the stand-in of its own engine but its contract, which does', () => {
+  const files = testAndHelperFilesOf(ROOT);
+  const [, engine] = STAND_INS;
+  for (const file of [engine.own, engine.walks.file, `${R}/test/engine.ts`, `${T}/placed.ts`])
+    assert.ok(files.includes(file), `the scan reads ${file}`);
+  assert.deepEqual(
+    takenBreaks(engine.own, repository(engine.own) ?? '', [{ ...engine, own: 'elsewhere' }]).length,
+    1,
+    'its own side takes it',
+  );
+  assert.deepEqual(
+    files.flatMap((file) => takenBreaks(file, repository(file) ?? '')),
+    [],
+  );
+});
+
+test('a boundary test of the runtime earns its name by the real engine alone, which is judged in no runtime test; one that names nothing real is still refused', () => {
+  const real = "import { Engine } from '../src/index.ts';\nEngine.layer({ root });\n";
+  const boundary = `${R}/test/x.boundary.test.ts`;
+  const reach = reachOf(boundary, over({ [boundary]: real }));
+  assert.deepEqual([reach.kinds, reach.named], [[], ['engine']], 'named, and judged nowhere in the runtime');
+  assert.deepEqual(breaksOf({ [boundary]: real }), []);
+  assert.deepEqual(breaksOf({ [`${R}/test/x.test.ts`]: real }), [], 'a runtime test names the real engine under any name');
+  assert.deepEqual(breaksOf({ [boundary]: "import { testEngine } from '../src/testing.ts';\ntestEngine();\n" }), [
+    `${boundary} is named a boundary test and reaches nothing real: drop .boundary from its name`,
+  ]);
+  const found = measureOf(ROOT);
+  assert.deepEqual(found.get(`${R}/test/engine-contract.boundary.test.ts`)?.named, ['engine']);
+  assert.deepEqual(found.get(`${R}/test/engine-contract.test.ts`)?.named, []);
+});
+
+test('the shared board is gone: no file of the three packages names its file', () => {
+  const files = PACKAGES.flatMap((pkg) =>
+    fs
+      .readdirSync(path.join(ROOT, pkg), { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(ts|md)$/.test(f) && !f.split(path.sep).includes('node_modules'))
+      .map((f) => `${pkg}/${f.split(path.sep).join('/')}`),
+  );
+  assert.ok(files.length > 500 && files.includes(`${T}/stand-ins.ts`), `the scan read ${files.length} files`);
+  const board = ['engine', 'board'].join('-');
+  assert.deepEqual(
+    files.filter((file) => repository(file)?.includes(board)),
+    [],
+  );
+  assert.ok(!onDisk(`${T}/${board}.ts`));
 });
 
 test('the sizes of the baseline add up: its entries by package, and its listed kinds by kind', () => {
@@ -478,5 +583,46 @@ test('REFUSED: a stand-in whose contract is missing on a side, walked on the rea
   assert.notEqual(other, own);
   assert.deepEqual(contractBreaks(place, repositoryWith({ [place.own]: other })), [
     `${place.own} is the test place's own side and does not import testPlace of ${place.folder}: walk the stand-in there`,
+  ]);
+});
+
+test("REFUSED: the engine's stand-in without its whole contract — a side missing, the real side under no boundary name or naming no real engine, a subset, another maker", () => {
+  const [, engine] = STAND_INS;
+  assert.equal(engine.name, 'the test engine');
+  assert.deepEqual(contractBreaks(engine, repository), []);
+  const whole = ')) test(name, walk);';
+  const how = 'for (const [name, walk] of walksOn(…)) test(name, walk);';
+  for (const [side, what] of [
+    [engine.real, 'the real thing'],
+    [engine.own, 'the stand-in'],
+  ] as const) {
+    const text = repository(side) ?? '';
+    assert.ok(text.includes(whole), `${side} walks with the line the fixtures change`);
+    const breaks = (changed: string | undefined): string[] => contractBreaks(engine, repositoryWith({ [side]: changed }));
+    assert.deepEqual(breaks(undefined), [
+      `the test engine has no walk of its contract on ${what}: ${side} is missing, and a stand-in without its contract is refused`,
+    ]);
+    const subset = [`${side} walks a subset of ${engine.walks.file}: every walk is a test, declared at the file's top by \`${how}\``];
+    assert.deepEqual(breaks(text.replace(whole, ').slice(1)) test(name, walk);')), subset, 'all but the first');
+    assert.deepEqual(breaks(text.replace(whole, ')) if (name.startsWith("view")) test(name, walk);')), subset, 'one verb');
+    assert.deepEqual(breaks(text.replace('for (const [name, walk] of walksOn(', 'for (const [name, walk] of none(')), [
+      `${side} asks walksOn of ${engine.walks.file} 0 times, not once: ${how}`,
+    ]);
+  }
+  const real = repository(engine.real) ?? '';
+  const renamed = { ...engine, real: 'packages/agent-runtime/test/engine-real.test.ts' };
+  assert.deepEqual(contractBreaks(renamed, repositoryWith({ [renamed.real]: real })), [
+    `${renamed.real} walks the real thing and is no boundary test: name it <what>.boundary.test.ts`,
+  ]);
+  const unreal = real.replace('Engine.layer(', 'Engine.other(');
+  assert.notEqual(unreal, real);
+  assert.deepEqual(contractBreaks(engine, repositoryWith({ [engine.real]: unreal })), [
+    `${engine.real} is the test engine's real side and names no real engine: walk the real thing there`,
+  ]);
+  const own = repository(engine.own) ?? '';
+  const other = own.replace("from '../src/testing.ts'", "from './elsewhere.ts'");
+  assert.notEqual(other, own);
+  assert.deepEqual(contractBreaks(engine, repositoryWith({ [engine.own]: other })), [
+    `${engine.own} is the test engine's own side and does not import testEngine of ${engine.folder}: walk the stand-in there`,
   ]);
 });

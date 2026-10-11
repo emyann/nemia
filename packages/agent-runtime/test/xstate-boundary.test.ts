@@ -203,7 +203,7 @@ const insides = async () => {
 test("neither of the runtime's entries exports XState, the machine, or what decide reads", async () => {
   const inside = await insides();
   assert.ok(inside.names.has('setup') && inside.names.has('transition') && inside.names.has('createActor'), 'XState was read');
-  for (const entry of ['agent-runtime', 'agent-runtime/vocabulary']) {
+  for (const entry of ['agent-runtime', 'agent-runtime/vocabulary', 'agent-runtime/testing']) {
     assert.deepEqual(exportBreaches(entry, { ...(await import(entry)) }, inside), [], entry);
   }
 });

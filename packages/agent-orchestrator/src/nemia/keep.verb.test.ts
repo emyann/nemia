@@ -15,7 +15,7 @@ import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { scratch } from '../../test/scratch.ts';
-import { board } from '../../test/engine-board.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-nemia-');
@@ -37,7 +37,7 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const { nemiaFence } = await import('../admission/index.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
 
-const b = board();
+const b = testEngine();
 
 /** The board's engine, whose `view` says when a task was filed and whether a stop was asked of it, as the runtime's fold does. */
 const e = {
@@ -345,7 +345,10 @@ const writeCustom = (words: string) => {
   fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), words);
 };
 
-/** Her task kept anew: any she has stopped at manual, then the store's level at semi-auto, a fresh task filed and subscribed. Its id. */
+/**
+ * Her task kept anew: any she has stopped at manual, then the store's level at semi-auto, a fresh task filed, subscribed and at work.
+ * Its id.
+ */
 const keptAnew = async (): Promise<string> => {
   withPipao();
   await runWith(e, LEVEL.handler({ level: 'manual' }));
@@ -355,6 +358,7 @@ const keptAnew = async (): Promise<string> => {
   assert.deepEqual(await beat(), ['file']);
   assert.deepEqual(await beat(), ['subscribe']);
   assert.deepEqual(await beat(), []);
+  b.settle(task, 'running');
   return task;
 };
 

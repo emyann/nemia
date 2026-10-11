@@ -57,8 +57,8 @@ const sourceFiles = (): string[] =>
 const read = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
 const DOORS = ['src/index.ts'];
-/** The runtime's entries: its one face, and the pure door to its vocabulary (`agent-runtime/vocabulary`). */
-const ENTRIES = [...DOORS, 'src/vocabulary.ts'];
+/** The runtime's entries: its one face, the pure door to its vocabulary (`agent-runtime/vocabulary`), and what a test is given. */
+const ENTRIES = [...DOORS, 'src/vocabulary.ts', 'src/testing.ts'];
 const under = (file: string, dir: string) => file.startsWith(`src/${dir}/`);
 /** What the core may import of the harnesses: the seam, the arguments a task carries, and their face. */
 const SEAM = ['src/harness/seam.ts', 'src/harness/args.ts', 'src/harness/index.ts'];
@@ -198,11 +198,70 @@ const flatBreaches = (files: readonly string[]): string[] =>
 
 test('REFUSED: a source file flat in src/ that is not an entry', () => {
   assert.deepEqual(
-    flatBreaches(['src/facade.ts', 'src/index.ts', 'src/vocabulary.ts', 'src/runner.ts', 'src/core/domain.ts', 'src/harness/claude/bg.ts']),
+    flatBreaches([
+      'src/facade.ts',
+      'src/index.ts',
+      'src/vocabulary.ts',
+      'src/testing.ts',
+      'src/runner.ts',
+      'src/core/domain.ts',
+      'src/harness/claude/bg.ts',
+    ]),
     [
-      "src/facade.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts do — put it in its feature's folder",
-      "src/runner.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts do — put it in its feature's folder",
+      "src/facade.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts, src/testing.ts do — put it in its feature's folder",
+      "src/runner.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts, src/testing.ts do — put it in its feature's folder",
     ],
+  );
+});
+
+/** The stand-in's files: the testing entry, the engine's stand-in, and the face that hands the one to the other. */
+const STAND_IN = { entry: 'src/testing.ts', made: 'src/service/test-engine.ts', face: 'src/service/index.ts', name: 'testEngine' };
+
+/**
+ * Where `file`, a file of `src` or `bin` that runs, takes the engine's stand-in: an import of the testing entry or of the stand-in's
+ * file, or its name written in code. The stand-in's own three files are let through.
+ */
+function standInBreaches(file: string, text: string): string[] {
+  if (Object.values(STAND_IN).includes(file) || isTest(file)) return [];
+  const why = 'the stand-in is for tests alone — a file that runs asks the `Engine` service, and whoever runs it gives the real one';
+  const targets = importsIn(text).map(({ spec }) => resolved(file, spec));
+  const out = [STAND_IN.entry, STAND_IN.made]
+    .filter((target) => targets.includes(target))
+    .map((target) => `${file} imports ${target}: ${why}`);
+  if (new RegExp(`\\b${STAND_IN.name}\\b`).test(withoutComments(text))) out.push(`${file} names ${STAND_IN.name}: ${why}`);
+  return out;
+}
+
+/** The package's files that run, under `src/` and `bin/`, by path from the package. */
+const runFiles = (): string[] => [...sourceFiles(), ...fs.readdirSync(path.join(PKG, 'bin')).map((f) => `bin/${f}`)];
+
+test("REFUSED: a file of src or bin that takes the engine's stand-in, by its entry, its file or its name", () => {
+  const why = 'the stand-in is for tests alone — a file that runs asks the `Engine` service, and whoever runs it gives the real one';
+  assert.deepEqual(standInBreaches('src/cli/main.ts', "import { testEngine } from '../testing.ts';"), [
+    `src/cli/main.ts imports src/testing.ts: ${why}`,
+    `src/cli/main.ts names testEngine: ${why}`,
+  ]);
+  assert.deepEqual(standInBreaches('bin/ae.ts', "const t = await import('../src/service/test-engine.ts');"), [
+    `bin/ae.ts imports src/service/test-engine.ts: ${why}`,
+  ]);
+  assert.deepEqual(standInBreaches('src/index.ts', "export { Engine, testEngine } from './service/index.ts';"), [
+    `src/index.ts names testEngine: ${why}`,
+  ]);
+  for (const own of Object.values(STAND_IN).slice(0, 3)) assert.deepEqual(standInBreaches(own, "export { testEngine } from './x.ts';"), []);
+  assert.deepEqual(
+    standInBreaches('src/service/x.test.ts', "import { testEngine } from './test-engine.ts';"),
+    [],
+    'a test beside the code',
+  );
+  assert.deepEqual(standInBreaches('src/service/engine.ts', ' * A test takes `testEngine` of `agent-runtime/testing`.'), [], 'prose');
+});
+
+test("no file of src or bin takes the engine's stand-in but its own three", () => {
+  const files = runFiles();
+  assert.ok(files.includes('bin/ae.ts') && files.includes('src/index.ts') && files.includes(STAND_IN.made), 'the scan reads src and bin');
+  assert.deepEqual(
+    files.flatMap((f) => standInBreaches(f, read(f))),
+    [],
   );
 });
 

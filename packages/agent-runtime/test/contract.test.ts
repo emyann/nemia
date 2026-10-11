@@ -1,10 +1,11 @@
 /**
  * Between packages, only the public contract (`docs/architecture.md`, rule 1).
  *
- * Code outside packages/agent-runtime reaches it through `agent-runtime`, and its vocabulary through `agent-runtime/vocabulary`,
- * alone. That rules out its src/ by any route: a subpath not in its `exports`, a relative path,
- * `import.meta.resolve`, or a path built with path.join. `decide` is exported by no entry. Spawning its `bin/` is its CLI, not an import,
- * and prose that names a file in src/ — a doc comment, a brief in a test — is not a route to it.
+ * Code outside packages/agent-runtime reaches it through `agent-runtime`, its vocabulary through `agent-runtime/vocabulary`, and,
+ * from a test alone, the engine's stand-in through `agent-runtime/testing` (`testingBreaches`). That rules out its src/ by any route:
+ * a subpath not in its `exports`, a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by no
+ * entry. Spawning its `bin/` is its CLI, not an import, and prose that names a file in src/ — a doc comment, a brief in a test — is
+ * not a route to it.
  *
  * The scan reads every file git lists outside this package, tracked or not yet added, so a new folder is scanned the day it is made. Turbo
  * caches this package's pass by this package's files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass
@@ -24,7 +25,7 @@ const PKG = path.join(import.meta.dirname, '..');
 const GUARDED = {
   name: 'agent-runtime',
   dir: 'packages/agent-runtime',
-  entries: ['agent-runtime', 'agent-runtime/vocabulary'],
+  entries: ['agent-runtime', 'agent-runtime/vocabulary', 'agent-runtime/testing'],
 } as const;
 
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
@@ -101,7 +102,7 @@ test('the scan reads the packages and apps above this one — or it would pass b
   );
 });
 
-test('code outside packages/agent-runtime reaches it through agent-runtime and agent-runtime/vocabulary alone', () => {
+test('code outside packages/agent-runtime reaches it through agent-runtime, agent-runtime/vocabulary and agent-runtime/testing alone', () => {
   const found = workspaceFiles(GUARDED).flatMap((f) => breaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'), GUARDED));
   assert.deepEqual(found, []);
 });
@@ -109,7 +110,7 @@ test('code outside packages/agent-runtime reaches it through agent-runtime and a
 test('REFUSED: a subpath not in its exports, the retired ./effect among them, a relative path, import.meta.resolve, and a path built into src — each route', () => {
   const at = 'packages/agent-orchestrator/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
-  const instead = 'reach it through agent-runtime or agent-runtime/vocabulary';
+  const instead = 'reach it through agent-runtime or agent-runtime/vocabulary or agent-runtime/testing';
   assert.deepEqual(refused("import { decide } from 'agent-runtime/src/domain.ts';"), [
     `${at} imports agent-runtime/src/domain.ts, which is not an entry of agent-runtime: ${instead}`,
   ]);
@@ -121,6 +122,9 @@ test('REFUSED: a subpath not in its exports, the retired ./effect among them, a 
   ]);
   assert.deepEqual(refused("import { fenceReach } from 'agent-runtime/vocabulary/x';"), [
     `${at} imports agent-runtime/vocabulary/x, which is not an entry of agent-runtime: ${instead}`,
+  ]);
+  assert.deepEqual(refused("import { testEngine } from 'agent-runtime/testing/x';"), [
+    `${at} imports agent-runtime/testing/x, which is not an entry of agent-runtime: ${instead}`,
   ]);
   assert.deepEqual(refused("import pkg from 'agent-runtime/package.json' with { type: 'json' };"), [
     `${at} imports agent-runtime/package.json, which is not an entry of agent-runtime: ${instead}`,
@@ -150,6 +154,7 @@ test('and what is not a route is not refused: the entries, the CLI spawned, and 
     "import type { Event } from 'agent-runtime';",
     "const { fold } = await import('agent-runtime');",
     "import { fenceReach } from 'agent-runtime/vocabulary';",
+    "import { testEngine } from 'agent-runtime/testing';",
     "execFileSync(process.execPath, [path.join(ROOT, 'packages', 'agent-runtime', 'bin', 'ae.ts'), 'ls']);",
     ' * Mirrors `TranscriptEvent` in packages/agent-runtime/src/runner.ts, as the api passes it on.',
     "// import { decide } from '../../agent-runtime/src/domain.ts';",
@@ -159,11 +164,65 @@ test('and what is not a route is not refused: the entries, the CLI spawned, and 
   assert.deepEqual(breaches('packages/agent-orchestrator/test/x.test.ts', text, GUARDED), []);
 });
 
-test("agent-runtime's exports are . (index.ts) and ./vocabulary (vocabulary.ts), and nothing else but its package.json: the map is pinned, and an entry added is a contract widened, a change to this test and to docs/architecture.md", () => {
+/** The entry a test alone imports, and the folders whose files are tests' own. */
+const TESTING = 'agent-runtime/testing';
+
+/** Whether `file` is a test or a helper of tests: a `.test.` file anywhere, or any file under a `test/` folder. */
+const isTestFile = (file: string): boolean => /\.test\.[cm]?[jt]sx?$/.test(file) || file.split('/').includes('test');
+
+/** Where `file`, which is no test's, imports the testing entry: a file that runs is never given a stand-in. */
+function testingBreaches(file: string, text: string): string[] {
+  if (isTestFile(file) || !specifiersIn(withoutComments(text)).includes(TESTING)) return [];
+  return [
+    `${file} imports ${TESTING}, which is for tests alone: a file that runs asks the engine it is given, and only a test file ` +
+      '(*.test.ts, or under a test/ folder) takes the stand-in',
+  ];
+}
+
+test('REFUSED: a file of a src or a bin, in any package, that imports the testing entry; a test file may', () => {
+  const line = "import { testEngine } from 'agent-runtime/testing';";
+  for (const file of [
+    'packages/agent-orchestrator/src/runtime-client.ts',
+    'packages/agent-orchestrator/src/tick/tick.verb.ts',
+    'packages/agent-orchestrator/bin/nemia.ts',
+    'apps/api/src/store.ts',
+    'apps/web/src/x.ts',
+    'tools/observe/render/render.ts',
+  ])
+    assert.deepEqual(testingBreaches(file, line), [
+      `${file} imports agent-runtime/testing, which is for tests alone: a file that runs asks the engine it is given, and only a ` +
+        'test file (*.test.ts, or under a test/ folder) takes the stand-in',
+    ]);
+  assert.equal(testingBreaches('apps/api/src/store.ts', "const t = await import('agent-runtime/testing');").length, 1, 'a dynamic import');
+  for (const file of [
+    'packages/agent-orchestrator/src/nemia/keep.verb.test.ts',
+    'packages/agent-orchestrator/test/x.test.ts',
+    'packages/agent-orchestrator/test/placed.ts',
+    'apps/api/test/x.test.ts',
+  ])
+    assert.deepEqual(testingBreaches(file, line), [], `not refused: ${file}`);
+  assert.deepEqual(testingBreaches('apps/api/src/store.ts', "import { Engine } from 'agent-runtime';"), [], 'the root entry');
+  assert.deepEqual(testingBreaches('apps/api/src/store.ts', ` * ${line}`), [], 'prose');
+});
+
+test('no file outside packages/agent-runtime that is no test imports the testing entry, and some test does', () => {
+  const files = workspaceFiles(GUARDED).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')] as const);
+  assert.ok(
+    files.some(([f, text]) => isTestFile(f) && specifiersIn(text).includes(TESTING)),
+    'a test outside the package takes the stand-in, so the scan reads the specifier',
+  );
+  assert.deepEqual(
+    files.flatMap(([f, text]) => testingBreaches(f, text)),
+    [],
+  );
+});
+
+test("agent-runtime's exports are . (index.ts), ./vocabulary (vocabulary.ts) and ./testing (testing.ts), and nothing else but its package.json: the map is pinned, and an entry added is a contract widened, a change to this test and to docs/architecture.md", () => {
   const { exports } = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')) as { exports: Record<string, string> };
   assert.deepEqual(exports, {
     '.': './src/index.ts',
     './vocabulary': './src/vocabulary.ts',
+    './testing': './src/testing.ts',
     './package.json': './package.json',
   });
 });
@@ -176,16 +235,33 @@ function exportBreaches(entries: Record<string, readonly string[]>): string[] {
   const out = Object.entries(entries)
     .filter(([, names]) => names.includes('decide'))
     .map(([entry]) => `${entry} exports decide, the runtime's judgement: export what it decided (fold, the events), never the function`);
+  out.push(
+    ...Object.entries(entries)
+      .filter(([entry, names]) => entry !== TESTING && names.includes('testEngine'))
+      .map(([entry]) => `${entry} exports testEngine, the engine's stand-in: only ${TESTING} gives it, to tests`),
+  );
+  if (!entries[TESTING]?.includes('testEngine')) out.push(`${TESTING} does not export testEngine: the stand-in has no entry`);
   if (!Object.values(entries).some((names) => names.includes('fold')))
     out.push('no entry exports fold: the check for decide would pass on entries that export nothing');
   return out;
 }
 
-test('decide is exported by no entry', async () => {
+test('decide is exported by no entry, and the stand-in by the testing entry alone', async () => {
   const entries = {
     'agent-runtime': Object.keys(await import('agent-runtime')),
     'agent-runtime/vocabulary': Object.keys(await import('agent-runtime/vocabulary')),
+    'agent-runtime/testing': Object.keys(await import('agent-runtime/testing')),
   };
+  assert.deepEqual(
+    exportBreaches({ ...entries, 'agent-runtime/testing': [...entries['agent-runtime/testing'], 'decide'] }),
+    ["agent-runtime/testing exports decide, the runtime's judgement: export what it decided (fold, the events), never the function"],
+    'REFUSED: decide exported by the testing entry',
+  );
+  assert.deepEqual(
+    exportBreaches({ ...entries, 'agent-runtime': [...entries['agent-runtime'], 'testEngine'] }),
+    ["agent-runtime exports testEngine, the engine's stand-in: only agent-runtime/testing gives it, to tests"],
+    'REFUSED: the stand-in exported by the root entry',
+  );
   assert.deepEqual(exportBreaches(entries), []);
   assert.deepEqual(
     exportBreaches({ ...entries, 'agent-runtime': [...entries['agent-runtime'], 'decide'] }),
@@ -193,8 +269,11 @@ test('decide is exported by no entry', async () => {
     'REFUSED: decide exported',
   );
   assert.deepEqual(
-    exportBreaches({ 'agent-runtime': [], 'agent-runtime/vocabulary': [] }),
-    ['no entry exports fold: the check for decide would pass on entries that export nothing'],
+    exportBreaches({ 'agent-runtime': [], 'agent-runtime/vocabulary': [], 'agent-runtime/testing': [] }),
+    [
+      'agent-runtime/testing does not export testEngine: the stand-in has no entry',
+      'no entry exports fold: the check for decide would pass on entries that export nothing',
+    ],
     'REFUSED: entries read as empty',
   );
 });

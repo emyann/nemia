@@ -50,7 +50,7 @@ const promisedExports = (files: string[]): string[] => {
 };
 
 test('the entries read are the ones package.json exports', () => {
-  assert.deepEqual(ENTRIES, ['src/index.ts', 'src/vocabulary.ts']);
+  assert.deepEqual(ENTRIES, ['src/index.ts', 'src/vocabulary.ts', 'src/testing.ts']);
 });
 
 test('no function an entry exports answers a Promise, or methods that do, but the ones PROMISED names', () => {

@@ -1,7 +1,8 @@
 /**
  * The pass's meter, on the engine: each of its verbs counted in its phase (`meteredEngine`), a pass's cost from those counts and the
  * runtime's totals before and after it (`costOf`), and that cost put into the process's metrics (`recordPassMetrics`), beside the facts
- * of the steps it saw settle (`recordStepMetrics`), each series of theirs exported at zero before its first value. A controller, wrapping the engine whose type the client gives (`runtime-client.ts`).
+ * of the steps it saw settle (`recordStepMetrics`), each series of theirs exported at zero before its first value. A controller, wrapping
+ * the engine whose type the client gives (`runtime-client.ts`).
  */
 import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';

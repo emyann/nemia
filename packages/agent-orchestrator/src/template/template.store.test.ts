@@ -14,6 +14,7 @@ import { parse } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
 import { packArchive } from '../archive/archive.ts';
@@ -26,6 +27,7 @@ const { writeRules } = await import('../rules/rules.store.ts');
 const { main } = await import('../cli/main.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 const { factoryRulesOf, instructionOf } = await import('./template.verb.ts');
 
 /** The factory `name`, as `--factory` names it to an export. */

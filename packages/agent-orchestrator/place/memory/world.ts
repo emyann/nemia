@@ -33,7 +33,7 @@ export type Held = { readonly repositories: Map<string, Repository>; made: numbe
 
 /**
  * What a session and a person do to a repository, which no verb of a place does: make one, commit, stage a merge or take one back, put a
- * branch back on an older commit, tag, and read a commit.
+ * branch back on an older commit, tag, and read a commit and the paths it changed.
  * One for the test place, over what it holds, and one over git for the place's contract.
  */
 export type World = {
@@ -53,6 +53,8 @@ export type World = {
   readonly head: (checkout: string) => string;
   /** The parents and the message of the commit `rev` names in `root`. */
   readonly read: (root: string, rev: string) => { readonly parents: readonly string[]; readonly message: string };
+  /** The paths the commit `rev` names in `root` changed against its first parent, in order: each file added, changed or removed. */
+  readonly changed: (root: string, rev: string) => readonly string[];
   /** The commit the branch `name` of `root` is at, or null where the repository has no branch of that name. */
   readonly tip: (root: string, name: string) => string | null;
   /** The paths `checkout` holds uncommitted, in order: each file added, changed or removed since the commit it is at. */

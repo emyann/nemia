@@ -4,6 +4,8 @@
  * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does.
+ * On one test place for the file, since its tests read one store built in order; the git processes a pass's place starts are counted on
+ * git in pass-processes.boundary.test.ts.
  * A file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import;
  * no cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is
@@ -13,7 +15,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { nameFor, Engine, type Sighting } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import type { RepositoryRun, Run } from '../run.ts';
@@ -22,6 +23,7 @@ import { scratch } from '../../test/scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
 import { placeOver, unreadBy } from '../../test/place-over.ts';
 
 const ROOT = scratch('wf-rest-');
@@ -39,25 +41,20 @@ const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, r
   await import('../record/record.store.ts');
 const { feedFile } = await import('../feed/feed.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer, shippedGitPlace } = await import('../place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
 const { PlaceService } = await import('../place/place.store.ts');
-const { addFactory, attachWorkflow, hireAgent } = await import('../factory/factory.store.ts');
-type Place = import('../place/place.store.ts').Place;
-
-const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd: repo,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
+const { meteredPlace } = await import('../place/shipped.store.ts');
+const made = testPlace();
+/** The file's test place, each question of it counted as the pass's `place` phase, as the shipped place counts its own. */
+const place = { ...made, place: meteredPlace(made.place), layer: PlaceService.layer(meteredPlace(made.place)) };
+const stand = () => place;
+const world = () => stand().world;
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  git(repo, 'init', '-q');
-  git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
+  world().repository(repo, {});
   return repo;
 };
 
@@ -193,8 +190,8 @@ const started = async (n: number, workflowDir = ONE, repo = REPO, isolate = fals
 
 const journals = (c: PassCost) => c.phases.journals.calls;
 const observes = (c: PassCost) => c.phases.observe.calls;
-/** The git processes a pass's place started: what `place.spawned` counts, each question itself a call and no process. */
-const places = (c: PassCost) => c.phases.place.spawned;
+/** The questions a pass asked of its place: what `place.calls` counts, a question one call whatever its place starts to answer it. */
+const places = (c: PassCost) => c.phases.place.calls;
 
 /** The store at each size, and the pass each was measured at: built once, read by the tests that follow. */
 const sizes: Array<{ finished: number; cost: PassCost; fresh?: PassCost }> = [];
@@ -230,7 +227,6 @@ test('a pass costs as many journal reads, observes and place processes on 200 fi
       places(none) + ISOLATED_REPOS.length,
       `${at} finished runs: one for-each-ref a repository whose runs' tips are read (three runs on each of two), and no more`,
     );
-    assert.equal(c.spawned, none.spawned + ISOLATED_REPOS.length, `${at} finished runs: no process more than those`);
   }
   assert.equal(none.rested, 0);
 });
@@ -426,11 +422,11 @@ test('a result branch moved takes its run out and its tip is written; one delete
   const run = aResting(true);
   const [branch, tip] = Object.entries(readRun(run.id).tips ?? {})[0] ?? [];
   assert.ok(branch && tip, 'the run has a tip on its record');
-  const moved = git(run.repo, 'commit-tree', `${tip}^{tree}`, '-p', tip, '-m', 'moved');
+  let moved = tip;
   await evicts(
     'a branch moved',
     () => {
-      git(run.repo, 'update-ref', `refs/heads/${branch}`, moved);
+      moved = world().branch(run.repo, branch, {});
     },
     run,
     2,
@@ -439,9 +435,11 @@ test('a result branch moved takes its run out and its tip is written; one delete
   assert.equal(readRun(run.id).tips![branch], moved, 'the tip the pass saw is on the record');
 
   const before = await rested();
-  git(run.repo, 'update-ref', '-d', `refs/heads/${branch}`);
+  const lanes = Object.values(readRun(run.id).steps).flatMap((step) => (step.branch === branch && step.workspace ? [step.workspace] : []));
+  const dropped = stand().place.askNow('remove', { repo: run.repo, workspaces: lanes, branches: [branch] });
+  assert.deepEqual('answer' in dropped && dropped.answer.deleted, [branch], 'the branch is deleted, its worktree removed first');
   assert.equal(await rested(), before, 'a branch git no longer has keeps the tip last seen: nothing to judge again');
-  git(run.repo, 'commit', '-q', '--allow-empty', '-m', 'later on the base branch');
+  world().commit(run.repo, 'later on the base branch');
   assert.equal(await rested(), before, 'the base branch is none of the key');
   assert.equal(readRun(run.id).tips![branch], moved);
 });
@@ -449,11 +447,11 @@ test('a result branch moved takes its run out and its tip is written; one delete
 /** The place the package ships, its `standing` of `repo` not heard: that repository reads unread, and every other as git has it. */
 const unreadIn = (repo: string) =>
   PlaceService.layer(
-    placeOver(shippedGitPlace, {
+    placeOver(stand().place, {
       standing: (request) =>
         path.resolve(request.repo) === path.resolve(repo)
           ? unreadBy('standing', 'the standing broke')
-          : shippedGitPlace.askNow('standing', request),
+          : stand().place.askNow('standing', request),
     }),
   );
 
@@ -464,8 +462,7 @@ test('REFUSED: a repository whose standing is unread answers none of its runs wi
   const tippedThere = [...MEMO.runs.values()].filter((kept) => kept.run.repo === run.repo && kept.tipped.length > 0).length;
   assert.ok(tippedThere > 0, 'runs of its repository rest on their tips');
   const before = await rested();
-  const moved = git(run.repo, 'commit-tree', `${tip}^{tree}`, '-p', tip, '-m', 'moved while unread');
-  git(run.repo, 'update-ref', `refs/heads/${branch}`, moved);
+  const moved = world().branch(run.repo, branch, {});
   const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }).pipe(Effect.provide(unreadIn(run.repo))));
   assert.equal(pass.cost!.rested, before - tippedThere, 'every run of it whose tips the memo holds is judged in full, and no other');
   assert.equal(readRun(run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
@@ -732,58 +729,4 @@ test('a pass lists the store once: an ending waiting on the checkout and a refus
   assert.equal(pass.queue, undefined, 'the refused card is not tried again');
   const listing = readInbox().find((l) => l.name === card.name);
   assert.ok(listing?.queued && listing.tried?.refused, 'the card still queued, with its refusal');
-});
-
-test('two factories on two repositories ask one place, the instance the pass is given: each question of it a call of the place phase, each git process it starts counted once', async () => {
-  const [left, right] = [aRepo(), aRepo()];
-  const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
-  const dir = path.join(team, 'hired');
-  fs.mkdirSync(path.join(team, 'agents'));
-  fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(team, 'agents', 'worker.md'), '---\nname: worker\n---\nDo the work.\n');
-  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\nharness: codex\n---\nWork it.\n');
-  for (const [name, repo] of [
-    ['left', left],
-    ['right', right],
-  ] as const) {
-    addFactory({ name, repos: [repo] });
-    attachWorkflow({ factory: name, workflow: 'hired' });
-    hireAgent({ factory: name, agent: 'worker', step: 'hired/work' });
-  }
-  for (const [factory, repo] of [
-    ['left', left],
-    ['right', right],
-  ] as const)
-    touched.add((await runPlaced(startRun({ brief: `in ${factory}`, repo, workflowDir: dir, isolate: true, factory }))).id);
-  const asked: Array<{ verb: string; repo?: string }> = [];
-  const noted = (verb: string, request: object): void => {
-    asked.push({ verb, ...('repo' in request && typeof request.repo === 'string' ? { repo: path.resolve(request.repo) } : {}) });
-  };
-  const one: Place = {
-    declared: shippedGitPlace.declared,
-    ask: (verb, request, options) => {
-      noted(verb, request);
-      return shippedGitPlace.ask(verb, request, options);
-    },
-    askNow: (verb, request, options) => {
-      noted(verb, request);
-      return shippedGitPlace.askNow(verb, request, options);
-    },
-  };
-  const pass = await runWith(
-    h.e,
-    tickRun({ repo: ROOT, memo: freshRestMemo(), verifyRest: false }).pipe(Effect.provide(PlaceService.layer(one))),
-  );
-  const of = (verb: string, repo: string) => asked.filter((a) => a.verb === verb && a.repo === path.resolve(repo)).length;
-  assert.deepEqual(
-    [of('standing', left), of('standing', right), of('make', left), of('make', right)],
-    [1, 1, 1, 1],
-    'the one instance was asked where each repository stands, and for the worktree of each run, whatever its factory',
-  );
-  const { calls, spawned } = pass.cost!.phases.place;
-  assert.equal(calls, asked.length, 'each question asked of the instance is one call of the place phase, and nothing else is');
-  assert.ok(
-    spawned >= of('standing', left) + of('standing', right) + 2,
-    `what is counted as started is git, a process or more a question: ${spawned}`,
-  );
 });

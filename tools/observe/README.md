@@ -167,8 +167,9 @@ node tools/observe/render/render.ts --stop <name>
   It is removed by its exact name (`docker rm -f -v <name>`) when the command ends, on a signal and on any error.
 - **Fake data** (`render/seed.ts`): fixtures written by hand, posted as OTLP/HTTP JSON to the throwaway's own collector, stamped inside
   the last minute: the daemon's passes, a run's filings and appends, the waits and the denied calls of two steps (`build / implement ·
-  ada`, `build / review · agora`, in the run `seeded-run-1`), every metric System charts, and two sessions' turns with their failed
-  `tool_result` events, one with no `tool_name`. Every panel that draws series is met by two; the two profile panels are not seeded
+  ada`, `build / review · agora`, in the run `seeded-run-1`), that run's timeline once over (`run.timeline`, each number a span with a
+  numeric `value`), every metric System charts, and two sessions' turns with their failed `tool_result` events, one with no
+  `tool_name`. Every panel that draws series is met by two; the two profile panels are not seeded
   (`UNSEEDED`). Fixtures and not the code's emitters: a tool imports no package's `src`. `observe.test.ts` refuses a name here the code
   does not emit, and a panel the seed does not meet: a change that adds a span, an attribute or a metric adds its fixture.
 - **What it writes**, into `--out`, else `$WF_ARTIFACTS`, else `.observe/` at the root (ignored by git): for each dashboard,
@@ -191,18 +192,47 @@ Chromium (`npx playwright install chromium`), and is never run by the suite: `ag
 on a stub `docker`.
 
 What it waits for, each bounded at 180 s and none a length of time: the container's own health, Grafana listing the dashboards, then
-the seed answering a query in each store, asked through Grafana. Tempo's generator writes a span-metric series a while after the
-spans, at its first value, so a panel that reads an increase would see none: once the series is there the sessions' turns are posted
-a second time, and the wait ends when the increase is above zero. Measured on this machine, 2026-10-11, as floors: the stack ready
+the seed answering a query in each store, asked through Grafana, the denied calls and the run's timeline in Tempo among them. Tempo's
+generator writes a span-metric series a while after the spans, at its first value, so a panel that reads an increase would see none:
+once the series is there the sessions' turns are posted a second time, and the wait ends when the increase is above zero. Measured on this machine, 2026-10-11, as floors: the stack ready
 after 31 s; the first span-metric series 21 s after the post; the increase 18 s after the second post; five dashboards rendered in
 80 s in all.
 
-What a step with a browser and no render of its own would need, none of it given today: the browser tools reaching a loopback
-address; the two forms `--hold` and `--stop` allowed on its own step, and no `docker`; `RENDERS` moved with them; a workspace at the
-change's head; and a user that reaches Docker. A held stack is not passed between steps: its time ends it.
+What a step with a browser and no render of its own would need: the browser tools reaching a loopback address, which the build's
+implement and review steps are given (`mcp: playwright`); and, none of it given today, the two forms `--hold` and `--stop` allowed on
+its own step, and no `docker`; `RENDERS` moved with them; a workspace at the change's head; and a user that reaches Docker. A held stack is not passed between steps: its time ends it.
 
 After moving the image, render once and read the text: what a panel's text is read from is Grafana's own markup (13.2.2), which no
 test in the suite sees.
+
+## What a restart loses
+
+A step's cost, tokens, time, tries, checks, rounds and waits are counters and histograms in the daemon's memory, read by the panels with
+`increase()`. Two things make them hold across a first try and a restart:
+
+- **Each series is born at zero.** The pass that records a step's facts first exports each series they write at zero, then at its
+  value, in two posts of their own. So a step's first try in a new factory shows in its panel with its cost, and after a restart
+  Prometheus sees the series come back at zero and reads a reset.
+- **Each settle is counted once, by a mark on the run's record** (`settlesCounted`), written by the pass before the metrics are
+  recorded. A session that ended while no daemon ran is counted by the first daemon that reads it, and a daemon started again counts
+  none twice. A session held open and answered by a person is one try when it settles, with its cost once, however many answers it took.
+
+Measured 2026-10-11 on this stack, with one try of $1.25 posted in a factory never seen: Prometheus kept the series at 0, then at 1.25
+24 ms later, and **System**'s own Cost and Tries queries answered it. `increase()` extrapolates to the edge of its range by half the
+gap between samples, so a series reads high while it is young: 1.33 for 1.25 after a minute of exports, and less as the daemon lives on.
+
+What is still lost:
+
+- **A daemon that dies between a pass's write of the record and the end of the export that follows** loses that pass's facts: they
+  are marked and were never exported. Nothing is counted twice.
+- **A series born while the collector does not answer** arrives later at its value, and that first value is not counted. The export
+  is waited for 2 s at most, and an exporter stays off for 60 s after a failed post.
+- **A run started before the mark existed** is counted as before, off the runtime's feed: a session of it that settles on the first
+  pass of a daemon started again is not counted.
+- **The daemon's own counters and the api's** (the passes' histograms, `api_step_follows_total` and the others on **System**) are not
+  born at zero: each loses its first sample, and a restart that brings one back at or above its last value is not read as a reset.
+- **Up to 10 s of anything else the daemon held and had not exported** when it was killed: the gauges and the passes' histograms. A
+  daemon stopped by a signal exports once more as it ends.
 
 ## Timing a step
 

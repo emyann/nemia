@@ -9,6 +9,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Effect, Logger, Metric } from 'effect';
+import { OtlpExporter } from 'effect/observability';
+import { TestClock } from 'effect/testing';
 import {
   DEFAULT_SERVICE_NAME,
   lineOf,
@@ -19,8 +21,8 @@ import {
   toolDetailsRefusalOf,
   tracesUrl,
 } from './telemetry.ts';
-import { PASS_METRICS } from '../meter/meter.verb.ts';
-import { lineLogger, telemetryLayer } from './telemetry.store.ts';
+import { PASS_METRICS, recordStepMetrics } from '../meter/meter.verb.ts';
+import { EXPORT_BOUND_MS, exportedNow, lineLogger, telemetryLayer } from './telemetry.store.ts';
 
 test('otlpOf: no export without an endpoint, or with a blank one; its endpoint, and its service: nemia unless named', () => {
   assert.equal(otlpOf({}), undefined);
@@ -200,4 +202,59 @@ test("REFUSED: no endpoint in the env the layer is given, no metric posted — n
 test('a collector that does not answer costs the metrics their post, never the program', async () => {
   const env = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9' };
   assert.equal(await Effect.runPromise(passed('ran').pipe(Effect.provide(telemetryLayer(env)))), 'ran');
+});
+
+type Point = { attributes: { key: string; value: { stringValue?: string } }[]; asDouble?: number; asInt?: number; count?: number | string };
+type Posted = {
+  resourceMetrics: {
+    scopeMetrics: { metrics: { name: string; sum?: { dataPoints: Point[] }; histogram?: { dataPoints: Point[] } }[] }[];
+  }[];
+};
+
+/** What a body posted to `/v1/metrics` says of `factory`'s series: each metric's name with its value, a histogram's with its count. */
+const seriesOf = (body: string, factory: string): Record<string, number> =>
+  Object.fromEntries(
+    (JSON.parse(body) as Posted).resourceMetrics
+      .flatMap((r) => r.scopeMetrics.flatMap((s) => s.metrics))
+      .flatMap((m) =>
+        [...(m.sum?.dataPoints ?? []), ...(m.histogram?.dataPoints ?? [])]
+          .filter((p) => p.attributes.some((a) => a.key === 'factory' && a.value.stringValue === factory))
+          .map((p) => [m.name, Number(p.asDouble ?? p.asInt ?? p.count)] as const),
+      ),
+  );
+
+test("a step's first try reaches the collector as two posts: each of its series at zero, then at its value, before the program ends", async (t) => {
+  const c = await collector(t);
+  const factory = 'born-at-zero';
+  const attributes = { factory, workflow: 'build', step: 'work', agent: 'ada', outcome: 'done' };
+  const fact = { metric: 'try', attributes, costUsd: 1.25, inputTokens: 1200, outputTokens: 300, ms: 300_000 } as const;
+  const posts = await Effect.runPromise(
+    recordStepMetrics([fact]).pipe(
+      Effect.andThen(Effect.sync(() => c.posts.filter((p) => p.path === '/v1/metrics' && p.body.includes(factory)).map((p) => p.body))),
+      Effect.provide(telemetryLayer({ OTEL_EXPORTER_OTLP_ENDPOINT: c.url })),
+    ),
+  );
+  assert.deepEqual(
+    posts.map((body) => seriesOf(body, factory)),
+    [
+      { 'step.tries': 0, 'step.duration': 0, 'step.cost': 0, 'step.tokens.input': 0, 'step.tokens.output': 0 },
+      { 'step.tries': 1, 'step.duration': 1, 'step.cost': 1.25, 'step.tokens.input': 1200, 'step.tokens.output': 300 },
+    ],
+    'both posted by the time its facts are recorded, neither left to the 10 s interval nor to the closing export',
+  );
+});
+
+test('REFUSED: an export that never ends holds its caller for the bound and no longer, and a process that exports nothing waits for none', async () => {
+  await Effect.runPromise(exportedNow);
+  const hung = OtlpExporter.Flusher.of({ flush: Effect.never, register: () => Effect.void });
+  const ended = await Effect.runPromise(
+    Effect.gen(function* () {
+      const waiting = yield* Effect.forkChild(exportedNow.pipe(Effect.provideService(OtlpExporter.Flusher, hung)));
+      yield* TestClock.adjust(EXPORT_BOUND_MS - 1);
+      const before = waiting.pollUnsafe() !== undefined;
+      yield* TestClock.adjust(1);
+      return { before, after: waiting.pollUnsafe() !== undefined };
+    }).pipe(Effect.provide(TestClock.layer())),
+  );
+  assert.deepEqual(ended, { before: false, after: true });
 });

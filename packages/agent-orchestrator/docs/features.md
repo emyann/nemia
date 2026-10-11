@@ -5853,14 +5853,19 @@ The side Grafana charts what the daemon keeps of its passes and what the tick kn
   `<endpoint>/v1/metrics` (`metricsUrl`), only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set: every metric in the process's registry,
   cumulative, every 10 s and once more as the process ends.
 - **The steps' metrics** (`STEP_METRICS`, `src/meter/meter.verb.ts`), recorded by the tick after its pass off what each run's full pass
-  read of the tasks the feed said settled (`settledIn`, `settledFacts`): a session's cost, tokens and time, the tries by outcome, the
+  read of its tasks settled and not yet counted on its record (`settlesCounted`, `settlesDue`, `settledFacts`; off the feed's
+  `settledIn` for a record with no mark): a session's cost, tokens and time, the tries by outcome, the
   checks by verdict, the rounds granted and exhausted, the calls denied — by factory, workflow, step, agent and outcome alone
-  (`boundedAttributes`). The README lists them with their Prometheus names, measured.
+  (`boundedAttributes`). Each series is exported at zero before its first value (`recordStepMetrics`, `exportedNow`). The README
+  lists them with their Prometheus names, measured.
 
 Tested in `src/telemetry/telemetry.test.ts` (a scratch collector posted `pass.duration` at `/v1/metrics`; none posted without an endpoint;
 a collector that does not answer costs no program), `src/meter/step.test.ts` (the facts, the five attributes, a run's id refused),
 `src/rest/rest.test.ts` and `src/rest/resting.test.ts` (each settle named by one read alone) and `test/step-metrics.test.ts` (a step
-settled with a cost recorded once over four passes of the real runtime, with no run's id).
+settled with a cost recorded once over four passes of the real runtime, with no run's id; a session that settles on the first pass of
+a daemon started again counted once, and by no daemon after; a blocked try answered in its session one try; a record with no mark
+counted off the feed). The birth at zero in `src/meter/step.test.ts` (two exports, zero then the value, through a stub `Flusher`) and
+`src/telemetry/telemetry.test.ts` (the two posts on the wire, and an export that never ends held to its bound).
 
 ## Shipped: what a result changed, read from the place (git-out card H, 2026-10-06)
 

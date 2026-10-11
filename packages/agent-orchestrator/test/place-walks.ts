@@ -372,6 +372,33 @@ const HANDOFF: readonly Walk[] = [
     },
   },
   {
+    name: 'a commit is read by the paths it changed against its first parent: a first commit, a hand-off, and a merge by what it brought',
+    walk: (side, area) => {
+      const { root, base } = repoIn(side, area, { 'a.txt': 'one\n', 'gone.txt': 'bye\n', 'kept.txt': 'kept\n' });
+      const { at, name } = cut(side, area, root, 'one');
+      fs.writeFileSync(path.join(at, 'a.txt'), 'changed\n');
+      fs.mkdirSync(path.join(at, 'dir'));
+      fs.writeFileSync(path.join(at, 'dir', 'new.txt'), 'new\n');
+      fs.rmSync(path.join(at, 'gone.txt'));
+      side.place.askNow('handoff', { workspace: at, step: 'one', why: '' });
+      side.world.branch(root, 'main', { 'main.txt': 'on main\n' });
+      side.world.stage(root, name);
+      const merge = side.world.commit(root, 'merge one');
+      return {
+        first: side.world.changed(root, base),
+        handed: side.world.changed(root, name),
+        merge: side.world.changed(root, merge),
+        byBranch: side.world.changed(root, 'main'),
+      };
+    },
+    says: {
+      first: ['a.txt', 'gone.txt', 'kept.txt'],
+      handed: ['a.txt', 'dir/new.txt', 'gone.txt'],
+      merge: ['a.txt', 'dir/new.txt', 'gone.txt'],
+      byBranch: ['a.txt', 'dir/new.txt', 'gone.txt'],
+    },
+  },
+  {
     name: 'REFUSED: a path that is no directory, and a directory that is no workspace',
     walk: (side, area) => [
       side.place.askNow('handoff', { workspace: path.join(area, 'none'), step: 'one', why: '' }),

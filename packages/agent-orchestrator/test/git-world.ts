@@ -77,6 +77,13 @@ export const gitWorld: World = {
     parents: git(root, 'log', '-1', '--format=%P', rev).split(' ').filter(Boolean),
     message: git(root, 'log', '-1', '--format=%B', rev),
   }),
+  changed: (root, rev) => {
+    const first = spawnSync('git', ['rev-parse', '--verify', '--quiet', `${rev}^1`], { cwd: root, env: GIT_ENV }).status === 0;
+    const listed = first
+      ? git(root, 'diff', '--name-only', `${rev}^1`, rev)
+      : git(root, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', rev);
+    return listed.split('\n').filter(Boolean).sort();
+  },
   tip: (root, name) => {
     const ran = spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], { cwd: root, env: GIT_ENV, encoding: 'utf8' });
     return ran.status === 0 ? ran.stdout.trim() : null;

@@ -1,9 +1,11 @@
 /**
  * The tick records a step's facts at the one place it sees them (`recordStepMetrics`, after `meteredPass`): a session that settles with a
- * cost is recorded once, on the pass whose read of the feed names it settled (`settledIn`), by the five attributes alone, and never again
- * on a pass that answers the run from its memo of runs at rest. And each call a harness denied a session is a span of its own
- * (`DENIED_SPAN`) on the pass that reads its attempt ended, whatever the turn signed, counted once by the run's own mark
- * (`deniedCounted`): a daemon started again, with no memo, records none twice.
+ * cost is recorded once, on the first pass that reads it settled and does not find it in the run's own mark (`settlesCounted`), by the
+ * five attributes alone, and never again: neither on a pass that answers the run from its memo of runs at rest, nor by a daemon started
+ * again, which counts the settle its first pass makes and none a daemon before it counted. A session held open and answered is one try.
+ * A record with no mark is counted on the pass whose read of the feed names its task settled (`settledIn`). And each call a harness
+ * denied a session is a span of its own (`DENIED_SPAN`) on the pass that reads its attempt ended, whatever the turn signed, counted once
+ * by the run's own mark (`deniedCounted`): a daemon started again, with no memo, records none twice.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness signed by hand, ticked by `tickRun` under a
  * registry of the test's own. `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST=1` judges

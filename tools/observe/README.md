@@ -151,6 +151,31 @@ code of ours: the test lists them as measured below.
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.
 
+## What a restart loses
+
+A step's cost, tokens, time, tries, checks, rounds and waits are counters and histograms in the daemon's memory, read by the panels with
+`increase()`. Two things make them hold across a first try and a restart:
+
+- **Each series is born at zero.** The pass that records a step's facts first exports each series they write at zero, then at its
+  value, in two posts of their own. So a step's first try in a new factory shows in its panel with its cost, and after a restart
+  Prometheus sees the series come back at zero and reads a reset.
+- **Each settle is counted once, by a mark on the run's record** (`settlesCounted`), written by the pass before the metrics are
+  recorded. A session that ended while no daemon ran is counted by the first daemon that reads it, and a daemon started again counts
+  none twice. A session held open and answered by a person is one try when it settles, with its cost once, however many answers it took.
+
+What is still lost:
+
+- **A daemon that dies between a pass's write of the record and the end of the export that follows** loses that pass's facts: they
+  are marked and were never exported. Nothing is counted twice.
+- **A series born while the collector does not answer** arrives later at its value, and that first value is not counted. The export
+  is waited for 2 s at most, and an exporter stays off for 60 s after a failed post.
+- **A run started before the mark existed** is counted as before, off the runtime's feed: a session of it that settles on the first
+  pass of a daemon started again is not counted.
+- **The daemon's own counters and the api's** (the passes' histograms, `api_step_follows_total` and the others on **System**) are not
+  born at zero: each loses its first sample, and a restart that brings one back at or above its last value is not read as a reset.
+- **Up to 10 s of anything else the daemon held and had not exported** when it was killed: the gauges and the passes' histograms. A
+  daemon stopped by a signal exports once more as it ends.
+
 ## Timing a step
 
 A step's Claude Code session exports its own spans (`packages/agent-orchestrator/README.md`): a turn, `claude_code.interaction`, holds

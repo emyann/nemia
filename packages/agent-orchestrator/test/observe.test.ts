@@ -1187,7 +1187,7 @@ function seedUnknown(seed: readonly ServiceSeed[], known: Known): string[] {
 }
 
 /** How many series rows of attributes make when kept by `labels`: the distinct tuples of their values, a missing one its own. */
-const seriesBy = (rows: readonly Record<string, string>[], labels: readonly string[]): number =>
+const seriesBy = (rows: readonly Record<string, string | number>[], labels: readonly string[]): number =>
   new Set(rows.map((row) => labels.map((label) => row[seededKey(label)] ?? '').join('\u0000'))).size;
 
 /** The labels each `by (…)` of `text` keeps, `strip` taken off the front of each, a bucket's bound and any without it left out. */
@@ -1209,7 +1209,7 @@ const madeLabels = (text: string): Map<string, string[]> =>
 /** What `seed` holds, as a query would find it: its metrics by the name Prometheus shows, its spans by name, its logs by service. */
 function seeded(seed: readonly ServiceSeed[]) {
   const spans = seed.flatMap((said) => spansUnder(said.spans));
-  const metrics = new Map<string, Record<string, string>[]>();
+  const metrics = new Map<string, Record<string, string | number>[]>();
   for (const metric of seed.flatMap((said) => said.metrics)) {
     const base = formOf(METRICS.get(metric.name) ?? [], metric.kind)?.replace(/_bucket$/, '') ?? metric.name;
     const forms = metric.kind === 'histogram' ? [`${base}_bucket`, `${base}_count`, `${base}_sum`] : [base];

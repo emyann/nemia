@@ -10,8 +10,11 @@
  */
 import { asked, awaited } from './stack.ts';
 
+/** The attributes of a seeded span: each a word, or a number where the code sends one. */
+export type SpanAttributes = Record<string, string | number>;
+
 /** A span of the seed: how long before the stamp it began and how long it took, in milliseconds, and the spans under it. */
-export type SpanSeed = { name: string; ago: number; took: number; attributes: Record<string, string>; children?: SpanSeed[] };
+export type SpanSeed = { name: string; ago: number; took: number; attributes: SpanAttributes; children?: SpanSeed[] };
 
 /** A log record of the seed: its body, how long before the stamp it was said, and its attributes. */
 export type LogSeed = { body: string; ago: number; attributes: Record<string, string> };
@@ -87,6 +90,47 @@ const wait = (name: string, step: typeof IMPLEMENT, ago: number, took: number, o
   attributes: { ...step, run: RUN, try: '1', outcome },
 });
 
+/** The run the seeded timeline is of, by the three labels every number of it carries: one that succeeded. */
+const ENDED = { factory: 'nemia', workflow: 'build', outcome: 'succeeded' };
+
+/** One number of the seeded run's timeline, as the daemon's span of it: `value` of `part`, on `row`, with `own` beside the run's labels. */
+const number = (of: string, row: string, part: string, value: number, own: SpanAttributes = {}): SpanSeed => ({
+  name: 'run.timeline',
+  ago: 20_000,
+  took: 0,
+  attributes: { ...ENDED, ...own, run: RUN, of, row, part, value },
+});
+
+/** The numbers of `step`'s row `row` in the seeded run's timeline: each try's wait, run and cost, and how many tries it took. */
+const stepNumbers = (step: typeof IMPLEMENT, row: string, tries: [queued: number, ran: number, cost: number][]): SpanSeed[] => {
+  const labels = { step: step.step, agent: step.agent };
+  return [
+    ...tries.flatMap(([queued, ran, cost], i) => [
+      number('try', row, 'queued', queued, { ...labels, try: i + 1 }),
+      number('try', row, 'ran', ran, { ...labels, try: i + 1 }),
+      number('try', row, 'cost', cost, { ...labels, try: i + 1 }),
+      number('check', `${row} check`, 'queued', queued / 2, { ...labels, try: i + 1 }),
+      number('check', `${row} check`, 'ran', ran / 4, { ...labels, try: i + 1 }),
+    ]),
+    number('step', row, 'tries', tries.length, labels),
+  ];
+};
+
+/** The seeded run's timeline: two steps, the first of two tries, two rounds of its loop, and the run's wall time and waits. */
+const TIMELINE: SpanSeed[] = [
+  ...stepNumbers(IMPLEMENT, '02 implement', [
+    [4_000, 900_000, 12.5],
+    [2_000, 300_000, 4],
+  ]),
+  ...stepNumbers(REVIEW, '03 review', [[1_000, 240_000, 3.25]]),
+  number('round', 'review round 01', 'wall', 1_500_000),
+  number('round', 'review round 02', 'wall', 600_000),
+  number('run', 'run', 'wall', 2_400_000),
+  number('run', 'run', 'queued', 7_000),
+  number('run', 'run', 'check', 360_000),
+  number('run', 'run', 'gate', 120_000),
+];
+
 /** A tool call of a session's turn, by its tool, with its command when it is a Bash call that says one, and its wait on a permission. */
 const tool = (labels: Record<string, string>, ago: number, took: number, name: string, command?: string): SpanSeed => ({
   name: 'claude_code.tool',
@@ -156,6 +200,7 @@ const DAEMON: ServiceSeed = {
     denied(IMPLEMENT, 36_000, 'Skill', 'Skill(md3-spec)'),
     denied(REVIEW, 20_000, 'Bash', 'Bash(npm test)'),
     denied(REVIEW, 18_000, 'mcp__playwright__browser_navigate', 'mcp__playwright__browser_navigate'),
+    ...TIMELINE,
     wait('step.queue', IMPLEMENT, 58_000, 4_000, 'done'),
     wait('step.check', IMPLEMENT, 34_000, 9_000, 'refused'),
     wait('step.check', IMPLEMENT, 24_000, 8_000, 'passed'),
@@ -282,9 +327,12 @@ const BOUNDS = [10, 100, 1_000, 10_000, 100_000, 1_000_000];
 /** `ms` since the epoch as OTLP's nanoseconds. */
 const nanos = (ms: number): string => `${Math.round(ms)}000000`;
 
-/** `attributes` as OTLP's list of string values. */
-const listed = (attributes: Record<string, string>): { key: string; value: { stringValue: string } }[] =>
-  Object.entries(attributes).map(([key, value]) => ({ key, value: { stringValue: value } }));
+/** `attributes` as OTLP's list of values: a word a string's, a number a double's. */
+const listed = (attributes: SpanAttributes): { key: string; value: { stringValue: string } | { doubleValue: number } }[] =>
+  Object.entries(attributes).map(([key, value]) => ({
+    key,
+    value: typeof value === 'number' ? { doubleValue: value } : { stringValue: value },
+  }));
 
 /** A resource of `service`, with its own attributes. */
 const resourceOf = (seed: ServiceSeed): { attributes: ReturnType<typeof listed> } => ({
@@ -415,7 +463,7 @@ const firstValue = (answer: unknown): number =>
 /** An instant query of the store `uid`, asked now. */
 const instant = (uid: string, api: string, query: string) => (): string => `${uid}/${api}?query=${encodeURIComponent(query)}`;
 
-/** The questions that say the seed arrived: a metric of the daemon's, a denied call's span, a log, and Tempo's first span metrics. */
+/** The questions that say the seed arrived: a daemon's metric, its denied calls and its timeline, a log, and Tempo's span metrics. */
 const ARRIVALS: Arrival[] = [
   {
     what: "the daemon's metrics in Prometheus",
@@ -426,6 +474,11 @@ const ARRIVALS: Arrival[] = [
     what: 'the denied calls in Tempo',
     path: () => `tempo/api/search?limit=20&q=${encodeURIComponent('{name="step.denied"}')}`,
     there: (answer) => ((answer as { traces?: unknown[] }).traces?.length ?? 0) >= 5,
+  },
+  {
+    what: "the run's timeline in Tempo",
+    path: () => `tempo/api/search?limit=20&q=${encodeURIComponent('{name="run.timeline"}')}`,
+    there: (answer) => ((answer as { traces?: unknown[] }).traces?.length ?? 0) >= 20,
   },
   {
     what: 'the tool results in Loki',

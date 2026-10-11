@@ -104,9 +104,9 @@ export type PickTarget =
 /**
  * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
  * other key of its search kept and `factory` set or dropped, its `repo` dropped with the factory it was of; on a workflow's page or a
- * step's, the same page read in the picked factory, on the repository it reads, its `repo` dropped likewise; on a factory's own page, its floor or its settings, the
- * picked factory's floor, or Home for All factories; on any other page, the picked factory's floor, and nowhere for All factories, which
- * that page already shows.
+ * step's, the same page read in the picked factory, on the repository it reads, its `repo` dropped likewise; on a factory's own page, its
+ * floor or its settings, the picked factory's floor, or Home for All factories; on any other page, the picked factory's floor, and
+ * nowhere for All factories, which that page already shows.
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
   if (isListing(path)) {

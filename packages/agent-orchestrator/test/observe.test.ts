@@ -1109,12 +1109,21 @@ function seedUnknown(seed: readonly ServiceSeed[], known: Known): string[] {
 const seriesBy = (rows: readonly Record<string, string>[], labels: readonly string[]): number =>
   new Set(rows.map((row) => labels.map((label) => row[seededKey(label)] ?? '').join('\u0000'))).size;
 
-/** The labels each `by (…)` of `text` keeps, `strip` taken off the front of each, a bucket's bound and a bare name left out. */
+/** The labels each `by (…)` of `text` keeps, `strip` taken off the front of each, a bucket's bound and any without it left out. */
 const keptBy = (text: string, strip = ''): string[][] =>
   [...text.matchAll(/\bby\s*\(([^)]*)\)/g)]
     .map(([, list]) => list.split(',').map((label) => label.trim()))
     .map((labels) => labels.filter((label) => label.startsWith(strip) && label !== 'le').map((label) => label.slice(strip.length)))
-    .filter((labels) => labels.length > 0 && !(strip === '' && labels.every((label) => label === 'name')));
+    .filter((labels) => labels.length > 0);
+
+/** The labels a LogQL query makes with `label_format`, each with the fields its template reads. */
+const madeLabels = (text: string): Map<string, string[]> =>
+  new Map(
+    [...text.matchAll(/label_format\s+(\w+)="((?:[^"\\]|\\.)*)"/g)].map(([, label, template]) => [
+      label,
+      [...new Set([...template.matchAll(/\.(\w+)/g)].map(([, field]) => field))],
+    ]),
+  );
 
 /** What `seed` holds, as a query would find it: its metrics by the name Prometheus shows, its spans by name, its logs by service. */
 function seeded(seed: readonly ServiceSeed[]) {
@@ -1158,7 +1167,10 @@ function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed
   const service = /service_name="([^"]*)"/.exec(text)?.[1].replace('$service', DEFAULT_SERVICE_NAME) ?? '';
   const rows = has.logs(service).map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [lokiField(key), value])));
   const fields = new Set([...rows.flatMap((row) => Object.keys(row)), ...LOKI_FIELDS]);
-  const few = keptBy(text).filter((labels) => seriesBy(rows, labels) < 2);
+  const made = madeLabels(text);
+  const few = keptBy(text)
+    .map((labels) => labels.flatMap((label) => made.get(label) ?? [label]))
+    .filter((labels) => seriesBy(rows, labels) < 2);
   return [...logNames(text).filter((field) => !fields.has(field)), ...few.map((labels) => `one series by ${labels.join(', ')}`)];
 }
 

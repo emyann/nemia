@@ -16,7 +16,7 @@ import { StopRefused, type TaskView } from '../core/engine/index.ts';
 import { Engine, ListRefused, listRefusalOf, type EngineShape } from './engine.ts';
 import { ForgetRefused } from './forget.ts';
 import type { TaskSpec } from './options.ts';
-import { OutputRefused } from './output.ts';
+import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
 
 /** A task as it was filed: its spec, under the id it was filed with or given. */
@@ -158,10 +158,8 @@ const outputOf =
   (tasks: Map<string, TestTask>): EngineShape['output'] =>
   (id, stream, lastBytes) => {
     const refuse = (message: string) => Effect.fail(new OutputRefused({ message }));
-    if (stream !== 'stdout' && stream !== 'stderr')
-      return refuse(`\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`);
-    if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0))
-      return refuse(`\`lastBytes: ${String(lastBytes)}\` is not a count of bytes: give a whole number above 0, or none.`);
+    if (stream !== 'stdout' && stream !== 'stderr') return refuse(notAStream(stream));
+    if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0)) return refuse(notACount(lastBytes));
     const t = tasks.get(id);
     if (!t) return refuse(unknown(id));
     const text = t.attempt ? t.printed[stream] : undefined;

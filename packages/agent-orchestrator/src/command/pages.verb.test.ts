@@ -10,6 +10,7 @@ import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-pages-');
 process.env.WF_ROOT = ROOT;
@@ -21,8 +22,9 @@ const runPlaced = runGiven(() => stand().layer);
 
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 
-/** The engine of this test, the stand-in none of these commands asks anything of. */
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
 /** A folder workflow of one step. */

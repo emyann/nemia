@@ -497,6 +497,16 @@ const worktrees = (repo: string): string => {
   return JSON.stringify(read.answer.workspaces.map((w) => w.path));
 };
 
+test('the workspaces a refused start is compared by are read off the place: one cut under the store lists, and the reading changes', () => {
+  const repo = aRepo();
+  const none = worktrees(repo);
+  const at = path.join(ROOT, 'worktrees', 'cut-by-hand', 'implement');
+  const made = stand().place.askNow('make', { repo, at, name: 'wf/cut-by-hand/implement', from: 'main', also: [] });
+  assert.ok('answer' in made, JSON.stringify(made));
+  assert.notEqual(worktrees(repo), none, 'a workspace cut since is a reading that differs');
+  assert.deepEqual(JSON.parse(worktrees(repo)), [fs.realpathSync(at)]);
+});
+
 test('REFUSED as shipped: nemia start with no --factory in a folder two factories hold, naming each and the fix, with nothing written; --factory picks one', async (t) => {
   asShipped(t);
   const { build } = fresh();

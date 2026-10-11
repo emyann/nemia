@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 import { scratch } from '../../test/scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-passes-');
@@ -19,8 +20,9 @@ const { passesOf } = await import('./passes.verb.ts');
 
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 
-/** The engine of this test, the stand-in none of these commands asks anything of. */
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
 /** A pass of `ms`, at the `k`th second, that saw `runs` runs. */

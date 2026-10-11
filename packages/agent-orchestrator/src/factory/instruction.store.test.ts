@@ -11,6 +11,7 @@ import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -34,8 +35,9 @@ const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, und
 
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 
-/** The engine of this test, the stand-in none of these commands asks anything of. */
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */

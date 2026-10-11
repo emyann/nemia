@@ -16,6 +16,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
@@ -34,8 +35,9 @@ const { readRun } = await import('../record/record.store.ts');
 
 const { engineOf } = await import('../runtime-client.ts');
 const stood = eachTest(testEngine);
+heldUnasked(stood);
 
-/** The engine of this test, the stand-in none of these commands asks anything of. */
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(stood().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */

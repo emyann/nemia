@@ -40,7 +40,7 @@ async function started(agent: string, url: string): Promise<string> {
   console.log = (...args: unknown[]) => void lines.push(args.join(' '));
   process.chdir(ROOT);
   try {
-    await main(['start', `a note for ${agent}`, '--workflows', dir]);
+    await main(['start', `a note for ${agent}`, '--workflows', dir], undefined, undefined, stand().place);
   } finally {
     console.log = log;
     process.chdir(cwd);

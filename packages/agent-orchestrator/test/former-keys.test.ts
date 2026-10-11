@@ -11,9 +11,11 @@ import { scratch } from './scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 const ROOT = scratch('wf-former-keys-');
 process.env.WF_ROOT = ROOT;
 const { readRun } = await import('../src/record/record.store.ts');

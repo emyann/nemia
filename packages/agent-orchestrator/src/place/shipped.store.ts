@@ -27,6 +27,9 @@ export const shippedGitPlace: Place = meteredPlace(gitPlace({ started: countSpaw
 /** `shippedGitPlace` as the layer a program is given it by. */
 export const gitPlaceLayer = PlaceService.layer(shippedGitPlace);
 
-/** `program` given `shippedGitPlace`, and still to be run: how the api's tests give a program the git place, by name. */
+/**
+ * `program` given `shippedGitPlace`, and still to be run: the git place by name, for a caller outside the package that builds no layer
+ * of its own. The api's tests call it, and the board's e2e seed does from a string no typecheck reads.
+ */
 export const shipped = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
   Effect.provide(program, gitPlaceLayer);

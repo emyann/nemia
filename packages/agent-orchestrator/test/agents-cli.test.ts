@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
 const ROOT = scratch('wf-agents-cli-');
 process.env.WF_ROOT = ROOT;
@@ -20,8 +21,9 @@ const { main } = await import('../src/cli/main.ts');
 
 const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 
-/** The engine of this test, the stand-in none of these commands asks anything of. */
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
 type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };

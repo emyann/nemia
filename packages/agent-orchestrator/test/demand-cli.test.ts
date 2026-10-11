@@ -10,6 +10,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
 const ROOT = scratch('wf-demand-cli-');
 process.env.WF_ROOT = ROOT;
@@ -25,8 +26,9 @@ const { [DEMAND_OFF]: _off, ...ON } = process.env;
 
 const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 
-/** The engine of this test, the stand-in none of these commands asks anything of. */
+/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
 /** Each command that ticks, typed with arguments it parses and its check lets through, on runs, cards and folders that are not there. */

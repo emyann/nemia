@@ -1,6 +1,7 @@
 /**
  * The `WF_` environment the package reads: where the store lives (`WF_ROOT`), the daemon's two ceilings (`WF_MAX_CONCURRENT`,
- * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), and how long the series are kept
+ * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), whether a finished run keeps its
+ * worktrees (`WF_KEEP_WORKTREES`), and how long the series are kept
  * (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`). Each is an Effect `Config` with its default, and
  * each has a plain reader that takes the environment, `process.env` unless given, and answers the value or throws `Invalid`, exit 2, in the
  * variable's own words. A value that is set and not one the variable takes is refused, never read as its default. Reads no disk.
@@ -41,6 +42,12 @@ const runs = Config.schema(Schema.String.check(Schema.isPattern(FROM_ZERO)), 'WF
 
 /** `WF_VERIFY_REST`: `1` on, `0` off; off when unset or empty. */
 const verifyRest = Config.schema(Schema.Literals(['0', '1']), 'WF_VERIFY_REST').pipe(
+  Config.map((value) => value === '1'),
+  Config.withDefault(false),
+);
+
+/** `WF_KEEP_WORKTREES`: `1` on, `0` off; off when unset or empty. */
+const keepWorktrees = Config.schema(Schema.Literals(['0', '1']), 'WF_KEEP_WORKTREES').pipe(
   Config.map((value) => value === '1'),
   Config.withDefault(false),
 );
@@ -106,6 +113,20 @@ export const maxRuns = (env: Env = process.env): number =>
     env,
     (value) =>
       `WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`,
+  );
+
+/**
+ * `WF_KEEP_WORKTREES`, whether the daemon leaves every finished run its worktrees, for a person to prune by hand: `1` keeps them; `0`,
+ * unset or empty and a finished run is freed. Refused when it is anything else: read as off, a mistyped value would free what it was
+ * set to keep.
+ */
+export const keepsWorktrees = (env: Env = process.env): boolean =>
+  read(
+    keepWorktrees,
+    'WF_KEEP_WORKTREES',
+    env,
+    (value) =>
+      `WF_KEEP_WORKTREES=${value} is neither 1 nor 0. It keeps the worktrees of every finished run, which the daemon otherwise removes: WF_KEEP_WORKTREES=1 — or 0, or unset, to have them freed.`,
   );
 
 /** `WF_VERIFY_REST`, whether a pass judges in full each run it answers from its memo of runs at rest: `1` on; `0`, unset or empty off. */

@@ -62,7 +62,7 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
   },
   {
     name: 'orchestrator',
-    at: ['packages/agent-orchestrator/src', 'packages/agent-orchestrator/bin', 'packages/agent-orchestrator/place/git/scripts'],
+    at: ['packages/agent-orchestrator/src', 'packages/agent-orchestrator/bin', 'packages/agent-orchestrator/place/git'],
     refused: SDKS,
     allowed: ['agent-runtime', 'agent-runtime/vocabulary', 'effect', 'node:fs', './runner.ts'],
   },

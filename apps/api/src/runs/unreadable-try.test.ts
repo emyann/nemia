@@ -14,7 +14,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore, runShipped as runWith, type RunSummary } from 'agent-orchestrator';
+import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

@@ -11,10 +11,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Acceptance } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 import type { RunDecision } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { acceptFile, acceptRun, engine, list, roundRun, runStore, runShipped as runWith } from 'agent-orchestrator';
+import { acceptFile, acceptRun, engine, list, roundRun, runStore } from 'agent-orchestrator';
 import { acceptWordsRefusal } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');

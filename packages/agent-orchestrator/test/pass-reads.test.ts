@@ -410,14 +410,8 @@ test('a forget drops the views of the tasks it forgets, and keeps the others the
   assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
 });
 
-/** The place the package ships, its `standing` of the base branch `base` (every base, given none) not heard, in `said`. */
-const standingUnread = (said: string, base?: string) =>
-  PlaceService.layer(
-    placeOver(shippedGitPlace, {
-      standing: (request) =>
-        base === undefined || request.base === base ? unreadBy('standing', said) : shippedGitPlace.askNow('standing', request),
-    }),
-  );
+/** The place the package ships, its `standing` not heard, in `said`. */
+const standingUnread = (said: string) => PlaceService.layer(placeOver(shippedGitPlace, { standing: () => unreadBy('standing', said) }));
 
 test('a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one', async () => {
   const { b, repo } = await theStore();
@@ -496,16 +490,23 @@ test('a step that left its work uncommitted is handed off on the pass that finis
   assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
 });
 
-test('REFUSED: a run filed while its own standing is unread keeps the base it was started on, its parent read shipped off its own', async () => {
+test('REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read shipped', async () => {
   const { b, repo } = await theStore();
   const parent = await atTheGate(b, repo);
-  git(repo, 'switch', '-q', '-c', 'other');
-  const child = await runPlaced(startRun({ brief: 'after it, unread', repo, workflowDir: oneStep, after: [parent.id] })).finally(() =>
-    git(repo, 'switch', '-q', 'main'),
-  );
+  const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
   git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(standingUnread('the standing broke', 'other'))));
-  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads shipped off its own base branch');
+  const headless = PlaceService.layer(
+    placeOver(shippedGitPlace, {
+      standing: (request) => {
+        const read = shippedGitPlace.askNow('standing', request);
+        if (!('answer' in read)) return read;
+        const { main: _base, ...heads } = read.answer.heads;
+        return { answer: { ...read.answer, heads } };
+      },
+    }),
+  );
+  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads shipped');
   assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
   assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
 });

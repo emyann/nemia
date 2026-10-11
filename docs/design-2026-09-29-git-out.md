@@ -3,6 +3,15 @@
 A design note for the owner to approve. It changes no code. It rests on the owner's words of 2026-09-29 and on the source as it is at
 `8b6e1077` (line numbers are that commit's). Where it reads a file that a feature-folder slice is about to move, it names today's path.
 
+> **Since 2026-10-11 the seam is a service, not a script.** What this note calls a place skill's scripts (`scripts/<verb>.ts`, run as one
+> Node process a question, declared by `place.json`, frozen with the run) is now code beside the skill: `PlaceService`
+> (`packages/agent-orchestrator/src/place/place.store.ts`) is what `src` asks, required and with no default, and the git place
+> (`packages/agent-orchestrator/place/git/place.ts`) answers each verb by running git itself, given as `gitPlaceLayer` by whoever
+> composes a program. The rule below stands as written: no `src` names git (`test/git-calls.test.ts`, which also refuses a script
+> started from a `src`), and the place's code stays outside `src`, behind one door (`placeBreaks` in `test/boundary.test.ts`). The
+> contract's requests, answers, refusals and deadlines are unchanged; `place.json`, the freeze of a place and `placeSkill` on a new
+> record are gone, and sections *How a verb is run*, *`place.json`* and *Freezing* describe what was.
+
 ## The rule
 
 The owner, 2026-09-29: "we should not take a dependency on Git because it is related to the user environment … all the Git ceremonial can

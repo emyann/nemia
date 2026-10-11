@@ -18,9 +18,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { engine, prune, prunedKept, prunedWords, runStore, runShipped as runWith, type RunSummary } from 'agent-orchestrator';
+import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(

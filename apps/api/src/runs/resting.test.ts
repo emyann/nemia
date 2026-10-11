@@ -27,12 +27,12 @@ import {
   passStanding,
   restingRead,
   runStore,
-  runShipped as runWith,
   type RunSummary,
   standingReader,
   standingSnapshot,
   verifiesRest,
 } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));

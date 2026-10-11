@@ -931,7 +931,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   assert.deepEqual([first.queue.card, first.queue.again], ['odd-include-a1b2', false]);
   assert.match(
     first.queue.failed,
-    /^the place's open was not heard: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
+    /^the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
     "a repository whose `.worktreeinclude` is a link to itself: the place's open cannot read it, and an open not heard is no refusal",
   );
   const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
@@ -939,7 +939,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
     listed,
-    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
+    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
   );
 
   const up = board();
@@ -967,7 +967,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   assert.match(
     named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
   );
   const again = await runWith(b.e, tickRun());
   assert.deepEqual(
@@ -1061,7 +1061,10 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     1,
     `a run holds the one slot, so the daemon's first pass reads no queue, and its second tries the card and fails as the pass above did, \`again\`, never said by this daemon:\n${printed.join('\n')}`,
   );
-  assert.match(named[0], /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: ELOOP: too many symbolic links/);
+  assert.match(
+    named[0],
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links/,
+  );
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
   assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);
 });

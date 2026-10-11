@@ -67,31 +67,34 @@ function started(workflowDir: string, opts: { gates?: string[]; refused?: Config
 const places = { home: ROOT };
 const GATED = folder('gated');
 
+/** What the git place denies a landing session, as a start hands it on. */
+const DENIED = declared.denyWhileLanding;
+
 test("REFUSED: a step's value its harness refuses, named by the line it comes from and the field it is filed as", () => {
-  const steps = stepsToStart(GATED, true, places).map((s) => (s.name === 'implement' ? { ...s, effort: 'ultra' } : s));
+  const steps = stepsToStart(GATED, true, places, DENIED).map((s) => (s.name === 'implement' ? { ...s, effort: 'ultra' } : s));
   assert.equal(
-    configRefused(steps, places, []),
+    configRefused(steps, places, [], DENIED),
     `implement: \`effort: ultra\` (filed as \`effort\`): ${configRefusal('claude', { effort: 'ultra' })}`,
   );
 });
 
 test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone, as no line of it gave the deny list', () => {
-  const steps = stepsToStart(GATED, true, places).map((s) => (s.name === 'ship' ? { ...s, harness: 'codex' } : s));
-  const why = configRefused(steps, places, []);
+  const steps = stepsToStart(GATED, true, places, DENIED).map((s) => (s.name === 'ship' ? { ...s, harness: 'codex' } : s));
+  const why = configRefused(steps, places, [], DENIED);
   assert.equal(why, `ship: ${configRefusal('codex', { disallowedTools: [...declared.denyWhileLanding] })}`);
 });
 
 test("REFUSED: a gate given at start makes an ending land on its check, and its harness's refusal of the deny list follows it", () => {
-  const steps = stepsToStart(GATED, true, places).map((s) => (s.name === 'ship' ? { ...s, gate: undefined, harness: 'codex' } : s));
-  assert.equal(configRefused(steps, places, []), undefined, 'not gated, the ending lands nothing and is denied nothing');
-  assert.match(configRefused(steps, places, ['ship'])!, /^ship: .*is a deny list/);
+  const steps = stepsToStart(GATED, true, places, DENIED).map((s) => (s.name === 'ship' ? { ...s, gate: undefined, harness: 'codex' } : s));
+  assert.equal(configRefused(steps, places, [], DENIED), undefined, 'not gated, the ending lands nothing and is denied nothing');
+  assert.match(configRefused(steps, places, ['ship'], DENIED)!, /^ship: .*is a deny list/);
 });
 
 test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {
-  const steps = stepsToStart(GATED, true, places);
-  assert.equal(configRefused(steps, places, []), undefined);
+  const steps = stepsToStart(GATED, true, places, DENIED);
+  assert.equal(configRefused(steps, places, [], DENIED), undefined);
   const remote = steps.map((s) => (s.name === 'implement' ? { ...s, harness: 'a2a:reviewer', effort: 'ultra' } : s));
-  assert.equal(configRefused(remote, places, []), undefined);
+  assert.equal(configRefused(remote, places, [], DENIED), undefined);
 });
 
 const ULTRA = folder('ultra', 'effort: ultra');

@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { approveRun, engine, list, runStore, runShipped as runWith, type RunSummary } from 'agent-orchestrator';
+import { approveRun, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
+import { runWith } from './placed.ts';
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

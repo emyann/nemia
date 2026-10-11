@@ -12,7 +12,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv, routeList, runShipped as runWith, triesDir } from 'agent-orchestrator';
+import { approvalFile, COMMANDS, engine, parseArgv, routeList, triesDir } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 import { extensionBreaks } from './extend.ts';
 import { wordBreaks } from './routes.ts';
 

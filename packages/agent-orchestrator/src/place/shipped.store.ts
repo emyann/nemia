@@ -4,6 +4,7 @@
  * pass's `place` phase while a pass is metered: its time, and each process the place starts for it (`countSpawn`).
  */
 import path from 'node:path';
+import { Effect } from 'effect';
 import { gitPlace } from '../../place/git/place.ts';
 import { PlaceService, type Place } from './place.store.ts';
 import { PLACE_SKILLS } from '../skills/read.store.ts';
@@ -24,3 +25,7 @@ export const shippedGitPlace: Place = meteredPlace(gitPlace({ started: countSpaw
 
 /** `shippedGitPlace` as the layer a program is given it by. */
 export const gitPlaceLayer = PlaceService.layer(shippedGitPlace);
+
+/** `program` given `shippedGitPlace`, and still to be run: how a command of the CLI gives its program the place, by name. */
+export const shipped = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
+  Effect.provide(program, gitPlaceLayer);

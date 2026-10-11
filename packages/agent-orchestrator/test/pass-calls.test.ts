@@ -299,9 +299,19 @@ test('an approved ending is filed in the checkout, once the pass has read afresh
   assert.deepEqual(shipped.counted, { journals: 2, act: 5 });
 });
 
-test("each place verb a pass runs starts one process, counted once in its place phase: the standing, a worktree's make, a hand-off", async () => {
+test("each question a pass asks its place is one call of its place phase, and each git process the place starts for it is counted once there, no other process started: the standing, a worktree's make, a hand-off", async (t) => {
   const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: main\ngate: true' }), true);
   const b = board();
+  const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
+  const ran = path.join(bin, 'ran');
+  const real = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho git >> '${ran}'\nexec '${real}' "$@"\n`, { mode: 0o755 });
+  const was = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${was ?? ''}`;
+  t.after(() => {
+    process.env.PATH = was;
+  });
+  const gitRan = (): number => (fs.existsSync(ran) ? fs.readFileSync(ran, 'utf8').split('\n').filter(Boolean).length : 0);
   const placed = async () => {
     const e = meteredEngine(b.e);
     const program = Effect.gen(function* () {
@@ -309,22 +319,30 @@ test("each place verb a pass runs starts one process, counted once in its place 
       const read = passRead(e, runs, process.env, yield* passStanding(runs));
       return (yield* advancePass(e, runs[0], undefined, read)).advanced;
     });
+    const before = gitRan();
     const { value, tallies } = await metered(() => runWith(e, program));
-    const all = Object.values(tallies!.kinds).reduce((n, t) => n + t.spawned, 0);
-    return { advanced: value, counted: [tallies!.kinds.place.calls, tallies!.kinds.place.spawned, all] };
+    const all = Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0);
+    return { advanced: value, calls: tallies!.kinds.place.calls, spawned: tallies!.kinds.place.spawned, all, git: gitRan() - before };
   };
 
   const filed = await placed();
   assert.deepEqual(filed.advanced.filed, ['implement']);
-  assert.deepEqual(filed.counted, [2, 2, 2], "the standing, and the make of implement's worktree");
+  assert.equal(filed.calls, 2, "two questions: the standing, and the make of implement's worktree");
+  assert.ok(filed.git >= 2, `each of them ran git: ${filed.git}`);
+  assert.deepEqual(
+    [filed.spawned, filed.all],
+    [filed.git, filed.git],
+    'every git process is counted once, in the place phase, and nothing else is',
+  );
 
   fs.writeFileSync(path.join(readRun(run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   const handed = await placed();
   assert.equal(readRun(run.id).steps.implement.handedOff, `${run.id}-implement`, 'implement was handed off on this pass');
-  assert.deepEqual(
-    handed.counted,
-    [3, 3, 3],
-    'the standing, the hand-off of what implement left, and the heads read again since the hand-off moved its branch',
+  assert.equal(
+    handed.calls,
+    3,
+    'three questions: the standing, the hand-off of what implement left, and the heads read again since the hand-off moved its branch',
   );
+  assert.deepEqual([handed.spawned, handed.all], [handed.git, handed.git]);
 });

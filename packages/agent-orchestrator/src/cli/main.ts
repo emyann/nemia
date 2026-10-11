@@ -31,7 +31,8 @@ import {
   takeoverLine,
   runMain,
   tickRun,
-  runShipped,
+  runWith,
+  shipped,
   gitPlaceLayer,
   telemetryLayer,
   up,
@@ -161,7 +162,7 @@ async function tickVerb(args: Args, e: Engine): Promise<void> {
   const stats = args.stats === true;
   const held = storeRefusal('tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
-  const { cost } = tickLines(await runShipped(e, tickRun({ repo: path.resolve('.') })));
+  const { cost } = tickLines(await runWith(e, shipped(tickRun({ repo: path.resolve('.') }))));
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;
 }
@@ -261,7 +262,7 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
   const runner = RUNS.get(command.name);
   if (runner || command.handler === undefined) return runner!(args, e);
-  const data = await runShipped(e, command.handler(args));
+  const data = await runWith(e, shipped(command.handler(args)));
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);
 }

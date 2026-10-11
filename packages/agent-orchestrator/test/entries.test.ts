@@ -310,7 +310,7 @@ const PINNED: Record<string, string[]> = {
     'runGraph',
     'runId',
     'runMain',
-    'runShipped',
+    'shipped',
     'shippedGitPlace',
     'runReading',
     'runSlots',

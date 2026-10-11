@@ -14,6 +14,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
+import { runWith } from '../../test/placed.ts';
 import { listWorkflows } from './workflows.ts';
 import {
   engine,
@@ -23,7 +24,6 @@ import {
   parentRecord,
   passStanding,
   runStore,
-  runShipped as runWith,
   standingLiveOf,
 } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';

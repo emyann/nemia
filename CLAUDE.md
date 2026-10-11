@@ -186,7 +186,7 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and three workflows: `intake` (an idea to an intent), `build` (an
   intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
-  the place skill `place/git` (`packages/agent-orchestrator/place/git`, run through `runPlaceVerb`), the skills the api lists as shipped
+  the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as shipped
   (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read

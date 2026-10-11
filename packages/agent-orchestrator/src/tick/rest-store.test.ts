@@ -43,6 +43,8 @@ const { gitPlaceLayer, shippedGitPlace } = await import('../place/shipped.store.
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { PlaceService } = await import('../place/place.store.ts');
+const { addFactory, attachWorkflow, hireAgent } = await import('../factory/factory.store.ts');
+type Place = import('../place/place.store.ts').Place;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -191,6 +193,7 @@ const started = async (n: number, workflowDir = ONE, repo = REPO, isolate = fals
 
 const journals = (c: PassCost) => c.phases.journals.calls;
 const observes = (c: PassCost) => c.phases.observe.calls;
+/** The git processes a pass's place started: what `place.spawned` counts, each question itself a call and no process. */
 const places = (c: PassCost) => c.phases.place.spawned;
 
 /** The store at each size, and the pass each was measured at: built once, read by the tests that follow. */
@@ -729,4 +732,58 @@ test('a pass lists the store once: an ending waiting on the checkout and a refus
   assert.equal(pass.queue, undefined, 'the refused card is not tried again');
   const listing = readInbox().find((l) => l.name === card.name);
   assert.ok(listing?.queued && listing.tried?.refused, 'the card still queued, with its refusal');
+});
+
+test('two factories on two repositories ask one place, the instance the pass is given: each question of it a call of the place phase, each git process it starts counted once', async () => {
+  const [left, right] = [aRepo(), aRepo()];
+  const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
+  const dir = path.join(team, 'hired');
+  fs.mkdirSync(path.join(team, 'agents'));
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(team, 'agents', 'worker.md'), '---\nname: worker\n---\nDo the work.\n');
+  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\nharness: codex\n---\nWork it.\n');
+  for (const [name, repo] of [
+    ['left', left],
+    ['right', right],
+  ] as const) {
+    addFactory({ name, repos: [repo] });
+    attachWorkflow({ factory: name, workflow: 'hired' });
+    hireAgent({ factory: name, agent: 'worker', step: 'hired/work' });
+  }
+  for (const [factory, repo] of [
+    ['left', left],
+    ['right', right],
+  ] as const)
+    touched.add((await runPlaced(startRun({ brief: `in ${factory}`, repo, workflowDir: dir, isolate: true, factory }))).id);
+  const asked: Array<{ verb: string; repo?: string }> = [];
+  const noted = (verb: string, request: object): void => {
+    asked.push({ verb, ...('repo' in request && typeof request.repo === 'string' ? { repo: path.resolve(request.repo) } : {}) });
+  };
+  const one: Place = {
+    declared: shippedGitPlace.declared,
+    ask: (verb, request, options) => {
+      noted(verb, request);
+      return shippedGitPlace.ask(verb, request, options);
+    },
+    askNow: (verb, request, options) => {
+      noted(verb, request);
+      return shippedGitPlace.askNow(verb, request, options);
+    },
+  };
+  const pass = await runWith(
+    h.e,
+    tickRun({ repo: ROOT, memo: freshRestMemo(), verifyRest: false }).pipe(Effect.provide(PlaceService.layer(one))),
+  );
+  const of = (verb: string, repo: string) => asked.filter((a) => a.verb === verb && a.repo === path.resolve(repo)).length;
+  assert.deepEqual(
+    [of('standing', left), of('standing', right), of('make', left), of('make', right)],
+    [1, 1, 1, 1],
+    'the one instance was asked where each repository stands, and for the worktree of each run, whatever its factory',
+  );
+  const { calls, spawned } = pass.cost!.phases.place;
+  assert.equal(calls, asked.length, 'each question asked of the instance is one call of the place phase, and nothing else is');
+  assert.ok(
+    spawned >= of('standing', left) + of('standing', right) + 2,
+    `what is counted as started is git, a process or more a question: ${spawned}`,
+  );
 });

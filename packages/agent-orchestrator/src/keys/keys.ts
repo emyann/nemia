@@ -271,7 +271,7 @@ export function workspaceOf(
   }
   if (check !== undefined && harness === 'codex') {
     refuse(
-      `${step}: \`workspace: main\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session (\`denyWhileLanding\` in the place's place.json) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`,
+      `${step}: \`workspace: main\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session (\`denyWhileLanding\`, which its place declares) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`,
     );
   }
   if (retries !== undefined) {

@@ -2256,7 +2256,7 @@ test("REFUSED at load: a `check:` on a gated step in the repository's checkout t
       () => fm('ship', lines),
       (e: WorkflowError) =>
         e.exitCode === 2 &&
-        /^ship: `workspace: main` with `check: npm test` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session \(`denyWhileLanding` in the place's place\.json\) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one\. Run the ending on claude — delete `harness: codex` — or delete the `check:` line\.$/.test(
+        /^ship: `workspace: main` with `check: npm test` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session \(`denyWhileLanding`, which its place declares\) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one\. Run the ending on claude — delete `harness: codex` — or delete the `check:` line\.$/.test(
           e.message,
         ),
       lines,

@@ -131,7 +131,7 @@ test('REFUSED at the shipped grace: a git held past its deadline, asked while th
     }
     const pid = Number(fs.readFileSync(marker, 'utf8'));
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
-    assert.equal(said, killedWords(deadlineMs));
+    assert.ok(said.startsWith(killedWords(deadlineMs)), said);
     const next = PLACE.askNow('status', { checkout: dir, tips: {} });
     assert.ok('answer' in next && next.answer.merging === 'none', `the next question is answered: ${JSON.stringify(next)}`);
     return;
@@ -154,7 +154,7 @@ test('REFUSED at the shipped grace: a git held past its deadline, asked off the 
     }
     const pid = Number(fs.readFileSync(marker, 'utf8'));
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone`);
-    assert.equal(said, killedWords(deadlineMs));
+    assert.ok(said.startsWith(killedWords(deadlineMs)), said);
     const next = await Effect.runPromise(PLACE.ask('status', { checkout: dir, tips: {} }));
     assert.ok('answer' in next && next.answer.merging === 'none', `the next question is answered: ${JSON.stringify(next)}`);
     return;

@@ -108,11 +108,11 @@ export function stepsToStart(
   workflowDir: string,
   isolate: boolean,
   places: Places,
+  denied: readonly string[],
   factory?: Factory,
   gates: readonly string[] = [],
   refused: ConfigRefused = configRefused,
   given = false,
-  denied: readonly string[] = [],
 ): Workflow[] {
   const steps = stepsIn(workflowDir, places, factory);
   if (!isolate && isFolderTeam(steps)) {
@@ -162,7 +162,7 @@ export function stepsToStart(
     ...(given ? { inputs: inputsDir({ id: 'run' }) } : {}),
   });
   if (unruled) throw new Invalid({ message: unruled });
-  const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir), denied);
+  const refusedConfig = refused(steps, places, gates, denied, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
 }
@@ -201,8 +201,8 @@ export const configRefused = (
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
+  denied: readonly string[],
   written: Readonly<Record<string, string>> = {},
-  denied: readonly string[] = [],
 ): string | undefined => refusedStep(steps, places, gates, written, [], denied)?.why;
 
 /** A run's artifacts folder as a start asks of its steps' first filing, before the run has an id. */
@@ -243,8 +243,8 @@ export type ConfigRefused = (
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
+  denied: readonly string[],
   written?: Readonly<Record<string, string>>,
-  denied?: readonly string[],
 ) => string | undefined;
 
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
@@ -556,7 +556,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const { declared } = yield* PlaceService;
   const denied = declared.denyWhileLanding;
   const steps = yield* tried(() =>
-    stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates, refused, Boolean(opts.inputs?.length), denied),
+    stepsToStart(opts.workflowDir, isolate, places, denied, factory, opts.gates, refused, Boolean(opts.inputs?.length)),
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));

@@ -14,7 +14,8 @@ import ts from 'typescript';
 import { scratch } from './scratch.ts';
 import { app, runtime } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
-import { engine, runShipped as runWith, tickRun } from 'agent-orchestrator';
+import { engine, tickRun } from 'agent-orchestrator';
+import { runWith } from './placed.ts';
 
 /** What a file's text loads with `import()`, each as its call is written: never one in a string, a comment or a type (`import('…').T`). */
 function importCalls(text: string): string[] {

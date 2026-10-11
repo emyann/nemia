@@ -34,11 +34,11 @@ import {
   retryRun,
   roundRun,
   runStore,
-  runShipped as runWith,
   type RunHolding,
   type RunSummary,
   unhold,
 } from 'agent-orchestrator';
+import { runWith } from './placed.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 

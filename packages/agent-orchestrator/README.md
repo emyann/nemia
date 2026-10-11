@@ -1885,7 +1885,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   conflicts or leaves out a result branch, a run cancelled or held first, or the session ending any way but `done`.
   The step reads `checking` until then, `verified ✓` once the commit is made, and `failed ✗ check (…)` or `failed`
   once the merge is aborted, and its record keeps which (`landed: {commit}` or `{aborted}`), which `wf ls` words on the
-  step's line — the commit, or why none was made — and the board with it. The session is filed denied what its place's `place.json` names
+  step's line — the commit, or why none was made — and the board with it. The session is filed denied what its place declares
   (`denyWhileLanding`; git's: `git commit` and `git merge --continue`) beside its own `disallowedTools:` (`filedDenies`), so it cannot
   commit the merge before the check; a deny is a prefix, and a merge run without `--no-commit` would still commit, which the pass after records as
   committed before its check ran. The parser refuses such an ending on codex, which takes no deny list. A job cannot hold its
@@ -3117,7 +3117,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
   answers), `journals` (the runtime's journals, read through the engine), `observe` (asking each harness what runs), `runtime` (the
-  runtime's own pass, less its observe), `place` (every place verb's script, `runPlaceVerb` or `runPlaceVerbAsync`, its process and
+  runtime's own pass, less its observe), `place` (every question asked of the place, a call each: the git processes it starts and
   its time, whether it judged where a branch stands or acted — so it is a phase of its own rather than part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`
   (filing, admitting, stopping, collecting artifacts, and writing the record, the feed and the ceilings). A phase inside another counts as the inner one, so the phases add up to the pass's
   time, which is measured apart from them; `src/meter/tally.store.test.ts` holds the one against the other.

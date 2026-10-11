@@ -244,7 +244,7 @@ function ratchetBreaks(counts: Record<string, number>, baseline: Baseline, exist
   const out: string[] = [];
   for (const [file, count] of Object.entries(counts))
     if (!(file in baseline))
-      out.push(`${file} holds ${count} git calls: a git call belongs to the place skill, run through runPlaceVerb; never add them here`);
+      out.push(`${file} holds ${count} git calls: a git call belongs to the place's code, asked as a service; never add them here`);
   for (const [file, entry] of Object.entries(baseline)) {
     const naming = namingBreak(file, entry);
     const counted = countBreak(file, counts[file] ?? 0, entry.count, exists);
@@ -367,7 +367,7 @@ test('the git calls of every src are held to their baseline, each entry naming i
 
 test('REFUSED: a new file with a git call, in each layer, and a count raised by one', () => {
   const texts = repository();
-  const fix = 'a git call belongs to the place skill, run through runPlaceVerb; never add them here';
+  const fix = "a git call belongs to the place's code, asked as a service; never add them here";
   const planted = (file: string, text: string): string[] => ratchetBreaks(measured(new Map([...texts, [file, text]])), GIT_SITES, onDisk);
   for (const [file, plant] of [
     ['packages/agent-orchestrator/src/x/x.store.ts', PLANTS.spawn[0]],

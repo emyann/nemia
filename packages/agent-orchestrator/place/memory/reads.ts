@@ -112,11 +112,22 @@ export function status(held: Held, { checkout: dir, tips }: PlaceRequests['statu
   };
 }
 
-/** The paths `found`'s checkout holds that its commit does not, those the commit knows first, each group in order. */
+/** A path the commit does not know, as the highest folder of it holding no path the commit knows, closed by `/`; else the path. */
+function unknownIn(known: readonly string[], file: string): string {
+  const folders = file.split('/').slice(0, -1);
+  const prefixes = folders.map((_, i) => `${folders.slice(0, i + 1).join('/')}/`);
+  return prefixes.find((prefix) => !known.some((k) => k.startsWith(prefix))) ?? file;
+}
+
+/**
+ * The paths `found`'s checkout holds that its commit does not, those the commit knows first, each group in order: a folder the commit
+ * does not know is named once, whatever it holds.
+ */
 function changesIn({ repo, checkout }: Found): string[] {
   const [was, now] = [treeOf(repo, checkout), readTree(checkout.dir)];
   const paths = [...new Set([...Object.keys(was), ...Object.keys(now)])].filter((p) => was[p] !== now[p]).sort();
-  return [...paths.filter((p) => was[p] !== undefined), ...paths.filter((p) => was[p] === undefined)];
+  const news = paths.filter((p) => was[p] === undefined).map((p) => unknownIn(Object.keys(was), p));
+  return [...paths.filter((p) => was[p] !== undefined), ...new Set(news)];
 }
 
 /** One workspace as `inventory` lists it. */

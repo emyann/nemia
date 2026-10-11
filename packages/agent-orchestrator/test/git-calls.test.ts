@@ -22,21 +22,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { argumentsOf, calleeName, calleeRoot, factsOf, literalParts, runsGit, SPAWNS, type FileFacts } from './git-spawns.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
-/** The calls that start a process, by the name they are called by: their first argument is the command. */
-const SPAWNS = ['execFileSync', 'execFile', 'spawn', 'spawnSync', 'execCounted'];
-
-/** The calls that run a shell line: their first argument is the whole line, which runs git when its first word is git. */
-const SHELLS = ['exec', 'execSync'];
-
 /** The helpers that wrap a git spawn: each call of one runs git. */
 const WRAPPERS = ['git', 'gitSays'];
-
-/** The modules whose calls take a path. */
-const PATH_MODULES = ['node:path', 'node:fs', 'node:fs/promises', 'path', 'fs', 'fs/promises'];
 
 /** The path segments only git's own files have. */
 const GIT_SEGMENTS = ['.git', 'MERGE_HEAD'];
@@ -62,53 +54,7 @@ type Baseline = Readonly<Record<string, Entry>>;
 /** Each file that calls git, with its count and the cards that remove its calls: none. */
 const GIT_SITES: Baseline = {};
 
-/** What a matcher reads of a file beside a call: the `const`s that hold a string, and the names bound to a path module. */
-type FileFacts = { consts: ReadonlyMap<string, string>; pathNames: ReadonlySet<string> };
-
 type Matcher = { name: 'spawn' | 'wrapper' | 'path' | 'script'; matches: (call: ts.CallExpression, facts: FileFacts) => boolean };
-
-/** `node` without the parentheses, `as`, `satisfies` and `!` around it. */
-function unwrapped(node: ts.Expression): ts.Expression {
-  let at = node;
-  while (ts.isParenthesizedExpression(at) || ts.isAsExpression(at) || ts.isSatisfiesExpression(at) || ts.isNonNullExpression(at))
-    at = at.expression;
-  return at;
-}
-
-/** The string `node` is: a literal, a template with no substitution, or a `const` of the file that holds one; else `undefined`. */
-function stringOf(node: ts.Expression | undefined, facts: FileFacts): string | undefined {
-  if (!node) return undefined;
-  const at = unwrapped(node);
-  if (ts.isStringLiteral(at) || ts.isNoSubstitutionTemplateLiteral(at)) return at.text;
-  if (ts.isIdentifier(at)) return facts.consts.get(at.text);
-  return undefined;
-}
-
-/** The literal parts of `node`: its string, or a template's text around its substitutions. */
-function literalParts(node: ts.Expression, facts: FileFacts): string[] {
-  const at = unwrapped(node);
-  if (ts.isTemplateExpression(at)) return [at.head.text, ...at.templateSpans.map((s) => s.literal.text)];
-  const said = stringOf(at, facts);
-  return said === undefined ? [] : [said];
-}
-
-/** The name a call is called by: an identifier's, or the last name of a property access. */
-function calleeName(call: ts.CallExpression): string | undefined {
-  const callee = unwrapped(call.expression);
-  if (ts.isIdentifier(callee)) return callee.text;
-  if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
-  return undefined;
-}
-
-/** The identifier a callee is rooted in: `fs` of `fs.promises.stat`, `join` of `join`. */
-function calleeRoot(call: ts.CallExpression): string | undefined {
-  let at = unwrapped(call.expression);
-  while (ts.isPropertyAccessExpression(at)) at = unwrapped(at.expression);
-  return ts.isIdentifier(at) ? at.text : undefined;
-}
-
-/** Whether a shell line runs git: its first word is git. */
-const shellRunsGit = (parts: readonly string[]): boolean => /^\s*git(\s|$)/.test(parts[0] ?? '');
 
 /** Whether a string holds one of git's own files as a whole `/`-separated segment. */
 const namesGitFile = (text: string): boolean => text.split('/').some((segment) => GIT_SEGMENTS.includes(segment));
@@ -116,23 +62,10 @@ const namesGitFile = (text: string): boolean => text.split('/').some((segment) =
 /** Whether a string holds the folder of a place's scripts as a whole `/`-separated segment. */
 const namesScript = (text: string): boolean => text.split('/').some((segment) => SCRIPT_SEGMENTS.includes(segment));
 
-/** The arguments of `call`, a list among them given as its elements. */
-const argumentsOf = (call: ts.CallExpression): ts.Expression[] =>
-  call.arguments.flatMap((arg) => {
-    const at = unwrapped(arg);
-    return ts.isArrayLiteralExpression(at) ? [...at.elements] : [arg];
-  });
-
 const MATCHERS: readonly Matcher[] = [
   {
     name: 'spawn',
-    matches: (call, facts) => {
-      const name = calleeName(call);
-      const first = call.arguments[0];
-      if (!name || !first) return false;
-      if (SPAWNS.includes(name)) return stringOf(first, facts) === 'git';
-      return SHELLS.includes(name) && shellRunsGit(literalParts(first, facts));
-    },
+    matches: runsGit,
   },
   { name: 'wrapper', matches: (call) => WRAPPERS.includes(calleeName(call) ?? '') },
   {
@@ -147,30 +80,6 @@ const MATCHERS: readonly Matcher[] = [
       argumentsOf(call).some((arg) => literalParts(arg, facts).some(namesScript)),
   },
 ];
-
-/** The facts of a file a matcher reads: each `const` that holds a string, and each name imported from a path module. */
-function factsOf(source: ts.SourceFile): FileFacts {
-  const consts = new Map<string, string>();
-  const pathNames = new Set<string>();
-  const facts = { consts, pathNames };
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && PATH_MODULES.includes(node.moduleSpecifier.text)) {
-      const clause = node.importClause;
-      if (clause?.name) pathNames.add(clause.name.text);
-      const bindings = clause?.namedBindings;
-      if (bindings && ts.isNamespaceImport(bindings)) pathNames.add(bindings.name.text);
-      if (bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) pathNames.add(element.name.text);
-    }
-    if (ts.isVariableDeclarationList(node) && node.flags & ts.NodeFlags.Const)
-      for (const declaration of node.declarations) {
-        const held = declaration.initializer && stringOf(declaration.initializer, facts);
-        if (ts.isIdentifier(declaration.name) && held !== undefined) consts.set(declaration.name.text, held);
-      }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return facts;
-}
 
 type Site = { line: number; matcher: Matcher['name'] };
 

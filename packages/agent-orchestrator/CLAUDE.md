@@ -13,15 +13,19 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
 - **The place is a service with no default (`PlaceService`, `src/place/place.store.ts`)**: a controller asks it (`yield* PlaceService`),
   a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon, the CLI
-  (`runWith(e, shipped(program))`) and the api, `runOver(runEngine, gitPlaceLayer)` at a test's head (`test/placed.ts`). A program given none does not
-  compile. A test answers a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
+  (`runWith(e, shipped(program))`) and the api, `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A
+  program given none does not compile. A test answers a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
 - **The git place's code is `place/git/` (`place.ts`, `git.ts`, `verbs/`), behind one door, `src/place/shipped.store.ts`**
   (`placeBreaks` in `test/boundary.test.ts`): a verb is a generator that yields each git command, so one body answers `ask` (off the
   loop) and `askNow` (`spawnSync`); it reads its request first (`asked.ts`), and a throw is unread in one sentence.
 - **The test place is `place/memory/` (`testPlace()`: a place, its layer, and `world`, a session's and a person's part)**: a test file
   names it with `const stand = eachTest(testPlace);` and `runOver(runEngine, () => stand().layer)` (`test/placed.ts`), new for each
-  test. Its merge is by file, with no rename, ignore rule, hook, lock or deadline: a test of one keeps `gitPlaceLayer`. A verb's
+  test. Its merge is by file, with no rename, ignore rule, hook, lock or deadline: a test of one keeps `gitPlaceLayer`, in a boundary
+  file. A verb's
   behaviour is a walk in `test/place-walks.ts`, with the one answer both places give.
+- **A test file that runs git, imports what starts a process, names the real place or engine, or makes an engine by hand is named
+  `<what>.boundary.test.ts`**, its helpers followed: `test/stand-ins.test.ts` refuses any other, but the files and kinds listed in
+  `test/stand-ins.baseline.ts` (`node test/stand-ins.ts` measures it), which only shrinks.
 - **A git call belongs to the place's code, never to `src`**: `test/git-calls.test.ts` refuses a `'git'` spawn, a call of `git` or
   `gitSays`, a `.git` or `MERGE_HEAD` path, and a `scripts` path handed to a spawn or to `node:path` (`script`: no process a question)
   in `packages/*/src` and `apps/*/src`; `GIT_SITES` is empty, and stays so.
@@ -32,7 +36,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **The command is `nemia` in every printed word; a `wf` said in `src` or `bin` is refused by `test/cli-name.test.ts`**, but a value
   stored and read back as written (`by: 'wf up'`, the check's marker `wf <name>:`), listed in its `KEPT` (the api's has none).
 - **Git holds `index.lock` through a clean filter under `git add`, not through `git commit`'s pre-commit hook** (it writes the index
-  first): a test that holds a lock past a verb's deadline holds it with a filter (`test/git-skill.test.ts`).
+  first): a test that holds a lock past a verb's deadline holds it with a filter (`test/git-skill.boundary.test.ts`).
 
 ## Keys, agents and folders
 

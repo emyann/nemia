@@ -12,9 +12,12 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A file in `src/<feature>/` says its kind by its name**: `x.store.ts`, `x.verb.ts`, else pure; only a top-level file is listed in
   `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
 - **The place is a service with no default (`PlaceService`, `src/place/place.store.ts`)**: a controller asks it (`yield* PlaceService`),
-  a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon, the CLI
-  (`runWith(e, shipped(program))`) and the api, `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A
-  program given none does not compile. A test answers a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
+  a store helper takes it as an argument, and whoever runs the program gives it by name — `gitPlaceLayer` at the daemon and the api,
+  `runOver(runEngine, () => stand().layer)` at a test's head (`test/placed.ts`). A program given none does not compile. A test answers
+  a verb itself with `placeOver` (`test/place-over.ts`), never a planted folder.
+- **`main` is handed its place as its engine and its demand host, the git place where it is handed none** (`src/cli/main.ts`), and
+  each command gives it to its program (`placedIn(place, program)`): a test that types a command hands the test's,
+  `main(argv, e, undefined, stand().place)`, and `test/cli-place.test.ts` refuses a file of `src/cli` that names the git place.
 - **The git place's code is `place/git/` (`place.ts`, `git.ts`, `verbs/`), behind one door, `src/place/shipped.store.ts`**
   (`placeBreaks` in `test/boundary.test.ts`): a verb is a generator that yields each git command, so one body answers `ask` (off the
   loop) and `askNow` (`spawnSync`); it reads its request first (`asked.ts`), and a throw is unread in one sentence.

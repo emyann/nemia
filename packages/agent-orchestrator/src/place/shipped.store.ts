@@ -29,3 +29,7 @@ export const gitPlaceLayer = PlaceService.layer(shippedGitPlace);
 /** `program` given `shippedGitPlace`, and still to be run: how a command of the CLI gives its program the place, by name. */
 export const shipped = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
   Effect.provide(program, gitPlaceLayer);
+
+/** `program` given `place`, and still to be run: how a command of the CLI gives its program the place it was handed. */
+export const placedIn = <A, E, R>(place: Place, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
+  Effect.provide(program, PlaceService.layer(place));

@@ -2,13 +2,13 @@
  * What the CLI's verbs and runners share: the help, a verb's shape, a usage refusal, a person's yes.
  */
 import readline from 'node:readline/promises';
-import { CLI_VERBS, Invalid, TABLE, helpOf, type engine } from '../runner.ts';
+import { CLI_VERBS, Invalid, TABLE, helpOf, type engine, type Place } from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
 
-/** A verb: it takes what follows it on the command line and the engine, and prints what it did, or throws a refusal. */
-export type Verb = (rest: string[], e: Engine) => void | Promise<void>;
+/** A verb: it takes what follows it on the command line, the engine and the place, and prints what it did, or throws a refusal. */
+export type Verb = (rest: string[], e: Engine, place: Place) => void | Promise<void>;
 
 /** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';

@@ -112,7 +112,7 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/test/forget-linked.test.ts': ['git', 'process', 'place', 'hand'],
   'packages/agent-orchestrator/test/former-keys.test.ts': ['git', 'process', 'hand'],
   'packages/agent-orchestrator/test/free.test.ts': ['git', 'process', 'place', 'engine'],
-  'packages/agent-orchestrator/test/gate.test.ts': ['git', 'process', 'place', 'hand'],
+  'packages/agent-orchestrator/test/gate.test.ts': ['hand'],
   'packages/agent-orchestrator/test/held.test.ts': ['git', 'process', 'place', 'engine'],
   'packages/agent-orchestrator/test/hold.test.ts': ['git', 'process', 'place', 'hand'],
   'packages/agent-orchestrator/test/imports.test.ts': ['process'],

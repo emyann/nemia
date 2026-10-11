@@ -10,13 +10,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -36,18 +36,20 @@ const {
   startRun,
   startFromInbox,
   runWith: runEngine,
-  gitPlaceLayer,
   standingLiveOf,
 } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 const { listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
-const { main } = await import('../src/cli/main.ts');
+const { main: cli } = await import('../src/cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Engine) => cli(argv, e, undefined, stand().place);
 const { engineOf } = await import('../src/runtime-client.ts');
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
@@ -56,10 +58,7 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 
@@ -88,14 +87,6 @@ const board = () => {
 };
 
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
-
-/** Git in a checkout, as a person types it there. */
-const gitIn = (cwd: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
 
 const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** An approval, written as a person's file beside the retry asks — what `nemia approve` writes. */
@@ -322,11 +313,11 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   await runWith(b.e, advanceRun(readRun(parent.id)));
   const wt = readRun(parent.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, 'parent.txt'), 'parent\n');
-  gitIn(wt, 'add', '-A');
-  gitIn(wt, 'commit', '-q', '-m', 'add parent.txt');
+  stand().world.commit(wt, 'add parent.txt');
   b.settle(`${parent.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(parent.id)));
-  gitIn(repo, 'merge', '-q', '--no-ff', `wf/${parent.id}/implement`, '-m', 'merge the parent');
+  stand().world.stage(repo, `wf/${parent.id}/implement`);
+  stand().world.commit(repo, 'merge the parent');
 
   const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] }));
   assert.equal((await runWith(b.e, parentNow(parent.id))).shipped, false, 'merged, and at its gate');

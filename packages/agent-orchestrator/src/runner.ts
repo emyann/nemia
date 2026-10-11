@@ -302,7 +302,7 @@ export { evictedBy } from './rest/rest.ts';
 export { removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
-export { gitPlaceLayer, shipped, shippedGitPlace } from './place/shipped.store.ts';
+export { gitPlaceLayer, placedIn, shipped, shippedGitPlace } from './place/shipped.store.ts';
 export { briefNow } from './tick/told.verb.ts';
 export type {
   BranchStood,

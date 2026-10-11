@@ -2,8 +2,8 @@
  * A step's metrics (`step.ts`, `recordStepMetrics`): the facts read off the tasks a pass saw settle, recorded by the five attributes
  * alone, and a fact whose attributes carry a run's id refused; the waits — a session's queue, a check's run, a gate's wait — equal to what
  * the timeline and `nemia stats` say of the same records, each a histogram by the five and a span with its run and try; and the calls a
- * harness denied a session (`deniedCalls`), one per call of each ended attempt past the run's mark, each a span and no metric. The tick that
- * hands them over is proven on a store in `test/step-metrics.test.ts` and `test/wait-metrics.test.ts`.
+ * harness denied a session (`deniedCalls`), one per call of each ended attempt past the run's mark, each a span and no metric. The tick
+ * that hands them over is proven on a store in `test/step-metrics.test.ts` and `test/wait-metrics.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

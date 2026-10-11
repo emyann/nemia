@@ -35,7 +35,7 @@ const { approveRun, cancelRun, feedCursorRefusal, feedFile, freshFeedMemo, readF
 const store = await import('./feed.store.ts');
 /** The lines the feed's writer wrote (`recordFeed`), as a pass hands it what it judged. */
 const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
-const { readRun } = await import('../record/record.store.ts');
+const { readRun, rewriteRun } = await import('../record/record.store.ts');
 const { freshRestMemo } = await import('../tick/tick.verb.ts');
 const { main, watchPrinted, watching } = await import('../cli/main.ts');
 
@@ -324,6 +324,7 @@ test('REFUSED: finished runs whose notes are worded anew, as a new denied: part 
     assert.deepEqual(lastSaid(r.id), ['succeeded', 'unverified · done', 'unverified · done'], 'each run finished, and the feed said so');
 
   for (const r of runs) b.deny(`${r.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
+  for (const r of runs) rewriteRun({ ...readRun(r.id), deniedCounted: [{ task: `${r.id}-plan`, attempts: 1 }] });
   const quiet = size();
   for (let i = 0; i < 2; i++) {
     const pass = await runWith(b.e, tickRun({ memo: freshRestMemo() }));

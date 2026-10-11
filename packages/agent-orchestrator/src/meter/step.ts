@@ -253,8 +253,8 @@ export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyM
 }
 
 /**
- * One call a harness denied a step's session, for a span of its own and no metric: the step's four labels (`stepKeys`, no outcome: a call is
- * denied whatever its try comes to), the run, the session's task, the tool denied and the call as a permission rule names it
+ * One call a harness denied a step's session, for a span of its own and no metric: the step's four labels (`stepKeys`, no outcome: a call
+ * is denied whatever its try comes to), the run, the session's task, the tool denied and the call as a permission rule names it
  * (`Skill(look)`), when its attempt ended (`at`), and which attempt of the task that was, from 1.
  */
 export type DeniedFact = {

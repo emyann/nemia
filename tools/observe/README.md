@@ -163,6 +163,10 @@ A step's cost, tokens, time, tries, checks, rounds and waits are counters and hi
   recorded. A session that ended while no daemon ran is counted by the first daemon that reads it, and a daemon started again counts
   none twice. A session held open and answered by a person is one try when it settles, with its cost once, however many answers it took.
 
+Measured 2026-10-11 on this stack, with one try of $1.25 posted in a factory never seen: Prometheus kept the series at 0, then at 1.25
+24 ms later, and **System**'s own Cost and Tries queries answered it. `increase()` extrapolates to the edge of its range by half the
+gap between samples, so a series reads high while it is young: 1.33 for 1.25 after a minute of exports, and less as the daemon lives on.
+
 What is still lost:
 
 - **A daemon that dies between a pass's write of the record and the end of the export that follows** loses that pass's facts: they

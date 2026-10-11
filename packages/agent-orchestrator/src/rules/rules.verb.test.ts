@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
@@ -16,8 +17,10 @@ const ROOT = scratch('wf-rules-verb-');
 process.env.WF_ROOT = ROOT;
 const { FACTORY_RULES, factoryRules } = await import('./rules.verb.ts');
 const { addFactory } = await import('../factory/factory.store.ts');
-const { runWith: runEngine, engine } = await import('../runner.ts');
+const { runWith: runEngine } = await import('../runner.ts');
+const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
@@ -28,7 +31,7 @@ const FILE = path.join(ROOT, 'factories', 'pipao', 'RULES.md');
 addFactory({ name: 'pipao', repos: [fs.mkdtempSync(path.join(ROOT, 'repo-'))] });
 
 /** The command run with `args`, as the CLI and the api run it. */
-const run = (args: Args) => runWith(engine(), FACTORY_RULES.handler(args));
+const run = (args: Args) => runWith(engineOf(engine().layer), FACTORY_RULES.handler(args));
 
 test('a factory with no rules reads none; written, they are read back and printed; cleared, they are gone', async () => {
   assert.deepEqual(await run({ factory: 'pipao' }), { name: 'pipao', file: FILE, words: null, error: null });

@@ -6,7 +6,8 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from '../../test/placed.ts';
 import { scratch } from '../../test/scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-passes-');
@@ -16,8 +17,11 @@ const { recentFile, recordRecentPass } = await import('../daemon/daemon.store.ts
 const { PHASES, passCost, passesRead, recentOf } = await import('./meter.ts');
 const { passesOf } = await import('./passes.verb.ts');
 
-/** No pass is run: the engine is never asked. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
+
+/** The engine of this test, the stand-in none of these commands asks anything of. */
+const noEngine = () => engineOf(engine().layer);
 
 /** A pass of `ms`, at the `k`th second, that saw `runs` runs. */
 const cost = (k: number, ms: number, runs: number) =>
@@ -43,7 +47,7 @@ const typed = async (t: TestContext, argv: string[]) => {
     printed.push(args.map(String).join(' '));
   });
   try {
-    await main(argv, NO_ENGINE);
+    await main(argv, noEngine());
   } finally {
     log.mock.restore();
   }
@@ -75,7 +79,7 @@ test('`nemia passes --json` is the whole answer, the passes oldest first; --last
 
 test('REFUSED: a --last that is not a whole number from 1, as Invalid, naming what it takes', async () => {
   for (const last of ['0', 'x', '-1', '1.5']) {
-    await assert.rejects(main(['passes', '--last', last], NO_ENGINE), (err: Error & { exitCode?: number }) => {
+    await assert.rejects(main(['passes', '--last', last], noEngine()), (err: Error & { exitCode?: number }) => {
       assert.equal(err.exitCode, 2);
       assert.equal(
         err.message,

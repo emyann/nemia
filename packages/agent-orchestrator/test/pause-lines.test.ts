@@ -9,14 +9,16 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest } from './placed.ts';
 
 const ROOT = scratch('wf-pause-lines-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { main } = await import('../src/cli/main.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 const { pauseSaid } = await import('../src/daemon/up.verb.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { pausedWords, RESUMED } = await import('../src/pause/pause.ts');
@@ -36,15 +38,14 @@ const printed = async (t: TestContext, fn: () => unknown): Promise<string[]> => 
   return lines.join('\n').split('\n');
 };
 
+const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 let factories = 0;
 
 /** A repository with one commit, a team of one step and one agent, and a factory of its own on the repository that offers it, hired. */
 const aStart = (): string[] => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   const dir = path.join(team, 'lines');
   fs.mkdirSync(dir);
@@ -61,13 +62,13 @@ const aStart = (): string[] => {
 test('nemia feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
-    const feed = await printed(t, () => main(['feed'], promised({})));
+    const feed = await printed(t, () => main(['feed'], engineOf(engine().layer), undefined, stand().place));
     assert.equal(feed[0], pausedWords({ pause, finishing: [], staged: [], held: [] }), feed.join('\n'));
     assert.match(feed[0], /^Paused since /);
   } finally {
     resumePause();
   }
-  const lifted = await printed(t, () => main(['feed'], promised({})));
+  const lifted = await printed(t, () => main(['feed'], engineOf(engine().layer), undefined, stand().place));
   assert.equal(
     lifted.some((l) => l.startsWith('Paus')),
     false,
@@ -79,14 +80,14 @@ test('nemia start says, after how to start the run, that nothing of it is filed 
   const pause = putPause({ by: 'ann' });
   let started: string[];
   try {
-    started = await printed(t, () => main(aStart(), promised({})));
+    started = await printed(t, () => main(aStart(), engineOf(engine().layer), undefined, stand().place));
   } finally {
     resumePause();
   }
   const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
   assert.ok(at > 0, started.join('\n'));
   assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [], staged: [], held: [] })}: nothing of this run is filed until then`);
-  const free = await printed(t, () => main(aStart(), promised({})));
+  const free = await printed(t, () => main(aStart(), engineOf(engine().layer), undefined, stand().place));
   assert.equal(
     free.some((l) => l.includes('nothing of this run is filed')),
     false,

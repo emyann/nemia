@@ -8,14 +8,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest } from './placed.ts';
 
+const stand = eachTest(testPlace);
 const ROOT = scratch('wf-store root*-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/start/start.verb.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
 
 /** A workflow folder `name` of `files`, each a step's file by its name. */
 function folder(name: string, files: Record<string, string>): string {
@@ -28,10 +29,7 @@ function folder(name: string, files: Record<string, string>): string {
 /** A repository with one commit, so a run has a base to record. */
 function aRepo(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 }
 
@@ -41,7 +39,7 @@ const runsWritten = (): string[] =>
 /** `startRun` of `workflowDir` in a repository of its own, given `inputs`: the run's id, or the refusal it failed with. */
 function started(workflowDir: string, inputs?: string[]): string {
   const exit = Effect.runSyncExit(
-    startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, ...(inputs ? { inputs } : {}) }).pipe(Effect.provide(gitPlaceLayer)),
+    startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, ...(inputs ? { inputs } : {}) }).pipe(Effect.provide(stand().layer)),
   );
   if (exit._tag === 'Success') return exit.value.id;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));

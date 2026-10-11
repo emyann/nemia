@@ -16,7 +16,7 @@ import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { readsMounts } from '../src/filed/filed.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
@@ -25,7 +25,9 @@ const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { artifactsDir, inputsDir, readRun } = await import('../src/record/record.store.ts');
@@ -75,41 +77,21 @@ function fresh(): { repos: string[]; loop: string; notes: string } {
 const readOnly = (...paths: string[]) => paths.map((p) => ({ path: p, readOnly: true }));
 
 /**
- * Just enough engine: each task's phase and closeout, and every task filed, by id, as the run handed it. A task settled `lost` keeps no
- * session id, so what is filed after it starts a new session.
+ * The engine stand-in with each task's phase and closeout settled by hand, and every task filed, by id, as the run handed it. A task
+ * settled `lost` keeps no session id, so what is filed after it starts a new session.
  */
 const board = () => {
-  const tasks = new Map<string, { phase: string; closeout?: unknown; lost?: boolean }>();
-  const filed = new Map<string, { brief: string; harness?: string; config?: { mounts?: unknown } }>();
-  const e = promised({
-    view: async (id: string) => {
-      const t = tasks.get(id);
-      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
-      return {
-        id,
-        phase: t?.phase ?? 'pending',
-        sessionId: t ? 's' : null,
-        state: {
-          brief: t ? 'filed' : '',
-          settled,
-          stopRequested: false,
-          said: [],
-          attempts:
-            !t || t.phase === 'pending'
-              ? []
-              : [{ n: 1, ended: null, nativeId: t.lost ? null : `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
-        },
-      };
+  const held = engine();
+  const filed = () => new Map(held.specs.map((spec) => [spec.id, spec]));
+  const settle = (id: string, phase: string, closeout?: unknown, lost = false) =>
+    held.settle(id, phase, { ...(closeout !== undefined && { closeout }), ...(lost && { nativeId: null }) });
+  return {
+    e: engineOf(held.layer),
+    get filed() {
+      return filed();
     },
-    file: async (spec: { id: string; brief: string; config?: { mounts?: unknown } }) => {
-      filed.set(spec.id, spec);
-      tasks.set(spec.id, { phase: 'pending' });
-      return spec.id;
-    },
-    stop: async () => {},
-  });
-  const settle = (id: string, phase: string, closeout?: unknown, lost = false) => tasks.set(id, { phase, closeout, lost });
-  return { e, filed, settle };
+    settle,
+  };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };

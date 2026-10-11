@@ -1,22 +1,23 @@
 /**
  * `main`, the verbs' table: the help for a verb it does not know and for one given too little, and the lines of the verbs no other test
- * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia accept` — over a store and a repository of their own, with git for real.
+ * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia accept` — over a store and a repository of their own, on the test place.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { TaskPhase } from '../run.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { runGiven, runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
-const { advanceRun, CLI, TABLE, startRun, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const { advanceRun, CLI, TABLE, startRun, runWith: runEngine } = await import('../runner.ts');
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../record/record.store.ts');
 const { aliased, main, VERBS } = await import('./main.ts');
 const { HELP, WF_HINT } = await import('./flags.ts');
@@ -24,20 +25,11 @@ const { offLine } = await import('../demand/demand.ts');
 
 type Engine = NonNullable<Parameters<typeof main>[1]>;
 
-const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-
 /** A repository with one commit. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
-  git(repo, 'add', '-A');
-  git(repo, 'commit', '-q', '-m', 'base');
+  stand().world.repository(repo, { 'README.md': 'readme\n' });
   return repo;
 };
 
@@ -106,7 +98,7 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
   const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
   const error = t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
   try {
-    await main(argv, e);
+    await main(argv, e, undefined, stand().place);
   } finally {
     log.mock.restore();
     error.mock.restore();

@@ -11,13 +11,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { runGiven } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 
+const place = testPlace();
+const stand = () => place;
 const ROOT = scratch('wf-telemetry-nesting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
@@ -26,18 +28,13 @@ process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const runPlaced = runGiven(() => stand().layer);
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'init', '-q'], { cwd: REPO, stdio: 'ignore' });
-execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], {
-  cwd: REPO,
-  stdio: 'ignore',
-});
+stand().world.repository(REPO, {});
 
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');

@@ -14,22 +14,24 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Effect, Metric, References } from 'effect';
 import { Engine as RuntimeEngine, nameFor, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 
+const place = testPlace();
+const stand = () => place;
 const ROOT = scratch('wf-wait-metrics-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '10';
 process.env.WF_MAX_CONCURRENT = '10';
-const { approveRun, runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { approveRun, runWith: runEngine, startRun, tickRun } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
@@ -130,8 +132,7 @@ const counted = async (id: string) =>
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'init', '-q'], { cwd: repo, stdio: 'ignore' });
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], { cwd: repo });
+  stand().world.repository(repo, {});
   return repo;
 };
 

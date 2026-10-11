@@ -14,14 +14,17 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-agents-copy-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, engine, hireAgent, runWith: runEngine, startRun, TABLE } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, hireAgent, runWith: runEngine, startRun, TABLE } = await import('../src/runner.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
@@ -30,7 +33,7 @@ const { agentsLines } = await import('../src/roster/roster.ts');
 const { agentSources } = await import('../src/sources/sources.store.ts');
 const { sourcesLines } = await import('../src/sources/sources.ts');
 
-const e = engine();
+const e = () => engineOf(engine().layer);
 
 /**
  * The fixture repository: `.claude/agents/` with `scout` and `counted`, `workflows/agents/` with `planner`, and a planted `docs/agents/`.
@@ -38,7 +41,7 @@ const e = engine();
 const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'agents-copy', 'repo');
 
 /** The copy `args` asks for, into the library of the store `home`. */
-const copy = (args: Record<string, string | readonly string[]>, home: string) => runWith(e, AGENTS_COPY.handler(args, undefined, home));
+const copy = (args: Record<string, string | readonly string[]>, home: string) => runWith(e(), AGENTS_COPY.handler(args, undefined, home));
 
 /** Refused by kind, exit 2, its message matching each of `patterns` — never `String(err)`, which starts with `Error: `. */
 const refusedWith =
@@ -337,7 +340,7 @@ test('nemia agents sources lists each repository the store knows, workflows/agen
   assert.equal(lines.at(-1), 'copy one into your library: nemia agents copy <file> [--as <name>]');
   assert.ok(lines.includes(`${path.join(repo, '.claude', 'agents')}  (the repository ${repo})`));
   await assert.rejects(
-    runWith(e, Effect.try({ try: () => agentSources({ at: path.join(home, 'none'), home }), catch: (err) => err })),
+    runWith(e(), Effect.try({ try: () => agentSources({ at: path.join(home, 'none'), home }), catch: (err) => err })),
     refusedWith('Missing', /none is not a folder/),
   );
 });

@@ -13,6 +13,7 @@ import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Finishing } from '../pause/pause.ts';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
@@ -24,8 +25,9 @@ delete process.env.WF_MAX_CONCURRENT;
 const { installService, uninstallService, serviceStatus, SERVICES } = await import('./service.verb.ts');
 const { restartService, RESTARTS } = await import('./restart.verb.ts');
 const { putPause, readPause, pauseFile, resumePause } = await import('../pause/pause.store.ts');
-const { EngineService, runWith: runEngine } = await import('../runtime-client.ts');
+const { EngineService, engineOf, runWith: runEngine } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const { nemiaFence } = await import('../admission/fence.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
@@ -141,7 +143,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
   return { host, events };
 }
 
-const install = (args: Args, host: ServiceHost) => runWith({} as never, installService(args, host));
+const install = (args: Args, host: ServiceHost) => runWith(engineOf(engine().layer), installService(args, host));
 
 beforeEach(() => {
   fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
@@ -267,7 +269,7 @@ test('a take-over interrupted while it waits on a landing lifts its own pause an
   const waiting = new Promise<void>((resolve) => (said = resolve));
   const fiber = Effect.runFork(
     installService({ takeOver: String(OLD) }, { ...host, say: (l) => (events.push(`say ${l}`), said()) }).pipe(
-      Effect.provideService(EngineService, {} as never),
+      Effect.provide(EngineService.layer(engineOf(engine().layer))),
       Effect.provide(stand().layer),
     ),
   );
@@ -304,10 +306,13 @@ test('REFUSED when the stopped daemon still holds the store: Conflict naming ps 
 
 test('uninstall stops, disables and removes the unit, then says how the lease stands; one not installed is Missing', async () => {
   const { host, events } = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null, landings: [] });
-  await assert.rejects(runWith({} as never, uninstallService({}, host)), refusedWith('Missing', /no service nemia is installed/));
+  await assert.rejects(
+    runWith(engineOf(engine().layer), uninstallService({}, host)),
+    refusedWith('Missing', /no service nemia is installed/),
+  );
   await install({}, host);
   events.length = 0;
-  const done = await runWith({} as never, uninstallService({}, host));
+  const done = await runWith(engineOf(engine().layer), uninstallService({}, host));
   assert.deepEqual(events, ['systemctl --user disable --now nemia.service', 'systemctl --user daemon-reload']);
   assert.equal(fs.existsSync(UNIT), false);
   assert.match(done.lines[1], /^api: none ticking — pid 4242 stopped/);
@@ -315,10 +320,10 @@ test('uninstall stops, disables and removes the unit, then says how the lease st
 
 test('status reads the unit back: what it runs, from which checkout, who holds the store, and lingering', async () => {
   const { host } = hostOf({ lease: lease(OLD), unitPid: OLD, landings: [] });
-  const before = await runWith({} as never, serviceStatus({}, host));
+  const before = await runWith(engineOf(engine().layer), serviceStatus({}, host));
   assert.equal(before.service.unit, null);
   await install({}, host);
-  const after = await runWith({} as never, serviceStatus({}, host));
+  const after = await runWith(engineOf(engine().layer), serviceStatus({}, host));
   assert.equal(after.service.unit?.entry, '/srv/nemia/apps/api/src/main.ts');
   assert.equal(after.service.unit?.node, '/usr/bin/node');
   assert.ok(
@@ -349,7 +354,7 @@ const installed = async (): Promise<void> => {
   await install({}, hostOf({ lease: { kind: 'none' }, unitPid: null, landings: [] }).host);
 };
 
-const restart = (args: Args, host: ServiceHost) => runWith({} as never, restartService(args, host));
+const restart = (args: Args, host: ServiceHost) => runWith(engineOf(engine().layer), restartService(args, host));
 
 test('REFUSED when the new daemon ends before its first pass: Conflict naming its log, the lease and nemia resume, and no resume', async () => {
   for (const ended of ['stopped', 'gone'] as const) {

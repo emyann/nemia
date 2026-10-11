@@ -11,14 +11,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { promised } from './promised.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { eachTest } from './placed.ts';
 
 const ROOT = scratch('wf-agents-cli-');
 process.env.WF_ROOT = ROOT;
 const { main } = await import('../src/cli/main.ts');
 
-/** No verb here asks the engine anything. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../src/runtime-client.ts');
+const engine = eachTest(testEngine);
+
+/** The engine of this test, the stand-in none of these commands asks anything of. */
+const noEngine = () => engineOf(engine().layer);
 
 type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
 
@@ -33,7 +37,7 @@ const printedBy = async (t: Mock, ...argv: string[]): Promise<{ out: string; err
     err.push(args.join(' '));
   });
   try {
-    await main(argv, NO_ENGINE);
+    await main(argv, noEngine());
   } finally {
     log.mock.restore();
     warn.mock.restore();

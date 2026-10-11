@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
@@ -31,8 +31,11 @@ const runWith = runOver(runEngine, () => stand().layer);
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 const { Effect } = await import('effect');
 
-/** No verb here asks the engine anything. */
-const NO_ENGINE = promised({});
+const { engineOf } = await import('../runtime-client.ts');
+const engine = eachTest(testEngine);
+
+/** The engine of this test, the stand-in none of these commands asks anything of. */
+const noEngine = () => engineOf(engine().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
@@ -79,7 +82,7 @@ const filed = (): string[] => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTOR
 
 /** `nemia factory apply` of the template `dir` as `name`, in the repository `repo`, with `rest` after. */
 const apply = (name: string, dir: string, repo: string, ...rest: string[]) =>
-  main(['factory', 'apply', name, '--template', dir, '--repo', repo, ...rest], NO_ENGINE);
+  main(['factory', 'apply', name, '--template', dir, '--repo', repo, ...rest], noEngine());
 
 /** The factory `name`, read as the controller reads it. */
 const templated = (name: string) =>
@@ -99,7 +102,7 @@ test('apply refuses a key not declared, a value of the wrong type and a required
   );
   await assert.rejects(apply('refused', dir, repo), refusedWith('Invalid', /budget has no default, and no --set gives it/));
   await assert.rejects(
-    main(['factory', 'apply', 'refused', '--repo', repo], NO_ENGINE),
+    main(['factory', 'apply', 'refused', '--repo', repo], noEngine()),
     refusedWith('Invalid', /name its folder or archive with --template <folder\|archive>/),
   );
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
@@ -175,7 +178,7 @@ test('a template packed into an archive applies as its folder does, each file re
   fs.mkdirSync(path.dirname(path.join(dir, script)), { recursive: true });
   fs.writeFileSync(path.join(dir, script), '#!/bin/sh\necho run\n', { mode: 0o755 });
   const archive = path.join(scratch('wf-applied-archive-'), 'team.tgz');
-  await main(['template', 'pack', dir, '--out', archive], NO_ENGINE);
+  await main(['template', 'pack', dir, '--out', archive], noEngine());
   fs.rmSync(dir, { recursive: true });
   await apply('packed', archive, repo, '--set', 'budget=7');
   assert.deepEqual(templated('packed').template, { source: archive, version: '0.1.0', params: { budget: 7, model: 'opus' } });
@@ -289,18 +292,18 @@ test("a templated factory's instruction is its tree's NEMIA.md, written by instr
   const words = path.join(scratch('wf-applied-words-'), 'words.md');
   fs.writeFileSync(words, 'Operate the tree.\n');
   await assert.rejects(
-    main(['factory', 'instruct', 'told', '--file', words], NO_ENGINE),
+    main(['factory', 'instruct', 'told', '--file', words], noEngine()),
     refusedWith('Conflict', /its tree is not rendered yet/),
   );
   assert.equal(fs.existsSync(treeDir('told')), false, 'an instruct refused seeds no tree');
   reconcileFactory(templated('told'));
-  await main(['factory', 'instruct', 'told', '--file', words], NO_ENGINE);
+  await main(['factory', 'instruct', 'told', '--file', words], noEngine());
   assert.equal(fs.readFileSync(path.join(treeDir('told'), 'NEMIA.md'), 'utf8'), 'Operate the tree.\n');
   await assert.rejects(
-    main(['factory', 'instruction', 'told', '--store'], NO_ENGINE),
+    main(['factory', 'instruction', 'told', '--store'], noEngine()),
     refusedWith('Invalid', /its instruction is its tree's NEMIA\.md/),
   );
-  await main(['factory', 'rm', 'told'], NO_ENGINE);
+  await main(['factory', 'rm', 'told'], noEngine());
   assert.deepEqual(
     filed().filter((f) => f.startsWith('told')),
     [],
@@ -315,7 +318,7 @@ test("a bare workflow name started in a templated factory is its tree's, and the
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
   const printed: string[] = [];
   t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
-  await main(['start', 'Cache the views', '--factory', 'started', '--workflows', 'dev'], NO_ENGINE);
+  await main(['start', 'Cache the views', '--factory', 'started', '--workflows', 'dev'], noEngine());
   const run = readRun(printed[0].split(' ')[0]);
   assert.equal(run.workflowDir, path.join(treeDir('started'), 'workflows', 'dev'));
   assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9, "the tree's step, as the person changed it");
@@ -329,8 +332,8 @@ test("a templated factory's due schedule starts its tree's workflow, as a person
   reconcileFactory(templated('scheduled'));
   const review = path.join(treeDir('scheduled'), 'workflows', 'dev', 'review.md');
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
-  await main(['factory', 'schedule', 'scheduled', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views'], NO_ENGINE);
-  const started = await runWith(NO_ENGINE, startDue(repo, [], Date.parse('2100-01-01T00:00:00Z')));
+  await main(['factory', 'schedule', 'scheduled', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views'], noEngine());
+  const started = await runWith(noEngine(), startDue(repo, [], Date.parse('2100-01-01T00:00:00Z')));
   assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
   const run = readRun(started.run);
   assert.equal(run.workflowDir, path.join(treeDir('scheduled'), 'workflows', 'dev'));
@@ -341,7 +344,7 @@ test("the writers' place factory writes a templated factory's tree; refused with
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('written', dir, repo, '--set', 'budget=7');
-  await main(['factory', 'add', 'plain', '--repo', repo], NO_ENGINE);
+  await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
   const drafts = scratch('wf-applied-drafts-');
   const beside = path.join(drafts, 'workflows', 'lean');
   fs.cpSync(path.join(repo, 'workflows', 'dev'), beside, { recursive: true });
@@ -360,20 +363,23 @@ test("the writers' place factory writes a templated factory's tree; refused with
     ['skills', 'write', 'factory', '--file', skill],
   ];
   for (const write of writes(beside)) {
-    await assert.rejects(main(write, NO_ENGINE), refusedWith('Invalid', /`factory` writes the tree .* none was named: .*--factory <name>/));
     await assert.rejects(
-      main([...write, '--factory', 'written'], NO_ENGINE),
+      main(write, noEngine()),
+      refusedWith('Invalid', /`factory` writes the tree .* none was named: .*--factory <name>/),
+    );
+    await assert.rejects(
+      main([...write, '--factory', 'written'], noEngine()),
       refusedWith('Conflict', /its tree is not rendered yet, at .*: start the daemon, nemia up/),
     );
-    await assert.rejects(main([...write, '--factory', 'plain'], NO_ENGINE), refusedWith('Invalid', /plain is not made from a template/));
+    await assert.rejects(main([...write, '--factory', 'plain'], noEngine()), refusedWith('Invalid', /plain is not made from a template/));
     await assert.rejects(
-      main([...write.slice(0, 2), 'yours', ...write.slice(3), '--factory', 'written'], NO_ENGINE),
+      main([...write.slice(0, 2), 'yours', ...write.slice(3), '--factory', 'written'], noEngine()),
       refusedWith('Invalid', /yours is the store's, and --factory names a factory's tree/),
     );
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
   reconcileFactory(templated('written'));
-  for (const write of writes(bare)) await main([...write, '--factory', 'written'], NO_ENGINE);
+  for (const write of writes(bare)) await main([...write, '--factory', 'written'], noEngine());
   const tree = path.join(treeDir('written'), 'workflows');
   assert.ok(fs.existsSync(path.join(tree, 'lean', 'review.md')), "the workflow is written into the tree's, its agents read in the tree");
   assert.ok(fs.existsSync(path.join(tree, 'agents', 'scout.md')), "the agent is written into the tree's agents");

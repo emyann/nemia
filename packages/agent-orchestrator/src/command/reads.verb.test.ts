@@ -18,7 +18,7 @@ const NONE = { pause: null, finishing: [], staged: [], held: [] };
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
-import { promised } from '../../test/promised.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
@@ -26,8 +26,9 @@ const ROOT = scratch('wf-reads-');
 process.env.WF_ROOT = ROOT;
 const { FEED, LOGS, SHOW, STATS } = await import('./reads.verb.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
-const { runWith: runEngine } = await import('../runtime-client.ts');
+const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
@@ -106,7 +107,7 @@ test("nemia feed reads the store's feed from a cursor, and prints the pause firs
   const whole = `${head}${JSON.stringify(second)}\n`;
   fs.writeFileSync(path.join(ROOT, 'feed.jsonl'), whole);
   const end = Buffer.byteLength(whole);
-  const e = promised({});
+  const e = engineOf(engine().layer);
 
   assert.deepEqual(await runWith(e, FEED.handler({})), { lines: [first, second], cursor: end, pause: NONE });
   const after = await runWith(e, FEED.handler({ cursor: String(Buffer.byteLength(head)) }));

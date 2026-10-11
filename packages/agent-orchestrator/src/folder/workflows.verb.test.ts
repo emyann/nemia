@@ -10,14 +10,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
 const { WORKFLOWS_LIST, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
-const { runWith: runEngine, engine } = await import('../runner.ts');
+const { runWith: runEngine } = await import('../runner.ts');
+const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const { runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('./version.store.ts');
@@ -25,7 +28,7 @@ const { removeWorkflow } = await import('./write.store.ts');
 const { queueInInbox } = await import('../inbox/inbox.store.ts');
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 
-const e = engine();
+const e = () => engineOf(engine().layer);
 
 /** A folder of yours, `name`, with each step's file as given. */
 function folder(name: string, files: Record<string, string>): string {
@@ -41,9 +44,9 @@ test('a folder written from its steps through the entry is the folder its list a
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
     { name: 'build', after: ['plan'], place: 'git', body: 'Build it.' },
   ]);
-  const done = await runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT));
+  const done = await runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
-  const listed = await runWith(e, WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT));
+  const listed = await runWith(e(), WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT));
   const loaded = listed[dir];
   assert.ok(loaded && 'steps' in loaded, JSON.stringify(loaded));
   assert.deepEqual(
@@ -53,21 +56,21 @@ test('a folder written from its steps through the entry is the folder its list a
       ['build', ['plan']],
     ],
   );
-  const read = await runWith(e, WORKFLOWS_STEP.handler({ from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT));
+  const read = await runWith(e(), WORKFLOWS_STEP.handler({ from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT));
   assert.equal(read.step?.body, 'Build it.');
   assert.deepEqual(read.steps, ['plan', 'build']);
 });
 
 test('a step the folder does not have is none, with the names of those it has', async () => {
   const dir = folder('one-step', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
-  const read = await runWith(e, WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT));
+  const read = await runWith(e(), WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT));
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
 
 test("REFUSED: a folder that does not load is listed with the loader's words whole, and the folder beside it still loads", async () => {
   const good = folder('good', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
   const bad = folder('bad', { 'only.md': '---\nafter: nowhere\nplace: git\n---\nDo it.\n' });
-  const listed = await runWith(e, WORKFLOWS_LIST.handler({ dirs: [bad, good] }, undefined, ROOT));
+  const listed = await runWith(e(), WORKFLOWS_LIST.handler({ dirs: [bad, good] }, undefined, ROOT));
   assert.deepEqual(listed[bad], { error: 'only: waits on "nowhere", which is not a step here' });
   assert.deepEqual(Object.keys(listed), [bad, good]);
   assert.ok(listed[good] && 'steps' in listed[good]);
@@ -79,7 +82,7 @@ test("REFUSED: a draft the writer refuses is thrown in the writer's words whole,
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
     { name: 'plan', after: [], place: 'git', body: 'Plan it again.' },
   ]);
-  await assert.rejects(runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
+  await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
     assert.equal(err.message, 'two steps are named plan, and a step is its file, plan.md. Rename one of them.');
     return true;
   });
@@ -94,7 +97,7 @@ function versionAt(dir: string): { version?: string } {
 /** The folder of yours `dir` removed through the entry, by its name, at the version it is at, as the api hands it. */
 const remove = (dir: string) =>
   runWith(
-    e,
+    e(),
     WORKFLOWS_REMOVE.handler({ from: 'yours', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }, undefined, ROOT),
   );
 
@@ -162,7 +165,7 @@ test("REFUSED: a repository's workflow is not removed here, nor a folder nested 
   fs.writeFileSync(path.join(theirs, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   const yours = path.join(ROOT, 'workflows');
   const fromRepo = WORKFLOWS_REMOVE.handler({ from: 'repo', name: 'shared', version: 'v1', repo }, undefined, ROOT);
-  await assert.rejects(runWith(e, fromRepo), (err: Error) => {
+  await assert.rejects(runWith(e(), fromRepo), (err: Error) => {
     assert.ok(err instanceof Invalid, `${err.name}: ${err.message}`);
     assert.equal(
       err.message,

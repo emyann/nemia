@@ -10,6 +10,7 @@ import { roundIn, dollars, durationWord, rebuiltCache, sumUsage, usedLines, type
 import { hasStarted } from '../wait/wait.ts';
 import type { Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
+import { turnOf, turnSpanOf, type TurnSpan, type TurnTry } from './turns.ts';
 
 /**
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
@@ -94,7 +95,9 @@ export type TaskSpan = {
 /**
  * One try of a step on the clock. `round` is the round of its loop it was filed in (`roundIn`). `session` is its session's task; null on
  * a try a recheck reached, which ran no session of its own — `sessionOf` names the try whose session it is. `check` is its check's task,
- * null for a try whose check was never filed. `used` is what its session consumed (`taskUsage`), absent on a recheck's try.
+ * null for a try whose check was never filed. `used` is what its session consumed (`taskUsage`), absent on a recheck's try. `turn` is
+ * the turn of that earlier try's session a try ran, where it answered it (`turnOf`): absent on a try that owns its session and on a
+ * recheck's.
  */
 export type TimelineTry = {
   try: number;
@@ -103,6 +106,7 @@ export type TimelineTry = {
   sessionOf: number | null;
   check: TaskSpan | null;
   used?: Consumed;
+  turn?: TurnSpan;
 };
 
 /**
@@ -171,6 +175,7 @@ export function timeline(
         taskId: t.taskId,
         check: t.check?.taskId,
         round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
+        then: t.then,
       })),
       ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
     ];
@@ -180,7 +185,9 @@ export function timeline(
       const check = t.check ? spanOf(t.check, views.get(t.check), filed.get(t.check)) : null;
       for (const span of [session, check]) if (span) counted.push({ loop: loopOf.get(name) ?? null, round: t.round, span });
       const used = session ? taskUsage(views.get(t.taskId)) : undefined;
-      return { try: i + 1, round: t.round, session, sessionOf: first === i ? null : first + 1, check, ...(used ? { used } : {}) };
+      const turn = turnIn(tries, i, views.get(t.taskId));
+      const shared = { ...(used ? { used } : {}), ...(turn ? { turn } : {}) };
+      return { try: i + 1, round: t.round, session, sessionOf: first === i ? null : first + 1, check, ...shared };
     });
   }
   const rounds = loops.flatMap((looping) => {
@@ -207,6 +214,14 @@ export function timeline(
     ),
     slot,
   };
+}
+
+/** The turn of an earlier try's session that try `i` of `tries` ran (`TurnSpan`), off the view of its task; undefined where it ran none. */
+function turnIn(tries: readonly TurnTry[], i: number, view: TaskClock | undefined): TurnSpan | undefined {
+  const turn = turnOf(tries, i);
+  if (!turn) return undefined;
+  const over = view !== undefined && (view.state.settled !== null || signedAndHeld(view));
+  return turnSpanOf(view?.state.attempts ?? [], turn.turn, turn.after, over);
 }
 
 /** A run's wait for a run slot (`SlotWait`), off its record and the filing times; null on a run the cap never held. */

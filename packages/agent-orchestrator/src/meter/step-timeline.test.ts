@@ -59,6 +59,12 @@ test("each fact is a row of the run's timeline with bounded attributes: a step's
     assert.equal(f.run, 'r-1');
     assert.equal('try' in f, f.of === 'try' || f.of === 'check', `${f.row}: a try only on a try's and a check's row`);
   }
+  const answer = facts.filter((f) => f.part === 'answer');
+  assert.deepEqual(
+    answer.map((f) => [f.of, f.row, f.value]),
+    [['run', 'run', rows.find((r) => r.part === 'answer')!.value]],
+    "the run's wait on a person's answer is one fact, with its row's value",
+  );
   const attributesOf = (row: string) => facts.find((f) => f.row === row)?.attributes;
   assert.deepEqual(attributesOf('01 work'), { factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada', outcome: 'succeeded' });
   assert.deepEqual(attributesOf('01 work check'), {

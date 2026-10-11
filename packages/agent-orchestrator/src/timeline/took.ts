@@ -139,17 +139,21 @@ export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, Ta
   };
 }
 
-/** When a try ended: its check's end, or its session's where it has no check; null while either is in flight. */
-export const tryEndOf = (t: TimelineTry): string | null => (t.check ? t.check.endedAt : (t.session?.endedAt ?? null));
+/**
+ * When a try ended: its check's end; where it has no check, its session's, or, for a try that answered an earlier try's session, the end
+ * of the turn it ran (`TurnSpan`). Null while any of them is in flight, and for a recheck's try whose check was never filed.
+ */
+export const tryEndOf = (t: TimelineTry): string | null => (t.check ? t.check.endedAt : (t.session?.endedAt ?? t.turn?.endedAt ?? null));
 
 /** The ms from `from` to `to`, never negative; null with no `from`. */
 const msBetween = (from: string | null, to: string): number | null => (from ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
 
 /**
- * How long a person took to approve try `t` of `step` in `run`, off the run's timeline `tl`: from the try's end to the approval of that
- * step and that try, or, for a step approved before it is filed (an ending in the checkout at a gate), from the latest end of the steps
- * it waits on before the approval. Null with no approval. The one rule of a gate's wait: `nemia stats` and the tick's metric
- * (`gateWaits`) both read it.
+ * How long a person took to approve try `t` of `step` in `run`, off the run's timeline `tl`: from the try's end (`tryEndOf`: for a try
+ * that answered an earlier try's session, the end of that answer's turn) to the approval of that step and that try, or, for a step
+ * approved before it is filed (an ending in the checkout at a gate), from the latest end of the steps it waits on before the approval.
+ * Null with no approval. The one rule of a gate's wait: `nemia stats`, the tick's metric (`gateWaits`) and the run's `gate` row
+ * (`timelineRows`) all read it.
  */
 export function gateWaitOf(
   run: Pick<Run, 'approvals'>,

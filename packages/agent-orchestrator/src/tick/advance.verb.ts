@@ -308,7 +308,9 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   its check, for a step filed without one.
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
  * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it, and each
- *   session's attempts whose denied calls it hands them as counted (`deniedCounted`), both by `markedOnce`.
+ *   session's attempts whose denied calls it hands them as counted (`deniedCounted`), both by `markedOnce`. A gate approved on a try
+ *   that answered an earlier try's session is timed only while `runTimed` is `false`, which `markedOnce` reads before `timedOnce`
+ *   writes it.
  * - marks each task whose settle it hands the metrics as counted (`settlesCounted`, `settledOnce`), on the pass that first reads it
  *   settled.
  * - hands the metrics the run's timeline on the first pass that reads it over with nothing in flight, and marks it (`runTimed`,

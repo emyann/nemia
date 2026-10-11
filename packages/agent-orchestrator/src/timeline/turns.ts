@@ -1,0 +1,58 @@
+/**
+ * Which turn of a session a try is: a try that answered an earlier try's task, held open, ran no session of its own but a turn of that
+ * one, and its clock is that turn's.
+ *
+ * Pure, as `timeline.ts` is, and imports nothing of it: the tries of a step's record and a task's attempts in, the turn and its span out.
+ */
+
+/** A try of a step as a turn is read off it: its session's task, and what replaced it; `then` absent on the step's current try. */
+export type TurnTry = { taskId: string; then?: string };
+
+/** An attempt as a turn is read off it: its spawn, its end, and the turn of a task held open the runtime stamped it with. */
+export type TurnAttempt = { spawnedAt: string | null; endedAt: string | null; turn?: number };
+
+/**
+ * The turn of an earlier try's session a try ran. `after` is what replaced the try it answers: `nudge` for a person's answer, `back` for
+ * work sent back with words, or another reason a try is filed for. `heldFrom` is when the turn before it ended, `spawnedAt` its own first
+ * spawn and `endedAt` its last attempt's end: each null where the task's attempts do not say.
+ */
+export type TurnSpan = { after: string; heldFrom: string | null; spawnedAt: string | null; endedAt: string | null };
+
+/**
+ * The turn try `i` of `tries` is, of the session an earlier try filed, and what replaced the try it answers. Null for a try on a task of
+ * its own, and for one a recheck reached, which ran its check again and no turn. The turn is the count of the tries behind it on its task
+ * that were not replaced by a recheck: the order the runtime numbers a held task's turns in, from 0.
+ */
+export function turnOf(tries: readonly TurnTry[], i: number): { turn: number; after: string } | null {
+  const behind = tries.slice(0, i).filter((t) => t.taskId === tries[i]?.taskId);
+  const answered = behind.at(-1)?.then;
+  if (answered === undefined || answered === 'recheck') return null;
+  return { turn: behind.filter((t) => t.then !== 'recheck').length, after: answered };
+}
+
+/**
+ * The span of `turn` among a task's `attempts`, replaced `after` (`TurnSpan`): an attempt with no turn is of turn 0. Where the runtime
+ * skipped the turn, or the task has no attempt, each time is null. The task's last turn has ended only once the task is `over`, settled
+ * or signed and waiting on a person: an attempt of it that ended before may be followed by another.
+ */
+export function turnSpanOf(attempts: readonly TurnAttempt[], turn: number, after: string, over: boolean): TurnSpan {
+  const own = attempts.filter((a) => (a.turn ?? 0) === turn);
+  const before = own.length ? attempts.filter((a) => (a.turn ?? 0) < turn).at(-1) : undefined;
+  const last = attempts.every((a) => (a.turn ?? 0) <= turn);
+  return {
+    after,
+    heldFrom: before?.endedAt ?? null,
+    spawnedAt: own.find((a) => a.spawnedAt)?.spawnedAt ?? null,
+    endedAt: last && !over ? null : (own.at(-1)?.endedAt ?? null),
+  };
+}
+
+/**
+ * How long a run waited on a person's answer before the turn of try `t`, in ms: from the end of the turn before it to its own first
+ * spawn, never negative. Null for a try that is no turn, a turn nobody's nudge started, and one whose two times are not both known.
+ */
+export function answerWaitOf(t: { turn?: TurnSpan }): number | null {
+  const turn = t.turn;
+  if (turn?.after !== 'nudge' || !turn.heldFrom || !turn.spawnedAt) return null;
+  return Math.max(0, Date.parse(turn.spawnedAt) - Date.parse(turn.heldFrom));
+}

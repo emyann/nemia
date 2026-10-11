@@ -162,7 +162,8 @@ type RunBase = {
   /**
    * The approvals whose gate wait the tick has put into the metrics (`gateWaits`), by step and try: each written by the pass that read the
    * approval first, so a pass after a restart, which reads the same approval, emits none again. `[]` on a run started with it; absent on a
-   * record written before it, whose gates are never timed.
+   * record written before it, whose gates are never timed. A gate approved on a try that answered an earlier try's session is timed only
+   * while `runTimed` is `false`.
    */
   gatesTimed?: Array<{ step: string; try: number }>;
   /**

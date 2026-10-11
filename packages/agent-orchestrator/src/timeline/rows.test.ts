@@ -115,6 +115,7 @@ test("each row's number is the timeline's own field: a try's, its check's, a ste
       ['queued', tl.run.queuedMs],
       ['check', checks],
       ['gate', gateWaitOf(RUN, tl, PLAN, tl.steps.plan[0])],
+      ['answer', 0],
     ],
   );
   assert.deepEqual(
@@ -123,7 +124,7 @@ test("each row's number is the timeline's own field: a try's, its check's, a ste
   );
   assert.deepEqual(
     rows.filter((r) => r.of === 'round' || r.of === 'run').map((r) => [r.step, r.try]),
-    Array.from({ length: 6 }, () => [null, null]),
+    Array.from({ length: 7 }, () => [null, null]),
     "a round's and the run's rows are of no step and no try",
   );
 });
@@ -178,4 +179,53 @@ test('a run that never left its first step has rows for that step alone, and non
   assert.deepEqual([...new Set(rows.map((r) => r.row))], ['01 plan', 'run']);
   assert.equal(valueOf(rows, 'run', 'gate'), 0, 'no approval, no time at a gate');
   assert.equal(valueOf(rows, 'run', 'check'), 0, 'no check, no time in one');
+  assert.equal(valueOf(rows, 'run', 'answer'), 0, 'no answer, no time waiting on one');
+});
+
+/** A gated step held open on one task: blocked at 10:05, answered into a turn from 10:11 to 10:20, and try 2 approved at 10:29. */
+const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
+const ANSWERED = {
+  id: 'r-3',
+  workflowDir: '/w/intake',
+  createdAt: at('09:59'),
+  steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', then: 'nudge' }] } },
+  approvals: [{ step: 'ask', try: 2, at: at('10:29') }],
+} as unknown as Run;
+const turn = (n: number, spawned: string, ended: string) => ({
+  startedAt: at(spawned),
+  spawnedAt: at(spawned),
+  endedAt: at(ended),
+  reason: null,
+  usage: { costUsd: n ? 1 : 3 },
+  ended: 'done',
+  turn: n,
+});
+const HELD: TaskClock = {
+  phase: 'input-required',
+  state: { brief: 'Do it.', settled: null, attempts: [turn(0, '10:01', '10:05'), turn(1, '10:11', '10:20')] },
+};
+
+test("a run answered then approved: its wait on the answer and its wait at the gate are two parts, and its session's rows are one", () => {
+  const tl = timeline(ANSWERED, new Map([['ask', HELD]]), new Map([['ask', at('10:00')]]), [ASK]);
+  const rows = timelineRows(ANSWERED, tl, [ASK]);
+  assert.deepEqual(
+    rows.map((r) => [r.of, r.try, r.part, r.value]),
+    [
+      ['try', 1, 'queued', MIN],
+      ['try', 1, 'ran', 13 * MIN],
+      ['try', 1, 'cost', 4],
+      ['step', null, 'tries', 2],
+      ['run', null, 'wall', 20 * MIN],
+      ['run', null, 'queued', MIN],
+      ['run', null, 'check', 0],
+      ['run', null, 'gate', 9 * MIN],
+      ['run', null, 'answer', 6 * MIN],
+    ],
+  );
+  const run = (part: TimelineRow['part']) => valueOf(rows, 'run', part);
+  assert.equal(valueOf(rows, '01 ask', 'ran', 1) + run('queued') + run('answer'), run('wall'), 'what ran, queued and waited is the wall');
+  const sentBack = { ...ANSWERED, steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', then: 'back' }] } } } as unknown as Run;
+  const back = timelineRows(sentBack, timeline(sentBack, new Map([['ask', HELD]]), new Map([['ask', at('10:00')]]), [ASK]), [ASK]);
+  assert.equal(valueOf(back, 'run', 'answer'), 0, 'REFUSED: work sent back with words waited on no answer');
+  assert.equal(valueOf(back, 'run', 'gate'), 9 * MIN);
 });

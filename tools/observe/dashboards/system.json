@@ -1192,10 +1192,10 @@
       "id": 21,
       "type": "bargauge",
       "title": "Denied calls",
-      "description": "step.denied: the calls a step's harness denied.",
+      "description": "The step.denied spans over the range: each call a harness denied, counted once its attempt ended. By step, agent and tool; by call and for one run on Steps.",
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "tempo",
+        "uid": "tempo"
       },
       "gridPos": {
         "x": 12,
@@ -1206,14 +1206,15 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "tempo",
+            "uid": "tempo"
           },
           "refId": "A",
-          "expr": "sum by (factory, workflow, step, agent) (increase(step_denied_total{service_name=\"$service\", factory=~\"$factory\", workflow=~\"$workflow\", step=~\"$step\", agent=~\"$agent\"}[$__range]))",
-          "legendFormat": "{{workflow}} / {{step}} · {{agent}}",
-          "instant": true,
-          "range": false
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"step.denied\" && span.factory=~\"$factory\" && span.workflow=~\"$workflow\" && span.step=~\"$step\" && span.agent=~\"$agent\"} | count_over_time() by (span.workflow, span.step, span.agent, span.tool)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
         }
       ],
       "fieldConfig": {
@@ -1247,7 +1248,16 @@
           "fields": "",
           "values": false
         }
-      }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^\\{span\\.agent=\"(.*)\", span\\.step=\"(.*)\", span\\.tool=\"(.*)\", span\\.workflow=\"(.*)\"\\}$",
+            "renamePattern": "$4 / $2 · $1 · $3"
+          }
+        }
+      ]
     },
     {
       "id": 32,

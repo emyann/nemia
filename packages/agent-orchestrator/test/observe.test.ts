@@ -6,10 +6,11 @@
  * `counter`) and named as Prometheus shows them through the collector, as measured on the stack: dots become underscores, a histogram
  * gets `_bucket`, `_count` and `_sum`, a gauge `_ratio`, a counter that only grows `_total` and any other counter nothing. The spans,
  * their attributes and the logs' annotations come from a pass of the tick traced over the runtime's engine as the client builds it
- * (`engineOf`), the orchestrator's own `Effect.fn` names, and the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`)
- * and their step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the attributes each `Metric.withAttributes` gives. What a
- * step's Claude Code session sends, and what Tempo's span metrics write, are no code of ours: they are listed as measured, dated, and
- * the span metrics' dimensions and the collector's `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
+ * (`engineOf`), the orchestrator's own `Effect.fn` names, the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`) and a
+ * denied call's (`DENIED_SPAN`, `DENIED_SPAN_KEYS`), each with its step's attributes; the labels from `STEP_ATTRIBUTE_KEYS` and the
+ * attributes each `Metric.withAttributes` gives. What a step's Claude Code session sends, its spans and its log events, and what Tempo's
+ * span metrics write, are no code of ours: they are listed as measured, dated, and the span metrics' dimensions and the collector's
+ * `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -35,7 +36,8 @@ delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { PASS_METRICS, STEP_METRICS, WAIT_SPAN_KEYS, WAIT_SPANS } = await import('../src/meter/meter.verb.ts');
+const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, WAIT_SPAN_KEYS, WAIT_SPANS } =
+  await import('../src/meter/meter.verb.ts');
 const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
 const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
@@ -77,6 +79,16 @@ const CLAUDE_SPANS = [
  * collector's (`tools/observe/otelcol.yaml`).
  */
 const CLAUDE_SPAN_ATTRIBUTES = ['tool_name', 'task'];
+
+/** The service a step's Claude Code session files its spans and its log events under, as measured. */
+const CLAUDE_SERVICE = 'claude-code';
+
+/**
+ * The fields of a session's log events in Loki a dashboard reads beside a run's and a step's, as measured 2026-10-11 on Claude Code
+ * 2.1.296 (`tools/observe/README.md`): the event's name (`tool_result`), whether the tool succeeded, the tool and its parameters, and
+ * the labels the session was started with.
+ */
+const CLAUDE_LOG_FIELDS = ['event_name', 'success', 'tool_name', 'tool_parameters', 'task', 'factory', 'workflow', 'agent'];
 
 /** The series Tempo's span metrics write to Prometheus, as measured: latency in seconds. */
 const SPAN_METRICS = [
@@ -308,18 +320,20 @@ const KNOWN: Known = {
   spans: new Set([
     ...TRACED.spans,
     ...Object.values(WAIT_SPANS),
+    DENIED_SPAN,
     ...[...SOURCE_TEXT.matchAll(/Effect\.fn\(\s*'([^']+)'/g)].map(([, name]) => name),
     ...CLAUDE_SPANS,
   ]),
   attributes: new Set([
     ...TRACED.attributes,
     ...WAIT_SPAN_KEYS,
+    ...DENIED_SPAN_KEYS,
     ...STEP_ATTRIBUTE_KEYS,
     ...CLAUDE_SPAN_ATTRIBUTES,
     ...COLLECTOR_ATTRIBUTES,
   ]),
   resources: new Set(RESOURCE_ATTRIBUTES),
-  logFields: new Set([...TRACED.annotations, ...LOKI_FIELDS]),
+  logFields: new Set([...TRACED.annotations, ...LOKI_FIELDS, ...CLAUDE_LOG_FIELDS]),
   profileLabels: new Set(PROFILE_LABELS),
   profileTypes: new Set(PROFILE_TYPES),
 };
@@ -363,13 +377,14 @@ function traceNames(query: string): { spans: string[]; attributes: string[]; res
   return { spans, attributes, resources };
 }
 
-/** The stream labels and the fields a LogQL query names. */
+/** The stream labels and the fields a LogQL query names: those it filters on, and those it counts by. */
 function logNames(query: string): string[] {
   const text = query.replace(/"(?:[^"\\]|\\.)*"/g, '""');
   const stream = /\{([^}]*)\}/.exec(text);
   const labels = [...(stream?.[1] ?? '').matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)/g)].map(([, l]) => l);
   const fields = [...text.slice(stream ? stream.index + stream[0].length : 0).matchAll(/\|\s*([A-Za-z_]\w*)\s*(?:=~|!~|!=|=|>|<)/g)];
-  return [...labels, ...fields.map(([, f]) => f)];
+  const grouped = [...text.matchAll(/\b(?:by|without)\s*\(([^)]*)\)/g)].flatMap(([, list]) => list.split(',').map((l) => l.trim()));
+  return [...labels, ...fields.map(([, f]) => f), ...grouped.filter(Boolean)];
 }
 
 /** The labels a Pyroscope label selector names, each with the value it asks for. */
@@ -634,6 +649,12 @@ test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log fi
     ['Time', 'tempo', 'span.test_scope', 'span.bash_scope', 'bash_scope'],
     ['Time', 'prometheus', 'sum by (test_scope)', 'sum by (bash_scope)', 'bash_scope'],
     ['Time', 'prometheus', 'traces_spanmetrics_latency_sum', 'traces_spanmetrics_duration_sum', 'traces_spanmetrics_duration_sum'],
+    ['Steps', 'tempo', `name="${DENIED_SPAN}"`, 'name="step.denid"', 'step.denid'],
+    ['Steps', 'tempo', 'span.tool', 'span.tol', 'tol'],
+    ['Steps', 'tempo', 'span.call', 'span.text', 'text'],
+    ['System', 'tempo', 'span.tool', 'span.tol', 'tol'],
+    ['Steps', 'loki', '| success=', '| succeeded=', 'succeeded'],
+    ['Steps', 'loki', 'by (step, tool_name)', 'by (step, tool)', 'tool'],
   ];
   for (const [title, datasource, from, to, named] of cases)
     assert.deepEqual(unknownNames(withQuery(dashboardTitled(title), datasource, from, to), KNOWN), [named], `${title}: ${to}`);
@@ -685,10 +706,102 @@ test('System charts every metric the code exports', () => {
   const system = dashboardTitled('System');
   const keep = (panels: Panel[]): Panel[] =>
     panels
-      .filter((p) => !(p.targets ?? []).some((t) => (t.expr ?? '').includes('step_denied_total')))
+      .filter((p) => !(p.targets ?? []).some((t) => (t.expr ?? '').includes('step_rounds_total')))
       .map((p) => ({ ...p, panels: keep(p.panels ?? []) }));
   system.panels = keep(system.panels);
-  assert.deepEqual(unchartedMetrics(system), ['step.denied']);
+  assert.deepEqual(unchartedMetrics(system), ['step.rounds']);
+  assert.equal(METRICS.has(DENIED_SPAN), false, 'a denied call is a span, and no metric to chart');
+});
+
+/** The four choices a step is picked by across runs, each a variable of the dashboards and a label of a session. */
+const STEP_PICKS = ['factory', 'workflow', 'step', 'agent'];
+
+/**
+ * What one counting query of a dashboard counts of a step's sessions, read off its text: the calls they were denied (the daemon's
+ * `DENIED_SPAN`), their tool errors (the sessions' failed `tool_result` events) or, of those, their failed skill loads; for what —
+ * the run and session picked (`run`), the steps picked across runs (`across`), or neither, which is `unscoped`; and whether it says the
+ * tool, by counting by it or, for a skill load, by asking for the `Skill` tool alone.
+ */
+type Counted = { what: 'denied' | 'errors' | 'skills'; scope: 'run' | 'across' | 'unscoped'; tool: boolean };
+
+/** Each query of `dashboard` that counts denied calls, tool errors or failed skill loads (`Counted`), in the dashboard's order. */
+function countedOf(dashboard: Dashboard): Counted[] {
+  return queriesOf(dashboard).flatMap((q): Counted[] => {
+    if (!q.text.includes('count_over_time')) return [];
+    const denied = q.datasource === 'tempo' && traceNames(q.text).spans.includes(DENIED_SPAN);
+    const errors = q.datasource === 'loki' && /\|\s*event_name\s*=\s*"tool_result"\s*\|\s*success\s*=\s*"false"/.test(q.text);
+    if (!denied && !errors) return [];
+    if (errors && !q.text.includes(`{service_name="${CLAUDE_SERVICE}"}`)) return [];
+    const filter = (name: string, op: string, value: string) =>
+      new RegExp(denied ? `\\bspan\\.${name}\\s*${op}\\s*"\\$${value}"` : `\\|\\s*${name}\\s*${op}\\s*"\\$${value}"`).test(q.text);
+    const scope =
+      filter('run', '=', 'run') && filter('task', '=~', 'session')
+        ? 'run'
+        : STEP_PICKS.every((name) => filter(name, '=~', name))
+          ? 'across'
+          : 'unscoped';
+    const skills = errors && /\|\s*tool_name\s*=\s*"Skill"/.test(q.text);
+    const tool = skills || new RegExp(`\\bby\\s*\\([^)]*${denied ? 'span\\.tool\\b' : '\\btool_name\\b'}`).test(q.text);
+    return [{ what: denied ? 'denied' : skills ? 'skills' : 'errors', scope, tool }];
+  });
+}
+
+/** `Counted`, each in a word, sorted. */
+const countedWords = (dashboard: Dashboard): string[] =>
+  countedOf(dashboard)
+    .map((c) => `${c.what} ${c.scope}${c.tool ? ' by tool' : ''}`)
+    .sort();
+
+const STEPS_COUNTED = [
+  'denied across by tool',
+  'denied run by tool',
+  'errors across by tool',
+  'errors run by tool',
+  'skills across by tool',
+  'skills run by tool',
+];
+
+test("Steps counts denied calls, tool errors and failed skill loads by tool, for one run's session and across runs", () => {
+  assert.deepEqual(countedWords(dashboardTitled('Steps')), STEPS_COUNTED);
+  assert.deepEqual(countedWords(dashboardTitled('System')), ['denied across by tool'], "System's Denied calls reads the same spans");
+  for (const d of [dashboardTitled('Steps'), dashboardTitled('System')])
+    for (const q of queriesOf(d).filter((q) => q.datasource === 'prometheus'))
+      assert.equal(q.text.includes('denied'), false, `${d.title}: no counter of denied calls is read: ${q.text}`);
+});
+
+test('REFUSED: a count that drops its session, one of its four choices, or its tool', () => {
+  const changed = (datasource: string, from: string, to: string) => countedWords(withQuery(dashboardTitled('Steps'), datasource, from, to));
+  const without = (word: string, instead: string) => [...STEPS_COUNTED.filter((w) => w !== word), instead].sort();
+  assert.deepEqual(changed('tempo', ' && span.task=~"$session"', ''), without('denied run by tool', 'denied unscoped by tool'));
+  assert.deepEqual(changed('tempo', 'span.run="$run"', 'span.run=~".+"'), without('denied run by tool', 'denied unscoped by tool'));
+  assert.deepEqual(changed('loki', ' | task=~"$session"', ''), without('errors run by tool', 'errors unscoped by tool'));
+  assert.deepEqual(changed('tempo', ' && span.agent=~"$agent"', ''), without('denied across by tool', 'denied unscoped by tool'));
+  assert.deepEqual(changed('loki', ' | workflow=~"$workflow"', ''), without('errors across by tool', 'errors unscoped by tool'));
+  assert.deepEqual(changed('tempo', 'by (span.tool, span.call)', 'by (span.call)'), without('denied run by tool', 'denied run'));
+  assert.deepEqual(changed('loki', 'by (step, tool_name)', 'by (step)'), without('errors run by tool', 'errors run'));
+});
+
+/** The tag each of a dashboard's `run` and `session` variables reads its values from, and what the session's All stands for. */
+const picksOf = (dashboard: Dashboard): unknown[] =>
+  ['run', 'session'].map((name) => {
+    const variable = dashboard.templating?.list.find((v) => v.name === name) as
+      | { query?: { label?: string }; allValue?: string }
+      | undefined;
+    return [name, variable?.query?.label, variable?.allValue];
+  });
+
+test("Steps picks a run and a session as Time does: the run's tag, and the runtime's task", () => {
+  assert.deepEqual(picksOf(dashboardTitled('Steps')), [
+    ['run', 'run', undefined],
+    ['session', 'task', '.*'],
+  ]);
+  assert.deepEqual(picksOf(dashboardTitled('Steps')), picksOf(dashboardTitled('Time')));
+  const steps = dashboardTitled('Steps');
+  const session = steps.templating?.list.find((v) => v.name === 'session');
+  assert.ok(session, 'Steps picks a session');
+  session.query = { ...(session.query as object), label: 'session' };
+  assert.deepEqual(unknownNames(steps, KNOWN), ['session'], 'REFUSED: a session read from a tag no span carries');
+  assert.notDeepEqual(picksOf(steps), picksOf(dashboardTitled('Time')));
 });
 
 /** A dashboard's links, as far as the checker reads them. */

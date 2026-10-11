@@ -160,6 +160,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   `validateFolderMode` refuses a `background: true` step of a folder team in any other.
 - **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
+- **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries
+  `tool_name`; the errored `claude_code.tool.execution` span carries none, and Tempo's join to its parent found 68 of 174. A skill whose
+  load fails is one for `Skill`; a `Skill` call for a skill that is not there exports no event and no span.
 - **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:
   `fileRuleRefusal`).
 - **`--add-dir` grants writes where the mode writes, and lists the folder's `.claude/skills`** (not its `CLAUDE.md`); an `Edit(//<path>/**)`

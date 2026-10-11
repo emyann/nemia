@@ -38,11 +38,15 @@ export function heldName(name: string, lock: Lock | undefined): string {
   return name;
 }
 
-/** What a hold prints: the container and when it ends, how to stop it, where Grafana listens, and each dashboard's address. */
+/**
+ * What a hold prints: the container and when it ends, how to stop it, where Grafana listens, where its collector listens over OTLP/HTTP,
+ * as the `OTEL_EXPORTER_OTLP_ENDPOINT` of a probe pointed at this stack and never the live one, and each dashboard's address.
+ */
 export function heldLines(
   name: string,
   until: Date,
   grafana: string,
+  collector: string,
   dashboards: readonly { name: string; uid: string }[],
   picks: Picks,
 ): string[] {
@@ -50,6 +54,7 @@ export function heldLines(
     `held: ${name}, until ${until.toISOString()}`,
     `stop it with: ${stopCommand(name)}`,
     `Grafana listens on ${grafana} (no login)`,
+    `its collector listens on ${collector} (OTLP/HTTP); point a probe at it with OTEL_EXPORTER_OTLP_ENDPOINT=${collector}`,
     ...dashboards.map((dashboard) => `${dashboard.name}  ${addressOf(grafana, dashboard.uid, picks)}`),
   ];
 }

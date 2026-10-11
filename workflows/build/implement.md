@@ -8,6 +8,7 @@ check: { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BA
 budget: 40
 skills: effect, shadcn, change-the-board, look, see-a-dashboard
 mcp: playwright
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe, Bash(claude *--bg*), Bash(claude *--background*), Bash(claude *remote-control*), Edit(//**/.claude/settings.local.json), Edit(~/.claude/settings.json), Edit(~/.claude.json), Bash(*:4318*), Bash(*:4317*)
 output: implement.schema.json
 ---
 When the change touches `apps/web`, picture the pages and the states it touches, in light and dark, and at a phone's width where the
@@ -51,3 +52,8 @@ machinery's trusted folder (`$WF_ROOT/probes`), and tells the person no action i
 settings. Only when the measurement needs the person's answer, add `--answer "<what to press>"`: the session then reaches their phone,
 and you stop `blocked` with the `needs` line it prints. Read your probes with `list`, and stop them with `stop` before you sign off:
 the check refuses a live one.
+
+When a measurement needs a collector, hold a throwaway stack and use its own: `node tools/observe/render/render.ts --hold` prints the
+collector's address as the `OTEL_EXPORTER_OTLP_ENDPOINT` to give what you start, and `--stop <name>` ends it. The live collector, on
+`:4318` and `:4317`, takes the factory's real work alone: a command that names either port is refused to you, a commit message or a
+search that spells one included.

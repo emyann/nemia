@@ -132,7 +132,9 @@ recorded by the tick off what it already read, by factory, workflow, step, agent
 collector: the orchestrator hands the runtime the endpoint (`engine()`), with `toolDetails` when the daemon's `NEMIA_TOOL_DETAILS` is
 `1`, which the runtime says to a harness that can export its tools' inputs, and files a step's task with its run and step as labels
 (`stepLabels`); the runtime, which alone knows how a harness is told, hands each session it starts the collector, those labels and its
-`task`, and the filing's trace context, and a command none (`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`).
+`task`, and the filing's trace context, and a command none (`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`). A test's seat drops the address
+(`agent-orchestrator/test/ambient.ts`, the api's `test/harness.ts`, the e2e's `apiEnvOf`), and a step's own probe is pointed at a
+throwaway collector by name (`tools/observe/README.md`, *Point the daemon at it*).
 
 **The feed** is the orchestrator's, written once, by the daemon alone: `emitFeed` (`src/feed/feed.verb.ts`) appends a run's line to
 `feed.jsonl`, and `up`, once it holds the store, a daemon's (`emitDaemonStarted`: `{at, daemon, word: 'daemon started', note}`, the note

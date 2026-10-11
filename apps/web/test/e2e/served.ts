@@ -203,6 +203,8 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   HKB_QUOTA_BACKOFF_MS: '0',
   /** Each read waits for its own ask, however slow: at a keep of 0 no other ask answers it. */
   HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),
+  /** No collector, whatever the shell names: an api served for a test or a look exports nothing (`otlpOf` reads `''` as none). */
+  OTEL_EXPORTER_OTLP_ENDPOINT: '',
   PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
 });
 

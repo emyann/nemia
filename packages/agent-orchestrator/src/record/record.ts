@@ -605,6 +605,8 @@ export type RunStore = {
     readonly dropFiles: (id: string) => string | null;
     /** Write the prune marker a person's `nemia prune` puts on the run, whole over the one there; `undefined` takes the marker away. */
     readonly prune: (id: string, marker: Pruned | undefined) => void;
+    /** The prune marker as its file reads now, with no read of the record: undefined for a run with none. */
+    readonly pruned: (id: string) => Pruned | undefined;
   };
   readonly asks: {
     /** The asks waiting beside the run. */

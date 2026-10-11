@@ -9,7 +9,7 @@ import path from 'node:path';
 import { Cause, Effect, Exit, type Duration } from 'effect';
 import { keepsWorktrees } from '../config/config.store.ts';
 import { HOME } from '../record/record.store.ts';
-import { dropEmpty, freeing, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
+import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
 import { freeable, freedLine, freeSaid, freeTurn, pruneLines, type Answered, type Pruning } from './prune.ts';
 
 /** The sweep's pace when it is given none. */
@@ -62,13 +62,12 @@ const swept = Effect.fnUntraced(function* (id: string) {
   return done;
 });
 
-/** The runs of one repository freed by one `remove` (`freeing`); a removal that failed leaves each as it was, in its words. */
-const freedTogether = Effect.fnUntraced(function* (ready: readonly Sized[]) {
-  const exit = yield* Effect.exit(freeing(ready));
+/** A group of one repository's runs after its removal: what was done with each; one that failed leaves each as it was, in its words. */
+function freedTogether({ group, exit }: { group: readonly Sized[]; exit: Exit.Exit<readonly Pruning[], unknown> }): readonly Pruning[] {
   if (Exit.isSuccess(exit)) return exit.value;
   const why = whyOf(exit.cause);
-  return ready.map((r): Pruning => ({ id: r.run.id, kind: 'refused', refusal: why, worktrees: [], left: [] }));
-});
+  return group.map((r): Pruning => ({ id: r.run.id, kind: 'refused', refusal: why, worktrees: [], left: [] }));
+}
 
 /** What is to be said of a run after its removal: nothing when every worktree went, else each line of what was left. */
 const afterWords = (p: Pruning): string | null => {
@@ -110,7 +109,7 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  *   no other run is asked anything, of its place or of the engine;
  * - the sweep takes `FREE_A_SWEEP` of them not judged yet, or one already judged in its turn (`freeTurn`);
  * - each is judged as `nemia prune <id>` judges it, with no flag (`judging`), and sized when ready (`sized`), side by side;
- * - those ready are removed by one `remove` a repository (`freeing`), repositories side by side;
+ * - those ready are removed by one `remove` a repository (`freedByRepo`), repositories side by side;
  * - each run freed is said (`freedLine`), and a run left is said once while its words stand (`freeSaid`): a locked, detached or
  *   changed worktree, a place that did not answer, a worktree git would not remove.
  *
@@ -125,9 +124,8 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
   const judged = yield* Effect.forEach(turn, swept, { concurrency: FREE_A_SWEEP });
   for (const id of turn) memory.judged.add(id);
 
-  const byRepo = new Map<string, Sized[]>();
-  for (const j of judged) if ('ready' in j) byRepo.set(j.ready.run.repo, [...(byRepo.get(j.ready.run.repo) ?? []), j.ready]);
-  const removed = (yield* Effect.forEach([...byRepo.values()], freedTogether, { concurrency: FREE_A_SWEEP })).flat();
+  const ready = judged.flatMap((j) => ('ready' in j ? [j.ready] : []));
+  const removed = (yield* freedByRepo(ready, FREE_A_SWEEP)).flatMap(freedTogether);
 
   const freed = removed.filter((p) => p.kind === 'pruned' && p.worktrees.length > 0);
   const left = [...judged.flatMap((j) => ('words' in j ? [j] : [])), ...removed.map((p) => ({ id: p.id, words: afterWords(p) }))];

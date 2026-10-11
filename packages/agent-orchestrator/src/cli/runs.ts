@@ -1,7 +1,8 @@
 /**
  * The runners of `nemia agents custom`, `nemia factory instruct` and `nemia factory rules`, which read the words a file holds; and the
- * runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask
- * a person's yes, and tally what was not done into the exit code; and the runner of `nemia admit`, which reads the call on stdin.
+ * runner of `nemia rm` (`RM`), which walks the many runs a command line names through the entry's handler, and of `nemia prune`, which
+ * hands them to the package's many-run verbs (`judgingMany`, `freeingMany`) and prints what they answer; each asks a person's yes and
+ * tallies what was not done into the exit code; and the runner of `nemia admit`, which reads the call on stdin.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,8 +12,9 @@ import {
   AUTO_PROPOSE,
   FACTORY_INSTRUCT,
   FACTORY_RULES,
+  freeingMany,
   HOME,
-  PRUNE,
+  judgingMany,
   pruneLines,
   pruningBytes,
   RM,
@@ -23,11 +25,13 @@ import {
   sizeOf,
   TABLE,
   type Args,
+  type Listed,
   type Pruning,
+  type Turned,
 } from '../runner.ts';
 import { HELP, usage, confirmed, type Engine } from './flags.ts';
 
-/** The runs a command line named, in the order given, each once (`RM`'s and `PRUNE`'s many positional). */
+/** The runs a command line named, in the order given, each once (the many positional of `RM`, and of `nemia prune`). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
 
 /**
@@ -92,17 +96,16 @@ function refusedNamed(tally: PruneTally): void {
   }
 }
 
-/** Each of `ids` judged for `nemia prune`, removing nothing whatever `args` says; a run it cannot judge is said and tallied. */
-async function judged(e: Engine, ids: readonly string[], args: Args, tally: PruneTally): Promise<Pruning[]> {
-  const found: Pruning[] = [];
-  for (const id of ids) {
-    try {
-      found.push((await runWith(e, shipped(PRUNE.handler({ ...args, runId: id, yes: false })))).pruning);
-    } catch (err) {
-      notPrunedLine(id, err, tally);
-    }
-  }
-  return found;
+/** Each of `ids` judged for `nemia prune`, side by side, nothing removed; a run it cannot judge is said and tallied, in the order named. */
+async function judged(
+  e: Engine,
+  ids: readonly string[],
+  flags: { unmerged: boolean; artifacts: boolean },
+  tally: PruneTally,
+): Promise<readonly Listed[]> {
+  const listed = await runWith(e, shipped(judgingMany(ids, flags)));
+  for (const l of listed) if ('failed' in l) notPrunedLine(l.id, l.failed, tally);
+  return listed;
 }
 
 /**
@@ -138,17 +141,15 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
     console.log(`${running.length} run${running.length > 1 ? 's' : ''} not over, not pruned: ${running.map((p) => p.id).join(', ')}`);
 }
 
-/** The runs `nemia prune` removes once a person has said yes, each judged again as it is pruned, never trusted from the listing. */
-async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
-  for (const p of prunable) {
-    try {
-      const data = await runWith(e, shipped(PRUNE.handler({ ...args, runId: p.id, yes: true })));
-      const done = data.pruning;
-      for (const line of PRUNE.print(data, args)) console.log(line);
-      if (done.kind === 'refused' || done.left.length) tally.notPruned.push(p.id);
-    } catch (err) {
-      notPrunedLine(p.id, err, tally);
+/** One turn of `nemia prune`'s removal, said as it ends: each run's lines, and a run not pruned, or with something left, tallied. */
+function saidTurn(turn: readonly Turned[], tally: PruneTally): void {
+  for (const done of turn) {
+    if ('failed' in done) {
+      notPrunedLine(done.id, done.failed, tally);
+      continue;
     }
+    for (const line of pruneLines(done.pruning)) console.log(line);
+    if (done.pruning.kind === 'refused' || done.pruning.left.length) tally.notPruned.push(done.id);
   }
 }
 
@@ -167,7 +168,9 @@ async function removing(
 
 /**
  * `nemia prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each
- * on its own, a line each, a refusal included; with none, every run.
+ * on its own, a line each, a refusal included; with none, every run. The runs are judged side by side and printed in the order named
+ * (`judgingMany`), a run that could not be judged first; those ready are removed a turn at a time, each turn said as it ends
+ * (`freeingMany`): on the listing's judgement under `--yes`, judged again after a person's y.
  */
 export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   const ids = idsOf(args);
@@ -176,7 +179,11 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   const artifacts = args.artifacts === true;
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const found = await withEngine(e, await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), args, tally));
+  const listed = await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
+  const found = await withEngine(
+    e,
+    listed.flatMap((l) => ('failed' in l ? [] : [l.pruning])),
+  );
   printFound(found, named, tally);
   const prunable = found.filter((p) => p.kind === 'prunable');
   if (!prunable.length) {
@@ -187,7 +194,7 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   const total = sizeOf(prunable.reduce((sum, p) => sum + pruningBytes(p), 0));
   console.log(`${prunable.length} run${prunable.length > 1 ? 's' : ''} to prune, ${total} in all`);
   if (!(await removing(prunable, named, { unmerged, yes, artifacts }))) return refusedNamed(tally);
-  await prunedAll(e, prunable, args, tally);
+  await runWith(e, shipped(freeingMany(listed, { unmerged, artifacts, yes }, (turn) => saidTurn(turn, tally))));
   return refusedNamed(tally);
 }
 

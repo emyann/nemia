@@ -3410,6 +3410,25 @@ own prune, so the number is a floor. At a terminal it asks, and removes on a `y`
 else it removes only with `--yes`. With no run named it reads every run in the store: the runs not over
 are summed up on one line, a run with nothing to prune is not said, and the rest are listed.
 
+**Many runs are judged side by side, and removed a few a turn.** The listing judges and sizes 4 runs at
+once (`PRUNE_A_TURN`, `judgingMany` in `src/prune/prune.verb.ts`) and prints them in the order named,
+whatever order they ended in. The removal goes in turns of 4 runs in that order, one turn after another
+(`freeingMany`): within a turn the runs of one repository go by one `remove` asked of the place
+(`freedByRepo`, which the daemon's sweep shares), repositories side by side, so a repository's own git
+writes are never two at once, and each turn's lines are printed as it ends. Under `--yes` a run is
+removed on the listing's judgement: it is judged once, and a late run of a long prune is removed on a
+judgement as old as the removals before it — git still refuses a worktree changed or locked since.
+After a `y` at the prompt, time has passed, so each run of a turn is judged again just before that
+turn's removal, and one no longer ready says why and is kept.
+
+**A run's mark is written on the file as it reads.** A prune marks a run before it removes anything and
+again once the removal is over, each time over the mark the file holds then (`runStore.runs.pruned`),
+never the one it judged: a worktree a mark lists is never dropped, and a prune that removed nothing
+takes its own mark back only while a worktree it listed still stands. So a person's prune and the
+daemon's sweep of the same run leave it marked with every worktree either removed, and a `remove` that
+was not heard and removed all the same leaves the run pruned. The read and the write are one stretch of
+one process, not a lock: two processes can still cross inside it.
+
 **The daemon frees a finished run itself.** A run that is finished — every result branch on its base,
 landed by its ending or merged by hand, or cancelled with its tasks settled — has its worktrees removed
 with no person's act: beside its passes the daemon sweeps every 5 seconds (`free`, `freeOnce` in

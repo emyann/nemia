@@ -2589,7 +2589,8 @@ What was built:
 
 - **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with what removing each worktree frees (`freedBytes`, a walk with `lstat`
   that follows no link and counts nothing for a file hardlinked from outside the worktree) and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
-  one line, and a run with nothing to prune is not said. The tick never prunes; since the retention rule, the daemon frees a finished
+  one line, and a run with nothing to prune is not said. Many runs are judged 4 at once and removed 4 a turn, one `remove` a repository
+  (`judgingMany`, `freeingMany`), once under `--yes` and again after a `y`. The tick never prunes; since the retention rule, the daemon frees a finished
   run's worktrees itself, on a sweep beside its passes (`freeOnce`, README, *Freeing the space*).
 - **The pure part, in `prune/prune.ts`.** `pruneRefusal` names each reason with its fix: a folder run; a run not over (`wf cancel` first); a finished
   run not merged, unless `--unmerged`; a hand-off owed (`handOffDue`); a worktree locked, detached on a commit no branch holds, or holding

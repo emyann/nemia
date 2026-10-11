@@ -1,8 +1,8 @@
 /**
  * The place a program is given (`place.ts` holds the contract): `PlaceService`, the service every caller asks, with no default, so a
- * program that asks the place and is given none does not compile; what a caller reads through it (`readRunPlace`, `askRunPlace`, `openPlace`,
- * `trialMerges`); and what an implementation that runs processes shares: the stop of a process group at a deadline (`stopGroup`), and
- * the words of an ask that was not heard (`stoppedWords`, `threwWords`).
+ * program that asks the place and is given none does not compile; what a caller reads through it (`readRunPlace`, `askRunPlace`,
+ * `openPlace`, `trialMerges`); and what an implementation that runs processes shares: the stop of a process group at a deadline
+ * (`stopGroup`), and the words of an ask that was not heard (`stoppedWords`, `threwWords`).
  */
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { Context, Effect, Layer, Schedule, Schema } from 'effect';

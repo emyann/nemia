@@ -1,7 +1,7 @@
 /**
  * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is
- * touched (`judging`), and removing through the place it is given (`freeing`); and what `nemia rm` shares with it — a path as git names a worktree
- * (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
+ * touched (`judging`), and removing through the place it is given (`freeing`); and what `nemia rm` shares with it — a path as git names
+ * a worktree (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
  * (`runtime-client.ts`); it never stops anything.
  */
 import fs from 'node:fs';

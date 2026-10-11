@@ -70,6 +70,7 @@ export const gitWorld: World = {
   },
   branch: (root, name, files, from = 'main') => branch(root, name, files, from),
   stage,
+  resolve: (checkout, file) => void git(checkout, 'add', '-A', '--', file),
   tag: (root, tag, rev) => void git(root, 'tag', tag, rev),
   head: (checkout) => git(checkout, 'rev-parse', 'HEAD'),
   read: (root, rev) => ({

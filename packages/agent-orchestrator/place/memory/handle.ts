@@ -3,7 +3,7 @@
  * work, puts a commit on a branch, stages a merge, tags and reads a commit, each in memory and in the directories the verbs read. It
  * throws on what a test got wrong — a directory that is no checkout, a name that is no commit — in words that say which.
  */
-import { checkoutAt, commitMade, committed, headOf, mergedIn, type Found } from './acts.ts';
+import { checkoutAt, commitMade, committed, headOf, mergedIn, resolved, type Found } from './acts.ts';
 import { isDirectory, real, writeChanges } from './disk.ts';
 import { commitAt, type Held, type Repository, type Tree, type World } from './world.ts';
 
@@ -64,6 +64,7 @@ export function worldOf(held: Held): World {
       if (at.checkout.staged) throw new Error(`${checkout} has a merge staged already: land it or take it back first`);
       mergedIn(held, at, idOf(at.repo, name), false, '');
     },
+    resolve: (checkout, file) => resolved(found(held, checkout), file),
     tag: (root, tag, rev) => {
       const { repo } = found(held, root);
       repo.tags.set(tag, idOf(repo, rev));

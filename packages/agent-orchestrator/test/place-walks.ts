@@ -591,6 +591,80 @@ const LAND: readonly Walk[] = [
     },
   },
   {
+    name: 'the commit holds the merge as staged: a file left in the checkout since, and an edit not taken, stay uncommitted there',
+    walk: (side, area) => {
+      const { root, main } = forked(side, area);
+      side.world.stage(root, 'work');
+      fs.writeFileSync(path.join(root, 'left.txt'), 'left by the check\n');
+      fs.writeFileSync(path.join(root, 'b.txt'), 'edited since\n');
+      const landed = side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
+      const report = { repo: root, baseRef: main, onto: 'main', branches: ['main'], diffOf: [], present: ['left.txt'], atBase: [] };
+      const { files, present } = answerOf(side.place.askNow('report', { ...report, atBase: [] }));
+      const after = answerOf(side.place.askNow('report', { ...report, baseRef: 'main', atBase: ['b.txt'] })).atBase;
+      return { main, landed, files, present, after, checkout: listed(side, root, area) };
+    },
+    says: {
+      after: { 'b.txt': 'two\n' },
+      checkout: {
+        branches: [],
+        workspaces: [
+          {
+            branch: 'main',
+            changes: ['b.txt', 'left.txt'],
+            clean: false,
+            detached: false,
+            head: 'commit-1',
+            onBranch: true,
+            path: '<area>/repo',
+            prunable: false,
+          },
+        ],
+      },
+      files: { main: [{ added: 1, path: 'b.txt', removed: 0, status: 'A' }] },
+      landed: { answer: { commit: 'commit-1' } },
+      main: 'commit-2',
+      present: { main: { 'left.txt': 'absent' } },
+    },
+  },
+  {
+    name: 'a conflict resolved in the checkout is one no longer: status says so, and the commit holds the resolution',
+    walk: (side, area) => {
+      const { root, main, clash } = forked(side, area);
+      side.world.stage(root, 'clash');
+      const before = side.place.askNow('status', { checkout: root, tips: { clash } });
+      fs.writeFileSync(path.join(root, 'a.txt'), 'both\n');
+      side.world.resolve(root, 'a.txt');
+      const resolved = side.place.askNow('status', { checkout: root, tips: { clash } });
+      const landed = side.place.askNow('land', { checkout: root, act: 'commit', message: 'land clash' });
+      const report = { repo: root, baseRef: 'main', onto: 'main', branches: [], diffOf: [], present: [], atBase: ['a.txt'] };
+      return {
+        main,
+        clash,
+        before,
+        resolved,
+        landed,
+        commit: side.world.read(root, 'main'),
+        text: answerOf(side.place.askNow('report', report)).atBase,
+        checkout: listed(side, root, area),
+      };
+    },
+    says: {
+      before: { answer: { conflicted: true, head: 'commit-1', merging: 'ours', missing: [] } },
+      checkout: {
+        branches: [],
+        workspaces: [
+          { branch: 'main', clean: true, detached: false, head: 'commit-2', onBranch: true, path: '<area>/repo', prunable: false },
+        ],
+      },
+      clash: 'commit-3',
+      commit: { message: 'land clash', parents: ['commit-1', 'commit-3'] },
+      landed: { answer: { commit: 'commit-2' } },
+      main: 'commit-1',
+      resolved: { answer: { conflicted: false, head: 'commit-1', merging: 'ours', missing: [] } },
+      text: { 'a.txt': 'both\n' },
+    },
+  },
+  {
     name: 'abort takes the merge back: the head where it was, the files as they were, and nothing staged',
     walk: (side, area) => {
       const { root, main } = forked(side, area);

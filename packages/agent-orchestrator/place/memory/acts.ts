@@ -1,8 +1,9 @@
 /**
  * What changes a repository the test place holds, in memory and in its directories together: a checkout found by its directory
- * (`checkoutAt`), a commit of what a checkout holds (`committed`), a branch merged into a checkout (`mergedIn`), a staged merge taken
- * back (`takenBack`), and a commit made of files alone (`commitMade`). The verbs (`reads.ts`, `writes.ts`) and the handle a test holds
- * (`handle.ts`) act through these, so a workspace a verb cut and a commit a test made are one repository.
+ * (`checkoutAt`), a commit of what a checkout holds (`committed`), a branch merged into a checkout (`mergedIn`), a path of a staged
+ * merge resolved (`resolved`), a staged merge taken back (`takenBack`), and a commit made of files alone (`commitMade`). The verbs
+ * (`reads.ts`, `writes.ts`) and the handle a test holds (`handle.ts`) act through these, so a workspace a verb cut and a commit a test
+ * made are one repository.
  */
 import { markStaged, readTree, real, writeChanges } from './disk.ts';
 import { baseOf, commitOf, merged, nextId, within, type Checkout, type Held, type Repository, type Tree } from './world.ts';
@@ -49,15 +50,31 @@ export const treeOf = (repo: Repository, checkout: Checkout): Tree => commitOf(r
 const sorted = (tree: Tree): Tree => Object.fromEntries(Object.entries(tree).sort(([a], [b]) => (a < b ? -1 : 1)));
 
 /**
- * What `found`'s checkout holds, committed on its branch under `message`: its files as its directory has them, after the commit it is at
- * and each commit of a merge staged there, which this ends. Answers the commit.
+ * `found`'s checkout committed on its branch under `message`, after the commit it is at and each commit of a merge staged there, which
+ * this ends: `tree` where given, else its files as its directory has them. Answers the commit.
  */
-export function committed(held: Held, { repo, checkout }: Found, message: string): string {
+export function committed(held: Held, { repo, checkout }: Found, message: string, tree: Tree = readTree(checkout.dir)): string {
   const parents = [headOf(repo, checkout), ...(checkout.staged?.heads ?? [])];
-  const id = commitMade(held, repo, checkout.branch, readTree(checkout.dir), parents, message);
+  const id = commitMade(held, repo, checkout.branch, tree, parents, message);
   if (checkout.staged) markStaged(checkout.dir, false);
   delete checkout.staged;
   return id;
+}
+
+/**
+ * `file` of the merge staged in `found`'s checkout taken as its directory has it now, or as gone where it has none, and no longer in
+ * conflict: what a person does to resolve a path, or to add an edit to the merge.
+ */
+export function resolved({ checkout }: Found, file: string): void {
+  const { staged } = checkout;
+  if (!staged) throw new Error(`${checkout.dir} has no merge staged, so ${file} is no path of one to resolve`);
+  const { [file]: _was, ...rest } = staged.tree;
+  const now = readTree(checkout.dir)[file];
+  checkout.staged = {
+    heads: staged.heads,
+    conflicts: staged.conflicts.filter((p) => p !== file),
+    tree: now === undefined ? rest : { ...rest, [file]: now },
+  };
 }
 
 /**

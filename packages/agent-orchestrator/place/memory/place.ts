@@ -6,7 +6,7 @@
  *
  * It models commits as whole files, a merge by file, and the directories a step works in, which are real. It does not model a merge
  * within one file, a rename, a binary file, a link, an ignore rule, a hook, a lock, a deadline or a request of the wrong shape: a test
- * that needs one of those asks the git place.
+ * that needs one of those asks the git place. A conflict is resolved, and an edit added to a staged merge, with `world.resolve`.
  */
 import { Effect, type Layer } from 'effect';
 import { worldOf } from './handle.ts';

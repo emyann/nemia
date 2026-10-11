@@ -47,7 +47,8 @@ every factory and repository of its process, a question a call that runs git and
 given as `gitPlaceLayer` by `src/place/shipped.store.ts`, the one file of `src` that imports it (`placeBreaks` in `test/boundary.test.ts`),
 so no `src` names git (`test/git-calls.test.ts`). The test place is a second one, beside it (`packages/agent-orchestrator/place/memory`,
 `testPlace()`): it answers the same verbs from memory, in real directories and with no process, new for each test, and no file of `src`
-or `bin` imports it. One table of walks holds it to git (`test/place-walks.ts`): each walk has the one answer both places must give,
+or `bin` imports it: the door gives git alone (`placeBreaks`). One table of walks holds it to git (`test/place-walks.ts`): each walk
+has the one answer both places must give,
 `test/git-place.boundary.test.ts` asks them of git and `test/place-contract.test.ts` of the test place, where a lie about any verb
 fails a walk and a verb with no walk is named. Two things are given up on purpose. *A team's own place as a folder of scripts*: a
 place is no longer a skill's `scripts/<verb>.ts` declared by a `place.json` and run as a process a question, so a team cannot bring

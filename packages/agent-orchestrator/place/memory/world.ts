@@ -44,6 +44,8 @@ export type World = {
   readonly branch: (root: string, name: string, files: Readonly<Record<string, string | null>>, from?: string) => string;
   /** The merge of `branch` staged in `checkout` and not committed, conflicts left in its files, as a landing session stages it. */
   readonly stage: (checkout: string, branch: string) => void;
+  /** `file` of the merge staged in `checkout` taken as the directory has it now, and no longer in conflict, as a person resolves one. */
+  readonly resolve: (checkout: string, file: string) => void;
   /** `tag` put on the commit `rev` names in `root`. */
   readonly tag: (root: string, tag: string, rev: string) => void;
   /** The commit `checkout` is at. */

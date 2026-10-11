@@ -56,7 +56,10 @@ export function handoff(held: Held, { workspace, step, why }: PlaceRequests['han
   return { commit: committed(held, found, `${step}: hand off what was left uncommitted${why}`) };
 }
 
-/** `land`: the merge staged in a checkout committed under the message given, or taken back. */
+/**
+ * `land`: the merge staged in a checkout committed under the message given, or taken back. The commit holds the merge as it was staged
+ * and resolved, never a file the checkout was left since.
+ */
 export function land(held: Held, request: PlaceRequests['land']): Reply<'land'> {
   const { checkout: dir, act } = request;
   const found = checkoutAt(held, dir);
@@ -69,7 +72,7 @@ export function land(held: Held, request: PlaceRequests['land']): Reply<'land'> 
   }
   if (staged.conflicts.length) return refused(`${staged.conflicts.join(', ')} still in conflict in ${dir}: resolve each, then land again`);
   if (!request.message.trim()) return refused(`the merge in ${dir} is given an empty message, and is not committed under none`);
-  return { commit: committed(held, found, request.message.trim()) };
+  return { commit: committed(held, found, request.message.trim(), staged.tree) };
 }
 
 /** Why the workspace `dir` of `repo` is not removed, or undefined once it is, with its directory. */

@@ -445,6 +445,87 @@ test('REFUSED: a gate already timed, a record with no gatesTimed and an approval
   assert.deepEqual(gateWaits(unfiled, [PLAN, BUILD], GATED_VIEWS), [], 'the try approved is not on the timeline yet');
 });
 
+const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
+
+/** A gated step held open: it signed off blocked, a person answered, and try 2, that answer's turn, was approved. Its timeline is due. */
+const ANSWERED = {
+  id: 'r-4',
+  workflowDir: '/w/intake',
+  createdAt: '2026-10-06T09:59:00.000Z',
+  steps: { ask: { status: 'done', taskId: 'r-4-ask', tries: [{ taskId: 'r-4-ask', then: 'nudge' }] } },
+  approvals: [{ step: 'ask', try: 2, at: '2026-10-06T10:29:00.000Z' }],
+  gatesTimed: [],
+  runTimed: false,
+} as unknown as Run;
+
+/** Its session: a first turn to 10:05, and the answer's from 10:11 to 10:20, signed and waiting on a person. */
+const ANSWERED_VIEWS = new Map<string, FactView>([
+  [
+    'r-4-ask',
+    {
+      phase: 'input-required',
+      state: {
+        brief: 'Do it.',
+        settled: null,
+        filedAt: `${DAY}T10:00:00.000Z`,
+        attempts: [
+          { startedAt: `${DAY}T10:00:00.000Z`, spawnedAt: `${DAY}T10:00:00.000Z`, endedAt: `${DAY}T10:05:00.000Z`, turn: 0 },
+          { startedAt: `${DAY}T10:11:00.000Z`, spawnedAt: `${DAY}T10:11:00.000Z`, endedAt: `${DAY}T10:20:00.000Z`, turn: 1 },
+        ].map((a) => ({ ...a, reason: null, usage: null, ended: 'done' })),
+      },
+    },
+  ],
+]);
+
+test("a gate approved on a try that answered a session is timed from that answer's end, on a run whose timeline is still due", () => {
+  assert.deepEqual(gateWaits(ANSWERED, [ASK], ANSWERED_VIEWS), [
+    {
+      metric: 'wait',
+      wait: 'gate',
+      attributes: { factory: 'default', workflow: 'intake', step: 'ask', agent: 'none', outcome: 'approved' },
+      run: 'r-4',
+      try: 2,
+      from: '2026-10-06T10:20:00.000Z',
+      to: '2026-10-06T10:29:00.000Z',
+      ms: 540_000,
+    },
+  ]);
+  const once = onceFacts(ANSWERED, [ASK], ANSWERED_VIEWS, callOf);
+  assert.deepEqual([once.facts.length, once.marks], [1, { gatesTimed: [{ step: 'ask', try: 2 }] }]);
+});
+
+test('REFUSED: a gate approved on an answered try is never timed on a run already handed over, nor on one started before the mark', () => {
+  const older = { ...ANSWERED };
+  delete older.runTimed;
+  for (const run of [{ ...ANSWERED, runTimed: true }, older]) {
+    assert.deepEqual(gateWaits(run, [ASK], ANSWERED_VIEWS), [], `runTimed: ${run.runTimed}`);
+    assert.deepEqual(onceFacts(run, [ASK], ANSWERED_VIEWS, callOf), { facts: [], marks: { gatesTimed: [] } }, `runTimed: ${run.runTimed}`);
+  }
+});
+
+test('the opposite: a gate approved on the try that owns its session is timed whatever the run says of its timeline', () => {
+  const owner = { ...ANSWERED, approvals: [{ step: 'ask', try: 1, at: '2026-10-06T10:29:00.000Z' }] } as Run;
+  for (const runTimed of [true, false]) {
+    assert.deepEqual(
+      gateWaits({ ...owner, runTimed }, [ASK], ANSWERED_VIEWS).map((w) => [w.try, w.ms]),
+      [[1, 540_000]],
+    );
+  }
+  const checked = {
+    ...ANSWERED,
+    runTimed: true,
+    steps: { ask: { ...ANSWERED.steps.ask, check: { taskId: 'r-4-ask-check' } } },
+  } as Run;
+  const withCheck = new Map([...ANSWERED_VIEWS, ['r-4-ask-check', clocked('10:20', '10:21', '10:25')]]);
+  assert.deepEqual(
+    gateWaits(checked, [ASK], withCheck).map((w) => [w.try, w.from, w.ms]),
+    [[2, '2026-10-06T10:25:00.000Z', 240_000]],
+    'an answered try with a check of its own ends at that check, as it did: timed on a run already handed over',
+  );
+  assert.equal(GATED.runTimed, undefined);
+  assert.equal(gateWaits(GATED, [PLAN, BUILD], GATED_VIEWS).length, 1, 'a record with no runTimed keeps the gates it had');
+});
+
 test('a wait is recorded into its histogram by the five attributes, and as a span from its start to its end with its run and try', async () => {
   const spans: Tracer.NativeSpan[] = [];
   const tracer = Tracer.make({

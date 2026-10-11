@@ -58,7 +58,8 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * One try of one step that ended, on the UTC day it ended: its check's end, or its session's where it has no check. `agent` is the
  * step's agent, null where it names none. `ranMs` is its session's and its check's run times, `checkMs` its check's alone, `costUsd`
  * what its session cost, `check` its check's verdict, null with no check, and `gateWaitMs` the wait for a person's approval of this try:
- * each null where not measured.
+ * each null where not measured. A try that answered an earlier try's session is a fact of its own, ended when its turn did, with no run
+ * time and no cost of its own, as a recheck's try has none: the session's are on the try that filed it.
  * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), on a step
  * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`). `skills` names each
  * skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which does

@@ -6,8 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
 import type { Consumed } from '../status/status.ts';
-import type { AttemptClock, TaskClock } from './timeline.ts';
-import { atWork, runTokens } from './took.ts';
+import type { Workflow } from '../step/step.ts';
+import { timeline, type AttemptClock, type TaskClock } from './timeline.ts';
+import { atWork, gateWaitOf, runTokens, tryEndOf } from './took.ts';
 
 const run = (steps: RepositoryRun['steps']): RepositoryRun => ({
   id: 'r-1',
@@ -160,4 +161,58 @@ test('the attempt in flight counts what it has used so far, off the view', () =>
   const r = run({ a: { taskId: 'a' } });
   const live = task([attempt(at(10), null)], null, { usage: used(2_000_000, 1_000) });
   assert.equal(runTokens(r, new Map([['a', live]]))!.total, 2_001_000);
+});
+
+const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
+
+/** A run of one gated step held open on task `T`: it signed off blocked, a person answered, and its second try is that answer's turn. */
+const answered = (approved: { try: number; at: string }): RepositoryRun => ({
+  ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', then: 'nudge' }] } }),
+  approvals: [{ step: 'ask', ...approved }],
+});
+
+/** The held session: a first turn that ended at 10:05, and the answer's turn from 10:11 to `end`, signed and waiting on a person. */
+const held = (end: string | null = at(10, 20)): TaskClock =>
+  task(
+    [attempt(at(10), at(10, 5), { turn: 0, ended: 'done' }), attempt(at(10, 11), end, { turn: 1, ended: end ? 'done' : null })],
+    null,
+    end ? { phase: 'input-required' } : {},
+  );
+
+test("a gate approved on a try that answered an earlier try's session waited from the end of that answer's turn", () => {
+  const r = answered({ try: 2, at: at(10, 29) });
+  const tl = timeline(r, new Map([['T', held()]]));
+  const [one, two] = tl.steps.ask;
+  assert.equal(two.session, null, 'the answered try has no session of its own');
+  assert.equal(tryEndOf(two), at(10, 20));
+  assert.equal(gateWaitOf(r, tl, ASK, two), 9 * MIN);
+  assert.equal(gateWaitOf(r, tl, ASK, one), null, 'the approval names try 2');
+});
+
+test("the opposite order: an approval that names the try owning the session waits from the session's end, as it did", () => {
+  const r = answered({ try: 1, at: at(10, 29) });
+  const tl = timeline(r, new Map([['T', held()]]));
+  const [one, two] = tl.steps.ask;
+  assert.equal(tryEndOf(one), one.session!.endedAt);
+  assert.equal(gateWaitOf(r, tl, ASK, one), 9 * MIN);
+  assert.equal(gateWaitOf(r, tl, ASK, two), null);
+});
+
+test("REFUSED: a recheck's try waits from its check's end, and an answered try whose turn has not ended has no wait", () => {
+  const rechecked = {
+    ...run({ ask: { taskId: 'T', check: { taskId: 'c2' }, tries: [{ taskId: 'T', check: { taskId: 'c1' }, then: 'recheck' }] } }),
+    approvals: [{ step: 'ask', try: 2, at: at(11) }],
+  } as RepositoryRun;
+  const views = new Map([
+    ['T', task([attempt(at(10), at(10, 5))])],
+    ['c1', task([attempt(at(10, 5), at(10, 10))], 'failed')],
+    ['c2', task([attempt(at(10, 40), at(10, 45))])],
+  ]);
+  const tl = timeline(rechecked, views);
+  assert.equal(tl.steps.ask[1].turn, undefined, 'a recheck ran no turn');
+  assert.equal(gateWaitOf(rechecked, tl, ASK, tl.steps.ask[1]), 15 * MIN);
+  const running = answered({ try: 2, at: at(10, 29) });
+  const during = timeline(running, new Map([['T', held(null)]]));
+  assert.equal(tryEndOf(during.steps.ask[1]), null);
+  assert.equal(gateWaitOf(running, during, ASK, during.steps.ask[1]), null, 'not a wait from the first turn, which ended earlier');
 });

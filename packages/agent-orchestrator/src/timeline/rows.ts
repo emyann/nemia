@@ -10,15 +10,17 @@ import { hasGate } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import type { Timeline } from './timeline.ts';
 import { gateWaitOf } from './took.ts';
+import { answerWaitOf } from './turns.ts';
 
 /** What a row is a number of: a try's session, a try's check, a step, a round of a loop, or the run. */
 export const TIMELINE_OF = ['try', 'check', 'step', 'round', 'run'] as const;
 
 /**
  * Which number a row is: the time `queued` and the time `ran`, in ms; a session's `cost`, in dollars; a step's `tries`, a count; a `wall`
- * time, in ms; and of a run alone, its time in `check` and at a `gate`, in ms.
+ * time, in ms; and of a run alone, its time in `check`, at a `gate`, and waiting on a person's `answer` to a step that signed off
+ * blocked, in ms.
  */
-export const TIMELINE_PARTS = ['queued', 'ran', 'cost', 'tries', 'wall', 'check', 'gate'] as const;
+export const TIMELINE_PARTS = ['queued', 'ran', 'cost', 'tries', 'wall', 'check', 'gate', 'answer'] as const;
 
 /**
  * One number of a run's timeline. `row` is its name: a step's is its place among the workflow's steps, from 1 and two digits wide, then
@@ -70,7 +72,8 @@ function stepRows(tl: Timeline, step: string, label: string): TimelineRow[] {
 
 /**
  * The run's own rows, only once its wall time is known: that wall time, the time its tasks were queued (its wait for a run slot among
- * it), the time its checks ran, and the time people took at its gates (`gateWaitOf`), each 0 where there was none.
+ * it), the time its checks ran, the time people took at its gates (`gateWaitOf`), and the time it waited on a person's answer to a
+ * session held open (`answerWaitOf`), each 0 where there was none.
  */
 function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly Workflow[]): TimelineRow[] {
   if (tl.run.wallMs === null) return [];
@@ -80,11 +83,13 @@ function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: rea
     .filter((step) => hasGate(step, run))
     .flatMap((step) => (tl.steps[step.name] ?? []).map((t) => gateWaitOf(run, tl, step, t) ?? 0))
     .reduce((ms, waited) => ms + waited, 0);
+  const answer = tries.reduce((ms, t) => ms + (answerWaitOf(t) ?? 0), 0);
   return measured({ of: 'run', step: null, try: null, row: 'run' }, [
     ['wall', tl.run.wallMs],
     ['queued', tl.run.queuedMs],
     ['check', check],
     ['gate', gate],
+    ['answer', answer],
   ]);
 }
 

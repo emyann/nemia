@@ -10,7 +10,8 @@
  * to the next. A settle is counted on the first pass that reads its task settled and does not find it among those the tick has counted
  * (`settlesCounted`, `settlesDue`); on a record with no such mark, on the pass whose read of the feed names it (`settledIn`). A gate is
  * timed on the first pass that reads its approval and does not find it among those the tick has timed (`gatesTimed`), and a denied call is
- * counted on the first pass that reads its attempt ended and past those the tick has counted (`deniedCounted`).
+ * counted on the first pass that reads its attempt ended and past those the tick has counted (`deniedCounted`). A gate approved on a try
+ * that answered an earlier try's session is timed only while the run's timeline is still to hand over (`runTimed` is `false`).
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
@@ -31,6 +32,7 @@ import {
   type AttemptClock,
   type TaskClock,
   type TimelineRow,
+  type TimelineTry,
 } from '../timeline/index.ts';
 
 /** The only attributes a step's metric carries: a series for each, never one for each run. */
@@ -285,9 +287,17 @@ export function settledWaits(run: Run, steps: readonly Workflow[], settled: Read
 }
 
 /**
+ * Whether try `t` ends at the turn it ran of an earlier try's session, with no check of its own, on a `run` whose timeline is handed over
+ * or was never to be (`runTimed` other than `false`): a gate `gateWaits` leaves untimed, whatever pass reads it.
+ */
+const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Boolean(t.turn) && !t.check && run.runTimed !== false;
+
+/**
  * The gate wait of each approval of `run` at a gated step that the tick has not timed (`gatesTimed`), off its `timeline` of `views`: the ms
  * `gateWaitOf` gives, ending at the approval. None on a record with no `gatesTimed`, written before the tick timed gates; none for an
- * approval whose try is not on the timeline yet, or whose wait is not known, which a later pass times once it is.
+ * approval whose try is not on the timeline yet, or whose wait is not known, which a later pass times once it is. And none, ever, for a
+ * wait read off the turn of a try that answered an earlier try's session (`answeredLate`) on a run whose timeline is not still to hand
+ * over (`runTimed` other than `false`): such a gate of a run already handed over, or started before the mark, is never timed late.
  */
 export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
   const timed = run.gatesTimed;
@@ -297,7 +307,7 @@ export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyM
     const step = steps.find((s) => s.name === a.step);
     if (!step || !hasGate(step, run) || timed.some((g) => g.step === a.step && g.try === a.try)) return [];
     const t = tl.steps[a.step]?.find((x) => x.try === a.try);
-    const ms = t ? gateWaitOf(run, tl, step, t) : null;
+    const ms = t && !answeredLate(run, t) ? gateWaitOf(run, tl, step, t) : null;
     if (ms === null) return [];
     const from = new Date(Date.parse(a.at) - ms).toISOString();
     return [

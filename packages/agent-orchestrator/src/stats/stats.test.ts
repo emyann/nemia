@@ -32,8 +32,9 @@ const TEAM = [
 /**
  * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one,
  * why the try after it was filed, whether its session failed, the calls its session was refused, the skills it loaded (unmeasured
- * unless given), whether it is a recheck, sharing the try before it's session, and the fields its session's closeout declared, where it
- * made one; and, for its check, how many seconds it ran (an hour unless given) and the deadline in seconds its task was filed with.
+ * unless given), whether it is a recheck, sharing the try before it's session, or answers that session, held open, as a turn of it
+ * that ends at its end, and the fields its session's closeout declared, where it made one; and, for its check, how many seconds it ran
+ * (an hour unless given) and the deadline in seconds its task was filed with.
  */
 type Try = {
   end: string;
@@ -45,6 +46,7 @@ type Try = {
   skills?: string[];
   files?: string[];
   recheck?: true;
+  answers?: true;
   closeout?: Record<string, unknown>;
   checkRan?: number;
   deadline?: number;
@@ -68,6 +70,20 @@ const ended = (end: string, cost: number | null, failed = false, ranMs = 60 * MI
   },
 });
 
+/** `view` answered in the same session: its attempts, then a turn more of ten minutes that ended at `end` and cost fifty cents. */
+const answeredBy = (view: TaskClock, end: string): TaskClock => {
+  const turn = Math.max(...view.state.attempts.map((a) => a.turn ?? 0)) + 1;
+  const answer = {
+    startedAt: minus(end, 10 * MIN),
+    spawnedAt: minus(end, 10 * MIN),
+    endedAt: end,
+    reason: 'harness',
+    usage: { costUsd: 0.5 },
+    turn,
+  };
+  return { ...view, state: { ...view.state, attempts: [...view.state.attempts, answer] } };
+};
+
 /**
  * A run's read (`RunRead`) over `steps`, each step's tries as given: a session per try ending at its end, or ten minutes before where it
  * has a check, which ends at the end.
@@ -86,10 +102,15 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     const ids: EarlierTry[] = [];
     list.forEach((t, i) => {
       const own = `${id}-${name}-${i + 1}`;
-      const taskId = t.recheck ? ids[i - 1].taskId : own;
+      const taskId = t.recheck || t.answers ? ids[i - 1].taskId : own;
       const sessionEnd = t.check ? minus(t.end, 10 * MIN) : t.end;
-      views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));
-      filed.set(taskId, minus(sessionEnd, 70 * MIN));
+      if (t.answers) {
+        ids[i - 1].then = 'nudge';
+        views.set(taskId, answeredBy(views.get(taskId)!, sessionEnd));
+      } else {
+        views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));
+        filed.set(taskId, minus(sessionEnd, 70 * MIN));
+      }
       if (t.denied) denied.set(taskId, t.denied);
       if (t.skills) skills.set(taskId, t.skills);
       if (t.files) files.set(taskId, t.files);
@@ -310,6 +331,25 @@ test("a gate wait runs from the try's end to its approval; none without one, non
     factsOf(ending).tries.find((t) => t.step === 'land')?.gateWaitMs,
     2 * 60 * MIN,
     'an ending approved before it is filed waits from the end of what it comes after',
+  );
+});
+
+test("a gate approved on a try that answered a session waits from that answer's end, and the try is a fact with no time or cost of its own", () => {
+  const gated = [step('design', [], { gate: true, by: 'seldon' })];
+  const tries = { design: [{ end: at(1) }, { end: at(2), answers: true as const }] };
+  const approved = readOf('a', gated, tries, { approvals: [{ step: 'design', try: 2, at: minus(at(3), 30 * MIN) }] });
+  const [one, two, ...more] = factsOf(approved).tries;
+  assert.deepEqual(more, []);
+  assert.deepEqual([one.try, one.gateWaitMs, one.costUsd], [1, null, 1.5]);
+  assert.deepEqual([two.try, two.gateWaitMs, two.ranMs, two.costUsd, two.day], [2, 30 * MIN, null, null, DAY]);
+  assert.equal(one.ranMs, 70 * MIN, 'the session ran its hour and the ten minutes of its answer, on the try that filed it');
+  assert.equal(factsOf(approved).runs.length, 1, 'a run whose last try answered a session finished');
+  assert.equal(factsOf(approved).runs[0].costUsd, 1.5, 'one session, its two turns, counted once');
+  const owner = readOf('o', gated, tries, { approvals: [{ step: 'design', try: 1, at: minus(at(3), 30 * MIN) }] });
+  assert.deepEqual(
+    factsOf(owner).tries.map((t) => t.gateWaitMs),
+    [30 * MIN, null],
+    "the opposite order: an approval of the try that owns the session waits from the session's end",
   );
 });
 

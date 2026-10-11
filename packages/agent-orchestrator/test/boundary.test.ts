@@ -401,10 +401,13 @@ const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
 /** The one file of `src` that imports a place's code, and gives it to whoever composes a program. */
 const PLACE_DOOR = 'src/place/shipped.store.ts';
 
+/** The one place the door gives: the shipped program is handed no other, and no test place. */
+const DOOR_GIVES = 'place/git/';
+
 /**
  * A place's code stands beside the package: a file of `place/<name>/` imports node's built-ins, `effect`, the files of its own place and
  * `PLACE_REACHES`, never another package, another place or the rest of `src`; and of `packageFiles`, the package's `src` and `bin`,
- * `PLACE_DOOR` alone imports a file under `place/`.
+ * `PLACE_DOOR` alone imports a file under `place/`, and of those only one under `DOOR_GIVES`.
  */
 function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
   const own = (file: string) => `${file.split('/').slice(0, 2).join('/')}/`;
@@ -417,7 +420,9 @@ function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
   );
   const throughDoor = Object.entries(packageFiles).flatMap(([file, imports]) =>
     file === PLACE_DOOR
-      ? []
+      ? imports
+          .filter((m) => m.startsWith('place/') && !m.startsWith(DOOR_GIVES))
+          .map((m) => `${file} imports ${m}: the door gives the place under ${DOOR_GIVES} alone, and a test gives its own`)
       : imports
           .filter((m) => m.startsWith('place/'))
           .map((m) => `${file} imports ${m}: ${PLACE_DOOR} alone imports a place's code, and every other file asks the place it is given`),
@@ -676,6 +681,19 @@ test("REFUSED: a place's file that imports a package, the rest of src or another
     ]);
   }
   assert.deepEqual(placeBreaks(placeSources(), unimported('place/git/place.ts')), [], 'and a package that imports none breaks nothing');
+});
+
+test('REFUSED: the door importing the test place, or any place but git — the shipped program is never handed a stand-in', () => {
+  assert.ok('place/memory/index.ts' in placeSources(), 'the test place is there to be imported');
+  for (const m of ['place/memory/index.ts', 'place/memory/place.ts', 'place/other/x.ts'])
+    assert.deepEqual(placeBreaks(placeSources(), adding(PLACE_DOOR, m)), [
+      `${PLACE_DOOR} imports ${m}: the door gives the place under ${DOOR_GIVES} alone, and a test gives its own`,
+    ]);
+  assert.deepEqual(
+    placeBreaks(placeSources(), adding(PLACE_DOOR, 'place/git/declared.ts')),
+    [],
+    'another file of the git place is let through',
+  );
 });
 
 test('store files import no runtime, no controller and not the client, load as a tree beneath the controllers, and only the client and the controllers beneath the CLI import them', () => {

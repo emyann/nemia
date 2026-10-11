@@ -117,6 +117,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   pass goes into the stamps. A run whose stamp holds is not read off disk (`keptOf`), so an input the stamp misses is missed for good;
   `WF_VERIFY_REST` dies on it. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
   pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+- **The daemon frees a finished run's worktrees on a sweep beside its passes** (`freeOnce`, `src/prune/free.verb.ts`): a test that
+  starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`.
 - **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
   test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`).
 - **A test of what the tick orders or words by the clock seeds `Date`** (`t.mock.timers`: `fileInOrder` in `test/pool.test.ts`, the ages in
@@ -151,8 +153,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `views/views.verb.ts`): `reported` reads the whole stdout, a person the tail of each; the engine's `logs` is a tail, read only for
   a check filed before the runtime kept streams (`test/check-handed.test.ts`).
 - **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's, and so does each workspace whose
-  own `node_modules` the lockfile installs into (`workspaceModules`, `depsPlan`); a lockfile that differs from main's costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand. `du` counts a
-  hardlinked file once per invocation (`diskBytes`).
+  own `node_modules` the lockfile installs into (`workspaceModules`, `depsPlan`); a lockfile that differs from main's costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand.
+- **What a removal frees is `freedBytes` (`src/prune/freed.store.ts`), a floor: a Node primitive (`lstat`, `readdir`, `fs.rm`,
+  `statfs`) before a spawned `du`, `find` or `rm`**, which `test/spawned-tools.test.ts` refuses in any `src`.
 - **An ending's check installs what the staged merge's lockfile asks for, in the checkout**, first (`checkoutParts`, `checkArgv`). A
   failed install is ended by a signal: only the attempt's exit code is a verdict (`attemptVerdict`), never what it printed.
 - **A test that spawns a `wf` child waits on it with `nodeChild`** (`test/child.ts`): for what it says or writes, or its exit, which fails

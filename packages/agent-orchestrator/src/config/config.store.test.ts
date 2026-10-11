@@ -7,7 +7,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { keepsWorktrees, maxConcurrent, maxRuns, metricsHourDays, metricsMinuteDays, verifiesRest, wfRoot, type Env } from './config.store.ts';
+import {
+  keepsWorktrees,
+  maxConcurrent,
+  maxRuns,
+  metricsHourDays,
+  metricsMinuteDays,
+  verifiesRest,
+  wfRoot,
+  type Env,
+} from './config.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** That `read` refuses `env` with `Invalid`, exit 2, and exactly `message`. */

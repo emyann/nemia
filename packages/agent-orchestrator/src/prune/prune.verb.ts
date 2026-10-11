@@ -319,24 +319,29 @@ export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Siz
     workspaces: ready.flatMap((r) => r.worktrees.map((w) => w.path)),
     branches: [],
   });
-  const done: Pruning[] = [];
-  for (const r of marked) {
-    const { removed, left } = removedOf(r, outcome);
-    dropEmpty(r.within);
-    const files = r.files ? yield* removeFiles(r.run.id, r.files) : undefined;
-    if (files?.left) left.push(files.left);
-    const filesWent = files !== undefined && (files.freed > 0 || !files.left);
-    runStore.runs.prune(r.run.id, !removed.length && !filesWent ? r.run.pruned : r.marker(removed, filesWent ? files.freed : undefined));
-    done.push({
-      id: r.run.id,
-      kind: 'pruned',
-      worktrees: removed,
-      ...(filesWent ? { artifacts: { path: r.files!.path, bytes: files.freed } } : {}),
-      left,
-      at: r.at,
-      ...(r.unmerged ? { unmerged: true as const } : {}),
-    });
-  }
+  return yield* Effect.forEach(marked, (r) => finished(r, outcome));
+});
+
+/**
+ * One marked run after the place's `remove` answered `outcome`: its folder of worktrees once empty, its files under `--artifacts`, and
+ * its marker written again with what went, or taken back when nothing did.
+ */
+const finished = Effect.fnUntraced(function* (r: Sized & ReturnType<typeof markerOf>, outcome: PlaceOutcome<'remove'>) {
+  const { removed, left } = removedOf(r, outcome);
+  dropEmpty(r.within);
+  const files = r.files ? yield* removeFiles(r.run.id, r.files) : undefined;
+  if (files?.left) left.push(files.left);
+  const filesWent = files !== undefined && (files.freed > 0 || !files.left);
+  runStore.runs.prune(r.run.id, !removed.length && !filesWent ? r.run.pruned : r.marker(removed, filesWent ? files.freed : undefined));
+  const done: Pruning = {
+    id: r.run.id,
+    kind: 'pruned',
+    worktrees: removed,
+    ...(filesWent ? { artifacts: { path: r.files!.path, bytes: files.freed } } : {}),
+    left,
+    at: r.at,
+    ...(r.unmerged ? { unmerged: true as const } : {}),
+  };
   return done;
 });
 
@@ -344,7 +349,10 @@ export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Siz
  * What the place's `remove` did with one run's worktrees: those it removed, and those it left, in git's words, or every one, when it did
  * not answer.
  */
-function removedOf({ place, worktrees }: Sized, outcome: PlaceOutcome<'remove'>): Pick<Pruning, 'left'> & { removed: Pruning['worktrees'] } {
+function removedOf(
+  { place, worktrees }: Sized,
+  outcome: PlaceOutcome<'remove'>,
+): Pick<Pruning, 'left'> & { removed: Pruning['worktrees'] } {
   if (!('answer' in outcome)) {
     const said = unansweredWords(outcome);
     return { removed: [], left: worktrees.map((w) => ({ path: w.path, unread: said })) };

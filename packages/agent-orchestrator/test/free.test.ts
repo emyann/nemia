@@ -67,7 +67,10 @@ fs.writeFileSync(path.join(WORK, 'work.md'), '---\nplace: git\nharness: codex\n-
 /** `work → ship`: an ending at its gate, whose own session merges the run's branch in the repository's checkout. */
 const ENDING = fs.mkdtempSync(path.join(ROOT, 'wf-ending-'));
 fs.writeFileSync(path.join(ENDING, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
-fs.writeFileSync(path.join(ENDING, 'ship.md'), '---\nafter: work\nplace: git\nworkspace: main\ngate: true\nharness: codex\n---\nShip it.\n');
+fs.writeFileSync(
+  path.join(ENDING, 'ship.md'),
+  '---\nafter: work\nplace: git\nworkspace: main\ngate: true\nharness: codex\n---\nShip it.\n',
+);
 
 const tasks = new Map<string, unknown[]>();
 const starts = new Map<string, number>();
@@ -355,7 +358,7 @@ test('REFUSED at shipped defaults: a landed run whose worktree holds a change, i
   git(repo, 'worktree', 'unlock', lane(locked.id));
   const freed: string[] = [];
   for (let k = 0; k < 3; k++) freed.push(...(await sweep(await tick(), ids, memory)).freed.map((p) => p.id));
-  assert.deepEqual(freed.sort(), [dirty.id, locked.id].sort(), 'the same memory, and the two a person saw to are freed');
+  assert.deepEqual(new Set(freed), new Set([dirty.id, locked.id]), 'the same memory, and the two a person saw to are freed');
   assert.deepEqual([gone(dirty.id), gone(locked.id), whole(detached.id)], [true, true, true]);
 });
 
@@ -387,12 +390,18 @@ test('a chain: a run waiting --after a landed, freed run starts from main, lands
   assert.ok(!readRun(b.id).steps.work?.taskId, 'B waits while A has not landed');
   const landed = await shipped(a.id, a.repo);
   const memory = freshFreeMemory();
-  assert.deepEqual((await sweep(landed, [a.id, b.id], memory)).freed.map((p) => p.id), [a.id]);
+  assert.deepEqual(
+    (await sweep(landed, [a.id, b.id], memory)).freed.map((p) => p.id),
+    [a.id],
+  );
   assert.ok(gone(a.id), "A's worktree is gone before B has done any work");
 
   await land(b.id, b.repo);
   assert.ok(fs.existsSync(path.join(lane(b.id), `${a.id}.txt`)), "B's worktree was cut from main, with A's work on it");
-  assert.deepEqual((await sweep(await tick(), [a.id, b.id], memory)).freed.map((p) => p.id), [b.id]);
+  assert.deepEqual(
+    (await sweep(await tick(), [a.id, b.id], memory)).freed.map((p) => p.id),
+    [b.id],
+  );
   assert.ok(gone(b.id));
 });
 
@@ -416,7 +425,11 @@ test('REFUSED at shipped defaults: a store with more finished runs than a sweep 
   assert.deepEqual(count('inventory'), [FREE_A_SWEEP, FREE_A_SWEEP, 2, 1, 1], 'and judges no more: the locked run once a sweep after that');
   assert.deepEqual(count('remove'), [1, 1, 1, 0, 0], 'one remove a repository, whatever the runs');
   const first = sweeps[0].asked.find((a) => a.verb === 'remove')!.request as PlaceRequests['remove'];
-  assert.deepEqual([first.repo, first.workspaces.length, first.branches], [repo, FREE_A_SWEEP, []], 'carrying every worktree, and no branch');
+  assert.deepEqual(
+    [first.repo, first.workspaces.length, first.branches],
+    [repo, FREE_A_SWEEP, []],
+    'carrying every worktree, and no branch',
+  );
   assert.ok(whole(kept.id));
 });
 
@@ -424,12 +437,12 @@ test('runs of two repositories freed by one sweep: the place is asked one remove
   const [here, there] = [aRepo(), aRepo()];
   const ids = [(await merged(here)).id, (await merged(here)).id, (await merged(there)).id];
   const done = await sweep(await tick(), ids, freshFreeMemory());
-  assert.deepEqual(done.freed.map((p) => p.id).sort(), [...ids].sort());
+  assert.deepEqual(new Set(done.freed.map((p) => p.id)), new Set(ids));
   const removes = done.asked.filter((a) => a.verb === 'remove').map((a) => a.request as PlaceRequests['remove']);
-  assert.deepEqual(removes.map((r) => [r.repo, r.workspaces.length]).sort(), [
-    [here, 2],
-    [there, 1],
-  ].sort());
+  assert.deepEqual(
+    removes.map((r) => `${r.repo} ${r.workspaces.length}`).sort((a, b) => a.localeCompare(b)),
+    [`${here} 2`, `${there} 1`].sort((a, b) => a.localeCompare(b)),
+  );
 });
 
 test('REFUSED at shipped defaults: with WF_KEEP_WORKTREES=1 a sweep asks nothing and frees nothing; unset, it frees', async (t) => {
@@ -440,7 +453,10 @@ test('REFUSED at shipped defaults: with WF_KEEP_WORKTREES=1 a sweep asks nothing
   const keptWhole = await sweep(pass, [id], freshFreeMemory());
   assert.deepEqual([keptWhole.verbs, keptWhole.freed, whole(id)], [[], [], true]);
   delete process.env.WF_KEEP_WORKTREES;
-  assert.deepEqual((await sweep(pass, [id], freshFreeMemory())).freed.map((p) => p.id), [id]);
+  assert.deepEqual(
+    (await sweep(pass, [id], freshFreeMemory())).freed.map((p) => p.id),
+    [id],
+  );
 });
 
 test('the daemon frees a finished run with no person: `up` forks the sweep beside its passes', WAITED, async (t) => {

@@ -89,7 +89,8 @@ read off the run by a controller (`seenOf`, `src/admission/seen.verb.ts`), and a
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
-next pass. A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
+next pass. Beside its passes it frees the worktrees of finished runs (`free` in `src/prune/free.verb.ts`, forked by `up`), asking
+`nemia prune`'s own judgement of each, a few runs a sweep. A person may run it as a login service (`nemia service install`, `src/service/`), which runs the same daemon and hands the
 lease over only when told: from the checkout, or, run from an install, from `releases/current`. `nemia service restart`
 (`src/service/restart.verb.ts`) restarts the service's daemon as a take-over does (`takeOver`, `src/service/takeover.verb.ts`, shared with
 `nemia service install --take-over` and `nemia upgrade`): the store paused unless a person's pause stands, each landing check let
@@ -253,7 +254,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick
   (tick.verb, advance.verb) and the verbs beneath it, one feature each (views.verb, file.verb, ending.verb, cap.verb,
   meter.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb, gate.verb, say.verb, wait.verb, round.verb,
-  merge.verb, list.verb, decide.verb, forget.verb, prune.verb); and src/cli/ and the bins,
+  merge.verb, list.verb, decide.verb, forget.verb, prune.verb, free.verb); and src/cli/ and the bins,
   bin/nemia.ts and its alias bin/wf.ts, above it. A verb reaches the client itself or through a controller it imports.
   src/cli/ reaches the package only through runner.ts, workflow.ts and its own files, and each bin only through cli/main.ts
   and cli/exit.ts. The client and

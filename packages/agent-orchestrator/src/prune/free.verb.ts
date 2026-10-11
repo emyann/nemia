@@ -73,8 +73,34 @@ const freedTogether = Effect.fnUntraced(function* (ready: readonly Sized[]) {
 /** What is to be said of a run after its removal: nothing when every worktree went, else each line of what was left. */
 const afterWords = (p: Pruning): string | null => {
   if (p.kind !== 'pruned') return p.refusal ?? null;
-  return p.left.length ? pruneLines({ ...p, worktrees: [] }).slice(1).join(' ') : null;
+  return p.left.length
+    ? pruneLines({ ...p, worktrees: [] })
+        .slice(1)
+        .join(' ')
+    : null;
 };
+
+/** The memory without what it holds of a run that is no candidate any more: freed, or no longer finished. */
+function forgotten(memory: FreeMemory, candidates: readonly string[]): void {
+  const standing = new Set(candidates);
+  for (const id of memory.judged) if (!standing.has(id)) memory.judged.delete(id);
+  for (const id of memory.said.keys()) if (!standing.has(id)) memory.said.delete(id);
+}
+
+/** Each run left said in a warning, unless its words are those last said of it; one with nothing to say is said afresh next time. */
+const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; words: string | null }>, memory: FreeMemory) {
+  const said: string[] = [];
+  for (const { id, words } of left) {
+    if (words === null) memory.said.delete(id);
+    else if (memory.said.get(id) !== words) {
+      memory.said.set(id, words);
+      const line = `${id}  not freed: ${words}`;
+      said.push(line);
+      yield* Effect.logWarning(line).pipe(Effect.annotateLogs({ run: id }));
+    }
+  }
+  return said;
+});
 
 /**
  * One sweep over what the latest pass answered (`answers`), given what this daemon's sweeps remember (`memory`). Nothing, where the
@@ -94,9 +120,7 @@ const afterWords = (p: Pruning): string | null => {
 export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answered[], memory: FreeMemory) {
   if (keepsWorktrees()) return { freed: [], said: [] } satisfies Freed;
   const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(HOME, 'worktrees', id)));
-  const standing = new Set(candidates);
-  for (const id of memory.judged) if (!standing.has(id)) memory.judged.delete(id);
-  for (const id of memory.said.keys()) if (!standing.has(id)) memory.said.delete(id);
+  forgotten(memory, candidates);
   const turn = freeTurn(candidates, memory.judged, FREE_A_SWEEP, memory.turn++);
   const judged = yield* Effect.forEach(turn, swept, { concurrency: FREE_A_SWEEP });
   for (const id of turn) memory.judged.add(id);
@@ -107,17 +131,8 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
 
   const freed = removed.filter((p) => p.kind === 'pruned' && p.worktrees.length > 0);
   const left = [...judged.flatMap((j) => ('words' in j ? [j] : [])), ...removed.map((p) => ({ id: p.id, words: afterWords(p) }))];
-  const said: string[] = [];
   for (const p of freed) yield* Effect.logInfo(freedLine(p)).pipe(Effect.annotateLogs({ run: p.id }));
-  for (const { id, words } of left) {
-    if (words === null) memory.said.delete(id);
-    else if (memory.said.get(id) !== words) {
-      memory.said.set(id, words);
-      const line = `${id}  not freed: ${words}`;
-      said.push(line);
-      yield* Effect.logWarning(line).pipe(Effect.annotateLogs({ run: id }));
-    }
-  }
+  const said = yield* saidOnce(left, memory);
   yield* Effect.annotateCurrentSpan({ candidates: candidates.length, judged: turn.length, freed: freed.length });
   return { freed, said } satisfies Freed;
 });

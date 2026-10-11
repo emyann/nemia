@@ -3403,11 +3403,36 @@ each run read as `wf rm` reads it, with what a pass filed and never wrote down; 
 is said not counted, and why.
 
 **It lists before it removes.** Without `--yes` it prints each run it would prune, each worktree with the
-space it holds (`du`, which does not follow the links a worktree's `node_modules` has into the main
-checkout), and the total, then `nothing removed`. At a terminal it asks, and removes on a `y`; anywhere
+space removing it frees, and the total, then `nothing removed`. The space is read by a walk in Node
+(`freedBytes`): a file hardlinked from the main checkout's `node_modules` counts nothing while main still
+holds it, a link is never followed, and a file two worktrees share between them counts for neither run's
+own prune, so the number is a floor. At a terminal it asks, and removes on a `y`; anywhere
 else it removes only with `--yes`. With no run named it reads every run in the store: the runs not over
-are summed up on one line, a run with nothing to prune is not said, and the rest are listed. The tick never
-prunes: space is a person's call.
+are summed up on one line, a run with nothing to prune is not said, and the rest are listed.
+
+**The daemon frees a finished run itself.** A run that is finished — every result branch on its base,
+landed by its ending or merged by hand, or cancelled with its tasks settled — has its worktrees removed
+with no person's act: beside its passes the daemon sweeps every 5 seconds (`free`, `freeOnce` in
+`src/prune/free.verb.ts`), and asks of each such run exactly what `wf prune <id> --yes` asks, with no flag.
+So everything below holds for it: what is kept is kept, what is refused is refused, and the run is marked
+`(pruned)` the same way. It is at once, with no delay to set, and it reads the state, never the landing: a
+finished run whose `worktrees/<id>` is still on disk is freed on a later sweep whatever happened between, a
+restart included. No pass waits on it: the place is asked off the daemon's loop.
+
+- **A few runs a sweep.** A sweep judges 4 runs at most (`FREE_A_SWEEP`) and removes them with one
+  `git worktree remove` pass a repository, so a store with hundreds of finished runs is freed over as many
+  sweeps as that takes, never in one.
+- **A run that is not finished is none of its business**: in flight, failed, stopped, over its budget or
+  waiting at a gate, it can still be tried again from its worktree, and nothing is asked of its place. A
+  run that succeeded and waits on a person's merge is judged and left, without a word.
+- **A worktree it will not remove is said once.** A finished run whose worktree is dirty, locked or
+  detached stays, and `nemia up` warns `<id>  not freed: …` once while those words stand (once more after
+  a restart), with the fix. A run it frees is one line: `<id>  freed: removed 1 worktree, 13.2 MB; …`.
+- **Keeping a worktree on purpose**: `git worktree lock <path>` keeps one, and the daemon started with
+  `WF_KEEP_WORKTREES=1` keeps them all, as before.
+
+`wf prune` is then for what the rule leaves: a finished run nobody will merge (`--unmerged`), a run's files
+(`--artifacts`), a worktree a person has since seen to, and a store no daemon ticks.
 
 **What it removes, and how:** each worktree git lists inside `worktrees/<id>/`, by `git worktree remove`,
 never `--force`, then `git worktree prune`. What git ignores (`node_modules`, `.e2e/`) goes with it, and

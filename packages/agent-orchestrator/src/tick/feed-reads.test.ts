@@ -15,13 +15,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { Engine, type Sighting } from 'agent-runtime';
 import { asyncOps, plainEngine, type AsyncRunner } from '../../test/promised.ts';
 import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
+import { testPlace } from '../../place/memory/index.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-feed-reads-');
@@ -30,18 +30,17 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { runWith: runEngine, startRun, tickRun } = await import('../runner.ts');
+const place = testPlace();
+const stand = () => place;
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { listRuns } = await import('../record/record.store.ts');
 const { freshRestMemo } = await import('./tick.verb.ts');
 const { filingsRead } = await import('../views/views.verb.ts');
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], {
-  cwd: (execFileSync('git', ['init', '-q'], { cwd: REPO }), REPO),
-  stdio: 'ignore',
-});
+stand().world.repository(REPO, {});
 const ONE = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(ONE, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 

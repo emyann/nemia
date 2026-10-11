@@ -8,22 +8,25 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { teamCopy } from '../../test/team.ts';
-import { runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate } = await import('../template/template.store.ts');
-const { engine, FACTORY_RULES, factoryRules, readFactory, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const { main } = await import('../cli/main.ts');
+const { engine, FACTORY_RULES, factoryRules, readFactory, runWith: runEngine } = await import('../runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const { main: cli } = await import('../cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 const { reconcileFactory } = await import('../applied/applied.verb.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
   await import('../applied/applied.store.ts');
@@ -40,11 +43,8 @@ const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) =
 function repoWithTeam(): string {
   const repo = scratch('wf-upgrade-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   return repo;
 }
 

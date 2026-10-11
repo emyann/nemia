@@ -5,28 +5,30 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { teamCopy } from '../../test/team.ts';
-import { runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate } = await import('../template/template.store.ts');
 const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
-const { main } = await import('../cli/main.ts');
+const { main: cli } = await import('../cli/main.ts');
 const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { startDue } = await import('../schedule/schedule.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 const { Effect } = await import('effect');
 
 /** No verb here asks the engine anything. */
@@ -40,11 +42,8 @@ const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) =
 function repoWithTeam(): string {
   const repo = scratch('wf-applied-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   return repo;
 }
 

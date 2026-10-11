@@ -1116,7 +1116,7 @@ const keptBy = (text: string, strip = ''): string[][] =>
     .map((labels) => labels.filter((label) => label.startsWith(strip) && label !== 'le').map((label) => label.slice(strip.length)))
     .filter((labels) => labels.length > 0);
 
-/** The labels a LogQL query makes with `label_format`, each with the fields its template reads. */
+/** The labels a LogQL query makes by formatting one, each with the fields its template reads. */
 const madeLabels = (text: string): Map<string, string[]> =>
   new Map(
     [...text.matchAll(/label_format\s+(\w+)="((?:[^"\\]|\\.)*)"/g)].map(([, label, template]) => [

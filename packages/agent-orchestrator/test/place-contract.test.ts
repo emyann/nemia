@@ -10,7 +10,7 @@ import { PLACE_VERBS, type PlaceAnswers, type PlaceVerb } from '../src/place/pla
 import { placeOver, type OwnVerbs } from './place-over.ts';
 import { failing, unwalked, walksOn, WALKS, type Side } from './place-walks.ts';
 
-walksOn(testPlace);
+for (const [name, walk] of walksOn(testPlace)) test(name, walk);
 
 /** A commit no walk makes. */
 const NO_COMMIT = 'f'.repeat(40);

@@ -7,7 +7,6 @@
  * as `{ refused: true }` and an unread answer by its verb alone, since the two places word them their own way. `unwalked` names a verb
  * with no walk, and `failing` the walks of a verb a side does not say: a stand-in that lies fails one.
  */
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -861,8 +860,11 @@ export const failing = (verb: PlaceVerb, sideOf: () => Side): string[] =>
     })
     .map((walk) => walk.name);
 
-/** Every walk of the contract declared as a test of the side `sideOf` makes, a new one for each: `<verb>: <walk>`. */
-export function walksOn(sideOf: () => Side): void {
-  for (const [verb, walks] of Object.entries(WALKS))
-    for (const walk of walks) test(`${verb}: ${walk.name}`, () => assert.deepStrictEqual(walked(walk, sideOf()), walk.says));
-}
+/**
+ * Every walk of the contract as a test of the side `sideOf` makes, a new one for each: its name, `<verb>: <walk>`, and its body. The
+ * file of a side declares each with `test`, so the runner counts the test as that file's.
+ */
+export const walksOn = (sideOf: () => Side): (readonly [name: string, body: () => void])[] =>
+  Object.entries(WALKS).flatMap(([verb, walks]) =>
+    walks.map((walk) => [`${verb}: ${walk.name}`, () => assert.deepStrictEqual(walked(walk, sideOf()), walk.says)] as const),
+  );

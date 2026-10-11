@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PassCost } from '../src/lib/api.ts';
-import { bucketLabel, bucketWord, bytesWord, msWord, PASS_PHASES, passLine, passTitle, seenWords, shareWord } from '../src/lib/pass.ts';
+import { bytesWord, msWord, PASS_PHASES, passLine, passTitle, seenWords } from '../src/lib/pass.ts';
 import { REPO } from './e2e/world.ts';
 import { scratch } from './scratch.ts';
 
@@ -76,15 +76,7 @@ test('the title says what the pass saw, before what measuring took, where the pa
   ]);
 });
 
-test('a bucket says its bound, and the last its open end past the last bound; a share rounds to a whole percent, a sliver to < 1%', () => {
-  const bounds = [10, 25, 5000];
-  assert.deepEqual([bucketWord(10, bounds), bucketWord(5000, bounds), bucketWord(null, bounds)], ['≤ 10 ms', '≤ 5000 ms', '> 5000 ms']);
-  assert.deepEqual(
-    [bucketLabel(250, [250, 2500, 5000]), bucketLabel(2500, [2500]), bucketLabel(null, [10, 5000])],
-    ['250', '2.5k', '>5k'],
-    'a label under a column is short',
-  );
-  assert.deepEqual([shareWord(1), shareWord(0.374), shareWord(0.004), shareWord(0)], ['100%', '37%', '< 1%', '0%']);
+test('what a pass saw is said in words, one run in the singular', () => {
   assert.equal(
     seenWords({ runs: 1, tasks: 3, queued: 0, admitted: 2 }),
     '1 run in the store, 3 tasks not settled, 0 queued and 2 admitted',

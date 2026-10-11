@@ -5399,176 +5399,6 @@ test('REFUSED: a character card draws no stats line for an agent that sets none,
   assert.doesNotMatch(broken, /data-agent-stats/);
 });
 
-const { StatsChart } = await import('../src/components/StatsChart.tsx');
-const { StatsTiles } = await import('../src/components/StatsTiles.tsx');
-const { StatsMarks } = await import('../src/components/StatsMarks.tsx');
-const { StatsFilters } = await import('../src/components/StatsFilters.tsx');
-const { StatsByStep } = await import('../src/components/StatsByStep.tsx');
-const { HEADLINES, marksByDay } = await import('../src/lib/stats.ts');
-
-/** A day of the Stats page with nothing measured but what it is given. */
-const statsDay = (day: string, given: Record<string, number | null> = {}) => ({
-  day,
-  runs: 0,
-  landed: null,
-  rounds: null,
-  firstTry: null,
-  costPerLanded: null,
-  timePerLanded: null,
-  tries: 0,
-  refused: 0,
-  gateWaitMs: null,
-  deniedPerTry: null,
-  skillsPerTry: null,
-  ...given,
-});
-
-/** A change mark served on `day`: the agent `name` changed in run r-2, since r-1. */
-const statsMark = (day: string, name: string) => ({
-  day,
-  kind: 'agent' as const,
-  name,
-  run: 'r-2',
-  since: 'r-1',
-  factory: 'nemia',
-  workflow: 'build',
-  repo: null,
-  steps: ['design'],
-  agents: [name],
-});
-
-/** The markup of one day's column of a chart, by its day. */
-const columnOf = (markup: string, day: string): string => markup.match(new RegExp(`<g data-day="${day}"[^>]*>.*?</g>`))?.[0] ?? '';
-
-test('REFUSED: a day nothing measured draws no bar and reads —, where a measured 0 draws a line at its foot, and a changed day a rule naming the change', () => {
-  const rounds = HEADLINES.find((h) => h.key === 'rounds')!;
-  const days = [statsDay('2026-09-28'), statsDay('2026-09-29', { rounds: 0 }), statsDay('2026-09-30', { rounds: 2 })];
-  const markup = renderToStaticMarkup(
-    createElement(StatsChart, { number: rounds, days, marks: marksByDay([statsMark('2026-09-29', 'seldon')]) }),
-  );
-  assert.match(markup, /data-chart="rounds"/);
-  const none = columnOf(markup, '2026-09-28');
-  const zero = columnOf(markup, '2026-09-29');
-  const two = columnOf(markup, '2026-09-30');
-  assert.match(none, /data-value="null"/);
-  assert.match(none, /<title>2026-09-28: —<\/title>/);
-  assert.doesNotMatch(none, /data-bar|data-zero/, 'refused: nothing is drawn for a day nothing measured');
-  assert.match(zero, /data-value="0"/);
-  assert.match(zero, /data-zero/);
-  assert.doesNotMatch(zero, /data-bar/);
-  assert.match(two, /data-value="2"/);
-  assert.match(two, /data-bar/);
-  assert.doesNotMatch(two, /data-zero/);
-  assert.equal([...markup.matchAll(/data-mark-day="([^"]+)"/g)].map((m) => m[1]).join(), '2026-09-29', 'one rule, on the changed day');
-  assert.match(zero, /<line data-mark-day="2026-09-29"[^>]*><title>2026-09-29: changed agent seldon<\/title>/);
-  assert.match(markup, /title="The top of the scale">2</);
-});
-
-test('REFUSED: a chart whose days measured nothing says its scale is —, never a top of 0', () => {
-  const cost = HEADLINES.find((h) => h.key === 'costPerLanded')!;
-  const markup = renderToStaticMarkup(
-    createElement(StatsChart, { number: cost, days: [statsDay('2026-09-29'), statsDay('2026-09-30')], marks: new Map() }),
-  );
-  assert.match(markup, /title="The top of the scale">—</);
-  assert.doesNotMatch(markup, /data-bar|data-zero/);
-});
-
-test('REFUSED: a tile keeps a number nothing measured apart from 0, and says the last 14 days beside the 14 before', () => {
-  const window = (from: string, to: string, given: Record<string, number | null>) => ({ ...statsDay('x', given), from, to });
-  const markup = renderToStaticMarkup(
-    createElement(StatsTiles, {
-      last: window('2026-09-17', '2026-09-30', { runs: 3, landed: 0, firstTry: null, skillsPerTry: 2 }),
-      before: window('2026-09-03', '2026-09-16', { runs: 1, landed: null, firstTry: 0.5 }),
-    }),
-  );
-  assert.equal([...markup.matchAll(/data-tile="/g)].length, 10, 'ten tiles');
-  assert.doesNotMatch(markup, /data-tile="skillsPerTry"/, 'refused: skills loaded is drawn as a chart only');
-  const tile = (key: string) => markup.match(new RegExp(`<li data-tile="${key}".*?</li>`))?.[0] ?? '';
-  assert.match(tile('runs'), /data-value="3"/);
-  assert.match(tile('runs'), />3<\/span>.*↑.*before 1</);
-  assert.match(tile('landed'), /data-value="0"/);
-  assert.match(tile('landed'), />0<\/span>.*before —</);
-  assert.doesNotMatch(tile('landed'), /[↑↓=]<\/span>/, 'no way it went, where the 14 before measured nothing');
-  assert.match(tile('firstTry'), /data-value="null"/);
-  assert.match(tile('firstTry'), />—<\/span>.*before 50%</);
-  assert.match(markup, /2026-09-17 → 2026-09-30/);
-});
-
-test('the changes are said a row each, with a link to the run that froze each, or a line saying nothing changed', async () => {
-  const markup = await routedWith(createElement(StatsMarks, { marks: [statsMark('2026-09-29', 'seldon')] }));
-  assert.match(markup, /data-mark="2026-09-29"/);
-  assert.match(markup, /agent seldon/);
-  assert.match(markup, /href="\/runs\/r-2"/);
-  assert.match(markup, />r-1</);
-  const none = await routedWith(createElement(StatsMarks, { marks: [] }));
-  assert.doesNotMatch(none, /data-mark=/);
-  assert.match(none, /Nothing a run froze changed in this period\./);
-});
-
-test('a step row says its step, its agent or —, its total as served, and each name with its count, none cut', () => {
-  const markup = renderToStaticMarkup(
-    createElement(StatsByStep, {
-      title: 'Skills loaded',
-      about: 'each skill',
-      kind: 'skills',
-      total: 'loads',
-      item: 'skill',
-      rows: [
-        {
-          step: 'implement',
-          agent: 'ada',
-          total: '3 (2 of 4)',
-          items: [
-            { name: 'look', count: 2 },
-            { name: 'effect', count: 1 },
-          ],
-        },
-        { step: 'design', agent: null, total: '—', items: [] },
-      ],
-    }),
-  );
-  assert.match(markup, /aria-label="Skills loaded" data-by-step="skills"/);
-  const row = (step: string) => markup.match(new RegExp(`<tr[^>]*data-by-step-row="${step}".*?</tr>`))?.[0] ?? '';
-  assert.match(row('implement'), />ada</);
-  assert.match(row('implement'), /data-total[^>]*>3 \(2 of 4\)</);
-  assert.match(row('implement'), /data-item="look"[^>]*>look <span[^>]*>×2</);
-  assert.match(row('implement'), /data-item="effect"[^>]*>effect <span[^>]*>×1</);
-  const cells = (step: string) => [...row(step).matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((m) => m[1]).slice(0, 3);
-  assert.deepEqual(cells('implement'), ['implement', 'ada', '3 (2 of 4)']);
-  assert.deepEqual(
-    cells('design'),
-    ['design', '—', '—'],
-    'refused: a step with no agent says —, and its total — where nothing was measured',
-  );
-  assert.doesNotMatch(markup, /truncate|text-ellipsis/, 'refused: a name is never cut');
-  const none = renderToStaticMarkup(
-    createElement(StatsByStep, { title: 'Calls refused', about: 'each call', kind: 'denials', total: 'calls', item: 'call', rows: [] }),
-  );
-  assert.doesNotMatch(none, /data-by-step-row/);
-  assert.match(none, /No step ended a try in this period\./);
-});
-
-test('the filters link each period with the filters kept, the default period left out, and light the key a value is kept of', async () => {
-  const markup = await routedWith(
-    createElement(StatsFilters, { search: { factory: 'nemia', agent: 'ada' }, now: new Date('2026-09-30T12:00:00Z') }),
-  );
-  const link = (period: string) => markup.match(new RegExp(`<a [^>]*data-period="${period}"[^>]*>`))?.[0] ?? '';
-  assert.match(link('28d'), /href="\/stats\?factory=nemia&amp;agent=ada"/);
-  assert.match(link('28d'), /data-active="true"/);
-  assert.match(link('all'), /href="\/stats\?factory=nemia&amp;agent=ada&amp;period=all"/);
-  assert.doesNotMatch(link('all'), /data-active/);
-  assert.match(markup, /data-filter="agent"[^>]*data-kept=""/);
-  assert.doesNotMatch(markup, /data-filter="step"[^>]*data-kept/);
-});
-
-test('REFUSED: the Stats page draws no picker of the factory, which the sidebar picks, and draws one for each other key', async () => {
-  const markup = await routedWith(createElement(StatsFilters, { search: { factory: 'nemia' }, now: new Date('2026-09-30T12:00:00Z') }));
-  assert.deepEqual(
-    [...markup.matchAll(/data-filter="([^"]+)"/g)].map((m) => m[1]),
-    ['agent', 'step', 'workflow', 'repo'],
-  );
-});
-
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
 async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = []): Promise<string> {
   const { RunNode } = await import('../src/components/RunNode.tsx');
@@ -5954,7 +5784,6 @@ test("REFUSED: the sidebar's sections carry the factory the address picks, the F
     { label: 'Inbox', href: '/inbox?factory=nemia', lit: false },
     { label: 'Runs', href: '/runs?factory=nemia', lit: true },
     { label: 'Workflows', href: '/workflows?factory=nemia', lit: false },
-    { label: 'Stats', href: '/stats?factory=nemia', lit: false },
   ]);
   assert.deepEqual(
     (await sidebarAt('/factories/nemia', {})).match(/data-factory-picker[\s\S]*?<\/button>/)?.[0].includes('>nemia<'),
@@ -5968,7 +5797,7 @@ test("REFUSED: the sidebar's sections carry the factory the address picks, the F
     const links = sectionLinks(await sidebarAt(path, search));
     assert.deepEqual(
       links.map((link) => link.label),
-      ['Inbox', 'Runs', 'Workflows', 'Stats'],
+      ['Inbox', 'Runs', 'Workflows'],
       `${path}: no Floor under All factories`,
     );
     assert.equal(links.filter((link) => link.href?.includes('factory=')).length, 0, `${path}: no section carries a factory`);
@@ -6165,7 +5994,7 @@ test("REFUSED: the Inbox's badge counts the picked factory's cards not yet start
   assert.equal(badge(await sidebarAt('/runs', {}, [filed('nemia')], [card('started', 'nemia', { startedAs: ['r-1'] })])), undefined);
   assert.deepEqual(
     sectionLinks(nemia).map((link) => link.label),
-    ['Floor', 'Inbox', 'Runs', 'Workflows', 'Stats'],
+    ['Floor', 'Inbox', 'Runs', 'Workflows'],
     'each link still reads its section alone',
   );
   assert.equal([...nemia.matchAll(/data-inbox-badge/g)].length, 1, 'on the Inbox alone');
@@ -6842,50 +6671,6 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
   const agentless = await stepFormMarkup(null, null);
   assert.doesNotMatch(agentless, /data-layer|data-agent-note/);
   assert.match(agentless, /What it is told/);
-});
-
-const { StatsPasses } = await import('../src/components/StatsPasses.tsx');
-const { passesRead } = await import('./factory-fixtures.ts');
-
-/** The Stats page's section on the tick's pass, its read answered by `passes`. */
-const passesMarkup = (passes: import('../src/lib/api.ts').PassesRead): string => {
-  const client = new QueryClient();
-  client.setQueryData(['passes'], passes);
-  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(StatsPasses)));
-};
-
-test("the tick's pass on the Stats page: a column a bucket with its count, a bar a part heaviest first, and what the last pass saw", () => {
-  const html = passesMarkup(passesRead());
-  assert.match(html, /id="passes"/, 'the Factory links to it by its anchor');
-  const buckets = [...html.matchAll(/data-bucket="([^"]+)" data-count="(\d+)"/g)].map((m) => [m[1], Number(m[2])]);
-  assert.equal(buckets.length, 10, html);
-  assert.deepEqual(
-    buckets.filter(([, n]) => n),
-    [
-      ['10', 1],
-      ['50', 1],
-      ['over', 1],
-    ],
-  );
-  assert.match(html, /title="&gt; 5000 ms: 1 pass"/, 'the open bucket names its end on hover');
-  assert.deepEqual(
-    [...html.matchAll(/data-part="([a-z]+)"/g)].map((m) => m[1]),
-    ['place', 'records'],
-  );
-  assert.match(html, /data-part="records"[^]*?1\.00 ms <span[^>]*>&lt; 1%</);
-  assert.deepEqual(
-    [...html.matchAll(/data-fact="([a-z]+)"/g)].map((m) => m[1]),
-    ['median', 'slowest', 'reads', 'runs', 'tasks', 'queued', 'admitted'],
-  );
-  assert.match(html, /data-fact="slowest"[^]*?<dd[^>]*>6000 ms</);
-  assert.match(html, /data-fact="runs"[^]*?<dd[^>]*>43</);
-  assert.match(html, /the last 3 the daemon kept, since /);
-});
-
-test("the tick's pass with none kept says so, and draws no column", () => {
-  const html = passesMarkup(passesRead({ recent: [], parts: [], summary: null }));
-  assert.match(html, /data-passes-none[^>]*>No pass is kept yet/);
-  assert.doesNotMatch(html, /data-bucket|data-part|data-fact/);
 });
 
 test("a workflow's steps, a row each: an agent's step by its policy, its agent linked and its skills; one without by its body and its own skills; each linked to its page", async () => {

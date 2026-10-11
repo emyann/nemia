@@ -45,13 +45,13 @@ async function picks(page: Page): Promise<void> {
   await expectAt(page, '/runs', `?factory=${FACTORY}`, `${FACTORY} picked on Runs stays on Runs`);
   await sidebar(page);
   const hrefs = await hrefsOf(page);
-  const want = [`/factories/${FACTORY}`, ...['inbox', 'runs', 'workflows', 'stats'].map((s) => `/${s}?factory=${FACTORY}`)];
+  const want = [`/factories/${FACTORY}`, ...['inbox', 'runs', 'workflows'].map((s) => `/${s}?factory=${FACTORY}`)];
   if (hrefs.join() !== want.join())
     throw new Refused(`every section carries ${FACTORY}: ${want.join(', ')} — they are ${hrefs.join(', ')}`);
   await settled(page);
   await photograph(page, path.join(OUT, `sidebar-picked-${await themeOf(page)}.png`));
-  await sectionsOf(page).filter({ hasText: 'Stats' }).click();
-  await expectAt(page, '/stats', `?factory=${FACTORY}`, 'Stats keeps the factory picked');
+  await sectionsOf(page).filter({ hasText: 'Workflows' }).click();
+  await expectAt(page, '/workflows', `?factory=${FACTORY}`, 'Workflows keeps the factory picked');
   await sidebar(page);
   await sectionsOf(page).filter({ hasText: 'Floor' }).click();
   await expectAt(page, `/factories/${FACTORY}`, '', 'the Floor opens its floor');

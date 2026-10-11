@@ -137,6 +137,11 @@ test('her spend says one session or several, and names the unmeasured ones only 
     spendWords({ usd: 2, measured: 2, unmeasured: 1 }),
     'Spent $2.00 over 2 sessions ended, 1 not measured; her open one counts once it ends.',
   );
+  assert.equal(
+    spendWords({ usd: 0.004, measured: 1, unmeasured: 0 }),
+    'Spent $0.004 over 1 session ended; her open one counts once it ends.',
+    'a spend under a cent keeps three figures',
+  );
 });
 
 test('the prune words send a person to her, and spell no command', () => {

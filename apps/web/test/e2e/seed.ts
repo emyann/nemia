@@ -472,7 +472,7 @@ export const ENDING = {
  * An eighth run, the same workflow with its ending approved and run: ship was approved with no words, filed in the repository's own
  * checkout, and merged the run's branch onto main. Every step is done and its branch is on the base, so there is nothing left to decide —
  * the folder answered for its own branch — and its card is off the Factory's floor with the rest of the finished. It froze `review` with
- * another note than ENDING, the run of its folder before it, did: the store's one change mark, which the Stats page draws (`changed`).
+ * another note than ENDING, the run of its folder before it, did: the store's one change mark (`changed`).
  */
 export const SHIPPED = {
   id: 'it-shipped-itself-e2e13',
@@ -1287,96 +1287,8 @@ export const PASS = {
 } as const;
 
 /**
- * The daemon's recent passes, as the tick keeps them in `tick-recent.json` (`recordRecentPass`), oldest first, a pass every four
- * seconds up to a minute ago: most under 100 ms, a few slower, one past the last bound; observing the harnesses the heaviest part. The
- * Stats page draws them at `#passes`.
- */
-export const RECENT = {
-  ms: [18, 22, 31, 45, 38, 27, 64, 88, 52, 41, 36, 29, 120, 75, 58, 47, 33, 212, 96, 61, 44, 39, 480, 70, 55, 26, 1300, 49, 35, 6200],
-  passes(now: number) {
-    return this.ms.map((ms, k) => ({
-      at: new Date(now - 60_000 - (this.ms.length - 1 - k) * 4000).toISOString(),
-      ms,
-      runs: 40 + (k % 4),
-      tasks: 3,
-      queued: 1,
-      admitted: 2,
-      records: 12,
-      rested: 28,
-      reads: 6,
-      phases: {
-        records: ms * 0.1,
-        asks: ms * 0.02,
-        journals: ms * 0.18,
-        observe: ms * 0.5,
-        runtime: ms * 0.05,
-        place: ms * 0.03,
-        assess: ms * 0.08,
-        act: ms * 0.02,
-      },
-    }));
-  },
-} as const;
-
-/**
- * The series the daemon keeps of its passes (`$WF_ROOT/metrics/<tier>/<day>.jsonl`, a rollup line a series and span): a line a minute over
- * the 23 hours before the last minute, and a line an hour over the week before the last hour. A pass's time at p50 and p95, the runs in the
- * store, the sessions queued and the longest wait, and the quota's two windows; a pass's time in its buckets (the package's `PASS_BOUNDS`),
- * from which a day's percentiles are read. The Stats page draws them at `#system`.
- */
-export const SERIES = {
-  minutes: 23 * 60,
-  hours: 7 * 24,
-  lines(span: number, count: number, now: number) {
-    const last = Math.floor(now / span) * span - span;
-    return Array.from({ length: count }, (_, k) => {
-      const t = new Date(last - (count - 1 - k) * span).toISOString();
-      const wave = Math.sin((k * 12 * Math.PI) / count);
-      const every = (times: number) => Math.ceil(count / times);
-      const line = (s: string, v: number, l: Record<string, string> = {}, more: object = {}) => ({
-        t,
-        s,
-        l,
-        n: 15,
-        sum: v * 15,
-        min: v,
-        max: v,
-        last: v,
-        ...more,
-      });
-      const p50 = 30 + 10 * wave;
-      const queued = k % every(20) === 3 ? 2 : 0;
-      const slow = k % every(15) === 0;
-      const p95 = slow ? 2.5 * p50 + 120 : 2.5 * p50;
-      return [
-        line('pass.ms', p50, {}, { min: p50 / 2, max: p95 * 1.1, b: [0, 3, 8, 3, slow ? 0 : 1, slow ? 1 : 0, 0, 0, 0, 0], p50, p95 }),
-        line('store.runs', 40 + (Math.floor(k / 12) % 6)),
-        line('sessions.queued', queued),
-        line('admission.wait.ms', queued * 45_000),
-        line('quota.used', 30 + (50 * (k % every(5))) / every(5), { harness: 'claude', window: 'five_hour' }),
-        line('quota.used', 60 + (k * 26) / count, { harness: 'claude', window: 'seven_day' }),
-      ];
-    }).flat();
-  },
-} as const;
-
-/** Write the series' lines into the store at `root`, each on its UTC day's file of its tier. */
-function seedSeries(root: string, now: number): void {
-  const tiers = [
-    ['minute', SERIES.lines(60_000, SERIES.minutes, now)],
-    ['hour', SERIES.lines(3_600_000, SERIES.hours, now)],
-  ] as const;
-  for (const [tier, lines] of tiers) {
-    const days = new Map<string, string[]>();
-    for (const line of lines) days.set(line.t.slice(0, 10), [...(days.get(line.t.slice(0, 10)) ?? []), `${JSON.stringify(line)}\n`]);
-    for (const [day, texts] of days) write(path.join(root, 'metrics', tier, `${day}.jsonl`), texts.join(''));
-  }
-}
-
-/**
  * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, `tick.json`, and
- * what the pass that wrote it cost (`tick-stats.json`, PASS), the recent passes (`tick-recent.json`, RECENT), and the series kept of
- * them (SERIES).
+ * what the pass that wrote it cost (`tick-stats.json`, PASS).
  */
 export function seedQueue(root: string, repo: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -1396,8 +1308,6 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
   write(path.join(root, 'queue', `${refused.name}.json`), JSON.stringify(tried, null, 2));
   write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
   write(path.join(root, 'tick-stats.json'), JSON.stringify(PASS.cost(ago(1)), null, 2));
-  write(path.join(root, 'tick-recent.json'), JSON.stringify(RECENT.passes(now)));
-  seedSeries(root, now);
 }
 
 /**

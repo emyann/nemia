@@ -163,6 +163,7 @@ export default {
     );
     const pass = page.locator('[data-cap] [data-pass]');
     await expectTexts(pass, [`· ${PASS.line}`], 'the pass is said beside the cap');
+    await expectCount(pass.locator('a'), 0, "the pass's line is text, and leads nowhere");
     const passTitle = (await pass.getAttribute('title')) ?? '';
     const passLines = passTitle.split('\n');
     if (!passLines[0]?.startsWith("The daemon's last pass, at ") || !passLines[0].endsWith(`: ${PASS.totals}`)) {

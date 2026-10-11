@@ -1,4 +1,4 @@
-import { Bot, ChartColumn, Factory, House, Inbox, List, Network, Settings, Waypoints } from 'lucide-react';
+import { Bot, Factory, House, Inbox, List, Network, Settings, Waypoints } from 'lucide-react';
 import { factorySearch } from '../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -12,14 +12,13 @@ const ownerOf = (path: string): string | undefined => /^\/factories\/([^/]+)(?:\
 
 /**
  * The sidebar's sections of the picked factory, in their order: its Floor, lit on a factory's floor; the Inbox, where an idea waits to be
- * started, lit on a card's page too; Runs, lit on a run's page; Workflows, lit on a step's page; and Stats, how well the runs went.
+ * started, lit on a card's page too; Runs, lit on a run's page; and Workflows, lit on a step's page.
  */
 export const SECTIONS = [
   { to: '/factories/$factory', label: 'Floor', icon: Factory, active: (path: string) => floorOf(path) !== undefined },
   { to: '/inbox', label: 'Inbox', icon: Inbox, active: under('/inbox') },
   { to: '/runs', label: 'Runs', icon: List, active: under('/runs') },
   { to: '/workflows', label: 'Workflows', icon: Waypoints, active: under('/workflows') },
-  { to: '/stats', label: 'Stats', icon: ChartColumn, active: (path: string) => path === '/stats' },
 ] as const;
 
 /** A section of the sidebar (`SECTIONS`). */
@@ -74,7 +73,7 @@ export const sectionOf = (path: string) => [...SECTIONS, ...RAIL].find((item) =>
 
 /**
  * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
- * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Stats — or of a workflow's page or a step's, which
+ * settings, else the `?factory=` of a section's page — the Inbox, Runs or Workflows — or of a workflow's page or a step's, which
  * read in it, and of no other page under them; none, All factories, on every other page.
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
@@ -106,16 +105,15 @@ export type PickTarget =
 
 /**
  * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
- * other key of its search kept and `factory` set or dropped — and on Workflows alone its `repo` dropped too, which is there the
- * repository of the factory left, where on Stats it is the page's own filter; on a workflow's page or a step's, the same page read in the
- * picked factory, on the repository it reads, its `repo` dropped likewise; on a factory's own page, its floor or its settings, the picked
- * factory's floor, or Home for All factories; on any other page, the picked factory's floor, and nowhere for All factories, which that
- * page already shows.
+ * other key of its search kept and `factory` set or dropped — but its `repo`, dropped too, which is the repository of the factory left;
+ * on a workflow's page or a step's, the same page read in the picked factory, on the repository it reads, its `repo` dropped likewise; on
+ * a factory's own page, its floor or its settings, the picked factory's floor, or Home for All factories; on any other page, the picked
+ * factory's floor, and nowhere for All factories, which that page already shows.
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
   if (isListing(path)) {
     const { factory: _dropped, ...rest } = search;
-    const kept = path === '/workflows' ? withoutRepo(rest) : rest;
+    const kept = withoutRepo(rest);
     return { to: path, search: factory === undefined ? kept : { ...kept, factory } };
   }
   const page = workflowPageAt(path);

@@ -19,6 +19,7 @@ import { scratch } from './scratch.ts';
 import { runGiven } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { until, WAITED } from './waits.ts';
+import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 
 const ROOT = scratch('wf-free-');
@@ -493,16 +494,31 @@ test(
     };
     process.env.WF_KEEP_WORKTREES = 'yes';
     t.after(() => delete process.env.WF_KEEP_WORKTREES);
+    const clock = steeredClock();
     const loop = Effect.runFork(
-      free(answers, '5 millis').pipe(
+      free(answers).pipe(
         Effect.provide(EngineService.layer(e)),
         Effect.provide(stand().layer),
         Effect.provide(Logger.layer([keeper])),
+        Effect.provide(clock.layer),
       ),
     );
     t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
     const ended = Effect.runPromise(Fiber.join(loop)).then(() => assert.fail('the loop ended'));
-    await Promise.race([until(t, () => sweeps >= 4, 'four sweeps, each refused its switch', { everyMs: 5 }), ended]);
+    const rested = (times: number) =>
+      Promise.race([until(t, () => clock.asked.length === times, `the loop is at rest ${times}`, { bell: clock.bell }), ended]);
+    await rested(1);
+    assert.deepEqual([clock.asked, sweeps], [[5_000], 1], 'the rest is the shipped five seconds');
+    await clock.adjust(4_999);
+    assert.deepEqual([clock.woken, clock.asked, sweeps], [[], [5_000], 1], 'a millisecond before its rest ends, no sweep');
+    await clock.adjust(1);
+    await rested(2);
+    assert.deepEqual([clock.woken, sweeps], [[5_000], 2], 'at five seconds, the next sweep');
+    for (const times of [3, 4]) {
+      await clock.adjust(5_000);
+      await rested(times);
+    }
+    assert.equal(sweeps, 4);
     assert.deepEqual(
       warned,
       [
@@ -512,7 +528,8 @@ test(
     );
     assert.ok(whole(id));
     delete process.env.WF_KEEP_WORKTREES;
-    await Promise.race([until(t, () => gone(id), `the loop frees ${id} once its switch reads`, { everyMs: 5 }), ended]);
+    await clock.adjust(5_000);
+    await Promise.race([until(t, () => gone(id), `the loop frees ${id} once its switch reads`, { bell: clock.bell }), ended]);
   },
 );
 

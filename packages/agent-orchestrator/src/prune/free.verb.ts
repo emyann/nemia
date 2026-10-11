@@ -137,9 +137,9 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
 
 /**
  * The retention, for as long as the daemon runs: a sweep (`freeOnce`) over what `answers` gives then — the latest pass's runs — and a
- * rest of `every`. A sweep that fails is a warning, said once while its words stand, and the next is tried a rest later.
+ * rest of `FREE_EVERY`, which no caller shortens. A sweep that fails is a warning, said once while its words stand, and the next is tried a rest later.
  */
-export const free = (answers: () => readonly Answered[], every: Duration.Input = FREE_EVERY) => {
+export const free = (answers: () => readonly Answered[]) => {
   const memory = freshFreeMemory();
   let failed: string | undefined;
   const sweep = Effect.suspend(() => freeOnce(answers(), memory)).pipe(
@@ -151,5 +151,5 @@ export const free = (answers: () => readonly Answered[], every: Duration.Input =
       return Effect.logWarning(`The worktrees of finished runs could not be freed this sweep: ${why}`);
     }),
   );
-  return Effect.forever(sweep.pipe(Effect.andThen(Effect.sleep(every))));
+  return Effect.forever(sweep.pipe(Effect.andThen(Effect.sleep(FREE_EVERY))));
 };

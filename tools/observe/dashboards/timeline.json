@@ -1,0 +1,777 @@
+{
+  "uid": "nemia-timeline",
+  "title": "Timeline",
+  "description": "A workflow's timeline, averaged over its runs that ended in the range: each step's time queued and at work with its check under it, its tries and its cost, each round's wall time, and the run's wall time beside its waits.",
+  "tags": [
+    "nemia"
+  ],
+  "editable": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "graphTooltip": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "custom",
+        "query": "nemia",
+        "current": {
+          "text": "nemia",
+          "value": "nemia"
+        },
+        "options": [
+          {
+            "text": "nemia",
+            "value": "nemia",
+            "selected": true
+          }
+        ],
+        "hide": 0,
+        "description": "The service the daemon files under: OTEL_SERVICE_NAME, else nemia."
+      },
+      {
+        "name": "factory",
+        "label": "Factory",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(step_tries_total{service_name=\"$service\"}, factory)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\"}, factory)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "hide": 0
+      },
+      {
+        "name": "workflow",
+        "label": "Workflow",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(step_tries_total{service_name=\"$service\", factory=~\"$factory\"}, workflow)",
+        "definition": "label_values(step_tries_total{service_name=\"$service\", factory=~\"$factory\"}, workflow)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1,
+        "hide": 0,
+        "description": "One workflow: two workflows' rows would be averaged together."
+      },
+      {
+        "name": "outcome",
+        "label": "Runs that",
+        "type": "custom",
+        "query": "succeeded,cancelled",
+        "current": {
+          "text": "succeeded",
+          "value": "succeeded"
+        },
+        "options": [
+          {
+            "text": "succeeded",
+            "value": "succeeded",
+            "selected": true
+          },
+          {
+            "text": "cancelled",
+            "value": "cancelled",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0,
+        "description": "How the runs counted ended: succeeded, or called off."
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": [
+        "nemia"
+      ],
+      "asDropdown": false,
+      "title": "Nemia",
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "bargauge",
+      "title": "Ran, mean",
+      "description": "How long a try's session ran, and under each step how long its check ran: the mean over every try of every run counted.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=~\"try|check\" && span.part=\"ran\"} | avg_over_time(span.value) by (span.row)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no run ended in the range"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.row=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Field",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "Queued, mean",
+      "description": "How long a try's session, and its check, waited from its filing to its spawn: the mean over every try of every run counted.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=~\"try|check\" && span.part=\"queued\"} | avg_over_time(span.value) by (span.row)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no run ended in the range"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.row=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Field",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Tries a run",
+      "description": "How many tries a step takes in a run, on average: its rounds and its retries, the first included.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"step\" && span.part=\"tries\"} | avg_over_time(span.value) by (span.row)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no run ended in the range"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.row=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Field",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Cost a try",
+      "description": "What a try's session cost, on average, where its harness measured it.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"try\" && span.part=\"cost\"} | avg_over_time(span.value) by (span.row)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no run ended in the range"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.row=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Field",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "A round's wall, mean",
+      "description": "The wall time of each round of a loop, from its first filing to its last end, on average over the runs that reached it.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"round\" && span.part=\"wall\"} | avg_over_time(span.value) by (span.row)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no run ended in the range"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.row=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Field",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "A run: wall and waiting",
+      "description": "A run's wall time, first filing to last end, beside what of it was waiting: queued for a slot, in its checks, and at its gates.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 16,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"run\"} | avg_over_time(span.value) by (span.part)",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "no run ended in the range"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "manual",
+        "minVizHeight": 22,
+        "maxVizHeight": 22,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(?:\\{span\\.part=\"(.*)\"\\}|(.*))$",
+            "renamePattern": "$1$2"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^queued$",
+            "renamePattern": "waiting: queue"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^(check|gate)$",
+            "renamePattern": "waiting: $1"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows",
+            "includeTimeField": false,
+            "labelsToFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Field",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Runs",
+      "description": "The runs counted: those of this workflow that ended in the range as the pick says, and whose wall time is known.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 18,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"$service\" && name=\"run.timeline\" && span.factory=~\"$factory\" && span.workflow=\"$workflow\" && span.outcome=~\"$outcome\" && span.of=\"run\" && span.part=\"wall\"} | count_over_time()",
+          "metricsQueryType": "instant",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "text",
+      "title": "What counts",
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 6
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Each bar is a mean over the runs of this workflow that **ended in the range**, succeeded or called off, as the pick says: a run still\ngoing, or stopped at a gate nobody answered, is not counted yet. The numbers are the ones a run's page shows in its Timeline, handed over\nonce when the run ends (the `run.timeline` spans), so a range holding one run shows that run.\n\n- **Queued** and **Ran** are per try: a step's row is its session, the row under it its check. A step that took three tries a run\n  spent three times its bar; **Tries a run** says how many.\n- **A round's wall** is from the first filing of a round of a loop to its last end: its sessions, its checks and its queues.\n- **A run** sets its wall time beside what of it was waiting: in the queue, in its checks, and at its gates for a person.\n\nTempo answers seven days back, and a run is counted at the moment the daemon read it over, not when it ended."
+      }
+    }
+  ]
+}

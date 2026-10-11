@@ -196,7 +196,7 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
-  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and its five dashboards held to the code's names by
+  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and its six dashboards held to the code's names by
   `agent-orchestrator/test/observe.test.ts`, and its timing of a step (the collector's command head and test scope, Tempo's span metrics and
   retention) by `observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.

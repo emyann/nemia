@@ -420,10 +420,11 @@ function markedOnce(run: Run, r: PassReads): StepFact[] {
  * The run's timeline for the metrics (`timelineFacts`), once: on the first pass that reads a run started with the mark (`runTimed`) over,
  * succeeded or called off, with no task of it in flight, off the engine's views of every try (`everyTryOf`), read on that pass alone. The
  * run is marked for the record this pass writes, and the metrics record the facts once the pass is done, as `markedOnce`'s. Undefined on
- * any other pass, which reads nothing: a run still going or stopped short, a record with no mark, and one already timed.
+ * any other pass, which reads nothing: a run still going or stopped short, a record with no mark, one already timed, and a run nothing
+ * was ever filed of, which has no timeline and is left as it is.
  */
 const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads, status: Assessment['status']) {
-  if (run.runTimed !== false || (status !== 'succeeded' && status !== 'cancelled')) return undefined;
+  if (run.runTimed !== false || !hasStarted(run) || (status !== 'succeeded' && status !== 'cancelled')) return undefined;
   const facts = timelineFacts(run, r.steps, yield* everyTryOf(e, run, r.views), status);
   if (facts) run.runTimed = true;
   return facts ?? undefined;

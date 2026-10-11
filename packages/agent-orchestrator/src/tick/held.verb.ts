@@ -1,8 +1,8 @@
 /**
  * A person's verbs a pass or `nemia cancel` asks of the engine for a task it read — stop it (`stopAsked`), close it (`closeHeld`), answer
- * it (`answerHeld`), close every task of a run that waits for a word (`closeWaitingTasks`) — each an Effect that succeeds with undefined once asked, and with the engine's refusal in its words where it refused:
- * the task moved since it was read, so a refusal is a note, not a failure. A controller, reaching the runtime through the client
- * (`runtime-client.ts`).
+ * it (`answerHeld`), close every task of a run that waits for a word (`closeWaitingTasks`) — each an Effect that succeeds with undefined
+ * once asked, and with the engine's refusal in its words where it refused: the task moved since it was read, so a refusal is a note, not
+ * a failure. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { Cause, Effect, Exit } from 'effect';
 import { asked, type Engine, type TaskView } from '../runtime-client.ts';

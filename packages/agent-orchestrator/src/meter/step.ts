@@ -3,8 +3,8 @@
  * loop was granted or ran out of, each with the attributes a series is kept by — the factory, the workflow, the step, its agent and the
  * outcome, and nothing else (`boundedAttributes`): a run's or a task's id would make a series of every run. And how long a step waited
  * outside its sessions once the wait ended (`WaitFact`): a session in the queue, its check's run, and a person at its gate. And each call
- * a harness denied one of its sessions (`DeniedFact`), which is no metric: a span of its own, with its run, its task and its tool. And, once
- * a run is over, each number of its timeline (`TimelineFact`), a span of its own too.
+ * a harness denied one of its sessions (`DeniedFact`), which is no metric: a span of its own, with its run, its task and its tool. And,
+ * once a run is over, each number of its timeline (`TimelineFact`), a span of its own too.
  *
  * Pure: the tick hands it the run, the tasks the feed said settled since its last read (`settledIn`), and what the pass already read of
  * them; it reads nothing more, and nothing is carried from one pass to the next. A gate is timed on the first pass that reads its approval
@@ -78,8 +78,8 @@ export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: 
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
  * measured and how long it ran; a check that settled (`check`); a round its loop was granted or ran out of (`round`); a wait outside the
  * step's sessions that ended (`WaitFact`); a call its harness denied one of its sessions (`DeniedFact`); a number of its run's timeline
- * once the run is over (`TimelineFact`). `attributes` are `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a
- * check; `granted` or `exhausted` for a round.
+ * once the run is over (`TimelineFact`). `attributes` are `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or
+ * `stopped` for a try; `passed`, `refused` or `unfinished` for a check; `granted` or `exhausted` for a round.
  */
 export type StepFact =
   | {

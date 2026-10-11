@@ -3159,6 +3159,16 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   the collector with it) and the step's `factory`, `workflow`, `step` and `agent`. What is counted is marked on the run record
   (`deniedCounted`, each session's attempts from the first), by the pass that counts, before the span is made: a daemon restarted
   counts none twice, one that dies between the two loses that pass's, and a run started before the mark existed counts none.
+- **A finished run's timeline is spans, `run.timeline`, and no metric** (`TIMELINE_SPAN`, `timelineFacts` in `src/meter/step.ts`): one
+  for each number of the timeline its page shows (`timelineRows` in `src/timeline/rows.ts`): a try's time queued, its time at work and
+  its cost, its check's two times, a step's tries, a round's wall time, and the run's wall time with its time queued, in its checks and
+  at its gates. Each is a root of its own trace, of no length, at the moment it is made, and carries `value`, `of`, `part` and `row` (a
+  step's place in the workflow and its name, so the rows sort into the workflow's order), its `run`, its `try` where it has one, and
+  `factory`, `workflow` and `outcome` (`succeeded` or `cancelled`), with `step` and `agent` on a step's rows. They are made once, on the
+  first pass that reads the run over with nothing in flight, off every try's view (`everyTryOf`, read on that pass alone), and the run
+  is marked (`runTimed`) in the record that pass writes, before the spans are made: a daemon restarted makes none twice, one that dies
+  between the two loses that run's, a run started before the mark existed is never handed over, a run retried after it was is not
+  handed over again, and a run called off with nothing filed has no timeline and is left unmarked.
 - **Their names in Prometheus**, through an OTLP collector, measured on the side Grafana: `pass_duration_bucket` (`_count`, `_sum`),
   `pass_phase_duration_bucket`, `pass_journal_reads_bucket`; the gauges with `_ratio`, the unit `1` the exporter gives one with none
   (`store_runs_ratio`, `sessions_queued_ratio`, `sessions_admitted_ratio`, `admission_wait_ratio`, `machine_load_ratio`); the counters

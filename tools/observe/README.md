@@ -1,7 +1,7 @@
 # tools/observe — the side Grafana
 
 A Grafana to watch how Nemia runs while we build it: one `grafana/otel-lgtm` container holding the OpenTelemetry collector, Tempo, Loki,
-Prometheus, Pyroscope and Grafana, with five dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
+Prometheus, Pyroscope and Grafana, with six dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
 package, `bin` or workflow refers to it. The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this
 machine alone (`127.0.0.1`).
 
@@ -124,11 +124,16 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   **A step across runs**, from Prometheus: the same over the range, by factory, workflow, step and agent, from Tempo's span metrics, beside
   the daemon's step time (`step_duration`), its queue, checks and gates, **Tests by scope**, a trend of the leaves, and **Unmeasured**: the
   steps with time but no session spans, a Codex step today. **A run** links to it for its run.
+- **Timeline** — one workflow as a run's page shows one run, averaged over its runs that ended in the range: pick a factory, one workflow
+  and how the runs ended. A row per step in the workflow's order and a row for its check under it, with the mean time a try's session
+  **ran** and was **queued**, its **tries a run** and its **cost a try**; the mean wall time of each round of a loop; and a run's mean
+  wall time beside what of it was waiting, in the queue, in its checks and at its gates. *A workflow's timeline*, below, says what it reads.
 
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log field
 the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler does not
-send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, and a server-side expression reading a
-query its panel has not. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
+send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, a server-side expression reading a
+query its panel has not, and a Timeline query that asks a row's `of` or `part` for a value the code gives none of, is not held to the one
+workflow picked, or whose workflow choice may hold several. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
 `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.
@@ -183,6 +188,32 @@ Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
   loaded. A `Skill` call for a skill that is not there exported nothing: no `tool_decision`, no `tool_result`, no span.
 - **The harness's own `tool_decision` events (`decision="reject"`) are not what Denied calls counts**: it counts what the runtime
   journals of a job's denials, the list a run's page shows.
+
+## A workflow's timeline
+
+**Timeline** reads one span, `run.timeline`, and nothing else: the daemon's own, no session's.
+
+- **A span is one number of one run's timeline**, the timeline its page shows (`timeline`, `timelineRows` in
+  `packages/agent-orchestrator/src/timeline/`). It carries `value`, and what the value is: `of` (`try`, `check`, `step`, `round`, `run`),
+  `part` (`queued`, `ran`, `cost`, `tries`, `wall`, and of a run `check` and `gate`), and `row`, the name of its row: a step's place in
+  the workflow and its name (`02 implement`), its check's (`02 implement check`), a round's (`review round 01`), or `run`. Times are in
+  ms and a cost in dollars. Beside them its `run`, its `try` on a try's and a check's row, and `factory`, `workflow` and `outcome` (how
+  the run ended, `succeeded` or `cancelled`), with `step` and `agent` on a step's rows.
+- **The rows sort as text into the workflow's order**, each check under its step: the panels sort on the name, since Tempo answers the
+  series in no order. A workflow whose steps were renamed or moved inside the range shows the old rows beside the new.
+- **A run is counted once, when it is over**: on the first pass that reads it succeeded or called off with nothing in flight, marked on
+  its record (`runTimed`). A run still going, or stopped at a gate nobody answered, is not there yet; neither is a run started before
+  the daemon ran this code, nor one retried after it was counted, whose later tries are missing.
+- **A span is stamped when it is made, not when its run ended**: a run that ended while the daemon was down is in the range of the
+  restart. The span has no length; its number is `span.value`, never its duration.
+- **The means are per try**, `avg_over_time(span.value) by (span.row)`, as a run's page has a row per try: a step that takes three tries
+  a run spends three times its bar, and **Tries a run** says how many. A range holding one run shows that run's own numbers
+  (`agent-orchestrator/test/timeline-spans.test.ts` holds the spans equal to the page's rows).
+- **Tempo answers 7 days back**, where Prometheus keeps 90: no month over month here. The `factory` and `workflow` choices are read from
+  Prometheus (`step_tries_total`), so a workflow is offered once a session of it has settled.
+- Measured 2026-10-11 on this stack, over probe spans under a service of their own: `avg_over_time` of a numeric span attribute answers
+  the mean, an integer and a decimal value averaged together included (a whole-dollar cost leaves as an integer); a bar gauge over the
+  instant query draws a bar per row once `reduce` (series to rows) and `sortBy` put them in order.
 
 ## The names, as measured
 

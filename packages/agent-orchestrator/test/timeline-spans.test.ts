@@ -183,8 +183,9 @@ const SOLO = folder('solo', { work: '---\nplace: git\n---\nDo it.\n' });
 const MIN = 60_000;
 /** The test's clock: `Date` seeded, and moved on by `minutes` at each call of the function it answers. */
 const clockOf = (t: TestContext) => {
-  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-06T10:00:00.000Z') });
-  return (minutes: number) => t.mock.timers.setTime(Date.now() + minutes * MIN);
+  let now = Date.parse('2026-10-06T10:00:00.000Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  return (minutes: number) => t.mock.timers.setTime((now += minutes * MIN));
 };
 
 const start = (workflowDir: string) => Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false }));

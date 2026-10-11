@@ -141,7 +141,7 @@ function exportBreaches(entry: string, exported: Record<string, unknown>, sdk: {
 test("neither of the runtime's entries exports an SDK name or value", async () => {
   const sdk = await sdkExports();
   assert.ok(sdk.names.has('TaskState') && sdk.names.has('Client') && sdk.names.has('TaskNotFoundError'), 'the SDK was read');
-  for (const entry of ['agent-runtime', 'agent-runtime/vocabulary']) {
+  for (const entry of ['agent-runtime', 'agent-runtime/vocabulary', 'agent-runtime/testing']) {
     assert.deepEqual(exportBreaches(entry, { ...(await import(entry)) }, sdk), [], entry);
   }
 });

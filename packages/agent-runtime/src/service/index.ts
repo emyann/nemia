@@ -7,3 +7,5 @@ export { FollowRefused } from './follow.ts';
 export { ForgetRefused } from './forget.ts';
 export type { ForgetReport } from './forget.ts';
 export { refusalWords } from './refusal.ts';
+export { testEngine } from './test-engine.ts';
+export type { TestEngine, TestFiling, TestTask } from './test-engine.ts';

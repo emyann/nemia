@@ -92,6 +92,7 @@ const PINNED: Record<string, string[]> = {
     'fenceReach',
     'unruledIn',
   ],
+  'agent-runtime/testing': ['testEngine'],
 };
 
 /** Where `exported` differs from `pinned`: each name dropped or added, worded with what to do. */

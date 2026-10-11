@@ -10,11 +10,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
 const { WORKFLOWS_LIST, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
-const { runWith, engine } = await import('../runner.ts');
+const { runWith: runEngine, gitPlaceLayer, engine } = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('./version.store.ts');
 const { removeWorkflow } = await import('./write.store.ts');

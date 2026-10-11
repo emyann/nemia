@@ -490,7 +490,15 @@ const WRITE = COMMANDS.find((c) => c.name === 'workflows write')!;
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
  * there (`changes`), handed the version it holds once its schemas are written, or a new one.
  */
-type Writing = { e: Engine['Service']; placeService: PlaceService['Service']; name: string; dir: string; repo: string; home: string; changes: boolean };
+type Writing = {
+  e: Engine['Service'];
+  placeService: PlaceService['Service'];
+  name: string;
+  dir: string;
+  repo: string;
+  home: string;
+  changes: boolean;
+};
 
 /**
  * A folder written through the package (`WRITE`, the table's `workflows write`), with the schemas pasted for it, or its refusal (422,

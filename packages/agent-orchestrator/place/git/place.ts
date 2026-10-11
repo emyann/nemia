@@ -2,6 +2,7 @@
  * The git place: what a place answers (`Place` in `src/place/place.store.ts`), answered by running git. `gitPlace` holds nothing between
  * questions: each one is a verb's body (`verbs/`) run over git by `answered` or `answeredNow` (`git.ts`), within the verb's deadline.
  */
+import { readable } from './asked.ts';
 import { declared } from './declared.ts';
 import { answered, answeredNow, type Asking, type Reply } from './git.ts';
 import { exported } from './verbs/export.ts';
@@ -35,6 +36,12 @@ const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<
   seal,
 };
 
+/** `verb`'s body for `request`, which it reads first: one it cannot read is `Malformed` before any command is run. */
+function* body<V extends PlaceVerb>(verb: V, request: PlaceRequests[V]): Asking<Reply<V>> {
+  readable(verb, request);
+  return yield* VERBS[verb](request);
+}
+
 /** What `gitPlace` may be given: the environment git runs in, this process's by default, and what to call for each process it starts. */
 export type GitPlaceOptions = { readonly env?: NodeJS.ProcessEnv; readonly started?: () => void };
 
@@ -47,7 +54,7 @@ export function gitPlace(options: GitPlaceOptions = {}): Place {
   });
   return {
     declared,
-    ask: (verb, request, given) => answered(verb, () => VERBS[verb](request), asked(verb, given?.deadlineMs)),
-    askNow: (verb, request, given) => answeredNow(verb, VERBS[verb](request), asked(verb, given?.deadlineMs)),
+    ask: (verb, request, given) => answered(verb, () => body(verb, request), asked(verb, given?.deadlineMs)),
+    askNow: (verb, request, given) => answeredNow(verb, body(verb, request), asked(verb, given?.deadlineMs)),
   };
 }

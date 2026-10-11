@@ -46,8 +46,8 @@ export type RepositoryRun = RunBase & {
   /** Whether each step gets a worktree of its own. False only for `--no-worktree`. */
   isolate: boolean;
   /**
-   * The place skill the run's verbs run from, by name and `skillVersion` digest, as `nemia start` opened it. Absent, the run's place is
-   * the package's own (`placeDirOf`).
+   * The place skill a run named when a record said which place its verbs ran from, by name and digest. Read and kept, never written: a
+   * run asks the place its program is given.
    */
   placeSkill?: { skill: string; version: string };
   /**

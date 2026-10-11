@@ -13,13 +13,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { Effect } from 'effect';
+import { runGiven } from './placed.ts';
 
 const ROOT = path.join(scratch('wf-start-handed-'), 'First (Last)');
 fs.mkdirSync(ROOT);
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { startRun } = await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 
 /** A git repository with one commit on `main`, under the store. */
 function aRepo(): string {
@@ -55,7 +57,7 @@ test("REFUSED at shipped defaults: a store no permission rule can carry refuses 
   const before = runs();
   let message = '';
   try {
-    await Effect.runPromise(
+    await runPlaced(
       startRun({
         brief: 'build it',
         repo,
@@ -72,7 +74,7 @@ test("REFUSED at shipped defaults: a store no permission rule can carry refuses 
 });
 
 test('a workflow of one step, handed nothing, starts in the same store', async () => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({ brief: 'build it', repo: aRepo(), workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false }),
   );
   assert.ok(runs().includes(`${run.id}.json`), runs().join('\n'));
@@ -82,9 +84,7 @@ test("REFUSED at shipped defaults: a store no permission rule can carry refuses 
   const before = runs();
   let message = '';
   try {
-    await Effect.runPromise(
-      startRun({ brief: 'read it', repo: aRepo(), workflowDir: folderOf({ argus: 'reads: inbox' }), isolate: false }),
-    );
+    await runPlaced(startRun({ brief: 'read it', repo: aRepo(), workflowDir: folderOf({ argus: 'reads: inbox' }), isolate: false }));
   } catch (err) {
     message = (err as Error).message;
   }
@@ -96,7 +96,7 @@ test("REFUSED at shipped defaults: a step in the checkout, under a store whose p
   const before = runs();
   let failed: (Error & { _tag?: string; exitCode?: number }) | undefined;
   try {
-    await Effect.runPromise(startRun({ brief: 'ship it', repo: aRepo(), workflowDir: folderOf({ ship: 'workspace: main' }) }));
+    await runPlaced(startRun({ brief: 'ship it', repo: aRepo(), workflowDir: folderOf({ ship: 'workspace: main' }) }));
   } catch (err) {
     failed = err as Error & { _tag?: string; exitCode?: number };
   }

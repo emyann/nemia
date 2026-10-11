@@ -10,11 +10,13 @@ import { execFileSync } from 'node:child_process';
 import type { TaskPhase } from '../run.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
-import { Effect } from 'effect';
+import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
-const { advanceRun, CLI, TABLE, startRun, runWith } = await import('../runner.ts');
+const { advanceRun, CLI, TABLE, startRun, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../record/record.store.ts');
 const { aliased, main, VERBS } = await import('./main.ts');
 const { HELP, WF_HINT } = await import('./flags.ts');
@@ -175,7 +177,7 @@ test('the help, once and alone, for a verb given too little to act on', async (t
 test('nemia cancel: a run with a step in flight, the same run again, and a run already finished', async (t) => {
   const b = board();
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  cancelled`, `   asked to stop: implement  (the engine stops it on its next tick)`],
@@ -187,7 +189,7 @@ test('nemia cancel: a run with a step in flight, the same run again, and a run a
     err: [offLine(ROOT)],
   });
 
-  const done = await Effect.runPromise(startRun({ brief: 'done', repo, workflowDir: oneStep() }));
+  const done = await runPlaced(startRun({ brief: 'done', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(done.id)));
   b.settle(`${done.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(done.id)));
@@ -199,7 +201,7 @@ test('nemia cancel: a run with a step in flight, the same run again, and a run a
 
 test('nemia cancel of a run with nothing filed yet says so, a line more', async (t) => {
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'not filed', repo: aRepo(), workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief: 'not filed', repo: aRepo(), workflowDir: oneStep() }));
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  cancelled`, `   nothing was in flight — no further steps will be filed`],
     err: [offLine(ROOT)],
@@ -208,7 +210,7 @@ test('nemia cancel of a run with nothing filed yet says so, a line more', async 
 
 test("REFUSED at shipped defaults: nemia cancel given a word after the run's id, and nothing is cancelled", async (t) => {
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
   for (const extra of ['extra', '--now'])
     await assert.rejects(typed(t, b.e, 'cancel', run.id, extra), (err: Error & { exitCode?: number }) => {
       assert.equal(err.message, `nemia cancel takes one run's id: not ${extra}.`);
@@ -221,7 +223,7 @@ test("REFUSED at shipped defaults: nemia cancel given a word after the run's id,
 test('nemia show prints the record as JSON, the brief and each step body cut short', async (t) => {
   const b = board();
   const brief = `${'a long brief, '.repeat(12)}and more`;
-  const run = await Effect.runPromise(startRun({ brief, repo: aRepo(), workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief, repo: aRepo(), workflowDir: oneStep() }));
   const { out, err } = await typed(t, b.e, 'show', run.id);
   assert.deepEqual(err, []);
   assert.equal(out.length, 1);
@@ -233,7 +235,7 @@ test('nemia show prints the record as JSON, the brief and each step body cut sho
 
 test('nemia logs: a step that has not run, and the output of one that has, from the engine', async (t) => {
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'go', repo: aRepo(), workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief: 'go', repo: aRepo(), workflowDir: oneStep() }));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: ['implement has not run yet'], err: [] });
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: [`the output of ${run.id}-implement`], err: [] });
@@ -260,7 +262,7 @@ test('REFUSED at shipped defaults: nemia show and nemia logs given a flag where 
 
 test('nemia accept of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
   const b = board();
-  const loop = await Effect.runPromise(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
+  const loop = await runPlaced(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
   await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(`${loop.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(loop.id)));

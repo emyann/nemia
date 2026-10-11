@@ -79,7 +79,9 @@ export const runs = new Hono<ApiEnv>()
       const { unreadable } = await runWith(e, viewsFor(e, [run]));
       const read = await runWith(
         e,
-        judgedUnlessUnreadable(run, unreadable, () => Effect.tryPromise({ try: () => decisionOf(run, e, placeService, home, env), catch: (err) => err })),
+        judgedUnlessUnreadable(run, unreadable, () =>
+          Effect.tryPromise({ try: () => decisionOf(run, e, placeService, home, env), catch: (err) => err }),
+        ),
       );
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
       return c.json(read.judged);

@@ -104,7 +104,13 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
  * read off `standing.json` (`standingSnapshot`): or, when its unfrozen folder does not load or a task it reads does not, why it is not
  * judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
  */
-export const judgedOn = (e: Engine['Service'], placeService: PlaceService['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) =>
+export const judgedOn = (
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  run: Run,
+  names: readonly string[],
+  workflows: readonly Workflow[] | null,
+) =>
   runPlaced(
     placeService,
     e,
@@ -119,8 +125,8 @@ export const judgedOn = (e: Engine['Service'], placeService: PlaceService['Servi
   );
 
 /**
- * A package program run for a request: over the engine `e` (`runWith`) and the place the app's layer gave (`Served.placeService`). Rejects with
- * what the program failed with or died of, as `runWith` does.
+ * A package program run for a request: over the engine `e` (`runWith`) and the place the app's layer gave (`Served.placeService`). Rejects
+ * with what the program failed with or died of, as `runWith` does.
  */
 export const runPlaced = <A, E>(
   place: PlaceService['Service'],

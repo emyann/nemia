@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runWith, statsRun as flowNumbers } from 'agent-orchestrator';
+import { runShipped as runWith, statsRun as flowNumbers } from 'agent-orchestrator';
 import type { Stats } from './stats.ts';
 import { app, runtime } from '../app.ts';
 import { Engine } from '../store.ts';

@@ -1,7 +1,7 @@
 /**
- * The git place's `make` (`place/git/scripts/make.ts`), run through `runPlaceVerb` against scratch repositories: a worktree cut, one
+ * The git place's `make` (`place/git/verbs/make.ts`), asked of `gitPlace` against scratch repositories: a worktree cut, one
  * already there taken up, a fan-in's merges clean and conflicting, and what `.worktreeinclude` copies and refuses — with the one parse of
- * that file, which `open` and `make` share (`worktreeInclude` in `scripts/contract.ts`). Git runs with no user or system configuration and
+ * that file, which `open` and `make` share (`worktreeInclude` in `place/git/git.ts`). Git runs with no user or system configuration and
  * a fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
 import { test } from 'node:test';
@@ -9,15 +9,12 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runPlaceVerb } from '../src/runner.ts';
+import { gitPlace } from '../place/git/place.ts';
 import type { Made, PlaceOutcome } from '../src/runner.ts';
-import { worktreeInclude } from '../place/git/scripts/contract.ts';
+import { worktreeInclude } from '../place/git/git.ts';
 import { scratch } from './scratch.ts';
 
-/** The git place the package ships. */
-const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
-
-/** The environment git and the scripts run in: this process's, without its git variables, with no configuration read and one identity. */
+/** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -58,7 +55,7 @@ function branched(dir: string, name: string, file: string, text: string): string
 const atOf = (step: string): string => path.join(scratch('wf-git-make-at-'), 'worktrees', 'r-1', step);
 
 /** `make` of the git place, in `ENV`, its request as given. */
-const make = (request: object): PlaceOutcome<'make'> => runPlaceVerb(GIT_SKILL, 'make', request as never, { env: ENV });
+const make = (request: object): PlaceOutcome<'make'> => gitPlace({ env: ENV }).askNow('make', request as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function madeOf(outcome: PlaceOutcome<'make'>): Made {

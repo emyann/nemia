@@ -17,6 +17,7 @@ import { Engine as EngineService, nameFor, type Sighting, type SpawnRequest } fr
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED } from './waits.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-step-labels-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -24,7 +25,18 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const {
+  addFactory,
+  advanceRun,
+  attachWorkflow,
+  hireAgent,
+  retryRun,
+  startRun,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { engine: clientEngine } = await import('../src/runtime-client.ts');
 const { stepAttributes } = await import('../src/meter/step.ts');
@@ -134,7 +146,7 @@ const labelled = (run: string, step: string, task: string) =>
   ({ run, factory: 'default', workflow: path.basename(LOOPED), step, agent: 'none', task }) as const;
 
 test("a ready step's, a round's and a try's sessions are each handed their run, factory, workflow, step and agent beside their own task", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }));
   const first = `${run.id}-implement`;
   assert.deepEqual((await pass(run.id)).filed, ['implement']);
   assert.deepEqual((await started(run.id, first)).resource, labelled(run.id, 'implement', first), 'a ready step');
@@ -167,7 +179,7 @@ test("a session of a step in a factory, worked by an agent it hired, is handed t
   attachWorkflow({ factory: 'labelled', workflow: 'hired' });
   hireAgent({ factory: 'labelled', agent: 'worker', step: 'hired/work' });
   const workflowDir = path.join(team, 'hired');
-  const run = await Effect.runPromise(startRun({ brief: 'work it', repo, workflowDir, isolate: false, factory: 'labelled' }));
+  const run = await runPlaced(startRun({ brief: 'work it', repo, workflowDir, isolate: false, factory: 'labelled' }));
   const task = `${run.id}-work`;
   assert.deepEqual((await pass(run.id)).filed, ['work']);
   const { resource } = await started(run.id, task);

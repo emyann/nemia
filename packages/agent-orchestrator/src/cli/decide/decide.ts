@@ -404,7 +404,12 @@ function printCloseout({ run, answering }: Decided, name: string, step: Steps[nu
   for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
   if (c.needs) console.log(`    needs: ${c.needs}`);
   if (answering[name]) console.log(`    ${answering[name]}`);
-  const files = artifactLines(artifactsDir(run, name), missingArtifacts(shippedGitPlace, run, name, c), artifactFiles(run, name), run.pruned);
+  const files = artifactLines(
+    artifactsDir(run, name),
+    missingArtifacts(shippedGitPlace, run, name, c),
+    artifactFiles(run, name),
+    run.pruned,
+  );
   for (const line of files) console.log(`    ${line}`);
 }
 

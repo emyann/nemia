@@ -178,7 +178,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, placeService, env }) => c.json(await ceilingsOf(e, placeService, env))))
     .get('/api/passes', (c) => served(c, async ({ e, placeService }) => c.json(await passesOf(e, placeService, c.req.query('last')))))
-    .get('/api/series', (c) => served(c, async ({ e, placeService, memo }) => c.json(await seriesOf(e, placeService, c.req.query('range'), memo.series))))
+    .get('/api/series', (c) =>
+      served(c, async ({ e, placeService, memo }) => c.json(await seriesOf(e, placeService, c.req.query('range'), memo.series))),
+    )
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
     .get('/api/pause', (c) => served(c, async ({ e, placeService }) => c.json(await pauseOf(e, placeService))))
     .get('/api/pause/now', (c) => served(c, async ({ e, placeService }) => c.json(await pauseNowOf(e, placeService))))

@@ -471,7 +471,13 @@ function stepReach(
  */
 export async function capabilitiesWithSteps(
   repo: string,
-  { e, placeService, env, home, asker }: { e: Engine['Service']; placeService: PlaceService['Service']; env: NodeJS.ProcessEnv; home: string; asker: AskServer },
+  {
+    e,
+    placeService,
+    env,
+    home,
+    asker,
+  }: { e: Engine['Service']; placeService: PlaceService['Service']; env: NodeJS.ProcessEnv; home: string; asker: AskServer },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
   let workflows: WorkflowListing[] = [];

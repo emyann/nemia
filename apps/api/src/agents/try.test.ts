@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { runWith, startRun, engine, tryFolder } from 'agent-orchestrator';
+import { runShipped as runWith, startRun, engine, tryFolder } from 'agent-orchestrator';
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
 process.env.HKB_REPO = repo;

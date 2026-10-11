@@ -1,9 +1,8 @@
 /**
- * `nemia start` opens a repository run's place (`openPlace`): the package's own place (`SHIPPED_PLACE`) unless a layer gives another
- * (`StartPlace`). Its `open` answers the record's base, branch and repository, and the record names the place it ran (`placeSkill`). A
- * place that refuses, or that leaves out a verb the workflow's run needs of it, refuses the start in its words, and nothing is written. A
- * SIGINT to `nemia start` is not passed on to `open`'s process group, which outlives it. `WF_ROOT` is set before the import, since the
- * module reads it as it loads.
+ * `nemia start` opens a repository run's place (`openPlace`), the one its program is given (`PlaceService`). Its `open` answers the
+ * record's base, branch and repository, and the record names no place: a record written when it named one (`placeSkill`) still reads. A
+ * place that refuses the start refuses it in its words, and nothing is written. A SIGINT to `nemia start` is not passed on to the
+ * process group of the git `open` runs, which outlives it. `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,12 +13,14 @@ import { Effect } from 'effect';
 import { nodeChild } from './child.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { placeOver } from './place-over.ts';
 
 const ROOT = scratch('wf-start-place-');
 process.env.WF_ROOT = ROOT;
-const { startRun, StartPlace } = await import('../src/start/start.verb.ts');
-const { SHIPPED_PLACE } = await import('../src/place/place.store.ts');
-const { skillVersion } = await import('../src/skills/read.store.ts');
+const { startRun } = await import('../src/start/start.verb.ts');
+const { PlaceService } = await import('../src/place/place.store.ts');
+const { gitPlaceLayer, shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { runFile } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 
@@ -61,20 +62,20 @@ const written = (): { runs: string[]; dirs: string[] } => {
 };
 
 /**
- * `startRun` of `workflowDir` on `repo`, opening `place` when given, cutting worktrees unless `isolate` is false: the run's record, or the
+ * `startRun` of `workflowDir` on `repo`, given the place `layer` holds, the package's git place by default: the run's record, or the
  * refusal it failed with.
  */
-function started(workflowDir: string, repo: string, place?: string, isolate = true) {
-  const program = startRun({ brief: 'add a flag', repo, workflowDir, isolate });
-  const exit = Effect.runSyncExit(place ? program.pipe(Effect.provideService(StartPlace, place)) : program);
+function started(workflowDir: string, repo: string, layer = gitPlaceLayer) {
+  const program = startRun({ brief: 'add a flag', repo, workflowDir, isolate: true });
+  const exit = Effect.runSyncExit(program.pipe(Effect.provide(layer)));
   if (exit._tag === 'Success') return exit.value;
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }
 
 /** What `started` is refused with, as `Invalid` with exit 2. */
-function refusedWith(workflowDir: string, repo: string, place?: string): string {
+function refusedWith(workflowDir: string, repo: string, layer = gitPlaceLayer): string {
   try {
-    started(workflowDir, repo, place);
+    started(workflowDir, repo, layer);
   } catch (err) {
     assert.ok(err instanceof Invalid, `Invalid expected, got ${String(err)}`);
     assert.equal(err.exitCode, 2);
@@ -83,7 +84,7 @@ function refusedWith(workflowDir: string, repo: string, place?: string): string 
   return assert.fail('the start was not refused');
 }
 
-test("a start opens the package's place: the record's base, branch and repository are open's, and it names the place by its version", () => {
+test("a start opens the place it is given: the record's base, branch and repository are open's, and it names no place", () => {
   const repo = aRepo();
   const run = started(LANDING, repo);
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
@@ -92,8 +93,16 @@ test("a start opens the package's place: the record's base, branch and repositor
   assert.equal(run.branch, 'trunk');
   assert.equal(run.repo, repo);
   assert.equal(run.workspace, repo);
-  assert.deepEqual(run.placeSkill, { skill: 'git', version: skillVersion(SHIPPED_PLACE) });
-  assert.deepEqual(runStore.runs.read(run.id).placeSkill, run.placeSkill);
+  assert.ok(!('placeSkill' in run) && !('placeSkill' in runStore.runs.read(run.id)), 'no place is named on a new record');
+});
+
+test('a record written when a run named its place still reads, the name kept as it was written', () => {
+  const run = started(PLAIN, aRepo());
+  const file = runFile(run.id);
+  const named = { skill: 'git', version: 'a'.repeat(64) };
+  fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), placeSkill: named }));
+  const read = runStore.runs.read(run.id);
+  assert.deepEqual([read.id, read.placeSkill], [run.id, named]);
 });
 
 test("REFUSED: a start on a directory that is no repository, in the place's words, and nothing is written", () => {
@@ -106,40 +115,21 @@ test("REFUSED: a start on a directory that is no repository, in the place's word
   assert.deepEqual(written(), before);
 });
 
-/** A copy of the package's place whose `place.json` declares no `verb`. */
-function placeWithout(verb: string): string {
-  const dir = path.join(scratch('wf-start-place-copy-'), 'git');
-  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
-  const file = path.join(dir, 'place.json');
-  const declared = JSON.parse(fs.readFileSync(file, 'utf8')) as { verbs: string[] };
-  fs.writeFileSync(file, JSON.stringify({ ...declared, verbs: declared.verbs.filter((v) => v !== verb) }));
-  return dir;
-}
-
-test('REFUSED: a place that declares no land, for a workflow whose ending lands on its check, naming land; it starts one that lands nothing', () => {
-  const place = placeWithout('land');
+test('REFUSED: a start whose place refuses its open is refused in the words of the place it was given, and nothing is written', () => {
   const repo = aRepo();
   const before = written();
-  const said = refusedWith(LANDING, repo, place);
-  assert.ok(said.startsWith(`${path.join(place, 'place.json')} does not declare land, which this workflow's run asks of its place`), said);
-  assert.deepEqual(written(), before);
-  const run = started(PLAIN, repo, place);
-  assert.deepEqual(run.placeSkill, { skill: 'git', version: skillVersion(place) });
-});
-
-test('REFUSED: a place that declares no make, or no handoff, for a run that cuts a worktree, naming the verb; it starts the same run in place', () => {
-  const repo = aRepo();
-  for (const verb of ['make', 'handoff']) {
-    const place = placeWithout(verb);
-    const before = written();
-    const said = refusedWith(PLAIN, repo, place);
-    assert.ok(
-      said.startsWith(`${path.join(place, 'place.json')} does not declare ${verb}, which this workflow's run asks of its place`),
-      said,
-    );
-    assert.deepEqual(written(), before);
-    assert.deepEqual(started(PLAIN, repo, place, false).placeSkill, { skill: 'git', version: skillVersion(place) });
-  }
+  const asked: string[] = [];
+  const refusing = PlaceService.layer(
+    placeOver(shippedGitPlace, {
+      open: (request) => {
+        asked.push(request.root);
+        return { refused: 'this place takes no run today: ask again tomorrow' };
+      },
+    }),
+  );
+  assert.equal(refusedWith(PLAIN, repo, refusing), 'this place takes no run today: ask again tomorrow');
+  assert.deepEqual([asked, written()], [[repo], before]);
+  assert.equal(started(PLAIN, repo).repo, repo, 'and the git place opens the same repository');
 });
 
 /** The processes of the group `pgid` leads, by pid, as `ps` lists them now. */
@@ -159,7 +149,7 @@ function killGroup(pgid: number): boolean {
   }
 }
 
-test("a SIGINT to nemia start is not passed on to open's process group: the start ends, nothing is written, and open's group is still there", async (t) => {
+test('a SIGINT to nemia start is not passed on to the group of the git open runs: the start ends, nothing is written, and that group is still there', async (t) => {
   const dir = scratch('wf-start-place-signal-');
   const store = path.join(dir, 'store');
   const bin = path.join(dir, 'bin');
@@ -192,14 +182,14 @@ test("a SIGINT to nemia start is not passed on to open's process group: the star
     start.child.kill('SIGKILL');
     if (pgid > 0) killGroup(pgid);
   });
-  await start.until(() => fs.existsSync(said), 'the fake git, run under open, says its pid and its parent');
-  pgid = Number(fs.readFileSync(said, 'utf8').trim().split(' ')[1]);
-  const parent = spawnSync('ps', ['-o', 'args=', '-p', String(pgid)], { encoding: 'utf8' }).stdout;
-  assert.match(parent, /scripts\/open\.ts/, `the git that hangs is open's: its parent is ${parent}`);
+  await start.until(() => fs.existsSync(said), 'the fake git, run by open, says its pid and its parent');
+  const [pid, parent] = fs.readFileSync(said, 'utf8').trim().split(' ').map(Number);
+  pgid = pid!;
+  assert.equal(parent, start.child.pid, 'the git that hangs is run by nemia start itself, no process between');
   assert.equal(spawnSync('ps', ['-o', 'pgid=', '-p', String(pgid)], { encoding: 'utf8' }).stdout.trim(), String(pgid));
   start.child.kill('SIGINT');
   const ended = await start.closed;
   assert.equal(ended.signal, 'SIGINT', `nemia start ended by SIGINT; it said: ${start.err()}`);
-  assert.ok(groupOf(pgid).includes(String(pgid)), "open's group outlives the start");
+  assert.ok(groupOf(pgid).includes(String(pgid)), "the group of open's git outlives the start");
   assert.deepEqual(fs.existsSync(path.join(store, 'runs')) ? fs.readdirSync(path.join(store, 'runs')) : [], [], 'no run written');
 });

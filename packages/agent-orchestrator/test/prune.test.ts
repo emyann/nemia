@@ -13,6 +13,8 @@ import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
+import { placeOver, unreadBy } from './place-over.ts';
 
 const ROOT = scratch('wf-prune-');
 process.env.WF_ROOT = ROOT;
@@ -31,10 +33,14 @@ const {
   roundRun,
   sizeOf,
   startRun,
-  runWith,
+  runWith: runEngine,
+  gitPlaceLayer,
 } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
-const { RunPlace, SHIPPED_PLACE } = await import('../src/place/place.store.ts');
+const { PlaceService } = await import('../src/place/place.store.ts');
+const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -128,7 +134,7 @@ const aFinished = async (
   }: { merged?: boolean; work?: string; budget?: number; costUsd?: number; closeout?: object | ((id: string) => object) } = {},
 ) => {
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: oneStep(budget) }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep(budget) }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, work), 'export const fixed = true;\n');
@@ -259,7 +265,7 @@ test('`nemia prune` on a run that shipped: listed with its size and nothing remo
 test('REFUSED at shipped defaults: a run not over — named, and told to cancel first; nothing removed, exit 2', async (t) => {
   const b = board();
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'still running', repo, workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief: 'still running', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   const { printed, error } = await typed(t, b.e, 'prune', run.id, '--yes', '--unmerged');
@@ -329,19 +335,14 @@ test('REFUSED at shipped defaults: a worktree on no branch, holding a commit no 
   assert.ok(fs.existsSync(locked.wt) && !under('runs', `${locked.run.id}.pruned`));
 });
 
-/** A copy of the package's place whose `inventory` says `said` on stderr and exits 1, as a place that cannot read its repository does. */
-function placeUnread(said: string): string {
-  const dir = path.join(scratch('wf-prune-place-'), 'git');
-  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'scripts', 'inventory.ts'), `process.stderr.write(${JSON.stringify(`${said}\n`)});\nprocess.exit(1);\n`);
-  return dir;
-}
+/** The package's place whose `inventory` is not heard, in `said`, as a place that cannot read its repository answers. */
+const placeUnread = (said: string) => PlaceService.layer(placeOver(shippedGitPlace, { inventory: () => unreadBy('inventory', said) }));
 
-test('REFUSED at shipped defaults: a place whose inventory exits 1 refuses `nemia prune` as not read, never as nothing left to prune — its worktree stays and the run is not marked pruned', async () => {
+test('REFUSED at shipped defaults: a place whose inventory is not heard refuses `nemia prune` as not read, never as nothing left to prune — its worktree stays and the run is not marked pruned', async () => {
   const b = board();
   const { run, repo, wt } = await aFinished(b, { merged: true });
   const planted = placeUnread('the inventory broke');
-  const refused = await runWith(b.e, prune(run.id, { yes: true }).pipe(Effect.provideService(RunPlace, () => planted)));
+  const refused = await runWith(b.e, prune(run.id, { yes: true }).pipe(Effect.provide(planted)));
   assert.equal(refused.kind, 'refused');
   assert.equal(
     refused.refusal,
@@ -354,7 +355,7 @@ test('REFUSED at shipped defaults: a place whose inventory exits 1 refuses `nemi
 test('REFUSED at shipped defaults: a hand-off still owed — a step settled and no pass since — until a tick has handed it off', async () => {
   const b = board();
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'owed', repo, workflowDir: oneStep() }));
+  const run = await runPlaced(startRun({ brief: 'owed', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -372,9 +373,7 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
   const b = board();
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nwrite the note\n');
-  const run = await Effect.runPromise(
-    startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'not-a-repo-')), workflowDir: team }),
-  );
+  const run = await runPlaced(startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'not-a-repo-')), workflowDir: team }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-write`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -394,7 +393,7 @@ test('REFUSED at shipped defaults: whatever holds `nemia rm` — a step waiting 
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
   fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
   fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
+  const run = await runPlaced(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -540,9 +539,9 @@ test('REFUSED after a prune: a step over its budget is offered no raise — `dec
 test('`nemia prune` with no run reads every run: one not over is summed up on a line, one with nothing to prune is not said, and the rest are listed with the total', async (t) => {
   const b = board();
   const merged = await aFinished(b, { merged: true });
-  const running = await Effect.runPromise(startRun({ brief: 'running', repo: aRepo(), workflowDir: oneStep() }));
+  const running = await runPlaced(startRun({ brief: 'running', repo: aRepo(), workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(running.id)));
-  const inPlace = await Effect.runPromise(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
+  const inPlace = await runPlaced(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
   await runWith(b.e, advanceRun(readRun(inPlace.id)));
   b.settle(`${inPlace.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(inPlace.id)));
@@ -693,7 +692,7 @@ test("`nemia prune --artifacts` of a run whose worktrees a plain prune already r
   assert.deepEqual([after.at, after.worktrees], [first.at, first.worktrees], 'when the worktrees went, and which, is as it was');
   assert.ok(after.artifacts && !under('runs', run.id, 'artifacts'));
 
-  const inPlace = await Effect.runPromise(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
+  const inPlace = await runPlaced(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
   await runWith(b.e, advanceRun(readRun(inPlace.id)));
   b.settle(`${inPlace.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(inPlace.id)));
@@ -766,7 +765,7 @@ test('`nemia prune --artifacts` marks the run before its files go, and a prune t
     fs.chmodSync(path.join(ROOT, 'runs', id, 'artifacts', 'implement'), 0o555);
     t.after(() => fs.chmodSync(path.join(ROOT, 'runs', id, 'artifacts', 'implement'), 0o755));
   };
-  const inPlace = await Effect.runPromise(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
+  const inPlace = await runPlaced(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
   await runWith(b.e, advanceRun(readRun(inPlace.id)));
   b.settle(`${inPlace.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(inPlace.id)));
@@ -802,7 +801,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   const b = board();
   const kept = (id: string, shot: string) => assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), id);
 
-  const running = await Effect.runPromise(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
+  const running = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(readRun(running.id)));
   const runningShot = aShot(running.id);
   const r = await typed(t, b.e, 'prune', running.id, '--artifacts', '--yes', '--unmerged');
@@ -849,9 +848,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
 
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nwrite the note\n');
-  const folder = await Effect.runPromise(
-    startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'not-a-repo-')), workflowDir: team }),
-  );
+  const folder = await runPlaced(startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'not-a-repo-')), workflowDir: team }));
   await runWith(b.e, advanceRun(readRun(folder.id)));
   b.settle(`${folder.id}-write`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(folder.id)));
@@ -862,7 +859,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
   fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
   fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-  const atGate = await Effect.runPromise(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
+  const atGate = await runPlaced(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
   await runWith(b.e, advanceRun(readRun(atGate.id)));
   b.settle(`${atGate.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(readRun(atGate.id)));

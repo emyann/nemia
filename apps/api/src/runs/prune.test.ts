@@ -20,7 +20,7 @@ import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { engine, prune, prunedKept, prunedWords, runStore, runWith, type RunSummary } from 'agent-orchestrator';
+import { engine, prune, prunedKept, prunedWords, runStore, runShipped as runWith, type RunSummary } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(

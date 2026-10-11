@@ -300,8 +300,7 @@ export function headsNow(run: Run, place: Place): Readonly<Record<string, string
 }
 
 /** What was read of the repository and base branch `run` is in, or undefined where none was. */
-const stoodOf = (standing: PassStanding, run: RepositoryRun): StoodRead | undefined =>
-  standing.read.get(keyOf(run.repo, run.branch));
+const stoodOf = (standing: PassStanding, run: RepositoryRun): StoodRead | undefined => standing.read.get(keyOf(run.repo, run.branch));
 
 /** Every branch of `run`'s repository and its commit, as it was read; undefined where none was. */
 export const headsFor = (standing: PassStanding, run: RepositoryRun): Readonly<Record<string, string>> | undefined => {

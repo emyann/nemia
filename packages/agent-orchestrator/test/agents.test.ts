@@ -23,11 +23,13 @@ import {
 import { loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { scratch } from './scratch.ts';
-import { Effect } from 'effect';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
 const { startRun, writeWorkflow } = await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
 /** A folder of workflows under a fresh directory, each file written from `files`, by its path from the folder. */
@@ -605,7 +607,7 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
   git('add', '-A');
   git('commit', '-q', '-m', 'base');
   const dir = workflows({ 'agents/implementer.md': IMPLEMENTER, 'dev/build.md': '---\nplace: git\nagent: implementer\n---\nBuild it.\n' });
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false }));
   fs.writeFileSync(path.join(dir, 'agents', 'implementer.md'), '---\nmodel: haiku\n---\nSomething else.\n');
   assert.ok(run.workflow, 'the workflow is frozen on the record at start');
   const [build] = run.workflow;

@@ -21,7 +21,7 @@ import {
   readInbox,
   runSlots,
   runStore,
-  runWith,
+  runShipped as runWith,
   slotWord,
   standingReader,
   standingSnapshot,

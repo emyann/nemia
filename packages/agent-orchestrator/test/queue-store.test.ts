@@ -22,6 +22,7 @@ import { TEAM } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
@@ -31,8 +32,21 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { addFactory, addToInbox, attachWorkflow, cancelRun, decideRun, readInbox, startRun, startFromInbox, tickRun, runWith } =
-  await import('../src/runner.ts');
+const {
+  addFactory,
+  addToInbox,
+  attachWorkflow,
+  cancelRun,
+  decideRun,
+  readInbox,
+  startRun,
+  startFromInbox,
+  tickRun,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { filesStore } = await import('../src/record/files.store.ts');
@@ -166,7 +180,7 @@ const started = async (
   createdAt: string,
   opts: { isolate?: boolean; after?: string[]; repo?: string } = {},
 ): Promise<Run> => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({
       brief,
       repo: opts.repo ?? aRepo(),
@@ -762,12 +776,12 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
     "a card a run's record names, its removal failed, is refused",
   );
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
+    async () => await runPlaced(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
     refusedAs('Conflict', startedAlready),
     'and so is its start, of the same kind',
   );
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
+    async () => await runPlaced(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
     refusedAs('Missing', /^no card no-such-card in the inbox\. Its cards are: .*\. Start one of those — nemia start /),
     'a start of a card not there',
   );

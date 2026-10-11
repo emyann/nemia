@@ -80,9 +80,9 @@ export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
 export type ApiEnv = { Variables: { runtime: ApiRuntime } };
 
 /**
- * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program asks,
- * given with `runPlaced`), and where the request is answered
- * (`placeFor`, factories/place.ts): `repo`, the repository it is answered on, and `factory`, the factory it names, none for the default.
+ * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program
+ * asks, given with `runPlaced`), and where the request is answered (`placeFor`, factories/place.ts): `repo`, the repository it is answered
+ * on, and `factory`, the factory it names, none for the default.
  */
 export type Served = {
   env: NodeJS.ProcessEnv;

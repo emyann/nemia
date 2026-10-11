@@ -19,7 +19,7 @@ import {
   noCardLine,
   startFromInbox,
   runStore,
-  runWith,
+  runShipped as runWith,
   engine,
 } from 'agent-orchestrator';
 const repo = scratch('nemia-api-inbox-repo-');

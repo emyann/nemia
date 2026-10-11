@@ -17,7 +17,7 @@ import {
   COMMANDS,
   clearCustomInstructions,
   engine,
-  runWith,
+  runShipped as runWith,
   writeCustomInstructions,
   type AgentsRead,
   type CardRead,

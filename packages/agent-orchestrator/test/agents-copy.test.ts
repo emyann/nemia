@@ -15,11 +15,23 @@ import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-agents-copy-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, engine, hireAgent, runWith, startRun, TABLE } = await import('../src/runner.ts');
+const {
+  addFactory,
+  attachWorkflow,
+  engine,
+  hireAgent,
+  runWith: runEngine,
+  gitPlaceLayer,
+  startRun,
+  TABLE,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
 const { agentsRead } = await import('../src/roster/roster.store.ts');
 const { agentsLines } = await import('../src/roster/roster.ts');
@@ -110,7 +122,7 @@ test('an agent copied in with its schema and skills, hired into a step, runs as 
   attachWorkflow({ factory: 'pipao', workflow: 'build' });
   hireAgent({ factory: 'pipao', agent: 'implementer', step: 'build/implement' });
   hireAgent({ factory: 'pipao', agent: 'critic', step: 'build/review' });
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
   const review = run.workflow?.find((step) => step.name === 'review');
   assert.equal(review?.agent?.name, 'critic');
 });

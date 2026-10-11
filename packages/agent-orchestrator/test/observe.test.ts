@@ -26,6 +26,7 @@ import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtim
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-observe-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -35,6 +36,8 @@ process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN, TIMELINE_SPAN_KEYS, WAIT_SPAN_KEYS, WAIT_SPANS } =
@@ -283,7 +286,7 @@ async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<strin
       defaultHarness: 'claude',
     }),
   );
-  await Effect.runPromise(startRun({ brief: 'one run', repo, workflowDir: folder }));
+  await runPlaced(startRun({ brief: 'one run', repo, workflowDir: folder }));
   const spans: Tracer.NativeSpan[] = [];
   const annotations = new Set<string>();
   const tracer = Tracer.make({
@@ -296,7 +299,7 @@ async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<strin
   const keeper = Logger.make(({ fiber }) => {
     for (const key of Object.keys(fiber.getRef(References.CurrentLogAnnotations))) annotations.add(key);
   });
-  await Effect.runPromise(
+  await runPlaced(
     tickRun({ repo: ROOT }).pipe(
       Effect.provide(EngineService.layer(e)),
       Effect.provide(Logger.layer([keeper])),

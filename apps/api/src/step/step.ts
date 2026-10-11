@@ -228,7 +228,10 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     const folder = folderOf(name, from, repo, home, factory?.tree);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
     const args = { from, name, step: asked, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-    const { step: found, steps } = (await runPlaced(placeService, e, STEP.handler(args, undefined, home))) as { step: Workflow | null; steps: string[] };
+    const { step: found, steps } = (await runPlaced(placeService, e, STEP.handler(args, undefined, home))) as {
+      step: Workflow | null;
+      steps: string[];
+    };
     if (!found) {
       return c.json({ error: `No step '${asked}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
     }

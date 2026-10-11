@@ -18,6 +18,7 @@ import { Effect, Metric, References, Tracer } from 'effect';
 import { Engine as RuntimeEngine, nameFor, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-timeline-spans-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -25,7 +26,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '10';
 process.env.WF_MAX_CONCURRENT = '10';
-const { approveRun, cancelRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
+const { approveRun, cancelRun, runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun, rewriteRun, stepsOf } = await import('../src/record/record.store.ts');
 const { TIMELINE_SPAN } = await import('../src/meter/meter.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
@@ -116,7 +119,7 @@ const registry = new Map();
 /** `n` passes of the tick, as the daemon `life` makes them. */
 const tick = async (n = 1, life = FIRST) => {
   for (let i = 0; i < n; i++)
-    await Effect.runPromise(
+    await runPlaced(
       tickRun({ memo: life.memo }).pipe(
         Effect.provide(EngineService.layer(engine)),
         Effect.provideService(Metric.MetricRegistry, registry),
@@ -202,7 +205,7 @@ const clockOf = (t: TestContext) => {
   return (minutes: number) => t.mock.timers.setTime((now += minutes * MIN));
 };
 
-const start = (workflowDir: string) => Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false }));
+const start = (workflowDir: string) => runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false }));
 
 test("a finished run's timeline spans are its page's timeline, row for row, handed once across passes and a daemon started again", async (t) => {
   const later = clockOf(t);

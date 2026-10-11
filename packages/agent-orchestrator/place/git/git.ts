@@ -9,8 +9,8 @@ import { type ChildProcessWithoutNullStreams, spawn, spawnSync, type SpawnSyncOp
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
-import { stopChild } from '../../src/place/place-async.store.ts';
-import { stopGroup, stoppedWords, threwWords, unreadNow } from '../../src/place/place.store.ts';
+import { Malformed } from './asked.ts';
+import { stopChild, stopGroup, stoppedWords, threwWords, unreadNow } from '../../src/place/place.store.ts';
 import type { PlaceAnswers, PlaceOutcome, PlaceVerb } from '../../src/place/place.ts';
 
 /** One command a verb wants run: the program, where, its arguments, and what it reads on stdin. */
@@ -70,7 +70,9 @@ export function* printed(command: Command): Asking<string> {
   return ran.stdout;
 }
 
-/** Git run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws `Failed` with git's words when git fails. */
+/**
+ * Git run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws `Failed` with git's words when git fails.
+ */
 export function* git(cwd: string, args: readonly string[], input?: string): Asking<string> {
   return (yield* printed({ cmd: 'git', cwd, args, input })).trim();
 }
@@ -157,19 +159,26 @@ function moved<V extends PlaceVerb>(body: Asking<Reply<V>>, ran?: Ran): Moved<V>
   }
 }
 
+/** What an unread verb says of what its body threw: a request it could not read in that refusal's own words, anything else by name. */
+const thrownWords = (verb: PlaceVerb, threw: unknown): string => (threw instanceof Malformed ? threw.message : threwWords(verb, threw));
+
 /** What a body returned, as the verb's outcome. */
 const outcomeOf = <V extends PlaceVerb>(reply: Reply<V>): PlaceOutcome<V> =>
   'refused' in reply ? { refused: reply.refused } : { answer: reply };
 
 /** How a command run with `spawnSync` ended, and whether it was stopped at the deadline, and had to be killed. */
-function ranNow(command: Command, leftMs: number, asked: Asked): { readonly ran: Ran; readonly timedOut: boolean; readonly killed: boolean } {
+function ranNow(
+  command: Command,
+  leftMs: number,
+  asked: Asked,
+): { readonly ran: Ran; readonly timedOut: boolean; readonly killed: boolean } {
   asked.started();
   const options: SpawnSyncOptionsWithStringEncoding & { readonly detached: boolean } = {
     cwd: command.cwd,
     input: command.input ?? '',
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
-    timeout: Math.max(1, leftMs),
+    timeout: Math.max(1, Math.ceil(leftMs)),
     killSignal: 'SIGTERM',
     maxBuffer: MAX_PRINTED,
     env: asked.env,
@@ -184,13 +193,14 @@ function ranNow(command: Command, leftMs: number, asked: Asked): { readonly ran:
 /**
  * `verb`, whose body is `body`, answered while this process waits: each command run in turn within what is left of `asked.deadlineMs`,
  * measured on the monotonic clock. Unread when a command is still running at the deadline, in the deadline's words, once its group is
- * stopped; and when the body throws, in one sentence naming the verb. Never throws.
+ * stopped; when the body cannot read its request, in that refusal's words; and when it throws, in one sentence naming the verb. Never
+ * throws.
  */
 export function answeredNow<V extends PlaceVerb>(verb: V, body: Asking<Reply<V>>, asked: Asked): PlaceOutcome<V> {
   const until = performance.now() + asked.deadlineMs;
   let at = moved<V>(body);
   for (;;) {
-    if ('threw' in at) return unreadNow(verb, threwWords(verb, at.threw));
+    if ('threw' in at) return unreadNow(verb, thrownWords(verb, at.threw));
     if (at.step.done) return outcomeOf(at.step.value);
     const { ran, timedOut, killed } = ranNow(at.step.value, until - performance.now(), asked);
     if (timedOut) return unreadNow(verb, stoppedWords(asked.deadlineMs, killed, ran.stderr));
@@ -252,7 +262,7 @@ export const answered = <V extends PlaceVerb>(verb: V, make: () => Asking<Reply<
     const run = Effect.gen(function* () {
       let at = moved<V>(body);
       for (;;) {
-        if ('threw' in at) return unreadNow(verb, threwWords(verb, at.threw));
+        if ('threw' in at) return unreadNow(verb, thrownWords(verb, at.threw));
         if (at.step.done) return outcomeOf(at.step.value);
         at = moved(body, yield* ranLater(at.step.value, asked, heard));
       }
@@ -261,9 +271,7 @@ export const answered = <V extends PlaceVerb>(verb: V, make: () => Asking<Reply<
       Effect.timeoutOrElse({
         duration: asked.deadlineMs,
         orElse: () =>
-          Effect.sync(() =>
-            unreadNow(verb, stoppedWords(asked.deadlineMs, heard.killed, Buffer.concat(heard.stderr).toString('utf8'))),
-          ),
+          Effect.sync(() => unreadNow(verb, stoppedWords(asked.deadlineMs, heard.killed, Buffer.concat(heard.stderr).toString('utf8')))),
       }),
     );
   });

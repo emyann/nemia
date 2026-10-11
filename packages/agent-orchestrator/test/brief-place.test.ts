@@ -13,9 +13,9 @@ import type { Workflow } from '../src/workflow.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { BriefPlace } from '../src/brief/brief.ts';
 import { SKILL_SECTIONS, type PlaceSay } from '../src/place/place.ts';
-import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
+import type { Place } from '../src/place/place.store.ts';
+import { shippedGitPlace } from '../src/place/shipped.store.ts';
 import { placeTold } from '../src/tick/told.verb.ts';
-import { scratch } from './scratch.ts';
 import { TEAM_DEV } from './team.ts';
 
 /** Where the pinned briefs are kept, one file each. */
@@ -57,15 +57,11 @@ const NONE = [undefined, undefined, undefined, undefined, undefined, undefined, 
 /** What a run's place tells one of its steps' briefs. */
 type Telling = (run: Run, step: Workflow) => BriefPlace;
 
-/** What `placeTold` tells a step, from `dir` or the run's own place; a place that tells nothing fails the test with its note. */
+/** What `placeTold` tells a step, by `place`, the package's git place when given none. */
 const toldBy =
-  (dir?: string): Telling =>
-  (run, step) => {
-    const notes: string[] = [];
-    const told = placeTold(run, step, notes, dir);
-    assert.ok(told, notes.join('\n'));
-    return told;
-  };
+  (place: Place = shippedGitPlace): Telling =>
+  (run, step) =>
+    placeTold(run, step, place);
 
 /** The six briefs of a repository run, by the name of their pinned file, each told what `told` says. */
 function briefs(told: Telling): Record<string, string> {
@@ -131,35 +127,32 @@ const PROSE = /unless git ignores it|sandboxes keep git read-only/;
 /** The lines of `brief` that name git, but the contracts' prose (`PROSE`). */
 const gitLines = (brief: string): string[] => brief.split('\n').filter((line) => /\bgit\b/.test(line) && !PROSE.test(line));
 
-/** A copy of the package's place whose words are Mercurial's: what a place of another tool would say. */
-function hgPlace(): string {
-  const dir = scratch('wf-hg-place-');
-  fs.cpSync(SHIPPED_PLACE, dir, { recursive: true });
-  const file = path.join(dir, 'place.json');
-  const declared = JSON.parse(fs.readFileSync(file, 'utf8')) as { say: PlaceSay; denyWhileLanding: string[] };
+/** The package's place, its words Mercurial's: what a place of another tool would say. */
+function hgPlace(): Place {
+  const declared = shippedGitPlace.declared;
   const hg = (line: string) => line.replaceAll('git', 'hg');
   const say = Object.fromEntries(
     Object.entries(declared.say).map(([key, said]: [string, string | readonly string[]]) => [
       key,
       typeof said === 'string' ? hg(said) : said.map(hg),
     ]),
-  );
-  const words = {
-    ...declared,
-    denyWhileLanding: ['Bash(hg commit:*)'],
-    say: {
-      ...say,
-      look: ['hg diff -r {baseRef}', 'hg status'],
-      results: ['hg log -r {base}::{branch}', 'hg diff -r {base} -r {branch}'],
-      merge: 'hg merge -r {sha}',
-      mergeUncommitted: 'hg merge -r {sha} --tool :merge3',
-      showMerge: 'hg diff -c .',
-      lastMerge: "hg log -r 'last(merge())'",
-      stage: 'hg -R {repo} merge {branches}',
+  ) as unknown as PlaceSay;
+  return {
+    ...shippedGitPlace,
+    declared: {
+      denyWhileLanding: ['Bash(hg commit:*)'],
+      say: {
+        ...say,
+        look: ['hg diff -r {baseRef}', 'hg status'],
+        results: ['hg log -r {base}::{branch}', 'hg diff -r {base} -r {branch}'],
+        merge: 'hg merge -r {sha}',
+        mergeUncommitted: 'hg merge -r {sha} --tool :merge3',
+        showMerge: 'hg diff -c .',
+        lastMerge: "hg log -r 'last(merge())'",
+        stage: 'hg -R {repo} merge {branches}',
+      },
     },
   };
-  fs.writeFileSync(file, JSON.stringify(words));
-  return dir;
 }
 
 test("a repository run's briefs say what they said before the place gave their git words, line for line", () => {
@@ -167,10 +160,11 @@ test("a repository run's briefs say what they said before the place gave their g
     assert.deepEqual(`${brief}\n`.split('\n'), fs.readFileSync(path.join(PINNED, name), 'utf8').split('\n'), name);
 });
 
-test("a run whose record names no place skill is told the package's place's words", () => {
+test('a run is told the words of the place it is given, whatever place its record once named', () => {
   const run = runOf();
-  assert.equal(run.placeSkill, undefined);
-  assert.deepEqual(toldBy()(run, stepNamed('review')), { words: undefined, say: readPlaceJson(SHIPPED_PLACE).say });
+  const named: RepositoryRun = { ...run, placeSkill: { skill: 'git', version: 'a'.repeat(64) } };
+  for (const each of [run, named])
+    assert.deepEqual(toldBy()(each, stepNamed('review')), { words: undefined, say: shippedGitPlace.declared.say });
 });
 
 test("a planted place's words replace every git command of a repository run's briefs", () => {

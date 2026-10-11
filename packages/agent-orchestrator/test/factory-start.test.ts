@@ -21,13 +21,15 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { promised } from './promised.ts';
-import { Effect } from 'effect';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-factory-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactory, attachWorkflow, hireAgent, inboxDir, parseArgv, repoFor, START, startRun, startFromInbox } =
   await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { nemiaDefinition } = await import('../src/nemia/level.store.ts');
@@ -73,14 +75,14 @@ test('REFUSED: a start in a factory that has attached no workflow offers none, n
   const { repo, build } = fresh([]);
   const before = runsWritten();
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith(
       'Invalid',
       /^build: the factory pipao does not offer this workflow — it offers none yet\. Attach it: nemia factory attach pipao build\. Nothing was started\.$/,
     ),
   );
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     (err: Error) => !/default factory/.test(err.message),
     "only the factory's own fix, never the default factory",
   );
@@ -91,7 +93,7 @@ test('REFUSED: a start of a workflow its factory has not attached, before its st
   const { repo, build, dev } = fresh(['dev']);
   const before = runsWritten();
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith(
       'Invalid',
       /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: nemia factory attach pipao build\. Nothing was started\.$/,
@@ -100,13 +102,13 @@ test('REFUSED: a start of a workflow its factory has not attached, before its st
   );
   attachWorkflow({ factory: 'pipao', workflow: 'build' });
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith('Invalid', /^build: in the factory pipao, 2 steps name no agent/),
     'once attached, its steps are judged',
   );
   fresh(['build']);
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'dev it', repo, workflowDir: dev, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'dev it', repo, workflowDir: dev, isolate: false, factory: 'pipao' })),
     refusedWith('Invalid', /^dev: the factory pipao does not offer this workflow — it offers: build\. /),
   );
   assert.deepEqual(runsWritten(), before);
@@ -116,7 +118,7 @@ test('REFUSED: a start in a factory that hires no one into its steps names each 
   const { repo, build } = fresh();
   const before = runsWritten();
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith(
       'Invalid',
       /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, review\. Hire an agent into each — nemia factory hire pipao <agent> --step build\/implement; nemia factory hire pipao <agent> --step build\/review\. Nothing was started\.$/,
@@ -129,7 +131,7 @@ test('once a factory hires into each step, a start in it runs each as its hire, 
   const { repo, build } = fresh();
   hireAgent({ factory: 'pipao', agent: 'implementer', step: 'build/implement' });
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'build/review' });
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
   hireAgent({ factory: 'pipao', agent: 'shipper', step: 'build/implement' });
   const steps = Object.fromEntries((run.workflow ?? []).map((s) => [s.name, s]));
   assert.equal(steps.implement.agent?.name, 'implementer');
@@ -149,9 +151,7 @@ test('in the default factory — no --factory, or default — every workflow is 
   );
   fs.writeFileSync(path.join(ROOT, 'factories', 'default.json'), '{"repos": ["/x"], "hires": {"build/implement": "shipper"}}\n');
   for (const factory of [undefined, 'default']) {
-    const run = await Effect.runPromise(
-      startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, ...(factory ? { factory } : {}) }),
-    );
+    const run = await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, ...(factory ? { factory } : {}) }));
     const steps = Object.fromEntries((run.workflow ?? []).map((s) => [s.name, s]));
     assert.equal(steps.implement.agent, undefined, String(factory));
     assert.equal(steps.implement.body, 'Build what was asked.');
@@ -165,7 +165,7 @@ test("REFUSED: a factory's hires into another workflow's steps of the same names
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'builder/review' });
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'build/review' });
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith('Invalid', /^build: in the factory pipao, the step implement names no agent, and pipao hires none into it\. /),
   );
 });
@@ -177,7 +177,7 @@ test('REFUSED: a hire into a step whose file names its own agent, naming both an
   hireAgent({ factory: 'pipao', agent: 'implementer', step: 'build/named' });
   const before = runsWritten();
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith(
       'Invalid',
       /^named: `agent: reviewer` fills this step in every factory, and the factory pipao hires implementer into it too\. Take the hire back — nemia factory fire pipao --step build\/named — /,
@@ -191,7 +191,7 @@ test('REFUSED: a hire of an agent there is not, in the words of the factory that
   hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' });
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'build/review' });
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith(
       'Invalid',
       /^implement: the factory pipao hires `ada` into it, which is not an agent here\. The agents are: implementer, reviewer, shipper — hire one — nemia factory hire pipao <agent> --step build\/implement, /,
@@ -209,7 +209,7 @@ test('REFUSED: Nemia is never a hire: a factory that hires nemia into a step sta
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'build/review' });
   const before = runsWritten();
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
     refusedWith(
       'Invalid',
       /^implement: the factory pipao hires `nemia` into it, which is not an agent here\. The agents are: implementer, /,
@@ -221,7 +221,7 @@ test('REFUSED: Nemia is never a hire: a factory that hires nemia into a step sta
 test('REFUSED: a start in a factory the store does not have is Missing, naming those it has', async () => {
   const { repo, build } = fresh();
   await assert.rejects(
-    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'nope' })),
+    async () => await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'nope' })),
     refusedWith('Missing', /^no factory nope in the store\. Its factories are: pipao\. Nothing was started\.$/),
   );
 });
@@ -267,7 +267,7 @@ const startedId = (lines: readonly string[]): string => lines[0].split(' ')[0];
 test('a run started in a factory names it on its record, as written to disk', async () => {
   const { repo, build } = fresh();
   hired();
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
   assert.equal(run.factory, 'pipao');
   assert.equal(readRun(run.id).factory, 'pipao');
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8')).factory, 'pipao');
@@ -280,9 +280,7 @@ test("REFUSED: a repository run on a repository outside its factory, naming the 
   const before = runsWritten();
   await assert.rejects(
     async () =>
-      await Effect.runPromise(
-        startRun({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' }),
-      ),
+      await runPlaced(startRun({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' })),
     (err: Error & { exitCode?: number; _tag?: string }) =>
       err._tag === 'Invalid' &&
       err.exitCode === 2 &&
@@ -291,9 +289,7 @@ test("REFUSED: a repository run on a repository outside its factory, naming the 
   );
   await assert.rejects(
     async () =>
-      await Effect.runPromise(
-        startRun({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' }),
-      ),
+      await runPlaced(startRun({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' })),
     (err: Error) => !/default factory/.test(err.message),
     "only the factory's own fix, never the default factory",
   );
@@ -339,7 +335,7 @@ test('a folder team started in a factory names it and works on no repository, wh
   const notes = path.join(path.dirname(build), 'notes');
   fs.mkdirSync(notes);
   fs.writeFileSync(path.join(notes, 'write.md'), '---\nworkspace: folder\nagent: implementer\n---\nWrite it.\n');
-  const run = await Effect.runPromise(startRun({ brief: 'a note', repo: ROOT, workflowDir: notes, factory: 'pipao' }));
+  const run = await runPlaced(startRun({ brief: 'a note', repo: ROOT, workflowDir: notes, factory: 'pipao' }));
   assert.equal(run.place?.kind, 'folder');
   assert.equal(run.factory, 'pipao');
   assert.equal(readRun(run.id).repo, undefined);
@@ -349,7 +345,7 @@ test('a run in the default factory — no --factory, or default — records no f
   const { build } = fresh();
   const other = aRepo();
   for (const factory of [undefined, 'default']) {
-    const run = await Effect.runPromise(
+    const run = await runPlaced(
       startRun({ brief: 'build it', repo: other, workflowDir: build, isolate: false, ...(factory ? { factory } : {}) }),
     );
     assert.equal('factory' in run, false, String(factory));
@@ -394,9 +390,7 @@ test("a card's factory: starts it in that factory, on its one repository, its wo
   attachWorkflow({ factory: 'other', workflow: 'build' });
   hired('other');
   aCard('over', '---\nfactory: pipao\n---\nBuild it.\n');
-  const over = await Effect.runPromise(
-    startFromInbox({ name: 'over', workflow: build, callerRepo: ROOT, isolate: false, factory: 'other' }),
-  );
+  const over = await runPlaced(startFromInbox({ name: 'over', workflow: build, callerRepo: ROOT, isolate: false, factory: 'other' }));
   assert.equal(over.run.factory, 'other');
   assert.equal(readRun(over.run.id).repo, other);
 });
@@ -408,7 +402,7 @@ test('a card of a factory with two repositories runs where it is started when th
   attachWorkflow({ factory: 'duo', workflow: 'build' });
   hired('duo');
   aCard('in-duo', '---\nfactory: duo\n---\nBuild it.\n');
-  const inside = await Effect.runPromise(startFromInbox({ name: 'in-duo', workflow: build, callerRepo: first, isolate: false }));
+  const inside = await runPlaced(startFromInbox({ name: 'in-duo', workflow: build, callerRepo: first, isolate: false }));
   assert.equal(readRun(inside.run.id).repo, first);
   assert.equal(inside.run.factory, 'duo');
 
@@ -416,7 +410,7 @@ test('a card of a factory with two repositories runs where it is started when th
   const before = runsWritten();
   const listed = [first, second].sort().join(', ');
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'outside-duo', workflow: build, callerRepo: ROOT, isolate: false })),
+    async () => await runPlaced(startFromInbox({ name: 'outside-duo', workflow: build, callerRepo: ROOT, isolate: false })),
     (err: Error & { exitCode?: number; _tag?: string }) =>
       err._tag === 'Invalid' &&
       err.exitCode === 2 &&
@@ -431,12 +425,12 @@ test("REFUSED: a card's factory: the store does not have, and one that does not 
   const before = runsWritten();
   const nosuch = aCard('nosuch', '---\nfactory: nosuch\n---\nBuild it.\n');
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'nosuch', workflow: build, callerRepo: repo, isolate: false })),
+    async () => await runPlaced(startFromInbox({ name: 'nosuch', workflow: build, callerRepo: repo, isolate: false })),
     refusedWith('Missing', /^no factory nosuch in the store\. Its factories are: pipao\. Nothing was started\.$/),
   );
   const unattached = aCard('unattached', '---\nfactory: pipao\n---\nBuild it.\n');
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'unattached', workflow: build, callerRepo: repo, isolate: false })),
+    async () => await runPlaced(startFromInbox({ name: 'unattached', workflow: build, callerRepo: repo, isolate: false })),
     refusedWith(
       'Invalid',
       /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: nemia factory attach pipao build\. Nothing was started\.$/,
@@ -450,7 +444,7 @@ test('with WF_DEFAULT_FACTORY_STARTS=1, a card that names no factory records non
   const { build } = fresh();
   const other = aRepo();
   aCard('no-key', 'Build it.\n');
-  const { run } = await Effect.runPromise(startFromInbox({ name: 'no-key', workflow: build, callerRepo: other, isolate: false }));
+  const { run } = await runPlaced(startFromInbox({ name: 'no-key', workflow: build, callerRepo: other, isolate: false }));
   assert.equal('factory' in readRun(run.id), false);
   assert.equal(readRun(run.id).repo, other);
 });
@@ -461,13 +455,13 @@ test('REFUSED: a card that says factory: default, or is started with --factory d
   const before = runsWritten();
   const card = aCard('by-name', '---\nfactory: default\n---\nBuild it.\n');
   await assert.rejects(
-    async () => await Effect.runPromise(startFromInbox({ name: 'by-name', workflow: build, callerRepo: other, isolate: false })),
+    async () => await runPlaced(startFromInbox({ name: 'by-name', workflow: build, callerRepo: other, isolate: false })),
     refusedWith('Invalid', /^`default` is the default factory: .* Name a factory — `factory: <name>` in .*by-name\.md, one of pipao\./),
   );
   aCard('plain', 'Build it.\n');
   await assert.rejects(
     async () =>
-      await Effect.runPromise(
+      await runPlaced(
         startFromInbox({ name: 'plain', workflow: build, callerRepo: other, isolate: false, factory: 'default', fix: '--factory <name>' }),
       ),
     refusedWith(

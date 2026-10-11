@@ -4,18 +4,9 @@
  * `trialMerges`); and what an implementation that runs processes shares: the stop of a process group at a deadline (`stopGroup`), and
  * the words of an ask that was not heard (`stoppedWords`, `threwWords`).
  */
-import { Context, type Effect, Layer, Schema } from 'effect';
-import type {
-  Inventory,
-  Opened,
-  PlaceDeclared,
-  PlaceOutcome,
-  PlaceRequests,
-  PlaceVerb,
-  Standing,
-  Trials,
-  Unread,
-} from './place.ts';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import { Context, Effect, Layer, Schedule, Schema } from 'effect';
+import type { Inventory, Opened, PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb, Standing, Trials, Unread } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { RepositoryRun } from '../record/record.ts';
 
@@ -183,3 +174,29 @@ export function trialMerges(repo: string, trials: readonly { readonly onto: stri
     trials: trials.map(() => ({ unknown })),
   };
 }
+
+/** Whether the group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. */
+const emptiedLater = (pgid: number): Effect.Effect<boolean> =>
+  Effect.sync(() => !signalGroup(pgid, 0)).pipe(
+    Effect.repeat({ until: (gone) => gone, schedule: Schedule.spaced(STOP_POLL_MS) }),
+    Effect.timeoutOrElse({ duration: STOP_GRACE_MS, orElse: () => Effect.sync(() => !signalGroup(pgid, 0)) }),
+  );
+
+/**
+ * A child that has not ended stopped, with what it started: the group it leads sent SIGTERM, then SIGKILL when a process of it outlives
+ * `STOP_GRACE_MS`, and its pipes closed. Answers whether it had to kill.
+ */
+export const stopChild = (child: ChildProcessWithoutNullStreams): Effect.Effect<boolean> =>
+  Effect.gen(function* () {
+    const pgid = child.pid;
+    if (pgid === undefined) return false;
+    let killed = false;
+    if (signalGroup(pgid, 'SIGTERM') && !(yield* emptiedLater(pgid))) {
+      signalGroup(pgid, 'SIGKILL');
+      yield* emptiedLater(pgid);
+      killed = true;
+    }
+    child.stdout.destroy();
+    child.stderr.destroy();
+    return killed;
+  });

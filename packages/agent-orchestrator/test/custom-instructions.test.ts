@@ -16,11 +16,13 @@ import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } fr
 import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
-import { Effect } from 'effect';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-custom-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
@@ -134,7 +136,7 @@ test('`nemia start` freezes the custom instructions with the step: an edit or a 
   const repo = aRepo();
   customFor('implementer', 'Before: French.\n');
   try {
-    const run = await Effect.runPromise(startRun({ brief: 'freeze the words', repo, workflowDir: path.join(team, 'dev') }));
+    const run = await runPlaced(startRun({ brief: 'freeze the words', repo, workflowDir: path.join(team, 'dev') }));
     customFor('implementer', 'After: German.\n');
     const frozen = () => (readRun(run.id).workflow ?? []).find((s) => s.name === 'implement')!;
     const prompt = () => fs.readFileSync(path.join(agentFilesDir(run, 'implement'), 'prompt.md'), 'utf8');
@@ -145,7 +147,7 @@ test('`nemia start` freezes the custom instructions with the step: an edit or a 
       fs.rmSync(CUSTOM, { recursive: true, force: true });
     }
     customFor('implementer', 'After: German.\n');
-    const later = await Effect.runPromise(startRun({ brief: 'the later words', repo, workflowDir: path.join(team, 'dev') }));
+    const later = await runPlaced(startRun({ brief: 'the later words', repo, workflowDir: path.join(team, 'dev') }));
     const step = (readRun(later.id).workflow ?? []).find((s) => s.name === 'implement')!;
     assert.equal(step.agent?.customInstructions, 'After: German.');
     assert.ok(fs.readFileSync(path.join(agentFilesDir(later, 'implement'), 'prompt.md'), 'utf8').includes('After: German.'));
@@ -180,7 +182,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
       plant();
       const before = runsIn();
       await assert.rejects(
-        async () => await Effect.runPromise(startRun({ brief: what, repo, workflowDir: path.join(team, 'dev') })),
+        async () => await runPlaced(startRun({ brief: what, repo, workflowDir: path.join(team, 'dev') })),
         (err: Error & { exitCode?: number }) => {
           assert.match(err.message, said, what);
           assert.ok(err.message.includes(path.join(CUSTOM, 'implementer.md')), `${what}: names the file: ${err.message}`);
@@ -189,7 +191,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
         },
       );
       assert.equal(runsIn(), before, `${what}: nothing started`);
-      const other = await Effect.runPromise(startRun({ brief: `${what}, another agent`, repo, workflowDir: solo }));
+      const other = await runPlaced(startRun({ brief: `${what}, another agent`, repo, workflowDir: solo }));
       assert.equal((readRun(other.id).workflow ?? [])[0]?.agent?.name, 'reviewer', what);
       fs.rmSync(CUSTOM, { recursive: true, force: true });
     }

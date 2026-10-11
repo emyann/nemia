@@ -15,6 +15,7 @@ import type { Run } from '../record/record.ts';
 import { PHASES, type PassCost } from './meter.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
+import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-meter-');
 const RUNS = path.join(ROOT, 'runs');
@@ -24,7 +25,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { lastPassCost, startRun, tickRun, runWith } = await import('../runner.ts');
+const { lastPassCost, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { EngineService } = await import('../runtime-client.ts');
 const { recentFile, recentPasses } = await import('../daemon/daemon.store.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
@@ -136,7 +139,7 @@ const oneStep = (() => {
 const started = async (n: number): Promise<Run[]> => {
   const runs: Run[] = [];
   for (let k = 0; k < n; k++)
-    runs.push(await Effect.runPromise(startRun({ brief: `run ${k}`, repo: aRepo(), workflowDir: oneStep, isolate: false })));
+    runs.push(await runPlaced(startRun({ brief: `run ${k}`, repo: aRepo(), workflowDir: oneStep, isolate: false })));
   return runs;
 };
 
@@ -459,7 +462,12 @@ test("a pass's metrics go into the registry of whoever runs it: its time, each p
   const registry = new Map();
   const own = <A, E>(program: import('effect').Effect.Effect<A, E>) =>
     Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
-  await own(tickRun({}).pipe(Effect.provide(EngineService.layer(fake({ queued: ['t-q', 't-r'], running: { claude: 3 } })))));
+  await own(
+    tickRun({}).pipe(
+      Effect.provide(gitPlaceLayer),
+      Effect.provide(EngineService.layer(fake({ queued: ['t-q', 't-r'], running: { claude: 3 } }))),
+    ),
+  );
   const snapshot = await own(Metric.snapshot);
   const one = (id: string) => snapshot.filter((m) => m.id === id);
   assert.equal((one('pass.duration')[0].state as { count: number }).count, 1);

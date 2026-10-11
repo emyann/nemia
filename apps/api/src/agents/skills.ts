@@ -151,7 +151,8 @@ function yourAgentsSkills(home: string): Array<[string, string[]]> {
  * in yours with the package's refusal as its `error`.
  */
 export async function listSkills(
-  e: Engine['Service'], placeService: PlaceService['Service'],
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
   repo: string,
   home: string,
   shipped: string = SHIPPED_SKILLS,
@@ -364,7 +365,8 @@ export function skillUsers(dir: string, name: string, repo: string): SkillUser[]
  * read as a draft, leaves `draft` null, the row saying why, and the page is filled from the body.
  */
 export async function skillDetail(
-  e: Engine['Service'], placeService: PlaceService['Service'],
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
   from: SkillSource,
   name: string,
   repo: string,
@@ -426,7 +428,8 @@ function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: st
  * is the skill's name on the path, none for a skill made. Throws what the package refuses, which `app.onError` answers by its kind.
  */
 async function written(
-  e: Engine['Service'], placeService: PlaceService['Service'],
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
   change: SkillChange,
   { version, name }: { version: string | null; name?: string },
   repo: string,
@@ -518,7 +521,11 @@ export const skills = new Hono<ApiEnv>()
         return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
       }
       if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
-      const copied = (await runPlaced(placeService, e, WRITE.handler({ from, copy: name, shipped: SHIPPED_SKILLS }, undefined, home))) as SkillCopied;
+      const copied = (await runPlaced(
+        placeService,
+        e,
+        WRITE.handler({ from, copy: name, shipped: SHIPPED_SKILLS }, undefined, home),
+      )) as SkillCopied;
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);

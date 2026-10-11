@@ -24,7 +24,7 @@ import { scratch } from '../../test/scratch.ts';
 import type { Said } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { engine, list, runStore, runWith, sayRun, type RunSummary } from 'agent-orchestrator';
+import { engine, list, runStore, runShipped as runWith, sayRun, type RunSummary } from 'agent-orchestrator';
 
 const tmp = (label: string) => scratch(`nemia-api-say-${label}-`);
 

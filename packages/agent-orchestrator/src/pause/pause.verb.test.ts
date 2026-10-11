@@ -11,13 +11,16 @@ import { scratch } from '../../test/scratch.ts';
 import type { Workflow } from '../step/step.ts';
 import type { FinishingView } from './pause.ts';
 import { promised } from '../../test/promised.ts';
+import { runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-pause-now-');
 process.env.WF_ROOT = ROOT;
 const { nowRead, pauseNow } = await import('./pause.verb.ts');
 const { askFile, asksDir } = await import('../record/record.store.ts');
 const { pauseFile, putPause, readPause, resumePause } = await import('./pause.store.ts');
-const { runWith } = await import('../runtime-client.ts');
+const { runWith: runEngine } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 
 const WORKFLOW: Workflow[] = [
   { name: 'implement', after: [], body: 'Implement it.', check: 'npm test' },

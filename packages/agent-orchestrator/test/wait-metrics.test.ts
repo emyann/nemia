@@ -19,6 +19,7 @@ import { Effect, Metric, References } from 'effect';
 import { Engine as RuntimeEngine, nameFor, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { scratch } from './scratch.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-wait-metrics-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -26,7 +27,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '10';
 process.env.WF_MAX_CONCURRENT = '10';
-const { approveRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
+const { approveRun, runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
@@ -110,7 +113,7 @@ const restarted = async () => {
 /** `n` passes of the tick, as the daemon makes them, its metrics in the test's registry. */
 const tick = async (n = 1) => {
   for (let i = 0; i < n; i++)
-    await Effect.runPromise(
+    await runPlaced(
       tickRun({ memo }).pipe(
         Effect.provide(EngineService.layer(engine)),
         Effect.provideService(Metric.MetricRegistry, registry),
@@ -145,7 +148,7 @@ const tickUntil = async (ready: () => boolean, n = 6) => {
 };
 
 test("a session's queue, a check's run and a gate's wait are each recorded once, across restarts of the tick", async () => {
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   assert.deepEqual(readRun(run.id).gatesTimed, [], 'started with no gate timed');
   const plan = `${run.id}-plan`;
   await tickUntil(() => sessions.has(nameFor(plan, 1)));
@@ -193,7 +196,7 @@ fs.writeFileSync(path.join(ALONE, 'plan.md'), '---\nplace: git\ngate: true\n---\
 
 test('a gate approved with nothing after it, on passes that file nothing, is recorded once and marked on disk', async () => {
   const before = await counted('step.gate.wait');
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: ALONE, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: ALONE, isolate: false }));
   const plan = `${run.id}-plan`;
   await tickUntil(() => sessions.has(nameFor(plan, 1)));
   sign(plan);

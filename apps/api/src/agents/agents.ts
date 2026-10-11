@@ -307,7 +307,9 @@ export const agents = new Hono<ApiEnv>()
       const { from, name } = c.req.param();
       const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const { agent } = (await runPlaced(placeService, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as { agent: AgentReading | null };
+      const { agent } = (await runPlaced(placeService, e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as {
+        agent: AgentReading | null;
+      };
       if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       return c.json(listingOf(agent, repo, home));
     }),
@@ -408,7 +410,11 @@ export const agents = new Hono<ApiEnv>()
           `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['brief']))}.`,
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      const run = (await runPlaced(placeService, e, TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home))) as AgentTried;
+      const run = (await runPlaced(
+        placeService,
+        e,
+        TRY.handler({ from, name, brief: read.body.brief, repo }, undefined, home),
+      )) as AgentTried;
       return c.json({ id: run.id } satisfies AgentTried, 201);
     }),
   )
@@ -449,7 +455,8 @@ type AgentAt = { from: string; repo: string; home: string };
  * answers by its kind, and any other error.
  */
 async function saved(
-  e: Engine['Service'], placeService: PlaceService['Service'],
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
   { from, repo, home }: AgentAt,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
   ok: 200 | 201,

@@ -9,7 +9,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { failedWords, git, gitSays, isDirectory, readInclude, refusalLines, refused, type Asking, type Refusal, type Reply } from '../git.ts';
+import {
+  failedWords,
+  git,
+  gitSays,
+  isDirectory,
+  readInclude,
+  refusalLines,
+  refused,
+  type Asking,
+  type Refusal,
+  type Reply,
+} from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The identity a merge commit of the run's is made under. */

@@ -27,7 +27,7 @@ import {
   passStanding,
   restingRead,
   runStore,
-  runWith,
+  runShipped as runWith,
   type RunSummary,
   standingReader,
   standingSnapshot,

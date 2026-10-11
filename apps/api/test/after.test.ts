@@ -21,7 +21,17 @@ import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { decideRun, engine, list, passStanding, runStore, runWith, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
+import {
+  decideRun,
+  engine,
+  list,
+  passStanding,
+  runStore,
+  runShipped as runWith,
+  type RunSummary,
+  waitAdvice,
+  waitWord,
+} from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
 

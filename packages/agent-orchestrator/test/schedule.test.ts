@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
 import { promised } from './promised.ts';
+import { runOver } from './placed.ts';
 
 const ROOT = scratch('wf-schedule-');
 
@@ -19,7 +20,8 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { addFactory, attachWorkflow, setSchedule, tickRun, runWith } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, setSchedule, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
 const { main } = await import('../src/cli/main.ts');

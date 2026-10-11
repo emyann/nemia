@@ -108,7 +108,8 @@ function* presentAt(repo: string, rev: string, paths: readonly string[]): Asking
 /** The text of each path of `paths` at `rev`, or null where it has no file. */
 function* textsAt(repo: string, rev: string, paths: readonly string[]): Asking<Record<string, string | null>> {
   const texts: Record<string, string | null> = {};
-  for (const p of paths) texts[p] = (yield* kindAt(repo, rev, p)) === 'blob' ? yield* read(repo, ['cat-file', 'blob', `${rev}:${p}`]) : null;
+  for (const p of paths)
+    texts[p] = (yield* kindAt(repo, rev, p)) === 'blob' ? yield* read(repo, ['cat-file', 'blob', `${rev}:${p}`]) : null;
   return texts;
 }
 

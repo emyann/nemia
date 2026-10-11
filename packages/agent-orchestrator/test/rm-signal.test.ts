@@ -10,14 +10,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { Effect } from 'effect';
 import { nodeChild } from './child.ts';
 import { scratch } from './scratch.ts';
+import { runGiven } from './placed.ts';
 
 const DIR = scratch('wf-rm-signal-');
 const STORE = path.join(DIR, 'store');
 process.env.WF_ROOT = STORE;
 const { startRun } = await import('../src/start/start.verb.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { markCancelled } = await import('../src/record/record.store.ts');
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -62,7 +64,7 @@ async function aCancelledRun() {
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
   const workflowDir = fs.mkdtempSync(path.join(DIR, 'one-'));
   fs.writeFileSync(path.join(workflowDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir }));
+  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
   const wt = path.join(STORE, 'worktrees', run.id, 'implement');
   git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/implement`, wt);
   markCancelled(run.id);

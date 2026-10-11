@@ -21,6 +21,7 @@ import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
+import { runGiven, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-feed-');
 const RUNS = path.join(ROOT, 'runs');
@@ -30,8 +31,21 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { approveRun, cancelRun, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, startRun, tickRun, watchFeed, runWith } =
-  await import('../runner.ts');
+const {
+  approveRun,
+  cancelRun,
+  feedCursorRefusal,
+  feedFile,
+  freshFeedMemo,
+  readFeed,
+  startRun,
+  tickRun,
+  watchFeed,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const store = await import('./feed.store.ts');
 /** The lines the feed's writer wrote (`recordFeed`), as a pass hands it what it judged. */
 const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
@@ -134,7 +148,7 @@ const gated = (() => {
 })();
 
 const started = async (brief: string): Promise<Run> =>
-  await Effect.runPromise(startRun({ brief, repo: aRepo(), workflowDir: gated, isolate: false }));
+  await runPlaced(startRun({ brief, repo: aRepo(), workflowDir: gated, isolate: false }));
 
 /** Every line in the feed, read off the file as a reader with cursor 0 would. */
 const lines = (): RunLine[] => readFeed(0).lines.filter(isRunLine);
@@ -243,7 +257,7 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   emptyStore();
   const b = board();
   const repo = aRepo();
-  const run = await Effect.runPromise(startRun({ brief: 'the ship gate', repo, workflowDir: ending }));
+  const run = await runPlaced(startRun({ brief: 'the ship gate', repo, workflowDir: ending }));
   await runWith(b.e, tickRun());
   const branch = readRun(run.id).steps.implement.branch!;
   const git = (...args: string[]) =>
@@ -266,7 +280,7 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'nemia decide says the same run awaits approval');
   assert.doesNotMatch(decided, /FAILED/, 'and that nothing failed');
 
-  const broke = await Effect.runPromise(startRun({ brief: 'the break', repo: aRepo(), workflowDir: ending }));
+  const broke = await runPlaced(startRun({ brief: 'the break', repo: aRepo(), workflowDir: ending }));
   await runWith(b.e, tickRun());
   b.set(`${broke.id}-implement`, 'failed');
   for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
@@ -311,9 +325,7 @@ test('REFUSED: finished runs whose notes are worded anew, as a new denied: part 
   emptyStore();
   const b = board();
   const runs = await Promise.all(
-    ['one', 'two', 'three'].map(
-      async (brief) => await Effect.runPromise(startRun({ brief, repo: aRepo(), workflowDir: ungated, isolate: false })),
-    ),
+    ['one', 'two', 'three'].map(async (brief) => await runPlaced(startRun({ brief, repo: aRepo(), workflowDir: ungated, isolate: false }))),
   );
   await runWith(b.e, tickRun());
   for (const r of runs) b.set(`${r.id}-plan`, 'succeeded', SIGNED);
@@ -348,7 +360,7 @@ test('REFUSED: finished runs whose notes are worded anew, as a new denied: part 
 test("a step whose attempt ends with a new denial says it on the pass that reads it ended, as the run finishes: no rest hides a step's own end", async () => {
   emptyStore();
   const b = board();
-  const run = await Effect.runPromise(startRun({ brief: 'the late denial', repo: aRepo(), workflowDir: ungated, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'the late denial', repo: aRepo(), workflowDir: ungated, isolate: false }));
   await runWith(b.e, tickRun());
   b.set(`${run.id}-plan`, 'succeeded', SIGNED);
   for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());

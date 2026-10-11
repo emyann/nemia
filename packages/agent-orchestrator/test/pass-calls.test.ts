@@ -17,6 +17,7 @@ import type { Run, TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-pass-calls-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -25,7 +26,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, cancelRun, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, approveRun, cancelRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { meteredEngine } = await import('../src/meter/meter.verb.ts');
@@ -62,7 +65,7 @@ const folder = (steps: Record<string, string>, extra: Record<string, string> = {
 
 /** `nemia start` over a fresh repository, the steps working in its checkout unless `isolate`, each then in a worktree of its own. */
 const started = async (dir: string, isolate = false): Promise<Run> =>
-  await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate }));
+  await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate }));
 
 /**
  * An engine board a test settles by hand, which writes down each call made of it — its verb and the task it names — in order (`calls`).

@@ -17,8 +17,9 @@
  * **A pure file reaches nothing outside the process**: no disk, no process, no network (`http`, `https`, `net`), nothing of the machine
  * (`os`), bare or as `node:` (`IMPURE`), and it reads neither `process.env` nor `fetch` outside its comment lines (`globalsIn`).
  *
- * **A place skill's script stands alone** (`placeBreaks`): it imports node's built-ins and the scripts beside it in its own `scripts/`
- * folder, and nothing else, since node runs it as it is.
+ * **A place's code stands beside the package, behind one door** (`placeBreaks`): a file under `place/<name>/` imports node's built-ins,
+ * `effect`, the files of its own place, and what a place is (`PLACE_REACHES`, the files of `src/place/` that say it), and nothing else; and
+ * of `src` and `bin`, one file alone imports a place's code, `PLACE_DOOR`, so every other file asks the place it is given.
  *
  * **The runtime is reached through one client**, `CLIENT`, `runtime-client.ts`: of the package's files, it alone imports agent-runtime,
  * a type included; every controller beneath the CLI imports it, or imports a controller that reaches it, and it imports no controller.
@@ -98,13 +99,13 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/skills/read.store.ts', 
  * (`skills/read.store.ts`) among it, then the agents read on it with a person's custom instructions (`agents/read.store.ts`), the folders
  * on both (`folder.store.ts`), a run's steps on the folders (`steps.store.ts`), the run store on them and the store's pause on the bottom,
  * the schedules' cron and tries on the run store, a templated factory's tree, base and status on it (`applied.store.ts`), the factories on
- * the run store and both, and the run store's files on them (`runStore`), the run's place on the skills read (`place.store.ts`) and its
- * verbs run off the event loop on it (`place-async.store.ts`), both counting on the pass's meter (`tally.store.ts`), then a step's
- * workspace, cut by the place, a workflow folder written on the run store, the two reads and the factories, and where a run looks and a
- * place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as the place says, on the
- * place (`changes.store.ts`), and where the branches stood on the run store and the place (`standing.store.ts`), and a run's result
- * branches (`branches.store.ts`), which a landing reads beside its place (`landing.store.ts`). No other store file is imported by another,
- * so the tree has no cycle; outside the store, the client and the controllers beneath the CLI alone import them.
+ * the run store and both, and the run store's files on them (`runStore`), what a place is and how its processes are stopped, on no store
+ * file (`place.store.ts`), then a step's workspace, cut by the place, a workflow folder written on the run store, the two reads and the
+ * factories, and where a run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch
+ * changed, as the place says, on the place (`changes.store.ts`), and where the branches stood on the run store and the place
+ * (`standing.store.ts`), and a run's result branches (`branches.store.ts`), which a landing reads beside its place (`landing.store.ts`). No
+ * other store file is imported by another, so the tree has no cycle; outside the store, the client and the controllers beneath the CLI
+ * alone import them.
  */
 const STORE_SHARED: Record<string, readonly string[]> = {
   'src/record/places.store.ts': [],
@@ -120,14 +121,12 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/applied/applied.store.ts': ['src/record/record.store.ts'],
   'src/factory/factory.store.ts': ['src/record/record.store.ts', 'src/schedule/schedule.store.ts', 'src/applied/applied.store.ts'],
   'src/record/files.store.ts': ['src/record/record.store.ts', 'src/pause/pause.store.ts'],
-  'src/place/place.store.ts': ['src/skills/read.store.ts', 'src/meter/tally.store.ts'],
-  'src/place/place-async.store.ts': ['src/place/place.store.ts', 'src/meter/tally.store.ts'],
+  'src/place/place.store.ts': [],
   'src/workspace/worktree.store.ts': [
     'src/record/record.store.ts',
     'src/record/places.store.ts',
     'src/meter/tally.store.ts',
     'src/place/place.store.ts',
-    'src/place/place-async.store.ts',
   ],
   'src/folder/write.store.ts': [
     'src/record/record.store.ts',
@@ -381,31 +380,49 @@ function cycles(sources: Sources): string[] {
   return [...found].sort();
 }
 
-/** Each script of a place skill (`place/<name>/scripts/`, in folders too) with its imports as written, unresolved. */
+/** Each file of a place's code (`place/<name>/`, in folders too) with its imports, the relative ones resolved from the package. */
 const placeSources = (): Sources => {
   const dir = path.join(PKG, 'place');
   return Object.fromEntries(
     fs
       .readdirSync(dir, { recursive: true, encoding: 'utf8' })
       .map((f) => `place/${f.split(path.sep).join('/')}`)
-      .filter((f) => /^place\/[^/]+\/scripts\/.+\.ts$/.test(f))
-      .map((f) => [f, importsIn(fs.readFileSync(path.join(PKG, f), 'utf8'))]),
+      .filter((f) => /^place\/[^/]+\/.+\.ts$/.test(f) && !f.endsWith('.test.ts'))
+      .map((f) => [f, importsIn(fs.readFileSync(path.join(PKG, f), 'utf8')).map((m) => resolved(f, m))]),
   );
 };
 
 /** A node built-in, bare or as `node:`. */
 const isBuiltin = (m: string): boolean => m.startsWith('node:') || builtinModules.includes(m);
 
+/** The files of `src` a place's code may import: what a place is, its contract and its service. */
+const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
+
+/** The one file of `src` that imports a place's code, and gives it to whoever composes a program. */
+const PLACE_DOOR = 'src/place/shipped.store.ts';
+
 /**
- * A place skill's script stands alone, run by node as it is: it imports node's built-ins and the scripts beside it in its own folder,
- * never a package, the package's source or another skill's script.
+ * A place's code stands beside the package: a file of `place/<name>/` imports node's built-ins, `effect`, the files of its own place and
+ * `PLACE_REACHES`, never another package, another place or the rest of `src`; and of `packageFiles`, the package's `src` and `bin`,
+ * `PLACE_DOOR` alone imports a file under `place/`.
  */
-function placeBreaks(sources: Sources): string[] {
-  return Object.entries(sources).flatMap(([file, imports]) =>
+function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
+  const own = (file: string) => `${file.split('/').slice(0, 2).join('/')}/`;
+  const inPlace = Object.entries(sources).flatMap(([file, imports]) =>
     imports
-      .filter((m) => !isBuiltin(m) && !/^\.\/[^/]+\.ts$/.test(m))
-      .map((m) => `${file} imports ${m}: a place script imports node's built-ins and the scripts beside it alone`),
+      .filter((m) => !isBuiltin(m) && !isEffect(m) && !m.startsWith(own(file)) && !PLACE_REACHES.includes(m))
+      .map(
+        (m) => `${file} imports ${m}: a place's code imports node's built-ins, effect, its own files and ${PLACE_REACHES.join(', ')} alone`,
+      ),
   );
+  const throughDoor = Object.entries(packageFiles).flatMap(([file, imports]) =>
+    file === PLACE_DOOR
+      ? []
+      : imports
+          .filter((m) => m.startsWith('place/'))
+          .map((m) => `${file} imports ${m}: ${PLACE_DOOR} alone imports a place's code, and every other file asks the place it is given`),
+  );
+  return [...inPlace, ...throughDoor];
 }
 
 /** The package's sources with `file`'s imports changed by `change`: a copy, so each plant breaks one thing. */
@@ -621,25 +638,44 @@ test('REFUSED: a pure file that reaches the network or the machine, reads the en
   assert.deepEqual(impurities(adding('src/wait/wait.verb.ts', 'global:process.env')), [], 'a controller reads the environment');
 });
 
-test('the scripts of a place skill import node built-ins and the scripts beside them alone', () => {
+test("a place's code imports node built-ins, effect, its own files and what a place is alone, and one file of src imports it", () => {
   const sources = placeSources();
-  assert.ok('place/git/scripts/contract.ts' in sources, `the scan read ${Object.keys(sources).join(', ') || 'no script'}`);
-  assert.ok(sources['place/git/scripts/land.ts'].includes('./contract.ts'), 'and read their imports');
-  assert.deepEqual(placeBreaks(sources), []);
+  assert.ok('place/git/git.ts' in sources, `the scan read ${Object.keys(sources).join(', ') || 'no file'}`);
+  assert.ok(sources['place/git/verbs/land.ts'].includes('place/git/git.ts'), 'and read their imports');
+  assert.ok(sources['place/git/git.ts'].includes('src/place/place.store.ts'));
+  assert.ok(packageSources()[PLACE_DOOR].includes('place/git/place.ts'), 'the door imports the git place');
+  assert.deepEqual(placeBreaks(sources, packageSources()), []);
 });
 
-test('REFUSED: a place script that imports a package, the package source, another skill or a folder beneath it', () => {
-  const at = 'place/git/scripts/contract.ts';
+test("REFUSED: a place's file that imports a package, the rest of src or another place, and a file of src but the door that imports a place", () => {
+  const at = 'place/git/git.ts';
   const plant = (m: string): Sources => ({ ...placeSources(), [at]: [...placeSources()[at], m] });
-  for (const m of ['effect', 'agent-runtime', 'agent-orchestrator/run', '../../../src/run.ts', '../../other/scripts/x.ts', './sub/x.ts'])
+  for (const m of [
+    'agent-runtime',
+    'agent-orchestrator/run',
+    'src/run.ts',
+    'src/runtime-client.ts',
+    'src/tick/tick.verb.ts',
+    'place/other/x.ts',
+  ])
     assert.deepEqual(placeBreaks(plant(m)), [
-      `${at} imports ${m}: a place script imports node's built-ins and the scripts beside it alone`,
+      `${at} imports ${m}: a place's code imports node's built-ins, effect, its own files and ${PLACE_REACHES.join(', ')} alone`,
     ]);
-  for (const m of ['node:fs', 'fs', 'path', 'node:child_process', './open.ts'])
+  for (const m of ['node:fs', 'fs', 'path', 'node:child_process', 'effect', 'place/git/verbs/open.ts', 'src/place/place.ts'])
     assert.deepEqual(placeBreaks(plant(m)), [], `${m} is let through`);
-  assert.deepEqual(placeBreaks({ 'place/other/scripts/x.ts': ['../../git/scripts/contract.ts'] }), [
-    "place/other/scripts/x.ts imports ../../git/scripts/contract.ts: a place script imports node's built-ins and the scripts beside it alone",
-  ]);
+  for (const file of [
+    'src/tick/tick.verb.ts',
+    'src/place/place.store.ts',
+    'src/place/landing.store.ts',
+    'src/cli/main.ts',
+    'bin/nemia.ts',
+  ]) {
+    assert.ok(file in packageSources(), file);
+    assert.deepEqual(placeBreaks(placeSources(), adding(file, 'place/git/place.ts')), [
+      `${file} imports place/git/place.ts: ${PLACE_DOOR} alone imports a place's code, and every other file asks the place it is given`,
+    ]);
+  }
+  assert.deepEqual(placeBreaks(placeSources(), unimported('place/git/place.ts')), [], 'and a package that imports none breaks nothing');
 });
 
 test('store files import no runtime, no controller and not the client, load as a tree beneath the controllers, and only the client and the controllers beneath the CLI import them', () => {
@@ -693,7 +729,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/factory/factory.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/skills/skills.store.ts', 'src/agents/agents.store.ts')), [
-    'src/skills/skills.store.ts imports src/agents/agents.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/place/place-async.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
+    'src/skills/skills.store.ts imports src/agents/agents.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/record/files.store.ts', 'src/workspace/worktree.store.ts')), [
     'src/record/files.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/pause/pause.store.ts',
@@ -703,7 +739,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   ]);
   assert.ok('src/place/place.store.ts' in packageSources());
   assert.deepEqual(treeBreaks(adding('src/place/place.store.ts', 'src/branches/branches.store.ts')), [
-    'src/place/place.store.ts imports src/branches/branches.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts, src/meter/tally.store.ts',
+    'src/place/place.store.ts imports src/branches/branches.store.ts, which the tree does not let it: it is the bottom, and imports no store file',
   ]);
   assert.deepEqual(treeBreaks(adding('src/branches/branches.store.ts', 'src/place/place.store.ts')), [
     'src/branches/branches.store.ts imports src/place/place.store.ts, which the tree does not let it: of the store it imports src/meter/tally.store.ts, src/record/files.store.ts, src/record/record.store.ts, src/workspace/worktree.store.ts',
@@ -718,7 +754,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/agents.store.ts is a store file and imports src/tick/tick.verb.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/inbox/inbox.store.ts')), [
-    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/place/place-async.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
+    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/record/steps.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/schedule/schedule.store.ts, src/applied/applied.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/standing/standing.store.ts',
   ]);
   assert.deepEqual(treeBreaks(unimported('src/agents/agents.store.ts')), [
     "src/agents/agents.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",

@@ -225,7 +225,11 @@ export const inbox = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const asked = filingOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-      const { card, file } = await runPlaced(placeService, e, INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo }));
+      const { card, file } = await runPlaced(
+        placeService,
+        e,
+        INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo }),
+      );
       return c.json(
         { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
         201,

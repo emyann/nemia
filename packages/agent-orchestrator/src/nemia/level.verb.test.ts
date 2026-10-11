@@ -10,13 +10,16 @@ import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
+import { runOver } from '../../test/placed.ts';
 
 process.env.WF_ROOT = scratch('wf-nemia-reach-');
 const { LEVEL } = await import('./level.verb.ts');
 const { writeLevel } = await import('./level.store.ts');
 const { bridgeOf } = await import('../views/views.verb.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
-const { engineOf, runWith } = await import('../runtime-client.ts');
+const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
 
 const TASK = 'nemia-20261006T080000Z';
 const LINK = 'https://example.test/code/session_0123';

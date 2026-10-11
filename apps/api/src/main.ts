@@ -93,7 +93,9 @@ else
       repo: repoOf(process.env, running),
       holder: 'api',
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
-    }).pipe(Effect.scoped, Effect.provideService(FeedHub, hub),
+    }).pipe(
+      Effect.scoped,
+      Effect.provideService(FeedHub, hub),
       Effect.provideService(PlaceService, place!),
       Effect.provide(telemetryLayer(process.env)),
     ),

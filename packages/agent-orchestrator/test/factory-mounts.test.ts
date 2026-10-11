@@ -18,13 +18,24 @@ import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
 import { promised } from './promised.ts';
-import { Effect } from 'effect';
 import { readsMounts } from '../src/filed/filed.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const {
+  addFactory,
+  advanceRun,
+  attachWorkflow,
+  hireAgent,
+  retryRun,
+  startRun,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { artifactsDir, inputsDir, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -137,7 +148,7 @@ test("factoryMounts: a factory's repositories as path.resolve spells them, sorte
 
 test('a run in a factory freezes its other repositories on its record, read-only, as written to disk and read back', async () => {
   const { repos, loop } = fresh();
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[1], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[1], workflowDir: loop, isolate: false, factory: 'trio' }));
   assert.deepEqual(run.mounts, readOnly(repos[0], repos[2]));
   assert.deepEqual(readRun(run.id).mounts, readOnly(repos[0], repos[2]));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8')).mounts, readOnly(repos[0], repos[2]));
@@ -151,7 +162,7 @@ test('a run in a factory freezes its other repositories on its record, read-only
 
 test('a folder team in a factory mounts every repository of it, having none of its own', async () => {
   const { repos, notes } = fresh();
-  const run = await Effect.runPromise(startRun({ brief: 'a note', repo: ROOT, workflowDir: notes, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'a note', repo: ROOT, workflowDir: notes, factory: 'trio' }));
   assert.equal(run.place?.kind, 'folder');
   assert.deepEqual(readRun(run.id).mounts, readOnly(...repos));
 });
@@ -167,7 +178,7 @@ test('a factory folder that is no directory at start is left out of the mounts, 
     out.join('\n'),
   );
   fs.rmSync(repos[1], { recursive: true });
-  const none = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const none = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   assert.equal('mounts' in readRun(none.id), false, 'none left: no key');
 });
 
@@ -178,7 +189,7 @@ test('a run in the default factory, or in a factory of one repository, mounts no
   hireAgent({ factory: 'solo', agent: 'implementer', step: 'loop/implement' });
   hireAgent({ factory: 'solo', agent: 'reviewer', step: 'loop/review' });
   for (const factory of [undefined, 'default', 'solo']) {
-    const run = await Effect.runPromise(
+    const run = await runPlaced(
       startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, ...(factory ? { factory } : {}) }),
     );
     assert.equal('mounts' in readRun(run.id), false, String(factory));
@@ -197,7 +208,7 @@ test('a run in the default factory, or in a factory of one repository, mounts no
 
 test('REFUSED: a record whose mounts are not mounts is unreadable, naming the field', async () => {
   const { repos, loop } = fresh();
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   const file = path.join(ROOT, 'runs', `${run.id}.json`);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), mounts: [{ path: 1 }] }));
   assert.throws(
@@ -209,7 +220,7 @@ test('REFUSED: a record whose mounts are not mounts is unreadable, naming the fi
 
 test("the frozen mounts are filed with a local step's first filing, a try and a round, and named on its brief; a later factory changes none", async () => {
   const { repos, loop } = fresh();
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   const frozen = readOnly(repos[1], repos[2]);
   fs.writeFileSync(path.join(ROOT, 'factories', 'trio.json'), `${JSON.stringify({ repos: [...repos, aRepo()] })}\n`);
   const b = board();
@@ -253,7 +264,7 @@ test("a step on a remote agent is filed no mounts, and its brief names none, a r
   fs.mkdirSync(asked);
   fs.writeFileSync(path.join(asked, 'ask.md'), '---\nplace: git\nharness: a2a:peer\n---\nAsk it.\n');
   attachWorkflow({ factory: 'trio', workflow: 'asked' });
-  const run = await Effect.runPromise(startRun({ brief: 'ask it', repo: repos[0], workflowDir: asked, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'ask it', repo: repos[0], workflowDir: asked, isolate: false, factory: 'trio' }));
   assert.deepEqual(run.mounts, readOnly(repos[1], repos[2]), 'the run mounts them');
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -277,8 +288,7 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
   const runs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
   const before = runs();
   await assert.rejects(
-    async () =>
-      await Effect.runPromise(startRun({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'trio' })),
+    async () => await runPlaced(startRun({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'trio' })),
     (err: Error & { _tag?: string }) =>
       err._tag === 'Invalid' &&
       err.message.includes(
@@ -291,7 +301,7 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
   addFactory({ name: 'solo', repos: [repos[0]] });
   attachWorkflow({ factory: 'solo', workflow: 'coded' });
   hireAgent({ factory: 'solo', agent: 'coder', step: 'coded/code' });
-  const run = await Effect.runPromise(startRun({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'solo' }));
+  const run = await runPlaced(startRun({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'solo' }));
   assert.equal('mounts' in run, false, 'with nothing to mount, the same step starts');
 });
 
@@ -307,7 +317,7 @@ test('REFUSED: a factory folder whose path a permission rule cannot name refuses
   const before = runs();
   let message = '';
   try {
-    await Effect.runPromise(startRun({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced' }));
+    await runPlaced(startRun({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced' }));
   } catch (err) {
     message = (err as Error).message;
   }
@@ -338,7 +348,7 @@ async function refusal(opts: Parameters<typeof startRun>[0]): Promise<string> {
   const before = runFiles();
   let failed: (Error & { _tag?: string }) | undefined;
   try {
-    await Effect.runPromise(startRun(opts));
+    await runPlaced(startRun(opts));
   } catch (err) {
     failed = err as Error & { _tag?: string };
   }
@@ -350,7 +360,7 @@ async function refusal(opts: Parameters<typeof startRun>[0]): Promise<string> {
 test("a step's `writable:` folder is filed writable for that step alone, on its first filing, a try and a round, and said on its brief and by nemia start", async () => {
   const { repos, loop } = fresh();
   writing(loop, path.basename(repos[1]));
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   assert.deepEqual(readRun(run.id).mounts, readOnly(repos[1], repos[2]), 'the record keeps the run read-only list');
   const writes = [
     { path: repos[1], readOnly: false },
@@ -395,7 +405,7 @@ test("a step's `writable:` folder is filed writable for that step alone, on its 
 test("a step's `writable:` that names the run's own repository mounts nothing more: that folder is its workspace", async () => {
   const { repos, loop } = fresh();
   writing(loop, path.basename(repos[0]));
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   assert.deepEqual(readRun(run.id).mounts, readOnly(repos[1], repos[2]));
 });
 
@@ -488,7 +498,7 @@ test("a step's `reads: inbox` is filed the store's inbox read-only, on its first
   fs.writeFileSync(path.join(loop, 'implement.md'), '---\nplace: git\nreads: inbox\n---\nBuild what was asked.\n');
   const inbox = path.join(ROOT, 'inbox');
   const said = `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: \`${inbox}\`. Each is mounted read-only; read it with Read, Grep and Glob.`;
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   const first = b.filed.get(`${run.id}-implement`)!;
@@ -550,7 +560,7 @@ test("every folder a local step is filed with is named on its brief, as it is mo
     path.join(loop, 'implement.md'),
     `---\nplace: git\nwritable: ${path.basename(repos[1])}\nreads: inbox\n---\nBuild what was asked.\n`,
   );
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'failed');
@@ -597,7 +607,7 @@ test('a run given an input files each local step its inputs folder read-only, on
   const { repos, loop } = fresh();
   const given = path.join(ROOT, 'template-draft.md');
   fs.writeFileSync(given, 'the draft\n');
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, inputs: [given] }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, inputs: [given] }));
   const inputs = inputsDir(run);
   const said = `Files given with it (\`nemia start --input\`), which you may read and must not write, in \`${inputs}\`: \`template-draft.md\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
   const b = board();
@@ -629,7 +639,7 @@ test('a run given an input files each local step its inputs folder read-only, on
 
 test('a run given no input is filed and told as before: no mount, and no line of files', async () => {
   const { repos, loop } = fresh();
-  const run = await Effect.runPromise(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   const first = b.filed.get(`${run.id}-implement`)!;

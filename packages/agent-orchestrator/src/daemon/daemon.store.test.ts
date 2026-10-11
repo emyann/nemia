@@ -21,6 +21,7 @@ import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 import { until, WAITED } from '../../test/waits.ts';
+import { runGiven } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;
@@ -28,6 +29,8 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
+const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { parseDaemonFile, parsePassCost, passed, recentFile, recentPasses, recordRecentPass, releaseStore, takeStore } =
   await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
@@ -865,7 +868,7 @@ test('`up` as the api takes the store as the api, writes where it serves once it
     assert.equal(read().url, undefined, 'no url before it listens');
     assert.equal(holdUrl('http://127.0.0.1:8787'), true);
   });
-  const threw = await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening }))).then(
+  const threw = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening }))).then(
     () => assert.fail('the daemon returned'),
     (err: unknown) => err,
   );
@@ -894,7 +897,7 @@ test('`up` writes the feed a daemon started line once it holds the store, before
   const started: Array<ReturnType<typeof daemonLines>[number] | undefined> = [];
   const serving = Effect.sync(() => started.push(daemonLines().at(-1)));
   const once = () =>
-    Effect.runPromise(Effect.scoped(up(engineOf(), { every: 10, repo: ROOT, holder: 'api', onTaken: () => serving }))).then(
+    runPlaced(Effect.scoped(up(engineOf(), { every: 10, repo: ROOT, holder: 'api', onTaken: () => serving }))).then(
       () => assert.fail('the daemon returned'),
       (err: unknown) => assert.equal(err, STOP),
     );
@@ -930,7 +933,7 @@ test('REFUSED at shipped defaults, both ways round: an api holding the store ref
   const { printed } = await typed(t, ['ls'], engineOf());
   assert.equal(printed.at(-1), `api: ticking, pid ${LIVE} at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (${at(-3000)})`);
   holdBy(LIVE);
-  const api = await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
+  const api = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
   assert.ok(
     refusedWith(
       new RegExp(`^api: ${ROOT} is held by the nemia up of pid ${LIVE}, started `),
@@ -953,7 +956,7 @@ test('an api whose store is taken over while it runs stops at its next pass, nam
     if (n === 1) theirs = holdBy(LIVE);
     if (n > 1) throw STOP;
   });
-  const threw = await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
+  const threw = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
   assert.match(
     (threw as Error).message,
     new RegExp(
@@ -1007,7 +1010,7 @@ test("the daemon asks each harness's quota and hands its reading to the passes; 
   Object.assign(e, {
     quota: () => Effect.succeed({ kind: 'windows', limits: [{ key: 'w', usedPercentage: 12, resetsAt: null }], subscription: null }),
   });
-  await assert.rejects(Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
+  await assert.rejects(runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
   const quota = recentPasses().at(-1)?.quota ?? {};
   assert.ok(Object.keys(quota).length > 0, 'a pass kept the reading');
   for (const windows of Object.values(quota)) assert.deepEqual(windows, { w: 12 });
@@ -1027,7 +1030,7 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
     if (told.length || n > 2000) throw STOP;
   });
   Object.assign(e, { say: (task: string, text: string) => Effect.sync(() => told.push(`${task}: ${text}`)) });
-  await assert.rejects(Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
+  await assert.rejects(runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
   assert.equal(told.length, 1, told.join('\n'));
   assert.match(
     told[0],

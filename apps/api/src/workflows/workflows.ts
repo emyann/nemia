@@ -253,7 +253,14 @@ const LIST = COMMANDS.find((c) => c.name === 'workflows list')!;
  * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows list`, by
  * folder.
  */
-export const loadedOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
+export const loadedOf = async (
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  dirs: readonly string[],
+  repo: string,
+  home: string,
+  factory?: Factory,
+) =>
   (await runPlaced(placeService, e, LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home))) as Record<
     string,
     FolderLoaded
@@ -264,7 +271,13 @@ export const loadedOf = async (e: Engine['Service'], placeService: PlaceService[
  * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
  * factory, which steps its hires leave unfilled.
  */
-export async function listWorkflows(e: Engine['Service'], placeService: PlaceService['Service'], repo: string, home: string, factory?: Factory): Promise<WorkflowListing[]> {
+export async function listWorkflows(
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  repo: string,
+  home: string,
+  factory?: Factory,
+): Promise<WorkflowListing[]> {
   const folders = unshadowed(
     sourcesOf(repo, home, factory?.tree).flatMap(({ from, dir }) =>
       foldersIn(dir)
@@ -555,7 +568,13 @@ export function agentSkillsOf(step: Workflow, dir: string, places: Places): Agen
  * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run
  * did not look at.
  */
-async function cardStarted(e: Engine['Service'], placeService: PlaceService['Service'], asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
+async function cardStarted(
+  e: Engine['Service'],
+  placeService: PlaceService['Service'],
+  asked: Extract<Asked, { card: string }>,
+  repo: string,
+  factory: string | undefined,
+) {
   const started = await runPlaced(
     placeService,
     e,
@@ -613,7 +632,9 @@ async function cardStarted(e: Engine['Service'], placeService: PlaceService['Ser
  *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */
 export const workflows = new Hono<ApiEnv>()
-  .get('/api/workflows', (c) => served(c, async ({ e, placeService, repo, home, factory }) => c.json(await listWorkflows(e, placeService, repo, home, factory))))
+  .get('/api/workflows', (c) =>
+    served(c, async ({ e, placeService, repo, home, factory }) => c.json(await listWorkflows(e, placeService, repo, home, factory))),
+  )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
     served(c, async ({ e, placeService, repo, home, factory }) => {

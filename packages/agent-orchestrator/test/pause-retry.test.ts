@@ -10,14 +10,16 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { board as engineBoard } from './engine-board.ts';
 import { scratch } from './scratch.ts';
-import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-pause-retry-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { askFile, asksDir, readRun } = await import('../src/record/record.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 
@@ -35,7 +37,7 @@ function aRepo(): string {
 async function pausedThen(phase: 'failed' | 'stopped') {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  const run = await Effect.runPromise(startRun({ brief: 'the pause', repo: aRepo(), workflowDir: dir, isolate: false }));
+  const run = await runPlaced(startRun({ brief: 'the pause', repo: aRepo(), workflowDir: dir, isolate: false }));
   const b = engineBoard();
   const e = engineOf(b.layer);
   await runWith(e, advanceRun(readRun(run.id)));

@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { Effect } from 'effect';
-import { engine, runStore, runWith, standingWhen } from 'agent-orchestrator';
+import { engine, runStore, runShipped as runWith, standingWhen } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 

@@ -21,13 +21,27 @@ import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { advanceRun, approveRun, cancelRun, decideRun, forgetRun, list, retryRun, startRun, runWith } = await import('../src/runner.ts');
+const {
+  advanceRun,
+  approveRun,
+  cancelRun,
+  decideRun,
+  forgetRun,
+  list,
+  retryRun,
+  startRun,
+  runWith: runEngine,
+  gitPlaceLayer,
+} = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readAsks, readRun } = await import('../src/record/record.store.ts');
 const { closeoutAsked, closeoutOf, deniedOf } = await import('../src/views/views.verb.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
@@ -145,7 +159,7 @@ const stateOf = async (e: Engine, taskId: string): Promise<TaskView> => Effect.r
  * A run of `folder(keys)` started in a fresh repository, its plan filed and started, and signed with `closeout`: where each test begins.
  */
 const signedPlan = async (keys: Parameters<typeof folder>[0], closeout: object, gates?: string[], usage?: Sighting['usage']) => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false, ...(gates ? { gates } : {}) }),
   );
   const h = engine();
@@ -165,7 +179,7 @@ test('a Claude Code job is filed held open, and one on codex, a background sessi
   assert.equal((await stateOf(e, `${run.id}-implement-check`)).state.holdOpen, undefined, "a check is the run's own, never held open");
 
   for (const keys of [{ plan: 'harness: codex' }, { plan: 'background: true\npermissionMode: dontAsk' }]) {
-    const other = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false }));
+    const other = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false }));
     const h = engine();
     const filed: Array<Parameters<Engine['file']>[0]> = [];
     const file = h.e.file.bind(h.e);
@@ -274,7 +288,7 @@ test('a try of a waiting step that is not an answer — `--fresh`, `--model` —
 
 test("a held task whose job ended `done` with no statement (`stated: false`) waits as the runtime holds any `done` open, reads `unsigned`, and is closed: the run's sign-off nudge is a `-try2` task, never an answer to it — gated or not", async () => {
   for (const keys of [{}, { plan: 'gate: true' }]) {
-    const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false }));
+    const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false }));
     const { e, pass, sessions } = engine();
     const plan = `${run.id}-plan`;
     await pass(run.id);
@@ -580,7 +594,7 @@ test("REFUSED by the engine: a close it will not journal is said on the pass, in
 });
 
 test('a run whose tasks were filed before tasks were held open is worked as it was: its gate settled at the sign-off, and a send-back is a `-try2` task', async () => {
-  const run = await Effect.runPromise(
+  const run = await runPlaced(
     startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder({ plan: 'gate: true' }), isolate: false }),
   );
   const h = engine();

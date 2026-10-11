@@ -30,7 +30,8 @@ export function* status({ checkout, tips }: PlaceRequests['status']): Asking<Rep
   const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
   const missing: string[] = [];
   for (const [branch, sha] of Object.entries(tips))
-    if (!heads.includes(sha) && (yield* gitSays(checkout, ['merge-base', '--is-ancestor', sha, 'HEAD'])) === undefined) missing.push(branch);
+    if (!heads.includes(sha) && (yield* gitSays(checkout, ['merge-base', '--is-ancestor', sha, 'HEAD'])) === undefined)
+      missing.push(branch);
   const head = yield* gitSays(checkout, ['rev-parse', '--verify', '--quiet', 'HEAD']);
   const conflicted = Boolean(yield* gitSays(checkout, ['ls-files', '--unmerged']));
   return { merging, conflicted, missing, ...(head ? { head } : {}) };

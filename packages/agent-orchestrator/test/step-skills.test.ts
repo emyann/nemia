@@ -16,11 +16,13 @@ import { skillsFor } from '../src/skills/read.store.ts';
 import { Result, Schema } from 'effect';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
-import { Effect } from 'effect';
+import { runGiven } from './placed.ts';
 
 const ROOT = scratch('wf-step-skills-');
 process.env.WF_ROOT = ROOT;
 const { startRun, writeWorkflow } = await import('../src/runner.ts');
+const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
@@ -202,7 +204,7 @@ test("`nemia start` freezes the step's own line and the session's list, renders 
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
-  const run = await Effect.runPromise(startRun({ brief: 'add a skill', repo, workflowDir: path.join(root, 'dev') }));
+  const run = await runPlaced(startRun({ brief: 'add a skill', repo, workflowDir: path.join(root, 'dev') }));
   fs.writeFileSync(path.join(root, 'dev', 'implement.md'), '---\nplace: git\nagent: implementer\n---\n');
   const frozen = (readRun(run.id).workflow ?? []).find((s) => s.name === 'implement')!;
   assert.deepEqual(frozen.skills, ['review-a-change']);

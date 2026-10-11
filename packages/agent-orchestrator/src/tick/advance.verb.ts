@@ -18,16 +18,7 @@ import { tipBranches, tipsSeen } from '../branches/index.ts';
 import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
-import {
-  checkTaskId,
-  isRepositoryRun,
-  stepTaskId,
-  tryOf,
-  type CloseoutAsked,
-  type RepositoryRun,
-  type Run,
-  type TaskPhase,
-} from '../record/record.ts';
+import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, holdsOf, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { handOffDue } from '../workspace/workspace.ts';
@@ -354,7 +345,9 @@ export const advancePass = Effect.fn('advancePass')(
     const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
     const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
     const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
-    const from = pass ? { read: pass, slot } : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
+    const from = pass
+      ? { read: pass, slot }
+      : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo);
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
@@ -498,9 +491,7 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: P
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
     if (!runStore.runs.exists(run.id)) continue;
     const record = run.steps[name];
-    const unhanded = isRepositoryRun(run)
-      ? yield* handedOffBy(place, record.workspace!, name)
-      : folderPlace(runsDir()).handOff(run, name);
+    const unhanded = isRepositoryRun(run) ? yield* handedOffBy(place, record.workspace!, name) : folderPlace(runsDir()).handOff(run, name);
     if (unhanded === undefined) {
       run.steps[name] = { ...record, handedOff: record.taskId! };
       marked = true;

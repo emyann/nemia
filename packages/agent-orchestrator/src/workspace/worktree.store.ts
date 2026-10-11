@@ -25,7 +25,7 @@ import {
   type Provisioned,
 } from './workspace.ts';
 import { folderPlace } from '../record/places.store.ts';
-import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
 import { countSpawn } from '../meter/tally.store.ts';
@@ -368,12 +368,7 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
  * provisioned after, in the workspace the place made, on the merged tree and its lockfile.
  */
-export const workspaceFor = Effect.fn('workspaceFor')(function* (
-  run: Run,
-  steps: readonly Workflow[],
-  step: Workflow,
-  place: Place,
-) {
+export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, steps: readonly Workflow[], step: Workflow, place: Place) {
   const plan = workspacePlan(steps, step);
   const cut = (made: Cut): CutOutcome => ({ cut: made });
   if (!isRepositoryRun(run)) return cut(folderPlace(runsDir()).make(run, plan, step.name));

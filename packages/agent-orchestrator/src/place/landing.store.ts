@@ -22,8 +22,8 @@ export type CheckoutRead = MergeState | { readonly unread: string };
 /**
  * One pass's reading of its places: the answers of `status` it has had (`reads`), by checkout and the run that asked, whose tips it was
  * asked with, so a pass that asks twice of one checkout for one run starts one process; every branch of a run's repository and its commit
- * as its caller read them (`heads`), which a run's result tips are read off (`resultTips`); and the place it asks (`place`). Owned by the pass and dropped with
- * it; a `land` clears its reads, since the checkout has changed.
+ * as its caller read them (`heads`), which a run's result tips are read off (`resultTips`); and the place it asks (`place`). Owned by the
+ * pass and dropped with it; a `land` clears its reads, since the checkout has changed.
  */
 export type StatusMemo = {
   readonly reads: Map<string, CheckoutRead>;
@@ -88,9 +88,9 @@ export type LandedThrough =
   | { readonly unread: string };
 
 /**
- * Commit the merge staged in `run`'s checkout with `message`, or abort it, through the place `memo` names (`land`); the pass's reads of `status`
- * in `memo` are cleared, since the checkout has changed. The place's refusal in its words (`refused`: a hook, a path still unmerged), or
- * why it was not heard (`unread`).
+ * Commit the merge staged in `run`'s checkout with `message`, or abort it, through the place `memo` names (`land`); the pass's reads of
+ * `status` in `memo` are cleared, since the checkout has changed. The place's refusal in its words (`refused`: a hook, a path still
+ * unmerged), or why it was not heard (`unread`).
  */
 export function landThrough(
   run: RepositoryRun,
@@ -114,12 +114,7 @@ export function landingDenies(run: Run, place: Place): readonly string[] {
  * `{repo}` and `{branches}` filled from the run's checkout and its result branches with a tip, recorded or among `heads` (`resultTips`),
  * and its denies. Undefined for any other step.
  */
-export function landingWords(
-  run: Run,
-  step: Workflow,
-  place: Place,
-  heads?: Readonly<Record<string, string>>,
-): LandingWords | undefined {
+export function landingWords(run: Run, step: Workflow, place: Place, heads?: Readonly<Record<string, string>>): LandingWords | undefined {
   if (!isRepositoryRun(run) || !landsOnCheck(step, run)) return undefined;
   const { declared } = place;
   const branches = Object.keys(resultTips(run, resultBranches(run), heads)).join(' ') || '<result branch>';

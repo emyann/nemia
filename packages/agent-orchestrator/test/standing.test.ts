@@ -1,5 +1,5 @@
 /**
- * The git place's `standing` (`place/git/scripts/standing.ts`), run through `runPlaceVerb` against scratch repositories: every head of the
+ * The git place's `standing` (`place/git/verbs/standing.ts`), asked of `gitPlace` against scratch repositories: every head of the
  * repository, and for each branch asked of whether it is on its base, whether it holds work past its run's base, how far ahead it is,
  * a gone branch judged by the tip its run recorded, and its refusals. Its two fallbacks are made to answer by a `git` planted on `PATH`:
  * one that refuses `%(ahead-behind:…)` as a git older than 2.41 does, and a `baseRef` git cannot read. Git runs with no user or system
@@ -10,17 +10,14 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runPlaceVerb } from '../src/runner.ts';
+import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { shippedOver } from '../src/branches/branches.ts';
 import { knownOf, toldOf } from '../src/standing/standing.verb.ts';
 import { scratch } from './scratch.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
 
-/** The git place the package ships. */
-const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
-
-/** The environment git and the script run in: this process's, without its git variables, with no configuration read and one identity. */
+/** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -74,7 +71,7 @@ function repository() {
 
 /** `standing` of the git place, in `env`, its request as given: one the contract's type refuses is how a malformed request is sent. */
 const standing = (asked: object, env: NodeJS.ProcessEnv = ENV): PlaceOutcome<'standing'> =>
-  runPlaceVerb(GIT_SKILL, 'standing', asked as never, { env });
+  gitPlace({ env }).askNow('standing', asked as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function answerOf(outcome: PlaceOutcome<'standing'>) {

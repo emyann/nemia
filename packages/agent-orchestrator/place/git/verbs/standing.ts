@@ -78,11 +78,7 @@ function* stoodOne(repo: string, base: string, one: Asked, listed: Listing): Ask
   const { branch, tip } = one;
   const head = Object.hasOwn(listed.heads, branch) ? listed.heads[branch] : null;
   const commit = head ?? tip;
-  const onBase: Within = !commit
-    ? 'unknown'
-    : head
-      ? yield* withinOf(repo, listed, branch, head, base)
-      : yield* within(repo, commit, base);
+  const onBase: Within = !commit ? 'unknown' : head ? yield* withinOf(repo, listed, branch, head, base) : yield* within(repo, commit, base);
   const past = onBase === 'yes' ? yield* pastOf(repo, listed, one, head, commit!) : undefined;
   const ahead =
     head === null

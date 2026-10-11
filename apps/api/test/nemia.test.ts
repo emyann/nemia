@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { COMMANDS, addFactory, engine, runWith } from 'agent-orchestrator';
+import { COMMANDS, addFactory, engine, runShipped as runWith } from 'agent-orchestrator';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 

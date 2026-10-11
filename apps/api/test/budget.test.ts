@@ -25,7 +25,7 @@ import {
   roundAskFile,
   roundRun,
   runStore,
-  runWith,
+  runShipped as runWith,
   type RunSummary,
   usedLines,
 } from 'agent-orchestrator';

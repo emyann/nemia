@@ -11,16 +11,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { Effect } from 'effect';
 import { parseAgent, parseWorkflow, type Agents, type Workflow } from '../src/workflow.ts';
 import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-factory-rules-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, engine, runWith, startRun } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, engine, runWith: runEngine, gitPlaceLayer, startRun } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { WORKFLOWS_STEP } = await import('../src/folder/workflows.verb.ts');
@@ -73,7 +75,7 @@ function fresh(): { repo: string; dev: string; file: string } {
 
 /** A run of `dev` started in `factory`, the default when none is named. */
 const started = (at: { repo: string; dev: string }, brief: string, factory?: string) =>
-  Effect.runPromise(startRun({ brief, repo: at.repo, workflowDir: at.dev, ...(factory !== undefined && { factory }) }));
+  runPlaced(startRun({ brief, repo: at.repo, workflowDir: at.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
 const frozen = (id: string): Workflow[] => readRun(id).workflow ?? [];

@@ -134,7 +134,7 @@ import {
   type TaskPhase,
 } from '../src/run.ts';
 import type { Held } from '../src/place/place.ts';
-import { SHIPPED_PLACE, readPlaceJson } from '../src/place/place.store.ts';
+import { declared } from '../place/git/declared.ts';
 import {
   CLOSEOUT_SCHEMA,
   closeoutSchemaOf,
@@ -398,7 +398,7 @@ const placed = (s: Workflow, r: Run, steps: readonly Workflow[]): string =>
     steps,
     ...([undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const),
     {
-      say: readPlaceJson(SHIPPED_PLACE).say,
+      say: declared.say,
     },
   );
 

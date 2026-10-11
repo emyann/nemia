@@ -1,277 +1,90 @@
 /**
- * A place's verbs heard (`runPlaceVerb`) and its declaration read (`readPlaceJson`), against scripts planted in a scratch skill: each of
- * the twelve answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
- * refusal; a non-zero exit, a signal, a stdout that is not JSON or is empty, a script past its deadline and one that is not there are
- * each unread, with their words; a script past its deadline leaves nothing it started running, children deaf to SIGTERM killed, gone
- * and named; and a `place.json` that does not read as the contract is refused, naming the file and the field.
+ * What the package asks of the place it is given (`PlaceService`), against places whose verbs the test answers: a program that asks the
+ * place and is given none does not compile, and dies when run all the same; `openPlace` hands on `open`'s answer, refuses in the place's
+ * words and throws a plain `Error` for an `open` not heard; `trialMerges` takes a refusal, an unread outcome and a short answer for no
+ * verdict; the words of a verb stopped at its deadline and of one that threw; and `sayFilled`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import {
-  PLACE_DEADLINE_MS,
-  PLACE_VERBS,
-  sayFilled,
-  type PlaceAnswers,
-  type PlaceOutcome,
-  type PlaceRequests,
-  type PlaceVerb,
-} from './place.ts';
-import { SHIPPED_PLACE, openPlace, placeDirOf, readPlaceJson, runPlaceVerb, trialMerges } from './place.store.ts';
-import { skillVersion } from '../skills/read.store.ts';
+import { Cause, Effect } from 'effect';
+import { sayFilled, type PlaceAnswers, type PlaceOutcome } from './place.ts';
+import { PlaceService, STOP_GRACE_MS, openPlace, stoppedWords, threwWords, trialMerges, type Place } from './place.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { metered } from '../meter/tally.store.ts';
-import { running } from '../../test/running.ts';
-import { scratch } from '../../test/scratch.ts';
+import { placeOver, unreadBy } from '../../test/place-over.ts';
 
-/** A skill folder holding one script, `scripts/<verb>.ts`, whose body is `body`. */
-function planted(verb: PlaceVerb, body: string): string {
-  const dir = scratch('wf-place-');
-  fs.mkdirSync(path.join(dir, 'scripts'));
-  fs.writeFileSync(path.join(dir, 'scripts', `${verb}.ts`), body);
-  return dir;
-}
-
-/** A script that prints `value` as JSON at exit 0. */
-const printing = (value: unknown): string => `process.stdout.write(${JSON.stringify(JSON.stringify(value))});\n`;
-
-const REQUESTS: PlaceRequests = {
-  open: { root: '/r', isolate: true },
-  make: { repo: '/r', at: '/w', name: 'wf/x/a', from: 'main', also: [] },
-  handoff: { workspace: '/w', step: 'a', why: '' },
-  report: { repo: '/r', baseRef: 'b', onto: 'main', branches: ['wf/x/a'], diffOf: [], present: [], atBase: [] },
-  standing: { repo: '/r', branches: [{ branch: 'wf/x/a', baseRef: 'b' }], base: 'main' },
-  trial: {
-    repo: '/r',
-    trials: [
-      { onto: 'main', branch: 'wf/x/a' },
-      { onto: 'main', branch: 'wf/x/b' },
-      { onto: 'gone', branch: 'wf/x/a' },
-    ],
-  },
-  status: { checkout: '/r', tips: {} },
-  land: { checkout: '/r', act: 'abort' },
-  inventory: { repo: '/r', under: '/w', prefix: 'wf/x/', base: 'main' },
-  remove: { repo: '/r', workspaces: [], branches: [] },
-  export: { repo: '/r', tag: 'v1', into: '/i' },
-  seal: { tree: '/i' },
+/** A place none of whose verbs may be asked: each fails the test that asks it. */
+const UNASKED: Place = {
+  declared: { denyWhileLanding: [], say: {} as Place['declared']['say'] },
+  ask: (verb) => Effect.die(new Error(`${verb} was asked of a place this test answers itself`)),
+  askNow: (verb) => assert.fail(`${verb} was asked of a place this test answers itself`),
 };
 
-const ANSWERS: PlaceAnswers = {
-  open: { repo: '/r', baseRef: 'abc', branch: 'main' },
-  make: { workspace: '/w', branch: 'wf/x/a', conflicts: ['a.ts'], notes: ['node_modules: linked'] },
-  handoff: { commit: null },
-  report: {
-    at: { baseRef: 'b', onto: 'o', tips: { 'wf/x/a': 't' } },
-    files: {
-      'wf/x/a': [
-        { path: 'a.ts', status: 'M', added: 1, removed: null },
-        { path: 'b.ts', from: 'c.ts', status: 'R', added: 0, removed: 0 },
-      ],
+const OPENED: PlaceAnswers['open'] = { repo: '/r', baseRef: 'abc', branch: 'main' };
+const TRIALS: PlaceAnswers['trial'] = {
+  at: { main: 'h', gone: null },
+  trials: [{ clean: true }, { clean: false, conflicts: ['a.ts'] }, { unknown: 'no ref' }],
+};
+const ASKED = [
+  { onto: 'main', branch: 'wf/x/a' },
+  { onto: 'main', branch: 'wf/x/b' },
+  { onto: 'gone', branch: 'wf/x/a' },
+];
+
+/** A place whose `open` answers `outcome`. */
+const opening = (outcome: PlaceOutcome<'open'>): Place => placeOver(UNASKED, { open: () => outcome });
+
+/** A place whose `trial` answers `outcome`. */
+const trying = (outcome: PlaceOutcome<'trial'>): Place => placeOver(UNASKED, { trial: () => outcome });
+
+test('REFUSED: a program that asks the place and is given none does not compile, and one run all the same dies naming the service', () => {
+  const asks = Effect.gen(function* () {
+    return (yield* PlaceService).declared;
+  });
+  // @ts-expect-error -- a program that asks the place is given none, and runSync takes no requirement
+  const exit = Effect.runSyncExit(asks);
+  assert.ok(exit._tag === 'Failure', 'it has no place to ask');
+  assert.match(String(Cause.squash(exit.cause)), /orchestrator\/PlaceService/);
+  const given = Effect.runSync(asks.pipe(Effect.provide(PlaceService.layer(UNASKED))));
+  assert.equal(given, UNASKED.declared, 'and given one by name, it reads that one');
+});
+
+test("openPlace answers open's answer, and hands open the root and whether the run cuts worktrees", () => {
+  const asked: unknown[] = [];
+  const place = placeOver(UNASKED, {
+    open: (request) => {
+      asked.push(request);
+      return { answer: OPENED };
     },
-    diffs: { 'wf/x/a': { 'a.ts': '@@ -1 +1 @@' } },
-    present: { 'wf/x/a': { 'shot.png': 'file', out: 'directory', gone: 'absent' } },
-    atBase: { 'package.json': null, 'README.md': '# r' },
-  },
-  standing: {
-    heads: { main: 'h' },
-    branches: [
-      { branch: 'wf/x/a', tip: null, onBase: 'unknown', pastBase: null, ahead: null },
-      { branch: 'wf/x/b', tip: 't', onBase: 'no', pastBase: true, ahead: 2 },
-    ],
-  },
-  trial: { at: { main: 'h', gone: null }, trials: [{ clean: true }, { clean: false, conflicts: ['a.ts'] }, { unknown: 'no ref' }] },
-  status: { merging: 'ours', conflicted: false, missing: [], head: 'h' },
-  land: { aborted: true },
-  inventory: {
-    workspaces: [
-      { path: '/w', step: 'a', branch: 'wf/x/a', head: 'h', detached: false, prunable: false, clean: true, onBranch: true },
-      { path: '/v', detached: true, locked: 'moving', prunable: true, clean: null, onBranch: false },
-    ],
-    branches: [{ branch: 'wf/x/a', merged: false }],
-  },
-  remove: { removed: ['/w'], left: [{ path: '/v', said: 'locked' }], deleted: ['wf/x/a'], kept: [{ branch: 'wf/x/b', said: 'unmerged' }] },
-  export: { commit: 'abc' },
-  seal: { removed: true },
-};
-
-/** `verb` run on a skill whose script prints `value`. */
-const heardOf = <V extends PlaceVerb>(verb: V, value: unknown): PlaceOutcome<V> =>
-  runPlaceVerb(planted(verb, printing(value)), verb, REQUESTS[verb]);
-
-/** The words of an unread outcome, or a failure naming what it was instead. */
-function saidOf(outcome: PlaceOutcome<PlaceVerb>, verb: PlaceVerb): string {
-  assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
-  assert.equal(outcome.unread.verb, verb);
-  assert.ok(!Number.isNaN(Date.parse(outcome.unread.at)), `at is a time: ${outcome.unread.at}`);
-  return outcome.unread.said;
-}
-
-for (const verb of PLACE_VERBS) {
-  test(`${verb}: its answer decodes, and a field the contract does not name is dropped`, () => {
-    assert.deepEqual(heardOf(verb, ANSWERS[verb]), { answer: ANSWERS[verb] });
-    assert.deepEqual(heardOf(verb, { ...ANSWERS[verb], newer: 'field' }), { answer: ANSWERS[verb] });
   });
+  assert.deepEqual(openPlace(place, '/r', true), OPENED);
+  assert.deepEqual(openPlace(place, '/q', false), OPENED);
+  assert.deepEqual(asked, [
+    { root: '/r', isolate: true },
+    { root: '/q', isolate: false },
+  ]);
+});
 
-  test(`${verb}: an answer missing a field, or holding one of another type, is unread and names the field`, () => {
-    const [first] = Object.keys(ANSWERS[verb]);
-    const { [first]: _dropped, ...missing } = ANSWERS[verb] as Record<string, unknown>;
-    const said = saidOf(heardOf(verb, missing), verb);
-    const wrong = saidOf(heardOf(verb, { ...ANSWERS[verb], [first]: 42 }), verb);
-    assert.match(said, new RegExp(`^its answer does not read as ${verb}'s: `));
-    assert.match(wrong, new RegExp(`^its answer does not read as ${verb}'s: `));
-    if (verb !== 'land') {
-      assert.match(said, new RegExp(`\`${first}\` is missing`));
-      assert.match(wrong, new RegExp(`\`${first}\` is 42, where `));
-    }
-  });
-}
-
-test('a verb run in a pass is counted in its place phase, its process and its time; a verb with no script starts nothing', async () => {
-  const { tallies } = await metered(async () => runPlaceVerb(planted('status', printing(ANSWERS.status)), 'status', REQUESTS.status));
-  assert.ok(tallies);
-  const { spawned, calls, ms } = tallies.kinds.place;
-  assert.deepEqual({ spawned, calls }, { spawned: 1, calls: 1 });
-  assert.ok(ms > 0, "its time is the place's");
-  const none = await metered(async () => runPlaceVerb(scratch('wf-place-none-'), 'status', REQUESTS.status));
-  assert.ok(none.tallies);
-  assert.deepEqual(
-    Object.values(none.tallies.kinds).map((k) => k.spawned),
-    Object.values(none.tallies.kinds).map(() => 0),
+test("REFUSED: openPlace when open refuses, in the place's words whole, as an Invalid with exit 2", () => {
+  const words = '/r is not a git repository: run git init there and commit once, or name a repository with --repo';
+  assert.throws(
+    () => openPlace(opening({ refused: words }), '/r', true),
+    (err: Error) => err instanceof Invalid && err.exitCode === 2 && err.message === words,
   );
 });
 
-test('a field deep in an answer that does not read is named by its path', () => {
-  const report = { ...ANSWERS.report, files: { 'wf/x/a': [{ path: 'a.ts', status: 'M', added: 'many', removed: 0 }] } };
-  assert.match(saidOf(heardOf('report', report), 'report'), /`files\.wf\/x\/a\.0\.added` is "many", where /);
-  const standing = { ...ANSWERS.standing, branches: [{ ...ANSWERS.standing.branches[0], onBase: 'maybe' }] };
-  assert.match(saidOf(heardOf('standing', standing), 'standing'), /`branches\.0\.onBase` is "maybe"/);
-});
-
-test('a refusal at exit 0 is a refusal, in its words; at another exit it is unread', () => {
-  assert.deepEqual(heardOf('open', { refused: 'no repository at /r: run git init there' }), {
-    refused: 'no repository at /r: run git init there',
-  });
-  const dir = planted('open', `${printing({ refused: 'why' })}process.exitCode = 1;\n`);
-  assert.equal(saidOf(runPlaceVerb(dir, 'open', REQUESTS.open), 'open'), 'it exited 1');
-});
-
-test('the script is handed the request with v 1 on stdin, and runs in the skill folder', () => {
-  const dir = planted(
-    'open',
-    `import fs from 'node:fs';\nconst request = fs.readFileSync(0, 'utf8');\nprocess.stdout.write(JSON.stringify({ repo: request, baseRef: process.cwd(), branch: 'b' }));\n`,
+test('an open that is not heard is no refusal: openPlace throws a plain Error with why, which a queued card tries again', () => {
+  assert.throws(
+    () => openPlace(opening(unreadBy('open', 'git: not found')), '/r', true),
+    (err: Error) =>
+      !(err instanceof Invalid) &&
+      (err as { exitCode?: unknown }).exitCode === undefined &&
+      err.message === "the place's open was not heard: git: not found. Nothing was started: start it again",
   );
-  const outcome = runPlaceVerb(dir, 'open', { root: '/some/where', isolate: false });
-  assert.ok('answer' in outcome, JSON.stringify(outcome));
-  assert.deepEqual(JSON.parse(outcome.answer.repo), { root: '/some/where', isolate: false, v: 1 });
-  assert.equal(fs.realpathSync(outcome.answer.baseRef), fs.realpathSync(dir));
-});
-
-test('the environment given is the one the script runs in', () => {
-  const dir = planted(
-    'open',
-    `process.stdout.write(JSON.stringify({ repo: process.env.PLACE_PROBE ?? 'unset', baseRef: 'b', branch: 'c' }));\n`,
-  );
-  const outcome = runPlaceVerb(dir, 'open', REQUESTS.open, { env: { ...process.env, PLACE_PROBE: 'given' } });
-  assert.deepEqual(outcome, { answer: { repo: 'given', baseRef: 'b', branch: 'c' } });
-});
-
-test("a non-zero exit is unread with the last four lines of the script's stderr, or its exit when it said nothing", () => {
-  const lines = ['one', 'two', 'three', 'four', 'five', 'six'].map((l) => `console.error(${JSON.stringify(l)});`).join('\n');
-  const said = saidOf(runPlaceVerb(planted('status', `${lines}\nprocess.exitCode = 1;\n`), 'status', REQUESTS.status), 'status');
-  assert.equal(said, 'three / four / five / six');
-  assert.equal(saidOf(runPlaceVerb(planted('status', 'process.exitCode = 3;\n'), 'status', REQUESTS.status), 'status'), 'it exited 3');
-});
-
-test('a script ended by a signal is unread, naming the signal', () => {
-  const dir = planted('handoff', `console.error('about to go');\nprocess.kill(process.pid, 'SIGTERM');\n`);
-  assert.equal(saidOf(runPlaceVerb(dir, 'handoff', REQUESTS.handoff), 'handoff'), 'it was ended by SIGTERM: about to go');
-});
-
-test('a stdout that is not JSON, or empty, at exit 0 is unread, not an answer', () => {
-  const said = saidOf(runPlaceVerb(planted('land', `process.stdout.write('landed, I think');\n`), 'land', REQUESTS.land), 'land');
-  assert.equal(said, 'its answer is not JSON: landed, I think');
-  assert.equal(saidOf(runPlaceVerb(planted('land', ''), 'land', REQUESTS.land), 'land'), 'it printed no answer');
-  assert.match(saidOf(heardOf('land', null), 'land'), /^its answer does not read as land's: /);
-  assert.match(saidOf(heardOf('land', []), 'land'), /^its answer does not read as land's: /);
-});
-
-test('a verb whose script is not there is unread, naming the path', () => {
-  const dir = planted('open', printing(ANSWERS.open));
-  const said = saidOf(runPlaceVerb(dir, 'make', REQUESTS.make), 'make');
-  assert.equal(said, `the place has no script for make: ${path.join(dir, 'scripts', 'make.ts')} is not there`);
-});
-
-test('a script past its deadline is unread, saying so, and is left running nowhere', () => {
-  const dir = planted('report', `console.error('reading the diff');\nsetInterval(() => {}, 1000);\n`);
-  const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs: 300 }), 'report');
-  assert.match(said, /^it gave no answer within 0\.3 s, its deadline, and was stopped/);
-  assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), []);
-});
-
-/** A script that starts four children, each deaf to SIGTERM, which write their pid to a marker once deaf. */
-const DEAF_GROUP = [
-  "import { spawn } from 'node:child_process';",
-  "import fs from 'node:fs';",
-  "import path from 'node:path';",
-  "const child = path.resolve('scripts', 'child.mjs');",
-  `fs.writeFileSync(child, ${JSON.stringify(
-    [
-      "import fs from 'node:fs';",
-      "process.on('SIGTERM', () => {});",
-      'fs.writeFileSync(process.argv[2], String(process.pid));',
-      'setInterval(() => {}, 1000);',
-    ].join('\n'),
-  )});`,
-  "for (const n of [1, 2, 3, 4]) spawn(process.execPath, [child, path.resolve(`deaf-${n}`)], { stdio: 'ignore' });",
-  'setInterval(() => {}, 1000);',
-].join('\n');
-
-/** The most tries the group test makes, each with twice the deadline of the one before, for its four children to be deaf in time. */
-const DEAF_TRIES = 6;
-
-test('a script past its deadline stops its whole group, killing the children that ignore SIGTERM, and says so', (t) => {
-  let deadlineMs = 1500;
-  for (let tries = 1; ; tries++, deadlineMs *= 2) {
-    const dir = planted('report', DEAF_GROUP);
-    const child = path.join(dir, 'scripts', 'child.mjs');
-    t.after(() => {
-      for (const pid of running(child)) process.kill(pid, 'SIGKILL');
-    });
-    const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs }), 'report');
-    assert.deepEqual(running(child), [], `try ${tries}: no child left running`);
-    assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), [], `try ${tries}: the script is not left running`);
-    const markers = [1, 2, 3, 4].map((n) => path.join(dir, `deaf-${n}`));
-    if (!markers.every((marker) => fs.existsSync(marker))) {
-      assert.ok(tries < DEAF_TRIES, `each child ignored SIGTERM before the deadline, on one of ${DEAF_TRIES} tries: ${said}`);
-      continue;
-    }
-    for (const pid of markers.map((marker) => Number(fs.readFileSync(marker, 'utf8'))))
-      assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
-    const seconds = String(deadlineMs / 1000).replace('.', '\\.');
-    assert.match(
-      said,
-      new RegExp(
-        `^it gave no answer within ${seconds} s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, so a lock it held may be left$`,
-      ),
-    );
-    return;
-  }
-});
-
-test('the deadline is two minutes a verb, ten for make, and it is the default the runner holds a script to', () => {
-  for (const verb of PLACE_VERBS) assert.equal(PLACE_DEADLINE_MS[verb], verb === 'make' ? 600_000 : 120_000, verb);
-  const body = `setTimeout(() => process.stdout.write(${JSON.stringify(JSON.stringify(ANSWERS.make))}), 1000);\n`;
-  assert.deepEqual(runPlaceVerb(planted('make', body), 'make', REQUESTS.make), { answer: ANSWERS.make });
-  assert.match(saidOf(runPlaceVerb(planted('make', body), 'make', REQUESTS.make, { deadlineMs: 200 }), 'make'), /within 0\.2 s/);
 });
 
 test('trialMerges answers what the trial verb answers, and asks nothing for no trial', () => {
-  const dir = planted('trial', printing(ANSWERS.trial));
-  assert.deepEqual(trialMerges('/r', REQUESTS.trial.trials, dir), ANSWERS.trial);
-  assert.deepEqual(trialMerges('/r', [], planted('trial', 'process.exitCode = 3;\n')), { at: {}, trials: [] });
-  assert.ok(fs.existsSync(path.join(SHIPPED_PLACE, 'scripts', 'trial.ts')), `the shipped place is ${SHIPPED_PLACE}`);
+  assert.deepEqual(trialMerges('/r', ASKED, trying({ answer: TRIALS })), TRIALS);
+  assert.deepEqual(trialMerges('/r', [], UNASKED), { at: {}, trials: [] });
 });
 
 test('REFUSED: a trial unread or refused, or an answer short of the trials asked, is no verdict: every trial is unknown in its words, and every base null', () => {
@@ -279,201 +92,35 @@ test('REFUSED: a trial unread or refused, or an answer short of the trials asked
     { onto: 'main', branch: 'wf/x/a' },
     { onto: 'wf/y/b', branch: 'wf/x/a' },
   ];
-  const silent = trialMerges('/r', pairs, planted('trial', "process.stderr.write('git is gone');\nprocess.exitCode = 1;\n"));
+  const silent = trialMerges('/r', pairs, trying(unreadBy('trial', 'git is gone')));
   assert.deepEqual(silent, {
     at: { main: null, 'wf/y/b': null },
     trials: [{ unknown: 'the trial merge was not heard: git is gone' }, { unknown: 'the trial merge was not heard: git is gone' }],
   });
-  const refused = trialMerges('/r', pairs, planted('trial', printing({ refused: '/r is not a directory' })));
+  const refused = trialMerges('/r', pairs, trying({ refused: '/r is not a directory' }));
   assert.deepEqual(refused.trials, [{ unknown: '/r is not a directory' }, { unknown: '/r is not a directory' }]);
-  const short = trialMerges('/r', pairs, planted('trial', printing({ at: { main: 'a'.repeat(40) }, trials: [{ clean: true }] })));
+  const short = trialMerges('/r', pairs, trying({ answer: { at: { main: 'a'.repeat(40) }, trials: [{ clean: true }] } }));
   assert.deepEqual(short, {
     at: { main: null, 'wf/y/b': null },
     trials: [{ unknown: 'the place answered 1 trial for the 2 asked' }, { unknown: 'the place answered 1 trial for the 2 asked' }],
   });
-  const unshaped = trialMerges('/r', pairs, planted('trial', printing({ at: {} })));
-  assert.ok(
-    unshaped.trials.every((t) => 'unknown' in t && /`trials` is missing/.test(t.unknown)),
-    JSON.stringify(unshaped),
+});
+
+test('a verb stopped at its deadline says so in the deadline words, with what it last said, and names a kill at the shipped grace', () => {
+  assert.equal(stoppedWords(300, false, ''), 'it gave no answer within 0.3 s, its deadline, and was stopped');
+  assert.equal(
+    stoppedWords(120_000, true, ''),
+    `it gave no answer within 120 s, its deadline, and was stopped, and a process it started outlived SIGTERM for ${STOP_GRACE_MS / 1000} s and was killed, so a lock it held may be left`,
   );
-});
-
-/** A skill folder with `declared` as its `place.json`, text as is or JSON, and a script for each verb in `scripts`. */
-function declaring(declared: unknown, scripts: readonly PlaceVerb[] = ['open', 'status']): string {
-  const dir = scratch('wf-place-json-');
-  fs.mkdirSync(path.join(dir, 'scripts'));
-  for (const verb of scripts) fs.writeFileSync(path.join(dir, 'scripts', `${verb}.ts`), '');
-  if (declared !== undefined)
-    fs.writeFileSync(path.join(dir, 'place.json'), typeof declared === 'string' ? declared : JSON.stringify(declared));
-  return dir;
-}
-
-const DECLARED = {
-  v: 1,
-  verbs: ['open', 'status'],
-  denyWhileLanding: ['Bash(git commit:*)'],
-  say: {
-    look: ['git status'],
-    readResult: 'r',
-    ship: 's',
-    drop: 'd',
-    conflicts: 'c',
-    unlock: 'u',
-    stage: 'st',
-    attach: 'a',
-    commit: 'm',
-    inspect: 'i',
-    orphans: 'o',
-    results: ['git log {base}..{branch}'],
-    merge: 'git merge {sha}',
-    mergeUncommitted: 'mu',
-    showMerge: 'sm',
-    lastMerge: 'lm',
-  },
-};
-
-/** What `readPlaceJson` refuses the skill in `dir` with, its kind and exit code checked. */
-function refusedWith(dir: string): string {
-  try {
-    readPlaceJson(dir);
-  } catch (err) {
-    assert.ok(err instanceof Invalid, `Invalid expected, got ${String(err)}`);
-    assert.equal(err.exitCode, 2);
-    assert.ok(err.message.startsWith(path.join(dir, 'place.json')), err.message);
-    return err.message;
-  }
-  return assert.fail('readPlaceJson read it');
-}
-
-test('place.json decodes as the contract has it', () => {
-  assert.deepEqual(readPlaceJson(declaring(DECLARED)), DECLARED);
-});
-
-test('REFUSED: a place.json that is not there, or not JSON', () => {
   assert.match(
-    refusedWith(declaring(undefined)),
-    /place\.json is not there, and a place skill declares itself in it: write it as contract v 1/,
-  );
-  assert.match(refusedWith(declaring('{ "v": 1,')), /place\.json is not JSON \(/);
-});
-
-test('REFUSED: a place.json whose first wrong field does not read as contract v 1, naming the field', () => {
-  assert.match(refusedWith(declaring({ ...DECLARED, v: 2 })), /`v` is 2, where 1 is expected/);
-  assert.match(refusedWith(declaring({ ...DECLARED, verbs: ['open', 'fly'] })), /`verbs\.1` is "fly", where /);
-  assert.match(
-    refusedWith(declaring({ ...DECLARED, denyWhileLanding: 'Bash(git commit:*)' })),
-    /`denyWhileLanding` is "Bash\(git commit:\*\)"/,
-  );
-  const { unlock: _unlock, ...say } = DECLARED.say;
-  assert.match(refusedWith(declaring({ ...DECLARED, say })), /`say\.unlock` is missing/);
-  assert.match(refusedWith(declaring([])), /does not read as a place's declaration/);
-});
-
-test('REFUSED: a `say` template naming a hole the code does not fill for its key, naming the key, the hole and the holes it may name', () => {
-  const unknown = refusedWith(declaring({ ...DECLARED, say: { ...DECLARED.say, look: ['git diff {nope}', 'git status'] } }));
-  assert.match(unknown, /`say\.look` names \{nope\}, a hole the code does not fill: look may name \{baseRef\}/);
-  const another = refusedWith(declaring({ ...DECLARED, say: { ...DECLARED.say, ship: 'git -C {repo} merge {sha}' } }));
-  assert.match(another, /`say\.ship` names \{sha\}, a hole the code does not fill: ship may name \{repo\}, \{branch\}/);
-  const none = refusedWith(declaring({ ...DECLARED, say: { ...DECLARED.say, lastMerge: 'git log -1 {sha}' } }));
-  assert.match(none, /`say\.lastMerge` names \{sha\}, a hole the code does not fill: lastMerge may name no hole/);
-  const dir = declaring({ ...DECLARED, say: { ...DECLARED.say, look: ['git diff {nope}'] } });
-  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: git\n---\n');
-  assert.match(openRefused(dir), /`say\.look` names \{nope\}/, 'and so at start');
-  assert.deepEqual(readPlaceJson(declaring(DECLARED)).say.merge, 'git merge {sha}', 'a hole its key fills is read');
-});
-
-test('REFUSED: a verb declared with no script in scripts/', () => {
-  assert.match(
-    refusedWith(declaring({ ...DECLARED, verbs: ['open', 'status', 'land'] })),
-    /declares land, and scripts\/ has no land\.ts: add the script, or take the verb off `verbs`/,
+    stoppedWords(300, false, 'reading the diff\n'),
+    /^it gave no answer within 0\.3 s, its deadline, and was stopped.*reading the diff/,
   );
 });
 
-test("placeDirOf answers the package's place for a record that names none and for one that names git", () => {
-  assert.equal(placeDirOf({ id: 'r' }), SHIPPED_PLACE);
-  assert.equal(placeDirOf({ id: 'r', placeSkill: { skill: 'git', version: 'x' } }), SHIPPED_PLACE);
-});
-
-test('REFUSED: placeDirOf of a record that names a place skill this nemia does not ship', () => {
-  assert.throws(
-    () => placeDirOf({ id: 'r', placeSkill: { skill: 'svn', version: 'x' } }),
-    (err: unknown) =>
-      err instanceof Invalid &&
-      err.exitCode === 2 &&
-      err.message === 'run r names the place skill svn, and this nemia ships only git: read its store with the nemia that started it',
-  );
-});
-
-/** A place skill that declares `verbs`, with a SKILL.md, a script for each verb, and `open`'s script `open` (an answer by default). */
-function placeWith(verbs: readonly PlaceVerb[], open: string = printing(ANSWERS.open)): string {
-  const dir = declaring({ ...DECLARED, verbs }, verbs);
-  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: git\n---\n');
-  fs.writeFileSync(path.join(dir, 'scripts', 'open.ts'), open);
-  return dir;
-}
-
-/** What `openPlace` refuses with, its kind and exit code checked. */
-function openRefused(dir: string, needed: readonly PlaceVerb[] = []): string {
-  try {
-    openPlace(dir, '/r', needed, true);
-  } catch (err) {
-    assert.ok(err instanceof Invalid, `Invalid expected, got ${String(err)}`);
-    assert.equal(err.exitCode, 2);
-    return err.message;
-  }
-  return assert.fail('openPlace opened it');
-}
-
-test("openPlace answers open's answer and the place skill it ran, by name and version", () => {
-  const dir = placeWith(['open', 'status']);
-  assert.deepEqual(openPlace(dir, '/r', [], true), { opened: ANSWERS.open, placeSkill: { skill: 'git', version: skillVersion(dir) } });
-  assert.equal(typeof skillVersion(dir), 'string');
-});
-
-test('REFUSED: openPlace of a place that leaves out a verb the run needs, naming the verb and its place.json; the same place asked none opens', () => {
-  const dir = placeWith(['open', 'status']);
-  const said = openRefused(dir, ['status', 'land']);
-  assert.ok(said.startsWith(`${path.join(dir, 'place.json')} does not declare land, which `), said);
-  assert.ok(!said.includes('status,'), said);
-  assert.ok(said.includes('add the verb to `verbs` with its script in scripts/'), said);
-  assert.equal(openPlace(dir, '/r', ['status'], true).opened.repo, '/r');
-});
-
-test("REFUSED: openPlace when open refuses, in the place's words whole, and hands open whether the run cuts worktrees", () => {
-  const words = '/r is not a git repository: run git init there and commit once, or name a repository with --repo';
-  assert.equal(openRefused(placeWith(['open'], printing({ refused: words }))), words);
-  const echoing = placeWith(
-    ['open'],
-    `import fs from 'node:fs';\nconst { isolate } = JSON.parse(fs.readFileSync(0, 'utf8'));\nprocess.stdout.write(JSON.stringify(isolate ? { refused: 'isolated' } : ${JSON.stringify(ANSWERS.open)}));\n`,
-  );
-  assert.equal(openRefused(echoing), 'isolated');
-  assert.deepEqual(openPlace(echoing, '/r', [], false).opened, ANSWERS.open);
-});
-
-test('an open that is not heard is no refusal: openPlace throws a plain Error with why, which a queued card tries again', () => {
-  const unheard = (open: string): Error => {
-    try {
-      openPlace(placeWith(['open'], open), '/r', [], true);
-    } catch (err) {
-      assert.ok(err instanceof Error && !(err instanceof Invalid), `a plain Error expected, got ${String(err)}`);
-      assert.equal((err as { exitCode?: unknown }).exitCode, undefined);
-      return err;
-    }
-    return assert.fail('openPlace opened it');
-  };
-  const failed = unheard("process.stderr.write('git: not found\\n');\nprocess.exitCode = 3;\n");
-  assert.ok(failed.message.startsWith("the place's open was not heard: git: not found"), failed.message);
-  assert.ok(failed.message.endsWith('Nothing was started: start it again'), failed.message);
-  const unshaped = unheard(printing({ repo: 1, baseRef: 'abc', branch: 'main' }));
-  assert.ok(unshaped.message.includes("its answer does not read as open's: `repo` is 1, where "), unshaped.message);
-});
-
-test('REFUSED: openPlace of a folder with no SKILL.md, or no place.json', () => {
-  const dir = placeWith(['open']);
-  fs.rmSync(path.join(dir, 'SKILL.md'));
-  assert.equal(openRefused(dir), `${dir} has no SKILL.md, so it is no skill to run a place from: write its SKILL.md there`);
-  fs.rmSync(path.join(dir, 'place.json'));
-  assert.match(openRefused(dir), /place\.json is not there/);
+test('a verb that threw says so in one sentence, naming the verb and what was thrown', () => {
+  assert.equal(threwWords('make', new Error('also is not iterable')), 'make threw before it answered: also is not iterable');
+  assert.equal(threwWords('land', 'a string'), 'land threw before it answered: a string');
 });
 
 test("sayFilled fills each hole it is handed, and leaves a hole it is not, and a person's `<branch>`, as written", () => {

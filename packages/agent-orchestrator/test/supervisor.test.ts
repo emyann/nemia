@@ -15,6 +15,7 @@ import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
+import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -22,7 +23,9 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, list, retryRun, runSlots, startRun, runWith } = await import('../src/runner.ts');
+const { advanceRun, list, retryRun, runSlots, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const runWith = runOver(runEngine, gitPlaceLayer);
+const runPlaced = runGiven(gitPlaceLayer);
 const { passParents } = await import('../src/views/views.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
@@ -120,7 +123,7 @@ const board = () => {
 test('a step answered five times over keeps working: each answer a try of the same session, told what was said, on the window it was started with, and nothing capping the count', async () => {
   const repo = aRepo();
   const { e, tasks, filings, settle } = board();
-  const run = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
+  const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
 
   await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual(filings, [`${run.id}-supervise`], "filed once, in the repository's own checkout");
@@ -164,7 +167,7 @@ test('a step answered five times over keeps working: each answer a try of the sa
 test('a pass over a step answered again and again reads what it is working on, not every try it has left behind — and with a cap in force it reads them all', async () => {
   const repo = aRepo();
   const { e, reads, settle } = board();
-  const run = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
+  const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
   await runWith(e, advanceRun(readRun(run.id)));
 
   const passReads = async (): Promise<string[]> => {
@@ -188,7 +191,7 @@ test('a pass over a step answered again and again reads what it is working on, n
   assert.deepEqual(later, [`${run.id}-supervise-try7`], 'the try it is on, and nothing else');
   assert.equal(later.length, early.length, 'a pass costs the same at six answers as at one: it does not grow with them');
 
-  const capped = await Effect.runPromise(
+  const capped = await runPlaced(
     startRun({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude\nbudget: 1' }), isolate: false }),
   );
   await runWith(e, advanceRun(readRun(capped.id)));
@@ -214,8 +217,8 @@ test('a pass over a step answered again and again reads what it is working on, n
 test("`slot: none` on disk: a watcher's run files its step at a full cap, counts against nothing, and holds no other run — while the run beside it waits", async () => {
   const repo = aRepo();
   const { e, filings, settle } = board();
-  const watcher = await Effect.runPromise(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
-  const work = await Effect.runPromise(
+  const watcher = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
+  const work = await runPlaced(
     startRun({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false }),
   );
 
@@ -260,7 +263,7 @@ test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of 
   ];
   for (const steps of shapes) {
     await assert.rejects(
-      async () => await Effect.runPromise(startRun({ brief: 'watch it', repo, workflowDir: folderOf(steps) })),
+      async () => await runPlaced(startRun({ brief: 'watch it', repo, workflowDir: folderOf(steps) })),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 &&
         /^supervise: `slot: none` takes this step's whole RUN out of the cap on runs in flight \(WF_MAX_RUNS\), and this workflow has \w+ beside it — a slot is a run's, not a step's/.test(
@@ -271,7 +274,7 @@ test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of 
   }
   assert.equal(runs(), before, 'nothing written');
   assert.ok(
-    (await Effect.runPromise(startRun({ brief: 'watch it', repo, workflowDir: FOLDER }))).id,
+    (await runPlaced(startRun({ brief: 'watch it', repo, workflowDir: FOLDER }))).id,
     'a watcher alone in its workflow is the shape that is allowed: one step, and it starts',
   );
 });

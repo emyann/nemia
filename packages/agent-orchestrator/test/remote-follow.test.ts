@@ -19,7 +19,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { EngineService, engine, feedHubLayer, followStep, tickRun } = await import('../src/runner.ts');
+const { EngineService, engine, feedHubLayer, followStep, gitPlaceLayer, tickRun } = await import('../src/runner.ts');
 const { main } = await import('../src/cli/main.ts');
 
 type Engine = ReturnType<typeof engine>;
@@ -48,7 +48,13 @@ async function started(agent: string, url: string): Promise<string> {
 /** A runtime with the feed's hub over the engine `e`, its logs at warnings: let go once the test `t` ends. */
 function runtimeOf(t: TestContext, e: Engine) {
   const rt = ManagedRuntime.make(
-    Layer.mergeAll(feedHubLayer(), Logger.layer([]), EngineService.layer(e), Layer.succeed(References.MinimumLogLevel, 'Warn')),
+    Layer.mergeAll(
+      feedHubLayer(),
+      Logger.layer([]),
+      EngineService.layer(e),
+      gitPlaceLayer,
+      Layer.succeed(References.MinimumLogLevel, 'Warn'),
+    ),
   );
   t.after(() => rt.dispose());
   return rt;

@@ -16,6 +16,7 @@ import {
   checkWait,
   deniedCalls,
   gateWaits,
+  onceFacts,
   queueWait,
   roundsGranted,
   settledFacts,
@@ -444,13 +445,24 @@ test("REFUSED: an attempt still running, one before its task's mark, a check's t
     [2, 2],
     'the first attempt is counted already',
   );
-  assert.deepEqual(denied({ ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] } as Run), []);
+  assert.deepEqual(denied({ ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] }), []);
   assert.equal(
     denied(DENIED_RUN).some(([task]) => task === 'r-1-work-try2-check'),
     false,
     "a check's task is never read",
   );
   assert.deepEqual(denied(RUN), [], 'a record written before the tick counted denials');
+});
+
+test("what a pass hands over once comes with the run's marks moved past it, and a record without a mark keeps none", () => {
+  const first = onceFacts({ ...GATED, steps: DENIED_RUN.steps, deniedCounted: [] } as Run, [WORK, REVIEW], DENIED_VIEWS, callOf);
+  assert.equal(first.facts.length, 3);
+  assert.deepEqual(first.marks, { gatesTimed: [], deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] });
+  const again = onceFacts({ ...DENIED_RUN, ...first.marks } as Run, [WORK, REVIEW], DENIED_VIEWS, callOf);
+  assert.deepEqual(again, { facts: [], marks: first.marks }, 'REFUSED: nothing handed over twice');
+  const gate = onceFacts(GATED, [PLAN, BUILD], GATED_VIEWS, callOf);
+  assert.deepEqual([gate.facts.length, gate.marks], [1, { gatesTimed: [{ step: 'plan', try: 1 }] }], 'no deniedCounted, none made');
+  assert.deepEqual(onceFacts(RUN, [WORK, REVIEW], DENIED_VIEWS, callOf), { facts: [], marks: {} });
 });
 
 test("a task that is the step's and one of its tries' is read once", () => {

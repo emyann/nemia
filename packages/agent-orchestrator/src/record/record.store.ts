@@ -512,9 +512,7 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
  * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them. The directory is listed once,
  * and each file in it read once.
  */
-export function readAsks(id: string): AsksRead {
-  return within('asks', () => readAsksNow(id));
-}
+export const readAsks = (id: string): AsksRead => within('asks', () => readAsksNow(id));
 
 function readAsksNow(id: string): AsksRead {
   const read: AsksRead = { asks: [], rounds: [], notes: [] };

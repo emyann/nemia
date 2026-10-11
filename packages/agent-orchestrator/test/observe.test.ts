@@ -84,9 +84,9 @@ const CLAUDE_SPAN_ATTRIBUTES = ['tool_name', 'task'];
 const CLAUDE_SERVICE = 'claude-code';
 
 /**
- * The fields of a session's log events in Loki a dashboard reads beside a run's and a step's, as measured 2026-10-11 on Claude Code
- * 2.1.296 (`tools/observe/README.md`): the event's name (`tool_result`), whether the tool succeeded, the tool and its parameters, and
- * the labels the session was started with.
+ * The fields of a session's log events in Loki a dashboard reads beside a run's and a step's, as measured (`tools/observe/README.md`,
+ * *Counting a session's errors*): the event's name (`tool_result`), whether the tool succeeded, the tool and its parameters, and the
+ * labels the session was started with.
  */
 const CLAUDE_LOG_FIELDS = ['event_name', 'success', 'tool_name', 'tool_parameters', 'task', 'factory', 'workflow', 'agent'];
 

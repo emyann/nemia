@@ -253,6 +253,31 @@ export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyM
 }
 
 /**
+ * What a pass hands the metrics once of `run`, and never again: each gate's wait not timed before (`gateWaits`) and each denied call not
+ * counted before (`deniedCalls`), with the run's two marks as they stand once these are handed over (`marks`), for the tick to write:
+ * `gatesTimed` with each gate timed, `deniedCounted` with each session's attempts counted through the last one read. A mark the record
+ * has not is left out, and its facts are none.
+ */
+export function onceFacts(
+  run: Run,
+  steps: readonly Workflow[],
+  views: ReadonlyMap<string, FactView>,
+  callOf: (denial: DeniedCall) => string,
+): { facts: StepFact[]; marks: Pick<Run, 'gatesTimed' | 'deniedCounted'> } {
+  const gates = gateWaits(run, steps, views);
+  const denied = deniedCalls(run, steps, views, callOf);
+  const counted = new Map((run.deniedCounted ?? []).map((c) => [c.task, c.attempts]));
+  for (const f of denied) counted.set(f.task, Math.max(counted.get(f.task) ?? 0, f.attempt));
+  return {
+    facts: [...gates, ...denied],
+    marks: {
+      ...(run.gatesTimed ? { gatesTimed: [...run.gatesTimed, ...gates.map((f) => ({ step: f.attributes.step, try: f.try }))] } : {}),
+      ...(run.deniedCounted ? { deniedCounted: [...counted].map(([task, attempts]) => ({ task, attempts })) } : {}),
+    },
+  };
+}
+
+/**
  * One call a harness denied a step's session, for a span of its own and no metric: the step's four labels (`stepKeys`, no outcome: a call
  * is denied whatever its try comes to), the run, the session's task, the tool denied and the call as a permission rule names it
  * (`Skill(look)`), when its attempt ended (`at`), and which attempt of the task that was, from 1.

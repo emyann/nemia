@@ -72,16 +72,7 @@ import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { RunPlace } from '../place/place.store.ts';
 import { runPlaceVerbAsync } from '../place/place-async.store.ts';
-import {
-  deniedCalls,
-  gateWaits,
-  roundsGranted,
-  settledFacts,
-  settledWaits,
-  type DeniedFact,
-  type StepFact,
-  type WaitFact,
-} from '../meter/index.ts';
+import { onceFacts, roundsGranted, settledFacts, settledWaits, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
@@ -241,8 +232,8 @@ export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
  * have, a line it refused, an `npm ci` that ran or failed), each try and each round filed and on whose word, a blocked session the engine
  * was asked to stop for a try, and an ask file that cannot be read. `looped` names the looping steps whose loop this pass took round again.
  * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass was handed as settled since the pass
- * before (`PassRead`'s `settled`) with the waits they ended, each round granted, each gate wait not timed before (`timedGates`), and each
- * denied call not counted before (`countedDenials`); absent where there is none.
+ * before (`PassRead`'s `settled`) with the waits they ended, each round granted, each gate wait not timed and each denied
+ * call not counted before (`markedOnce`); absent where there is none.
  * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
@@ -315,8 +306,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   pass, and a worktree cut for it stays for `nemia rm` to find. A step's files directory is made before its brief names it, and again for
  *   its check, for a step filed without one.
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
- * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it (`timedGates`),
- *   and each session's attempts whose denied calls it hands them as counted (`deniedCounted`, `countedDenials`).
+ * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it, and each
+ *   session's attempts whose denied calls it hands them as counted (`deniedCounted`), both by `markedOnce`.
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`BranchReader.shipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
@@ -367,7 +358,7 @@ export const advancePass = Effect.fn('advancePass')(
     const liftNotes = yield* liftHold(e, run, parents);
     const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
     const settled = settledOf(run, reads, pass?.settled);
-    const marked = [...timedGates(run, reads), ...countedDenials(run, reads)];
+    const marked = markedOnce(run, reads);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
@@ -409,29 +400,15 @@ function settledOf(run: Run, r: PassReads, settled: ReadonlySet<string> | undefi
 }
 
 /**
- * The gate waits of the run's approvals the tick has not timed yet (`gateWaits`), off this pass's views, each marked timed on the run
- * (`gatesTimed`) for the record this pass writes. The metrics record them once the pass is done, after that write (`tickRun`): a process
- * that dies between the two loses them, and never records one twice.
+ * What the pass hands the metrics once of the run (`onceFacts`), off this pass's views: the gate waits of its approvals not timed yet and
+ * the calls its sessions were denied not counted yet, each marked on the run (`gatesTimed`, `deniedCounted`) for the record this pass
+ * writes. The metrics record them once the pass is done, after that write (`tickRun`): a process that dies between the two loses them,
+ * and never records one twice, a restart between passes included.
  */
-function timedGates(run: Run, r: PassReads): WaitFact[] {
-  const facts = gateWaits(run, r.steps, r.views);
-  run.gatesTimed?.push(...facts.map((f) => ({ step: f.attributes.step, try: f.try })));
-  return facts;
-}
-
-/**
- * The calls the run's sessions were denied that the tick has not counted yet (`deniedCalls`), off this pass's views, each session's
- * attempts marked counted on the run (`deniedCounted`) through the last one read, for the record this pass writes. The metrics record
- * them after that write, as they do a gate's wait (`timedGates`): a call is counted once at most, a restart between passes included.
- */
-function countedDenials(run: Run, r: PassReads): DeniedFact[] {
-  const facts = deniedCalls(run, r.steps, r.views, denialText);
-  for (const { task, attempt } of facts) {
-    const mark = run.deniedCounted?.find((c) => c.task === task);
-    if (mark) mark.attempts = Math.max(mark.attempts, attempt);
-    else run.deniedCounted?.push({ task, attempts: attempt });
-  }
-  return facts;
+function markedOnce(run: Run, r: PassReads): StepFact[] {
+  const once = onceFacts(run, r.steps, r.views, denialText);
+  Object.assign(run, once.marks);
+  return once.facts;
 }
 
 /**

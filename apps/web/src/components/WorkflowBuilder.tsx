@@ -29,6 +29,7 @@ import {
 } from '../lib/builder';
 import { edgeStroke, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { extentOf } from '../lib/layout';
+import { rereadWorkflows } from '../lib/placed';
 import { BuilderEdge, type BuilderFlowEdge } from './BuilderEdge';
 import { StepForm, type DraftUpdate } from './StepForm';
 import { SpecNode, type SpecFlowNode } from './StepNode';
@@ -108,7 +109,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       startFrom(answer.workflow);
       setSaved(answer);
       queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, answer.workflow));
-      void queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true });
+      void rereadWorkflows(queryClient);
     },
     onError: (err) => {
       const refused = err instanceof BuildRefusal ? err : new BuildRefusal(err.message, []);

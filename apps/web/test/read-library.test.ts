@@ -9,7 +9,14 @@ import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { agentQuery, agentsQuery, readAgent, type AgentListing, type LibraryAgent } from '../src/lib/api/agents.ts';
 import { skillQuery, skillsQuery, type SkillDetail, type SkillPlace } from '../src/lib/api/skills.ts';
-import { repositoryQuery, stepQuery, workflowsQuery, type WorkflowListing, type WorkflowStepPage } from '../src/lib/api/workflows.ts';
+import {
+  repositoryQuery,
+  stepQuery,
+  workflowsInQuery,
+  workflowsQuery,
+  type WorkflowListing,
+  type WorkflowStepPage,
+} from '../src/lib/api/workflows.ts';
 import { keyFormQuery, type KeyForm } from '../src/lib/api/builder.ts';
 import { machineQuery, machinesQuery, type MachineGraph, type MachineListing } from '../src/lib/api/machines.ts';
 import { StepKeySchema, WorkflowStepSpecSchema } from '../src/lib/api/library.ts';
@@ -235,6 +242,26 @@ test("a step's page is read in the place named, keyed by it, with what a run of 
   assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review', { factory: 'g' }).queryKey);
   await (stepQuery('yours', 'w', 'review', { factory: 'f', repo: '/code/app' }).queryFn as unknown as () => Promise<unknown>)();
   assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f&repo=%2Fcode%2Fapp');
+});
+
+test("REFUSED: a list of workflows is read in its place — with none, the list the builder drafts from; in a factory, the factory's, under the key its start reads", async (t) => {
+  const asked: string[] = [];
+  const before = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    asked.push(String(input));
+    return new Response(JSON.stringify([workflow()]), { headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  const every = workflowsInQuery(null);
+  await (every.queryFn as unknown as () => Promise<unknown>)();
+  assert.equal(asked.at(-1), '/api/workflows');
+  assert.deepEqual([...every.queryKey], ['workflows']);
+  const placed = workflowsInQuery({ factory: 'f', repo: '/code/app' });
+  await (placed.queryFn as unknown as () => Promise<unknown>)();
+  assert.equal(asked.at(-1), '/api/workflows?factory=f&repo=%2Fcode%2Fapp');
+  assert.deepEqual([...placed.queryKey], ['factory-workflows', 'f', '/code/app']);
 });
 
 test("REFUSED, a step's page: one without its recent runs, the factories that hire into it, whether it can be hired into, or a skill's place the board knows", async (t) => {

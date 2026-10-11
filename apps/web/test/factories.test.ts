@@ -2,7 +2,7 @@
  * The factories as the board splits the machine by them (src/lib/factories.ts): a block a factory, the default one only while no factory
  * is filed and it holds runs; each run and queued card in the factory its record or card names, the default factory's naming none; where a
  * floor starts a run; and, for the pages that list the whole machine, the factory each run or card is tagged with, what the factory picked
- * keeps, the factories a workflow is in and the workflows the factory picked offers.
+ * keeps, the factories a workflow listed with no factory is in and where the address's place reads a list of workflows.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,8 +15,8 @@ import {
   floorPlace,
   hireOnCreate,
   hirePlaceOf,
-  hiresInto,
-  offeredIn,
+  listPlace,
+  fromWord,
   queuedIn,
   runsIn,
   shownIn,
@@ -207,39 +207,51 @@ test("REFUSED: a workflow is tagged only with the factories that attach it where
   assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
 });
 
-test('REFUSED: the Workflows page lists only the workflows the factory picked is in; every one with none picked or the default; none while the factories are unread', () => {
-  const factories = [
-    factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
-    factory('nemia', { repos: ['/r'], workflows: ['dev'] }),
-    factory('quay', { repos: ['/elsewhere'], workflows: ['build'] }),
-  ];
-  const listed = [
-    { name: 'dev', from: 'repo' as const },
-    { name: 'build', from: 'yours' as const },
-    { name: 'intake', from: 'repo' as const },
-  ];
-  const offered = (picked: string | undefined, read: typeof factories | undefined) =>
-    listed.filter(offeredIn(picked, read)).map((workflow) => workflow.name);
-  assert.deepEqual(offered(undefined, factories), ['dev', 'build', 'intake']);
-  assert.deepEqual(offered(undefined, undefined), ['dev', 'build', 'intake'], 'with none picked, every one, read or not');
-  assert.deepEqual(offered('default', factories), ['dev', 'build', 'intake'], 'the default factory offers every workflow');
-  assert.deepEqual(offered('nemia', factories), ['dev']);
-  assert.deepEqual(offered('quay', factories), ['build']);
-  assert.deepEqual(offered('gone', factories), []);
-  assert.deepEqual(offered('nemia', undefined), [], 'none while the factories are unread');
+test("REFUSED: a named factory's workflows are read in it, on its own repository — never judged against the default factory's", () => {
+  const factories = [fallback, factory('pipao', { repos: ['/code/pipao'], workflows: ['dev'] })];
+  assert.deepEqual(listPlace({ factory: 'pipao' }, factories), {
+    kind: 'in',
+    place: { factory: 'pipao', repo: '/code/pipao' },
+    repos: ['/code/pipao'],
+  });
+  assert.deepEqual(listPlace({ factory: 'pipao' }, factories.slice(1)), listPlace({ factory: 'pipao' }, factories), 'default read or not');
 });
 
-test("REFUSED: a workflow page's rows hire into its steps only in a factory picked that offers it — never with none picked, in the default, or before the factories are read", () => {
-  const factories = [
-    factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
-    factory('nemia', { repos: ['/r'], workflows: ['dev'] }),
-  ];
-  const dev = { name: 'dev', from: 'repo' as const };
-  assert.equal(hiresInto(dev, 'nemia', factories), true);
-  assert.equal(hiresInto(dev, undefined, factories), false);
-  assert.equal(hiresInto(dev, 'default', factories), false, 'the default factory offers every workflow and hires no one');
-  assert.equal(hiresInto({ name: 'build', from: 'repo' }, 'nemia', factories), false);
-  assert.equal(hiresInto(dev, 'nemia', undefined), false);
+test('REFUSED: the address reads every workflow with no factory or the default; a factory on several repositories is read on the one named, and asks which when none is', () => {
+  const two = factory('quay', { repos: ['/a', '/b'] });
+  const factories = [fallback, factory('nemia'), two];
+  assert.deepEqual(listPlace({}, factories), { kind: 'every' });
+  assert.deepEqual(listPlace({ repo: '/a' }, factories), { kind: 'every' });
+  assert.deepEqual(listPlace({ factory: 'default' }, factories), { kind: 'every' });
+  assert.deepEqual(listPlace({ factory: 'quay', repo: '/b' }, factories), {
+    kind: 'in',
+    place: { factory: 'quay', repo: '/b' },
+    repos: ['/a', '/b'],
+  });
+  assert.deepEqual(listPlace({ factory: 'quay' }, factories), { kind: 'pick', factory: 'quay', repos: ['/a', '/b'] });
+});
+
+test('REFUSED: a factory of no such name, one whose file does not read and one on no repository list nothing, and say why', () => {
+  const broken = factory('broken', { error: '/wf/factories/broken.json is not JSON' });
+  const homeless = factory('homeless', { repos: [] });
+  const factories = [fallback, broken, homeless];
+  assert.deepEqual(listPlace({ factory: 'gone' }, factories), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
+  assert.deepEqual(listPlace({ factory: 'gone' }, []), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
+  const why = (name: string, of: Factory) => {
+    const floor = floorPlace(of);
+    assert.ok(floor && 'why' in floor);
+    assert.deepEqual(listPlace({ factory: name, repo: '/x' }, factories), { kind: 'refused', factory: name, why: floor.why });
+  };
+  why('broken', broken);
+  why('homeless', homeless);
+});
+
+test("REFUSED: a workflow read in a named factory is the factory's, never said to be this repository's; yours is yours anywhere", () => {
+  assert.equal(fromWord('yours'), 'yours');
+  assert.equal(fromWord('yours', 'pipao'), 'yours');
+  assert.equal(fromWord('repo'), 'this repository');
+  assert.equal(fromWord('repo', 'default'), 'this repository');
+  assert.equal(fromWord('repo', 'pipao'), "the factory's");
 });
 
 test("REFUSED: New agent's address names the step it hires into only whole — a factory, a workflow and a step, each a string not empty", () => {

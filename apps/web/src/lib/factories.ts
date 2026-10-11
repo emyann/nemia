@@ -1,10 +1,10 @@
 /**
  * The machine split by factory, without React Flow: a block for each factory, with what it holds; the runs and the queued cards of one
  * factory; where a factory's floor starts a run; and, for the pages that list the whole machine, the factory each run or card is tagged
- * with, what the factory picked keeps, the factories a workflow is in and the workflows the factory picked offers. A run or a card belongs
- * to the factory it names, and one naming none to the default factory. Pure.
+ * with, what the factory picked keeps, the factories a workflow listed with no factory is in, and where the address's place reads a list of
+ * workflows. A run or a card belongs to the factory it names, and one naming none to the default factory. Pure.
  */
-import type { Factory, FactoryCondition, InboxEntry, PagePlace, RunSummary, WorkflowListing, WorkflowPageAddress } from './api.ts';
+import type { Factory, FactoryCondition, InboxEntry, PagePlace, Place, RunSummary, WorkflowListing, WorkflowPageAddress } from './api.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
@@ -136,9 +136,10 @@ export const shownIn = <T extends { factory: string | null }>(items: readonly T[
   items.filter(keptBy(filter));
 
 /**
- * The factories a listed workflow is in, by name, sorted: each named factory whose file reads and that attaches it by its folder's name,
- * on a repository it is found on. One of yours is found on every repository; one of the repository's only on the api's, the default
- * factory's. None while `factories` holds no default factory to say which repository that is.
+ * The factories a workflow listed with no factory is in, by name, sorted, which tag it on the list read with none picked: each named
+ * factory whose file reads and that attaches it by its folder's name, on a repository it is found on. One of yours is found on every
+ * repository; one of the repository's only on the api's, the default factory's. None while `factories` holds no default factory to say
+ * which repository that is. A list read in a named factory is the api's answer there, and is tagged with that factory alone.
  */
 export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from'>, factories: readonly Factory[]): string[] => {
   const here = factories.find((f) => f.default)?.repos[0];
@@ -150,25 +151,43 @@ export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from
 };
 
 /**
- * Whether a listed workflow is listed with the factory `factory` picked: every one is with none picked, or the default factory, which
- * offers every workflow; else only one the factory is in (`workflowFactories`), and none while `factories` are unread.
+ * Where the address's place reads a list of workflows: `every`, with no factory, the list read with none; `in` a named factory on one of
+ * its repositories, the api's answer there, with the factory's `repos`; `pick`, for a factory on several repositories whose address names
+ * none, which a person picks among; or `refused`, with `why` the factory `factory` lists none.
  */
-export const offeredIn =
-  (factory: string | undefined, factories: readonly Factory[] | undefined) =>
-  (workflow: Pick<WorkflowListing, 'name' | 'from'>): boolean =>
-    factory === undefined ||
-    factory === DEFAULT_NAME ||
-    (factories !== undefined && workflowFactories(workflow, factories).includes(factory));
+export type ListPlace =
+  | { kind: 'every' }
+  | { kind: 'in'; place: Place; repos: string[] }
+  | { kind: 'pick'; factory: string; repos: string[] }
+  | { kind: 'refused'; factory: string; why: string };
 
 /**
- * Whether the factory `factory` hires into the steps of a listed workflow: a factory picked that offers it (`workflowFactories`) — never
- * none, nor the default factory, which hires no one — and none while `factories` are unread.
+ * Where `address` reads a list of workflows among `factories` (`ListPlace`): `every` for no factory and for the default one; `refused`
+ * for a name no factory has, a factory whose file does not read and one on no repository, in `floorPlace`'s words; `in` the factory on
+ * the repository the address names, else its only one (`startRepo`); `pick` where it has several and the address names none — never a
+ * guess among them, nor the default factory's repository.
  */
-export const hiresInto = (
-  workflow: Pick<WorkflowListing, 'name' | 'from'>,
-  factory: string | undefined,
-  factories: readonly Factory[] | undefined,
-): boolean => factory !== undefined && factories !== undefined && workflowFactories(workflow, factories).includes(factory);
+export const listPlace = (address: PagePlace, factories: readonly Factory[]): ListPlace => {
+  const { factory: name, repo } = address;
+  if (name === undefined || name === DEFAULT_NAME) return { kind: 'every' };
+  const factory = factories.find((f) => f.name === name && !f.default);
+  const floor = factory ? floorPlace(factory) : null;
+  if (!floor) return { kind: 'refused', factory: name, why: `No factory is named ${name}.` };
+  if ('why' in floor) return { kind: 'refused', factory: name, why: floor.why };
+  const on = startRepo(floor, repo ?? null);
+  return on === null
+    ? { kind: 'pick', factory: name, repos: floor.repos }
+    : { kind: 'in', place: { factory: name, repo: on }, repos: floor.repos };
+};
+
+/**
+ * The word for where a workflow read from `from` comes from, read in `factory`: `yours` for one of yours anywhere; `this repository` for
+ * one read with no factory or in the default one; `the factory's` in a named factory, whose folder its page prints.
+ */
+export const fromWord = (from: WorkflowListing['from'], factory?: string): string => {
+  if (from === 'yours') return 'yours';
+  return factory === undefined || factory === DEFAULT_NAME ? 'this repository' : "the factory's";
+};
 
 /** The step a new agent is to be hired into once written: a factory, a workflow of yours, and its step. */
 export type HirePlace = { factory: string; workflow: string; step: string };

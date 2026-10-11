@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
-import type { RunDetail, WorkflowListing } from '../lib/api';
+import type { PagePlace, RunDetail, WorkflowListing } from '../lib/api';
 import { specStep } from '../lib/bar';
 import { extentOf, layout, stepsOf } from '../lib/layout';
 import { useBarOver } from '../lib/useBarOver';
@@ -186,9 +186,10 @@ function drawnOf(workflow: WorkflowListing): Drawn | Error {
  * again or the empty canvas closes it, and another switches it. A double click on a step, or the bar's Open, goes to its page
  * (`useCanvasPress`). Its frame holds its rows and the room around them, 180 px at least and 420 px at most, so one workflow never takes
  * the page; its flow has an id of its own, which scopes its arrowheads' ids on a page that draws several, and its arrowheads take their
- * edges' colour in both themes. The builder (`WorkflowBuilder`) draws a workflow in its place, and keeps a click to edit a step.
+ * edges' colour in both themes. The builder (`WorkflowBuilder`) draws a workflow in its place, and keeps a click to edit a step. A step's
+ * page is reached in `place`, the place the workflow's page is read in.
  */
-export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
+export function WorkflowCanvas({ workflow, place = {} }: { workflow: WorkflowListing; place?: PagePlace }) {
   const drawn = useMemo(() => drawnOf(workflow), [workflow]);
   if (drawn instanceof Error) {
     return (
@@ -197,21 +198,22 @@ export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
   }
   return (
     <ReactFlowProvider>
-      <Graph workflow={workflow} drawn={drawn} />
+      <Graph workflow={workflow} drawn={drawn} place={place} />
     </ReactFlowProvider>
   );
 }
 
 /**
  * The canvas of `workflow`'s graph `drawn`, its step the bar shows marked `inspected`, and its frame narrowed by what the bar covers of it
- * (`useBarOver`), so the step inspected stays clear of the bar, fitted again as the frame changes width (`useRefit`).
+ * (`useBarOver`), so the step inspected stays clear of the bar, fitted again as the frame changes width (`useRefit`). A double click
+ * goes to the step's page in `place`.
  */
-function Graph({ workflow, drawn }: { workflow: WorkflowListing; drawn: Drawn }) {
+function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: Drawn; place: PagePlace }) {
   const { from, name } = workflow;
   const navigate = useNavigate();
   const { shown, ...press } = useCanvasPress(
     (step) => ({ kind: 'spec', from, workflow: name, step }),
-    (step) => void navigate({ to: '/workflows/$from/$workflow/$step', params: { from, workflow: name, step } }),
+    (step) => void navigate({ to: '/workflows/$from/$workflow/$step', params: { from, workflow: name, step }, search: place }),
   );
   const inspected = specStep(shown, from, name);
   const nodes = useMemo(

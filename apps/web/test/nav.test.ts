@@ -137,6 +137,12 @@ test("a pick on a section's page stays there, keeping its other keys; on a facto
   assert.deepEqual(pickTo('/stats', search, 'nemia'), { to: '/stats', search: { period: '90d', agent: 'ada', factory: 'nemia' } });
   assert.deepEqual(pickTo('/stats', search, undefined), { to: '/stats', search: { period: '90d', agent: 'ada' } });
   assert.deepEqual(pickTo('/runs', {}, 'nemia'), { to: '/runs', search: { factory: 'nemia' } });
+  assert.deepEqual(
+    pickTo('/workflows', { factory: 'a', repo: '/x' }, 'b'),
+    { to: '/workflows', search: { factory: 'b' } },
+    'refused: the repository of the factory left rides to no other',
+  );
+  assert.deepEqual(pickTo('/workflows', { factory: 'a', repo: '/x' }, undefined), { to: '/workflows', search: {} });
   assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
   assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
   assert.deepEqual(pickTo('/factories/nemia/settings', {}, undefined), { to: '/' }, "All factories leaves a factory's settings for Home");

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryTags } from '../components/FactoryTag';
@@ -8,15 +9,24 @@ import { StartRun } from '../components/StartRun';
 import { StepRows } from '../components/StepRows';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { FromBadge, NoBuilder } from '../components/WorkflowParts';
-import { factoriesQuery, storeQuery, workflowsQuery, type Factory, type PagePlace, type WorkflowListing } from '../lib/api';
-import { pagePlaceOf } from '../lib/factories';
+import { FromBadge, NoBuilder, Unplaced } from '../components/WorkflowParts';
+import {
+  factoriesQuery,
+  storeQuery,
+  workflowsInQuery,
+  workflowsQuery,
+  type Factory,
+  type PagePlace,
+  type Place,
+  type WorkflowListing,
+} from '../lib/api';
 import { specStep, barOf } from '../lib/bar';
-import { hiresInto, workflowFactories } from '../lib/factories';
+import { listPlace, pagePlaceOf, whyNotStarted, workflowFactories } from '../lib/factories';
+import { loadWorkflowsIn } from '../lib/placed';
 
 /**
- * The page's search: `build`, while the builder of one of yours is open; and the place its steps' pages are read in, `factory` and `repo`,
- * as the Workflows list or a run reached it.
+ * The page's search: `build`, while the builder of one of yours is open; and the place the page and its steps' pages are read in,
+ * `factory` and `repo`, as the Workflows list or a run reached it.
  */
 const workflowSearch = (search: Record<string, unknown>): { build?: true } & PagePlace => ({
   ...(search.build === true || search.build === 'true' ? { build: true as const } : {}),
@@ -25,15 +35,17 @@ const workflowSearch = (search: Record<string, unknown>): { build?: true } & Pag
 
 /**
  * The page of a workflow, at /workflows/$from/$workflow: `workflows_` draws it on its own, not inside the Workflows page, which has no
- * outlet for it. `?build=true` opens the builder of one of yours.
+ * outlet for it. `?build=true` opens the builder of one of yours. It is read in the address's place (`loadWorkflowsIn`), and one of yours
+ * read in a factory loads the list read with none too, which its builder drafts from.
  */
 export const Route = createFileRoute('/workflows_/$from/$workflow')({
   validateSearch: workflowSearch,
-  loader: ({ context }) =>
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps, params }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(workflowsQuery),
+      loadWorkflowsIn(context.queryClient, deps),
       context.queryClient.ensureQueryData(storeQuery),
-      context.queryClient.prefetchQuery(factoriesQuery),
+      params.from === 'yours' ? context.queryClient.prefetchQuery(workflowsQuery) : null,
     ]),
   component: WorkflowPage,
   errorComponent: ({ error }) => (
@@ -45,27 +57,147 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
 });
 
 /**
- * One workflow: what it is, its star, the factories it is in, its README whole — the workflow level's instruction — then, for one that
- * reads, its graph, its steps a row each, and a start; for one that does not, the loader's refusal in their place. One of yours is built
- * here, its builder in place of the README, the graph, the rows and the start while `build` is in the address — the README is edited
- * there — and removed, which leaves for the Workflows page; the repository's says why it has neither.
+ * One workflow, read in the address's place (`listPlace`): with no factory, the folder the list read with none names (`Everywhere`); in a
+ * named factory, the folder the api lists in it, its own where it shadows the repository's (`InFactory`); and where the factory lists
+ * nowhere, why, with the way back (`Unplaced`).
  */
 function WorkflowPage() {
   const { from, workflow: name } = Route.useParams();
-  const { data: all } = useSuspenseQuery(workflowsQuery);
-  const { build: building = false, ...place } = Route.useSearch();
-  const navigate = useNavigate();
+  const { build: building = false, ...address } = Route.useSearch();
   const { data: factories } = useQuery(factoriesQuery);
+  const where = listPlace(address, factories ?? []);
+  if (where.kind === 'every') return <Everywhere from={from} name={name} address={address} building={building} factories={factories} />;
+  if (where.kind === 'in')
+    return (
+      <InFactory
+        from={from}
+        name={name}
+        address={address}
+        place={where.place}
+        building={building}
+        factory={factories?.find((f) => f.name === where.place.factory)}
+      />
+    );
+  return (
+    <div className="space-y-3">
+      <BackToWorkflows place={address} />
+      <Unplaced
+        where={where}
+        back={
+          <Link to="/workflows" search={{}} className="underline underline-offset-2">
+            Show every factory&apos;s
+          </Link>
+        }
+        onRepo={(repo, label) => (
+          <Link
+            to="/workflows/$from/$workflow"
+            params={{ from, workflow: name }}
+            search={{ ...address, repo }}
+            className="font-mono underline underline-offset-2"
+          >
+            {label}
+          </Link>
+        )}
+      />
+    </div>
+  );
+}
+
+/** What both readings of a workflow's page are given: the workflow the address names, its place, and whether its builder is asked for. */
+type Asked = { from: string; name: string; address: PagePlace; building: boolean };
+
+/** The workflow `name` read from `from` with no factory, tagged with the factories it is in; or that none is listed by that name. */
+function Everywhere({ from, name, address, building, factories }: Asked & { factories: readonly Factory[] | undefined }) {
+  const { data: all } = useSuspenseQuery(workflowsQuery);
   const workflow = all.find((w) => w.from === from && w.name === name);
   if (!workflow) return <NotListed from={from} name={name} />;
-  const buildable = workflow.from === 'yours' && !workflow.error;
+  return (
+    <Workflow
+      workflow={workflow}
+      own={workflow}
+      address={address}
+      building={building}
+      tags={workflowFactories(workflow, factories ?? [])}
+      start={<StartRun workflow={workflow} />}
+    >
+      <StepRows workflow={workflow} place={address} />
+    </Workflow>
+  );
+}
+
+/**
+ * The workflow `name` read from `from` in `place`, as the api lists it there with the hires of `factory`, tagged with that factory alone:
+ * its rows hire into its steps, and its start runs in the factory, on its repository, or says why it cannot (`whyNotStarted`). One of
+ * yours is built and removed as the list read with no factory has it, since a builder drafts a folder as its files write it. One the
+ * factory does not list says so (`NotOffered`).
+ */
+function InFactory({ from, name, address, place, building, factory }: Asked & { place: Place; factory: Factory | undefined }) {
+  const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
+  const { data: plain } = useQuery({ ...workflowsQuery, enabled: from === 'yours' });
+  const workflow = listed.find((w) => w.from === from && w.name === name);
+  if (!workflow) return <NotOffered name={name} place={place} address={address} attach={factory?.commands.attach} />;
+  const why = whyNotStarted(workflow);
+  return (
+    <Workflow
+      workflow={workflow}
+      own={from === 'yours' ? plain?.find((w) => w.from === from && w.name === name) : undefined}
+      address={address}
+      building={building}
+      tags={[place.factory]}
+      factory={place.factory}
+      start={
+        why === null ? (
+          <StartRun workflow={workflow} repo={place.repo} place={place} />
+        ) : (
+          <p data-why-not className="text-sm whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+            {why}
+          </p>
+        )
+      }
+    >
+      <StepRows workflow={workflow} place={address} hiring />
+    </Workflow>
+  );
+}
+
+/**
+ * The page of `workflow`: what it is, its star, the factories in `tags`, its README whole — the workflow level's instruction — then, for
+ * one that reads, its graph, `children`, its steps a row each, and `start`; for one that does not, the loader's refusal in their
+ * place. `own` is the folder as the list read with no factory has it, which the board writes: where it is one of yours that reads, it is
+ * built here, its builder in place of the README, the graph, the rows and the start while `building` — the README is edited there — and
+ * removed, which leaves for the Workflows page; any other says why it has neither. `factory` is the named factory it is read in, none
+ * with none.
+ */
+function Workflow({
+  workflow,
+  own,
+  address,
+  building,
+  tags,
+  factory,
+  start,
+  children,
+}: {
+  workflow: WorkflowListing;
+  own: WorkflowListing | undefined;
+  address: PagePlace;
+  building: boolean;
+  tags: readonly string[];
+  factory?: string;
+  start: ReactNode;
+  children: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const buildable = own !== undefined && own.from === 'yours' && !own.error;
   const open = building && buildable;
 
   return (
     <article aria-label={`Workflow ${workflow.name}`} className="space-y-6">
-      <BackToWorkflows />
+      <BackToWorkflows place={address} />
       <WorkflowHeader
         workflow={workflow}
+        tags={tags}
+        factory={factory}
         onBuild={
           buildable && !open
             ? () =>
@@ -79,26 +211,25 @@ function WorkflowPage() {
                 })
             : undefined
         }
-        onRemoved={() => navigate({ to: '/workflows' })}
-        removable={workflow.from === 'yours' && !open}
+        onRemoved={() => navigate({ to: '/workflows', search: address })}
+        removable={own !== undefined && own.from === 'yours' && !open ? own : undefined}
       />
       {!open && <Readme text={workflow.readme} />}
       {workflow.error ? (
         <Refused error={workflow.error} />
       ) : open ? (
         <WorkflowBuilder
-          workflow={workflow}
+          workflow={own}
           onClose={() => void navigate({ to: '.', search: (search) => ({ ...search, build: undefined }), replace: true })}
         />
       ) : (
         <>
-          <WorkflowCanvas workflow={workflow} />
+          <WorkflowCanvas workflow={workflow} place={address} />
           <section className="space-y-2">
             <h2 className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Steps</h2>
-            <NotOffered workflow={workflow} factory={place.factory} factories={factories} />
-            <StepRows workflow={workflow} place={place} hiring={hiresInto(workflow, place.factory, factories)} />
+            {children}
           </section>
-          <StartRun workflow={workflow} />
+          {start}
         </>
       )}
     </article>
@@ -106,29 +237,33 @@ function WorkflowPage() {
 }
 
 /**
- * The workflow's head: its name, its star, which puts it under Favorites, where it is read from, the factories it is in, each linked to
- * its floor, its step count and its folder; Build where `onBuild` is given, Remove where `removable`, and why it has no builder.
+ * The workflow's head: its name, its star, which puts it under Favorites, where it is read from, in `factory` when it is read in a named
+ * one, the factories in `tags`, each linked to its floor, its step count and its folder, as the api names it; Build where `onBuild` is
+ * given, Remove for `removable`, the folder the board removes, and why it has no builder.
  */
 function WorkflowHeader({
   workflow,
+  tags,
+  factory,
   onBuild,
   onRemoved,
   removable,
 }: {
   workflow: WorkflowListing;
+  tags: readonly string[];
+  factory: string | undefined;
   onBuild: (() => void) | undefined;
   onRemoved: () => Promise<void>;
-  removable: boolean;
+  removable: WorkflowListing | undefined;
 }) {
   const { name, from, dir, steps, error } = workflow;
-  const { data: factories } = useQuery(factoriesQuery);
   return (
     <header className="space-y-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="font-mono text-base font-semibold">{name}</h1>
         <FavoriteStar favorite={{ kind: 'workflow', from, workflow: name }} name={from === 'yours' ? `${name} (yours)` : name} />
-        <FromBadge from={from} />
-        <FactoryTags names={workflowFactories(workflow, factories ?? [])} linked />
+        <FromBadge from={from} factory={factory} />
+        <FactoryTags names={tags} linked />
         {!error && (
           <span className="text-xs text-neutral-500">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
@@ -144,34 +279,36 @@ function WorkflowHeader({
             Build
           </button>
         )}
-        {removable && <RemoveWorkflow workflow={workflow} onRemoved={onRemoved} />}
+        {removable && <RemoveWorkflow workflow={removable} onRemoved={onRemoved} />}
       </div>
-      <p className="font-mono text-[11px] break-all text-neutral-500">{dir}</p>
-      <NoBuilder workflow={workflow} />
+      <p data-folder className="font-mono text-[11px] break-all text-neutral-500">
+        {dir}
+      </p>
+      <NoBuilder workflow={workflow} factory={factory} />
     </header>
   );
 }
 
 /**
- * Once above the steps, where the factory picked is one in the store that does not offer the workflow: that it hires no one into its
- * steps until the workflow is attached to it.
+ * A workflow the factory of `place` does not list on its repository: said so, with the line that attaches one, `attach`, as the api
+ * answers it on the factory, and the way back to the factory's workflows.
  */
-function NotOffered({
-  workflow,
-  factory,
-  factories,
-}: {
-  workflow: WorkflowListing;
-  factory: string | undefined;
-  factories: readonly Factory[] | undefined;
-}) {
-  const named = factories?.find((f) => f.name === factory && !f.default);
-  if (!named || hiresInto(workflow, factory, factories)) return null;
+function NotOffered({ name, place, address, attach }: { name: string; place: Place; address: PagePlace; attach: string | undefined }) {
   return (
-    <p data-not-offered={named.name} className="text-xs text-neutral-500">
-      {named.name} does not offer {workflow.name}, so it hires no agent into its steps: attach the workflow to {named.name} first, and its
-      steps can be hired into here.
-    </p>
+    <div className="space-y-3">
+      <BackToWorkflows place={address} />
+      <p data-not-offered={place.factory} className="text-sm text-neutral-500">
+        {place.factory} does not offer {name} on <span className="font-mono text-xs break-all">{place.repo}</span>, so nothing of it is read
+        here and it hires no agent into its steps: attach the workflow to {place.factory} first
+        {attach ? (
+          <>
+            {' '}
+            with <code className="font-mono text-xs">{attach}</code>
+          </>
+        ) : null}
+        .
+      </p>
+    </div>
   );
 }
 
@@ -218,9 +355,10 @@ function NotListed({ from, name }: { from: string; name: string }) {
   );
 }
 
-function BackToWorkflows() {
+/** Back to the Workflows page, in `place`, the place this page is read in. */
+function BackToWorkflows({ place = {} }: { place?: PagePlace }) {
   return (
-    <Link to="/workflows" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+    <Link to="/workflows" search={place} className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
       ← Workflows
     </Link>
   );

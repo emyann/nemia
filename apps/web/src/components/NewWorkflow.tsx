@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createWorkflow, workflowsQuery } from '../lib/api';
 import type { WorkflowStepSpec } from '../lib/api';
 import { firstStep, listedWith } from '../lib/builder';
+import { rereadWorkflows } from '../lib/placed';
 
 const INPUT =
   'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
@@ -78,7 +79,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
     onSuccess: (made) => {
       onCreated(made.workflow.name);
       queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, made.workflow));
-      void queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true });
+      void rereadWorkflows(queryClient);
       setOpen(false);
       setName('');
       setStep('');

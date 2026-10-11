@@ -205,11 +205,11 @@ test('Open visits nothing for a state of a machine, which has no page', () => {
   assert.equal(barOpens(STATE), null);
 });
 
-test("Open visits a workflow's step's page for a workflow's step", () => {
-  assert.deepEqual(barOpens(SPEC), {
-    to: '/workflows/$from/$workflow/$step',
-    params: { from: 'repo', workflow: 'dev', step: 'review' },
-  });
+test("REFUSED: Open visits a workflow's step's page in the place the page under the bar is read in, never the step of another folder", () => {
+  const page = { to: '/workflows/$from/$workflow/$step', params: { from: 'repo', workflow: 'dev', step: 'review' } };
+  assert.deepEqual(barOpens(SPEC, { factory: 'pipao', repo: '/r' }), { ...page, search: { factory: 'pipao', repo: '/r' } });
+  assert.deepEqual(barOpens(SPEC), { ...page, search: {} }, 'with no place, none rides along');
+  assert.deepEqual(barOpens(RUN, { factory: 'pipao' }), { to: '/runs/$runId', params: { runId: 'abc' } }, "a run's page reads no place");
 });
 
 test("Open visits a factory's floor for a factory", () => {

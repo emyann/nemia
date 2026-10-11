@@ -2,7 +2,6 @@
 role: Code reviewer
 description: Reviews a change as a second engineer would, against its intent and spec, and sends it back for another round while a finding is worth it.
 skills: review-a-change
-mcp: playwright
 harness: claude
 model: opus
 effort: high

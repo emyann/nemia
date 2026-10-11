@@ -67,6 +67,8 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
   await expectVisible(policy.getByRole('textbox', { name: 'Its words' }), "the step's words are its policy");
   await expectCount(policy.locator('[data-field="disallowedTools"]'), 1, 'and the fence key it sets');
   await expectCount(keys.locator('[data-field="disallowedTools"]'), 1, 'drawn once: never again among the wiring keys');
+  await expectCount(policy.locator('[data-field="mcp"]'), 1, "and the servers it adds to its agent's");
+  await expectCount(keys.locator('[data-field="mcp"]'), 1, 'drawn once too');
   await expectVisible(policy.getByText(`May only tighten ${agent}'s fence: a loosening is refused on save.`), 'which may only tighten');
   await expectCount(policy.locator('[data-field="check"], [data-field="model"]'), 0, 'and no wiring key is in it');
   await instructions.locator('summary').click();

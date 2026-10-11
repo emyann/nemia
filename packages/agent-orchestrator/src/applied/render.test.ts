@@ -100,6 +100,38 @@ test("an agent's mcp: line has its place in a template: exported in the agent's 
   assert.deepEqual(review?.agent?.mcp, ['playwright', 'docs']);
 });
 
+test("a step's mcp: line has its place in a template: exported in the step's overrides, and rendered back as the step's own line", () => {
+  const repo = scratch('wf-render-repo-');
+  fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+  const step = path.join(repo, 'workflows', 'dev', 'review.md');
+  fs.writeFileSync(step, fs.readFileSync(step, 'utf8').replace('---\n', '---\nmcp: docs, playwright\n'));
+  const dir = path.join(scratch('wf-render-out-'), 'team');
+  exportTemplate({ dir, from: repo });
+  const yaml = path.join(dir, 'workflows/dev/workflow.yaml');
+  const steps = parse(fs.readFileSync(yaml, 'utf8')).spec.steps as Array<{ name: string; overrides?: { mcp?: string[] } }>;
+  assert.deepEqual(steps.find((s) => s.name === 'review')?.overrides?.mcp, ['docs', 'playwright']);
+  assert.equal(Object.hasOwn(parse(fs.readFileSync(path.join(dir, 'agents/reviewer/agent.yaml'), 'utf8')).spec, 'mcp'), false);
+  const { tree, out } = rendered(dir);
+  assert.deepEqual(out.refusals, []);
+  assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/review.md'), 'utf8'), /^mcp: docs, playwright$/m);
+  assert.doesNotMatch(fs.readFileSync(path.join(tree, 'workflows/agents/reviewer.md'), 'utf8'), /^mcp:/m);
+  const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+  const review = loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills).find((s) => s.name === 'review');
+  assert.deepEqual(
+    [review?.mcp, review?.agent?.mcp],
+    [
+      ['docs', 'playwright'],
+      ['docs', 'playwright'],
+    ],
+  );
+  fs.writeFileSync(yaml, fs.readFileSync(yaml, 'utf8').replace('- docs', '- docs server'));
+  assert.throws(
+    () => loadWorkflows(path.join(rendered(dir).tree, 'workflows', 'dev'), {}, fills),
+    (err: Error) => /review: `mcp: docs server, playwright` has `docs server`, which is not a server's name/.test(err.message),
+    "a name the template writes that is no server's is refused as the step file is read, as its own line would be",
+  );
+});
+
 test('a file a render asks for that is no file of the template is refused, so a {path} cannot reach outside it', () => {
   const { dir } = exported();
   fs.writeFileSync(path.join(path.dirname(dir), 'outside.md'), 'not the template');

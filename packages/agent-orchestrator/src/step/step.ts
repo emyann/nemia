@@ -82,6 +82,11 @@ export type Workflow = {
    * (`StepAgent.skills`). Only on a step with an agent.
    */
   skills?: string[];
+  /**
+   * The MCP servers the step adds to its agent's (`mcp:`), by the names the checkout's `.mcp.json` gives them, as its own line names
+   * them: never the agent's, which the session loads first (`StepAgent.mcp`). Only on a step with an agent.
+   */
+  mcp?: string[];
   harness?: string;
   model?: string;
   /** How hard the harness should think, in its own words, which the runtime judges for the harness the step runs on at `nemia start`. */
@@ -112,8 +117,8 @@ export type Workflow = {
   /**
    * The only tools the session may have, in the harness's names — `tools: Read, Grep, Glob, Bash`. Absent: the
    * harness's own set. Claude Code is given exactly the list (`--tools`), which names its built-in tools; the
-   * servers its agent names of the checkout's `.mcp.json` (`StepAgent.mcp`) are not on it. Refused on codex, which has no tool
-   * list: its fence is the sandbox `sandbox:` names.
+   * servers its agent and its own `mcp:` line name of the checkout's `.mcp.json` (`StepAgent.mcp`) are not on it. Refused on codex,
+   * which has no tool list: its fence is the sandbox `sandbox:` names.
    */
   tools?: string[];
   /**
@@ -276,8 +281,9 @@ export type StepAgent = {
   addedSkills?: string[];
   harnessPrompt?: HarnessPrompt;
   /**
-   * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, as its agent's `mcp:` line names them:
-   * frozen at `nemia start` on every step with an agent, empty for an agent with no line, whose sessions load none. Absent on a record
+   * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, its agent's `mcp:` line first, then those
+   * the step's own line adds (`Workflow.mcp`), each once: frozen at `nemia start` on every step with an agent, empty where neither names
+   * any, whose sessions load none. Absent on a record
    * frozen before the key, whose sessions load the whole file as they did.
    */
   mcp?: string[];
@@ -317,6 +323,7 @@ export const STEP_KEYS = [
   'slot',
   'agent',
   'skills',
+  'mcp',
   'harness',
   'model',
   'effort',
@@ -371,6 +378,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
   skills:
     "skills the step adds to its agent's, each a folder in a `skills/` beside `agents/`: the session is given the agent's, then these, each once, and none is taken away — on a step with an agent, whose fence lets it load them with `Skill`",
+  mcp: "MCP servers the step adds to its agent's, each by its name in the checkout's `.mcp.json`: the session loads the agent's, then these, each once, and none is taken away — on a step with an agent; loading a server allows none of its tools",
   harness:
     "what runs the session: `claude` (the default), `codex` or `claude-detached` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
   model: "the model the harness runs the session on: the harness's own default when unset",

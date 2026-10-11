@@ -150,3 +150,25 @@ test('REFUSED: an agent whose `skills:` names a skill that is not a role’s own
 test("each agent of the team names only its role's skills", () => {
   assert.deepEqual(foreignSkills(team()), []);
 });
+
+/** Each agent file of `files` whose frontmatter has an `mcp:` line, a server of one repository's `.mcp.json`: a line each, as written. */
+const namedServers = (files: Map<string, string>): string[] =>
+  [...files]
+    .filter(([file]) => file.endsWith('.md') && file.startsWith(`${AGENTS}/`))
+    .flatMap(([file, text]) => {
+      const line = /^mcp:.*$/m.exec(splitFrontmatter(file, text).block ?? '')?.[0];
+      return line === undefined ? [] : [`${file}: ${line}`];
+    });
+
+test("REFUSED: an MCP server named in an agent's file, which the step that needs it names", () => {
+  const files = new Map([
+    ['workflows/agents/x.md', '---\nrole: X\nmcp: playwright\n---\nYou are X.\n'],
+    ['workflows/agents/y.md', '---\nrole: Y\n---\nYou are Y, and mcp: playwright is no line of yours.\n'],
+    ['workflows/build/implement.md', '---\nplace: git\nagent: x\nmcp: playwright\n---\nBuild.\n'],
+  ]);
+  assert.deepEqual(namedServers(files), ['workflows/agents/x.md: mcp: playwright']);
+});
+
+test('no agent of the team names an MCP server', () => {
+  assert.deepEqual(namedServers(team()), []);
+});

@@ -135,6 +135,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   slot: null,
   agent: null,
   skills: [],
+  mcp: [],
   permissionMode: null,
   sandbox: null,
   tools: null,
@@ -229,8 +230,8 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   );
   assert.deepEqual(
     form.policyKeys,
-    ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills'],
-    "the policy keys, which the builder groups as the step's policy over its agent: the fence keys and the skills it adds",
+    ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills', 'mcp'],
+    "the policy keys, which the builder groups as the step's policy over its agent: the fence keys and the skills and servers it adds",
   );
   assert.deepEqual(form.policyKeys, [...POLICY_KEYS], "the package's list, never one of the api's own");
   for (const own of agentOnly)
@@ -370,6 +371,25 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     '---\nplace: git\nagent: coder\ncheck: npm test\n---\nMind nothing.\n',
     'a step sent without `own`, as one drafted by hand, has every key it sets as its own, and its body as its note',
   );
+});
+
+test("a step's `mcp:` is a list the form sets as policy: saved as the step's own line, and listed as its own beside the servers its sessions load", async () => {
+  const dir = attached('with-servers');
+  const [build] = await listedSteps('with-servers');
+  assert.deepEqual([build.spec.mcp, build.mcp], [[], []], 'neither the step nor its agent names a server');
+  const form = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+  assert.equal(form.keys.find((k) => k.key === 'mcp')?.kind, 'list');
+  assert.ok(form.policyKeys.includes('mcp'));
+  const res = await put('with-servers', {
+    steps: [{ ...build, spec: { ...build.spec, mcp: ['docs'] }, own: { keys: [...build.own!.keys, 'mcp'], body: build.own!.body } }],
+  });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^agent: coder\nmcp: docs$/m);
+  const [read] = await listedSteps('with-servers');
+  assert.deepEqual([read.spec.mcp, read.mcp, read.own?.keys.includes('mcp')], [['docs'], ['docs'], true]);
+  const bad = await put('with-servers', { steps: [{ ...read, spec: { ...read.spec, mcp: ['docs server'] } }] });
+  assert.equal(bad.status, 422, await bad.clone().text());
+  assert.match(((await bad.json()) as { error: string }).error, /`mcp: docs server` has `docs server`, which is not a server's name/);
 });
 
 test("a step with an agent is listed with its layers — the agent's instructions, your custom instructions, the step's policy and the fence lines it tightens — and a save of the listing writes none of them", async () => {

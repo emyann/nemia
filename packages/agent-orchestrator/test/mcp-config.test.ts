@@ -11,9 +11,10 @@
  * The server is spawned as Claude Code spawns the entry, in the session's cwd, speaking JSON-RPC on stdio; listing its tools launches no
  * browser, so that test costs nothing and needs no install.
  *
- * A step's session loads only the servers its agent's `mcp:` line names: started on a fake `claude` that records its argv, a session of an
- * agent that names none is named no MCP config in a checkout that has one, and every shipped step given the `look` skill is filled by an
- * agent that names `playwright`.
+ * A step's session loads only the servers its agent's `mcp:` line and its own name: started on a fake `claude` that records its argv, a
+ * session of a step and an agent that name none is named no MCP config in a checkout that has one, a step that names one over an agent
+ * that names none is named that one alone and no rule that allows a tool of it, and every shipped step given the `look` skill names
+ * `playwright`, itself or by its agent.
  *
  * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money. It files a task at shipped defaults:
  * the engine's built-in harnesses, `claude` first, asked for a background session, with no `mcp` on the task, so the only servers it can
@@ -235,13 +236,13 @@ test('the server starts as configured, from the repository root, and offers brow
   }
 });
 
-/** The steps of the folder `dir` given the `look` skill whose agent's file names no `playwright`: each a session that could not look. */
+/** The steps of the folder `dir` given the `look` skill that load no `playwright`, by their line or their agent's: each could not look. */
 const blindLookers = (dir: string, places = placesOf(dir)): string[] =>
   loadWorkflows(dir, places)
     .filter((step) => step.agent?.skills?.includes('look') && !step.agent.mcp?.includes('playwright'))
     .map((step) => `${path.basename(dir)}/${step.name}`);
 
-test('every shipped step given the look skill is filled by an agent that names playwright, whose tools the skill uses', () => {
+test('every shipped step given the look skill names playwright, itself or by its agent, whose tools the skill uses', () => {
   const lookers = shippedFolders().flatMap((dir) => loadWorkflows(dir, placesOf(dir)).filter((s) => s.agent?.skills?.includes('look')));
   assert.ok(lookers.length > 0, 'a step of this repository is given look');
   assert.deepEqual(
@@ -255,12 +256,17 @@ test('every shipped step given the look skill is filled by an agent that names p
   fs.writeFileSync(path.join(root, 'skills', 'look', 'SKILL.md'), '---\nname: look\ndescription: Looks.\n---\nLook.\n');
   fs.writeFileSync(path.join(root, 'agents', 'sighted.md'), '---\nmcp: playwright\n---\nYou look.\n');
   fs.writeFileSync(path.join(root, 'agents', 'blind.md'), '---\nmcp: docs\n---\nYou look.\n');
-  for (const agent of ['sighted', 'blind'])
-    fs.writeFileSync(path.join(root, 'dev', `${agent}.md`), `---\nplace: git\nagent: ${agent}\nskills: look\n---\nLook.\n`);
+  fs.writeFileSync(path.join(root, 'agents', 'plain.md'), '---\ndescription: Looks.\n---\nYou look.\n');
+  const step = (name: string, agent: string, lines = '') =>
+    fs.writeFileSync(path.join(root, 'dev', `${name}.md`), `---\nplace: git\nagent: ${agent}\nskills: look\n${lines}---\nLook.\n`);
+  step('sighted', 'sighted');
+  step('blind', 'blind');
+  step('named', 'plain', 'mcp: playwright\n');
+  step('unnamed', 'plain');
   assert.deepEqual(
     blindLookers(path.join(root, 'dev'), {}),
-    ['dev/blind'],
-    'a step given look whose agent names another server is refused',
+    ['dev/blind', 'dev/unnamed'],
+    'a step given look is refused where neither it nor its agent names playwright, and passes where the step alone does',
   );
 });
 
@@ -292,17 +298,18 @@ const mcpConfigsOf = (args: string[]): string[] => {
 };
 
 /**
- * The argv Claude Code is started with for the first session of a step filled by an agent whose file has the lines `agent`, in a checkout
- * whose `.mcp.json` names the servers `repo` and `other`: the step resolved and frozen as a start does, filed as the tick files it.
+ * The argv Claude Code is started with for the first session of a step whose file has the lines `own`, filled by an agent whose file has
+ * the lines `agent`, in a checkout whose `.mcp.json` names the servers `repo` and `other`: the step resolved and frozen as a start does,
+ * filed as the tick files it.
  */
-const sessionArgv = async (t: Parameters<typeof until>[0], agent: string): Promise<{ cwd: string; args: string[] }> => {
+const sessionArgv = async (t: Parameters<typeof until>[0], agent: string, own = ''): Promise<{ cwd: string; args: string[] }> => {
   const cwd = scratch('wf-mcp-checkout-');
   fs.writeFileSync(
     path.join(cwd, '.mcp.json'),
     JSON.stringify({ mcpServers: { repo: { command: 'repo-server' }, other: { command: 'o' } } }),
   );
   const scout = parseAgent('scout', `---\n${agent}---\nYou look.\n`);
-  const step = parseWorkflow('look', '---\nplace: git\nagent: scout\n---\nLook.\n', undefined, new Map([['scout', scout]]));
+  const step = parseWorkflow('look', `---\nplace: git\nagent: scout\n${own}---\nLook.\n`, undefined, new Map([['scout', scout]]));
   const config = filedConfig(
     step,
     [step],
@@ -350,6 +357,42 @@ test("a session of an agent that names one of its checkout's servers is started 
   assert.notEqual(configs[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
   assert.deepEqual(JSON.parse(fs.readFileSync(configs[0], 'utf8')), { mcpServers: { repo: { command: 'repo-server' } } });
 });
+
+/** The servers the one MCP config named on `args` holds, by name, in its order. */
+const serversLoaded = (args: string[]): string[] => {
+  const configs = mcpConfigsOf(args);
+  assert.equal(configs.length, 1, JSON.stringify(configs));
+  return Object.keys((JSON.parse(fs.readFileSync(configs[0], 'utf8')) as { mcpServers: object }).mcpServers);
+};
+
+test('a session of a step that names a server, filled by an agent that names none, is started with that one alone', WAITED, async (t) => {
+  const { cwd, args } = await sessionArgv(t, 'description: Looks.\n', 'mcp: repo\n');
+  const configs = mcpConfigsOf(args);
+  assert.equal(configs.length, 1, JSON.stringify(configs));
+  assert.notEqual(configs[0], path.join(cwd, '.mcp.json'), "not the checkout's file, which names another too");
+  assert.deepEqual(JSON.parse(fs.readFileSync(configs[0], 'utf8')), { mcpServers: { repo: { command: 'repo-server' } } });
+  assert.ok(args.includes('--strict-mcp-config'));
+});
+
+test("a session loads its agent's servers and its step's, and one both name once", WAITED, async (t) => {
+  assert.deepEqual(serversLoaded((await sessionArgv(t, 'mcp: other\n', 'mcp: repo\n')).args).sort(), ['other', 'repo']);
+  assert.deepEqual(serversLoaded((await sessionArgv(t, 'mcp: repo\n', 'mcp: repo\n')).args), ['repo']);
+});
+
+test(
+  'loading a server allows none of its tools: a dontAsk session of a step that names one is started in dontAsk with no rule for it',
+  WAITED,
+  async (t) => {
+    const { args } = await sessionArgv(t, 'permissionMode: dontAsk\nallowedTools: Read\n', 'mcp: repo\n');
+    assert.deepEqual(serversLoaded(args), ['repo'], 'the server is loaded');
+    assert.equal(args[args.indexOf('--permission-mode') + 1], 'dontAsk', 'in the mode that denies what no rule allows');
+    assert.deepEqual(
+      args.filter((arg) => arg.includes('mcp__')),
+      [],
+      'and no argument names a tool of the server, so nothing allows one',
+    );
+  },
+);
 
 const live = process.env.AE_LIVE === '1';
 

@@ -454,10 +454,11 @@ harness thinks, `effort: high`. Both reach `e.file` on every filing of the step:
 
 What it leaves:
 
-- **`mcp:` on a step is the next question.** An agent's file names the servers of the checkout's `.mcp.json`
-  its sessions load (`mcp:`), and the runtime leaves the rest of the file out (`checkoutMcp`): a session loads
-  what its agent names and no other. A step has no `mcp:` line of its own yet, one that adds to its agent's as
-  its `skills:` does, so a server only one step needs is named by the agent that fills it.
+- **`mcp:` on a step is shipped.** An agent's file names the servers of the checkout's `.mcp.json` its sessions
+  load (`mcp:`), a step's own `mcp:` line adds to them as its `skills:` does, and the runtime leaves the rest of
+  the file out (`checkoutMcp`): a session loads what its agent and its step name and no other. A server only one
+  repository has is named by the step that needs it, and no agent of this repository's team names one
+  (`test/team-portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
 - **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
   built-in set", and a `claude -p` with `--tools Read,Grep,Glob,Bash` and `.mcp.json` listed every `browser_*`
   tool (2026-09-13, *Shipped: looking is a skill*). What keeps a server's tool from such a step is its permission

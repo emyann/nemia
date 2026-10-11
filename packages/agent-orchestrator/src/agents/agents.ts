@@ -78,9 +78,9 @@ export const AGENT_KEYS = [
 ] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given, its harness prompt and
- * the MCP servers its sessions load. A
- * step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
+ * The agent keys that are the agent's own, which no step takes from it: the job it holds, what it is for, the skills it is given, its
+ * harness prompt and the MCP servers its sessions load. A step's `skills:` and `mcp:` are lines of its own that add to its agent's,
+ * never the agent's read as the step's default, and code outside the package that reads the role keys leaves them out
  * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
  * hand).
  */
@@ -167,8 +167,8 @@ export type Agent = {
   /** What becomes of Claude Code's own prompt (`HARNESS_PROMPTS`), a former line read as its word now; absent is `keep`. */
   harnessPrompt?: HarnessPrompt;
   /**
-   * The MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them (`mcp:`). Absent, its sessions load none: a
-   * server is loaded only where an agent names it.
+   * The MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them (`mcp:`). Absent, its sessions load only those a
+   * step's own line adds: a server is loaded only where an agent or a step names it.
    */
   mcp?: string[];
   keys: Partial<Record<RoleKey, string>>;

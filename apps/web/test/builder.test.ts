@@ -228,6 +228,17 @@ test("an empty list field says what its key leaves unset: the harness's tools, n
   ]);
 });
 
+test("a step's servers are a list of its own: unset as none added, put back as set, and the draft's copy is not the listing's", () => {
+  assert.equal(listUnsetWords('mcp'), 'no servers added');
+  assert.deepEqual(UNSET.mcp, []);
+  const named = { steps: [listed('look', { mcp: ['docs'] })] };
+  const draft = draftOf(named);
+  assert.deepEqual(toPut(draft)[0].spec.mcp, ['docs']);
+  draft[0].spec.mcp.push('other');
+  assert.deepEqual(named.steps[0].spec.mcp, ['docs'], 'the draft is a copy');
+  assert.deepEqual(specOf(addStep(draftOf(named), 'ship', 'Ship it.'), 'ship').mcp, [], 'a new step names none');
+});
+
 test('what is typed into a list or a number field, as the listing has it', () => {
   assert.deepEqual(listOf('Read, Grep,  Bash(npm test) ,'), ['Read', 'Grep', 'Bash(npm test)']);
   assert.deepEqual(listOf('  '), []);

@@ -68,18 +68,20 @@ test('an agent is its role keys as written, its description, and its body as its
 /**
  * The agent's own keys: `role`, `description`, `skills`, `harnessPrompt` and `mcp` describe the agent itself — the job it holds, who it
  * is, what it is given (and so what it says it can do), how its sessions are told and the MCP servers they load — and a step sets none
- * of them for its agent: a step's work is the workflow's, not the agent's. A step's own `skills:` adds to its agent's and never stands
- * in for them. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
+ * of them for its agent: a step's work is the workflow's, not the agent's. A step's own `skills:` and `mcp:` add to its agent's and never
+ * stand in for them. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
  */
 const AGENT_OWN = ['role', 'description', 'skills', 'harnessPrompt', 'mcp'];
 
 test("the role keys are the keys a step has, but for wiring, the agent's own keys", () => {
   assert.deepEqual([...AGENT_OWN_KEYS], AGENT_OWN, 'the package names the same keys as its own');
   for (const key of AGENT_KEYS) if (!AGENT_OWN.includes(key)) assert.ok((STEP_KEYS as readonly string[]).includes(key), key);
-  for (const key of AGENT_OWN.filter((own) => own !== 'skills'))
+  for (const key of AGENT_OWN.filter((own) => own !== 'skills' && own !== 'mcp'))
     assert.ok(!(STEP_KEYS as readonly string[]).includes(key), `${key} describes the agent, and is no step's key`);
   assert.ok(STEP_KEYS.includes('skills'), "a step's `skills:` is a key of its own, which adds to its agent's skills");
   assert.ok(!AGENT_KEYS.filter((key) => !AGENT_OWN.includes(key)).includes('skills'), 'and no role key a step takes from it');
+  assert.ok(STEP_KEYS.includes('mcp'), "a step's `mcp:` is a key of its own, which adds to its agent's servers");
+  assert.ok(!AGENT_KEYS.filter((key) => !AGENT_OWN.includes(key)).includes('mcp'), 'and no role key a step takes from it');
 });
 
 test('REFUSED at shipped defaults: every wiring key in an agent file, by name, saying it belongs on the step', () => {

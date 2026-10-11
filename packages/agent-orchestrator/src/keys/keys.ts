@@ -476,8 +476,9 @@ export function composedRefusal(
 }
 
 /**
- * Why the MCP servers an agent or a step names (`mcp:`) cannot reach the sessions of a step that runs as `step` does, or `undefined`: a step run by
- * a remote agent, which is filed no configuration and loads what its operator gave it. `named` says whose, as `composedRefusal`'s.
+ * Why the MCP servers an agent or a step names (`mcp:`) cannot reach the sessions of a step that runs as `step` does, or `undefined`:
+ * a step run by a remote agent, which is filed no configuration and loads what its operator gave it. `named` says whose, as
+ * `composedRefusal`'s.
  */
 export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<Workflow, 'harness'>): string | undefined {
   if (!mcp?.length || !isRemoteHarness(step.harness)) return undefined;
@@ -487,7 +488,10 @@ export function serversRefusal(named: string, mcp: readonly string[] | undefined
 /** An MCP server's name, as a `.mcp.json` keys one: letters, digits, `-` and `_`. */
 export const SERVER_NAME = /^[\w-]+$/;
 
-/** `mcp:` as the server names it lists, an agent's line or a step's, refused in `file`'s name unless each is a server's name (`SERVER_NAME`), once. */
+/**
+ * `mcp:` as the server names it lists, an agent's line or a step's, refused in `file`'s name unless each is a server's name
+ * (`SERVER_NAME`), once.
+ */
 export function serverNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;
   const named = `${file}: \`mcp: ${written}\``;

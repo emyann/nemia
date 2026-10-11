@@ -557,12 +557,13 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   settings"*, Claude Code 2.1.285). An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session
   calls `nemia-<agent>:look`, the one it is listed.
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
-  A session loads the servers its agent names and no other: an agent with no line loads none, and neither does a step with no agent.
+  A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
+  step with no agent.
   The run hands the runtime the names alone (`checkoutMcp`), which reads those entries from the session's checkout when it starts it; a
   name that file does not declare refuses the session at its start, saying so. A Codex step is handed the same entries as
   `-c mcp_servers=…`. Loading a server allows none of its tools: the agent's fence still decides. Refused at load: a line that names
   no server, an empty name, a name twice, and any name on a step a remote agent runs, which loads what its operator configured. A
-  step has no `mcp:` line of its own. A run started before the key keeps the whole file on its later tries.
+  step's own `mcp:` line adds to its agent's (below). A run started before the key keeps the whole file on its later tries.
 - `harnessPrompt:` — what becomes of the harness's own prompt, Claude Code's system prompt. `keep`, or no line, keeps it and appends
   the instructions after it; `no-coding` does too, less Claude Code's coding instructions, through an output style in the plugin that
   says `keep-coding-instructions: false`, chosen by its namespaced name in `--settings` (a bare name is echoed and not applied, F16,
@@ -596,6 +597,13 @@ A step with an agent may write `skills:` too: skills this position asks of whoev
 where the agent's are, frozen with the step at `wf start`, and the session is given the agent's skills, then the step's, each once; a
 step never takes one of its agent's away, so naming a few of them changes nothing. `renderStep` writes the step's own line back as it
 wrote it, never its agent's, and the board's step form shows it as a plain list. The board's version digests each skill a step adds.
+
+A step with an agent may write `mcp:` as well: servers of its checkout's `.mcp.json` this position needs, added to its agent's, so
+an agent's file need name nothing of one repository. The session loads the agent's servers, then the step's, each once (frozen with
+the step at `wf start` as one list), and the line only adds: no step takes a server of its agent's away. Loading one allows none of
+its tools, so the line asks nothing of the fence. Refused at load as the agent's line is — no server, an empty name, a name twice, a
+step a remote agent runs — and on a step with no agent, which has no servers to add to. `renderStep` writes the step's own line
+back, a template carries it in the step's `overrides.mcp`, and the board's step form shows it as a plain list beside `skills:`.
 
 A subagent Claude Code's `/agents` wizard wrote into `.claude/agents/` runs as it is: its `name`, `description`, `tools` and `model`
 are the run's keys, and its `color` is read and ignored (`CLAUDE_CODE_IGNORED`) — it colours a name in Claude Code and holds nothing
@@ -639,7 +647,7 @@ Review the change in this workspace as a second engineer would.
 `tools:` is the harness's tool names, comma-separated, and they are the only tools the session has.
 Claude Code is given exactly the list as `--tools`, where a tool not on it does not exist for the
 session — not `--allowedTools`, where an unapproved one is still there to try. The list names Claude
-Code's built-in tools; the servers its agent names of the checkout's `.mcp.json` (`mcp:`) are not on it. Refused at load: a line
+Code's built-in tools; the servers its agent and its own line name of the checkout's `.mcp.json` (`mcp:`) are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
 `Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex, the orchestrator's own rule, since the runtime
 takes the list there and Codex ignores it. Codex has no tool list, only

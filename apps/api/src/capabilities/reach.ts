@@ -5,8 +5,8 @@
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
  * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the
- * settings enable and its agent or its own line names (`mcp:`), whatever its tools; the settings' deny rules and its own `disallowedTools:`; the
- * settings' ask rules; Claude Code's
+ * settings enable and its agent or its own line names (`mcp:`), whatever its tools; the settings' deny rules and its own
+ * `disallowedTools:`; the settings' ask rules; Claude Code's
  * read-only commands, which ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what
  * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that
  * says `background: true`), which asks nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
@@ -130,8 +130,8 @@ export type StepReach = {
   /** The repository's skills it can load — every one, with the Skill tool; none without it, and why. */
   skills: { names: string[]; why: string | null } | null;
   /**
-   * Each server the step or its agent names (`fence.mcp`): one the checkout enables with the tools it listed, or why there are none to show;
-   * and one no `.mcp.json` of the checkout declares with no tools and why, since a session of the step is refused at its start.
+   * Each server the step or its agent names (`fence.mcp`): one the checkout enables with the tools it listed, or why there are none to
+   * show; and one no `.mcp.json` of the checkout declares with no tools and why, since a session of the step is refused at its start.
    */
   mcp: Array<{ server: string; tools: ReachedMcpTool[] | null; why: string | null }> | null;
   /** Every deny rule that holds for it: the settings', then its own. None for a step whose harness reads no settings. */

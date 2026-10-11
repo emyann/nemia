@@ -94,7 +94,7 @@ export type TriedAgent = {
   schemaFile: string | null;
 };
 
-/** Why the agent `name`, whose `mcp:` line is written `line`, cannot be tried: a try has no checkout whose `.mcp.json` declares a server. */
+/** Why the agent `name`, whose `mcp:` line is written `line`, cannot be tried: a try has no checkout to load a server from. */
 const serversUntried = (name: string, line: string): string =>
   `${name} names MCP servers (\`mcp: ${line}\`), which a session loads from its checkout's \`.mcp.json\`, and a try runs with no repository, in a folder of its own, which has none. Delete the line to try it, and name the server on the step that needs it: a step's own \`mcp:\` adds to its agent's.`;
 

@@ -117,8 +117,8 @@ export type Workflow = {
   /**
    * The only tools the session may have, in the harness's names — `tools: Read, Grep, Glob, Bash`. Absent: the
    * harness's own set. Claude Code is given exactly the list (`--tools`), which names its built-in tools; the
-   * servers its agent and its own `mcp:` line name of the checkout's `.mcp.json` (`StepAgent.mcp`) are not on it. Refused on codex, which has no tool
-   * list: its fence is the sandbox `sandbox:` names.
+   * servers its agent and its own `mcp:` line name of the checkout's `.mcp.json` (`StepAgent.mcp`) are not on it. Refused on codex,
+   * which has no tool list: its fence is the sandbox `sandbox:` names.
    */
   tools?: string[];
   /**

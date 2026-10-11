@@ -353,9 +353,11 @@ test('a prune marker put is read back and calls the run off, and taken back it d
   const marker = { at, worktrees: [{ path: '/w/implement', bytes: 12 }], artifacts: { at, bytes: 3 } };
   filesStore.runs.prune(run.id, marker);
   assert.deepEqual(filesStore.runs.read(run.id).pruned, marker);
+  assert.deepEqual(filesStore.runs.pruned(run.id), marker, 'and by its own reader, which reads no record');
   assert.equal(filesStore.runs.calledOff(run.id), true);
   filesStore.runs.prune(run.id, undefined);
   assert.equal(filesStore.runs.read(run.id).pruned, undefined);
+  assert.equal(filesStore.runs.pruned(run.id), undefined);
   assert.equal(filesStore.runs.calledOff(run.id), false);
 });
 
@@ -494,6 +496,7 @@ const GUARDED = [
   'cancelFile',
   'holdFile',
   'pruneFile',
+  'readPruned',
 ];
 
 /** The files the interface is built from, which alone may import them for good. */

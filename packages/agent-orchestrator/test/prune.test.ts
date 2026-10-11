@@ -39,6 +39,8 @@ const {
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { runStore } = await import('../src/record/files.store.ts');
+const { freeing, judging, sized } = await import('../src/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -121,7 +123,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
  * A run that is over: started for real, its one step filed in a worktree of its own, `work` committed on its branch, signed off, and handed
  * off by a pass, which leaves nothing uncommitted — with a `node_modules` in the worktree that git ignores, holding a link out of it and a
  * megabyte of main's, hardlinked as the run provisions a package, which removing the worktree does not free. Merged into `main` with
- * `merged`.
+ * `merged`; in the repository `repo`, when given one, else in one of its own.
  */
 const aFinished = async (
   b: ReturnType<typeof board>,
@@ -131,9 +133,16 @@ const aFinished = async (
     budget,
     costUsd,
     closeout = SIGNED,
-  }: { merged?: boolean; work?: string; budget?: number; costUsd?: number; closeout?: object | ((id: string) => object) } = {},
+    repo = aRepo(),
+  }: {
+    merged?: boolean;
+    work?: string;
+    budget?: number;
+    costUsd?: number;
+    closeout?: object | ((id: string) => object);
+    repo?: string;
+  } = {},
 ) => {
-  const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep(budget) }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
@@ -147,8 +156,9 @@ const aFinished = async (
   fs.symlinkSync(outside, path.join(wt, 'node_modules', 'linked'));
   fs.mkdirSync(path.join(repo, 'node_modules', 'big'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'node_modules', 'big', 'index.js'), 'y'.repeat(1024 * 1024));
-  fs.mkdirSync(path.join(wt, 'node_modules', 'big'));
-  fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
+  fs.mkdirSync(path.join(wt, 'node_modules', 'big'), { recursive: true });
+  if (!fs.existsSync(path.join(wt, 'node_modules', 'big', 'index.js')))
+    fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
   b.settle(
     `${run.id}-implement`,
     'succeeded',
@@ -951,4 +961,76 @@ test('the whole screen of a pruned run over its budget', async (t) => {
       '  drop it   git -C <repo> branch -D wf/<id>/implement',
     ],
   );
+});
+
+/** A finished merged run judged and sized now, as a prune that removes it later holds it. */
+const readyNow = async (b: ReturnType<typeof board>, id: string) => {
+  const judged = await runWith(b.e, judging(id));
+  assert.ok('ready' in judged, `${id} is ready to prune`);
+  return runWith(b.e, sized(judged.ready));
+};
+
+test('the mark of a run another prune freed since it was judged: a removal on the older judgement leaves that mark, its worktree and its time', async () => {
+  const b = board();
+  const { run, wt } = await aFinished(b, { merged: true });
+  const stale = await readyNow(b, run.id);
+  assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned');
+  const first = readRun(run.id).pruned!;
+  assert.deepEqual(
+    first.worktrees.map((w) => w.path),
+    [wt],
+  );
+
+  const [late] = await runWith(b.e, freeing([stale]));
+  assert.deepEqual(late.worktrees, [], 'the later removal removed nothing');
+  assert.equal(late.left.length, 1, 'and says the worktree it found gone');
+  assert.deepEqual(readRun(run.id).pruned, first, "the mark is the first prune's, whole");
+});
+
+test('the mark of a run another prune frees while this one asks its removal: the mark that prune wrote stays, though this one removed nothing', async () => {
+  const b = board();
+  const { run, wt } = await aFinished(b, { merged: true });
+  const other = { at: '2026-01-01T00:00:00.000Z', worktrees: [{ path: wt, bytes: 7 }] };
+  const between = PlaceService.layer(
+    placeOver(shippedGitPlace, {
+      remove: (request) => {
+        const theirs = shippedGitPlace.askNow('remove', request);
+        assert.ok('answer' in theirs && theirs.answer.removed.length === 1, 'the other prune removed the worktree');
+        runStore.runs.prune(run.id, other);
+        return {
+          answer: { ...theirs.answer, removed: [], left: request.workspaces.map((at) => ({ path: at, said: 'is not a working tree' })) },
+        };
+      },
+    }),
+  );
+  const done = await runWith(b.e, prune(run.id, { yes: true }).pipe(Effect.provide(between)));
+  assert.deepEqual([done.worktrees, done.left.length], [[], 1]);
+  assert.ok(!fs.existsSync(wt));
+  assert.deepEqual(readRun(run.id).pruned, other, 'the run reads pruned, by the mark of the prune that removed its worktree');
+});
+
+test('the mark of a run whose removal was not heard and removed all the same: the run reads pruned, with the worktree that is gone, and its line says the removal unread', async () => {
+  const b = board();
+  const { run, wt } = await aFinished(b, { merged: true });
+  const deaf = PlaceService.layer(
+    placeOver(shippedGitPlace, {
+      remove: (request) => {
+        shippedGitPlace.askNow('remove', request);
+        return unreadBy('remove', 'the removal was not heard');
+      },
+    }),
+  );
+  const done = await runWith(b.e, prune(run.id, { yes: true }).pipe(Effect.provide(deaf)));
+  assert.deepEqual(
+    done.left.map((l) => [l.path, 'unread' in l ? l.unread : null]),
+    [[wt, 'the removal was not heard']],
+  );
+  assert.ok(!fs.existsSync(wt), 'the worktree went');
+  const mark = readRun(run.id).pruned;
+  assert.deepEqual(
+    mark?.worktrees.map((w) => w.path),
+    [wt],
+    `the mark stays and lists it: ${JSON.stringify(mark)}`,
+  );
+  assert.equal((await runWith(b.e, prune(run.id))).kind, 'nothing', 'and the next prune has nothing to do');
 });

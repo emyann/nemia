@@ -214,7 +214,7 @@ export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
  * field that does not read is empty. Its files (`nemia prune --artifacts`) are pruned when the marker names them, at the time it says or
  * none.
  */
-function readPruned(id: string): Pruned | undefined {
+export function readPruned(id: string): Pruned | undefined {
   const marker = markerOf(pruneFile(id));
   if (!marker) return undefined;
   const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];

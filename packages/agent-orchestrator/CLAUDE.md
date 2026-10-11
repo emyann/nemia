@@ -158,6 +158,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   a check filed before the runtime kept streams (`test/check-handed.test.ts`).
 - **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's, and so does each workspace whose
   own `node_modules` the lockfile installs into (`workspaceModules`, `depsPlan`); a lockfile that differs from main's costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand.
+- **A removal asks the place its judgement read (`Ready.place`), never the one its program is given**: a test that counts or holds
+  `remove` gives its place to `judging` or `judgingMany` too (`test/prune.test.ts`).
 - **What a removal frees is `freedBytes` (`src/prune/freed.store.ts`), a floor: a Node primitive (`lstat`, `readdir`, `fs.rm`,
   `statfs`) before a spawned `du`, `find` or `rm`**, which `test/spawned-tools.test.ts` refuses in any `src`.
 - **An ending's check installs what the staged merge's lockfile asks for, in the checkout**, first (`checkoutParts`, `checkArgv`). A

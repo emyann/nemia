@@ -18,11 +18,9 @@ export type Steered = {
   adjust: (by: Duration.Input) => Promise<void>;
 };
 
-/** How long the test clock waits, in real time, before it warns that nothing moved it: longer than any test runs. */
-const NEVER_WARNED: Duration.Input = '1 day';
-
 /**
- * A clock no real time moves, for one program.
+ * A clock no real time moves, for one program. It is moved by nothing once as it is made, which ends `TestClock`'s own real-time warning
+ * of a clock nobody moves: that warning's timer would hold a failed test's process open, and its line would reach the test's logger.
  *
  * @returns `layer`, which gives the program its clock; `asked`, each sleep's milliseconds as it is asked, `bell` rung with it; `woken`,
  *   each sleep's milliseconds once the program runs on past it; and `adjust`, which moves the clock by a duration, waking the sleeps
@@ -37,7 +35,8 @@ export function steeredClock(): Steered {
   const layer = Layer.effect(
     Clock.Clock,
     Effect.gen(function* () {
-      const clock = yield* TestClock.make({ warningDelay: NEVER_WARNED });
+      const clock = yield* TestClock.make();
+      yield* clock.adjust(0);
       made = clock;
       const sleep = (duration: Duration.Duration) =>
         Effect.suspend(() => {

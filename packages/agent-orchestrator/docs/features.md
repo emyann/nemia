@@ -2587,8 +2587,8 @@ and the run's page.
 
 What was built:
 
-- **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with each worktree's size (`du -sk`, which counts a link as a link)
-  and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
+- **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with what removing each worktree frees (`freedBytes`, a walk with `lstat`
+  that follows no link and counts nothing for a file hardlinked from outside the worktree) and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
   one line, and a run with nothing to prune is not said. The tick never prunes; since the retention rule, the daemon frees a finished
   run's worktrees itself, on a sweep beside its passes (`freeOnce`, README, *Freeing the space*).
 - **The pure part, in `prune/prune.ts`.** `pruneRefusal` names each reason with its fix: a folder run; a run not over (`wf cancel` first); a finished

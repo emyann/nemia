@@ -35,7 +35,8 @@ const { runStore } = await import('../src/record/files.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
-const { freeOnce, freshFreeMemory, FREE_A_SWEEP } = await import('../src/prune/free.verb.ts');
+const { free, freeOnce, freshFreeMemory, FREE_A_SWEEP } = await import('../src/prune/free.verb.ts');
+const { EngineService } = await import('../src/runtime-client.ts');
 const { freeable, freeSaid, freeTurn } = await import('../src/prune/prune.ts');
 const { up } = await import('../src/daemon/up.verb.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -63,6 +64,14 @@ const aRepo = (): string => {
 /** A workflow of one step, `work`. */
 const WORK = fs.mkdtempSync(path.join(ROOT, 'wf-work-'));
 fs.writeFileSync(path.join(WORK, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
+
+/** `work → ship`, the ending landed by the run on its check: the run reads its checkout's merge through the place's `status`. */
+const CHECKED = fs.mkdtempSync(path.join(ROOT, 'wf-checked-'));
+fs.writeFileSync(path.join(CHECKED, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
+fs.writeFileSync(
+  path.join(CHECKED, 'ship.md'),
+  '---\nafter: work\nplace: git\nworkspace: main\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
+);
 
 /** `work → ship`: an ending at its gate, whose own session merges the run's branch in the repository's checkout. */
 const ENDING = fs.mkdtempSync(path.join(ROOT, 'wf-ending-'));
@@ -124,19 +133,19 @@ const sign = (id: string, outcome: 'done' | 'blocked' = 'done') => {
   }
 };
 
-/** What the place was asked, verb by verb, while a program ran over `counted`. */
-type Asked = Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb] }>;
+/** What the place was asked, verb by verb, and through which door: `ask`, off the loop, or `askNow`, which holds the process. */
+type Asked = Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb]; door: 'ask' | 'askNow' }>;
 
-/** The shipped git place, every question noted in `asked` before it is answered. */
+/** The shipped git place, every question noted in `asked`, with its door, before it is answered. */
 const counting = (asked: Asked) =>
   PlaceService.layer({
     declared: shippedGitPlace.declared,
     ask: (verb, request, options) => {
-      asked.push({ verb, request });
+      asked.push({ verb, request, door: 'ask' });
       return shippedGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
-      asked.push({ verb, request });
+      asked.push({ verb, request, door: 'askNow' });
       return shippedGitPlace.askNow(verb, request, options);
     },
   });
@@ -157,7 +166,8 @@ const answerOf = (pass: Pass, id: string) => pass.runs.find((a) => a.run.id === 
 const rests = (pass: Pass, id: string, status: string) => answerOf(pass, id)?.status === status && answerOf(pass, id)?.feed.atRest === true;
 
 /**
- * One sweep over what `pass` answered of the runs `ids`, in that order, with what it logged and what it asked of the place.
+ * One sweep over what `pass` answered of the runs `ids`, in that order, with what it logged and what it asked of the place: refused
+ * here, for every test, when a question went through `askNow`.
  */
 async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   const asked: Asked = [];
@@ -171,6 +181,11 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
       Effect.provide(Logger.layer([keeper])),
       Effect.provideService(References.MinimumLogLevel, 'Info'),
     ),
+  );
+  assert.deepEqual(
+    asked.filter((a) => a.door === 'askNow').map((a) => a.verb),
+    [],
+    'a sweep asks its place nothing that holds the process: every question goes off the loop',
   );
   return { ...done, logged, asked, verbs: asked.map((a) => a.verb) };
 }
@@ -362,6 +377,31 @@ test('REFUSED at shipped defaults: a landed run whose worktree holds a change, i
   assert.deepEqual([gone(dirty.id), gone(locked.id), whole(detached.id)], [true, true, true]);
 });
 
+test("REFUSED at shipped defaults: a finished run that stays, judged while another merge is staged in its repository's checkout, has the checkout's status asked off the loop", async () => {
+  const { id, repo } = await started(CHECKED);
+  await worked(id);
+  await runEngine(e, cancelRun(id));
+  git(repo, 'worktree', 'lock', lane(id));
+  git(repo, 'branch', 'other');
+  const other = fs.mkdtempSync(path.join(ROOT, 'other-'));
+  git(repo, 'worktree', 'add', '-q', other, 'other');
+  fs.writeFileSync(path.join(other, 'other.txt'), "another run's work\n");
+  git(other, 'add', '-A');
+  git(other, 'commit', '-q', '-m', 'other');
+  const pass = await ticked((p) => rests(p, id, 'cancelled'), 'cancelled at its gate, and at rest');
+  git(repo, 'merge', '-q', '--no-ff', '--no-commit', 'other');
+  assert.ok(fs.existsSync(readRun(id).stagedFile!), "a merge is staged in the checkout, and it is not this run's");
+
+  const done = await sweep(pass, [id], freshFreeMemory());
+  assert.deepEqual(
+    done.asked.filter((a) => a.verb === 'status').map((a) => a.door),
+    ['ask'],
+    'the checkout is read, once, and off the loop',
+  );
+  assert.deepEqual([done.freed, whole(id)], [[], true]);
+  git(repo, 'merge', '--abort');
+});
+
 test('a restart between the landing and the sweep changes nothing: a daemon that remembers nothing frees the run on its first pass and sweep', async () => {
   const { id, repo } = await started(ENDING);
   await land(id, repo);
@@ -469,6 +509,44 @@ test('the daemon frees a finished run with no person: `up` forks the sweep besid
   await until(t, () => gone(id), `the daemon frees ${id}`, { everyMs: 50 });
   assert.equal(readRun(id).pruned?.worktrees.length, 1);
 });
+
+test(
+  'REFUSED at shipped defaults: a sweep that fails ends nothing — the loop warns once while its words stand, sweeps on, and frees once the cause is gone',
+  WAITED,
+  async (t) => {
+    const { id } = await merged();
+    const pass = await tick();
+    const warned: string[] = [];
+    const keeper = Logger.make(({ message }) => void warned.push((Array.isArray(message) ? message : [message]).join(' ')));
+    let sweeps = 0;
+    const answers = () => {
+      sweeps++;
+      return pass.runs.filter((a) => a.run.id === id);
+    };
+    process.env.WF_KEEP_WORKTREES = 'yes';
+    t.after(() => delete process.env.WF_KEEP_WORKTREES);
+    const loop = Effect.runFork(
+      free(answers, '5 millis').pipe(
+        Effect.provide(EngineService.layer(e)),
+        Effect.provide(gitPlaceLayer),
+        Effect.provide(Logger.layer([keeper])),
+      ),
+    );
+    t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
+    const ended = Effect.runPromise(Fiber.join(loop)).then(() => assert.fail('the loop ended'));
+    await Promise.race([until(t, () => sweeps >= 4, 'four sweeps, each refused its switch', { everyMs: 5 }), ended]);
+    assert.deepEqual(
+      warned,
+      [
+        'The worktrees of finished runs could not be freed this sweep: WF_KEEP_WORKTREES=yes is neither 1 nor 0. It keeps the worktrees of every finished run, which the daemon otherwise removes: WF_KEEP_WORKTREES=1 — or 0, or unset, to have them freed.',
+      ],
+      'said once across four failed sweeps',
+    );
+    assert.ok(whole(id));
+    delete process.env.WF_KEEP_WORKTREES;
+    await Promise.race([until(t, () => gone(id), `the loop frees ${id} once its switch reads`, { everyMs: 5 }), ended]);
+  },
+);
 
 test('the rule as data: which answers are candidates, which a sweep takes, and what is said of one left', () => {
   const answer = (id: string, status: string, atRest: boolean, repo = true) => ({

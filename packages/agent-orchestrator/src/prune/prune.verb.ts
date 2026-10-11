@@ -21,7 +21,7 @@ import { askRunPlace, PlaceService, type RunPlaceRead } from '../place/place.sto
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../place/place.ts';
 import { shippedOf, standingsOf } from '../branches/branches.store.ts';
-import { checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
+import { askCheckoutStatus, checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
 import { headsOver, standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../tick/advance.verb.ts';
@@ -34,14 +34,19 @@ import { Conflict, Invalid } from '../refusal/refusal.ts';
  * nothing is removed on a guess.
  */
 export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: StatusMemo): MergeState['merging'] {
-  if (!isRepositoryRun(run)) return 'none';
-  const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
-  const marked = stagedHere(run);
-  if (!landings.length || marked === false) return 'none';
-  if (marked === undefined && !landings.some((s) => run.steps[s.name]?.taskId && !run.steps[s.name]?.landed)) return 'none';
+  if (!readsCheckout(run, steps)) return 'none';
   const read = checkoutStatus(run, memo);
   if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
   return read.merging;
+}
+
+/** Whether `merging` asks the place how `run`'s checkout stands: never for a run it answers `none` of without a question. */
+function readsCheckout(run: Run, steps: readonly Workflow[] | undefined): run is RepositoryRun {
+  if (!isRepositoryRun(run)) return false;
+  const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
+  const marked = stagedHere(run);
+  if (!landings.length || marked === false) return false;
+  return marked !== undefined || landings.some((s) => run.steps[s.name]?.taskId && !run.steps[s.name]?.landed);
 }
 
 /**
@@ -213,7 +218,8 @@ export function dropEmpty(within: string): void {
 
 /**
  * Whether the run is over, what holds it as `nemia rm` would be held (`forgetRefusal`, worded for prune) and the hand-offs owed, once
- * what a pass filed and never wrote down is adopted onto it; none of it, for a run whose workflow does not read.
+ * what a pass filed and never wrote down is adopted onto it; none of it, for a run whose workflow does not read. Where `merging` reads
+ * the run's checkout, the place is asked first and off the loop (`askCheckoutStatus`), and `merging` answers from that.
  */
 const judgedOf = Effect.fn('prune.judged')(function* (
   e: Engine,
@@ -239,6 +245,8 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   }
   const askAt = (a: AskName) => runStore.asks.where(run.id, a);
   const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, git) : [];
+  const checkout = statusMemo(headsOver(git), placed);
+  if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, checkout);
   return {
     decided: decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf)
       .kind,
@@ -256,7 +264,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
       askAt,
       standings,
       'prune',
-      merging(run, steps, statusMemo(headsOver(git), placed)),
+      merging(run, steps, checkout),
       pruneAgain(run.id, flags),
     ),
     owed: handOffOwed(steps, run, phaseOf),

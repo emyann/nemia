@@ -8,6 +8,7 @@ rounds: 3
 budget: 16
 tally: findings, findings.kind=placement, mutants.proves
 skills: effect, shadcn, change-the-board, look
+mcp: playwright
 output: review.schema.json
 disallowedTools: Bash(cd:*), Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force)
 ---

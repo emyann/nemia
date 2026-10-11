@@ -23,9 +23,13 @@ export type AttemptClock = {
   reason: string | null;
   usage: Consumed | null;
   resumeFrom?: string;
-  /** How it ended — `done` once it signed — and the turn of a task held open it ran, as the engine's `Attempt` keeps them. */
+  /**
+   * How it ended — `done` once it signed — the turn of a task held open it ran, and the closeout it signed, as the engine's `Attempt`
+   * keeps them.
+   */
   ended?: string | null;
   turn?: number;
+  closeout?: unknown;
   /** A limit its harness said it ended the session at — `budget`, the step's cap — carried by the runtime and judged here (`taskSpend`). */
   limit?: string;
 };
@@ -219,9 +223,9 @@ export function timeline(
 /** The turn of an earlier try's session that try `i` of `tries` ran (`TurnSpan`), off the view of its task; undefined where it ran none. */
 function turnIn(tries: readonly TurnTry[], i: number, view: TaskClock | undefined): TurnSpan | undefined {
   const turn = turnOf(tries, i);
-  if (!turn) return undefined;
+  if (turn === null) return undefined;
   const over = view !== undefined && (view.state.settled !== null || signedAndHeld(view));
-  return turnSpanOf(view?.state.attempts ?? [], turn.turn, turn.after, over);
+  return turnSpanOf(view?.state.attempts ?? [], turn, over);
 }
 
 /** A run's wait for a run slot (`SlotWait`), off its record and the filing times; null on a run the cap never held. */

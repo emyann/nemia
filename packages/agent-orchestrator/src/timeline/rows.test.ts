@@ -191,7 +191,7 @@ const ANSWERED = {
   steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', then: 'nudge' }] } },
   approvals: [{ step: 'ask', try: 2, at: at('10:29') }],
 } as unknown as Run;
-const turn = (n: number, spawned: string, ended: string) => ({
+const turn = (n: number, spawned: string, ended: string, outcome = 'done') => ({
   startedAt: at(spawned),
   spawnedAt: at(spawned),
   endedAt: at(ended),
@@ -199,10 +199,11 @@ const turn = (n: number, spawned: string, ended: string) => ({
   usage: { costUsd: n ? 1 : 3 },
   ended: 'done',
   turn: n,
+  closeout: { outcome, summary: 'said', artifacts: [], needs: outcome === 'blocked' ? 'which flag?' : null },
 });
 const HELD: TaskClock = {
   phase: 'input-required',
-  state: { brief: 'Do it.', settled: null, attempts: [turn(0, '10:01', '10:05'), turn(1, '10:11', '10:20')] },
+  state: { brief: 'Do it.', settled: null, attempts: [turn(0, '10:01', '10:05', 'blocked'), turn(1, '10:11', '10:20')] },
 };
 
 test("a run answered then approved: its wait on the answer and its wait at the gate are two parts, and its session's rows are one", () => {
@@ -224,8 +225,8 @@ test("a run answered then approved: its wait on the answer and its wait at the g
   );
   const run = (part: TimelineRow['part']) => valueOf(rows, 'run', part);
   assert.equal(valueOf(rows, '01 ask', 'ran', 1) + run('queued') + run('answer'), run('wall'), 'what ran, queued and waited is the wall');
-  const sentBack = { ...ANSWERED, steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', then: 'back' }] } } } as unknown as Run;
-  const back = timelineRows(sentBack, timeline(sentBack, new Map([['ask', HELD]]), new Map([['ask', at('10:00')]]), [ASK]), [ASK]);
-  assert.equal(valueOf(back, 'run', 'answer'), 0, 'REFUSED: work sent back with words waited on no answer');
+  const signedDone: TaskClock = { ...HELD, state: { ...HELD.state, attempts: [turn(0, '10:01', '10:05'), turn(1, '10:11', '10:20')] } };
+  const back = timelineRows(ANSWERED, timeline(ANSWERED, new Map([['ask', signedDone]]), new Map([['ask', at('10:00')]]), [ASK]), [ASK]);
+  assert.equal(valueOf(back, 'run', 'answer'), 0, 'REFUSED: the same record after a done sign-off is work sent back from its gate');
   assert.equal(valueOf(back, 'run', 'gate'), 9 * MIN);
 });

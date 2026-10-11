@@ -511,6 +511,17 @@ test('the opposite: a gate approved on the try that owns its session is timed wh
       [[1, 540_000]],
     );
   }
+  const checked = {
+    ...ANSWERED,
+    runTimed: true,
+    steps: { ask: { ...ANSWERED.steps.ask, check: { taskId: 'r-4-ask-check' } } },
+  } as Run;
+  const withCheck = new Map([...ANSWERED_VIEWS, ['r-4-ask-check', clocked('10:20', '10:21', '10:25')]]);
+  assert.deepEqual(
+    gateWaits(checked, [ASK], withCheck).map((w) => [w.try, w.from, w.ms]),
+    [[2, '2026-10-06T10:25:00.000Z', 240_000]],
+    'an answered try with a check of its own ends at that check, as it did: timed on a run already handed over',
+  );
   assert.equal(GATED.runTimed, undefined);
   assert.equal(gateWaits(GATED, [PLAN, BUILD], GATED_VIEWS).length, 1, 'a record with no runTimed keeps the gates it had');
 });

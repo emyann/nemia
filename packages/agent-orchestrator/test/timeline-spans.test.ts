@@ -391,6 +391,40 @@ test("a gated step that signed off blocked, was answered and then approved gives
   assert.equal(timelineSpans(run.id).length, spans.length, 'never again on a later pass');
 });
 
+test('REFUSED: a gated step sent back from its gate with words waited on no answer, and its gate is timed from the turn it was sent back for', async (t) => {
+  const later = clockOf(t);
+  const run = await start(ALONE);
+  const intake = `${run.id}-intake`;
+  await tick();
+  later(1);
+  await tickUntil(() => sessions.has(nameFor(intake, 1)));
+  later(4);
+  sign(intake, 0.5);
+  await tick(3);
+  later(6);
+  await runWith(engine, retryRun(run.id, 'intake', { mode: 'nudge', message: 'smaller steps, please' }));
+  await tickUntil(() => sessions.has(nameFor(intake, 2)));
+  assert.deepEqual(
+    [readRun(run.id).steps.intake.taskId, readRun(run.id).steps.intake.tries?.map((x) => x.then)],
+    [intake, ['nudge']],
+    'the record an answer to a blocked sign-off leaves, but for what the first turn signed',
+  );
+  later(3);
+  sign(intake, 0.25, {}, 2);
+  await tick(3);
+  later(9);
+  await runWith(engine, approveRun(run.id, 'intake'));
+  await tickUntil(() => readRun(run.id).runTimed === true);
+  const spans = timelineSpans(run.id);
+  assert.deepEqual(spans.map(lineOf).sort(), (await pageRows(run.id)).map(lineOf).sort(), "each span is a row of the page's timeline");
+  const value = (row: string, part: string) => spans.filter((s) => s.row === row && s.part === part).map((s) => s.value);
+  assert.deepEqual(
+    [value('run', 'answer'), value('run', 'gate'), value('01 intake', 'ran'), value('01 intake', 'tries')],
+    [[0], [9 * MIN], [7 * MIN], [2]],
+    'the six minutes before the send-back were at its gate, unapproved, and are in no part',
+  );
+});
+
 test('a run called off is handed over once its tasks have stopped, as cancelled', async (t) => {
   const later = clockOf(t);
   const run = await start(SOLO);

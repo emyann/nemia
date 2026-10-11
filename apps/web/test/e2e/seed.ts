@@ -987,6 +987,8 @@ export const WORKFLOWS = {
       person: 'Implementer',
       role: 'Software engineer',
       runsOn: 'implementer · claude · opus',
+      /** The MCP server its sessions load, by the name the checkout's `.mcp.json` gives it (`CHECKOUT.server`): review, with no agent, loads none. */
+      mcp: 'fixture',
       /** Its instructions, the body of its file: markdown, which its page reads as markdown and not as the source. */
       body: '## How you work\n\nYou implement what is asked, and **test** it:\n\n- the failing test first\n- then the change\n',
       /**
@@ -1084,7 +1086,7 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\n${good.more}\n`);
   write(
     path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`),
-    `---\nrole: ${good.agent.role}\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\n${good.agent.body}`,
+    `---\nrole: ${good.agent.role}\nskills: ${good.agent.skill.id}\nmcp: ${good.agent.mcp}\nharness: claude\nmodel: opus\n---\n${good.agent.body}`,
   );
   writeSkill(path.join(repo, 'workflows', 'skills'), good.agent.skill);
   write(

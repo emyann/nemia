@@ -50,6 +50,7 @@ const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${
   own: null,
   hired: null,
   layers: null,
+  mcp: [],
 });
 
 /** implement ⇄ review, as the listing has a folder of yours. */
@@ -299,6 +300,7 @@ const attached: Pick<WorkflowListing, 'steps'> = {
       own: { keys: ['check'], body: 'Mind the cache.' },
       hired: null,
       layers: null,
+      mcp: [],
     },
   ],
 };

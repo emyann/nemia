@@ -353,7 +353,7 @@
     {
       "files": ["apps/web/src/components/AgentForm.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 155, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

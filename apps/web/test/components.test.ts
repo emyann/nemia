@@ -4667,6 +4667,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
     schema: null,
     skills: 'write-a-note, file-it',
     harnessPrompt: null,
+    mcp: null,
     given: [],
     source: '',
     version: 'v1',
@@ -4783,6 +4784,7 @@ const composing = {
   schema: null,
   skills: 'write-a-note, ask-first, gone',
   harnessPrompt: null,
+  mcp: null,
   source: '',
   version: 'v1',
   usedBy: [],
@@ -5343,6 +5345,7 @@ const character = {
   },
   skills: 'grilling',
   harnessPrompt: 'no-coding',
+  mcp: null,
   card: [{ id: 'grilling', name: 'Grilling', description: 'Asks until the plan holds.', tags: ['interview'] }],
   usedBy: [{ from: 'repo', workflow: 'intake', step: 'ask' }],
 };
@@ -5745,6 +5748,7 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
     own: { keys: [], body: '' },
     hired: null,
     layers: null,
+    mcp: [],
     taskParts: null,
   });
   const listing = workflow({
@@ -6538,7 +6542,7 @@ test('REFUSED: a place that lists no workflows is said on the page — a factory
 test("REFUSED: the step's bar reads in the address's factory — its folder there, never the list read with none; and a factory that lists nowhere is said in the bar", async () => {
   const { SpecBar } = await import('../src/components/SpecBar.tsx');
   const { workflow, stepSpec } = await import('./library-fixtures.ts');
-  const step = (name: string) => ({ name, spec: stepSpec(), body: '', own: null, hired: null, layers: null });
+  const step = (name: string) => ({ name, spec: stepSpec(), body: '', own: null, hired: null, layers: null, mcp: [] });
   const listing = (steps: string[]) => workflow({ name: 'dev', from: 'repo', steps: steps.map(step), error: null });
   const bar = createElement(SpecBar, { from: 'repo', workflow: 'dev', step: 'draft' });
   const quay = filed('quay', { repos: ['/a', '/b'] });
@@ -6913,8 +6917,17 @@ test("a workflow's steps, a row each: an agent's step by its policy, its agent l
         own: null,
         hired: null,
         layers,
+        mcp: [],
       },
-      { name: 'ship', spec: stepSpec({ agent: null, skills: ['land-a-branch'] }), body: 'Land it.', own: null, hired: null, layers: null },
+      {
+        name: 'ship',
+        spec: stepSpec({ agent: null, skills: ['land-a-branch'] }),
+        body: 'Land it.',
+        own: null,
+        hired: null,
+        layers: null,
+        mcp: [],
+      },
     ],
   });
   const html = await routedWith(createElement(StepRows, { workflow: listing }));

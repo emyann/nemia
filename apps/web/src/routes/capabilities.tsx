@@ -246,6 +246,9 @@ function ServerRow({ server }: { server: McpServer }) {
 }
 
 /** The tools of the listed servers that `rule` is the one to refuse, by server. */
+/** The servers a step's fence names, as its line reads: the names, or that it names none and so loads none. */
+const serversNamed = (names: readonly string[]): string => names.join(', ') || 'none named: its sessions load no server';
+
 const refusedBy = (mcp: Capabilities['mcp'], rule: string): string[] =>
   mcp.flatMap((server) => (server.tools ?? []).filter((tool) => tool.denied === rule).map((tool) => `${server.name} · ${tool.name}`));
 
@@ -301,7 +304,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
             ['allowed tools', fence.allowedTools.join(', ') || 'nothing'],
             step.harness === 'codex' ? ['sandbox', fence.sandbox ?? OWN] : ['permission mode', fence.permissionMode ?? OWN],
             ['effort', fence.effort ?? OWN],
-            ['mcp', 'none named: a step has no mcp: key'],
+            ['mcp', serversNamed(fence.mcp)],
           ] as const
         ).map(([label, value]) => (
           <div key={label} className="contents">
@@ -416,7 +419,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-neutral-500">No server the checkout enables.</p>
+                <p className="text-xs text-neutral-500">No server is named for it: its sessions load none.</p>
               )}
             </Reach>
           )}

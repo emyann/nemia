@@ -164,12 +164,16 @@ test("REFUSED, the inbox: a try that does not say whether it was refused, and a 
   await assert.rejects(readCard(), unread('/api/inbox/x', 'keys[0].value', '7, where'));
 });
 
-test('REFUSED, the capabilities: what asks denied by a person, and a step whose fence names a server', async (t) => {
+test('REFUSED, the capabilities: what asks denied by a person, and a step whose fence names no list of servers', async (t) => {
   answering(t, capabilities({ steps: [stepReach({ allowed: { ...stepReach().allowed, askDenier: 'a person' as never } })] }));
   await assert.rejects(readCapabilities(), unread('/api/capabilities', 'steps[0].allowed.askDenier', '"a person", where'));
 
-  answering(t, capabilities({ steps: [stepReach({ fence: { ...stepReach().fence, mcp: [] as never } })] }));
-  await assert.rejects(readCapabilities(), unread('/api/capabilities', 'steps[0].fence.mcp', '[], where the board reads null'));
+  answering(t, capabilities({ steps: [stepReach({ fence: { ...stepReach().fence, mcp: null as never } })] }));
+  await assert.rejects(readCapabilities(), unread('/api/capabilities', 'steps[0].fence.mcp', 'null, where'));
+
+  const named = capabilities({ steps: [stepReach({ fence: { ...stepReach().fence, mcp: ['playwright', 'docs'] } })] });
+  answering(t, named);
+  assert.deepEqual((await readCapabilities()).steps[0].fence.mcp, ['playwright', 'docs'], 'the servers its agent names, read as names');
 });
 
 test('REFUSED, the quota: a state the board has no word for, and a window used as a sentence', async (t) => {

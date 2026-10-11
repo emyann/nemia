@@ -192,6 +192,7 @@ export default {
       await form.getByRole('textbox', { name: 'Description' }).fill(made.description);
       await form.getByRole('textbox', { name: 'Model' }).fill(made.model);
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill(made.tools);
+      await form.getByRole('textbox', { name: 'MCP servers' }).fill('fixture');
       await form.getByRole('button', { name: 'Add a skill' }).click();
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await sheet
@@ -224,7 +225,7 @@ export default {
       ]);
       if (created.status() !== 201) throw new Refused(`the api makes the agent — it answered ${created.status()}: ${await created.text()}`);
       await page.waitForURL((url) => url.pathname === agentPath('yours', made.name), { timeout: WAIT_MS });
-      const written = `---\ndescription: ${made.description}\nskills: ${made.skills}\nmodel: ${made.model}\ntools: ${made.tools}\n---\n${made.body}\n`;
+      const written = `---\ndescription: ${made.description}\nskills: ${made.skills}\nmcp: fixture\nmodel: ${made.model}\ntools: ${made.tools}\n---\n${made.body}\n`;
       if (!fs.existsSync(madeFile) || fs.readFileSync(madeFile, 'utf8') !== written)
         throw new Refused(
           `agents/${made.name}.md is written as the package writes an agent — it holds ${fs.existsSync(madeFile) ? JSON.stringify(fs.readFileSync(madeFile, 'utf8')) : 'nothing'}`,
@@ -245,6 +246,9 @@ export default {
 
       const madeForm = page.locator(`form[data-agent-form="${made.name}"]`);
       await expectVisible(madeForm, `the page of ${made.name}, made`);
+      const servers = await madeForm.getByRole('textbox', { name: 'MCP servers' }).inputValue();
+      if (servers !== 'fixture')
+        throw new Refused(`the MCP servers it names are read back as written — they read ${JSON.stringify(servers)}`);
       await madeForm.getByRole('textbox', { name: 'Model' }).fill(made.edited);
       const [saved] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/yours/${made.name}`, {

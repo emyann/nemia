@@ -134,7 +134,7 @@ export type StepReach = {
     permissionMode: string | null;
     sandbox: string | null;
     effort: string | null;
-    mcp: null;
+    mcp: string[];
   };
   tools: {
     from: 'declared' | 'measured';
@@ -208,7 +208,7 @@ const StepReachSchema = Schema.Struct({
     permissionMode: Schema.NullOr(Schema.String),
     sandbox: Schema.NullOr(Schema.String),
     effort: Schema.NullOr(Schema.String),
-    mcp: Schema.Null,
+    mcp: Strings,
   }),
   tools: Schema.NullOr(
     Schema.Struct({

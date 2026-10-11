@@ -152,15 +152,29 @@ export default {
       }),
       'with the day and version the read-only commands were measured on, as a measurement of that day',
     );
+    const mcpOf = (step: typeof review) => step.locator('dt', { hasText: /^mcp$/ }).locator('xpath=following-sibling::dd[1]');
     await expectVisible(
-      review.locator('[data-mcp-tool="echo"][data-not-allowed]'),
-      "review's server tool no rule allows is marked: dontAsk denies it without a prompt",
+      mcpOf(review).getByText('none named: its sessions load no server', { exact: true }),
+      "review, a step with no agent, names no server on its fence, though the checkout's .mcp.json declares two",
     );
-    await expectVisible(
-      review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`),
-      `review's server tool the settings deny is marked denied (${server.denied})`,
-    );
+    await expectCount(review.locator('[data-server]'), 0, 'and reaches no server');
+    await expectCount(review.locator('[data-mcp-tool]'), 0, 'nor a tool of one');
+    await expectVisible(review.getByText('No server is named for it: its sessions load none.'), 'and says why it has no MCP tool');
     const implement = steps.locator(`li[data-step="${good.name}/implement"]`);
+    await expectVisible(
+      mcpOf(implement).getByText(good.agent.mcp, { exact: true }),
+      `implement's fence names the server its agent's mcp: line names (${good.agent.mcp})`,
+    );
+    await expectCount(
+      implement.locator('[data-server]'),
+      1,
+      `implement reaches that server alone, not ${missing.name}, which no agent names`,
+    );
+    await expectVisible(implement.locator(`[data-server="${server.name}"] [data-mcp-tool="echo"]`), "with the server's tool echo");
+    await expectVisible(
+      implement.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`),
+      `implement's server tool the settings deny is marked denied (${server.denied})`,
+    );
     await expectVisible(
       implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }),
       "implement has the harness's own set, with the date and version it was measured on",

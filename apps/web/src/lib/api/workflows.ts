@@ -24,7 +24,8 @@ import {
  * resolved; `own` is what a step with an agent sets itself, null for a step with none; `hired` is the agent the factory the listing is in
  * hires into it, which `spec.agent` then names too — null for a step it hires no one into, and in the default factory. `layers` is what
  * a run of a step with an agent would be told, by layer — the agent's instructions, your custom instructions, the step's policy — null for
- * a step with none. `mcp` is the MCP servers its sessions load, as its agent names them: empty where it names none or the step has no agent.
+ * a step with none. `mcp` is the MCP servers its sessions load, as its agent names them: empty where it names none or the step has no
+ * agent.
  */
 export type ListedStep = {
   name: string;

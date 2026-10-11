@@ -78,7 +78,7 @@ const plain = (agent: Agent) => ({
   role: agent.role,
   description: agent.description,
   skills: agent.skills,
-  mcp: agent.mcp,
+  ...(agent.mcp && { mcp: agent.mcp }),
   keys: agent.keys,
   body: agent.body,
 });

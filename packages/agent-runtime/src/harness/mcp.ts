@@ -1,7 +1,8 @@
 /**
  * A task's MCP servers, as Claude Code is handed them: what the engine refuses of a task's `mcp`, the checkout's own
  * `.mcp.json` and the entries a task picks of it, the task's config written to a file, and the flags that load those and nothing
- * else. And as Codex is handed them: the server names an operator's Codex config already has, and a task's servers as its `mcp_servers` table.
+ * else. And as Codex is handed them: the server names an operator's Codex config already has, and a task's servers as its
+ * `mcp_servers` table.
  */
 import fs from 'node:fs';
 import path from 'node:path';

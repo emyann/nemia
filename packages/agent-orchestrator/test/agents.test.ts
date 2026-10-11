@@ -67,9 +67,9 @@ test('an agent is its role keys as written, its description, and its body as its
 
 /**
  * The agent's own keys: `role`, `description`, `skills`, `harnessPrompt` and `mcp` describe the agent itself — the job it holds, who it
- * is, what it is given (and so what it says it can do), how its sessions are told and the MCP servers they load — and a step sets none of them for its agent: a step's work is
- * the workflow's, not the agent's. A step's own `skills:` adds to its agent's and never stands in for them. Every other agent key is a
- * key a step may set for itself, and takes from its agent when it does not.
+ * is, what it is given (and so what it says it can do), how its sessions are told and the MCP servers they load — and a step sets none
+ * of them for its agent: a step's work is the workflow's, not the agent's. A step's own `skills:` adds to its agent's and never stands
+ * in for them. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
  */
 const AGENT_OWN = ['role', 'description', 'skills', 'harnessPrompt', 'mcp'];
 

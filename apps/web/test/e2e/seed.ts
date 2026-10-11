@@ -987,7 +987,7 @@ export const WORKFLOWS = {
       person: 'Implementer',
       role: 'Software engineer',
       runsOn: 'implementer · claude · opus',
-      /** The MCP server its sessions load, by the name the checkout's `.mcp.json` gives it (`CHECKOUT.server`): review, with no agent, loads none. */
+      /** The MCP server its sessions load, by its name in the checkout's `.mcp.json`: review, with no agent, loads none. */
       mcp: 'fixture',
       /** Its instructions, the body of its file: markdown, which its page reads as markdown and not as the source. */
       body: '## How you work\n\nYou implement what is asked, and **test** it:\n\n- the failing test first\n- then the change\n',

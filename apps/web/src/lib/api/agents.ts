@@ -145,8 +145,8 @@ export const agentQuery = (from: string, name: string) =>
 
 /**
  * An agent as a write sends it: its name, description, the skills it gives and its harness prompt — each null for none — the role keys it
- * sets, one unset as null, its instructions, and a result schema pasted for it. `skills`, `harnessPrompt` and `mcp` are the agent's own lines, as
- * `description` is. Its card is generated from its skills, and nothing sends it.
+ * sets, one unset as null, its instructions, and a result schema pasted for it. `skills`, `harnessPrompt` and `mcp` are the agent's
+ * own lines, as `description` is. Its card is generated from its skills, and nothing sends it.
  */
 export type AgentDraft = {
   name: string;

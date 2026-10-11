@@ -11,6 +11,12 @@ A design note for the owner to approve. It changes no code. It rests on the owne
 > started from a `src`), and the place's code stays outside `src`, behind one door (`placeBreaks` in `test/boundary.test.ts`). The
 > contract's requests, answers, refusals and deadlines are unchanged; `place.json`, the freeze of a place and `placeSkill` on a new
 > record are gone, and sections *How a verb is run*, *`place.json`* and *Freezing* describe what was.
+>
+> **Two things are given up on purpose.** *A team's own place as a folder of scripts*: the card this note waits for twice, "the card
+> that lets a team supply its own place", will not come in that form. A team cannot bring a place as a skill's scripts; another place
+> is code that implements `PlaceService`, given as a layer where a program is composed. *A place frozen per run*: no copy under
+> `WF_ROOT/places/`, no version compared, no `nemia refreeze`. A run in flight is answered by the place of the process that asks,
+> the release installed, and a change to the place reaches it at the next restart.
 
 ## The rule
 
@@ -263,7 +269,8 @@ workflow gives the same value, the rule `workspace: folder` follows today (`isFo
 *Deferred on 2026-10-06, at card C2*: `nemia start` resolves `place: git` to the package's own place (`SHIPPED_PLACE`), reads its
 `place.json` (`readPlaceJson`), refuses a workflow whose run needs a verb it does not declare, runs `open` from it (`openPlace` in
 `src/place/place.store.ts`), and records `placeSkill: { skill, version }`. No copy is made: the copy under `WF_ROOT/places/`, the
-refusal of a copy whose version drifted, prune's part and `nemia refreeze` wait for the card that lets a team supply its own place. Until
+refusal of a copy whose version drifted, prune's part and `nemia refreeze` wait for the card that lets a team supply its own place
+(given up on 2026-10-11, with the freeze: the note at the head). Until
 then the only place is the package's code, installed as a release that never changes under a run, so `version` is recorded and not yet
 compared. `placeDirOf` is the one answer to where a run's place runs from, and that card makes it answer the frozen copy.
 
@@ -430,7 +437,7 @@ absorbs. The `say` templates are what make the words match.
    person's file, `runs/<id>.refreeze`, which the tick reads: it freezes the skill again from the lookup and writes the new version into
    the record's `placeSkill`. The person chose the new copy by name, so no command comes from a checkout unasked.
    *Deferred on 2026-10-06, at card C2*: no copy is frozen yet (*Freezing*), so there is nothing to refreeze. It comes with the card
-   that lets a team supply its own place.
+   that lets a team supply its own place (given up on 2026-10-11, with the freeze: the note at the head).
 7. **A `staged` marker without a process.** If card J's measure shows `status` costs a pass too much, `open` could answer the path of a
    file whose existence means "something is staged" (for git, the checkout's MERGE_HEAD, which the skill locates), and the code would
    `stat` that path without knowing what it is. *Recommend* not building it until measured.

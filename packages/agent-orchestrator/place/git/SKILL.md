@@ -24,8 +24,8 @@ Your brief names the commit the run started from, its base. When it does not giv
 - **On a result branch**, from the base's checkout: `git log --oneline <base>..<branch>` for its commits and `git diff <base>...<branch>`
   for its change, as the branch made it, whatever the base did since.
 
-The run reads the same without you, from git's object store, through `scripts/report.ts`: what each result branch changed against the
-base, file by file.
+The run reads the same without you, from git's object store, through this place's `report` verb (`verbs/report.ts`): what each result
+branch changed against the base, file by file.
 
 ## Merge the base when a person asks
 

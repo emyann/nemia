@@ -5,19 +5,26 @@
  */
 import type { TestContext } from 'node:test';
 import type { Engine } from '../src/runtime-client.ts';
+import type { Place } from '../src/place/place.store.ts';
 
 /**
  * What `nemia decide <argv>` prints, split on line breaks, with each value of `as` replaced by its key: `{ '<id>': run.id }`. A value that
- * is empty is refused, as it would match between every two characters.
+ * is empty is refused, as it would match between every two characters. `main` is handed `place`, and takes its own where given none.
  */
-export async function decideScreen(t: TestContext, e: Engine, argv: string[], as: Record<string, string>): Promise<string[]> {
+export async function decideScreen(
+  t: TestContext,
+  e: Engine,
+  argv: string[],
+  as: Record<string, string>,
+  place?: Place,
+): Promise<string[]> {
   const { main } = await import('../src/cli/main.ts');
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
     out.push(args.map(String).join(' '));
   });
   try {
-    await main(['decide', ...argv], e);
+    await main(['decide', ...argv], e, undefined, place);
   } finally {
     log.mock.restore();
   }

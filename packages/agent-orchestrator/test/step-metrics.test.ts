@@ -1,9 +1,11 @@
 /**
  * The tick records a step's facts at the one place it sees them (`recordStepMetrics`, after `meteredPass`): a session that settles with a
- * cost is recorded once, on the pass whose read of the feed names it settled (`settledIn`), by the five attributes alone, and never again
- * on a pass that answers the run from its memo of runs at rest. And each call a harness denied a session is a span of its own
- * (`DENIED_SPAN`) on the pass that reads its attempt ended, whatever the turn signed, counted once by the run's own mark
- * (`deniedCounted`): a daemon started again, with no memo, records none twice.
+ * cost is recorded once, on the first pass that reads it settled and does not find it in the run's own mark (`settlesCounted`), by the
+ * five attributes alone, and never again: neither on a pass that answers the run from its memo of runs at rest, nor by a daemon started
+ * again, which counts the settle its first pass makes and none a daemon before it counted. A session held open and answered is one try.
+ * A record with no mark is counted on the pass whose read of the feed names its task settled (`settledIn`). And each call a harness
+ * denied a session is a span of its own (`DENIED_SPAN`) on the pass that reads its attempt ended, whatever the turn signed, counted once
+ * by the run's own mark (`deniedCounted`): a daemon started again, with no memo, records none twice.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness signed by hand, ticked by `tickRun` under a
  * registry of the test's own. `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST=1` judges
@@ -79,9 +81,9 @@ const engine = plainEngine(
   }),
 );
 
-/** Attempt 1 of `taskId` signed off done, having cost `costUsd` and used 1,200 tokens in and 300 out. */
-const sign = (taskId: string, costUsd: number) => {
-  const name = nameFor(taskId, 1);
+/** Attempt `n` of `taskId`, the first unless said, signed off done, having cost `costUsd` and used 1,200 tokens in and 300 out. */
+const sign = (taskId: string, costUsd: number, n = 1) => {
+  const name = nameFor(taskId, n);
   sessions.set(name, {
     ...sessions.get(name)!,
     state: 'completed',
@@ -218,4 +220,89 @@ test("the next turn's denials count on top, a call denied twice is two, and a da
   for (let i = 0; i < 3; i++) await tick(restarted);
   assert.ok(restarted.spans.length > 0, 'the daemon started again made its passes');
   assert.deepEqual(deniedSpans(restarted, run.id), [], 'REFUSED: nothing counted again');
+});
+
+/** A workflow folder `name` of one step, `implement`, whose series are its own in the registry the file shares. */
+const workflowOf = (name: string): string => {
+  const dir = path.join(ROOT, name);
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nBuild it.\n');
+  return dir;
+};
+
+/** A run of the workflow `name`, started and ticked by `life` until its session works. */
+const working = async (name: string, life = FIRST) => {
+  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: workflowOf(name), isolate: false }));
+  const taskId = `${run.id}-implement`;
+  for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 1)); i++) await tick(life);
+  assert.ok(sessions.has(nameFor(taskId, 1)), 'its session started');
+  return { run, taskId };
+};
+
+/**
+ * Passes of the daemon `life` until its tick has closed `taskId`, signed and held open, and no pass after: the runtime settles a closed
+ * task on its next pass, which is then the first pass of whichever daemon is started next, whose memo reads the feed from its end.
+ */
+const closedUnsettled = async (taskId: string, life = FIRST) => {
+  const state = async () => (await Effect.runPromise(engine.view(taskId))).state;
+  for (let i = 0; i < 4 && !(await state()).closed; i++) await tick(life);
+  assert.deepEqual([(await state()).closed, (await state()).settled], [true, null], 'closed by the tick, not settled yet');
+};
+
+/** Each series of `id` the workflow `name` has in the registry, as its outcome and its count. */
+const counted = async (id: string, name: string) =>
+  (await series(id))
+    .filter((m) => m.attributes?.workflow === name)
+    .map((m) => [m.attributes?.outcome, (m.state as { count: number }).count]);
+
+test('a session that settles on the first pass of a daemon started again is counted once by it, and by no daemon after it', async () => {
+  const { run, taskId } = await working('restarted');
+  assert.deepEqual(readRun(run.id).settlesCounted, [], 'a run just started has counted no settle');
+  sign(taskId, 2.5);
+  await closedUnsettled(taskId);
+
+  const second = daemon();
+  for (let i = 0; i < 4; i++) await tick(second);
+  assert.deepEqual(await counted('step.cost', 'restarted'), [['done', 2.5]], 'its cost, though no daemon read its settle off the feed');
+  assert.deepEqual(await counted('step.tries', 'restarted'), [['done', 1]]);
+  assert.deepEqual(await counted('step.tokens.input', 'restarted'), [['done', 1200]]);
+  assert.deepEqual(readRun(run.id).settlesCounted, [taskId]);
+
+  const third = daemon();
+  for (let i = 0; i < 3; i++) await tick(third);
+  assert.ok(third.spans.length > 0, 'the daemon started again made its passes');
+  assert.deepEqual(await counted('step.cost', 'restarted'), [['done', 2.5]], 'REFUSED: nothing counted again');
+  assert.deepEqual(await counted('step.tries', 'restarted'), [['done', 1]], 'REFUSED: no try counted again');
+  assert.deepEqual(readRun(run.id).settlesCounted, [taskId], 'the task is marked once');
+});
+
+test('a blocked try answered in its session and signed done is one try, with its cost once', async () => {
+  const { run, taskId } = await working('answered');
+  signDenied(taskId, 1, 'blocked', []);
+  for (let i = 0; i < 3; i++) await tick();
+  assert.deepEqual(await counted('step.tries', 'answered'), [], 'held open for a word, not settled');
+  await runWith(engine, retryRun(run.id, 'implement', { mode: 'nudge', message: 'the --dry-run flag' }));
+  for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 2)); i++) await tick();
+  assert.ok(sessions.has(nameFor(taskId, 2)), 'the answer is the same task, in its next attempt');
+  sign(taskId, 0.75, 2);
+  for (let i = 0; i < 4; i++) await tick();
+  assert.deepEqual(await counted('step.tries', 'answered'), [['done', 1]]);
+  assert.deepEqual(await counted('step.cost', 'answered'), [['done', 0.75]]);
+  assert.deepEqual(readRun(run.id).settlesCounted, [taskId]);
+});
+
+test('a record with no settlesCounted, started before the mark, is counted off the feed once, and never by a daemon started again', async () => {
+  const { run, taskId } = await working('unmarked');
+  const file = path.join(ROOT, 'runs', `${run.id}.json`);
+  const { settlesCounted: _, ...before } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  fs.writeFileSync(file, JSON.stringify(before));
+  sign(taskId, 1.5);
+  for (let i = 0; i < 4; i++) await tick();
+  assert.deepEqual(await counted('step.cost', 'unmarked'), [['done', 1.5]]);
+  assert.equal(readRun(run.id).settlesCounted, undefined, 'no mark is made for it');
+
+  const restarted = daemon();
+  for (let i = 0; i < 3; i++) await tick(restarted);
+  assert.deepEqual(await counted('step.cost', 'unmarked'), [['done', 1.5]], 'REFUSED: an old record is never counted again');
+  assert.deepEqual(await counted('step.tries', 'unmarked'), [['done', 1]]);
 });

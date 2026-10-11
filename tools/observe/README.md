@@ -114,6 +114,11 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
     whose own shell command failed), by `tool_parameters`, which names the skill where the event carries its inputs
     (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports no event and no span, and is **not measured**; a skill a
     session was refused is a denied call, `Skill(<name>)`.
+  - Tool errors and Failed skill loads draw one bar for each series, at most 100, named in the query itself (`label_format name=…`,
+    `sum by (name)`): Grafana draws no legend for an instant Loki query (*Counting a session's errors*). For one run a bar is `<step> ·
+    <tool>`; across runs `<workflow> / <step> · <agent> · <tool>`, and `unlabelled / <step> · <tool>` for the events of sessions
+    exported before they carried their factory, workflow and agent: they stay counted, so the bars add up to Loki's count, and are
+    read only while Factory, Workflow and Agent are all All. A failed skill load whose event carries no inputs has nothing after its `·`.
   - Their limits: Tempo answers 7 days back at most; errors and skill loads are counted for sessions that export telemetry alone (a
     Claude Code step of a daemon given an endpoint, never a Codex step); a run started before the daemon counted denied calls has
     none, and the daemon must run the code that counts them.
@@ -127,8 +132,10 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
 
 `packages/agent-orchestrator/test/observe.test.ts` holds them to the code: a query that names a metric, label, span, attribute or log field
 the code does not emit fails it, and so does a metric the code defines that System does not chart, a profile type the profiler does not
-send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, and a server-side expression reading a
-query its panel has not. What a session sends and what the span metrics write are no code of ours: the test lists them as measured below.
+send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, a server-side expression reading a
+query its panel has not, and a bar gauge over Loki that would draw one nameless bar: one that does not read each row of an instant
+query, counts by more than one label, keeps a `legendFormat`, sets no limit, or does not name a bar by its row's label. What a session
+sends and what the span metrics write are no code of ours: the test lists them as measured below.
 `agent-orchestrator/test/observe-time.test.ts` holds the timing below: the command head and the test scope, each over a table of commands,
 the span metrics' dimensions, the retention and reach, and the mounts. `agent-orchestrator/test/profile.test.ts` holds the preload: with no
 endpoint, nothing loaded and nothing opened.
@@ -183,6 +190,23 @@ Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
   loaded. A `Skill` call for a skill that is not there exported nothing: no `tool_decision`, no `tool_result`, no span.
 - **The harness's own `tool_decision` events (`decision="reject"`) are not what Denied calls counts**: it counts what the runtime
   journals of a job's denials, the list a run's page shows.
+- **A bar gauge over an instant Loki query reads a table, not series** (Grafana 13.2.2, read off rendered pages of a scratch
+  dashboard): the server answers a frame for each series, and Grafana's Loki datasource merges them in the browser into one table, a
+  row for each series, its labels as columns beside one `Value`. The `legendFormat` is never drawn.
+  - As a gauge is made (`reduceOptions.values: false`, `lastNotNull`), it reduces the column to its last row: `Tool errors, across
+    runs`, 21 series adding up to 177, drew one nameless bar reading 1.
+  - With `values: true` it draws a bar for each row, named by every label's value joined by a space in column order, a missing label
+    drawn as `0`. So the query makes one label (`| label_format name="…"`) and counts `by (name)`: the 21 bars then read Loki's own
+    counts (25, 67, 20, …, 177 in all), and Failed skill loads' two read 4 and 11.
+  - A table of one row draws its bar with no name, unless the gauge's `displayName` reads the row (`${__data.fields.name}`): a run
+    with one failed skill load drew a bare `1` without it, and `implement · {"skill_name":"nemia-ada:shadcn"}` with it.
+  - With `values: true` and no `limit`, the first 25 rows are drawn and the rest dropped without a word: of 109 series, 25 bars; with
+    `limit: 100`, 100.
+  - Loki's template evaluates an `if`: `{{ if .workflow }}…{{ else }}unlabelled / {{.step}}{{ end }}` named 10 of the 21 series
+    `unlabelled`, events with no `workflow`.
+  - A range query cut to one point (`maxDataPoints: 1`) keeps the legend's names but miscounts: a series read 2 where Loki counts 67,
+    its last point not being evaluated at the range's end.
+  - The bars come in the order Loki answers, and a long name is cut short where the panel is narrow.
 
 ## The names, as measured
 

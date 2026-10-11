@@ -157,8 +157,11 @@ What the `create-an-agent` skill, being generic, does not say here:
 - Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the five layers.
 - A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
   `.claude/skills/` is not found.
-- A checking agent given `Bash` denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows other roles,
-  allows by exact name the checks it runs (`npm run lint`, `npx turbo run typecheck --force`), and joins `CHECKERS` with its skill in
+- An agent's file and its own skills name nothing of this repository (`packages/agent-orchestrator/test/team-portable.test.ts`): what
+  is ours is said by the step (`build-told.test.ts`), by `.claude/settings.json`, by a `CLAUDE.md` or by the factory's rules.
+- A checking step, its agent given `Bash`, denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows
+  other roles, on its own `disallowedTools:`, beside each deny of its agent's; the checks it runs are allowed by exact name in
+  `.claude/settings.json` (`npm run lint`, `npx turbo run typecheck --force`) and named in its note, where `CHECKERS` reads them in
   `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence.
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.

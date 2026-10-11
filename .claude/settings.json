@@ -10,6 +10,10 @@
     "allow": [
       "Bash(npm test)",
       "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npx turbo run typecheck --force)",
+      "Bash(npx nemia stats:*)",
+      "Bash(npx nemia inbox)",
       "Bash(npm run build)",
       "Bash(npm run e2e)",
       "Bash(npx turbo run test:*)",

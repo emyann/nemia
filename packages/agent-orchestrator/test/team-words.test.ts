@@ -19,6 +19,7 @@ const REPOSITORY_WORDS = /agent-runtime|agent-orchestrator|apps\/api|runtime-cli
 const MECHANISM: Array<{ file: string; holds: string; body: boolean }> = [
   { file: 'workflows/agents/spec.schema.json', holds: '"placement"', body: false },
   { file: 'workflows/agents/review.schema.json', holds: '"kind"', body: false },
+  { file: 'workflows/build/review.schema.json', holds: '"kind"', body: false },
   { file: 'workflows/agents/seldon.md', holds: 'write-a-spec', body: true },
   { file: 'workflows/agents/agora.md', holds: 'review-a-change', body: true },
   { file: 'workflows/agents/ada.md', holds: 'implement-a-change', body: true },

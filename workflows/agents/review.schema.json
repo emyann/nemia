@@ -21,22 +21,8 @@
         "additionalProperties": false
       }
     },
-    "mutants": {
-      "type": "array",
-      "description": "Every `wf mutants:` line handed to you under What implement's check said, in its `reported`, each quoted whole, with your judgement of it. Empty only when `reported` holds none. When the section says `reported` is partial, still quote every `wf mutants:` line it holds, and say in a finding that lines printed earlier may be missing.",
-      "items": {
-        "type": "object",
-        "properties": {
-          "line": { "type": "string", "description": "The `wf mutants:` line, quoted whole as the check printed it." },
-          "proves": { "type": "boolean", "description": "true when the mutant breaks the rule it names, so the test that killed it proves that rule; false when it only breaks the file, or proves nothing the change adds." },
-          "why": { "type": "string", "description": "Why, in a sentence: the rule the mutant breaks, or what it breaks instead." }
-        },
-        "required": ["line", "proves", "why"],
-        "additionalProperties": false
-      }
-    },
     "again": { "type": "boolean", "description": "true when a finding is worth another round: the engineer is handed your findings and the change comes back to you. false when it is done as far as a review can tell." }
   },
-  "required": ["findings", "mutants", "again"],
+  "required": ["findings", "again"],
   "additionalProperties": false
 }

@@ -5,16 +5,17 @@ description: "Read a factory's stats since the janitor's last run, against the s
 
 # Read the stats
 
-1. **Run each read bare**, one command per call: `npx wf stats --json --workflow janitor`,
-   `npx wf stats --json --by agent --from <day> --to <day>`, `npx wf stats --json --by step --from <day> --to <day>`, `npx wf inbox`.
-   Never wrap one in `timeout` or `( … )`, pipe it to `tail` or `grep`, or redirect it; never `cd`, `git -C`, `VAR=` or `for`: your
-   fence refuses them. Read a file with Read and search with Grep or Glob.
-2. **Choose the period.** A period the brief gives wins. Else it runs from the last day `npx wf stats --json --workflow janitor` counts
-   a run on (`all.days`, the latest with `runs` above 0) to today; with none, the last 14 days to today. It is compared with as many
-   days, ending the day before it starts (`against`). Days are UTC, `YYYY-MM-DD`.
+1. **Run each read bare**, one command per call, run as your step says the command is reached:
+   `nemia stats --json --workflow <the workflow your step is in>`, `nemia stats --json --by agent --from <day> --to <day>`,
+   `nemia stats --json --by step --from <day> --to <day>`, `nemia inbox`. Never wrap one in `timeout` or `( … )`, pipe it to `tail` or
+   `grep`, or redirect it; never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. Read a file with Read and search with Grep
+   or Glob.
+2. **Choose the period.** A period the brief gives wins. Else it runs from the last day the first of those reads counts a run on
+   (`all.days`, the latest with `runs` above 0) to today; with none, the last 14 days to today. It is compared with as many days,
+   ending the day before it starts (`against`). Days are UTC, `YYYY-MM-DD`.
 3. **Read both periods**, by agent and by step (`--by agent`, `--by step`), and the step rows (`all.steps`): tries, time, cost, checks,
-   gate waits, and refused calls (`deniedCalls`, `deniedTries`, `denials`). Quote the numbers as `wf stats` gives them; a number it gives
-   as null was not measured, and is said so, never as 0. Never re-derive one from a workflow's step names. Read each step's skills
+   gate waits, and refused calls (`deniedCalls`, `deniedTries`, `denials`). Quote the numbers as `nemia stats` gives them; a number it
+   gives as null was not measured, and is said so, never as 0. Never re-derive one from a workflow's step names. Read each step's skills
    table (`skills`): `loads`, `tries` that loaded the skill, and `when touched`, `<loaded> of <touched>` (`loadedWhenTouched` of
    `touched`), the tries that touched the paths the skill applies to and how many of them loaded it. A skill touched in many tries
    and loaded in few is a description to sharpen: propose its new description, with the numbers beside it, on the skill of ours
@@ -29,7 +30,7 @@ description: "Read a factory's stats since the janitor's last run, against the s
    rounds, a gate that waited longer, a count a workflow declares over its closeouts that rose (`all.tallies`: each step's `sum` over
    its measured `tries`, null where none was measured). Propose a correction only where the numbers point at one; a number that moved with nothing to
    correct goes in the report, not on a card.
-6. **Read the inbox** (`npx wf inbox`, and its cards in the inbox folder your brief names, mounted read-only: read them with Read, Grep
+6. **Read the inbox** (`nemia inbox`, and its cards in the inbox folder your brief names, mounted read-only: read them with Read, Grep
    and Glob): propose nothing a card there already says, under its title or another. The check files no card whose title one there already has.
 7. **Write each card ready to start**: a title of one line, what to correct; the correction exactly — the rule, or the line and the
    file it goes in; the evidence, the numbers of both periods; the agent; and the factory, the workflow and the repository it is

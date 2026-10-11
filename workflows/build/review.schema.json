@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "findings": {
+      "type": "array",
+      "description": "What is worth changing, one finding each. Empty when nothing is: a finding invented to look thorough costs a round.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string", "description": "The file, by path from the workspace root." },
+          "line": { "type": ["integer", "null"], "description": "The line it is about; null when it is about something absent, such as a test nobody wrote." },
+          "kind": {
+            "type": "string",
+            "enum": ["placement", "behaviour", "test", "limit", "scope", "other"],
+            "description": "What kind of finding: `placement`, code in a boundary the repository's own rules give to another concern, or built elsewhere than the spec placed it; `behaviour`, a wrong result; `test`, a rule unproven, or a test that passes for nothing; `limit`, a ceiling raised or a size broken; `scope`, done what the spec did not ask, or left out what it asked; `other`, none of these."
+          },
+          "rule": { "type": ["string", "null"], "description": "The repository rule the finding cites: the file that states or holds it, and its words. Null when it cites none; never null for a `placement` finding." },
+          "what": { "type": "string", "description": "What goes wrong, concretely: the input or the case, and the wrong result." }
+        },
+        "required": ["file", "line", "kind", "rule", "what"],
+        "additionalProperties": false
+      }
+    },
+    "mutants": {
+      "type": "array",
+      "description": "Every `wf mutants:` line handed to you under What implement's check said, in its `reported`, each quoted whole, with your judgement of it. Empty only when `reported` holds none. When the section says `reported` is partial, still quote every `wf mutants:` line it holds, and say in a finding that lines printed earlier may be missing.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "line": { "type": "string", "description": "The `wf mutants:` line, quoted whole as the check printed it." },
+          "proves": { "type": "boolean", "description": "true when the mutant breaks the rule it names, so the test that killed it proves that rule; false when it only breaks the file, or proves nothing the change adds." },
+          "why": { "type": "string", "description": "Why, in a sentence: the rule the mutant breaks, or what it breaks instead." }
+        },
+        "required": ["line", "proves", "why"],
+        "additionalProperties": false
+      }
+    },
+    "again": { "type": "boolean", "description": "true when a finding is worth another round: the engineer is handed your findings and the change comes back to you. false when it is done as far as a review can tell." }
+  },
+  "required": ["findings", "mutants", "again"],
+  "additionalProperties": false
+}

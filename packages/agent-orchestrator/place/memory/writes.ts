@@ -23,8 +23,8 @@ function cut(repo: Repository, at: string, name: string, from: string): string |
 }
 
 /**
- * `make`: the workspace at `at` on `name`, cut from `from` or taken up as it stands, with each branch of `also` merged into it: one the
- * repository lacks, or asked while a conflict stands, is a note, dropped where a conflict is left.
+ * `make`: the workspace at `at` on `name`, cut from `from` or taken up as it stands while its directory is one, with each branch of
+ * `also` merged into it: one the repository lacks, or asked while a conflict stands, is a note, dropped where a conflict is left.
  */
 export function make(held: Held, { repo: dir, at, name, from, also }: PlaceRequests['make']): Reply<'make'> {
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no workspace can be cut from it`);
@@ -33,7 +33,7 @@ export function make(held: Held, { repo: dir, at, name, from, also }: PlaceReque
   const there = repo.checkouts.get(real(at));
   if (there && there.branch !== name)
     return refused(`${at} holds a workspace on ${there.branch}, not on ${name}: remove it, then let the run cut it again`);
-  const failed = there ? undefined : cut(repo, at, name, from);
+  const failed = there && isDirectory(at) ? undefined : cut(repo, at, name, from);
   if (failed) return refused(`${at} could not be cut on ${name} from ${from}: ${failed}`);
   const found = checkoutAt(held, at)!;
   const notes: string[] = [];

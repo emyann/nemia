@@ -42,6 +42,9 @@ const OTHER_RUN = 'seeded-run-2';
 const IMPLEMENT = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
 const REVIEW = { factory: 'nemia', workflow: 'build', step: 'review', agent: 'agora' };
 
+/** A step the daemon timed whose session sent no span, as a step on another harness: what Time lists as unmeasured. */
+const DESIGN = { factory: 'nemia', workflow: 'build', step: 'design', agent: 'seldon' };
+
 /** The task a step's session of the seeded run runs as. */
 const taskOf = (step: { step: string }): string => `${RUN}-${step.step}`;
 
@@ -198,6 +201,7 @@ const DAEMON: ServiceSeed = {
     bySteps('step.duration', 'histogram', [
       [IMPLEMENT, 'done', 900_000],
       [REVIEW, 'done', 300_000],
+      [DESIGN, 'done', 120_000],
     ]),
     bySteps('step.tries', 'total', [
       [IMPLEMENT, 'done', 3],
@@ -384,11 +388,19 @@ export async function post(otlp: string, seed: readonly ServiceSeed[] = SEED): P
 /** What a render opens every dashboard on: the range in milliseconds since the epoch, and the seeded run and session. */
 export type Picks = { from: number; to: number; run: string; session: string };
 
+/** The longest step a panel asks its chart in (`interval` in a dashboard's file): a chart's points fall on its multiples. */
+const LONGEST_STEP_MS = 5 * 60_000;
+
 /**
- * The picks of a seed stamped `seededAt` and looked at `now`: a quarter of an hour before the stamp to now, the seeded run, every
- * session.
+ * The picks of a seed stamped `seededAt` and looked at `now`: from a quarter of an hour before the stamp to the first multiple of
+ * `LONGEST_STEP_MS` after now, so that a chart stepped that far has a point after the seed; the seeded run, every session.
  */
-export const picks = (seededAt: number, now: number): Picks => ({ from: seededAt - 15 * 60_000, to: now, run: RUN, session: '$__all' });
+export const picks = (seededAt: number, now: number): Picks => ({
+  from: seededAt - 15 * 60_000,
+  to: Math.ceil(now / LONGEST_STEP_MS) * LONGEST_STEP_MS,
+  run: RUN,
+  session: '$__all',
+});
 
 /** How long `arrived` waits for each store, in seconds. */
 export const ARRIVAL_SECONDS = 180;

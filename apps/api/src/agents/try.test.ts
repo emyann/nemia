@@ -60,6 +60,7 @@ for (const name of ['agents', 'skills'])
   fs.writeFileSync(path.join(YOURS, `${name}.md`), `---\ndescription: Use this as ${name}.\n---\nDo it.\n`);
 fs.writeFileSync(path.join(YOURS, 'coder.md'), '---\ndescription: Use this to code.\nharness: codex\n---\nCode it.\n');
 fs.writeFileSync(path.join(YOURS, 'faraway.md'), '---\ndescription: Use this far away.\nharness: a2a:faraway\n---\nDo it there.\n');
+fs.writeFileSync(path.join(YOURS, 'browsing.md'), '---\ndescription: Use this to look at a page.\nmcp: playwright\n---\nLook.\n');
 fs.writeFileSync(path.join(YOURS, 'bridged.md'), '---\ndescription: Use this from a phone.\nremote: true\n---\nDo it.\n');
 fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'critic.md'), '---\ndescription: Use this to criticise.\n---\nCriticise it.\n');
@@ -360,6 +361,21 @@ test("an agent a try's fence does not reach is refused before anything is writte
   await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`.*a try runs as a job/);
   for (const name of ['coder', 'faraway', 'bridged'])
     assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
+});
+
+const SERVERS_UNTRIED =
+  "browsing names MCP servers (`mcp: playwright`), which a session loads from its checkout's `.mcp.json`, and a try runs with no repository, in a folder of its own, which has none. Delete the line to try it, and name the server on the step that needs it: a step's own `mcp:` adds to its agent's.";
+
+test('an agent that names MCP servers is refused a try before anything is written, and its listing says the same words', async () => {
+  const res = await tryIt('browsing', { brief: 'Look.' });
+  assert.equal(res.status, 422, await res.clone().text());
+  assert.equal(((await res.json()) as { error: string }).error, SERVERS_UNTRIED);
+  assert.equal(fs.existsSync(path.join(TRIES, 'browsing')), false, 'no try folder for it');
+  const agents = (await (await app.request('/api/agents')).json()) as AgentListing[];
+  assert.deepEqual(agents.find((agent) => agent.from === 'yours' && agent.name === 'browsing')?.untried, {
+    why: SERVERS_UNTRIED,
+    copy: null,
+  });
 });
 
 test('the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent', async () => {

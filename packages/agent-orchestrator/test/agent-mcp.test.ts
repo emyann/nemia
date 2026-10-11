@@ -1,12 +1,13 @@
 /**
- * An agent's `mcp:` line: the MCP servers of the checkout its sessions load, by name. Read and written back as the file's own line, refused
- * where it names no server or reaches no session, frozen on every step with an agent, and filed as the names alone: no step loads a server
- * its agent does not name, and a record frozen before the key loads the whole file as it did.
+ * An agent's `mcp:` line and a step's: the MCP servers of the checkout a session loads, by name. Each is read and written back as its
+ * file's own line and refused where it names no server or reaches no session; the step's adds to its agent's, frozen as one list on every
+ * step with an agent and filed as the names alone. No step loads a server neither names, naming one changes nothing of the fence, and a
+ * record frozen before the key loads the whole file as it did.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { agentDraftOf, parseAgent, parseWorkflow, renderAgent, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { agentDraftOf, parseAgent, parseWorkflow, renderAgent, renderStep, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { filedConfig } from '../src/filed/filed.ts';
 import { FrozenStepSchema } from '../src/folder/folder.store.ts';
 import { agentsLines } from '../src/roster/roster.ts';
@@ -77,10 +78,59 @@ test("mcpServers, Claude Code's own key, is refused naming the mcp: line that do
   );
 });
 
-test('a step is no place for mcp:, and an agent that names a server cannot fill a step a remote agent runs', () => {
+test("a step's mcp: adds to its agent's: the session's servers are the agent's, then the step's, each once, and the step keeps its own line", () => {
+  const alone = stepOf(agentOf(''), 'mcp: playwright\n');
+  assert.deepEqual(alone.agent?.mcp, ['playwright'], 'an agent that names none loads what its step names');
+  assert.deepEqual(alone.mcp, ['playwright']);
+  const both = stepOf(agentOf('mcp: a, b\n'), 'mcp: c, a\n');
+  assert.deepEqual(both.agent?.mcp, ['a', 'b', 'c'], "the agent's first, and one both name once");
+  assert.deepEqual(both.mcp, ['c', 'a'], "the step's own line, as written");
+  assert.deepEqual(filed(both).checkoutMcp, ['a', 'b', 'c']);
+  const read = Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(both))) as Workflow;
+  assert.deepEqual(
+    [read.agent?.mcp, read.mcp],
+    [
+      ['a', 'b', 'c'],
+      ['c', 'a'],
+    ],
+    'both read back off a run record',
+  );
+  assert.equal(stepOf(agentOf('mcp: a\n')).mcp, undefined, 'a step with no line has none of its own');
+});
+
+test("a step's mcp: line is refused as an agent's is, under the step's name, and on a step with no agent", () => {
+  const of = (line: string) => refusal(() => stepOf(agentOf(''), `mcp: ${line}\n`));
+  assert.match(of('a,, b'), /^look: `mcp: a,, b` has an empty name\. Each is a server's name in the checkout's `\.mcp\.json`/);
+  assert.match(of('a, b c'), /^look: `mcp: a, b c` has `b c`, which is not a server's name\./);
+  assert.equal(of('a, a'), 'look: `mcp: a, a` names `a` twice. Name it once.');
+  assert.equal(
+    refusal(() => stepOf(undefined, 'mcp: playwright\n')),
+    "look: `mcp: playwright` adds MCP servers to the step's agent's, and this step has none. Name one — `agent: <name>` — whose servers these add to, or delete the line.",
+  );
+});
+
+test("renderStep writes a step's own mcp: line, never its agent's servers, and no line for none", () => {
+  const step = stepOf(agentOf('mcp: playwright\n'), 'mcp: docs\n');
+  assert.match(renderStep(step), /^mcp: docs$/m);
+  assert.doesNotMatch(renderStep(step), /playwright/);
+  assert.doesNotMatch(renderStep(stepOf(agentOf('mcp: playwright\n'))), /^mcp:/m);
+  assert.doesNotMatch(renderStep({ ...step, mcp: [] }), /^mcp:/m, 'an empty list is no line');
+});
+
+test('naming a server allows none of its tools: a dontAsk step that names one is filed as the same step naming none, but for the servers', () => {
+  const agent = agentOf('permissionMode: dontAsk\nallowedTools: Read\n');
+  const { checkoutMcp: named, ...withServer } = filed(stepOf(agent, 'mcp: playwright\n'));
+  const { checkoutMcp: none, ...without } = filed(stepOf(agent));
+  assert.deepEqual([named, none], [['playwright'], []]);
+  assert.deepEqual(withServer, without, 'the mode, the allow rules and the deny rules are those of the step that names none');
+  assert.equal(withServer.permissionMode, 'dontAsk');
+  assert.doesNotMatch(JSON.stringify(withServer), /mcp__/, 'no rule names a tool of the server');
+});
+
+test('an agent that names a server cannot fill a step a remote agent runs, nor may such a step name one itself', () => {
   assert.match(
-    refusal(() => stepOf(agentOf(''), 'mcp: playwright\n')),
-    /look: `mcp` is not a key a step has\./,
+    refusal(() => stepOf(agentOf(''), 'harness: a2a:helper\nmcp: playwright\n')),
+    /^look: `mcp: playwright` names servers of the checkout's `\.mcp\.json`.*`harness: a2a:helper` is a remote A2A agent/,
   );
   assert.match(
     refusal(() => agentOf('harness: a2a:helper\nmcp: playwright\n')),

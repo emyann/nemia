@@ -115,7 +115,8 @@ function stepFile(workflow: string, step: Spec, harness: string, read: TemplateR
   const overrides = isMap(step.overrides) ? step.overrides : {};
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;
   if (overrides.skills !== undefined) keys.skills = lineOf(overrides.skills);
-  Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills']), harness, refusals));
+  if (overrides.mcp !== undefined) keys.mcp = lineOf(overrides.mcp);
+  Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills', 'mcp']), harness, refusals));
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read) ?? '';
   try {
     return renderStep({ name, body, ...keys } as never);

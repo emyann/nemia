@@ -5,7 +5,7 @@
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
  * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the
- * settings enable and its agent names (`mcp:`), whatever its tools; the settings' deny rules and its own `disallowedTools:`; the
+ * settings enable and its agent or its own line names (`mcp:`), whatever its tools; the settings' deny rules and its own `disallowedTools:`; the
  * settings' ask rules; Claude Code's
  * read-only commands, which ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what
  * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that
@@ -109,8 +109,8 @@ export type StepReach = {
   /** Whether it runs on Claude Code, whose set was measured. Every field below that says null says it is not. */
   claudeCode: boolean;
   /**
-   * The fence as its file declares it, null where it declares none. `mcp` is the servers its sessions load, as its agent's `mcp:` line
-   * names them: empty where the agent names none and for a step with no agent, whose sessions load no server.
+   * The fence as its file declares it, null where it declares none. `mcp` is the servers its sessions load, its agent's `mcp:` line
+   * then its own: empty where neither names any and for a step with no agent, whose sessions load no server.
    * `permissionMode` is Claude Code's, `sandbox` Codex's: a step has at most one of the two.
    */
   fence: {
@@ -130,7 +130,7 @@ export type StepReach = {
   /** The repository's skills it can load — every one, with the Skill tool; none without it, and why. */
   skills: { names: string[]; why: string | null } | null;
   /**
-   * Each server the step's agent names (`fence.mcp`): one the checkout enables with the tools it listed, or why there are none to show;
+   * Each server the step or its agent names (`fence.mcp`): one the checkout enables with the tools it listed, or why there are none to show;
    * and one no `.mcp.json` of the checkout declares with no tools and why, since a session of the step is refused at its start.
    */
   mcp: Array<{ server: string; tools: ReachedMcpTool[] | null; why: string | null }> | null;
@@ -269,11 +269,12 @@ const undeclared = (named: readonly string[], declared: Capabilities['mcp']): No
     .map((server) => ({
       server,
       tools: null,
-      why: `The checkout's .mcp.json declares no server named ${server}: a session of this step is refused at its start. Declare the server there, or take the name off the agent's \`mcp:\` line.`,
+      why: `The checkout's .mcp.json declares no server named ${server}: a session of this step is refused at its start. Declare the server there, or take the name off the \`mcp:\` line that names it, the step's or its agent's.`,
     }));
 
 /** What follows why a named server's tools are not listed, where the settings do not enable it: a step's session loads it by its name. */
-const LOADED_ANYWAY = " A session of this step loads it all the same: its agent's `mcp:` line names it, and the settings are not asked.";
+const LOADED_ANYWAY =
+  " A session of this step loads it all the same: an `mcp:` line, its own or its agent's, names it, and the settings are not asked.";
 
 /**
  * The servers a step's sessions load, each with the tools it listed as the step's rules leave them: those the checkout declares among the

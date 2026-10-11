@@ -71,9 +71,9 @@ export const FENCE_KEYS = ['tools', 'allowedTools', 'disallowedTools', 'permissi
 
 /**
  * The keys a step's own file sets as its policy over its agent: the fence keys, which only tighten the agent's (`fenceRefusal`), and
- * `skills:`, which adds to the agent's (`addedSkillsRefusal`). Every other key is the step's wiring, or its agent's role.
+ * `skills:` and `mcp:`, which add to the agent's (`addedSkillsRefusal`; a server loaded allows no tool). Every other key is the step's wiring, or its agent's role.
  */
-export const POLICY_KEYS = [...FENCE_KEYS, 'skills'] as const satisfies readonly StepKey[];
+export const POLICY_KEYS = [...FENCE_KEYS, 'skills', 'mcp'] as const satisfies readonly StepKey[];
 
 /** One of a fence's keys. */
 type FenceKey = (typeof FENCE_KEYS)[number];

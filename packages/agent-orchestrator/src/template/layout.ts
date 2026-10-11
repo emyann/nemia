@@ -73,8 +73,8 @@ export type AgentSpec = {
   harness?: string;
 } & { readonly [harness: string]: unknown };
 
-/** What a step changes of the agent it hires: its harness, skills added, and one block per harness (`Profile`). */
-export type Overrides = { harness?: string; skills?: readonly string[] } & { readonly [harness: string]: unknown };
+/** What a step changes of the agent it hires: its harness, skills and MCP servers added, and one block per harness (`Profile`). */
+export type Overrides = { harness?: string; skills?: readonly string[]; mcp?: readonly string[] } & { readonly [harness: string]: unknown };
 
 /** A step of a workflow, in order: its wiring, what it reads of the store, what is tallied of its closeout, and its overrides. */
 export type Step = {
@@ -219,7 +219,7 @@ const METADATA: Shape = {
   required: ['name'],
 };
 
-const OVERRIDES: Shape = { fields: { harness: 'string', skills: 'strings', ...BLOCKS } };
+const OVERRIDES: Shape = { fields: { harness: 'string', skills: 'strings', mcp: 'strings', ...BLOCKS } };
 
 const STEP: Shape = {
   fields: {

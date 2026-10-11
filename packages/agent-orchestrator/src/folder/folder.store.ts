@@ -284,6 +284,7 @@ const frozenStepFields = {
   slot: Schema.optionalKey(Schema.Literal('none')),
   agent: Schema.optionalKey(StepAgentSchema),
   skills: Schema.optionalKey(Strings),
+  mcp: Schema.optionalKey(Strings),
   harness: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
   effort: Schema.optionalKey(Schema.String),

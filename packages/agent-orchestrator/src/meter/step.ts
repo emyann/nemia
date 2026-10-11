@@ -115,15 +115,22 @@ export type FactReads = {
   statusOf: (step: Workflow) => StepStatus;
 };
 
-/** Each of a step's tasks, its session's and its check's, of every try: which it is. */
-const tasksOf = (record: Run['steps'][string]): Array<{ taskId: string; metric: 'try' | 'check' }> => [
-  ...(record.taskId ? [{ taskId: record.taskId, metric: 'try' as const }] : []),
-  ...(record.check ? [{ taskId: record.check.taskId, metric: 'check' as const }] : []),
-  ...(record.tries ?? []).flatMap((t) => [
-    { taskId: t.taskId, metric: 'try' as const },
-    ...(t.check ? [{ taskId: t.check.taskId, metric: 'check' as const }] : []),
-  ]),
-];
+/**
+ * Each of a step's tasks, its session's and its check's, of every try: which it is. Each once, its first mention kept: a session held open
+ * and answered is the step's task and one of its tries', and one task.
+ */
+function tasksOf(record: Run['steps'][string]): Array<{ taskId: string; metric: 'try' | 'check' }> {
+  const all = [
+    ...(record.taskId ? [{ taskId: record.taskId, metric: 'try' as const }] : []),
+    ...(record.check ? [{ taskId: record.check.taskId, metric: 'check' as const }] : []),
+    ...(record.tries ?? []).flatMap((t) => [
+      { taskId: t.taskId, metric: 'try' as const },
+      ...(t.check ? [{ taskId: t.check.taskId, metric: 'check' as const }] : []),
+    ]),
+  ];
+  const seen = new Set<string>();
+  return all.filter((t) => !seen.has(t.taskId) && seen.add(t.taskId));
+}
 
 /** How a session ended: `done` or `blocked` as it signed, the step's current one read off its closeout, else `failed` or `stopped`. */
 export function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined): string {

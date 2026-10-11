@@ -133,6 +133,27 @@ test('a round exhausted once for a step one of its settled tasks leaves out of r
   );
 });
 
+test("a session held open and answered, the step's task and one of its tries', is one try fact with its cost once", () => {
+  const held = {
+    ...RUN,
+    steps: { work: { status: 'running', taskId: 'r-1-work-try2', tries: [{ taskId: 'r-1-work-try2' }] } },
+  } as unknown as Run;
+  const facts = settledFacts(held, [WORK], new Set(['r-1-work-try2']), reads());
+  assert.deepEqual(
+    facts.map((f) => [f.metric, 'costUsd' in f ? f.costUsd : undefined]),
+    [['try', 1.25]],
+  );
+  const recheck = {
+    ...RUN,
+    steps: { work: { status: 'running', taskId: 'r-1-work', check: { taskId: 'r-1-work-try2-check' }, tries: [{ taskId: 'r-1-work' }] } },
+  } as unknown as Run;
+  assert.deepEqual(
+    settledFacts(recheck, [WORK], new Set(['r-1-work', 'r-1-work-try2-check']), reads()).map((f) => f.metric),
+    ['try', 'check'],
+    "a recheck's session is counted once, and its check beside it",
+  );
+});
+
 /** `program` over a registry of its own, and what it holds after. */
 const recorded = async (facts: readonly StepFact[]) => {
   const registry = new Map();

@@ -137,7 +137,8 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
 
 /**
  * The retention, for as long as the daemon runs: a sweep (`freeOnce`) over what `answers` gives then — the latest pass's runs — and a
- * rest of `FREE_EVERY`, which no caller shortens. A sweep that fails is a warning, said once while its words stand, and the next is tried a rest later.
+ * rest of `FREE_EVERY`, which no caller shortens. A sweep that fails is a warning, said once while its words stand, and the next is
+ * tried a rest later.
  */
 export const free = (answers: () => readonly Answered[]) => {
   const memory = freshFreeMemory();

@@ -272,7 +272,10 @@ export const reconcileOnce = Effect.fn('reconcileOnce')(function* () {
 /** The controller's pace, which no caller shortens. */
 export const RECONCILE_EVERY: Duration.Input = '5 seconds';
 
-/** The controller, for as long as it runs: a pass each `RECONCILE_EVERY`; a pass that fails is a warning, and the next is tried a pass later. */
+/**
+ * The controller, for as long as it runs: a pass each `RECONCILE_EVERY`; a pass that fails is a warning, and the next is tried a pass
+ * later.
+ */
 export const reconcile = (): Effect.Effect<never> => {
   const pass = Effect.suspend(() => reconcileOnce()).pipe(
     Effect.catchCause((cause) => Effect.logWarning(`The factories could not be reconciled this pass: ${Cause.pretty(cause)}`)),

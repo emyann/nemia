@@ -1,12 +1,13 @@
 /**
  * The pass's meter, on the engine: each of its verbs counted in its phase (`meteredEngine`), a pass's cost from those counts and the
  * runtime's totals before and after it (`costOf`), and that cost put into the process's metrics (`recordPassMetrics`), beside the facts
- * of the steps it saw settle (`recordStepMetrics`). A controller, wrapping the engine whose type the client gives (`runtime-client.ts`).
+ * of the steps it saw settle (`recordStepMetrics`), each series of theirs exported at zero before its first value. A controller, wrapping the engine whose type the client gives (`runtime-client.ts`).
  */
 import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
+import { exportedNow } from '../telemetry/telemetry.store.ts';
 import { boundedAttributes, type DeniedFact, type StepFact, type TimelineFact, type Wait, type WaitFact } from './step.ts';
 
 /**
@@ -236,16 +237,12 @@ const rootSpan = (name: string, from: string, to: string, own: Record<string, st
   });
 
 /**
- * One wait into its histogram (`WAIT_METRICS`), by its step's attributes alone, and into a span of its own (`WAIT_SPANS`) from when it
- * began to when it ended, a root of its own trace, carrying its run and its try (`WAIT_SPAN_KEYS`) beside those attributes: a wait spans
- * passes, so no pass's span is its parent.
+ * One wait into a span of its own (`WAIT_SPANS`) from when it began to when it ended, a root of its own trace, carrying its run and its
+ * try (`WAIT_SPAN_KEYS`) beside its step's attributes: a wait spans passes, so no pass's span is its parent. Its histogram is
+ * `writesOf`'s.
  */
 const recordWait = (fact: WaitFact): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    yield* into(WAIT_METRICS[fact.wait], fact.attributes, fact.ms);
-    const own = Object.fromEntries(WAIT_SPAN_KEYS.map((key) => [key, fact[key]]));
-    yield* rootSpan(WAIT_SPANS[fact.wait], fact.from, fact.to, own, fact.attributes);
-  });
+  rootSpan(WAIT_SPANS[fact.wait], fact.from, fact.to, Object.fromEntries(WAIT_SPAN_KEYS.map((key) => [key, fact[key]])), fact.attributes);
 
 /**
  * One denied call into a span of its own (`DENIED_SPAN`), a root of its own trace, at the moment its attempt ended, carrying its run, its
@@ -274,36 +271,68 @@ const recordTimeline = (fact: TimelineFact): Effect.Effect<void> =>
     return rootSpan(TIMELINE_SPAN, now, now, own, fact.attributes);
   });
 
-/** `value` into `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
-const into = <In, Out>(metric: Metric.Metric<In, Out>, attributes: Record<string, string>, value: In) =>
-  Metric.update(Metric.withAttributes(metric, boundedAttributes(attributes)), value);
+/**
+ * One value a fact puts into one series: the series born, at zero and with nothing counted (`born`), and the value put into it (`said`).
+ */
+type Write = { born: Effect.Effect<void>; said: Effect.Effect<void> };
+
+/** `value` into the counter `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`): born by adding 0. */
+const counted = (metric: Metric.Counter<number>, attributes: Record<string, string>, value: number): Write => {
+  const series = Metric.withAttributes(metric, boundedAttributes(attributes));
+  return { born: Metric.update(series, 0), said: Metric.update(series, value) };
+};
 
 /**
- * One fact into the metrics: a session's tally, cost, tokens and time; a check's or a round's count; a wait (`recordWait`); a denied call,
- * into its span alone (`recordDenied`); a number of a run's timeline, into its span alone (`recordTimeline`).
+ * `value` into the histogram `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`): born by a read of
+ * it, which makes it with nothing measured.
  */
-function recordFact(fact: StepFact): Effect.Effect<void> {
+const measured = (metric: Metric.Histogram<number>, attributes: Record<string, string>, value: number): Write => {
+  const series = Metric.withAttributes(metric, boundedAttributes(attributes));
+  return { born: Effect.asVoid(Metric.value(series)), said: Metric.update(series, value) };
+};
+
+/**
+ * Each value `fact` puts into the step's metrics (`STEP_METRICS`), the one account of them that both a series' birth and its value are
+ * read off: a session's tally and time, and its cost and tokens where measured; a check's or a round's count; a wait's time
+ * (`WAIT_METRICS`). None for a denied call and a number of a run's timeline, which are spans alone.
+ */
+function writesOf(fact: StepFact): Write[] {
   const { attributes } = fact;
+  if (fact.metric === 'denied' || fact.metric === 'timeline') return [];
+  if (fact.metric === 'wait') return [measured(WAIT_METRICS[fact.wait], attributes, fact.ms)];
+  if (fact.metric !== 'try') return [counted(fact.metric === 'check' ? STEP_METRICS.checks : STEP_METRICS.rounds, attributes, 1)];
+  return [
+    counted(STEP_METRICS.tries, attributes, 1),
+    measured(STEP_METRICS.duration, attributes, fact.ms),
+    ...(fact.costUsd !== undefined ? [counted(STEP_METRICS.cost, attributes, fact.costUsd)] : []),
+    ...(fact.inputTokens !== undefined ? [counted(STEP_METRICS.input, attributes, fact.inputTokens)] : []),
+    ...(fact.outputTokens !== undefined ? [counted(STEP_METRICS.output, attributes, fact.outputTokens)] : []),
+  ];
+}
+
+/** The span of a fact that has one: a wait's (`recordWait`), a denied call's (`recordDenied`), a timeline number's (`recordTimeline`). */
+function spanOf(fact: StepFact): Effect.Effect<void> {
   if (fact.metric === 'wait') return recordWait(fact);
   if (fact.metric === 'denied') return recordDenied(fact);
-  if (fact.metric === 'timeline') return recordTimeline(fact);
-  if (fact.metric !== 'try') return into(fact.metric === 'check' ? STEP_METRICS.checks : STEP_METRICS.rounds, attributes, 1);
-  return Effect.all(
-    [
-      into(STEP_METRICS.tries, attributes, 1),
-      into(STEP_METRICS.duration, attributes, fact.ms),
-      ...(fact.costUsd !== undefined ? [into(STEP_METRICS.cost, attributes, fact.costUsd)] : []),
-      ...(fact.inputTokens !== undefined ? [into(STEP_METRICS.input, attributes, fact.inputTokens)] : []),
-      ...(fact.outputTokens !== undefined ? [into(STEP_METRICS.output, attributes, fact.outputTokens)] : []),
-    ],
-    { discard: true },
-  );
+  return fact.metric === 'timeline' ? recordTimeline(fact) : Effect.void;
 }
 
 /**
- * The facts a pass read of its runs' steps, each recorded once: into the step's metrics (`STEP_METRICS`), a denied call and a number of
- * a run's timeline each into its span.
+ * The facts a pass read of its runs' steps, each recorded once: into the step's metrics (`writesOf`), and a wait, a denied call and a
+ * number of a run's timeline each into its span (`spanOf`).
+ *
+ * Where a fact writes a metric, each series it writes is first born at zero and exported so (`exportedNow`), then the values are put in
+ * and exported in turn: a collector that reads a counter by its increase counts nothing for a series first seen at a value, and reads a
+ * series a process started again brings back as a reset only once it has seen it lower. A series that is there already is born for
+ * nothing. A process that exports nothing waits for none, and facts that are spans alone ask for no export.
  */
 export const recordStepMetrics = Effect.fn('recordStepMetrics')(function* (facts: readonly StepFact[]) {
-  for (const fact of facts) yield* recordFact(fact);
+  const writes = facts.flatMap(writesOf);
+  if (writes.length) {
+    for (const write of writes) yield* write.born;
+    yield* exportedNow;
+  }
+  for (const write of writes) yield* write.said;
+  for (const fact of facts) yield* spanOf(fact);
+  if (writes.length) yield* exportedNow;
 });

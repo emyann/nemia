@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Metric, Tracer } from 'effect';
+import { OtlpExporter } from 'effect/observability';
 import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpend } from '../status/status.ts';
@@ -215,6 +216,44 @@ test('a session that settled with a cost records its cost once, by the five attr
   assert.equal(count('step.tokens.input'), 1200);
   assert.equal(count('step.duration'), 1);
   assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {}))));
+});
+
+test('each series a fact writes is exported at zero, then at its value: two exports, and none where no fact writes a metric', async () => {
+  const registry = new Map();
+  const own = <A, E>(program: Effect.Effect<A, E>) =>
+    Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+  const exports: Record<string, number>[] = [];
+  const flusher = OtlpExporter.Flusher.of({
+    flush: Effect.map(Metric.snapshot, (snapshot) => {
+      exports.push(Object.fromEntries(snapshot.map((m) => [`${m.id} ${m.attributes?.outcome}`, (m.state as { count: number }).count])));
+    }),
+    register: () => Effect.void,
+  });
+  const exported = (facts: readonly StepFact[]) => own(recordStepMetrics(facts).pipe(Effect.provideService(OtlpExporter.Flusher, flusher)));
+  const wait: WaitFact = {
+    metric: 'wait',
+    wait: 'queue',
+    attributes: stepAttributes(RUN, WORK, 'blocked'),
+    run: 'r-1',
+    try: 2,
+    from: '2026-10-06T10:00:00.000Z',
+    to: '2026-10-06T10:00:02.000Z',
+    ms: 2000,
+  };
+  await exported([...settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check']), reads()), wait]);
+  const names = ['tries blocked', 'duration blocked', 'cost blocked', 'tokens.input blocked', 'tokens.output blocked', 'checks refused'];
+  const series = (values: number[], queue: number) =>
+    Object.fromEntries([...names.map((name, i) => [`step.${name}`, values[i]]), ['step.queue.duration blocked', queue]]);
+  assert.deepEqual(exports, [series([0, 0, 0, 0, 0, 0], 0), series([1, 1, 1.25, 1200, 300, 1], 1)]);
+
+  await exported([{ metric: 'check', attributes: stepAttributes(RUN, WORK, 'refused') }]);
+  assert.equal(exports.length, 4, 'a series that is there is exported as it stands, then with its value');
+  assert.deepEqual([exports[2]['step.checks refused'], exports[3]['step.checks refused']], [1, 2], 'born for nothing: it loses no count');
+
+  const [denial] = denied(DENIED_RUN);
+  assert.ok(denial, 'a denied call to hand over');
+  await exported(deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf));
+  assert.equal(exports.length, 4, 'REFUSED: facts that are spans alone ask for no export');
 });
 
 test("REFUSED: a fact whose attributes carry a run's id is recorded nowhere", async () => {

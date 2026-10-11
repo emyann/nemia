@@ -8,7 +8,7 @@ markdown is a workflow (the `wf` CLI). `apps/api` puts the workflows behind HTTP
 Each layer reaches exactly the one below it, and nothing reaches up or skips one: the web reaches the api over HTTP alone
 (`apps/web/test/structure.test.ts`); the api reaches the orchestrator's public entries alone (the entries:
 `packages/agent-orchestrator/test/contract.test.ts`; that its source imports no runtime: its lint block, which
-`packages/agent-orchestrator/test/imports.test.ts` proves); the orchestrator reaches the runtime's behaviour through its one client,
+`packages/agent-orchestrator/test/imports.boundary.test.ts` proves); the orchestrator reaches the runtime's behaviour through its one client,
 `src/runtime-client.ts` (`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door,
 `agent-runtime/vocabulary`, from any file. Read `README.md` and each package's
 README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores

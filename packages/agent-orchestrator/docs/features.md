@@ -336,7 +336,7 @@ What it leaves:
 - **The engine's deadline is `failed`, not `stopped`.** A check stopped at its deadline settles `failed` with
   no exit code, so the missing exit code, not the phase, is what says it did not finish.
 - **`bin/wf.ts` exited 1 on every error**, including the verbs' refusals, which set `exitCode` 2. Since 2026-09-28 it exits with a
-  refusal's code and 1 on a crash (`exitCodeOf` in `src/cli/exit.ts`, `test/exit-code.test.ts` runs `wf` as a process).
+  refusal's code and 1 on a crash (`exitCodeOf` in `src/cli/exit.ts`, `test/exit-code.boundary.test.ts` runs `wf` as a process).
 - **No `retries:` on this repository's workflows.** A flaky suite would spend a whole session on a nudge.
 
 ## Shipped: going round again — `loop:`, `rounds:` and `wf round`
@@ -1711,7 +1711,7 @@ What it leaves:
   random suffix, so this takes a hand-named file.
 - **`wf ls` does not say a run came from the inbox.** Only `wf decide` does.
 - **`bin/wf.ts` exited 1 on every refusal**, whatever `exitCode` it carried. This was here before the inbox, and was not changed then; it
-  exits with the refusal's code since 2026-09-28 (`test/exit-code.test.ts`).
+  exits with the refusal's code since 2026-09-28 (`test/exit-code.boundary.test.ts`).
 - **The board had no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gave the api its routes and the board its page: *The board
   half*, below.
 
@@ -4625,7 +4625,7 @@ the git words are not renamed. No change to `packages/agent-runtime`: a task's `
 - **`workflows/note/`**: write → review, with `note-writer` and `note-reviewer` in `workflows/agents/` and a schema each.
 - **The board** tolerates a folder run: the api's repo, base, branch and isolate are null with `place`, the web's mirror types
   them so, and a run card says `folders` where it named a repository (`apps/api/test/folder-run.test.ts`).
-- **Tests.** `test/folder.test.ts` starts, advances, decides and forgets a folder run from a directory that is no repository, with
+- **Tests.** `test/folder.boundary.test.ts` starts, advances, decides and forgets a folder run from a directory that is no repository, with
   a `git` first on PATH that fails and logs each call, and reads that none was made; one git team shows the stub records. The
   shipped folders' runs are pinned unchanged (`git-before-after.test.ts`).
 
@@ -4729,7 +4729,7 @@ The fix is a copy, and the brief names the copy.
   called `given` is still listed.
 - **What it does not do.** No size cap: a folder team that writes something large hands every fan-in child a whole copy of it. No
   case yet.
-- **Tests.** `test/folder.test.ts` runs a real fan-in (`a`, `b` → `c`) started with `--input` on the fake board and asserts, for
+- **Tests.** `test/folder.boundary.test.ts` runs a real fan-in (`a`, `b` → `c`) started with `--input` on the fake board and asserts, for
   every brief, that no path under the store is named and that every path that *is* named resolves inside that step's own cwd and is
   on disk — the assertion that keeps the brief and the fence from drifting apart in words. Beside it: the symlink and the parent's
   `given/` are not copied through; a fourth step continuing the fan-in's session (`d`, `after: c`) works in `c`'s folder and is given
@@ -4768,7 +4768,7 @@ chose the rule already there: a folder run's `runs/<id>/work/<step>` lives exact
 - **When it comes back.** A fan-in copies each parent's whole folder into `given/from/<step>` (`copyGiven`), so a team that fans
   in stores its work more than once, and a large one more than a little. No shipped team fans in yet; the first one that does is
   the time to measure again.
-- **Pinned.** `test/folder.test.ts`, *a folder run's folder outlives its end*: a run whose write step signed off `blocked` is nudged
+- **Pinned.** `test/folder.boundary.test.ts`, *a folder run's folder outlives its end*: a run whose write step signed off `blocked` is nudged
   with `wf retry`, and the try is filed in `runs/<id>/work/write`, which still holds the `note.md` the first try wrote. A mutant that
   removes `work/` before the retry fails it on that read.
 

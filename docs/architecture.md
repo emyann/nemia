@@ -22,7 +22,7 @@ Each layer reaches exactly the one below it, and nothing reaches up or skips one
 - the web reaches the api over HTTP alone (`apps/web/test/structure.test.ts`, and the web's lint block);
 - the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
   api's lint block; that its source imports no runtime: the api's lint block, proven by
-  `packages/agent-orchestrator/test/imports.test.ts`). The api's source reaches only the orchestrator; its tests may import the
+  `packages/agent-orchestrator/test/imports.boundary.test.ts`). The api's source reaches only the orchestrator; its tests may import the
   runtime's public entries to build fakes;
 - the orchestrator reaches the runtime's behaviour through its one client, `src/runtime-client.ts` (`CLIENT` in
   `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door, `agent-runtime/vocabulary`, from
@@ -240,7 +240,7 @@ through its three entries alone, and no runtime or harness SDK; the orchestrator
 layer above it. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
 
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,
-`packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.test.ts`, which runs oxlint
+`packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.boundary.test.ts`, which runs oxlint
 with the layers' blocks on planted files.
 
 **2. Inside the orchestrator, every file is of one of four kinds**, held by

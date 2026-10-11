@@ -200,7 +200,7 @@
     },
     // The layers (docs/architecture.md): each reaches the one below it, and nothing reaches up or skips one. One block per layer, over its
     // source alone, since a test may import the runtime's entries for a fake. Their globs never overlap, because a later block that sets
-    // `no-restricted-imports` on a file replaces an earlier one's options. packages/agent-orchestrator/test/imports.test.ts reads these blocks.
+    // `no-restricted-imports` on a file replaces an earlier one's options. packages/agent-orchestrator/test/imports.boundary.test.ts reads these blocks.
     // The board reaches the api over HTTP alone: no workspace package, no harness SDK, no path into packages/.
     {
       "files": ["apps/web/src/**"],

@@ -26,6 +26,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   test. Its merge is by file, with no rename, ignore rule, hook, lock or deadline: a test of one keeps `gitPlaceLayer`, in a boundary
   file. A verb's
   behaviour is a walk in `test/place-walks.ts`, with the one answer both places give.
+- **A person's hand on a repository is on the handle (`World`, `place/memory/world.ts`)**: `staged`, `takeBack`, `putBack` beside
+  `stage` and `commit`, each walked on both places, `gitWorld` (`test/git-world.ts`) its git side; a test reads no `.git` path.
 - **A test names its engine with `const engine = eachTest(testEngine);` (`agent-runtime/testing`) and `engineOf(engine().layer)`**:
   `settle(id, phase, end)` takes what the attempt ended with as an object (`{ closeout, exitCode }`), and a `say` or a `stop` is
   refused as the runtime refuses it (say to a task settled `running` first).

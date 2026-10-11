@@ -8,7 +8,8 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 
 - **The test script loads `test/harness.ts` with `--import`, and every test file imports it first too**, by its path from the file
   (`../../test/harness.ts` beside the code): a fake `claude` first on PATH, so no test asks this machine's live registry, even one run by
-  hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it.
+  hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it. It deletes
+  `OTEL_EXPORTER_OTLP_ENDPOINT` too: the api is the daemon, and a test that exports sets the address of a collector it made.
   It sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value the package refuses: a test that reads a ceiling sets or deletes it itself.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach

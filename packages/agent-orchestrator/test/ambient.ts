@@ -11,6 +11,9 @@
  * And `NEMIA_DAEMON_START=off` (`DEMAND_OFF`): a command that ticks, typed in a test on a store no daemon holds, would start the daemon of
  * this checkout (`ensureDaemon`), and so would a `nemia` child a test spawns with this environment. A test of the start hands `main` a
  * host of its own and unsets the switch in that host's environment alone.
+ *
+ * And no `OTEL_EXPORTER_OTLP_ENDPOINT`: a suite typed in a shell that names a collector would post every test daemon's spans to it
+ * (`otlpOf`). A test that exports sets the address of a collector it made itself.
  */
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
@@ -20,3 +23,4 @@ process.env.WF_MAX_RUNS = SENTINEL;
 process.env.WF_MAX_CONCURRENT = SENTINEL;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
+delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;

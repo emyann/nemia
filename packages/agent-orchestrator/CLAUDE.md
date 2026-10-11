@@ -134,7 +134,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **The daemon frees a finished run's worktrees on a sweep beside its passes** (`freeOnce`, `src/prune/free.verb.ts`): a test that
   starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`.
 - **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
-  test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`).
+  test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`). It deletes
+  `OTEL_EXPORTER_OTLP_ENDPOINT` too: a test that exports sets the address of a collector it made (`test/check-export.boundary.test.ts`).
 - **A test of what the tick orders or words by the clock seeds `Date`** (`t.mock.timers`: `fileInOrder` in `test/pool.test.ts`, the ages in
   `daemon.store.test.ts`), and stamps a fake closeout from the attempt's journalled start (`starts` in `test/held.test.ts`). A duration it
   decides on is never on `Date`: the daemon's silence is `elapsedMs` over `instantNow()`, a place verb's grace on `performance.now()`.

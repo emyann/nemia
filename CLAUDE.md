@@ -66,7 +66,10 @@ holds what every change needs.
 - **Temporary folders come from `scratch(prefix)`**, never `os.tmpdir()`; `scratch.test.ts` refuses the call. Bound every background
   process a test starts, and every loop you run in the background yourself (`timeout 120 bash -c '…'`).
 - **A test that depends on the environment sets it.** A run's checks inherit the daemon's environment (`WF_MAX_CONCURRENT=50` on the
-  owner's machine), so a test that relies on a default passes there and fails by hand.
+  owner's machine), so a test that relies on a default passes there and fails by hand. All of it but the telemetry: the runtime takes
+  it out of every child that is no session (`withoutTelemetry`; `agent-orchestrator/test/check-export.boundary.test.ts`), and the three
+  seats drop the collector's address (`test/ambient.ts`, the api's `test/harness.ts`, the e2e's `apiEnvOf`): a test that exports sets a
+  collector it made.
 - **Assert on `err.message`,** never `assert.throws(fn, /^…/)`: that matches `String(err)`, which starts with `Error: `.
 - **A test that reads source text ends a slice on a name that must exist,** and matches across line breaks (`\s*`): a formatter moves
   them, and a pattern that no longer matches makes an assertion of absence pass for nothing.
@@ -177,6 +180,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   each allowed by exact name and named in its note (`BOARD_CHECKS`); its agent allows the browser's tools by name, never the server
   whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test). Agent and
   step both deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a relative one is written into the workspace.
+- A step that runs what no deny names (implement, land) denies the live collector's ports by address, `Bash(*:4318*)` and
+  `Bash(*:4317*)`, on its own `disallowedTools:`, beside each deny of its agent's (`LIVE_COLLECTOR`, same test): a typed command only,
+  a commit message or a search that spells the port included, never an address inside a script.
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 
@@ -211,7 +217,8 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
-  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and its six dashboards held to the code's names by
+  started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe goes to a held throwaway,
+  `node tools/observe/render/render.ts --hold`, at the collector address it prints), and its six dashboards held to the code's names by
   `agent-orchestrator/test/observe.test.ts`, and its timing of a step (the collector's command head and test scope, Tempo's span metrics and
   retention) by `observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.

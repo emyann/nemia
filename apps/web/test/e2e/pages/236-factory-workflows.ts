@@ -154,6 +154,7 @@ export default {
         page.getByRole('form', { name: `Start a run of ${yours.name}` }).getByText(`in the factory ${TREED}`),
         'and its start, every step filled, runs in the factory',
       );
+      await shoot('yours');
 
       await goto(page, `/workflows?factory=${TWIN.name}`);
       const pick = page.locator(`[data-pick-repo="${TWIN.name}"]`);

@@ -3,6 +3,10 @@
   "options": {
     "typeAware": true
   },
+  // The design system kit is another repository's code (french-tech-homies/design-system): the shadcn CLI writes it into the board from
+  // the `@ds` registry, its skills beside it, and an update fetches it again and is read as a diff. Nothing here shapes it, so no rule
+  // reads it. packages/agent-orchestrator/test/comments.test.ts holds this list and refuses a folder that joins it.
+  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**"],
   "jsPlugins": [
     { "name": "comments", "specifier": "./lint/comments.ts" },
     { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }

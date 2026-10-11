@@ -11,6 +11,9 @@
  * No line that holds a comment, in any source file under packages/, apps/, lint/ and tools/, is wider than 140 columns: oxfmt wraps code
  * at that width and rewraps no comment.
  *
+ * The design system kit the shadcn CLI writes into the board, and its skills beside it, are another repository's code, fetched again
+ * at each update: the linter skips them (`"ignorePatterns"`) and so do the scans here, and no other folder may join them.
+ *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
@@ -31,7 +34,16 @@ const SELF = path
   .join('/');
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
-type Config = { jsPlugins: { name: string; specifier: string }[]; overrides: Block[]; [key: string]: unknown };
+type Config = { jsPlugins: { name: string; specifier: string }[]; overrides: Block[]; ignorePatterns?: string[]; [key: string]: unknown };
+
+/** The folders that hold another repository's code as it ships it: the design system kit in the board, and its skills beside it. */
+const VENDORED = ['apps/web/src/components/ui/ds/**', 'apps/web/.claude/**'];
+
+/** Whether `file`, from the root, is under a vendored folder. */
+const vendored = (file: string): boolean => VENDORED.some((glob) => path.matchesGlob(file, glob));
+
+/** The globs the linter is told to skip that are not a vendored folder's, in the order the config lists them: each hides code of ours. */
+const strayIgnores = (config: Config): string[] => (config.ignorePatterns ?? []).filter((glob) => !VENDORED.includes(glob));
 
 /** `.oxlintrc.json`, read as oxlint reads it: JSON with comments. */
 function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8')): Config {
@@ -357,7 +369,34 @@ test('REFUSED: a guard block with an excludeFiles is found', () => {
   assert.deepEqual(excludedBlocks(readConfig(text.replace(line, `${line} "excludeFiles": ["apps/api/**"],`))), ['apps/api']);
 });
 
-/** Every source file git lists under packages/, apps/, lint/ and tools/, tracked or not yet added, that is on disk, from the root. */
+test('the linter skips the vendored folders, each one, and no folder of ours', () => {
+  const config = readConfig();
+  assert.deepEqual(strayIgnores(config), [], 'the linter is told to skip these: every guard runs on every file of ours');
+  assert.deepEqual(config.ignorePatterns, VENDORED, 'the vendored folders the linter skips');
+});
+
+test('REFUSED: a folder of ours the linter is told to skip is found', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8');
+  const key = '"ignorePatterns": [';
+  assert.equal(text.split(key).length, 2, `no one ${key} in .oxlintrc.json`);
+  assert.deepEqual(strayIgnores(readConfig(text.replace(key, `${key}"apps/api/**", `))), ['apps/api/**']);
+});
+
+test('REFUSED: a file of ours beside the vendored folders is no vendored file', () => {
+  assert.deepEqual(
+    ['apps/web/src/components/ui/ds/components/Button.tsx', 'apps/web/.claude/skills/ds-spec/md3.mjs'].filter((file) => !vendored(file)),
+    [],
+  );
+  assert.deepEqual(
+    ['apps/web/src/components/ui/button.tsx', 'apps/web/src/components/ds.tsx', '.claude/skills/look/SKILL.md'].filter(vendored),
+    [],
+  );
+});
+
+/**
+ * Every source file of ours git lists under packages/, apps/, lint/ and tools/, tracked or not yet added, that is on disk, from the root:
+ * no generated route tree, and no file under a vendored folder.
+ */
 const sourceFiles = (): string[] =>
   execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint', 'tools'], {
     cwd: ROOT,
@@ -365,7 +404,7 @@ const sourceFiles = (): string[] =>
     stdio: ['ignore', 'pipe', 'pipe'],
   })
     .split('\n')
-    .filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.gen.ts') && fs.existsSync(path.join(ROOT, file)));
+    .filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.gen.ts') && !vendored(file) && fs.existsSync(path.join(ROOT, file)));
 
 /** `text` parsed as TypeScript, or as TSX where the file name says so. */
 const parse = (file: string, text: string): ts.SourceFile =>

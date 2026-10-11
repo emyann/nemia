@@ -133,7 +133,8 @@ holds what every change needs.
   - The guards: the oxlint plugin `lint/comments.ts`, oxlint's `no-warning-comments` and `no-inline-comments`, in one override block per
     package in `.oxlintrc.json`, and a test that a name a comment quotes in backticks is one the code has
     (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
-  - Every package's guards are on: no block has an `excludeFiles` (`comments.test.ts`, *no guard block has an excludeFiles*). A new
+  - Every package's guards are on: no block has an `excludeFiles` (`comments.test.ts`, *no guard block has an excludeFiles*). The
+    linter skips the vendored design system kit and its skills, and no folder of ours (`VENDORED`, same test). A new
     package gets a block of its own, and the runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it
     (`comments.test.ts`, *one guard block per workspace package*).
   - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc.
@@ -204,6 +205,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), and `grilling` and `grill-me` (Iris's interview).
+- `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
+  and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`; the
+  board's look is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and three workflows: `intake` (an idea to an intent), `build` (an
   intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:

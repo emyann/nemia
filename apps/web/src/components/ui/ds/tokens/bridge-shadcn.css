@@ -1,0 +1,64 @@
+/* =============================================================================
+   shadcn/ui ↔ MD3 bridge  (optional — import only if the app uses shadcn/ui)
+   -----------------------------------------------------------------------------
+   Defines shadcn's variable set *from* the MD3 roles, so shadcn components
+   pick up the Material palette without touching a single component file.
+   One token source, two component families. Every value is a finished color,
+   which is what 2026 shadcn components (`color-mix(in oklch, var(--secondary),
+   …)`) and the shadcn CLI expect.
+
+   Import AFTER theme.css so these definitions see the MD3 variables:
+
+     @import "./components/ui/ds/tokens/theme.css";
+     @import "./components/ui/ds/tokens/bridge-shadcn.css";
+     @import "./components/ui/ds/tokens/theme.v4.css";
+
+   Mapping rationale (shadcn meaning → MD3 role):
+   - accent      "interactive hover/focus surface" → surface-container-high.
+                 Never an accent *hue*: mapping it to tertiary painted every
+                 menu focus and toggle-on state solid teal.
+   - muted       quiet surface / de-emphasised text → surface-container-highest
+                 + on-surface-variant (`surface-variant` is deprecated in MD3).
+   - popover     menus, dropdowns → surface-container (MD3 menu container).
+   - card        → surface-container-low (MD3 elevated card).
+   - ring        focus indicator → secondary (MD3 focus ring color).
+   - destructive → error / on-error.
+
+   Known collision, deliberately NOT bridged: `primary` and `secondary`. The
+   Tailwind utilities `bg-primary` / `bg-secondary` are owned by the MD3 theme
+   (theme.v4.css), so shadcn's `variant="secondary"` renders as an MD3 *filled*
+   secondary (secondary + on-secondary), not the quiet shadcn secondary. Re-skin
+   such components rather than re-mapping the variable — the names are shared.
+   `chart-*` and `sidebar-*` are unbridged (define them if you install those).
+   ========================================================================== */
+
+:root,
+.dark {
+  --background: var(--md-sys-color-background);
+  --foreground: var(--md-sys-color-on-background);
+
+  --card: var(--md-sys-color-surface-container-low);
+  --card-foreground: var(--md-sys-color-on-surface);
+  --popover: var(--md-sys-color-surface-container);
+  --popover-foreground: var(--md-sys-color-on-surface);
+
+  --primary: var(--md-sys-color-primary);
+  --primary-foreground: var(--md-sys-color-on-primary);
+  --secondary: var(--md-sys-color-secondary);
+  --secondary-foreground: var(--md-sys-color-on-secondary);
+
+  --muted: var(--md-sys-color-surface-container-highest);
+  --muted-foreground: var(--md-sys-color-on-surface-variant);
+  --accent: var(--md-sys-color-surface-container-high);
+  --accent-foreground: var(--md-sys-color-on-surface);
+
+  --destructive: var(--md-sys-color-error);
+  --destructive-foreground: var(--md-sys-color-on-error);
+
+  --border: var(--md-sys-color-outline-variant);
+  --input: var(--md-sys-color-outline);
+  --ring: var(--md-sys-color-secondary);
+
+  /* shadcn's radius base: 8px = MD3 shape "small". */
+  --radius: 0.5rem;
+}

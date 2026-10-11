@@ -1,0 +1,457 @@
+/* =============================================================================
+   MD3 theme for Tailwind v4 (@theme inline)
+   -----------------------------------------------------------------------------
+   Maps the `--md-sys-*` variables from theme.css onto Tailwind utility
+   namespaces. Import after theme.css:
+
+     @import "tailwindcss";
+     @import "./components/ui/ds/tokens/theme.css";
+     @import "./components/ui/ds/tokens/theme.v4.css";
+
+   `inline` makes every utility reference the `--md-sys-color-*` variable
+   directly (`background-color: var(--md-sys-color-primary)`), so a `.dark`
+   scope — or any nested re-theme — is picked up at the element, not frozen
+   at :root. Opacity modifiers (`bg-primary/8`) resolve through color-mix()
+   and need no <alpha-value> placeholder. Numeric opacity utilities
+   (`opacity-0`, `opacity-38`) are built into v4; the state layer uses the
+   `state-opacity-*` utilities at the bottom of this file instead, because
+   the numeric ones compile to literals nothing can retheme.
+
+   Interaction-state variants are Tailwind's own (`hover:`, `focus-visible:`,
+   `disabled:`) plus the bare data-attribute variants React Aria Components
+   emit (`data-pressed:`, `data-entering:`, `data-[placement=top]:`), exactly
+   as shadcn/ui's React Aria base does. No Tailwind plugin is required.
+
+   Dark mode: the project's DESIGN.md chooses how it is switched, and
+   theme.css is generated accordingly. On a `.dark` class (the default), also
+   declare the custom variant in your entry CSS, because v4's own `dark:`
+   follows `prefers-color-scheme`:
+     @custom-variant dark (&:where(.dark, .dark *));
+   On the system setting (`--md3-dark-mode: system`), declare nothing.
+   ========================================================================== */
+@theme inline {
+  /* ---- color roles ---- */
+  /* Generic names the kit's own styles use. `ring` is MD3's focus indicator
+     color (secondary); border/input follow the outline roles. */
+  --color-background: var(--md-sys-color-background);
+  --color-foreground: var(--md-sys-color-on-background);
+  --color-border: var(--md-sys-color-outline-variant);
+  --color-input: var(--md-sys-color-outline);
+  --color-ring: var(--md-sys-color-secondary);
+  --color-scrim: var(--md-sys-color-scrim);
+  --color-shadow: var(--md-sys-color-shadow);
+
+  --color-primary: var(--md-sys-color-primary);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-primary-fixed: var(--md-sys-color-primary-fixed);
+  --color-on-primary: var(--md-sys-color-on-primary);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-on-primary-fixed: var(--md-sys-color-on-primary-fixed);
+
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-secondary-container: var(--md-sys-color-secondary-container);
+  --color-secondary-fixed: var(--md-sys-color-secondary-fixed);
+  --color-on-secondary: var(--md-sys-color-on-secondary);
+  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-on-secondary-fixed: var(--md-sys-color-on-secondary-fixed);
+
+  --color-tertiary: var(--md-sys-color-tertiary);
+  --color-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-tertiary-fixed: var(--md-sys-color-tertiary-fixed);
+  --color-on-tertiary: var(--md-sys-color-on-tertiary);
+  --color-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+  --color-on-tertiary-fixed: var(--md-sys-color-on-tertiary-fixed);
+
+  --color-error: var(--md-sys-color-error);
+  --color-error-container: var(--md-sys-color-error-container);
+  --color-on-error: var(--md-sys-color-on-error);
+  --color-on-error-container: var(--md-sys-color-on-error-container);
+
+  --color-surface: var(--md-sys-color-surface);
+  --color-surface-variant: var(--md-sys-color-surface-variant);
+  --color-surface-dim: var(--md-sys-color-surface-dim);
+  --color-surface-bright: var(--md-sys-color-surface-bright);
+  --color-surface-tint: var(--md-sys-color-surface-tint);
+  --color-surface-container: var(--md-sys-color-surface-container);
+  --color-surface-container-lowest: var(
+    --md-sys-color-surface-container-lowest
+  );
+  --color-surface-container-low: var(--md-sys-color-surface-container-low);
+  --color-surface-container-high: var(--md-sys-color-surface-container-high);
+  --color-surface-container-highest: var(
+    --md-sys-color-surface-container-highest
+  );
+
+  --color-on-background: var(--md-sys-color-on-background);
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+
+  --color-outline: var(--md-sys-color-outline);
+  --color-outline-variant: var(--md-sys-color-outline-variant);
+
+  --color-inverse-surface: var(--md-sys-color-inverse-surface);
+  --color-inverse-on-surface: var(--md-sys-color-inverse-on-surface);
+  --color-inverse-primary: var(--md-sys-color-inverse-primary);
+
+  /* =========================================================================
+     MD3 system scales — the values a theme or a preset overrides
+     -------------------------------------------------------------------------
+     Everything below is declared twice on purpose: once under Material's own
+     token name, and once as the Tailwind namespace that maps to it.
+
+     The indirection is what makes a preset possible. A value written straight
+     into a Tailwind namespace here (`--radius-shape-full: 9999px`) is
+     *inlined* by `@theme inline` — the utility compiles to a frozen
+     `border-radius: 9999px` and the variable is never emitted, so nothing can
+     override it afterwards. `--md-sys-*` is not a Tailwind namespace, so it
+     survives into `:root` verbatim and every utility that reads it through
+     `var()` follows any later redefinition — a `.dark` scope, a media query,
+     or a preset class. That is why the colour roles could already be
+     re-themed at runtime and the other four scales could not.
+
+     Layer rules: README.md, "Retheming — the three layers".
+     ====================================================================== */
+
+  /* ---- MD3 typefaces ----
+     Material splits the scale across two faces: `brand` carries display,
+     headline and title, `plain` carries body and label. Both default to the
+     kit's single `--font-inter` hook (theme.css), so a host that fills that
+     hook still gets one family everywhere and nothing renders differently.
+     Override one of them — in a preset, a `.dark` scope, anywhere — to get the
+     split: a serif for the headings, the loaded sans for the running text.
+     `primitives/Typography.tsx` applies the right one per variant.
+     Set from the project's DESIGN.md by `npm run theme:generate` (the family
+     of the display/headline/title tokens, and of the body/label tokens). */
+  --md-sys-typescale-brand-font: var(--font-inter);
+  --md-sys-typescale-plain-font: var(--font-inter);
+
+  /* ---- MD3 type scale ----
+     Values set from the `typography` tokens of the project's DESIGN.md by
+     `npm run theme:generate`: edit them there, not here. */
+  --md-sys-typescale-display-large-size: 57px;
+  --md-sys-typescale-display-large-line-height: 64px;
+  --md-sys-typescale-display-large-tracking: -0.25px;
+  --md-sys-typescale-display-medium-size: 45px;
+  --md-sys-typescale-display-medium-line-height: 52px;
+  --md-sys-typescale-display-small-size: 36px;
+  --md-sys-typescale-display-small-line-height: 44px;
+
+  --md-sys-typescale-headline-large-size: 32px;
+  --md-sys-typescale-headline-large-line-height: 40px;
+  --md-sys-typescale-headline-medium-size: 28px;
+  --md-sys-typescale-headline-medium-line-height: 36px;
+  --md-sys-typescale-headline-small-size: 24px;
+  --md-sys-typescale-headline-small-line-height: 32px;
+
+  --md-sys-typescale-title-large-size: 22px;
+  --md-sys-typescale-title-large-line-height: 28px;
+  --md-sys-typescale-title-medium-size: 16px;
+  --md-sys-typescale-title-medium-line-height: 24px;
+  --md-sys-typescale-title-medium-tracking: 0.15px;
+  --md-sys-typescale-title-medium-weight: 500;
+  --md-sys-typescale-title-small-size: 14px;
+  --md-sys-typescale-title-small-line-height: 20px;
+  --md-sys-typescale-title-small-tracking: 0.1px;
+  --md-sys-typescale-title-small-weight: 500;
+
+  --md-sys-typescale-label-large-size: 14px;
+  --md-sys-typescale-label-large-line-height: 20px;
+  --md-sys-typescale-label-large-tracking: 0.1px;
+  --md-sys-typescale-label-large-weight: 500;
+  --md-sys-typescale-label-medium-size: 12px;
+  --md-sys-typescale-label-medium-line-height: 16px;
+  --md-sys-typescale-label-medium-tracking: 0.5px;
+  --md-sys-typescale-label-medium-weight: 500;
+  --md-sys-typescale-label-small-size: 11px;
+  --md-sys-typescale-label-small-line-height: 16px;
+  --md-sys-typescale-label-small-tracking: 0.5px;
+  --md-sys-typescale-label-small-weight: 500;
+
+  --md-sys-typescale-body-large-size: 16px;
+  --md-sys-typescale-body-large-line-height: 24px;
+  --md-sys-typescale-body-large-tracking: 0.5px;
+  --md-sys-typescale-body-medium-size: 14px;
+  --md-sys-typescale-body-medium-line-height: 20px;
+  --md-sys-typescale-body-medium-tracking: 0.25px;
+  --md-sys-typescale-body-small-size: 12px;
+  --md-sys-typescale-body-small-line-height: 16px;
+  --md-sys-typescale-body-small-tracking: 0.4px;
+
+  /* ---- MD3 shape scale ----
+     Values set from the `rounded` tokens of the project's DESIGN.md by
+     `npm run theme:generate`: edit them there, not here. */
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* ---- MD3 elevation ----
+     Values set from the reference block of the project's DESIGN.md by
+     `npm run theme:generate`: edit them there, not here. */
+  --md-sys-elevation-1:
+    0 1px 2px 0 --alpha(var(--md-sys-color-shadow) / 30%),
+    0 1px 3px 1px --alpha(var(--md-sys-color-shadow) / 15%);
+  --md-sys-elevation-2:
+    0 1px 2px 0 --alpha(var(--md-sys-color-shadow) / 30%),
+    0 2px 6px 2px --alpha(var(--md-sys-color-shadow) / 15%);
+  --md-sys-elevation-3:
+    0 1px 3px 0 --alpha(var(--md-sys-color-shadow) / 30%),
+    0 4px 8px 3px --alpha(var(--md-sys-color-shadow) / 15%);
+  --md-sys-elevation-4:
+    0 2px 3px 0 --alpha(var(--md-sys-color-shadow) / 30%),
+    0 6px 10px 4px --alpha(var(--md-sys-color-shadow) / 15%);
+  --md-sys-elevation-5:
+    0 4px 4px 0 --alpha(var(--md-sys-color-shadow) / 30%),
+    0 8px 12px 6px --alpha(var(--md-sys-color-shadow) / 15%);
+
+  /* ---- MD3 state-layer opacities ----
+     How loud interaction feedback is. Material's own numbers, under Material's
+     own token names; the kit reads them through the `state-opacity-*`
+     utilities declared below, never through Tailwind's numeric `opacity-8`,
+     which compiles to a literal `opacity: 8%` no preset could reach.
+
+     Written as percentages rather than the spec's decimals so the same
+     variable is valid in both places a state layer can live: `opacity`, and
+     the alpha of a `color-mix()` — `bg-on-surface/(--md-sys-state-hover-
+     state-layer-opacity)` for a control that tints its own background instead
+     of rendering an overlay. `color-mix()` rejects a unitless alpha.
+
+     Values set from the reference block of the project's DESIGN.md by
+     `npm run theme:generate`: edit them there, not here. */
+  --md-sys-state-hover-state-layer-opacity: 8%;
+  --md-sys-state-focus-state-layer-opacity: 10%;
+  --md-sys-state-pressed-state-layer-opacity: 10%;
+  --md-sys-state-dragged-state-layer-opacity: 16%;
+
+  /* ---- MD3 motion: easing ----
+     Values set from the reference block of the project's DESIGN.md by
+     `npm run theme:generate`: edit them there, not here. */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --md-sys-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  /* =========================================================================
+     Tailwind namespaces — every one of them reads a system token above
+     ====================================================================== */
+
+  /* ---- type ---- */
+  /* `font-brand` / `font-plain`. Registered in `twMergeConfig` (utils.ts) as
+     font-family, next to `font-regular` as font-weight, so the two never
+     collide in a merge and a caller's own `font-*` family still wins. */
+  --font-brand: var(--md-sys-typescale-brand-font);
+  --font-plain: var(--md-sys-typescale-plain-font);
+
+  --text-display-large: var(--md-sys-typescale-display-large-size);
+  --text-display-large--line-height: var(
+    --md-sys-typescale-display-large-line-height
+  );
+  --text-display-large--letter-spacing: var(
+    --md-sys-typescale-display-large-tracking
+  );
+  --text-display-medium: var(--md-sys-typescale-display-medium-size);
+  --text-display-medium--line-height: var(
+    --md-sys-typescale-display-medium-line-height
+  );
+  --text-display-small: var(--md-sys-typescale-display-small-size);
+  --text-display-small--line-height: var(
+    --md-sys-typescale-display-small-line-height
+  );
+
+  --text-headline-large: var(--md-sys-typescale-headline-large-size);
+  --text-headline-large--line-height: var(
+    --md-sys-typescale-headline-large-line-height
+  );
+  --text-headline-medium: var(--md-sys-typescale-headline-medium-size);
+  --text-headline-medium--line-height: var(
+    --md-sys-typescale-headline-medium-line-height
+  );
+  --text-headline-small: var(--md-sys-typescale-headline-small-size);
+  --text-headline-small--line-height: var(
+    --md-sys-typescale-headline-small-line-height
+  );
+
+  --text-title-large: var(--md-sys-typescale-title-large-size);
+  --text-title-large--line-height: var(
+    --md-sys-typescale-title-large-line-height
+  );
+  --text-title-medium: var(--md-sys-typescale-title-medium-size);
+  --text-title-medium--line-height: var(
+    --md-sys-typescale-title-medium-line-height
+  );
+  --text-title-medium--letter-spacing: var(
+    --md-sys-typescale-title-medium-tracking
+  );
+  --text-title-medium--font-weight: var(--md-sys-typescale-title-medium-weight);
+  --text-title-small: var(--md-sys-typescale-title-small-size);
+  --text-title-small--line-height: var(
+    --md-sys-typescale-title-small-line-height
+  );
+  --text-title-small--letter-spacing: var(
+    --md-sys-typescale-title-small-tracking
+  );
+  --text-title-small--font-weight: var(--md-sys-typescale-title-small-weight);
+
+  --text-label-large: var(--md-sys-typescale-label-large-size);
+  --text-label-large--line-height: var(
+    --md-sys-typescale-label-large-line-height
+  );
+  --text-label-large--letter-spacing: var(
+    --md-sys-typescale-label-large-tracking
+  );
+  --text-label-large--font-weight: var(--md-sys-typescale-label-large-weight);
+  --text-label-medium: var(--md-sys-typescale-label-medium-size);
+  --text-label-medium--line-height: var(
+    --md-sys-typescale-label-medium-line-height
+  );
+  --text-label-medium--letter-spacing: var(
+    --md-sys-typescale-label-medium-tracking
+  );
+  --text-label-medium--font-weight: var(--md-sys-typescale-label-medium-weight);
+  --text-label-small: var(--md-sys-typescale-label-small-size);
+  --text-label-small--line-height: var(
+    --md-sys-typescale-label-small-line-height
+  );
+  --text-label-small--letter-spacing: var(
+    --md-sys-typescale-label-small-tracking
+  );
+  --text-label-small--font-weight: var(--md-sys-typescale-label-small-weight);
+
+  --text-body-large: var(--md-sys-typescale-body-large-size);
+  --text-body-large--line-height: var(
+    --md-sys-typescale-body-large-line-height
+  );
+  --text-body-large--letter-spacing: var(--md-sys-typescale-body-large-tracking);
+  --text-body-medium: var(--md-sys-typescale-body-medium-size);
+  --text-body-medium--line-height: var(
+    --md-sys-typescale-body-medium-line-height
+  );
+  --text-body-medium--letter-spacing: var(
+    --md-sys-typescale-body-medium-tracking
+  );
+  --text-body-small: var(--md-sys-typescale-body-small-size);
+  --text-body-small--line-height: var(
+    --md-sys-typescale-body-small-line-height
+  );
+  --text-body-small--letter-spacing: var(--md-sys-typescale-body-small-tracking);
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+
+  /* ---- shape ---- */
+  --radius-shape-extra-small: var(--md-sys-shape-corner-extra-small);
+  --radius-shape-small: var(--md-sys-shape-corner-small);
+  --radius-shape-medium: var(--md-sys-shape-corner-medium);
+  --radius-shape-large: var(--md-sys-shape-corner-large);
+  --radius-shape-extra-large: var(--md-sys-shape-corner-extra-large);
+  --radius-shape-full: var(--md-sys-shape-corner-full);
+
+  /* ---- elevation ---- */
+  --shadow-elevation-1: var(--md-sys-elevation-1);
+  --shadow-elevation-2: var(--md-sys-elevation-2);
+  --shadow-elevation-3: var(--md-sys-elevation-3);
+  --shadow-elevation-4: var(--md-sys-elevation-4);
+  --shadow-elevation-5: var(--md-sys-elevation-5);
+
+  /* ---- motion: easing ---- */
+  --ease-standard: var(--md-sys-motion-easing-standard);
+  --ease-standard-accelerate: var(--md-sys-motion-easing-standard-accelerate);
+  --ease-standard-decelerate: var(--md-sys-motion-easing-standard-decelerate);
+  --ease-emphasized: var(--md-sys-motion-easing-emphasized);
+  --ease-emphasized-accelerate: var(
+    --md-sys-motion-easing-emphasized-accelerate
+  );
+  --ease-emphasized-decelerate: var(
+    --md-sys-motion-easing-emphasized-decelerate
+  );
+
+  /* ---- MD3 motion: named durations ----
+     Exposed as variables for use in hand-written CSS. Tailwind v4 has no
+     `--duration-*` theme namespace (unlike `--ease-*`), so the matching
+     `duration-<name>` utilities are declared explicitly below.
+     Values set from the reference block of the project's DESIGN.md by
+     `npm run theme:generate`: edit them there, not here. */
+  --md3-duration-short-1: 50ms;
+  --md3-duration-short-2: 100ms;
+  --md3-duration-short-3: 150ms;
+  --md3-duration-short-4: 200ms;
+  --md3-duration-medium-1: 250ms;
+  --md3-duration-medium-2: 300ms;
+  --md3-duration-medium-3: 350ms;
+  --md3-duration-medium-4: 400ms;
+  --md3-duration-long-1: 450ms;
+  --md3-duration-long-2: 500ms;
+  --md3-duration-long-3: 550ms;
+  --md3-duration-long-4: 600ms;
+}
+
+/* `duration-short-4` and friends. v4 resolves `duration-*` from a static
+   numeric scale plus arbitrary values only, so each named step is its own
+   utility here. They also drive `data-entering:duration-*` /
+   `data-exiting:duration-*`,
+   which is how the modal and side-sheet transitions are timed. */
+@utility duration-short-1 {
+  transition-duration: var(--md3-duration-short-1);
+}
+@utility duration-short-2 {
+  transition-duration: var(--md3-duration-short-2);
+}
+@utility duration-short-3 {
+  transition-duration: var(--md3-duration-short-3);
+}
+@utility duration-short-4 {
+  transition-duration: var(--md3-duration-short-4);
+}
+@utility duration-medium-1 {
+  transition-duration: var(--md3-duration-medium-1);
+}
+@utility duration-medium-2 {
+  transition-duration: var(--md3-duration-medium-2);
+}
+@utility duration-medium-3 {
+  transition-duration: var(--md3-duration-medium-3);
+}
+@utility duration-medium-4 {
+  transition-duration: var(--md3-duration-medium-4);
+}
+@utility duration-long-1 {
+  transition-duration: var(--md3-duration-long-1);
+}
+@utility duration-long-2 {
+  transition-duration: var(--md3-duration-long-2);
+}
+@utility duration-long-3 {
+  transition-duration: var(--md3-duration-long-3);
+}
+@utility duration-long-4 {
+  transition-duration: var(--md3-duration-long-4);
+}
+
+/* The state layer's opacity, as utilities rather than Tailwind's numeric
+   `opacity-8` / `opacity-10` / `opacity-16`. Those are a static numeric scale
+   compiled to `opacity: 8%` at build time — a literal in the utility, with no
+   variable left for a theme to move, which is why the state layer was the one
+   Material tell a preset could not flatten or exaggerate. Read through
+   `--md-sys-state-*`, they follow any later redefinition, exactly like the
+   colour, shape, type, elevation and motion scales.
+
+   Used both by `primitives/StateLayer.tsx` and by the CSS-driven layers
+   (`group-hover/<name>:state-opacity-hover` …); registered in `twMergeConfig`
+   (utils.ts) as `opacity`, so they conflict with `opacity-*` in a merge the
+   way two opacities should. */
+@utility state-opacity-hover {
+  opacity: var(--md-sys-state-hover-state-layer-opacity);
+}
+@utility state-opacity-focus {
+  opacity: var(--md-sys-state-focus-state-layer-opacity);
+}
+@utility state-opacity-pressed {
+  opacity: var(--md-sys-state-pressed-state-layer-opacity);
+}
+@utility state-opacity-dragged {
+  opacity: var(--md-sys-state-dragged-state-layer-opacity);
+}

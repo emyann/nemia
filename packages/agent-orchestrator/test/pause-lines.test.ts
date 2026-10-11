@@ -13,6 +13,7 @@ import { scratch } from './scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest } from './placed.ts';
+import { heldUnasked } from './unasked.ts';
 
 const ROOT = scratch('wf-pause-lines-');
 process.env.WF_ROOT = ROOT;
@@ -40,6 +41,7 @@ const printed = async (t: TestContext, fn: () => unknown): Promise<string[]> => 
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 let factories = 0;
 
 /** A repository with one commit, a team of one step and one agent, and a factory of its own on the repository that offers it, hired. */

@@ -16,6 +16,7 @@ import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { unasked } from './unasked.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -97,7 +98,7 @@ const approveByHand = (id: string, step: string, n: number, held: unknown = { st
 
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
 
-/** What `main` printed, line by line. */
+/** What `main` printed, line by line: given no engine, it is handed one of its own, which it is to file on, stop, say to or forget from nothing. */
 const printedBy = async (
   t: { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } },
   argv: string[],
@@ -107,11 +108,13 @@ const printedBy = async (
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
+  const own = testEngine();
   try {
-    await main(argv, e ?? engineOf(engine().layer));
+    await main(argv, e ?? engineOf(own.layer));
   } finally {
     log.mock.restore();
   }
+  unasked(own);
   return printed.join('\n').split('\n');
 };
 

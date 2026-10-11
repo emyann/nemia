@@ -21,6 +21,7 @@ import { parseArgv, type CommandSpec } from './command.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-reads-');
 process.env.WF_ROOT = ROOT;
@@ -29,6 +30,7 @@ const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
+heldUnasked(engine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */

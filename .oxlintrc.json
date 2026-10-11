@@ -326,7 +326,7 @@
     {
       "files": ["apps/api/src/capabilities/reach.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 152, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 137, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 26]
       }

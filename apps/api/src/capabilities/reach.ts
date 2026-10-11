@@ -263,6 +263,35 @@ export function reachOf(
 }
 
 /**
+ * The servers a step's sessions load, each with the tools it listed as the step's rules leave them: those the checkout enables among the
+ * ones its agent names (`named`), then a row for each name the checkout does not declare (`undeclared`).
+ */
+function serversReached(
+  servers: Capabilities['mcp'],
+  named: readonly string[],
+  rules: { deny: string[]; ask: string[]; denied: DeniedRule[]; asked: DeniedRule[]; allow: string[] },
+): NonNullable<StepReach['mcp']> {
+  const loaded = servers
+    .filter((server) => server.enabled && named.includes(server.name))
+    .map((server) => ({
+      server: server.name,
+      tools:
+        server.tools?.map((tool): ReachedMcpTool => {
+          const rule = denyingRule(rules.deny, server.name, tool.name);
+          const asking = rule === null ? denyingRule(rules.ask, server.name, tool.name) : null;
+          return {
+            name: tool.name,
+            denied: rule === null ? null : rules.denied.find((d) => d.rule === rule)!,
+            asks: asking === null ? null : rules.asked.find((a) => a.rule === asking)!,
+            allowed: rule === null && asking === null && denyingRule(rules.allow, server.name, tool.name) !== null,
+          };
+        }) ?? null,
+      why: server.tools ? null : (server.error ?? server.notAsked ?? 'It did not list its tools.'),
+    }));
+  return [...loaded, ...undeclared(named, servers)];
+}
+
+/**
  * What one step gets (`StepReach`). A step on a harness that is not Claude Code reads no settings, and nothing of them is claimed for it.
  * On Claude Code:
  *
@@ -410,24 +439,7 @@ function stepReach(
         return { command, measured, denied: by ?? (askDenier ? asks : null), asks };
       });
 
-  const loaded = capabilities.mcp
-    .filter((server) => server.enabled && named.includes(server.name))
-    .map((server) => ({
-      server: server.name,
-      tools:
-        server.tools?.map((tool): ReachedMcpTool => {
-          const rule = denyingRule(deny, server.name, tool.name);
-          const asking = rule === null ? denyingRule(ask, server.name, tool.name) : null;
-          return {
-            name: tool.name,
-            denied: rule === null ? null : denied.find((d) => d.rule === rule)!,
-            asks: asking === null ? null : asked.find((a) => a.rule === asking)!,
-            allowed: rule === null && asking === null && denyingRule(allowed.rules, server.name, tool.name) !== null,
-          };
-        }) ?? null,
-      why: server.tools ? null : (server.error ?? server.notAsked ?? 'It did not list its tools.'),
-    }));
-  const mcp = [...loaded, ...undeclared(named, capabilities.mcp)];
+  const mcp = serversReached(capabilities.mcp, named, { deny, ask, denied, asked, allow: allowed.rules });
 
   return {
     ...reach,

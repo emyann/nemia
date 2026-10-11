@@ -32,7 +32,8 @@ export type Repository = {
 export type Held = { readonly repositories: Map<string, Repository>; made: number };
 
 /**
- * What a session and a person do to a repository, which no verb of a place does: make one, commit, stage a merge, tag, and read a commit.
+ * What a session and a person do to a repository, which no verb of a place does: make one, commit, stage a merge or take one back, put a
+ * branch back on an older commit, tag, and read a commit.
  * One for the test place, over what it holds, and one over git for the place's contract.
  */
 export type World = {
@@ -56,12 +57,18 @@ export type World = {
   readonly tip: (root: string, name: string) => string | null;
   /** The paths `checkout` holds uncommitted, in order: each file added, changed or removed since the commit it is at. */
   readonly changes: (checkout: string) => readonly string[];
+  /** The commit the merge staged in `checkout` merges, or null where none is staged there. */
+  readonly staged: (checkout: string) => string | null;
+  /** The merge staged in `checkout` taken back, its files as its commit has them, as a person aborts one; nothing where none is staged. */
+  readonly takeBack: (checkout: string) => void;
+  /** The branch `checkout` is on put back on the commit `rev` names, its files as that commit has them and nothing staged. */
+  readonly putBack: (checkout: string, rev: string) => void;
 };
 
-/** A new id for a commit of `held`: forty hexadecimal characters, counted. */
+/** A new id for a commit of `held`: forty hexadecimal characters, counted in its first seven, so a short id tells two commits apart. */
 export function nextId(held: Held): string {
   held.made += 1;
-  return held.made.toString(16).padStart(40, '0');
+  return held.made.toString(16).padStart(7, '0').padEnd(40, '0');
 }
 
 /** The commit `rev` names in `repo` — a branch, a tag or a commit's id — or undefined where it names none. */

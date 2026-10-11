@@ -87,4 +87,12 @@ export const gitWorld: World = {
       .filter(Boolean)
       .map((line) => line.slice(3))
       .sort(),
+  staged: (checkout) => {
+    const ran = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'], { cwd: checkout, env: GIT_ENV, encoding: 'utf8' });
+    return ran.status === 0 ? ran.stdout.trim() : null;
+  },
+  takeBack: (checkout) => {
+    if (gitWorld.staged(checkout) !== null) git(checkout, 'merge', '--abort');
+  },
+  putBack: (checkout, rev) => void git(checkout, 'reset', '-q', '--hard', rev),
 };

@@ -1,10 +1,10 @@
 /**
  * The handle a test holds on what its test place holds (`World` in `world.ts`): `worldOf(held)` makes a repository, commits a checkout's
- * work, puts a commit on a branch, stages a merge, tags, and reads a commit, a branch's tip and what a checkout holds uncommitted, each
- * in memory and in the directories the verbs read. It throws on what a test got wrong — a directory that is no checkout, a name that is
- * no commit — in words that say which.
+ * work, puts a commit on a branch, stages a merge or takes one back, puts a branch back on an older commit, tags, and reads a commit, a
+ * branch's tip, the merge staged in a checkout and what a checkout holds uncommitted, each in memory and in the directories the verbs
+ * read. It throws on what a test got wrong — a directory that is no checkout, a name that is no commit — in words that say which.
  */
-import { checkoutAt, commitMade, committed, headOf, mergedIn, resolved, treeOf, type Found } from './acts.ts';
+import { checkoutAt, commitMade, committed, headOf, mergedIn, putBackOn, resolved, takenBack, treeOf, type Found } from './acts.ts';
 import { isDirectory, readTree, real, writeChanges } from './disk.ts';
 import { commitAt, type Held, type Repository, type Tree, type World } from './world.ts';
 
@@ -88,5 +88,11 @@ export function worldOf(held: Held): World {
     },
     tip: (root, name) => found(held, root).repo.branches.get(name) ?? null,
     changes: (checkout) => changes(held, checkout),
+    staged: (checkout) => found(held, checkout).checkout.staged?.heads[0] ?? null,
+    takeBack: (checkout) => takenBack(found(held, checkout)),
+    putBack: (checkout, rev) => {
+      const at = found(held, checkout);
+      putBackOn(at, idOf(at.repo, rev));
+    },
   };
 }

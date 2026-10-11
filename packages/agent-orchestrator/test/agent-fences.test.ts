@@ -27,6 +27,8 @@
  * its round's check already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
  * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
+ * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
+ * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
@@ -991,6 +993,47 @@ test('every git question review-a-change names is one Agora asks by its own allo
   assert.ok(asked.length >= 7, `review-a-change names its git questions: ${asked.join(', ')}`);
   const calls = asked.map((command) => ({ tool: 'Bash', command }) as const);
   assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
+});
+
+/** The line of the build workflow's implement that names the render of a checkout's dashboards. */
+const RENDER_NOTE = 'When the change touches `tools/observe`';
+
+/** The render (`tools/observe/render/render.ts`) in each form a session types: bare, with its files, held for a browser, and stopped. */
+const RENDERS: Call[] = [
+  'node tools/observe/render/render.ts',
+  'node tools/observe/render/render.ts --out /s/runs/r-1/artifacts/implement --dashboards steps',
+  'node tools/observe/render/render.ts --hold 600',
+  'node tools/observe/render/render.ts --stop nemia-render-1-ab',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** Docker by hand, which only the render talks to. */
+const DOCKER: Call[] = ['docker run -d --rm grafana/otel-lgtm', 'docker rm -f nemia-lgtm', 'docker ps'].map((command) => ({
+  tool: 'Bash',
+  command,
+}));
+
+test('the render of a dashboard is the implementer’s alone: design and review are refused each form of it, and Docker by hand', () => {
+  const ada = shippedStepOf('ada');
+  assert.equal(ada.name, 'implement');
+  assert.notEqual(ada.permissionMode, 'dontAsk', 'the implementer runs what no deny names');
+  assert.deepEqual(
+    unfenced(ada, SETTINGS, RENDERS),
+    RENDERS.map((call) => `implement: ${shown(call)}`),
+  );
+  const named = checksOf('workflows/build/implement.md', RENDER_NOTE, /`(node tools\/observe\/[^`]*)`/g);
+  assert.ok(named.length >= 2, `implement's note names the render: ${named.join(', ')}`);
+  for (const command of named) assert.ok(command.startsWith('node tools/observe/render/render.ts'), command);
+  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), [...RENDERS, ...DOCKER]), [], agent);
+});
+
+test('REFUSED: design or review that an allow of the render reaches, by the settings or its own line, runs each form of it', () => {
+  const allow = 'Bash(node tools/observe/render/render.ts:*)';
+  const settings = { permissions: { allow: [...SETTINGS_ALLOWS, allow] } };
+  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), RENDERS, settings), RENDERS.map(shown), agent);
+  const own = { ...shippedStepOf('agora'), allowedTools: [...(shippedStepOf('agora').allowedTools ?? []), allow, 'Bash(docker:*)'] };
+  assert.deepEqual(runs(own, [...RENDERS, ...DOCKER]), [...RENDERS, ...DOCKER].map(shown));
+  const fenced = { ...shippedStepOf('ada'), disallowedTools: [...(shippedStepOf('ada').disallowedTools ?? []), allow] };
+  assert.deepEqual(unfenced(fenced, SETTINGS, RENDERS), [], 'a deny of its own would refuse the implementer');
 });
 
 /** The whole suite in the spellings a session types: what implement's check already ran on the round's tree. */

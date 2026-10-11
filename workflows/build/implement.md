@@ -6,7 +6,7 @@ agent: ada
 context: 400k
 check: { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && npm test -- --force && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then m=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/mutants.ts" > "$m/mutants.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/mutants.ts, so no mutant can be run; start the run on a base that has it" >&2; false; }; } && node "$m/mutants.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$m"; [ "$c" -eq 0 ]; else echo "wf check: the mutants run only in a run's check, where WF_BASE_REF names the base whose runner judges them"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf '%s\n' "$touched" | grep -Eq '^(apps/(web|api)/|package(-lock)?\.json$|turbo\.json$)'; then npm run e2e; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi
 budget: 40
-skills: effect, shadcn, change-the-board, look
+skills: effect, shadcn, change-the-board, look, see-a-dashboard
 mcp: playwright
 output: implement.schema.json
 ---
@@ -20,6 +20,13 @@ but to measure it: this step's check runs every page, in workers, outside your s
 
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
 where your shell must be for that load.
+
+When the change touches `tools/observe` — a dashboard, the collector's or Tempo's file, the compose file, the render — see it rendered
+before you sign off: `node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace
+with fake data, never the live one, and writes `dashboard-<name>.png` and `dashboard-<name>.txt` for each dashboard. Read them as the
+`see-a-dashboard` skill says, and name each in `artifacts` by its absolute path: the check refuses a changed dashboard whose picture and
+text are not named (`pictures.ts`); a change only to `tools/observe/README.md` or under `tools/observe/profile` asks for none. To look
+with your browser, add `--hold`, and stop the stack it names when you are done: `node tools/observe/render/render.ts --stop <name>`.
 
 **Name your mutants** in the closeout: one per rule or guard the change adds, each a `file`, the text `from` it holds exactly once in
 your committed result, what it becomes `to` (valid code that breaks the rule, never a syntax error), the `test` file that must fail,

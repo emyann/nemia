@@ -510,7 +510,6 @@ const OTHER_PROGRAMS = new Set([
   'crossSessionInbound',
   'claudeInChromeDefaultEnabled',
   '$CLAUDE_CONFIG_DIR',
-  'networkidle',
   'dragTo',
   'Origin',
   'changeOrigin',

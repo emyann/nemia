@@ -226,7 +226,8 @@ function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
  * the runtime keeps a command's first word alone, so `Bash(npm)` denied may be `disallowedTools: Bash(npm run build)` at work, or
  * `npm test` that nothing allowed. A rule on the same tool — any file-editing tool for an `Edit` rule — matches a call when it names
  * nothing, or names that command's first word, or a path pattern the call's path is under (from the root for `//`, from the session's
- * directory for any other; `~` is nobody's here, and matches nothing), or exactly what the call names.
+ * directory for any other; `~` is nobody's here, and matches nothing), or exactly what the call names. An MCP tool's call is kept by its
+ * name alone, so a rule on one of its parameters (`mcp__playwright__browser_navigate(url:*:8787*)`) may be what denied it.
  */
 export function disallowedBy(denied: string, disallowedTools: readonly string[], at: DeniedAt = {}): string | undefined {
   const call = callOf(denied);
@@ -234,7 +235,7 @@ export function disallowedBy(denied: string, disallowedTools: readonly string[],
     const rule = callOf(written);
     if (rule.tool !== call.tool && !(rule.tool === 'Edit' && EDITING_TOOLS.includes(call.tool))) return false;
     if (rule.what === undefined) return true;
-    if (call.what === undefined) return false;
+    if (call.what === undefined) return call.tool.startsWith('mcp__');
     if (call.tool === 'Bash') {
       const first = rule.what.replace(/:\*$/, '').trim().split(/\s+/)[0];
       return first === call.what || first === '*';

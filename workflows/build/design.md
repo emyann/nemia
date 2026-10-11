@@ -3,8 +3,9 @@ place: git
 agent: seldon
 gate: true
 budget: 10
-skills: effect, shadcn, change-the-board
-disallowedTools: Bash(cd:*), Bash(npm run build), Bash(npm run e2e)
+skills: effect, shadcn, change-the-board, look
+mcp: playwright
+disallowedTools: Bash(cd:*), mcp__playwright__browser_run_code_unsafe, Bash(npm run build), Bash(npm run e2e), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 reads: costs
 ---
 Your brief says what recent runs of this workflow cost, per step and whole (*What runs of this workflow cost*): propose the cut and each
@@ -15,3 +16,7 @@ When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with R
 never with the Skill tool, which your fence refuses.
 
 The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.
+
+To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill: this workspace's
+board, built outside the workspace and served on ports of its own against a store of its own that holds the e2e's seed. Never the live
+board on :8787 or :5173, which your fence refuses by address. Run `npm run board:stop` before you sign off.

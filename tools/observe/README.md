@@ -108,13 +108,19 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
     by `tool` and `call`, the call as a permission rule names it (`Skill(md3-spec)`, `Bash(npm run md3)`); across runs by workflow,
     step, agent and `tool`; and **Denied calls, each**, a table of the latest spans with their run and call. A span has no first sample
     to lose, and what is counted is marked on the run's record, so a daemon started again counts none twice.
-  - **Tool errors** count the sessions' own `tool_result` events with `success="false"`, from Loki, by `tool_name`: a command that
-    exited non-zero, a file that is not there, a pattern the search refused.
+  - **Tool errors** count the sessions' own `tool_result` events with `success="false"`, from Loki, by `tool_name`, of every tool but
+    Bash (`| tool_name!="Bash"`): a file that is not there, a pattern the search refused, a skill that did not load. An event with no
+    `tool_name` stays counted, its bar named with nothing after its `·`.
+  - **Bash: exited non-zero** counts the Bash tool's alone, on a line of its own under each row's error panels: a command that exited
+    non-zero, which is often an answer and no error (a `grep` with no match, an `ls` of a file that is not there, a test asked to
+    fail), and the event carries no exit code and no stderr. Apart, so its bar does not set the scale the other tools' are read at
+    (*Counting a session's errors*). For one run a bar is `<step>`; across runs `<workflow> / <step> · <agent>`, and `unlabelled /
+    <step>` as Tool errors names them. Both are counts, not rates.
   - **Failed skill loads** are those errors of the `Skill` tool: a skill that was called and whose loading failed (measured: a skill
     whose own shell command failed), by skill: its name is read out of `tool_parameters` in the query (`regexReplaceAll`), where the
     event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports no event and no span, and is
     **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.
-  - Tool errors and Failed skill loads draw one bar for each series, at most 100, named in the query itself (`label_format name=…`,
+  - Tool errors, Failed skill loads and Bash: exited non-zero draw one bar for each series, at most 100, named in the query itself (`label_format name=…`,
     `sum by (name)`): Grafana draws no legend for an instant Loki query (*Counting a session's errors*). For one run a bar is `<step> ·
     <tool>`; across runs `<workflow> / <step> · <agent> · <tool>`, and `unlabelled / <step> · <tool>` for the events of sessions
     exported before they carried their factory, workflow and agent: they stay counted, so the bars add up to Loki's count, and are
@@ -144,7 +150,8 @@ the code does not emit fails it, and so does a metric the code defines that Syst
 send, a Tempo table naming a span that would show its trace's duration, a span name both layers emit, a server-side expression reading a
 query its panel has not, and a bar gauge over Loki that would draw one nameless bar: one that does not read each row of an instant
 query, counts by more than one label, keeps a `legendFormat`, sets no limit, or does not name a bar by its row's label; a bar gauge
-of Steps that does not write a bar's name above it, and a failed skill load counted by its raw inputs, not by its skill; a Timeline
+of Steps that does not write a bar's name above it, a failed skill load counted by its raw inputs, not by its skill, a count of tool
+errors that lets Bash back in, and a count of Bash that drops its tool, its session or one of its four choices; a Timeline
 query that asks a row's `of` or `part` for a value the code gives none of or is not held to the one factory and the one workflow
 picked, and a Timeline factory or workflow choice that may hold several. What a session sends and what the span metrics write are no
 code of ours: the test lists them as measured below.
@@ -169,10 +176,11 @@ node tools/observe/render/render.ts --stop <name>
 - **Fake data** (`render/seed.ts`): fixtures written by hand, posted as OTLP/HTTP JSON to the throwaway's own collector, stamped inside
   the last minute: the daemon's passes, a run's filings and appends, the waits and the denied calls of two steps (`build / implement ·
   ada`, `build / review · agora`, in the run `seeded-run-1`), that run's timeline once over (`run.timeline`, each number a span with a
-  numeric `value`), every metric System charts, and two sessions' turns with their failed `tool_result` events, one with no
-  `tool_name`. Every panel that draws series is met by two; the two profile panels are not seeded
+  numeric `value`), every metric System charts, and two sessions' turns with their failed `tool_result` events, of both kinds in both
+  steps: the Bash tool's (seven) and other tools' (six, one with no `tool_name`). Every panel that draws series is met by two; the two profile panels are not seeded
   (`UNSEEDED`). Fixtures and not the code's emitters: a tool imports no package's `src`. `observe.test.ts` refuses a name here the code
-  does not emit, and a panel the seed does not meet: a change that adds a span, an attribute or a metric adds its fixture.
+  does not emit, and a panel the seed does not meet, counted over the rows a Loki query's literal filters keep (a seed with no failed
+  Bash leaves the Bash panels unmet): a change that adds a span, an attribute or a metric adds its fixture.
 - **What it writes**, into `--out`, else `$WF_ARTIFACTS`, else `.observe/` at the root (ignored by git): for each dashboard,
   `dashboard-<name>.png`, the whole page at 1600 pixels wide, and `dashboard-<name>.txt`, the text of every panel as the page drew it
   (`render/panels.ts`): each bar's name and value, a bar with no name as `(no name)`, a chart's series, a table's rows, `no data`, or
@@ -283,6 +291,11 @@ Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
   session's `tool_result` event carries `tool_name` and `success` itself: 176 over the same days.
 - **A failed skill load is a `tool_result` of `Skill` with `success="false"`**: 15, each a skill whose own shell command failed as it
   loaded. A `Skill` call for a skill that is not there exported nothing: no `tool_decision`, no `tool_result`, no span.
+- **A failed Bash is a command that exited non-zero, and most of the failures** (read on the live stack, 2026-10-06 to 10-11): 208
+  failed `tool_result` events of 24,682, 128 of them Bash's, each recorded as `Shell command failed` with no exit code and no stderr.
+  Of the 42 that carry their command, about 22 answered no and exited non-zero: a `grep` that found nothing, an `ls` of a file that is
+  not there, `git merge-base --is-ancestor`. So Steps counts them apart from the other tools' (ten `Read`, fifteen `Skill`). Loki's
+  `| tool_name!="Bash"` keeps an event with no `tool_name` (rendered on the seed: its one such result stays in Tool errors).
 - **The harness's own `tool_decision` events (`decision="reject"`) are not what Denied calls counts**: it counts what the runtime
   journals of a job's denials, the list a run's page shows.
 - **A bar gauge over an instant Loki query reads a table, not series** (Grafana 13.2.2, read off rendered pages of a scratch

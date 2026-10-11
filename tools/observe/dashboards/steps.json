@@ -205,11 +205,11 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 9
       },
       "options": {
         "mode": "markdown",
-        "content": "**Denied calls** are the daemon's own `step.denied` spans, in Tempo: one for each call a harness denied a session, counted when its attempt ends, whatever the try came to, with its `tool` and its `call` as a permission rule names it (`Skill(look)`, `Bash(git push)`): the count a run's page shows. A run started before the daemon counted them has none. **Tool errors** are the sessions' own `tool_result` events with `success=\"false\"`, in Loki, by `tool_name`: a command that exited non-zero, a file that is not there, a pattern refused. **Failed skill loads** are those of the `Skill` tool: a skill that was called and whose loading failed, each bar named by its skill, read out of `tool_parameters` where the event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports nothing, and is **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.\n\n**One run's session** reads the `Run` and `Session` picked above; **Across runs** the factory, workflow, step and agent. Errors and skill loads are counted for sessions that export telemetry alone: a Claude Code step of a daemon given an endpoint, never a Codex step. Tempo answers 7 days back at most.\n\nWhere a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
+        "content": "**Denied calls** are the daemon's own `step.denied` spans, in Tempo: one for each call a harness denied a session, counted when its attempt ends, whatever the try came to, with its `tool` and its `call` as a permission rule names it (`Skill(look)`, `Bash(git push)`): the count a run's page shows. A run started before the daemon counted them has none. **Tool errors** are the sessions' own `tool_result` events with `success=\"false\"`, in Loki, by `tool_name`, of every tool but Bash: a file that is not there, a pattern refused, a skill that did not load. **Bash: exited non-zero** are the Bash tool's, apart, by step: a command that exited non-zero, which is often an answer and no error (a `grep` with no match, an `ls` of a file that is not there), and the event carries no exit code and no stderr. **Failed skill loads** are those of the `Skill` tool: a skill that was called and whose loading failed, each bar named by its skill, read out of `tool_parameters` where the event carries its inputs (`NEMIA_TOOL_DETAILS=1`). A call to a skill that is not there exports nothing, and is **not measured**; a skill a session was refused is a denied call, `Skill(<name>)`.\n\n**One run's session** reads the `Run` and `Session` picked above; **Across runs** the factory, workflow, step and agent. Errors and skill loads are counted for sessions that export telemetry alone: a Claude Code step of a daemon given an endpoint, never a Codex step. Tempo answers 7 days back at most.\n\nWhere a step's time goes — the model, each tool, Bash by its command head, permission waits, and its queue, check and gate — is on [Time](/d/nemia-time?${__url_time_range}&${factory:queryparam}&${workflow:queryparam}&${step:queryparam}&${agent:queryparam}), for these steps and this range."
       }
     },
     {
@@ -223,7 +223,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 7,
+        "y": 9,
         "w": 12,
         "h": 9
       },
@@ -283,7 +283,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 7,
+        "y": 9,
         "w": 12,
         "h": 9
       },
@@ -343,7 +343,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 18,
         "w": 24,
         "h": 8
       },
@@ -400,7 +400,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 26,
         "w": 24,
         "h": 1
       },
@@ -417,7 +417,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 25,
+        "y": 27,
         "w": 24,
         "h": 8
       },
@@ -482,14 +482,14 @@
       "id": 8,
       "type": "bargauge",
       "title": "Tool errors",
-      "description": "The sessions' tool_result events that failed over the range, by tool. For the run and session picked.",
+      "description": "The sessions' tool_result events that failed over the range, by tool, the Bash tool's left out: they are counted below, in Bash: exited non-zero. For the run and session picked.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
         "x": 0,
-        "y": 33,
+        "y": 35,
         "w": 12,
         "h": 9
       },
@@ -501,7 +501,7 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}} · {{.tool_name}}\" [$__range]))"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name!=\"Bash\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}} · {{.tool_name}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
@@ -551,7 +551,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 33,
+        "y": 35,
         "w": 12,
         "h": 9
       },
@@ -603,13 +603,75 @@
       }
     },
     {
+      "id": 15,
+      "type": "bargauge",
+      "title": "Bash: exited non-zero",
+      "description": "The Bash tool's failed tool_result events over the range: a command that exited non-zero, which is often an answer and no error (a search that found nothing, a file that is not there, a test asked to fail). The event carries no exit code and no stderr. A count, by step. For the run and session picked.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Bash\" | run=\"$run\" | task=~\"$session\" | label_format name=\"{{.step}}\" [$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__data.fields.name}",
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "limit": 100,
+          "values": true
+        }
+      }
+    },
+    {
       "id": 10,
       "type": "row",
       "title": "Across runs",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 42,
+        "y": 51,
         "w": 24,
         "h": 1
       },
@@ -626,7 +688,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 43,
+        "y": 52,
         "w": 8,
         "h": 10
       },
@@ -691,14 +753,14 @@
       "id": 12,
       "type": "bargauge",
       "title": "Tool errors, across runs",
-      "description": "The sessions' tool_result events that failed over the range, by tool. By factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
+      "description": "The sessions' tool_result events that failed over the range, by tool, the Bash tool's left out: they are counted below, in Bash: exited non-zero, across runs. By factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
         "x": 8,
-        "y": 43,
+        "y": 52,
         "w": 8,
         "h": 10
       },
@@ -710,7 +772,7 @@
           },
           "refId": "A",
           "queryType": "instant",
-          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }} · {{.tool_name}}\" [$__range]))"
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name!=\"Bash\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }} · {{.tool_name}}\" [$__range]))"
         }
       ],
       "fieldConfig": {
@@ -760,7 +822,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 43,
+        "y": 52,
         "w": 8,
         "h": 10
       },
@@ -812,6 +874,68 @@
       }
     },
     {
+      "id": 16,
+      "type": "bargauge",
+      "title": "Bash: exited non-zero, across runs",
+      "description": "The Bash tool's failed tool_result events over the range: a command that exited non-zero, which is often an answer and no error (a search that found nothing, a file that is not there, a test asked to fail). The event carries no exit code and no stderr. A count, by step. By factory, workflow, step and agent. A bar named `unlabelled / <step>` counts sessions started before they carried their factory, workflow and agent, read only while all three choices are All.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "expr": "sum by (name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | success=\"false\" | tool_name=\"Bash\" | factory=~\"$factory\" | workflow=~\"$workflow\" | step=~\"$step\" | agent=~\"$agent\" | label_format name=\"{{ if .workflow }}{{.workflow}} / {{.step}} · {{.agent}}{{ else }}unlabelled / {{.step}}{{ end }}\" [$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__data.fields.name}",
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "manual",
+        "minVizHeight": 36,
+        "maxVizHeight": 36,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 14
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "limit": 100,
+          "values": true
+        }
+      }
+    },
+    {
       "id": 14,
       "type": "table",
       "title": "Denied calls, each",
@@ -822,7 +946,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 71,
         "w": 24,
         "h": 9
       },

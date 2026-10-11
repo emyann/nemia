@@ -724,7 +724,14 @@ test('a bar gauge over Loki reads each row of an instant query, named by one lab
   for (const [file, d] of DASHBOARDS) assert.deepEqual(lokiGaugeFaults(d), [], file);
   assert.deepEqual(
     lokiGauges(dashboardTitled('Steps')).map((p) => p.title),
-    ['Tool errors', 'Failed skill loads', 'Tool errors, across runs', 'Failed skill loads, across runs'],
+    [
+      'Tool errors',
+      'Failed skill loads',
+      'Bash: exited non-zero',
+      'Tool errors, across runs',
+      'Failed skill loads, across runs',
+      'Bash: exited non-zero, across runs',
+    ],
   );
 });
 
@@ -1019,13 +1026,23 @@ const STEP_PICKS = ['factory', 'workflow', 'step', 'agent'];
 
 /**
  * What one counting query of a dashboard counts of a step's sessions, read off its text: the calls they were denied (the daemon's
- * `DENIED_SPAN`), their tool errors (the sessions' failed `tool_result` events) or, of those, their failed skill loads; for what —
+ * `DENIED_SPAN`), their tool errors (the sessions' failed `tool_result` events) or, of those, their failed skill loads or the `Bash`
+ * tool's alone, a command that exited non-zero; whether a count of tool errors leaves the `Bash` tool's out (`apart`); for what —
  * the run and session picked (`run`), the steps picked across runs (`across`), or neither, which is `unscoped`; and whether it says the
  * tool, by counting by it, or by a label made from it (`labelsMade`), or, for a skill load, by asking for the `Skill` tool alone; and
  * whether a skill load says its skill, by counting by a label whose template (`templatesMade`) reads `SKILL_KEY` out of the tool's
  * parameters, and not by the parameters' raw text.
  */
-type Counted = { what: 'denied' | 'errors' | 'skills'; scope: 'run' | 'across' | 'unscoped'; tool: boolean; skill: boolean };
+type Counted = {
+  what: 'denied' | 'errors' | 'skills' | 'bash';
+  scope: 'run' | 'across' | 'unscoped';
+  tool: boolean;
+  skill: boolean;
+  apart: boolean;
+};
+
+/** Whether the LogQL query `text` keeps, of its lines, only those whose `tool_name` is (`=`) or is not (`!=`) `tool`. */
+const asksTool = (text: string, op: '=' | '!=', tool: string): boolean => new RegExp(`\\|\\s*tool_name\\s*${op}\\s*"${tool}"`).test(text);
 
 /** The key of a `Skill` call's parameters that holds the skill's name, as measured (`{"skill_name":"…"}`). */
 const SKILL_KEY = 'skill_name';
@@ -1046,7 +1063,8 @@ function countedOf(dashboard: Dashboard): Counted[] {
         : STEP_PICKS.every((name) => filter(name, '=~', name))
           ? 'across'
           : 'unscoped';
-    const skills = errors && /\|\s*tool_name\s*=\s*"Skill"/.test(q.text);
+    const skills = errors && asksTool(q.text, '=', 'Skill');
+    const bash = errors && asksTool(q.text, '=', 'Bash');
     const made = labelsMade(q.text);
     const tool =
       skills ||
@@ -1056,17 +1074,20 @@ function countedOf(dashboard: Dashboard): Counted[] {
       countedBy(q.text)
         .map((l) => templatesMade(q.text).get(l) ?? '')
         .some((template) => /\.tool_parameters\b/.test(template) && template.includes(SKILL_KEY));
-    return [{ what: denied ? 'denied' : skills ? 'skills' : 'errors', scope, tool, skill }];
+    const what = denied ? 'denied' : skills ? 'skills' : bash ? 'bash' : 'errors';
+    return [{ what, scope, tool, skill, apart: what !== 'errors' || asksTool(q.text, '!=', 'Bash') }];
   });
 }
 
-/** `Counted`, each in a word, sorted. */
+/** `Counted`, each in a word, sorted: a count of tool errors that does not leave the `Bash` tool's out says so. */
 const countedWords = (dashboard: Dashboard): string[] =>
   countedOf(dashboard)
-    .map((c) => `${c.what} ${c.scope}${c.skill ? ' by skill' : c.tool ? ' by tool' : ''}`)
+    .map((c) => `${c.what} ${c.scope}${c.skill ? ' by skill' : c.tool ? ' by tool' : ''}${c.apart ? '' : ', Bash among them'}`)
     .sort();
 
 const STEPS_COUNTED = [
+  'bash across',
+  'bash run',
   'denied across by tool',
   'denied run by tool',
   'errors across by tool',
@@ -1100,15 +1121,37 @@ test('REFUSED: a count that drops its session, one of its four choices, its tool
   assert.deepEqual(changed('loki', `${SKILL_READ}" [`, '{{.step}}" ['), without('skills run by skill', 'skills run by tool'));
 });
 
+test('REFUSED: a count of tool errors that lets Bash back in, and a count of Bash that drops its tool, its session or one of its four choices', () => {
+  const changed = (from: string, to: string) => countedWords(withQuery(dashboardTitled('Steps'), 'loki', from, to));
+  const without = (word: string, instead: string) => [...STEPS_COUNTED.filter((w) => w !== word), instead].sort();
+  const BASH = ' | tool_name="Bash"';
+  const RUN = `${BASH} | run="$run"`;
+  const ACROSS = `${BASH} | factory=~"$factory"`;
+  assert.deepEqual(
+    changed(' | tool_name!="Bash" | run="$run"', ' | run="$run"'),
+    without('errors run by tool', 'errors run by tool, Bash among them'),
+  );
+  assert.deepEqual(
+    changed(' | tool_name!="Bash" | factory=~"$factory"', ' | factory=~"$factory"'),
+    without('errors across by tool', 'errors across by tool, Bash among them'),
+  );
+  assert.deepEqual(changed(RUN, ' | run="$run"'), without('bash run', 'errors run, Bash among them'));
+  assert.deepEqual(changed(`${RUN} | task=~"$session"`, RUN), without('bash run', 'bash unscoped'));
+  assert.deepEqual(changed(ACROSS, ' | factory=~"$factory"'), without('bash across', 'errors across, Bash among them'));
+  assert.deepEqual(changed(`${ACROSS} | workflow=~"$workflow"`, ACROSS), without('bash across', 'bash unscoped'));
+});
+
 const STEPS_BARS = [
   'Input tokens',
   'Output tokens',
   'Denied calls',
   'Tool errors',
   'Failed skill loads',
+  'Bash: exited non-zero',
   'Denied calls, across runs',
   'Tool errors, across runs',
   'Failed skill loads, across runs',
+  'Bash: exited non-zero, across runs',
 ];
 
 test('Steps names each bar above it', () => {
@@ -1268,7 +1311,22 @@ function seeded(seed: readonly ServiceSeed[]) {
   return { spans, metrics, logs };
 }
 
-/** Why `seed` does not meet the query `text` sent to `datasource`: a name it does not hold, or one series where the query keeps several. */
+/**
+ * The rows of `rows` a LogQL query's filters keep, as far as `text` says them with a literal: each `| <field>="<value>"` and
+ * `| <field>!="<value>"` after its stream selector, a field a row does not carry read as the empty string. A value that reads a
+ * variable (`$`) keeps every row, and so does a filter by a pattern (`=~`, `!~`).
+ */
+function keptRows(text: string, rows: readonly Record<string, string | number>[]): Record<string, string | number>[] {
+  const filters = [...text.slice(text.indexOf('}') + 1).matchAll(/\|\s*([A-Za-z_]\w*)\s*(!=|=)\s*"((?:[^"\\]|\\.)*)"/g)]
+    .map(([, field, op, value]) => ({ field, op, value }))
+    .filter(({ value }) => !value.includes('$'));
+  return rows.filter((row) => filters.every(({ field, op, value }) => (String(row[field] ?? '') === value) === (op === '=')));
+}
+
+/**
+ * Why `seed` does not meet the query `text` sent to `datasource`: a name it does not hold, or one series where the query keeps several,
+ * counted for a LogQL query over the rows its literal filters keep (`keptRows`).
+ */
 function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed[]): string[] {
   const has = seeded(seed);
   if (datasource === 'prometheus') {
@@ -1291,9 +1349,10 @@ function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed
   const rows = has.logs(service).map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [lokiField(key), value])));
   const fields = new Set([...rows.flatMap((row) => Object.keys(row)), ...LOKI_FIELDS]);
   const made = madeLabels(text);
+  const kept = keptRows(text, rows);
   const few = keptBy(text)
     .map((labels) => labels.flatMap((label) => made.get(label) ?? [label]))
-    .filter((labels) => seriesBy(rows, labels) < 2);
+    .filter((labels) => seriesBy(kept, labels) < 2);
   return [...logNames(text).filter((field) => !fields.has(field)), ...few.map((labels) => `one series by ${labels.join(', ')}`)];
 }
 
@@ -1335,6 +1394,14 @@ test("the render's seed sends only names the code emits, or the measured ones", 
     .logs(CLAUDE_SERVICE)
     .filter((log) => log.success === 'false' && log.tool_name === undefined);
   assert.equal(nameless.length, 1, 'one failed tool result with its tool label missing');
+  const failedIn = (bash: boolean) =>
+    new Set(
+      seeded(SEED)
+        .logs(CLAUDE_SERVICE)
+        .filter((log) => log['event.name'] === 'tool_result' && log.success === 'false' && (log.tool_name === 'Bash') === bash)
+        .map((log) => log.step),
+    ).size;
+  assert.deepEqual([failedIn(true), failedIn(false)], [2, 2], 'failed results of Bash in two steps, and of another tool in two steps');
 });
 
 /** `seed` with every span named `from` named `to`. */
@@ -1374,6 +1441,28 @@ test('REFUSED: a query the seed does not meet, a panel left with one series, an 
   }));
   const few = unmet(dashboardTitled('Steps'), 'steps', oneStep).filter((why) => why.startsWith('Tool errors: one series by '));
   assert.equal(few.length, 1, 'one step and one tool leave Tool errors one series');
+  const toolsKept = (keep: (tool: unknown) => boolean) =>
+    SEED.map((said) => ({ ...said, logs: said.logs.filter((log) => keep(log.attributes.tool_name)) }));
+  assert.deepEqual(
+    unmet(
+      dashboardTitled('Steps'),
+      'steps',
+      toolsKept((tool) => tool !== 'Bash'),
+    ),
+    ['Bash: exited non-zero: one series by step', 'Bash: exited non-zero, across runs: one series by workflow, step, agent'],
+    'a seed with no failed Bash',
+  );
+  assert.deepEqual(
+    unmet(
+      dashboardTitled('Steps'),
+      'steps',
+      toolsKept((tool) => tool === 'Bash'),
+    )
+      .filter((why) => why.includes(': one series by '))
+      .map((why) => why.replace(/: one series by .*$/, '')),
+    ['Tool errors', 'Failed skill loads', 'Tool errors, across runs', 'Failed skill loads, across runs'],
+    'a seed with only failed Bash',
+  );
   assert.deepEqual(unmet(dashboardTitled('System'), 'system', SEED, []), [
     'CPU, over the range: nothing sent to pyroscope',
     'Heap in use, over the range: nothing sent to pyroscope',

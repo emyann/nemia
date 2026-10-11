@@ -19,6 +19,7 @@ import { DAEMON_STARTED, startedLine } from '../feed/feed.ts';
 import { emitDaemonStarted } from '../feed/feed.verb.ts';
 import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../applied/applied.verb.ts';
+import { free } from '../prune/free.verb.ts';
 import { leaseRelease } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 
@@ -199,8 +200,9 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
  * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
  * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series. On
- * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), and
- * on a fifth it brings each factory made from a template to it (`reconcile`).
+ * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on
+ * a fifth it brings each factory made from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest
+ * pass answered finished (`free`), which no pass waits on.
  */
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService> =>
   Effect.gen(function* () {
@@ -221,6 +223,8 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
     yield* Effect.forkScoped(over(e)(deliver()));
     yield* Effect.forkScoped(over(e)(keep()));
     yield* Effect.forkScoped(reconcile());
+    let rested: Pass['runs'] = [];
+    yield* Effect.forkScoped(over(e)(free(() => rested)));
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
@@ -229,6 +233,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
       const pass = yield* tickRun({ repo, quota: () => reading }).pipe(over(e));
       passed(taken.held);
+      rested = pass.runs;
       said = yield* logPass(pass, said);
       yield* Effect.sleep(every);
     }

@@ -52,6 +52,14 @@ export type HarnessArgs = {
    */
   mcp?: Record<string, McpServer>;
   /**
+   * The servers of its checkout's `.mcp.json` the session loads, by name, as a Pod's volume gives a ConfigMap's `items`. Absent:
+   * the whole file, as it is. `[]`: none of it. Names: those entries alone, read from `<cwd>/.mcp.json` when the session is
+   * spawned and handed over with the task's own `mcp`, and a spawn whose file does not declare one is refused, `unstartable`.
+   * Claude Code and Codex hold it; a harness that cannot leave the file out refuses the task (`HarnessSpec.checkoutMcp`).
+   * Refused unless a list of server names, none twice and none also in `mcp`.
+   */
+  checkoutMcp?: string[];
+  /**
    * The context window the session is given, in tokens — `200000`. Given to Claude Code as `--autocompact`: past about it
    * the session compacts its conversation, a summary in place of what it read, and carries on, on `claude --bg` and
    * `claude -p` alike. Every attempt gets the same window, a continuation included. Absent: the harness's own, which is the
@@ -151,6 +159,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   allowedTools: true,
   disallowedTools: true,
   mcp: true,
+  checkoutMcp: true,
   contextTokens: true,
   background: true,
   worktree: true,
@@ -305,14 +314,34 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
 
 /**
  * Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or the
- * mounts and the admission every harness renders its own way, or `undefined`.
+ * mounts and the admission every harness renders its own way, or a `checkoutMcp` that names no servers, or `undefined`.
  */
 const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
   claudeFlagsRefusalOf(config.claude) ??
   codexArgsRefusalOf(config.codex) ??
   commandArgsRefusalOf(config) ??
+  checkoutMcpRefusalOf(config) ??
   mountsRefusalOf(config.mounts) ??
   admissionRefusalOf(config.callAdmission);
+
+/**
+ * Why a task's `checkoutMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: not a list of server names, a name
+ * twice, or a name the task's own `mcp` gives too, where one would hide the other.
+ */
+const checkoutMcpRefusalOf = ({ checkoutMcp, mcp }: HarnessArgs): string | undefined => {
+  if (checkoutMcp === undefined) return undefined;
+  const names: unknown = checkoutMcp;
+  if (!(Array.isArray(names) && names.every((n) => typeof n === 'string' && /^[\w-]+$/.test(n)))) {
+    return `\`checkoutMcp: ${JSON.stringify(names)}\` is not a list of server names. Give the names of the checkout's \`.mcp.json\` servers the session loads, like ["playwright"], [] for none, or leave it out for the whole file.`;
+  }
+  const twice = checkoutMcp.find((n, i) => checkoutMcp.indexOf(n) !== i);
+  if (twice !== undefined) return `\`checkoutMcp\` names \`${twice}\` twice. Name each server once.`;
+  const both = checkoutMcp.find((n) => typeof mcp === 'object' && mcp !== null && Object.hasOwn(mcp, n));
+  if (both !== undefined) {
+    return `\`checkoutMcp\` names \`${both}\`, and \`mcp.${both}\` gives a server of that name too: one would hide the other. Give the task's server another name, or take the name off \`checkoutMcp\`.`;
+  }
+  return undefined;
+};
 
 /** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
 const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;

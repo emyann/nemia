@@ -231,3 +231,20 @@ test('command, env and niceness are refused on Codex, Claude Code and a remote a
     }
   }
 });
+
+test("checkoutMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it", async () => {
+  const root = scratch('ae-command-');
+  const harnesses = { codex, claude: 'claude', command: commandHarness } as const;
+  const engine = builtEngine(EngineService.layer({ root, harnesses }));
+  const filed = (harness: string, config: object) =>
+    Effect.runPromise(engine.file({ brief: 'b', cwd: root, harness, config })).then(
+      () => 'filed',
+      (err: Error) => err.message,
+    );
+  assert.equal(
+    await filed('command', { command: ['true'], checkoutMcp: [] }),
+    "`checkoutMcp` says which servers of the checkout's `.mcp.json` the session loads, and the `command` harness loads no MCP server it could leave out: it would run as if nothing were asked. File the task on `codex` or `claude`, or leave `checkoutMcp` off.",
+  );
+  assert.equal(await filed('codex', { checkoutMcp: [] }), 'filed');
+  assert.equal(await filed('claude', { checkoutMcp: ['a'] }), 'filed');
+});

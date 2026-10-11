@@ -4,12 +4,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { SpawnRequest } from '../seam.ts';
+import type { McpServer, SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
 import { CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
-import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
+import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedCheckoutMcp } from '../mcp.ts';
 
 /**
  * The project paths a Codex config trusts.
@@ -109,9 +109,36 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
  * Its worker keeps stdout apart (`streams`), so a session is followed live (`follow`): its state, then its rollout's events as Codex
  * writes them, each message whole (`codexPartials`), its stdout decoded as it comes.
  */
+/** A session's servers as Codex's one `mcp_servers` override, or no argument when it has none. */
+const codexMcpArgs = (mcp: Record<string, McpServer>): string[] =>
+  Object.keys(mcp).length ? ['-c', `mcp_servers=${codexMcpServers(mcp)}`] : [];
+
+/** Why Codex cannot connect to one of these servers, or `undefined`: an SSE server, which it has no transport for. */
+const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefined => {
+  const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
+  return sse
+    ? `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`
+    : undefined;
+};
+
+/**
+ * The entries a task's `checkoutMcp` picks from its checkout's `.mcp.json`, as servers Codex can be handed, or `undefined` for a
+ * task that names none. Refused: an entry not in the shape a task's own `mcp` takes (`mcpRefuses`), which Codex's table cannot
+ * say, and an SSE server.
+ */
+const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => {
+  const names = r.config?.checkoutMcp;
+  if (!names?.length) return undefined;
+  const picked = pickedCheckoutMcp(r.cwd, names);
+  const refused = mcpRefuses(picked) ?? sseRefusal(picked as Record<string, McpServer>);
+  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(r.cwd, '.mcp.json')}, picked by \`checkoutMcp\`.`);
+  return picked as Record<string, McpServer>;
+};
+
 export const codex: HarnessSpec = {
   name: 'codex',
   codexArgs: true,
+  checkoutMcp: true,
   mounts: { readOnly: true },
   command: (r, io) => ({
     cmd: 'codex',
@@ -127,7 +154,7 @@ export const codex: HarnessSpec = {
       ...(r.config?.worktree ? ['--worktree'] : []),
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
       ...(r.config?.effort ? ['-c', `model_reasoning_effort="${r.config?.effort}"`] : []),
-      ...(r.config?.mcp && Object.keys(r.config?.mcp).length ? ['-c', `mcp_servers=${codexMcpServers(r.config?.mcp)}`] : []),
+      ...codexMcpArgs({ ...io?.pickedMcp, ...r.config?.mcp }),
       ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
       ...(r.resumeFrom ? ['resume', r.resumeFrom] : []),
       r.brief,
@@ -155,11 +182,7 @@ export const codex: HarnessSpec = {
     }
     const mounted = codexMountRefusal(task);
     if (mounted) return mounted;
-    const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
-    if (sse) {
-      return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;
-    }
-    return undefined;
+    return sseRefusal(mcp);
   },
   readOutput: codexOutput,
   streams: true,
@@ -189,23 +212,25 @@ export const codex: HarnessSpec = {
    * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
    */
   prepare: (r) => {
+    const pickedMcp = codexPicked(r);
+    const picked = pickedMcp ? { pickedMcp } : {};
     const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
     let toml: string;
     try {
       toml = fs.readFileSync(config, 'utf8');
     } catch {
-      return {};
+      return picked;
     }
     const operators = codexMcpServerNames(toml);
-    const taken = Object.keys(r.config?.mcp ?? {}).filter((name) => operators.has(name));
+    const taken = Object.keys({ ...pickedMcp, ...r.config?.mcp }).filter((name) => operators.has(name));
     if (taken.length) {
       throw new Error(
         `${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`,
       );
     }
     const named = r.config?.codex?.trustFrom;
-    if (named === undefined) return {};
+    if (named === undefined) return picked;
     const from = path.resolve(named);
-    return trustedProjects(toml).has(from) ? { trustedDirs: [...new Set([from, r.cwd])] } : {};
+    return trustedProjects(toml).has(from) ? { ...picked, trustedDirs: [...new Set([from, r.cwd])] } : picked;
   },
 };

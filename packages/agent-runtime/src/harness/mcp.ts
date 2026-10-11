@@ -1,6 +1,6 @@
 /**
  * A task's MCP servers, as Claude Code is handed them: what the engine refuses of a task's `mcp`, the checkout's own
- * `.mcp.json`, the task's config written to a file, and the flags that load those and nothing else. And as Codex is
+ * `.mcp.json` and the entries a task picks of it, the task's config written to a file, and the flags that load those and nothing else. And as Codex is
  * handed them: the server names an operator's Codex config already has, and a task's servers as its `mcp_servers` table.
  */
 import fs from 'node:fs';
@@ -78,12 +78,56 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
 };
 
 /**
- * A task's `mcp`, written to `file` as an MCP config (`{"mcpServers": …}`) — or `file` cleared when
- * the task names none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
+ * The entries of the checkout's `.mcp.json` under `names`, as the file gives them, none changed: what a task's `checkoutMcp`
+ * loads of it. No name reads no file. Refused, saying what to change: a checkout with no `.mcp.json`, one that is not JSON or
+ * has no `mcpServers` map, and a name the file does not declare.
+ */
+export const pickedCheckoutMcp = (cwd: string, names: readonly string[]): Record<string, unknown> => {
+  if (!names.length) return {};
+  const file = path.resolve(cwd, '.mcp.json');
+  const asked = `\`checkoutMcp: ${JSON.stringify(names)}\``;
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (e) {
+    throw new Error(
+      `${asked} names servers of ${file}, which cannot be read (${(e as Error).message}). Declare them there, or take the names off the task.`,
+      { cause: e },
+    );
+  }
+  let servers: unknown;
+  try {
+    servers = (JSON.parse(text) as { mcpServers?: unknown } | null)?.mcpServers;
+  } catch (e) {
+    throw new Error(`${file} is not valid JSON (${(e as Error).message}), and ${asked} names servers of it. Fix the file.`, { cause: e });
+  }
+  if (!isMap(servers)) {
+    throw new Error(`${file} has no \`mcpServers\` map, and ${asked} names servers of it. Declare them there, or take the names off the task.`);
+  }
+  const absent = names.filter((name) => !Object.hasOwn(servers, name));
+  if (absent.length) {
+    const declared = Object.keys(servers);
+    throw new Error(
+      `${asked} names ${absent.map((n) => `\`${n}\``).join(', ')}, which ${file} does not declare: ${declared.length ? `its servers are ${declared.join(', ')}` : 'it declares no server'}. Declare the server there, or take the name off the task.`,
+    );
+  }
+  return Object.fromEntries(names.map((name) => [name, servers[name]]));
+};
+
+/**
+ * The servers a session's config file holds: the entries a task's `checkoutMcp` picks from its checkout's `.mcp.json`
+ * (`pickedCheckoutMcp`), then the task's own `mcp`. `undefined` when the task gives neither.
+ */
+export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> | undefined =>
+  config?.checkoutMcp ? { ...pickedCheckoutMcp(cwd, config.checkoutMcp), ...config.mcp } : config?.mcp;
+
+/**
+ * A session's servers (`sessionMcp`), written to `file` as an MCP config (`{"mcpServers": …}`) — or `file` cleared when
+ * there is none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
  * `headers` value may be a secret. Returns the file's absolute path, as `checkoutMcpConfig` does: a
  * `file` given relative is relative to the engine, not to the session's cwd.
  */
-export const writeMcpConfig = (file: string, mcp: HarnessArgs['mcp']): string | undefined => {
+export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | undefined): string | undefined => {
   if (!mcp || !Object.keys(mcp).length) {
     fs.rmSync(file, { force: true });
     return undefined;

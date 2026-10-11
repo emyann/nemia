@@ -5,7 +5,8 @@
   "singleQuote": true,
   "trailingComma": "all",
   // Code only. Markdown is prose (briefs, agents, docs, and CLAUDE.md merged by union); JSON holds test fixtures pinned byte for byte
-  // and agent schemas whose bytes are digested into versions; the route tree is generated; the skills are vendored.
+  // and agent schemas whose bytes are digested into versions; the route tree is generated; the skills are vendored. So is the design
+  // system kit the shadcn CLI writes into the board, with its skills, and the board's theme is generated from its DESIGN.md.
   "ignorePatterns": [
     "**/*.md",
     "**/*.json",
@@ -16,6 +17,9 @@
     "**/routeTree.gen.ts",
     "**/fixtures/**",
     ".claude/**",
+    "apps/web/.claude/**",
+    "apps/web/src/components/ui/ds/**",
+    "apps/web/theme/**",
     "workflows/**",
     "packages/*/workflows/**"
   ]

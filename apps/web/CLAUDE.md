@@ -7,6 +7,25 @@ of `src` that spells one, a JSDoc's mention included: an aside says it in the bo
 The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's components on React Aria (`aria-nova`). Its node tests
 (`test/*.test.ts`) load `src/` as Node does; its e2e (`test/e2e/`) drives the built app in Chromium.
 
+Two component families draw from one palette. shadcn's (`src/components/ui/*.tsx`) are what the pages use today. The design system kit
+(`src/components/ui/ds`, Material Design 3 on React Aria) is what the board moves to, a component at a time. The look is `DESIGN.md`,
+and `theme/` is what the kit's generator makes of it; `src/styles.css` imports the theme and reads shadcn's names from its roles.
+
+## The design system kit
+
+- `src/components/ui/ds` and `.claude/skills/ds-{theme,build,spec}` are another repository's files, as its registry ships them (`@ds`
+  in `components.json`): never edited, linted or formatted here (`VENDORED` in `packages/agent-orchestrator/test/comments.test.ts`). A
+  component the kit lacks is written beside it, under the board's own rules.
+- `npx shadcn add @ds/ds --overwrite -y`, from `apps/web`, takes an update: read `git diff`. The CLI also writes into `src/styles.css`
+  each time, and that is taken back out: a second `tw-animate-css` import, names that point at themselves in `@theme inline`
+  (`--ring: var(--ring)`), a `.dark` block, `--radius`. The message it prints, to import the kit's default theme, is not for us.
+- `theme/` is generated, never edited: change `DESIGN.md`, then `npx tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out
+  theme` from `apps/web`, and read the warnings in `theme/DESIGN.resolved.md`. A font the DESIGN.md names is loaded by `src/styles.css`,
+  under the exact family its package registers (`Orbitron Variable`).
+- The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own. shadcn's `secondary` reads the
+  theme's filled `secondary`, louder than the kit's tonal button. The chart colours are not the theme's.
+- The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.
+
 ## Build and e2e
 
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.

@@ -14,6 +14,8 @@ import { teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import { steeredClock } from '../../test/steered.ts';
+import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;
@@ -21,7 +23,7 @@ const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate } = await import('../template/template.store.ts');
 const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
 const { main: cli } = await import('../cli/main.ts');
-const { reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
+const { reconcile, reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { startDue } = await import('../schedule/schedule.verb.ts');
@@ -172,6 +174,27 @@ test("the controller renders the base read-only and seeds the tree once; a secon
   assert.deepEqual(readStatus('seeded'), status, 'a restart reads it all again off the disk');
   assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
 });
+
+test(
+  'REFUSED at shipped defaults: a factory applied after a pass is not rendered before five seconds, and is at the next pass',
+  WAITED,
+  async (t) => {
+    t.mock.method(console, 'log', () => {});
+    const { Fiber } = await import('effect');
+    const clock = steeredClock();
+    const loop = Effect.runFork(reconcile().pipe(Effect.provide(clock.layer)));
+    t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
+    await until(t, () => clock.asked.length === 1, 'the first pass done', { bell: clock.bell });
+    assert.deepEqual(clock.asked, [5_000], 'the controller rests the shipped five seconds');
+    const { dir, repo } = template();
+    await apply('paced', dir, repo, '--set', 'budget=7');
+    await clock.adjust(4_999);
+    assert.deepEqual([clock.woken, readStatus('paced')], [[], undefined], 'a millisecond early, no pass');
+    await clock.adjust(1);
+    await until(t, () => clock.asked.length === 2, 'the second pass done', { bell: clock.bell });
+    assert.equal(readStatus('paced')?.version, '0.1.0', 'rendered by the pass at five seconds');
+  },
+);
 
 test('a template packed into an archive applies as its folder does, each file read off the archive, its mode kept', async (t) => {
   t.mock.method(console, 'log', () => {});

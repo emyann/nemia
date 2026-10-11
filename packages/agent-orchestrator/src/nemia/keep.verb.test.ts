@@ -11,19 +11,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Fiber } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { steeredClock } from '../../test/steered.ts';
+import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-nemia-');
 process.env.WF_ROOT = ROOT;
 const CONFIG = scratch('wf-nemia-config-');
 process.env.CLAUDE_CONFIG_DIR = CONFIG;
-const { keepOnce } = await import('./keep.verb.ts');
+const { keep, keepOnce } = await import('./keep.verb.ts');
 const { LEVEL } = await import('./level.verb.ts');
 const { MEMORY } = await import('./memory.verb.ts');
 const { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } = await import('./level.store.ts');
@@ -32,7 +34,7 @@ const { customInstructionsFile } = await import('../agents/read.store.ts');
 const { addFactory, factoryNames } = await import('../factory/factory.store.ts');
 const { factoryLevelFile } = await import('../level/level.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
-const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
+const { engineOf, over, runWith: runEngine } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { nemiaFence } = await import('../admission/index.ts');
@@ -113,6 +115,31 @@ test('semi-auto while her folder is not trusted is written, naming the command t
   assert.deepEqual(await beat(), ['stop']);
   fs.rmSync(levelFile());
 });
+
+test(
+  'REFUSED at shipped defaults: a level set after a beat files her task not before five seconds, and at the next beat',
+  WAITED,
+  async (t) => {
+    trust(true);
+    const clock = steeredClock();
+    const keeper = Effect.runFork(over(e)(keep()).pipe(Effect.provide(clock.layer)));
+    const stopped = () => Effect.runPromise(Fiber.interrupt(keeper));
+    t.after(stopped);
+    await until(t, () => clock.asked.length === 1, 'the first beat done', { bell: clock.bell });
+    assert.deepEqual(clock.asked, [5_000], 'the keeper rests the shipped five seconds');
+    const filings = b.filings.length;
+    const set = await runWith(e, LEVEL.handler({ level: 'semi-auto' }));
+    await clock.adjust(4_999);
+    assert.deepEqual([clock.woken, b.filings.length], [[], filings], 'a millisecond early, no beat');
+    await clock.adjust(1);
+    await until(t, () => clock.asked.length === 2, 'the second beat done', { bell: clock.bell });
+    assert.deepEqual(b.filings.slice(filings), [set.task], 'filed by the beat at five seconds');
+    await stopped();
+    await runWith(e, LEVEL.handler({ level: 'manual' }));
+    assert.deepEqual(await beat(), ['stop']);
+    fs.rmSync(levelFile());
+  },
+);
 
 test("at semi-auto the keeper files her task long-lived in auto, the daemon's bin first on her path, every store write asked but her memory; subscribes it once open, and owes nothing on the next beat", async () => {
   fs.mkdirSync(path.dirname(customInstructionsFile(ROOT, 'nemia')), { recursive: true });

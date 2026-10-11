@@ -16,11 +16,12 @@ import { Duration, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub,
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { bell, until, WAITED } from '../../test/waits.ts';
+import { steeredClock } from '../../test/steered.ts';
 import { isRunLine } from '../feed/feed.ts';
 
 const ROOT = scratch('wf-deliver-');
 process.env.WF_ROOT = ROOT;
-const { SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deliver.verb.ts');
+const { DELIVER_DEFAULTS, SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deliver.verb.ts');
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
 const { feedFile, feedSize, readFeed } = await import('../feed/feed.store.ts');
@@ -322,10 +323,10 @@ test('a restart between a say and its cursor write says the message again: at le
   dropSubscription('between');
 });
 
-test('a failed say is said again after a backoff that doubles from retry and never waits longer than retryCap', () => {
+test('at shipped defaults a failed say is said again after a backoff that doubles from one second and never waits longer than five minutes', () => {
   const delays = Effect.runSync(
     Effect.gen(function* () {
-      const step = yield* Schedule.toStep(sayBackoff({ retry: '1 second', retryCap: '5 minutes' }));
+      const step = yield* Schedule.toStep(sayBackoff(DELIVER_DEFAULTS));
       const waits: number[] = [];
       let now = 0;
       for (let k = 0; k < 12; k++) {
@@ -338,6 +339,33 @@ test('a failed say is said again after a backoff that doubles from retry and nev
   );
   assert.deepEqual(delays, [1000, 2000, 4000, 8000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000, 300_000]);
 });
+
+test(
+  'REFUSED at shipped defaults: a subscription written after a read is not delivered before five seconds, and its digest not asked again before thirty',
+  WAITED,
+  async (t) => {
+    const clock = steeredClock();
+    const fiber = Effect.runFork(over(e)(deliver()).pipe(Effect.provide(clock.layer)));
+    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    const at = (what: string, holds: () => boolean) => until(t, holds, what, { bell: clock.bell });
+    const rests = (ms: number) => clock.asked.filter((asked) => asked === ms).length;
+    await at('the first read of the subscriptions done', () => clock.asked.length === 1);
+    assert.deepEqual(clock.asked, [5_000], 'the subscriptions are read again after the shipped five seconds');
+    const checks = digestChecks();
+    subscribed('steered', 't-steered');
+    t.after(() => dropSubscription('steered'));
+    await clock.adjust(4_999);
+    assert.deepEqual([clock.woken, digestChecks()], [[], checks], 'a millisecond early, no read and no deliverer');
+    await clock.adjust(1);
+    await at('its deliverer at rest after its first digest check', () => rests(30_000) === 1);
+    assert.equal(digestChecks(), checks + 1);
+    await clock.adjust(29_999);
+    assert.deepEqual([digestChecks(), rests(30_000)], [checks + 1, 1], 'a millisecond early, no second check');
+    await clock.adjust(1);
+    await at('its second digest check done', () => rests(30_000) === 2);
+    assert.equal(digestChecks(), checks + 2);
+  },
+);
 
 test('an unsubscribe stops delivery, and the deliverer drops its file', WAITED, async (t) => {
   subscribed('leaving', 't-leaving');

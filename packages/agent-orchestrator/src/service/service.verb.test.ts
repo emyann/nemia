@@ -16,13 +16,15 @@ import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { steeredClock } from '../../test/steered.ts';
+import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-service-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { installService, uninstallService, serviceStatus, SERVICES } = await import('./service.verb.ts');
+const { installService, liveHost, uninstallService, serviceStatus, SERVICES } = await import('./service.verb.ts');
 const { restartService, RESTARTS } = await import('./restart.verb.ts');
 const { putPause, readPause, pauseFile, resumePause } = await import('../pause/pause.store.ts');
 const { EngineService, engineOf, runWith: runEngine } = await import('../runtime-client.ts');
@@ -303,6 +305,40 @@ test('REFUSED when the stopped daemon still holds the store: Conflict naming ps 
   assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
   assert.ok(readPause() !== null);
 });
+
+test(
+  'REFUSED at shipped defaults: a stopped daemon that still holds the store is waited for sixty seconds and no less, its lease read every two seconds',
+  WAITED,
+  async (t) => {
+    const world: World = { lease: lease(OLD), unitPid: null, landings: [[]] };
+    const { host } = hostOf(world);
+    const live = liveHost();
+    let reads = 0;
+    const shipped = { ...host, pollMs: live.pollMs, waitMs: live.waitMs, lease: () => (reads++, host.lease()) };
+    const clock = steeredClock();
+    const fiber = Effect.runFork(
+      installService({ takeOver: String(OLD) }, shipped).pipe(
+        Effect.provide(EngineService.layer(engineOf(engine().layer))),
+        Effect.provide(stand().layer),
+        Effect.provide(clock.layer),
+      ),
+    );
+    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    const refused = Effect.runPromise(Fiber.join(fiber));
+    refused.catch(() => undefined);
+    await until(t, () => clock.asked.length === 2, 'the wait and its first rest asked', { bell: clock.bell });
+    assert.deepEqual(clock.asked, [2_000, 60_000], 'the shipped pace of its reads, and the shipped wait');
+    const read = reads;
+    await clock.adjust(1_999);
+    assert.deepEqual([clock.woken, reads], [[], read], 'a millisecond early, the lease is not read again');
+    await clock.adjust(1);
+    assert.deepEqual([clock.woken, reads], [[2_000], read + 1], 'at two seconds it is');
+    await clock.adjust(57_999);
+    assert.equal(fiber.pollUnsafe(), undefined, 'a millisecond before sixty seconds, the take-over still waits');
+    await clock.adjust(1);
+    await assert.rejects(refused, refusedWith('Conflict', /still holds the store: check it with ps -p 4242/));
+  },
+);
 
 test('uninstall stops, disables and removes the unit, then says how the lease stands; one not installed is Missing', async () => {
   const { host, events } = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null, landings: [] });

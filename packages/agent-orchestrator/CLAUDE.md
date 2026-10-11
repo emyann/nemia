@@ -143,6 +143,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A test of what the tick orders or words by the clock seeds `Date`** (`t.mock.timers`: `fileInOrder` in `test/pool.test.ts`, the ages in
   `daemon.store.test.ts`), and stamps a fake closeout from the attempt's journalled start (`starts` in `test/held.test.ts`). A duration it
   decides on is never on `Date`: the daemon's silence is `elapsedMs` over `instantNow()`, a place verb's grace on `performance.now()`.
+- **A controller's rest or deadline is steered with `steeredClock()` (`test/steered.ts`), at its shipped duration written as a literal**:
+  wait for the rest asked (`asked`, on `bell`) before `adjust`, a millisecond short, then the millisecond. A wall decision keeps its
+  `now` on `Date`; `test/steered.test.ts` refuses `effect/testing` in a file of `src`, `bin` or `place` that is no test.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: the place's `standing` lists again without it (pinned in

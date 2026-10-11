@@ -26,6 +26,8 @@ import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
 import { runGiven, runOver } from './placed.ts';
+import { steeredClock } from './steered.ts';
+import { until, WAITED } from './waits.ts';
 import { placeOver, placeSplit, unreadBy } from './place-over.ts';
 import { gitPlace } from '../place/git/place.ts';
 
@@ -511,18 +513,40 @@ test('REFUSED: a run filed on a pass whose standing read no head of its base kee
   assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
 });
 
-test('REFUSED at the shipped deadline: a standing whose git never answers is stopped at 15 s, and its repository reads unread on that pass', async () => {
-  const { b } = await theStore();
-  const bin = scratch('wf-pass-reads-hung-');
-  fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nexec sleep 600\n', { mode: 0o755 });
-  const deaf = gitPlace({ env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` } });
-  const hung = PlaceService.layer(placeSplit(shippedGitPlace, deaf, ['standing']));
-  await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(hung)));
-  const places = readStanding()?.places ?? [];
-  assert.ok(places.length > 0, 'the pass read a repository');
-  for (const p of places)
-    assert.match('unread' in p ? p.unread : 'answered', /^the place was not heard: it gave no answer within 15 s, its deadline/);
-});
+test(
+  'REFUSED at the shipped deadline: a standing whose git never answers is stopped at 15 s, and its repository reads unread on that pass',
+  WAITED,
+  async (t) => {
+    const { b } = await theStore();
+    const bin = scratch('wf-pass-reads-hung-');
+    fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nexec sleep 600\n', { mode: 0o755 });
+    const deaf = gitPlace({ env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` } });
+    const hung = PlaceService.layer(placeSplit(shippedGitPlace, deaf, ['standing']));
+    const clock = steeredClock();
+    let ended = false;
+    const pass = runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(hung), Effect.provide(clock.layer))).then(
+      () => void (ended = true),
+    );
+    const drained = async (): Promise<void> => {
+      if (ended) return;
+      await clock.adjust(1_000);
+      return drained();
+    };
+    t.after(drained);
+    await until(t, () => clock.asked.length > 0, 'the standing is asked under its deadline', { bell: clock.bell });
+    assert.deepEqual([...new Set(clock.asked)], [15_000], 'the deadline is the shipped fifteen seconds, for each repository');
+    await clock.adjust(14_999);
+    assert.deepEqual([clock.woken, ended], [[], false], 'a millisecond before the deadline, the pass still waits on its git');
+    await clock.adjust(1);
+    assert.ok(clock.woken.includes(15_000), 'at 15 s the deadline fires');
+    await until(t, () => ended || clock.adjust(20).then(() => ended), 'the pass ends once its git is stopped', { everyMs: 5 });
+    await pass;
+    const places = readStanding()?.places ?? [];
+    assert.ok(places.length > 0, 'the pass read a repository');
+    for (const p of places)
+      assert.match('unread' in p ? p.unread : 'answered', /^the place was not heard: it gave no answer within 15 s, its deadline/);
+  },
+);
 
 test("a pass where no branch moved asks no distance from a run's base: a kept memo lists base's alone, a restart each base once", async () => {
   const { b, repo } = await theStore();

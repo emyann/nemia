@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from '../../test/scratch.ts';
+import { steeredClock } from '../../test/steered.ts';
+import { until, WAITED } from '../../test/waits.ts';
 
 const ROOT = scratch('wf-demand-');
 process.env.WF_ROOT = ROOT;
@@ -133,6 +135,45 @@ test("the store's login service is started in place of a spawn, and a unit of an
   );
   fs.rmSync(CONFIG, { recursive: true, force: true });
 });
+
+test(
+  'REFUSED at shipped defaults: a service that never takes the store is waited for sixty seconds and no less, its lease read every 200 ms',
+  WAITED,
+  async (t) => {
+    fs.rmSync(CONFIG, { recursive: true, force: true });
+    unitFor('nemia', ROOT);
+    t.after(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
+    const live = liveDemandHost();
+    let reads = 0;
+    const { host, said } = hostOf({
+      machine: () => ({ platform: 'linux', wsl: false, systemd: true }),
+      pollMs: live.pollMs,
+      waitMs: live.waitMs,
+      lease: () => {
+        reads++;
+        return live.lease();
+      },
+    });
+    const clock = steeredClock();
+    let ended = false;
+    const start = Effect.runPromise(ensureDaemon(host).pipe(Effect.provide(clock.layer))).then((answer) => {
+      ended = true;
+      return answer;
+    });
+    await until(t, () => clock.asked.length === 2, 'the wait and its first rest asked', { bell: clock.bell });
+    assert.deepEqual(clock.asked, [200, 60_000], 'the shipped pace of its reads, and the shipped wait');
+    const read = reads;
+    await clock.adjust(199);
+    assert.deepEqual([clock.woken, reads], [[], read], 'a millisecond early, the lease is not read again');
+    await clock.adjust(1);
+    assert.deepEqual([clock.woken, reads], [[200], read + 1], 'at 200 ms it is');
+    await clock.adjust(59_799);
+    assert.equal(ended, false, 'a millisecond before sixty seconds, the command still waits');
+    await clock.adjust(1);
+    assert.deepEqual(await start, { kind: 'service' });
+    assert.match(said.join('\n'), /started its login service nemia\.service, but it has not taken the store after 60s: /);
+  },
+);
 
 test('on a Mac the login agent of the store is bootstrapped', async () => {
   const agents = path.join(HOME, 'Library', 'LaunchAgents');

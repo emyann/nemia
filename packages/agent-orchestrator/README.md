@@ -702,6 +702,10 @@ disallowedTools: Bash(npm run build), Bash(npm run e2e)
 Review the change in this workspace as a second engineer would.
 ```
 
+A checker may still see the change in a browser: `npm run board:serve` builds outside the workspace and serves it on ports and a
+store of its own, and `npm run board:stop` ends it. A deny may also match one parameter of an MCP tool, `Tool(param:value)`, as
+`mcp__playwright__browser_navigate(url:*:8787*)` refuses the live board's port and no other address.
+
 `disallowedTools:` is Claude Code's permission rules, comma-separated: a tool, `SendMessage`, or a tool and what
 it may not run, `Bash(npm run build)`. The engine gives Claude Code the list as `--disallowedTools` on every
 filing of the step (the first, each try and each round), and a deny beats every allow: the checkout's

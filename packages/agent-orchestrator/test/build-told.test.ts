@@ -36,6 +36,21 @@ const WHOLE_SUITE = [
   'Bash(npx turbo run test --continue --force)',
 ];
 
+/** What a step given the browser denies itself: the unsafe tool its agent denies, and the live board's ports, in the tab or a new one. */
+const BROWSER_FENCE = [
+  'mcp__playwright__browser_run_code_unsafe',
+  ...['console_messages', 'evaluate', 'network_request', 'network_requests', 'snapshot', 'take_screenshot'].map(
+    (tool) => `mcp__playwright__browser_${tool}(filename:*)`,
+  ),
+  'mcp__playwright__browser_navigate(url:*:8787*)',
+  'mcp__playwright__browser_navigate(url:*:5173*)',
+  'mcp__playwright__browser_tabs(url:*:8787*)',
+  'mcp__playwright__browser_tabs(url:*:5173*)',
+];
+const NO_LIVE_BOARD = 'Never the live board on :8787 or :5173, which your fence refuses by address.';
+const NO_FILENAME = 'Give no browser tool a `filename`, which your fence refuses';
+const STOP_BOARD = 'Run `npm run board:stop` before you sign off.';
+
 const TOLD: Told[] = [
   {
     workflow: 'build',
@@ -44,9 +59,13 @@ const TOLD: Told[] = [
       SHADCN_READ,
       'The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.',
       "the owner's line for a run, which this factory's rules give",
+      'To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill',
+      NO_LIVE_BOARD,
+      NO_FILENAME,
+      STOP_BOARD,
     ],
-    adds: ['shadcn'],
-    denies: ['Bash(cd:*)', ...NO_BUILD],
+    adds: ['shadcn', 'look'],
+    denies: ['Bash(cd:*)', ...NO_BUILD, ...BROWSER_FENCE],
     declares: [],
   },
   {
@@ -76,11 +95,18 @@ const TOLD: Told[] = [
       '**Judge the mutants, do not run them**',
       "Quote each `wf mutants:` line you judged in your closeout's `mutants`.",
       'Never build or run the e2e',
+      '**Open the change when a picture cannot show it**: when it changes what a page does when pressed, typed into or hovered, or a state no picture shows.',
+      'Run `npm run board:serve`, bare',
+      'say in your closeout what you opened and what it showed',
+      'The pictures are enough for a change of layout or of words that they show.',
+      NO_LIVE_BOARD,
+      NO_FILENAME,
+      STOP_BOARD,
       "When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`",
       'You do not render one yourself: your fence refuses the command and Docker.',
     ],
     adds: ['shadcn', 'look', 'see-a-dashboard'],
-    denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE],
+    denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'mutants', 'again'],
   },
   { workflow: 'intake', step: 'intake', says: [], adds: [], denies: ['Bash(cd:*)', ...NO_BUILD], declares: [] },
@@ -174,6 +200,32 @@ test('REFUSED: a step whose note says a sentence no more is named, whatever line
   assert.deepEqual(untold('build', review), ['build/review: says "**Judge the mutants, do not run them**"']);
   assert.match('Run a\n   check   bare.', across('Run a check bare.'));
   assert.deepEqual(untold('build', []), ['build/design: is not there', 'build/implement: is not there', 'build/review: is not there']);
+});
+
+test('REFUSED: design or review told no more to open a served board, when the pictures are enough, or to stop it, is named', () => {
+  const cut = (step: string, from: RegExp): string[] =>
+    untold(
+      'build',
+      shippedEdited('build', step, (text) => text.replace(from, '')),
+    );
+  assert.deepEqual(cut('review', /The pictures are enough for a change of layout\s+or of words that they show\. /), [
+    'build/review: says "The pictures are enough for a change of layout or of words that they show."',
+  ]);
+  assert.deepEqual(cut('review', / Run\s+`npm run board:stop` before you sign off\./), [`build/review: says "${STOP_BOARD}"`]);
+  assert.deepEqual(cut('review', /Give no browser tool a\s+`filename`, which your fence refuses/), [`build/review: says "${NO_FILENAME}"`]);
+  assert.deepEqual(cut('review', /\*\*Open the change when a picture cannot show it\*\*/), [
+    'build/review: says "**Open the change when a picture cannot show it**: when it changes what a page does when pressed, typed into or hovered, or a state no picture shows."',
+  ]);
+  assert.deepEqual(cut('design', / Run `npm run board:stop` before you sign off\./), [`build/design: says "${STOP_BOARD}"`]);
+  assert.deepEqual(cut('design', /Never the live\s+board on :8787 or :5173, which your fence refuses by address\. /), [
+    `build/design: says "${NO_LIVE_BOARD}"`,
+  ]);
+  assert.deepEqual(cut('design', /, mcp__playwright__browser_tabs\(url:\*:5173\*\)/), [
+    'build/design: denies mcp__playwright__browser_tabs(url:*:5173*)',
+  ]);
+  assert.deepEqual(cut('review', /, mcp__playwright__browser_navigate\(url:\*:8787\*\)/), [
+    'build/review: denies mcp__playwright__browser_navigate(url:*:8787*)',
+  ]);
 });
 
 type Schema = { properties: Record<string, unknown>; required: string[] };

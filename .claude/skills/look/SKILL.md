@@ -21,11 +21,17 @@ picture goes outside it.
   (`node -p "require('os').tmpdir()"`).
 - **The browser saves only where its server lets it:** its output directory, `/tmp/playwright-mcp`
   (`--output-dir` in `.mcp.json`, in the system's temp directory), or the workspace, which is never
-  where you save. Give `browser_take_screenshot` a *relative* `filename`, which lands under
-  `/tmp/playwright-mcp`, in a folder named for your run and your step (`<run>/<step>/<page>-<theme>.png`):
-  every step on this machine shares that directory. An absolute path anywhere else is refused (`File
-  access denied … outside allowed roots`). When you can run `cp`, copy what the steps after you should
-  see into your files directory, and name them there.
+  where you save. Give `browser_take_screenshot` an *absolute* `filename` under `/tmp/playwright-mcp`, in
+  a folder named for your run and your step (`/tmp/playwright-mcp/<run>/<step>/<page>-<theme>.png`): every
+  step on this machine shares that directory. A relative `filename` is resolved against the workspace,
+  where you never save, and an absolute path anywhere else is refused (`File access denied … outside
+  allowed roots`). (Measured with Claude Code 2.1.296 and `@playwright/mcp` 0.0.80.) When you can run `cp`,
+  copy what the steps after you should see into your files directory, and name them there.
+- **A step that only reads gives no `filename` at all.** A design or a review step is refused one on every
+  browser tool that takes it (`browser_take_screenshot`, `browser_snapshot`, `browser_console_messages`,
+  `browser_network_requests`, `browser_network_request`, `browser_evaluate`), since a file named could be
+  the workspace's. Called without one, the tool saves under `/tmp/playwright-mcp`, says where, and
+  answers with the picture itself: judge that, and name the path in what you report.
 - **The e2e too:** run it with `WF_ARTIFACTS` set. Without it, it writes its pictures into `.e2e/` at the
   repository root.
 
@@ -55,26 +61,29 @@ not the page.
 ## 2. Open the pages in the browser
 
 The pictures are what the e2e saw. The browser is where you see what a person does with a page. Serve
-the app as `npm run e2e` does: built, and on ports of its own, never :8787 or :5173, so it runs beside a
-person's dev servers and beside another worktree's e2e.
+this workspace's board with one command, bare, from the workspace's root:
 
-1. `npm run build`.
-2. The api, on a free port and a store of its own: `PORT=0 WF_ROOT=<a new directory under the temp
-   directory> node apps/api/src/main.ts`. It prints `api listening on http://127.0.0.1:<port>`. Never the
-   default store: the board starts runs.
-3. The built app, from `apps/web`: `HKB_API_URL=http://127.0.0.1:<the api's port> npx vite preview --port 0
-   --host 127.0.0.1`. It prints `Local: http://127.0.0.1:<port>/`.
+1. `npm run board:serve`. It builds the app outside the workspace, serves it on ports of its own against
+   a store of its own, and prints `board on http://127.0.0.1:<port>` and `api on http://127.0.0.1:<port>`.
+   Open the first. A board already served from this workspace is said again, and nothing is started.
+2. `npm run board:stop` when you are done, and always before you sign off. A board nobody stops ends by
+   itself after thirty minutes.
 
-Start both with a shell `&`, keeping each pid (`$!`), and `kill` both when you are done: in a job, `run_in_background` runs a
-command in the foreground, and a server would hold the call. A store of your own is empty: the runs, the session and the loop
-the e2e seeds (`apps/web/test/e2e/seed.ts`) are in its pictures, not on these pages.
+The served store holds the e2e's seed (`apps/web/test/e2e/seed.ts`): the runs, the session and the loop
+its pictures show are on these pages, and what you press there writes to that store alone, which goes
+with the board. It was built when you served it: after a change to a page, stop it and serve again.
+
+**Never the live board.** :8787 and :5173 are a person's own board over the default store, where a press
+starts a run or approves a gate. A design or a review step is refused both by address; no step opens them.
 
 Then, for every page you are looking at, in the browser tools (`browser_*`, from `.mcp.json`):
 
 - `browser_resize` to 1280 × 800, the e2e's window, once.
 - `browser_navigate` to the page. `browser_snapshot` says what is on it and what can be pressed, and
   `browser_console_messages` what went wrong.
-- `browser_take_screenshot` with `fullPage: true` and a relative `filename`, then read the file.
+- `browser_take_screenshot` with `fullPage: true`: with an absolute `filename` under `/tmp/playwright-mcp`,
+  then read the file; or, in a design or a review step, with no `filename`, and judge the picture the
+  call answers with.
 - Use the page as a person would — `browser_click`, `browser_hover`, `browser_type`, `browser_press_key` on
   what the change is about — and photograph what it shows.
 
@@ -88,11 +97,11 @@ would stay light, and you would be judging your own stylesheet.
 past every fence the other tools keep. Every shipped step that could reach it is denied it by name, in its
 agent's `disallowedTools:`; a job in `dontAsk` is refused it because no allow reaches it.
 
-**When the browser is denied.** A step in `permissionMode: dontAsk` runs only the commands and tools
-`.claude/settings.json` allows, and today that is no `browser_*` tool, no command that serves the app and
-no `cp`: each is denied without a prompt. Reading a PNG outside the workspace is allowed. (Measured with
-Claude Code 2.1.270.) Then the pictures are the pages: read them, say in what you report that you judged
-from the screenshots, and do not guess at what a page does when pressed.
+**When the browser is denied.** A step in `permissionMode: dontAsk` runs only what an allow reaches: its
+agent's `allowedTools:`, or `.claude/settings.json`. One whose agent allows no `browser_*` tool, or that
+names no `playwright` server, has no browser, and is refused `cp` too; reading a PNG outside the workspace
+is allowed. Then the pictures are the pages: read them, say in what you report that you judged from the
+screenshots, and do not guess at what a page does when pressed.
 
 ## 3. Judge what you see
 

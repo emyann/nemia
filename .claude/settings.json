@@ -16,6 +16,8 @@
       "Bash(npx nemia inbox)",
       "Bash(npm run build)",
       "Bash(npm run e2e)",
+      "Bash(npm run board:serve)",
+      "Bash(npm run board:stop)",
       "Bash(npx turbo run test:*)",
       "Bash(node --test:*)",
       "Bash(git diff:*)",

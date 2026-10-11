@@ -43,7 +43,8 @@ export const givenPlace =
 
 /**
  * What `make` makes, new for each test of the file that calls this at its head: the function answers the one made for the test running
- * now, which its subtests share. It throws before the first test, where none is made yet. A file whose tests run at once makes its own in each.
+ * now, which its subtests share. It throws before the first test, where none is made yet. A file whose tests run at once makes its own
+ * in each.
  */
 export function eachTest<A>(make: () => A): () => A {
   let now: { readonly made: A } | undefined;

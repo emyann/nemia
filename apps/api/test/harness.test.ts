@@ -143,6 +143,31 @@ test('--import installs the harness once in a test file that imports nothing of 
   assert.ok(path.basename(seen.wfRoot ?? '').startsWith('nemia-api-store-'), `the store is a scratch folder: ${seen.wfRoot}`);
 });
 
+test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file run under the harness sees no collector, and without it sees the shell's", () => {
+  const dir = scratch('nemia-api-probe-');
+  const out = path.join(dir, 'probe.json');
+  fs.writeFileSync(
+    path.join(dir, 'probe.test.mjs'),
+    [
+      "import fs from 'node:fs';",
+      "import { test } from 'node:test';",
+      'const address = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null;',
+      "test('probe', () => fs.writeFileSync(process.env.PROBE_OUT, JSON.stringify({ address })));",
+      '',
+    ].join('\n'),
+  );
+  const named = 'http://127.0.0.1:9';
+  const env: Record<string, string | undefined> = { ...process.env, PROBE_OUT: out, OTEL_EXPORTER_OTLP_ENDPOINT: named };
+  for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
+  const seen = (flags: string[]): unknown => {
+    const ran = spawnSync(process.execPath, [...flags, '--test', 'probe.test.mjs'], { cwd: dir, env, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
+    return JSON.parse(fs.readFileSync(out, 'utf8'));
+  };
+  assert.deepEqual(seen(['--import', path.join(API, 'test', 'harness.ts')]), { address: null });
+  assert.deepEqual(seen([]), { address: named }, 'the probe reads what it is given, so the absence above is the harness');
+});
+
 test("REFUSED, whatever the daemon's: a test that leaves WF_MAX_RUNS to the harness is answered 422 by GET /api/ceilings, naming the variable to set", async () => {
   fs.rmSync(path.join(root, 'tick.json'), { force: true });
   const res = await app.request('/api/ceilings');

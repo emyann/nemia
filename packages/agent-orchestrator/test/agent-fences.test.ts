@@ -29,6 +29,9 @@
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
+ * Implement and land, which run what no deny names, deny the live collector by its two ports on their own line, each beside every deny
+ * of its agent's (`LIVE_COLLECTOR`, `COLLECTOR_FENCED`). A deny is matched against a part as typed too, its leading assignment kept
+ * (`deniedPartsOfCall`), as Claude Code was measured to match one; an allow against the unwrapped part alone.
  *
  * Seldon and Agora drive the browser: each allows every tool of its server by name on its own file (`BROWSER_TOOLS`), never the server
  * whole (`wholeServers`), and denies `browser_run_code_unsafe`; the design and review steps name the server, deny the live board by its
@@ -241,11 +244,10 @@ function unwrapped(part: string): string {
 }
 
 /**
- * The parts of a shell command Claude Code matches a rule against, each `unwrapped`: split on `&&`, `||`, `;`, `|&`, `|`, `&` and a
- * newline outside quotes. Throws on a substitution, a redirection, an escape, an unclosed quote or a separator inside quotes, which
- * this matcher does not model.
+ * The parts of a shell command as typed: split on `&&`, `||`, `;`, `|&`, `|`, `&` and a newline outside quotes, each trimmed. Throws on
+ * a substitution, a redirection, an escape, an unclosed quote or a separator inside quotes, which this matcher does not model.
  */
-function partsOf(command: string): string[] {
+function typedPartsOf(command: string): string[] {
   if (/\$\(|[`<>\\]/.test(command))
     throw new Error(`${command}: a substitution, redirection or escape is not modelled; say how it reads, here`);
   const tokens = [...command.matchAll(/'[^']*'|"[^"]*"|&&|\|\||\|&|[;|&\n]|[^'"&|;\n]+/g)].map((token) => token[0]);
@@ -256,12 +258,24 @@ function partsOf(command: string): string[] {
   for (const token of tokens)
     if (/^(?:&&|\|\||\|&|[;|&\n])$/.test(token)) parts.push('');
     else parts[parts.length - 1] += token;
-  return parts.map(unwrapped).filter(Boolean);
+  return parts.map((part) => part.trim()).filter(Boolean);
 }
 
-/** A call as the parts Claude Code matches: each part of a shell command (`partsOf`), or the tool call itself. */
+/** The parts of a shell command Claude Code matches an allow against: each part as typed (`typedPartsOf`), `unwrapped`. */
+const partsOf = (command: string): string[] => typedPartsOf(command).map(unwrapped).filter(Boolean);
+
+/** A call as the parts Claude Code matches an allow against: each part of a shell command (`partsOf`), or the tool call itself. */
 const partsOfCall = (call: Call): Call[] =>
   call.command === undefined ? [call] : partsOf(call.command).map((command) => ({ tool: 'Bash', command }) as const);
+
+/**
+ * A call as the parts Claude Code matches a deny against: each part of a shell command unwrapped, and as typed too, its leading
+ * assignment and wrappers kept, so a deny of what an assignment says reaches it; or the tool call itself.
+ */
+const deniedPartsOfCall = (call: Call): Call[] =>
+  call.command === undefined
+    ? [call]
+    : [...new Set([...partsOf(call.command), ...typedPartsOf(call.command)])].map((command) => ({ tool: 'Bash', command }) as const);
 
 /** A SKILL.md's `allowed-tools`, split on commas: what a session that loads the skill may run without asking. */
 function allowedToolsOf(file: string): string[] {
@@ -296,7 +310,7 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
   const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
   return calls
     .filter((call) => {
-      if (partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
+      if (deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
       return !dontAsk || partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)));
     })
     .map((call) => `${step.name}: ${shown(call)}`);
@@ -448,6 +462,19 @@ test('the matcher splits a command into the parts Claude Code matches, strips th
   assert.equal(reaches('Bash(pkill:*)', compound), false, 'a rule matched against the whole command misses the part');
   assert.ok(partsOfCall(compound).some((part) => reaches('Bash(pkill:*)', part)));
   assert.deepEqual(partsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
+  const assigned: Call = { tool: 'Bash', command: 'true && X=http://localhost:4318 timeout 5 true' };
+  assert.deepEqual(typedPartsOf(assigned.command), ['true', 'X=http://localhost:4318 timeout 5 true']);
+  assert.deepEqual(
+    deniedPartsOfCall(assigned).map((part) => part.command),
+    ['true', 'X=http://localhost:4318 timeout 5 true'],
+    'a deny is matched against a part as typed too',
+  );
+  assert.ok(
+    deniedPartsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)),
+    'so a deny of an address reaches an assignment',
+  );
+  assert.ok(!partsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)), 'and an allow of it reaches nothing an assignment says');
+  assert.deepEqual(deniedPartsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
 });
 
 test('every shipped agent is named by a shipped step, so the fence below reads each one', () => {
@@ -620,7 +647,7 @@ test("REFUSED: Ada without its deny of pkill and killall, read from its file as 
   const ada = shippedStepOf('ada');
   const line = ada.disallowedTools!.filter((rule) => rule !== 'Bash(pkill:*)' && rule !== 'Bash(killall:*)');
   assert.equal(line.length, ada.disallowedTools!.length - 2, 'Ada denies both by name');
-  const bare = shippedWith('ada', 'build', 'disallowedTools', line.join(', '));
+  const bare = shippedWith('ada', 'build', 'disallowedTools', line.join(', '), ...denyFilesOf('ada'));
   assert.equal(bare.permissionMode, 'auto');
   assert.deepEqual(unfenced(bare), killsByName(bare.name));
   assert.ok(
@@ -681,7 +708,7 @@ for (const agent of ['ada', 'otto'])
     assert.equal(step.permissionMode, 'auto');
     const line = step.disallowedTools!.filter((rule) => !probeRule(rule));
     assert.ok(line.length < step.disallowedTools!.length, `${agent} denies a session started by hand`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '), ...denyFilesOf(agent));
     assert.deepEqual(
       unfenced(bare, SETTINGS, PROBES),
       PROBES.map((call) => `${bare.name}: ${shown(call)}`),
@@ -707,9 +734,15 @@ for (const agent of ['ada', 'otto'])
     const step = shippedStepOf(agent);
     const line = step.disallowedTools!.filter((rule) => rule !== 'Edit(//**/.claude/settings.local.json)');
     assert.equal(line.length, step.disallowedTools!.length - 1, `${agent} denies an edit of a folder's local settings`);
-    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '));
+    const bare = shippedWith(agent, 'build', 'disallowedTools', line.join(', '), ...denyFilesOf(agent));
     assert.deepEqual(editsDenied(bare, HARNESS_FILES), HARNESS_FILES.slice(1), 'the rule cut leaves the projects folder open');
-    const none = shippedWith(agent, 'build', 'disallowedTools', line.filter((rule) => !rule.startsWith('Edit(')).join(', '));
+    const none = shippedWith(
+      agent,
+      'build',
+      'disallowedTools',
+      line.filter((rule) => !rule.startsWith('Edit(')).join(', '),
+      ...denyFilesOf(agent),
+    );
     assert.deepEqual(editsDenied(none, HARNESS_FILES), [], 'and the trust and user settings with theirs');
   });
 
@@ -737,14 +770,30 @@ function acting(step: Step): string[] {
 }
 
 /**
- * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, its agent's `key` line replaced
- * by `line`.
+ * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, the `key` line replaced by `line`
+ * in each file of `of`, the agent's alone by default.
  */
-function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'disallowedTools', line: string): Step {
-  return shippedEdited(agent, workflow, `a ${key} line to replace`, (text) =>
-    text.replace(new RegExp(`^${key}: .*$`, 'm'), `${key}: ${line}`),
+function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'disallowedTools', line: string, ...of: string[]): Step {
+  return shippedEdited(
+    agent,
+    workflow,
+    `a ${key} line to replace`,
+    (text) => text.replace(new RegExp(`^${key}: .*$`, 'm'), `${key}: ${line}`),
+    ...of,
   );
 }
+
+/** The steps that run what no deny names, each with its file under the shipped holder: the two whose own line denies the collector. */
+const COLLECTOR_FENCED = [
+  { agent: 'ada', workflow: 'build', file: 'build/implement.md' },
+  { agent: 'otto', workflow: 'build', file: 'build/land.md' },
+];
+
+/** The files a deny of `agent`'s is written in, from the shipped holder: its own, and its step's, which repeats each to add its own. */
+const denyFilesOf = (agent: string): string[] => [
+  `agents/${agent}.md`,
+  ...COLLECTOR_FENCED.filter((fenced) => fenced.agent === agent).map((fenced) => fenced.file),
+];
 
 /**
  * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote each file
@@ -1280,8 +1329,10 @@ function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS,
   const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   return calls
-    .filter((call) =>
-      partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)) && !denies.some((rule) => reaches(rule, part))),
+    .filter(
+      (call) =>
+        partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part))) &&
+        !deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))),
     )
     .map(shown);
 }
@@ -1394,6 +1445,68 @@ test('REFUSED: design or review that an allow of the render reaches, by the sett
   assert.deepEqual(runs(own, [...RENDERS, ...DOCKER]), [...RENDERS, ...DOCKER].map(shown));
   const fenced = { ...shippedStepOf('ada'), disallowedTools: [...(shippedStepOf('ada').disallowedTools ?? []), allow] };
   assert.deepEqual(unfenced(fenced, SETTINGS, RENDERS), [], 'a deny of its own would refuse the implementer');
+});
+
+/**
+ * The live collector, the side Grafana's own on :4318 (OTLP/HTTP) and :4317 (gRPC), in the spellings a session types to export or post
+ * there: what a step that runs what no deny names never points a process of its own at.
+ */
+const LIVE_COLLECTOR: Call[] = [
+  'OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 node src/main.ts',
+  'export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318',
+  'env OTEL_EXPORTER_OTLP_ENDPOINT=http://[::1]:4318 nemia up',
+  'curl -s -X POST http://localhost:4318/v1/traces -d @spans.json',
+  'cd apps/api && OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 timeout 60 node src/main.ts',
+  'OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 node src/main.ts',
+].map((command) => ({ tool: 'Bash', command }));
+
+test('every shipped step is refused the live collector by address: implement and land by their own deny, a dontAsk step by no allow', () => {
+  for (const { step } of shipped()) assert.deepEqual(unfenced(step, SETTINGS, LIVE_COLLECTOR), [], step.name);
+  for (const { agent } of COLLECTOR_FENCED) {
+    const step = shippedStepOf(agent);
+    assert.notEqual(step.permissionMode, 'dontAsk', `${step.name} runs what no deny names`);
+    for (const port of ['4318', '4317']) assert.ok(step.disallowedTools?.includes(`Bash(*:${port}*)`), `${step.name} denies :${port}`);
+  }
+  assert.deepEqual(
+    unfenced(shippedStepOf('ada'), SETTINGS, RENDERS),
+    RENDERS.map((call) => `implement: ${shown(call)}`),
+    'and the render, which holds a throwaway collector, still runs',
+  );
+  const deny = SETTINGS.permissions?.deny ?? [];
+  for (const call of LIVE_COLLECTOR)
+    assert.deepEqual(
+      deny.filter((rule) => deniedPartsOfCall(call).some((part) => reaches(rule, part))),
+      [],
+      `${shown(call)} is denied by .claude/settings.json, which binds the person's session that starts the live daemon`,
+    );
+});
+
+test('REFUSED: implement or land with one of its two address rules cut is open on the live collector by that port', () => {
+  for (const { agent, workflow, file } of COLLECTOR_FENCED)
+    for (const port of ['4318', '4317']) {
+      const rule = `Bash(*:${port}*)`;
+      const cut = shippedEdited(agent, workflow, `the rule ${rule}`, (text) => text.replace(`, ${rule}`, ''), file);
+      const open = LIVE_COLLECTOR.filter((call) => call.command?.includes(`:${port}`));
+      assert.equal(open.length, port === '4318' ? 5 : 1);
+      assert.deepEqual(
+        unfenced(cut, SETTINGS, LIVE_COLLECTOR),
+        open.map((call) => `${cut.name}: ${shown(call)}`),
+        `${file} without ${rule}`,
+      );
+    }
+});
+
+test("REFUSED: a deny read against the unwrapped part alone leaves the collector's address in a leading assignment open", () => {
+  const assigned = LIVE_COLLECTOR.filter((call) => /^(?:cd \S+ && )?[A-Z_]+=/.test(call.command ?? ''));
+  assert.equal(assigned.length, 3);
+  const denies = shippedStepOf('ada').disallowedTools ?? [];
+  for (const call of assigned) {
+    assert.ok(!partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))), `${shown(call)}, unwrapped, names no port`);
+    assert.ok(
+      deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))),
+      `${shown(call)}, as typed, does`,
+    );
+  }
 });
 
 /** The whole suite in the spellings a session types: what implement's check already ran on the round's tree. */

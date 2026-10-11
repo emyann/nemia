@@ -6481,11 +6481,87 @@ test("hiring into one of the repository's steps: no New agent; its page says one
   assert.doesNotMatch(page, /data-new-agent=/);
   assert.match(
     page,
-    /data-new-agent-repo[^>]*>A new agent for this repository&#x27;s workflow is added through a card on the[^]*href="\/inbox"[^]*, or by copying the workflow&#x27;s folder into <code[^>]*>\/store\/workflows\/<\/code>/,
+    /data-new-agent-repo[^>]*>A new agent for the factory&#x27;s workflow is added through a card on the[^]*href="\/inbox"[^]*, or by copying the workflow&#x27;s folder into <code[^>]*>\/store\/workflows\/<\/code>/,
+  );
+  const none = await hireOn({ hired: null, from: 'repo', hiring: { refused: null, agents: [] } });
+  assert.match(
+    none,
+    /data-hire-none[^>]*>None of the factory&#x27;s agents reads, so there is no agent to hire into this step in hiring\./,
+  );
+  assert.doesNotMatch(
+    page + none,
+    /this repository/,
+    "refused: read in a named factory, whose folder may be its own, it is never this repository's",
   );
   const row = await hireOn({ hired: null, from: 'repo', hiring: PICKABLE }, 'row');
   assert.match(row, /data-hire-picker/);
   assert.doesNotMatch(row, /data-new-agent/, 'a row says no more than its controls');
+});
+
+/** `element` drawn as the root route's page at the address `at`, loaded, so it reads the address, with its queries already answered. */
+async function routedAt(
+  at: string,
+  element: ReturnType<typeof createElement>,
+  data: Array<[readonly unknown[], unknown]>,
+): Promise<string> {
+  const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } = await import('@tanstack/react-router');
+  const client = new QueryClient();
+  for (const [key, value] of data) client.setQueryData(key, value);
+  const root = createRootRoute({ component: () => createElement(QueryClientProvider, { client }, element) });
+  const router = createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: [at] }) });
+  await router.load();
+  return renderToStaticMarkup(createElement(RouterProvider, { router }));
+}
+
+test('REFUSED: a place that lists no workflows is said on the page — a factory on several repositories asks which, each a link, and one refused says why — and a place that lists draws nothing', async () => {
+  const { Unplaced } = await import('../src/components/WorkflowParts.tsx');
+  const draw = (where: unknown) =>
+    routedWith(
+      createElement(Unplaced, {
+        where: where as never,
+        back: 'the way out',
+        onRepo: (repo: string, name: string) => createElement('a', { href: `?repo=${repo}` }, name),
+      }),
+    );
+  const pick = await draw({ kind: 'pick', factory: 'quay', repos: ['/code/a', '/code/b'] });
+  assert.match(pick, /data-pick-repo="quay"[^]*works on 2 repositories/);
+  assert.match(
+    pick,
+    /title="\/code\/a"[^]*<a href="\?repo=\/code\/a">a<\/a>[^]*title="\/code\/b"[^]*<a href="\?repo=\/code\/b">b<\/a>[^]*the way out\./,
+  );
+  const refused = await draw({ kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
+  assert.match(refused, /data-unplaced="gone"[^>]*>No factory is named gone\. the way out\.</);
+  assert.equal(await draw({ kind: 'every' }), '');
+  assert.equal(await draw({ kind: 'in', place: { factory: 'f', repo: '/r' }, repos: ['/r'] }), '');
+});
+
+test("REFUSED: the step's bar reads in the address's factory — its folder there, never the list read with none; and a factory that lists nowhere is said in the bar", async () => {
+  const { SpecBar } = await import('../src/components/SpecBar.tsx');
+  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const step = (name: string) => ({ name, spec: stepSpec(), body: '', own: null, hired: null, layers: null });
+  const listing = (steps: string[]) => workflow({ name: 'dev', from: 'repo', steps: steps.map(step), error: null });
+  const bar = createElement(SpecBar, { from: 'repo', workflow: 'dev', step: 'draft' });
+  const quay = filed('quay', { repos: ['/a', '/b'] });
+  const pipao = filed('pipao', { repos: ['/code/pipao'] });
+  const data: Array<[readonly unknown[], unknown]> = [
+    [['factories'], [quay, pipao]],
+    [['workflows'], [listing(['implement'])]],
+    [['factory-workflows', 'pipao', '/code/pipao'], [listing(['draft'])]],
+  ];
+  const at = (factory: string) => `/?factory=${factory}&bar=spec%3Arepo%2Fdev%2Fdraft`;
+  const placed = await routedAt(at('pipao'), bar, data);
+  assert.match(placed, /data-runs-on/, "the factory's folder has the step");
+  assert.match(placed, /the factory&#x27;s/);
+  assert.doesNotMatch(placed, /has no step named|this repository/);
+  assert.match(
+    await routedAt('/?bar=spec%3Arepo%2Fdev%2Fdraft', bar, data),
+    /dev has no step named draft\./,
+    'with no factory, the list read with none',
+  );
+  const gone = await routedAt(at('gone'), bar, data);
+  assert.match(gone, /data-unplaced[^>]*>No factory is named gone\.</);
+  assert.doesNotMatch(gone, /data-runs-on|has no step named/, 'no list is read for it');
+  assert.match(await routedAt(at('quay'), bar, data), /data-unplaced[^>]*>The factory quay works on 2 repositories/);
 });
 
 test('hiring into a step draws nothing before its read is there', async () => {

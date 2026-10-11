@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import type { PagePlace, RunDetail, WorkflowListing } from '../lib/api';
-import { specStep } from '../lib/bar';
+import { specStep, stepPage } from '../lib/bar';
 import { extentOf, layout, stepsOf } from '../lib/layout';
 import { useBarOver } from '../lib/useBarOver';
 import { useCanvasPress } from '../lib/useCanvasPress';
@@ -213,7 +213,7 @@ function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: D
   const navigate = useNavigate();
   const { shown, ...press } = useCanvasPress(
     (step) => ({ kind: 'spec', from, workflow: name, step }),
-    (step) => void navigate({ to: '/workflows/$from/$workflow/$step', params: { from, workflow: name, step }, search: place }),
+    (step) => void navigate(stepPage({ kind: 'spec', from, workflow: name, step }, place)),
   );
   const inspected = specStep(shown, from, name);
   const nodes = useMemo(

@@ -4,8 +4,9 @@
  * list in it; a factory that reads nowhere loads no list — and what a write of a folder of yours reads again.
  */
 import type { QueryClient } from '@tanstack/react-query';
-import { factoriesQuery, workflowsInQuery, workflowsQuery, type PagePlace } from './api';
-import { listPlace } from './factories';
+import { factoriesQuery } from './api/factories.ts';
+import { workflowsInQuery, workflowsQuery, type PagePlace } from './api/workflows.ts';
+import { listPlace } from './factories.ts';
 
 /**
  * Loads into `queryClient` what the page at `address` lists its workflows from. Rejects where a read it draws from fails — the factories'

@@ -138,6 +138,16 @@ export type BarPage =
   | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string }; search: PagePlace };
 
 /**
+ * The page of the workflow's step `bar` shows, read in `place`: where the bar's Open and a double click on the step's node both lead, so
+ * neither reaches the step of another folder of the same name.
+ */
+export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace = {}): Extract<BarPage, { search: PagePlace }> => ({
+  to: '/workflows/$from/$workflow/$step',
+  params: { from: bar.from, workflow: bar.workflow, step: bar.step },
+  search: place,
+});
+
+/**
  * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
  * step's page for a workflow's step, read in `place`, the place the page under the bar is read in, and none for the start of a run, a
  * state of a machine, the gauges or the runs waiting on you, which have no page of their own: each row of those opens its run's.
@@ -151,7 +161,7 @@ export function barOpens(bar: Bar, place: PagePlace = {}): BarPage | null {
     case 'step':
       return { to: '/runs/$runId/steps/$step', params: { runId: bar.run, step: bar.step } };
     case 'spec':
-      return { to: '/workflows/$from/$workflow/$step', params: { from: bar.from, workflow: bar.workflow, step: bar.step }, search: place };
+      return stepPage(bar, place);
     case 'start':
     case 'state':
     case 'gauges':

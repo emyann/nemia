@@ -4,8 +4,9 @@
  *
  * `SEED` holds what the daemon would say (the service `nemia`: its passes, a run's filings and appends, the waits and the denied calls
  * of two steps, that run's timeline once over, each number a span, its metrics and its logs) and what two steps' sessions would
- * (`claude-code`: a turn with its model request and tools, and their `tool_result` events). Every panel that draws series is met by two at least, and one failed `tool_result` carries no
- * `tool_name`, so a panel that drops a label shows it. What no fixture meets is listed in `UNSEEDED`, with why.
+ * (`claude-code`: a turn with its model request and tools, and their `tool_result` events). Every panel that draws series is met by
+ * two at least, and one failed `tool_result` carries no `tool_name`, so a panel that drops a label shows it. What no fixture meets is
+ * listed in `UNSEEDED`, with why.
  * `packages/agent-orchestrator/test/observe.test.ts` holds the names here to those the code emits, and the dashboards to the seed.
  */
 import { asked, awaited } from './stack.ts';

@@ -252,8 +252,8 @@ What it leaves:
   npm replaces a package's files rather than writing into them, and nothing else here writes under `node_modules`, but it is not
   isolation.
 - **A kept worktree holds main's replaced files.** After main's next `npm install`, a worktree still holding the old files keeps their
-  blocks until `wf prune`. `du` of a worktree alone counts every hardlinked file, so `wf prune` measures it beside main's
-  `node_modules` in one `du` and reads the worktree's line (`diskBytes`): what removing it frees.
+  blocks until `wf prune`. A worktree's own size counts every hardlinked file, so `wf prune` walks it with `lstat` and counts a file
+  only when every name it has is inside the worktrees removed (`freedBytes`): what removing it frees.
 - **A store on another filesystem falls back to links.** A hardlink there fails `EXDEV` (or `EPERM`, `ENOTSUP` where the filesystem
   refuses one); main's packages are then linked as before, `provisionDeps` answers `{ tree: 'linked', why }`, and the run's notes say
   that a fenced step's reads under `node_modules` are denied. A second pass reads the links it left and says so again.
@@ -2587,9 +2587,10 @@ and the run's page.
 
 What was built:
 
-- **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with each worktree's size (`du -sk`, which counts a link as a link)
-  and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
-  one line, and a run with nothing to prune is not said. The tick never prunes.
+- **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with what removing each worktree frees (`freedBytes`, a walk with `lstat`
+  that follows no link and counts nothing for a file hardlinked from outside the worktree) and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
+  one line, and a run with nothing to prune is not said. The tick never prunes; since the retention rule, the daemon frees a finished
+  run's worktrees itself, on a sweep beside its passes (`freeOnce`, README, *Freeing the space*).
 - **The pure part, in `prune/prune.ts`.** `pruneRefusal` names each reason with its fix: a folder run; a run not over (`wf cancel` first); a finished
   run not merged, unless `--unmerged`; a hand-off owed (`handOffDue`); a worktree locked, detached on a commit no branch holds, or holding
   changes no commit has. It also refuses whatever `forgetRefusal` refuses, with `wf prune` in its fixes. `prunedRefusal` is the one wording of why

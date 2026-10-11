@@ -1,17 +1,19 @@
 /**
  * A landing, read and acted on through the run's place: whether a merge is staged in the repository's checkout (`stagedHere`, a `stat` of
- * the file the place named at `open`, with no process), how it stands (`checkoutStatus`, the place's `status`), its commit or its abort
- * (`landThrough`, the place's `land`), and what a landing session is denied and told (`landingDenies`, `landingWords`). An answer the
- * place did not give, or refused, is never a verdict: it is folded into words, and the caller acts on none.
+ * the file the place named at `open`, with no process), how it stands (`checkoutStatus`, the place's `status`; `askCheckoutStatus`, the
+ * same off the loop), its commit or its abort (`landThrough`, the place's `land`), and what a landing session is denied and told
+ * (`landingDenies`, `landingWords`). An answer the place did not give, or refused, is never a verdict: it is folded into words, and the
+ * caller acts on none.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
 import type { MergeState } from '../ending/ending.ts';
 import type { LandingWords } from '../check/check.ts';
 import { resultBranches } from '../branches/branches.store.ts';
 import { resultTips } from '../branches/index.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
-import type { PlaceSay } from './place.ts';
+import type { PlaceOutcome, PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import type { Place } from './place.store.ts';
@@ -55,13 +57,33 @@ export function checkoutStatus(run: RepositoryRun, memo: StatusMemo): CheckoutRe
   return read;
 }
 
-/** What `place` says of `checkout` against `tips`, or why it said nothing. */
-function statusRead(place: Place, checkout: string, tips: Readonly<Record<string, string>>): CheckoutRead {
-  const outcome = place.askNow('status', { checkout, tips });
+/** The place's `status` outcome as a reading of the checkout: its answer, or why it said nothing. */
+function readOf(outcome: PlaceOutcome<'status'>): CheckoutRead {
   if ('answer' in outcome) return outcome.answer;
   if ('refused' in outcome) return { unread: `the place refused to read the checkout: ${outcome.refused}` };
   return { unread: `the place's status was not heard: ${outcome.unread.said}` };
 }
+
+/** What `place` says of `checkout` against `tips`, or why it said nothing. */
+const statusRead = (place: Place, checkout: string, tips: Readonly<Record<string, string>>): CheckoutRead =>
+  readOf(place.askNow('status', { checkout, tips }));
+
+/**
+ * `checkoutStatus`, asked off the loop (`ask`) and kept in `memo`, so the `checkoutStatus` that follows it for the same run answers
+ * from there and starts no process: for a caller the daemon's pass must not wait on.
+ */
+export const askCheckoutStatus = (run: RepositoryRun, memo: StatusMemo): Effect.Effect<CheckoutRead> => {
+  const key = JSON.stringify([path.resolve(run.repo), run.id]);
+  const known = memo.reads.get(key);
+  if (known) return Effect.succeed(known);
+  return memo.place.ask('status', { checkout: run.repo, tips: resultTips(run, resultBranches(run), memo.heads(run)) }).pipe(
+    Effect.map((outcome) => {
+      const read = readOf(outcome);
+      memo.reads.set(key, read);
+      return read;
+    }),
+  );
+};
 
 /**
  * Whether a merge is staged in the checkout of `run`, whose ending lands on its check, as a pass that only needs to know reads it: the

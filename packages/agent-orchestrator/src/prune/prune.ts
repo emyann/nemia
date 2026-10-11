@@ -1,6 +1,8 @@
 /**
  * Pruning a finished run: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`)
- * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`). Pure.
+ * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`); and
+ * the daemon's rule for a finished run: which runs it may free (`freeable`), which of them a sweep takes (`freeTurn`), and what it says
+ * of one it left (`freeSaid`) or freed (`freedLine`). Pure.
  */
 import { andList, isRepositoryRun, prunedWords, type RepositoryRun, type Pruned, type Run } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
@@ -214,3 +216,44 @@ function storeLines(p: Pruning): string[] {
     ),
   ];
 }
+
+/** A run as a pass answered it, as far as the daemon's rule reads it: the run, its status, and whether the pass found it at rest. */
+export type Answered = { readonly run: Run; readonly status: string; readonly feed: { readonly atRest?: true } };
+
+/**
+ * The runs the daemon may free of their worktrees, by id, among what a pass answered: at rest, succeeded or cancelled, and a
+ * repository's. Pure. Every other run is none of the rule's, and nothing is asked of its place: one in flight, failed, stopped, over
+ * its budget or waiting on a person may still be tried again from its worktree, and a folder run's folders are its work. Whether a
+ * succeeded run is merged is not read here: the prune's own judgement refuses one that is not (`pruneRefusal`).
+ */
+export const freeable = (answers: readonly Answered[]): string[] =>
+  answers
+    .filter((a) => a.feed.atRest === true && (a.status === 'succeeded' || a.status === 'cancelled') && isRepositoryRun(a.run))
+    .map((a) => a.run.id);
+
+/**
+ * The candidates one sweep judges: up to `bound` of those not judged yet, in order; and once every one has been, one of them, each in
+ * its turn (`turn` counts the sweeps). Pure. So a store with many finished runs is freed `bound` a sweep, and a run that stays — one
+ * awaiting its merge, a worktree a person must see to — costs a judgement a sweep at most, whatever their number.
+ */
+export function freeTurn(candidates: readonly string[], judged: ReadonlySet<string>, bound: number, turn: number): string[] {
+  const fresh = candidates.filter((id) => !judged.has(id)).slice(0, Math.max(0, bound));
+  if (fresh.length || !candidates.length || bound < 1) return fresh;
+  return [candidates[turn % candidates.length]];
+}
+
+/**
+ * What the daemon says of a run it judged and did not free — or null, when the refusal is the rule's own boundary and nothing is to be
+ * said. Pure. Said: a place that did not answer (`facts` undefined: the judgement got no further), and a finished run — shipped or
+ * cancelled, nothing holding it, no hand-off owed — whose worktree is what refuses, locked, on no branch or holding changes: a person
+ * must see to it. Not said: a run not merged or not over, which is kept on purpose.
+ */
+export function freeSaid(facts: PruneFacts | undefined, refusal: string): string | null {
+  if (!facts) return refusal;
+  const finished = (facts.decided === 'shipped' || facts.decided === 'cancelled') && !facts.held && !facts.owed.length;
+  return finished ? refusal : null;
+}
+
+/** What the daemon says of a run it freed: how many worktrees, and the bytes that freed. Pure. */
+export const freedLine = (p: Pick<Pruning, 'id' | 'worktrees'>): string =>
+  `${p.id}  freed: removed ${p.worktrees.length} worktree${p.worktrees.length === 1 ? '' : 's'}, ${sizeOf(prunedBytes(p.worktrees))}; its record, branches and files are kept`;

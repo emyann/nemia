@@ -1,8 +1,8 @@
 /**
  * The place a program is given (`place.ts` holds the contract): `PlaceService`, the service every caller asks, with no default, so a
- * program that asks the place and is given none does not compile; what a caller reads through it (`readRunPlace`, `openPlace`,
- * `trialMerges`); and what an implementation that runs processes shares: the stop of a process group at a deadline (`stopGroup`), and
- * the words of an ask that was not heard (`stoppedWords`, `threwWords`).
+ * program that asks the place and is given none does not compile; what a caller reads through it (`readRunPlace`, `askRunPlace`,
+ * `openPlace`, `trialMerges`); and what an implementation that runs processes shares: the stop of a process group at a deadline
+ * (`stopGroup`), and the words of an ask that was not heard (`stoppedWords`, `threwWords`).
  */
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { Context, Effect, Layer, Schedule, Schema } from 'effect';
@@ -141,6 +141,19 @@ export function readRunPlace(
   const read = place.askNow('inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch });
   return 'answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read;
 }
+
+/**
+ * `readRunPlace`'s answer, asked off the loop (`ask`): for a caller the daemon's pass must not wait on, as its sweep of finished runs
+ * and `nemia prune` are.
+ */
+export const askRunPlace = (
+  run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
+  place: Place,
+  under: string,
+): Effect.Effect<RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }>> =>
+  place
+    .ask('inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch })
+    .pipe(Effect.map((read) => ('answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read)));
 
 /**
  * A repository run's place, opened at `nemia start` on `root`: `place` asked its `open` verb, told whether the run cuts worktrees

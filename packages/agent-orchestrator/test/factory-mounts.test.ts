@@ -12,42 +12,33 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
 import { promised } from './promised.ts';
 import { readsMounts } from '../src/filed/filed.ts';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const {
-  addFactory,
-  advanceRun,
-  attachWorkflow,
-  hireAgent,
-  retryRun,
-  startRun,
-  runWith: runEngine,
-  gitPlaceLayer,
-} = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { addFactory, advanceRun, attachWorkflow, hireAgent, retryRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { artifactsDir, inputsDir, readRun } = await import('../src/record/record.store.ts');
-const { main } = await import('../src/cli/main.ts');
+const { main: cli } = await import('../src/cli/main.ts');
+/** `nemia`, as a person types it, its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 
 /** A git repository with one commit on `main`, in a folder named from `prefix`. */
 function aRepo(prefix = 'repo-'): string {
   const repo = fs.mkdtempSync(path.join(ROOT, prefix));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   return repo;
 }
 

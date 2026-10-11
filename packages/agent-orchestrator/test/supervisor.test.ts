@@ -9,13 +9,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -23,9 +23,10 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advanceRun, list, retryRun, runSlots, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { advanceRun, list, retryRun, runSlots, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { passParents } = await import('../src/views/views.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
@@ -35,10 +36,7 @@ const { readRun } = await import('../src/record/record.store.ts');
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 

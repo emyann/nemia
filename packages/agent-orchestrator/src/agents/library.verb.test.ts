@@ -8,13 +8,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-library-root-');
 process.env.WF_ROOT = ROOT;
 const { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } = await import('./library.verb.ts');
-const { runWith: runEngine, gitPlaceLayer, engine } = await import('../runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const { runWith: runEngine, engine } = await import('../runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 
 const e = engine();
 const repo = scratch('wf-library-repo-');

@@ -20,15 +20,17 @@ import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { until, WAITED, type Waiter } from './waits.ts';
 import { Effect } from 'effect';
-import { runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-pool-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { engine, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const { engine, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 
 /** The fakes, their gates, and the count of `claude agents` calls. */
 const fakes = () => {

@@ -14,14 +14,14 @@ import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { nameFor, type Sighting, type SpawnRequest, type TaskView, Engine as EngineService } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -38,10 +38,10 @@ const {
   retryRun,
   startRun,
   runWith: runEngine,
-  gitPlaceLayer,
 } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { readAsks, readRun } = await import('../src/record/record.store.ts');
 const { closeoutAsked, closeoutOf, deniedOf } = await import('../src/views/views.verb.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
@@ -49,10 +49,7 @@ const { phaseOfView } = await import('../src/views/views-words.ts');
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
-  git('init', '-q');
-  git('commit', '-q', '--allow-empty', '-m', 'base');
+  stand().world.repository(repo, {});
   return repo;
 };
 

@@ -13,7 +13,8 @@ import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Finishing } from '../pause/pause.ts';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
-import { runOver } from '../../test/placed.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { eachTest, runOver } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-service-');
 process.env.WF_ROOT = ROOT;
@@ -24,8 +25,8 @@ const { installService, uninstallService, serviceStatus, SERVICES } = await impo
 const { restartService, RESTARTS } = await import('./restart.verb.ts');
 const { putPause, readPause, pauseFile, resumePause } = await import('../pause/pause.store.ts');
 const { EngineService, runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
 const { nemiaFence } = await import('../admission/fence.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
 type ServiceHost = import('./service.verb.ts').ServiceHost;
@@ -267,7 +268,7 @@ test('a take-over interrupted while it waits on a landing lifts its own pause an
   const fiber = Effect.runFork(
     installService({ takeOver: String(OLD) }, { ...host, say: (l) => (events.push(`say ${l}`), said()) }).pipe(
       Effect.provideService(EngineService, {} as never),
-      Effect.provide(gitPlaceLayer),
+      Effect.provide(stand().layer),
     ),
   );
   await waiting;

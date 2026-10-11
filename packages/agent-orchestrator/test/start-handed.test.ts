@@ -11,27 +11,24 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { runGiven } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven } from './placed.ts';
 
 const ROOT = path.join(scratch('wf-start-handed-'), 'First (Last)');
 fs.mkdirSync(ROOT);
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { startRun } = await import('../src/runner.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
+const stand = eachTest(testPlace);
+const runPlaced = runGiven(() => stand().layer);
 
 /** A git repository with one commit on `main`, under the store. */
 function aRepo(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   return repo;
 }
 

@@ -11,27 +11,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
-import { runGiven, runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
+import { eachTest, runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-agents-copy-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const {
-  addFactory,
-  attachWorkflow,
-  engine,
-  hireAgent,
-  runWith: runEngine,
-  gitPlaceLayer,
-  startRun,
-  TABLE,
-} = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const { addFactory, attachWorkflow, engine, hireAgent, runWith: runEngine, startRun, TABLE } = await import('../src/runner.ts');
+const stand = eachTest(testPlace);
+const runWith = runOver(runEngine, () => stand().layer);
+const runPlaced = runGiven(() => stand().layer);
 const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
 const { agentsRead } = await import('../src/roster/roster.store.ts');
 const { agentsLines } = await import('../src/roster/roster.ts');
@@ -112,12 +104,9 @@ test('an agent copied in with its schema and skills, hired into a step, runs as 
   fs.writeFileSync(path.join(build, 'implement.md'), '---\nplace: git\n---\nBuild what was asked.\n');
   fs.writeFileSync(path.join(build, 'review.md'), '---\nafter: implement\nplace: git\n---\nReview it.\n');
   const repo = scratch('wf-agents-copy-repo-');
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
-  git('init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
+  stand().world.repository(repo, {});
+  stand().world.commit(repo, 'base');
   addFactory({ name: 'pipao', repos: [repo] });
   attachWorkflow({ factory: 'pipao', workflow: 'build' });
   hireAgent({ factory: 'pipao', agent: 'implementer', step: 'build/implement' });

@@ -82,12 +82,11 @@ test("a test's subtests share its place, and the program it runs is given that o
 });
 
 test('REFUSED: a place made for each test, asked at the head of the file, outside any test', () => {
-  assert.equal(OUTSIDE, 'eachTest: asked outside a test, where nothing is made: ask inside the test that uses it');
+  assert.equal(OUTSIDE, 'eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
 });
 
 /** The modules a source imports, across line breaks. */
-const importsOf = (source: string): string[] =>
-  [...source.matchAll(/\bfrom\s*'([^']+)'|\bimport\s*\(\s*'([^']+)'/g)].map((m) => m[1] ?? m[2]);
+const importsOf = (source: string): string[] => [...source.matchAll(/\b(?:from|import)\s*\(?\s*'([^']+)'/g)].map((m) => m[1]);
 
 /** The modules that start a process or a thread. */
 const STARTS = ['node:child_process', 'child_process', 'node:worker_threads', 'worker_threads', 'node:cluster', 'cluster'];
@@ -109,9 +108,14 @@ test('REFUSED: a process in the test place — no file of place/memory imports w
   assert.deepEqual(starting(sources), []);
   const planted = {
     ...sources,
-    'planted.ts': "import {\n  spawnSync,\n} from\n  'node:child_process';\nconst w = await import('node:worker_threads');\n",
+    'planted.ts':
+      "import {\n  spawnSync,\n} from\n  'node:child_process';\nconst w = await import('node:worker_threads');\nimport 'node:cluster';\n",
   };
-  assert.deepEqual(starting(planted), ['planted.ts imports node:child_process', 'planted.ts imports node:worker_threads']);
+  assert.deepEqual(starting(planted), [
+    'planted.ts imports node:child_process',
+    'planted.ts imports node:worker_threads',
+    'planted.ts imports node:cluster',
+  ]);
 });
 
 test('both ways of asking answer the same, and a verb that throws is unread in one sentence naming it', async () => {

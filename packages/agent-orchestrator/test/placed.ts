@@ -43,7 +43,7 @@ export const givenPlace =
 
 /**
  * What `make` makes, new for each test of the file that calls this at its head: the function answers the one made for the test running
- * now, which its subtests share. It throws outside a test, where none is made. A file whose tests run at once makes its own in each.
+ * now, which its subtests share. It throws before the first test, where none is made yet. A file whose tests run at once makes its own in each.
  */
 export function eachTest<A>(make: () => A): () => A {
   let now: { readonly made: A } | undefined;
@@ -54,10 +54,9 @@ export function eachTest<A>(make: () => A): () => A {
   });
   afterEach(() => {
     depth -= 1;
-    if (depth === 0) now = undefined;
   });
   return () => {
-    if (!now) throw new Error('eachTest: asked outside a test, where nothing is made: ask inside the test that uses it');
+    if (!now) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
     return now.made;
   };
 }

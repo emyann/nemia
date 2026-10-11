@@ -16,9 +16,11 @@ attachment*, for the whole format; this is the procedure, and what it cost to le
   (`agent: nora`). The board shows the name as a person's (`Nora`) beside a face drawn from it (Blobatar), the same wherever it shows.
 - **`role:`** is the job it holds, in a few words (`Product engineer`); **`description:`** says when to attach it, one line. Both are the
   agent's own lines, with `harnessPrompt:`: a step that sets one is refused. A step's `skills:` adds to its agent's (*Its skills*).
-- **`mcp:`** names the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them (`mcp: playwright`), and is the
-  agent's own line too. A session loads the servers its agent names and no other: with no line it loads none, and a name the checkout
-  does not declare refuses the session at its start. Loading a server allows none of its tools: its fence still decides.
+- **`mcp:`** names the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them (`mcp: playwright`). A step's
+  `mcp:` adds to its agent's, as its `skills:` does: a server only one repository has is named by the step that needs it, so the agent
+  stays portable. A session loads the servers its agent and its step name and no other: with no line on either it loads none, and a
+  name the checkout does not declare refuses the session at its start. Loading a server allows none of its tools: its fence still
+  decides. An agent that names one cannot be tried, since a try has no checkout.
 - A `name:` line must equal the file's name; `card:` is retired (the card is generated from its skills: `npx wf agents card <name>`).
 
 ## The file

@@ -93,6 +93,8 @@ export type WorkflowStepSpec = {
   agent: string | null;
   /** The skills the step adds to its agent's (`skills:`), as its own line names them: empty where it adds none. */
   skills: string[];
+  /** The MCP servers the step adds to its agent's (`mcp:`), as its own line names them: empty where it adds none. */
+  mcp: string[];
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
   /**
@@ -193,8 +195,9 @@ export type ListedStep = {
    */
   layers: ToldLayers | null;
   /**
-   * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, as its agent's `mcp:` line names them:
-   * empty where its agent names none, and for a step with no agent. No key of the step, so not in `spec`, and a save never writes it.
+   * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, its agent's `mcp:` line first, then those
+   * its own line adds, each once: empty where neither names any, and for a step with no agent. The step's own line is `spec.mcp`, which
+   * a save writes; this one it never writes.
    */
   mcp: string[];
 };
@@ -391,6 +394,7 @@ const listsOf = (step: Workflow) => ({
   writable: step.writable ?? [],
   reads: step.reads ?? [],
   skills: step.skills ?? [],
+  mcp: step.mcp ?? [],
   disallowedTools: step.disallowedTools ?? [],
   allowedTools: step.allowedTools ?? [],
   tally: step.tally ?? [],

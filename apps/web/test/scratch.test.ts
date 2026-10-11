@@ -13,10 +13,11 @@ const TEST = import.meta.dirname;
 /** The one copy the others are held to. */
 const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'scratch.ts');
 /**
- * The files under `test/` that may make a root by hand: the helper, and the e2e's runner, a script and no test file, which
- * `node:test`'s hooks would make a test run of: it removes its store and stops its servers on its own exit and signals.
+ * The files under `test/` that may make a root by hand: the helper, and the e2e's runner and the served board's command, each a script
+ * and no test file, which `node:test`'s hooks would make a test run of: each removes its store and stops its servers on its own exit and
+ * signals.
  */
-const ALLOWED = ['scratch.ts', 'e2e/run.ts'];
+const ALLOWED = ['scratch.ts', 'e2e/run.ts', 'e2e/serve.ts'];
 
 /** Each line of `text` that calls the temp directory by name, or makes a root with `mkdtempSync` in `machineTempDir()`. */
 const tmpdirCalls = (text: string) =>

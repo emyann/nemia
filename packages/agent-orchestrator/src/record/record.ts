@@ -162,7 +162,8 @@ type RunBase = {
   /**
    * The approvals whose gate wait the tick has put into the metrics (`gateWaits`), by step and try: each written by the pass that read the
    * approval first, so a pass after a restart, which reads the same approval, emits none again. `[]` on a run started with it; absent on a
-   * record written before it, whose gates are never timed.
+   * record written before it, whose gates are never timed. A gate approved on a try that answered an earlier try's session is timed only
+   * while `runTimed` is `false`.
    */
   gatesTimed?: Array<{ step: string; try: number }>;
   /**
@@ -171,6 +172,13 @@ type RunBase = {
    * run started with it; absent on a record written before it, whose denied calls are never counted.
    */
   deniedCounted?: Array<{ task: string; attempts: number }>;
+  /**
+   * The tasks whose settle the tick has handed the metrics (`settlesDue`), a session's and a check's alike: each written by the pass that
+   * first reads it settled, so a pass after a restart, which reads the same task settled, counts none again, and a task that settled
+   * while no daemon read is counted by the first that does. `[]` on a run started with it; absent on a record written before it, whose
+   * settles are counted off the engine's feed (`settledIn`).
+   */
+  settlesCounted?: string[];
   /**
    * Whether the tick has handed the run's timeline to the metrics (`timelineFacts`): `false` on a run started with it, `true` once the
    * pass that read the run over, with nothing of it in flight, has written it, so a pass after a restart hands none again. Absent on a

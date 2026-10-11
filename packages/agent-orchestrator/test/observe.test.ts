@@ -13,6 +13,10 @@
  * spans and its log events, and what Tempo's span metrics write, are no code of ours: they are listed as measured, dated, and the span
  * metrics' dimensions and the collector's `command_head` and `test_scope` are read from `tempo.yaml` and `otelcol.yaml`.
  *
+ * The fake telemetry a render shows the dashboards over (`tools/observe/render/seed.ts`) is held the same way: every name it sends is one
+ * the code emits or a measured one (`seedUnknown`), and every panel is met by it, with two series where it draws series, or listed as
+ * unseeded (`unmet`, `strayUnseeded`). Met is by name: no query is evaluated here, which the render itself does.
+ *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
@@ -27,6 +31,7 @@ import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { runGiven } from './placed.ts';
+import { SEED, UNSEEDED, type ServiceSeed, type SpanSeed } from '../../../tools/observe/render/seed.ts';
 
 const ROOT = scratch('wf-observe-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -159,8 +164,11 @@ type Target = {
   legendFormat?: string;
 };
 
-/** A panel's transformation, as far as the checker reads it: a `sortBy`'s fields among its options. */
-type Transformation = { id: string; options?: { sort?: { field?: string }[] } };
+/**
+ * A panel's transformation, as far as the checker reads it: a `sortBy`'s fields among its options, and a `renameByRegex`'s pattern and
+ * what it renames a match to.
+ */
+type Transformation = { id: string; options?: { sort?: { field?: string }[]; regex?: string; renamePattern?: string } };
 
 /**
  * A panel of a dashboard, as far as the checker reads it: of a bar gauge, in `reduceOptions`, whether it draws a bar for each row its
@@ -942,7 +950,44 @@ test("Timeline reads a finished run's timeline by the values the code gives, for
   assert.ok(queries.length > 0 && queries.every((q) => traceNames(q.text).spans.includes(TIMELINE_SPAN)), 'every panel reads the span');
   const asked = (key: string) => [...new Set(queries.flatMap((q) => askedOf(q.text, key)))].sort();
   assert.deepEqual(asked('of'), [...TIMELINE_OF].sort(), 'each kind of row is drawn');
-  assert.deepEqual(asked('part'), ['cost', 'queued', 'ran', 'tries', 'wall'], "the run's check and gate are drawn by its part, unasked");
+  assert.deepEqual(
+    asked('part'),
+    ['cost', 'queued', 'ran', 'tries', 'wall'],
+    "the run's check, gate and answer are drawn by its part, unasked",
+  );
+});
+
+/** The parts a run's own rows have, as the code names them: every part but a session's time at work, its cost and a step's tries. */
+const RUN_PARTS = TIMELINE_PARTS.filter((part) => part !== 'ran' && part !== 'cost' && part !== 'tries');
+
+/**
+ * The name the panel titled `title` of `dashboard` draws each of a run's parts under: the series Tempo answers for it, by its part,
+ * through the panel's `renameByRegex` transformations, in their order.
+ */
+function runBarNames(dashboard: Dashboard, title: string): Record<string, string> {
+  const renames = (dashboard.panels.find((p) => p.title === title)?.transformations ?? []).filter((x) => x.id === 'renameByRegex');
+  const named = (series: string) =>
+    renames.reduce((name, x) => name.replace(new RegExp(x.options?.regex ?? '$^'), x.options?.renamePattern ?? ''), series);
+  return Object.fromEntries(RUN_PARTS.map((part) => [part, named(`{span.part="${part}"}`)]));
+}
+
+test('A run: wall and waiting names each part of a run the code gives that is a wait as waiting, and a part it leaves out is refused', () => {
+  const names = runBarNames(dashboardTitled('Timeline'), 'A run: wall and waiting');
+  assert.deepEqual(names, {
+    wall: 'wall',
+    queued: 'waiting: queue',
+    check: 'waiting: check',
+    gate: 'waiting: gate',
+    answer: 'waiting: answer',
+  });
+  assert.deepEqual(Object.keys(names).sort(), [...RUN_PARTS].sort(), "every part of a run's rows is named");
+  const without = dashboardTitled('Timeline');
+  const rename = without.panels
+    .find((p) => p.title === 'A run: wall and waiting')
+    ?.transformations?.find((x) => x.options?.regex?.includes('answer'));
+  assert.ok(rename?.options?.regex, 'a rename that names the answer');
+  rename.options.regex = rename.options.regex.replace('|answer', '');
+  assert.equal(runBarNames(without, 'A run: wall and waiting').answer, 'answer', 'REFUSED: a rename without it draws a bare answer');
 });
 
 test('REFUSED: a Timeline query for a part or a kind the code gives none of, one of every workflow or factory, and a choice of several', () => {
@@ -1135,4 +1180,204 @@ test('Steps and A run link to Time, with their own choices', () => {
     links.some((l) => l.type === 'link' && (l.url ?? '').startsWith('/d/nemia-time?') && (l.url ?? '').includes('var-run=${run}')),
     'A run links to Time for its run',
   );
+});
+
+/** The span attribute the collector's transforms read, as measured, which a session sends only under `NEMIA_TOOL_DETAILS=1`. */
+const COLLECTOR_READS = ['full_command'];
+
+/** The attribute of a seeded span a label is drawn from: the collector's own are derived from the command it reads. */
+const seededKey = (label: string): string => (COLLECTOR_ATTRIBUTES.includes(label) ? COLLECTOR_READS[0] : label);
+
+/** Every span of `spans`, those under each among them. */
+const spansUnder = (spans: readonly SpanSeed[]): SpanSeed[] => spans.flatMap((span) => [span, ...spansUnder(span.children ?? [])]);
+
+/** A log field as Loki shows a log attribute: its dots underscores. */
+const lokiField = (key: string): string => key.replace(/\./g, '_');
+
+/** The form Prometheus shows of a seeded metric of `kind`, among the forms of the code's metric. */
+const formOf = (forms: readonly string[], kind: string): string | undefined =>
+  forms.find((form) =>
+    kind === 'histogram'
+      ? form.endsWith('_bucket')
+      : kind === 'gauge'
+        ? form.endsWith('_ratio')
+        : form.endsWith('_total') === (kind === 'total'),
+  );
+
+/** Every name `seed` sends that `known` does not hold or the code gives another kind, each once. */
+function seedUnknown(seed: readonly ServiceSeed[], known: Known): string[] {
+  const unknown = new Set<string>();
+  const check = (names: string[], set: Set<string>) => names.filter((n) => !set.has(n)).forEach((n) => unknown.add(n));
+  for (const said of seed) {
+    check([said.service], new Set([DEFAULT_SERVICE_NAME, CLAUDE_SERVICE]));
+    for (const metric of said.metrics) {
+      if (formOf(METRICS.get(metric.name) ?? [], metric.kind) === undefined) unknown.add(metric.name);
+      check(
+        metric.series.flatMap(([attributes]) => Object.keys(attributes)),
+        known.labels,
+      );
+    }
+    for (const span of spansUnder(said.spans)) {
+      check([span.name], known.spans);
+      check(Object.keys(span.attributes), new Set([...known.attributes, ...COLLECTOR_READS]));
+    }
+    check(
+      said.logs.flatMap((log) => Object.keys(log.attributes).map(lokiField)),
+      known.logFields,
+    );
+  }
+  return [...unknown];
+}
+
+/** How many series rows of attributes make when kept by `labels`: the distinct tuples of their values, a missing one its own. */
+const seriesBy = (rows: readonly Record<string, string | number>[], labels: readonly string[]): number =>
+  new Set(rows.map((row) => labels.map((label) => row[seededKey(label)] ?? '').join('\u0000'))).size;
+
+/** The labels each `by (…)` of `text` keeps, `strip` taken off the front of each, a bucket's bound and any without it left out. */
+const keptBy = (text: string, strip = ''): string[][] =>
+  [...text.matchAll(/\bby\s*\(([^)]*)\)/g)]
+    .map(([, list]) => list.split(',').map((label) => label.trim()))
+    .map((labels) => labels.filter((label) => label.startsWith(strip) && label !== 'le').map((label) => label.slice(strip.length)))
+    .filter((labels) => labels.length > 0);
+
+/** The labels a LogQL query makes by formatting one, each with the fields its template reads. */
+const madeLabels = (text: string): Map<string, string[]> =>
+  new Map(
+    [...text.matchAll(/label_format\s+(\w+)="((?:[^"\\]|\\.)*)"/g)].map(([, label, template]) => [
+      label,
+      [...new Set([...template.matchAll(/\.(\w+)/g)].map(([, field]) => field))],
+    ]),
+  );
+
+/** What `seed` holds, as a query would find it: its metrics by the name Prometheus shows, its spans by name, its logs by service. */
+function seeded(seed: readonly ServiceSeed[]) {
+  const spans = seed.flatMap((said) => spansUnder(said.spans));
+  const metrics = new Map<string, Record<string, string | number>[]>();
+  for (const metric of seed.flatMap((said) => said.metrics)) {
+    const base = formOf(METRICS.get(metric.name) ?? [], metric.kind)?.replace(/_bucket$/, '') ?? metric.name;
+    const forms = metric.kind === 'histogram' ? [`${base}_bucket`, `${base}_count`, `${base}_sum`] : [base];
+    for (const form of forms)
+      metrics.set(
+        form,
+        metric.series.map(([attributes]) => attributes),
+      );
+  }
+  const sessions = spans.filter((span) => CLAUDE_SPANS.includes(span.name)).map((span) => span.attributes);
+  for (const form of sessions.length ? SPAN_METRICS : []) metrics.set(form, sessions);
+  const logs = (service: string) =>
+    seed.filter((said) => said.service === service).flatMap((said) => said.logs.map((log) => log.attributes));
+  return { spans, metrics, logs };
+}
+
+/** Why `seed` does not meet the query `text` sent to `datasource`: a name it does not hold, or one series where the query keeps several. */
+function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed[]): string[] {
+  const has = seeded(seed);
+  if (datasource === 'prometheus') {
+    const named = promNames(text).metrics;
+    const rows = named.flatMap((metric) => has.metrics.get(metric) ?? []);
+    const few = keptBy(text).filter((labels) => seriesBy(rows, labels) < 2);
+    return [...named.filter((metric) => !has.metrics.has(metric)), ...few.map((labels) => `one series by ${labels.join(', ')}`)];
+  }
+  if (datasource === 'tempo') {
+    const named = traceNames(text).spans;
+    const rows = has.spans.filter((span) => named.includes(span.name)).map((span) => span.attributes);
+    const few = keptBy(text, 'span.').filter((labels) => seriesBy(rows, labels) < 2);
+    return [
+      ...named.filter((name) => !has.spans.some((span) => span.name === name)),
+      ...few.map((labels) => `one series by ${labels.join(', ')}`),
+    ];
+  }
+  if (datasource !== 'loki') return [`nothing sent to ${datasource}`];
+  const service = /service_name="([^"]*)"/.exec(text)?.[1].replace('$service', DEFAULT_SERVICE_NAME) ?? '';
+  const rows = has.logs(service).map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [lokiField(key), value])));
+  const fields = new Set([...rows.flatMap((row) => Object.keys(row)), ...LOKI_FIELDS]);
+  const made = madeLabels(text);
+  const few = keptBy(text)
+    .map((labels) => labels.flatMap((label) => made.get(label) ?? [label]))
+    .filter((labels) => seriesBy(rows, labels) < 2);
+  return [...logNames(text).filter((field) => !fields.has(field)), ...few.map((labels) => `one series by ${labels.join(', ')}`)];
+}
+
+/** An entry of the render's unseeded panels. */
+type Unseeded = (typeof UNSEEDED)[number];
+
+/** Each panel of the dashboard in the file `name` that `seed` does not meet and `unseeded` does not list, as `<title>: <why>`. */
+function unmet(dashboard: Dashboard, name: string, seed: readonly ServiceSeed[], unseeded: readonly Unseeded[] = UNSEEDED): string[] {
+  const listed = (panel: Panel) => unseeded.some((entry) => entry.dashboard === name && entry.panel === panel.title);
+  return allPanels(dashboard.panels)
+    .filter((panel) => !listed(panel))
+    .flatMap((panel) =>
+      (panel.targets ?? [])
+        .filter((target) => target.datasource?.uid !== EXPRESSIONS)
+        .flatMap((target) =>
+          unmetQuery(
+            target.datasource?.uid ?? panel.datasource?.uid ?? '',
+            target.expr ?? target.query ?? target.labelSelector ?? '',
+            seed,
+          ),
+        )
+        .map((why) => `${panel.title}: ${why}`),
+    );
+}
+
+/** Each entry of `unseeded` that names no panel of the shipped dashboards, as `<dashboard>: <panel>`. */
+const strayUnseeded = (unseeded: readonly Unseeded[]): string[] =>
+  unseeded
+    .filter((entry) => !allPanels(DASHBOARDS.get(`${entry.dashboard}.json`)?.panels ?? []).some((panel) => panel.title === entry.panel))
+    .map((entry) => `${entry.dashboard}: ${entry.panel}`);
+
+test("the render's seed sends only names the code emits, or the measured ones", () => {
+  assert.deepEqual(seedUnknown(SEED, KNOWN), []);
+  assert.ok(
+    seeded(SEED).spans.some((span) => span.name === DENIED_SPAN),
+    'the seed holds denied calls',
+  );
+  const nameless = seeded(SEED)
+    .logs(CLAUDE_SERVICE)
+    .filter((log) => log.success === 'false' && log.tool_name === undefined);
+  assert.equal(nameless.length, 1, 'one failed tool result with its tool label missing');
+});
+
+/** `seed` with every span named `from` named `to`. */
+const renamed = (seed: readonly ServiceSeed[], from: string, to: string): ServiceSeed[] => {
+  const again = (span: SpanSeed): SpanSeed => ({ ...span, name: span.name === from ? to : span.name, children: span.children?.map(again) });
+  return seed.map((said) => ({ ...said, spans: said.spans.map(again) }));
+};
+
+test('REFUSED: a seed with a renamed span, a metric of another kind, an attribute or a log field the code does not send', () => {
+  assert.deepEqual(seedUnknown(renamed(SEED, DENIED_SPAN, 'step.denid'), KNOWN), ['step.denid']);
+  const [daemon, ...sessions] = SEED;
+  const asGauge = daemon.metrics.map((metric) => (metric.name === 'step.cost' ? { ...metric, kind: 'gauge' as const } : metric));
+  assert.deepEqual(seedUnknown([{ ...daemon, metrics: asGauge }], KNOWN), ['step.cost']);
+  const loose = { name: 'step.tries', kind: 'total' as const, series: [[{ run: 'r-1' }, 1] as [Record<string, string>, number]] };
+  assert.deepEqual(seedUnknown([{ ...daemon, spans: [], logs: [], metrics: [loose] }], KNOWN), ['run']);
+  const odd = { ...sessions[0], logs: [{ body: 'x', ago: 0, attributes: { 'tool.title': 'Bash' } }] };
+  assert.deepEqual(seedUnknown([odd], KNOWN), ['tool_title']);
+});
+
+test('the seed meets every panel of every dashboard, with two series where a panel draws series, or the panel is listed unseeded', () => {
+  for (const [file, d] of DASHBOARDS) assert.deepEqual(unmet(d, file.replace(/\.json$/, ''), SEED), [], file);
+  assert.deepEqual(strayUnseeded(UNSEEDED), []);
+  assert.ok(UNSEEDED.length > 0 && UNSEEDED.every((entry) => entry.why.length > 0), 'each unseeded panel says why');
+});
+
+test('REFUSED: a query the seed does not meet, a panel left with one series, an unlisted profile panel, and an unseeded entry naming no panel', () => {
+  const steps = withQuery(dashboardTitled('Steps'), 'prometheus', 'step_tokens_input_total', 'step_tokens_cached_total');
+  assert.deepEqual(unmet(steps, 'steps', SEED), [
+    'Input tokens: step_tokens_cached_total',
+    'Input tokens: one series by factory, workflow, step, agent',
+  ]);
+  const spanless = withQuery(dashboardTitled('Steps'), 'tempo', `name="${DENIED_SPAN}"`, 'name="step.refused"');
+  assert.deepEqual(unmet(spanless, 'steps', SEED).slice(0, 1), ['Denied calls: step.refused']);
+  const oneStep = SEED.map((said) => ({
+    ...said,
+    logs: said.logs.filter((log) => log.attributes.step !== 'review' && log.attributes.tool_name === 'Bash'),
+  }));
+  const few = unmet(dashboardTitled('Steps'), 'steps', oneStep).filter((why) => why.startsWith('Tool errors: one series by '));
+  assert.equal(few.length, 1, 'one step and one tool leave Tool errors one series');
+  assert.deepEqual(unmet(dashboardTitled('System'), 'system', SEED, []), [
+    'CPU, over the range: nothing sent to pyroscope',
+    'Heap in use, over the range: nothing sent to pyroscope',
+  ]);
+  assert.deepEqual(strayUnseeded([...UNSEEDED, { dashboard: 'system', panel: 'Wall time', why: 'x' }]), ['system: Wall time']);
 });

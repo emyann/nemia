@@ -6,10 +6,12 @@
  * a harness denied one of its sessions (`DeniedFact`), which is no metric: a span of its own, with its run, its task and its tool. And,
  * once a run is over, each number of its timeline (`TimelineFact`), a span of its own too.
  *
- * Pure: the tick hands it the run, the tasks the feed said settled since its last read (`settledIn`), and what the pass already read of
- * them; it reads nothing more, and nothing is carried from one pass to the next. A gate is timed on the first pass that reads its approval
- * and does not find it among those the tick has timed (`gatesTimed`), and a denied call is counted on the first pass that reads its attempt
- * ended and past those the tick has counted (`deniedCounted`).
+ * Pure: the tick hands it the run and what the pass already read of its tasks; it reads nothing more, and nothing is carried from one pass
+ * to the next. A settle is counted on the first pass that reads its task settled and does not find it among those the tick has counted
+ * (`settlesCounted`, `settlesDue`); on a record with no such mark, on the pass whose read of the feed names it (`settledIn`). A gate is
+ * timed on the first pass that reads its approval and does not find it among those the tick has timed (`gatesTimed`), and a denied call is
+ * counted on the first pass that reads its attempt ended and past those the tick has counted (`deniedCounted`). A gate approved on a try
+ * that answered an earlier try's session is timed only while the run's timeline is still to hand over (`runTimed` is `false`).
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
@@ -30,6 +32,7 @@ import {
   type AttemptClock,
   type TaskClock,
   type TimelineRow,
+  type TimelineTry,
 } from '../timeline/index.ts';
 
 /** The only attributes a step's metric carries: a series for each, never one for each run. */
@@ -115,15 +118,22 @@ export type FactReads = {
   statusOf: (step: Workflow) => StepStatus;
 };
 
-/** Each of a step's tasks, its session's and its check's, of every try: which it is. */
-const tasksOf = (record: Run['steps'][string]): Array<{ taskId: string; metric: 'try' | 'check' }> => [
-  ...(record.taskId ? [{ taskId: record.taskId, metric: 'try' as const }] : []),
-  ...(record.check ? [{ taskId: record.check.taskId, metric: 'check' as const }] : []),
-  ...(record.tries ?? []).flatMap((t) => [
-    { taskId: t.taskId, metric: 'try' as const },
-    ...(t.check ? [{ taskId: t.check.taskId, metric: 'check' as const }] : []),
-  ]),
-];
+/**
+ * Each of a step's tasks, its session's and its check's, of every try: which it is. Each once, its first mention kept: a session held open
+ * and answered is the step's task and one of its tries', and one task.
+ */
+function tasksOf(record: Run['steps'][string]): Array<{ taskId: string; metric: 'try' | 'check' }> {
+  const all = [
+    ...(record.taskId ? [{ taskId: record.taskId, metric: 'try' as const }] : []),
+    ...(record.check ? [{ taskId: record.check.taskId, metric: 'check' as const }] : []),
+    ...(record.tries ?? []).flatMap((t) => [
+      { taskId: t.taskId, metric: 'try' as const },
+      ...(t.check ? [{ taskId: t.check.taskId, metric: 'check' as const }] : []),
+    ]),
+  ];
+  const seen = new Set<string>();
+  return all.filter((t) => !seen.has(t.taskId) && seen.add(t.taskId));
+}
 
 /** How a session ended: `done` or `blocked` as it signed, the step's current one read off its closeout, else `failed` or `stopped`. */
 export function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined): string {
@@ -173,6 +183,36 @@ export function settledFacts(run: Run, steps: readonly Workflow[], settled: Read
       facts.push({ metric: 'round', attributes: stepAttributes(run, step, 'exhausted') });
     return facts;
   });
+}
+
+/**
+ * The tasks of `run` whose settle the tick has not handed the metrics: each task of its steps' records, a session's and a check's alike,
+ * that its view says settled and the run's mark (`settlesCounted`) does not hold. Read off the record and the views alone, so a task
+ * that settled while no daemon read is due on the first pass that reads it. A task the pass has no view of is not due. Undefined on a
+ * record with no mark, written before the tick kept one: its settles are those the engine's feed names (`settledIn`).
+ */
+export function settlesDue(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, FactView>): Set<string> | undefined {
+  const counted = run.settlesCounted;
+  if (!counted) return undefined;
+  const tasks = steps.flatMap((step) => tasksOf(run.steps[step.name] ?? { status: 'pending' }).map((t) => t.taskId));
+  return new Set(tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId)));
+}
+
+/**
+ * What a pass hands the metrics of `run`'s settled tasks, once: their facts (`settledFacts`) and the waits they ended (`settledWaits`),
+ * for the tasks due by the run's mark (`settlesDue`), with that mark as it stands once they are handed over (`marks`), for the tick to
+ * write. On a record with no mark, for the tasks the feed named since its last read (`fed`), and no mark is made.
+ */
+export function settledOnce(
+  run: Run,
+  steps: readonly Workflow[],
+  fed: ReadonlySet<string> | undefined,
+  reads: FactReads,
+): { facts: StepFact[]; marks: Pick<Run, 'settlesCounted'> } {
+  const due = settlesDue(run, steps, reads.views);
+  const settled = due ?? fed ?? new Set<string>();
+  const facts = [...settledFacts(run, steps, settled, reads), ...settledWaits(run, steps, settled, reads)];
+  return { facts, marks: due?.size ? { settlesCounted: [...(run.settlesCounted ?? []), ...due] } : {} };
 }
 
 /** A round `granted` for each looping step whose loop the pass took round again (`looped`). */
@@ -247,9 +287,17 @@ export function settledWaits(run: Run, steps: readonly Workflow[], settled: Read
 }
 
 /**
+ * Whether try `t` ends at the turn it ran of an earlier try's session, with no check of its own, on a `run` whose timeline is handed over
+ * or was never to be (`runTimed` other than `false`): a gate `gateWaits` leaves untimed, whatever pass reads it.
+ */
+const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Boolean(t.turn) && !t.check && run.runTimed !== false;
+
+/**
  * The gate wait of each approval of `run` at a gated step that the tick has not timed (`gatesTimed`), off its `timeline` of `views`: the ms
  * `gateWaitOf` gives, ending at the approval. None on a record with no `gatesTimed`, written before the tick timed gates; none for an
- * approval whose try is not on the timeline yet, or whose wait is not known, which a later pass times once it is.
+ * approval whose try is not on the timeline yet, or whose wait is not known, which a later pass times once it is. And none, ever, for a
+ * wait read off the turn of a try that answered an earlier try's session (`answeredLate`) on a run whose timeline is not still to hand
+ * over (`runTimed` other than `false`): such a gate of a run already handed over, or started before the mark, is never timed late.
  */
 export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
   const timed = run.gatesTimed;
@@ -259,7 +307,7 @@ export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyM
     const step = steps.find((s) => s.name === a.step);
     if (!step || !hasGate(step, run) || timed.some((g) => g.step === a.step && g.try === a.try)) return [];
     const t = tl.steps[a.step]?.find((x) => x.try === a.try);
-    const ms = t ? gateWaitOf(run, tl, step, t) : null;
+    const ms = t && !answeredLate(run, t) ? gateWaitOf(run, tl, step, t) : null;
     if (ms === null) return [];
     const from = new Date(Date.parse(a.at) - ms).toISOString();
     return [

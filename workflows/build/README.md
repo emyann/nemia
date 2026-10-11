@@ -19,6 +19,12 @@ step unless the closeout's `artifacts` names a picture, an image file (`.png`, `
 bytes, by an absolute path in the step's files directory (`WF_ARTIFACTS`) or from the workspace root. The refusal names the command that
 takes them, `npm run e2e -- --photos --pages <name,…>`. A change only under `apps/web/test` asks for none.
 
+The same script asks a change under `tools/observe` that a dashboard reads for its dashboards rendered: each
+`tools/observe/dashboards/<name>.json` changed owes `dashboard-<name>.png` and `dashboard-<name>.txt` in `artifacts`, and any other path
+there but `README.md` and `profile/`, one such pair at least. The refusal names the command that writes them, `node
+tools/observe/render/render.ts --out <files>`, which implement alone may run; implement and review are given `see-a-dashboard`, this
+repository's skill for reading them.
+
 It runs `probe.ts`, read from the base as well: a session a step starts to measure something, a probe, is named `<run>-probe-<label>`
 (`node workflows/build/probe.ts start <label> -- <prompt>`), runs in the machinery's trusted folder `$WF_ROOT/probes`, and says in its
 first message whether the person must act; it reaches the person's phone through Remote Control only with `--answer`, and the step then

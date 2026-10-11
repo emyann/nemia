@@ -307,6 +307,7 @@ type Told = Pick<
   | 'mounts'
   | 'gatesTimed'
   | 'deniedCounted'
+  | 'settlesCounted'
   | 'runTimed'
 >;
 
@@ -382,7 +383,8 @@ export function leftOutMounts(run: Run): string[] {
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, and `mounts`
  * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts. No gate of it is
- * timed yet (`gatesTimed`), no denied call counted (`deniedCounted`), and its timeline not handed to the metrics (`runTimed`).
+ * timed yet (`gatesTimed`), no denied call counted (`deniedCounted`), no settle counted (`settlesCounted`), and its timeline not handed
+ * to the metrics (`runTimed`).
  */
 function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
   const after = opts.after ?? [];
@@ -404,6 +406,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(mounts.length ? { mounts } : {}),
     gatesTimed: [],
     deniedCounted: [],
+    settlesCounted: [],
     runTimed: false,
   };
 }

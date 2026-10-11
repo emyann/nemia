@@ -27,6 +27,13 @@
  * its round's check already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
  * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
+ * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
+ * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
+ *
+ * Seldon and Agora drive the browser: each allows every tool of its server by name on its own file (`BROWSER_TOOLS`), never the server
+ * whole (`wholeServers`), and denies `browser_run_code_unsafe`; the design and review steps name the server, deny the live board by its
+ * address (`LIVE_BOARD`) and name the two commands that serve a board of the change (`BOARD_CHECKS`), which the settings allow. Agent
+ * and step alike deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a file named could be the workspace's.
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
  * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
@@ -78,8 +85,16 @@ const SKILL_FOLDERS = [
 type Settings = { permissions?: { allow?: string[]; deny?: string[] } };
 const SETTINGS = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as Settings;
 
-/** A call a session makes: a shell command, or a tool by its name, an edit or a write with the absolute path it writes when one is said. */
-type Call = { tool: 'Bash'; command: string; path?: undefined } | { tool: string; command?: undefined; path?: string };
+/**
+ * A call a session makes: a shell command, or a tool by its name, an edit or a write with the absolute path it writes when one is said, a
+ * browser tool with the address it opens or the file it is told to write when one is given.
+ */
+type Call =
+  | { tool: 'Bash'; command: string; path?: undefined; url?: undefined; filename?: undefined }
+  | { tool: string; command?: undefined; path?: string; url?: string; filename?: string };
+
+/** The parameters of an MCP tool a rule may name here, each read off the call as it wrote it. */
+const PARAMS = ['url', 'filename'] as const;
 
 /** What no shipped step may run, in the spellings a session types. */
 const FENCED: Call[] = [
@@ -121,20 +136,37 @@ const HARNESS_FILES = [`${HOME}/projects/.claude/settings.local.json`, `${HOME}/
 const OWN_FILE = `${HOME}/.agent-workflows/worktrees/r-1/design/src/a.ts`;
 
 /** A call as a rule would name it, for a message. */
-const shown = (call: Call): string => (call.command === undefined ? call.tool : `Bash(${call.command})`);
+const shown = (call: Call): string => {
+  if (call.command !== undefined) return `Bash(${call.command})`;
+  const param = PARAMS.find((name) => call[name] !== undefined);
+  return param === undefined ? call.tool : `${call.tool}(${param}:${call[param]})`;
+};
 
 /**
  * Whether a permission rule reaches a call: a bare tool name is that tool, `mcp__<server>` or `mcp__<server>__*` every tool of the
  * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more; a `*`
  * inside a Bash rule is any run of characters, none included (`globbed`). Any other `Tool(x)` reaches some call of that tool, so it is
  * read as reaching every one, unless the call says the path it writes: then `Edit(//<glob>)` and `Edit(~/<glob>)` reach it when the glob
- * covers it (`covers`). Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. Throws on a `*` in a
- * tool's name, which this matcher does not model.
+ * covers it (`covers`). Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. A rule on an MCP tool's
+ * parameter, `mcp__<server>__<tool>(url:<glob>)` or `(filename:<glob>)`, reaches a call of that tool whose parameter the glob covers
+ * whole, each `*` any run of characters, compared as the call wrote it, and no call that gives none: so Claude Code was measured to
+ * read one in a deny list, and an allow list is read through `granting`, which refuses one. Throws on a `*` in a tool's name and on any
+ * other parameter, which this matcher does not model.
  */
 function reaches(rule: string, call: Call): boolean {
   const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
   if (bash === undefined) {
     const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
+    if (tool?.startsWith('mcp__')) {
+      const said = rule.slice(tool.length + 1, -1);
+      const param = PARAMS.find((name) => said.startsWith(`${name}:`));
+      if (param === undefined || tool.includes('*'))
+        throw new Error(
+          `${rule}: a parameter rule on an MCP tool is modelled for \`url:\` and \`filename:\` alone; say how it reads, here`,
+        );
+      const given = call[param];
+      return tool === call.tool && given !== undefined && globbed(said.slice(param.length + 1), false).test(given);
+    }
     const pathed = call.path !== undefined && tool !== undefined;
     if (pathed && (tool === call.tool || (call.tool === 'Write' && tool === 'Edit')))
       return covers(rule.slice(tool.length + 1, -1), call.path!);
@@ -181,6 +213,17 @@ function covers(rulePath: string, file: string): boolean {
     )
     .join('');
   return new RegExp(`^${pattern}$`).test(file);
+}
+
+/**
+ * The rules of an allow list as this matcher may read them: all of them. Throws on a rule on an MCP tool's parameter, which Claude Code
+ * was measured to read in a deny list alone: what such a rule allows is not modelled, and a guess would make a fence pass for nothing.
+ */
+function granting(rules: readonly string[]): readonly string[] {
+  const odd = rules.find((rule) => /^mcp__[^(]*\(/.test(rule));
+  if (odd !== undefined)
+    throw new Error(`${odd}: a parameter rule on an MCP tool in an allow list is not modelled; say how it reads, here`);
+  return rules;
 }
 
 /** A wrapper Claude Code strips before it matches a part: a leading assignment, `timeout` with its duration, `nohup`. */
@@ -248,7 +291,7 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
   if (harness !== 'claude' && harness !== 'claude-detached')
     return [`${step.name}: on ${harness}, which this test does not know how to fence`];
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
-  const allows = [...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...SKILL_GRANTS];
+  const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...SKILL_GRANTS]);
   const unshipped = step.background === true || step.workspace === 'main';
   const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
   return calls
@@ -278,7 +321,7 @@ const SETTINGS_ALLOWS = SETTINGS.permissions?.allow ?? [];
 
 /** The commands a step's fence would refuse: reached by no allow of its own or of the settings' `allowed`, or by a deny of its own. */
 function unallowed(step: Step, commands: string[], allowed: readonly string[] = SETTINGS_ALLOWS): string[] {
-  const allows = [...(step.allowedTools ?? []), ...allowed];
+  const allows = granting([...(step.allowedTools ?? []), ...allowed]);
   return commands.filter((command) => {
     const call = { tool: 'Bash', command } as const;
     return !allows.some((rule) => reaches(rule, call)) || (step.disallowedTools ?? []).some((rule) => reaches(rule, call));
@@ -332,6 +375,55 @@ test('the matcher reads the rule shapes the fences use, and throws on a wildcard
   assert.throws(
     () => reaches('mcp__play*', unsafe),
     (err: Error) => err.message.includes('not modelled'),
+  );
+});
+
+test('the matcher reads a rule on a browser tool by the address it opens, as written, and throws on a parameter it does not model', () => {
+  const live = 'mcp__playwright__browser_navigate(url:*:8787*)';
+  const to = (url?: string): Call => ({ tool: 'mcp__playwright__browser_navigate', url });
+  for (const url of ['http://127.0.0.1:8787/', 'localhost:8787', 'http://[::1]:8787/runs', 'http://localhost:8787'])
+    assert.equal(reaches(live, to(url)), true, url);
+  assert.equal(reaches(live, to('http://127.0.0.1:41234/')), false, 'another port');
+  assert.equal(reaches(live, to('http://127.0.0.1:18787/')), false, "the colon is the port's");
+  assert.equal(reaches(live, to()), false, 'a call that gives no address is matched by no parameter rule');
+  assert.equal(reaches(live, { tool: 'mcp__playwright__browser_tabs', url: 'http://127.0.0.1:8787/' }), false, "a rule is one tool's");
+  assert.equal(reaches('mcp__playwright__browser_navigate', to('http://127.0.0.1:8787/')), true, 'a bare name is every call of it');
+  assert.equal(reaches('mcp__playwright', to('http://127.0.0.1:8787/')), true);
+  assert.equal(shown(to('http://127.0.0.1:8787/')), 'mcp__playwright__browser_navigate(url:http://127.0.0.1:8787/)');
+  for (const rule of ['mcp__playwright__browser_evaluate(function:*)', 'mcp__playwright__*(url:*)'])
+    assert.throws(
+      () => reaches(rule, to('http://127.0.0.1:8787/')),
+      (err: Error) => err.message.includes('modelled for `url:` and `filename:` alone'),
+      rule,
+    );
+  const named = 'mcp__playwright__browser_take_screenshot(filename:*)';
+  const shot = (filename?: string): Call => ({ tool: 'mcp__playwright__browser_take_screenshot', filename });
+  for (const filename of ['x.png', 'a/x.png', '/tmp/playwright-mcp/x.png']) assert.equal(reaches(named, shot(filename)), true, filename);
+  assert.equal(reaches(named, shot()), false, 'a picture given no name is matched by no rule on its name');
+  assert.equal(reaches(named, { tool: 'mcp__playwright__browser_snapshot', filename: 'x.yml' }), false);
+  assert.equal(shown(shot('x.png')), 'mcp__playwright__browser_take_screenshot(filename:x.png)');
+});
+
+test("REFUSED: a rule on an MCP tool's parameter in an allow list is not read as allowing anything: the matcher throws on it", () => {
+  const reviewer = stepOf('reviewer');
+  const call = [{ tool: 'mcp__playwright__browser_navigate', url: 'http://127.0.0.1:41234/' }];
+  const allowed = {
+    ...reviewer,
+    allowedTools: [...(reviewer.allowedTools ?? []), 'mcp__playwright__browser_navigate(url:http://127.0.0.1:*)'],
+  };
+  const unmodelled = (err: Error) => err.message.includes('in an allow list is not modelled');
+  assert.throws(() => runs(allowed, call), unmodelled);
+  assert.throws(() => unfenced(allowed), unmodelled);
+  assert.throws(() => unallowed(allowed, ['npm run lint']), unmodelled);
+  assert.throws(
+    () => runs(reviewer, call, { permissions: { allow: ['mcp__playwright__browser_tabs(url:*)'] } }),
+    unmodelled,
+    'nor in the settings',
+  );
+  assert.deepEqual(
+    runs({ ...reviewer, disallowedTools: ['mcp__playwright__browser_navigate(url:*:8787*)'] }, call),
+    [],
+    'a deny list reads one',
   );
 });
 
@@ -655,17 +747,19 @@ function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'dis
 }
 
 /**
- * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote the file
- * `of`, the agent's by default. Fails, saying the agent has no `what`, when the edit changes nothing.
+ * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team in which `edit` rewrote each file
+ * of `of`, the agent's alone by default. Fails, saying which file has no `what`, when the edit changes nothing in one.
  */
-function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string, of = `agents/${agent}.md`): Step {
+function shippedEdited(agent: string, workflow: string, what: string, edit: (text: string) => string, ...of: string[]): Step {
   const root = scratch(`wf-fences-${agent}-`);
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const file = path.join(root, of);
-  const text = fs.readFileSync(file, 'utf8');
-  const changed = edit(text);
-  assert.notEqual(changed, text, `${agent} has ${what}`);
-  fs.writeFileSync(file, changed);
+  for (const name of of.length ? of : [`agents/${agent}.md`]) {
+    const file = path.join(root, name);
+    const text = fs.readFileSync(file, 'utf8');
+    const changed = edit(text);
+    assert.notEqual(changed, text, `${name} has ${what}`);
+    fs.writeFileSync(file, changed);
+  }
   return loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.agent?.name === agent)!;
 }
 
@@ -674,6 +768,238 @@ const shippedAllowed = (agent: string, workflow: string, allowed: string): Step 
 
 /** The janitor's step, its agent's `allowedTools` line replaced by `allowed` (`shippedAllowed`). */
 const argusAllowed = (allowed: string): Step => shippedAllowed('argus', 'janitor', allowed);
+
+/** Every tool of the browser's server a step given the browser drives: all of the pinned server's but `browser_run_code_unsafe`. */
+const BROWSER_TOOLS = [
+  'click',
+  'close',
+  'console_messages',
+  'drag',
+  'drop',
+  'evaluate',
+  'file_upload',
+  'fill_form',
+  'find',
+  'handle_dialog',
+  'hover',
+  'navigate',
+  'navigate_back',
+  'network_request',
+  'network_requests',
+  'press_key',
+  'resize',
+  'select_option',
+  'snapshot',
+  'tabs',
+  'take_screenshot',
+  'type',
+  'wait_for',
+].map((name) => `mcp__playwright__browser_${name}`);
+
+/** A page of a board served for the step (`npm run board:serve`), opened in the tab or in a new one. */
+const SERVED_BOARD: Call[] = [
+  { tool: 'mcp__playwright__browser_navigate', url: 'http://127.0.0.1:41234/runs' },
+  { tool: 'mcp__playwright__browser_tabs', url: 'http://127.0.0.1:41234/' },
+];
+
+/** The live board, the person's own on :8787 and :5173, in the spellings a session types: what a step given the browser never opens. */
+const LIVE_BOARD: Call[] = [
+  'http://127.0.0.1:8787/',
+  'http://localhost:8787/runs',
+  'localhost:8787',
+  'http://[::1]:8787/',
+  'http://127.0.0.1:5173/',
+  'http://localhost:5173/factory',
+].flatMap((url) => [
+  { tool: 'mcp__playwright__browser_navigate', url },
+  { tool: 'mcp__playwright__browser_tabs', url },
+]);
+
+/**
+ * A browser tool told the file to write, in the workspace or out of it: each tool of the pinned server that takes a `filename` but
+ * `browser_run_code_unsafe`. A step that writes nothing gives none, and the tool then saves in the server's own output directory.
+ */
+const FILE_TOOLS = ['console_messages', 'evaluate', 'network_request', 'network_requests', 'snapshot', 'take_screenshot'];
+const NAMED_FILES: Call[] = FILE_TOOLS.flatMap((name) =>
+  ['x.png', 'notes/x.png', '/tmp/playwright-mcp/x.png'].map((filename) => ({ tool: `mcp__playwright__browser_${name}`, filename })),
+);
+
+/** The dontAsk agents given the browser, each with its workflow and the file of the step that names the server and the live board. */
+const BROWSERS = [
+  { agent: 'seldon', workflow: 'build', file: 'build/design.md' },
+  { agent: 'agora', workflow: 'build', file: 'build/review.md' },
+];
+
+/** The rules of a step's `allowedTools` that allow a whole MCP server: a tool its pinned server gains later would be allowed unnamed. */
+const wholeServers = (step: Step): string[] =>
+  (step.allowedTools ?? []).filter((rule) => /^mcp__[^_(]+(?:_[^_(]+)*(?:__\*)?$/.test(rule)).map((rule) => `${step.name}: ${rule}`);
+
+test('Seldon and Agora drive the browser by their own allow, each tool by name, on a served board, and are refused the live board by address', () => {
+  const tools = BROWSER_TOOLS.map((tool) => ({ tool }));
+  assert.equal(BROWSER_TOOLS.length, 23);
+  for (const { agent, workflow, file } of BROWSERS) {
+    const step = shippedStepOf(agent);
+    assert.equal(step.permissionMode, 'dontAsk', agent);
+    assert.ok(step.agent?.mcp?.includes('playwright'), `${agent}'s step loads the browser's server, or its allows reach no tool`);
+    assert.deepEqual(runs(step, tools, {}, []), BROWSER_TOOLS, `${agent}: by its own allow, no settings read`);
+    assert.deepEqual(runs(step, SERVED_BOARD, {}, []), SERVED_BOARD.map(shown), `${agent} opens a served board`);
+    assert.deepEqual(unfenced(step, SETTINGS, LIVE_BOARD), [], `${agent} is refused the live board`);
+    assert.deepEqual(unfenced(step, SETTINGS, NAMED_FILES), [], `${agent} names no file a browser tool writes`);
+    assert.deepEqual(unfenced(step), [], agent);
+    const hired = shippedEdited(agent, workflow, 'a deny line of its own', (text) => text.replace(/^disallowedTools: .*\n/m, ''), file);
+    assert.ok(
+      hired.disallowedTools?.includes('mcp__playwright__browser_run_code_unsafe'),
+      `${agent}'s own file denies browser_run_code_unsafe by name, for a step that hires it and denies nothing itself`,
+    );
+    assert.deepEqual(unfenced(hired, SETTINGS, NAMED_FILES), [], `${agent}'s own file denies a named file too`);
+  }
+  assert.deepEqual(
+    shipped().flatMap(({ step }) => wholeServers(step)),
+    [],
+    'no shipped step allows a whole server',
+  );
+});
+
+test('REFUSED: a browser tool an agent allows no more is reached no more, and browser_run_code_unsafe allowed without its deny is open', () => {
+  for (const { agent, workflow, file } of BROWSERS) {
+    const cut = shippedEdited(agent, workflow, 'an allow of browser_click', (text) => text.replace(', mcp__playwright__browser_click', ''));
+    const reached = runs(
+      cut,
+      BROWSER_TOOLS.map((tool) => ({ tool })),
+      {},
+      [],
+    );
+    assert.deepEqual(
+      BROWSER_TOOLS.filter((tool) => !reached.includes(tool)),
+      ['mcp__playwright__browser_click'],
+      agent,
+    );
+    const unsafe = shippedEdited(
+      agent,
+      workflow,
+      'a deny of browser_run_code_unsafe',
+      (text) =>
+        text
+          .replace(', mcp__playwright__browser_run_code_unsafe', '')
+          .replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
+      `agents/${agent}.md`,
+      file,
+    );
+    assert.deepEqual(unfenced(unsafe), [`${unsafe.name}: mcp__playwright__browser_run_code_unsafe`], agent);
+    assert.throws(
+      () => shippedEdited(agent, workflow, 'a deny', (text) => text.replace(', mcp__playwright__browser_run_code_unsafe', ''), file),
+      (err: Error) => err.message.includes('would lift `mcp__playwright__browser_run_code_unsafe`'),
+      `${file} alone cannot drop what its agent denies`,
+    );
+    const allowedAlone = shippedEdited(agent, workflow, 'an allowedTools line', (text) =>
+      text.replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
+    );
+    assert.deepEqual(unfenced(allowedAlone), [], `${agent}: its own deny wins over an allow`);
+  }
+});
+
+test('REFUSED: a whole server allowed on an agent is named, in either spelling, and a tool or a rule on one is not', () => {
+  for (const [rule, named] of [
+    ['mcp__playwright', true],
+    ['mcp__playwright__*', true],
+    ['mcp__my_server', true],
+    ['mcp__playwright__browser_click', false],
+    ['mcp__playwright__browser_navigate(url:*:8787*)', false],
+  ] as const) {
+    const step = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
+      text.replace(/^allowedTools: (.*)$/m, `allowedTools: $1, ${rule}`),
+    );
+    assert.deepEqual(wholeServers(step), named ? [`review: ${rule}`] : [], rule);
+  }
+});
+
+test('REFUSED: design or review with one of its four address rules cut opens the live board on that port by that tool', () => {
+  for (const { agent, workflow, file } of BROWSERS)
+    for (const tool of ['mcp__playwright__browser_navigate', 'mcp__playwright__browser_tabs'])
+      for (const port of ['8787', '5173']) {
+        const rule = `${tool}(url:*:${port}*)`;
+        const cut = shippedEdited(agent, workflow, `the rule ${rule}`, (text) => text.replace(`, ${rule}`, ''), file);
+        const open = LIVE_BOARD.filter((call) => call.tool === tool && call.url?.includes(`:${port}`));
+        assert.equal(open.length, port === '8787' ? 4 : 2);
+        assert.deepEqual(
+          unfenced(cut, SETTINGS, LIVE_BOARD),
+          open.map((call) => `${cut.name}: ${shown(call)}`),
+          `${file} without ${rule}`,
+        );
+      }
+});
+
+test("REFUSED: a step or an agent that denies a browser tool its filename no more may have it write a file, the workspace's too", () => {
+  for (const { agent, workflow, file } of BROWSERS)
+    for (const name of FILE_TOOLS) {
+      const tool = `mcp__playwright__browser_${name}`;
+      const cut = (text: string) => text.replace(`, ${tool}(filename:*)`, '');
+      const open = NAMED_FILES.filter((call) => call.tool === tool);
+      assert.equal(open.length, 3);
+      const both = shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, cut, `agents/${agent}.md`, file);
+      assert.deepEqual(
+        unfenced(both, SETTINGS, NAMED_FILES),
+        open.map((call) => `${both.name}: ${shown(call)}`),
+        `${file} and agents/${agent}.md without it`,
+      );
+      assert.throws(
+        () => shippedEdited(agent, workflow, `a deny of a filename to ${tool}`, cut, file),
+        (err: Error) => err.message.includes(`would lift \`${tool}(filename:*)\``),
+        `${file} alone cannot drop what its agent denies`,
+      );
+      const narrowed = shippedEdited(
+        agent,
+        workflow,
+        `a deny of a filename to ${tool}`,
+        (text) => text.replace(`${tool}(filename:*)`, `${tool}(filename:/tmp/*)`),
+        `agents/${agent}.md`,
+        file,
+      );
+      assert.deepEqual(
+        unfenced(narrowed, SETTINGS, NAMED_FILES),
+        open.filter((call) => !call.filename?.startsWith('/tmp/')).map((call) => `${narrowed.name}: ${shown(call)}`),
+        `${file} and agents/${agent}.md denying only a file under /tmp leave the workspace's open`,
+      );
+    }
+});
+
+/** The line of a step's note that names the two commands of a served board. */
+const BOARD_CHECKS = '`npm run board:serve`';
+
+test('design and review name the two commands of a served board, the settings allow each by its exact name, and neither may build', () => {
+  for (const { agent, file } of BROWSERS) {
+    const step = shippedStepOf(agent);
+    const checks = checksOf(`workflows/${file}`, BOARD_CHECKS);
+    assert.deepEqual([...new Set(checks)].sort(), ['npm run board:serve', 'npm run board:stop'], file);
+    assert.deepEqual(unallowed(step, checks), [], `${agent}'s fence refuses a command ${file} names`);
+    for (const command of ['npm run board:serve', 'npm run board:stop']) {
+      assert.ok(SETTINGS_ALLOWS.includes(`Bash(${command})`), `${command} is allowed by its exact name`);
+      assert.deepEqual(
+        unallowed(
+          step,
+          [command],
+          SETTINGS_ALLOWS.filter((rule) => rule !== `Bash(${command})`),
+        ),
+        [command],
+        `REFUSED: ${agent} without the settings' allow of ${command}`,
+      );
+      assert.deepEqual(runs(step, [{ tool: 'Bash', command: `${command} --workspace api` }]), [], 'and no longer command');
+    }
+    assert.deepEqual(
+      runs(
+        step,
+        ['npm run build', 'npm run e2e', 'npm run board:serve && npm run build'].map((command) => ({ tool: 'Bash', command })),
+      ),
+      [],
+      `${agent} still builds nothing in the workspace`,
+    );
+  }
+  assert.throws(
+    () => checksOf('workflows/build/implement.md', BOARD_CHECKS),
+    (err: Error) => err.message.includes('workflows/build/implement.md: no "`npm run board:serve`"'),
+    'REFUSED: a note that names the commands no more',
+  );
+});
 
 /** The steps of the build workflow that design, write or judge a change, and the skills each gives its session to list. */
 const WORK_STEPS = ['design', 'implement', 'review'];
@@ -951,7 +1277,7 @@ const GIT_WRITES: Call[] = [
  */
 function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS, grants: readonly string[] = SKILL_GRANTS): string[] {
   assert.ok(dontAskJob(step), `${step.name} is a dontAsk job, which runs only what an allow reaches`);
-  const allows = [...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants];
+  const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   return calls
     .filter((call) =>
@@ -991,6 +1317,47 @@ test('every git question review-a-change names is one Agora asks by its own allo
   assert.ok(asked.length >= 7, `review-a-change names its git questions: ${asked.join(', ')}`);
   const calls = asked.map((command) => ({ tool: 'Bash', command }) as const);
   assert.deepEqual(runs(shippedStepOf('agora'), calls, {}, []), calls.map(shown));
+});
+
+/** The line of the build workflow's implement that names the render of a checkout's dashboards. */
+const RENDER_NOTE = 'When the change touches `tools/observe`';
+
+/** The render (`tools/observe/render/render.ts`) in each form a session types: bare, with its files, held for a browser, and stopped. */
+const RENDERS: Call[] = [
+  'node tools/observe/render/render.ts',
+  'node tools/observe/render/render.ts --out /s/runs/r-1/artifacts/implement --dashboards steps',
+  'node tools/observe/render/render.ts --hold 600',
+  'node tools/observe/render/render.ts --stop nemia-render-1-ab',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** Docker by hand, which only the render talks to. */
+const DOCKER: Call[] = ['docker run -d --rm grafana/otel-lgtm', 'docker rm -f nemia-lgtm', 'docker ps'].map((command) => ({
+  tool: 'Bash',
+  command,
+}));
+
+test('the render of a dashboard is the implementer’s alone: design and review are refused each form of it, and Docker by hand', () => {
+  const ada = shippedStepOf('ada');
+  assert.equal(ada.name, 'implement');
+  assert.notEqual(ada.permissionMode, 'dontAsk', 'the implementer runs what no deny names');
+  assert.deepEqual(
+    unfenced(ada, SETTINGS, RENDERS),
+    RENDERS.map((call) => `implement: ${shown(call)}`),
+  );
+  const named = checksOf('workflows/build/implement.md', RENDER_NOTE, /`(node tools\/observe\/[^`]*)`/g);
+  assert.ok(named.length >= 2, `implement's note names the render: ${named.join(', ')}`);
+  for (const command of named) assert.ok(command.startsWith('node tools/observe/render/render.ts'), command);
+  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), [...RENDERS, ...DOCKER]), [], agent);
+});
+
+test('REFUSED: design or review that an allow of the render reaches, by the settings or its own line, runs each form of it', () => {
+  const allow = 'Bash(node tools/observe/render/render.ts:*)';
+  const settings = { permissions: { allow: [...SETTINGS_ALLOWS, allow] } };
+  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), RENDERS, settings), RENDERS.map(shown), agent);
+  const own = { ...shippedStepOf('agora'), allowedTools: [...(shippedStepOf('agora').allowedTools ?? []), allow, 'Bash(docker:*)'] };
+  assert.deepEqual(runs(own, [...RENDERS, ...DOCKER]), [...RENDERS, ...DOCKER].map(shown));
+  const fenced = { ...shippedStepOf('ada'), disallowedTools: [...(shippedStepOf('ada').disallowedTools ?? []), allow] };
+  assert.deepEqual(unfenced(fenced, SETTINGS, RENDERS), [], 'a deny of its own would refuse the implementer');
 });
 
 /** The whole suite in the spellings a session types: what implement's check already ran on the round's tree. */

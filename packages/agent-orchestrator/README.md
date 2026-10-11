@@ -169,7 +169,8 @@ wf stats --json                            # what GET /api/stats answers
 - **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
   ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
-  non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval.
+  non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval; for a try
+  that answered an earlier try's session, from the end of that answer's turn (`gateWaitOf`).
 - **A landing check that passed in more than half its deadline is named**, with what to do: measure
   the passing landing checks again, then change `LANDING_CHECK_DEADLINE_SECONDS` and its JSDoc
   (`src/check/check.ts`). A landing check is the check of a step the run lands on (`workspace: main`
@@ -557,12 +558,13 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   settings"*, Claude Code 2.1.285). An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session
   calls `nemia-<agent>:look`, the one it is listed.
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
-  A session loads the servers its agent names and no other: an agent with no line loads none, and neither does a step with no agent.
+  A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
+  step with no agent.
   The run hands the runtime the names alone (`checkoutMcp`), which reads those entries from the session's checkout when it starts it; a
   name that file does not declare refuses the session at its start, saying so. A Codex step is handed the same entries as
   `-c mcp_servers=…`. Loading a server allows none of its tools: the agent's fence still decides. Refused at load: a line that names
   no server, an empty name, a name twice, and any name on a step a remote agent runs, which loads what its operator configured. A
-  step has no `mcp:` line of its own. A run started before the key keeps the whole file on its later tries.
+  step's own `mcp:` line adds to its agent's (below). A run started before the key keeps the whole file on its later tries.
 - `harnessPrompt:` — what becomes of the harness's own prompt, Claude Code's system prompt. `keep`, or no line, keeps it and appends
   the instructions after it; `no-coding` does too, less Claude Code's coding instructions, through an output style in the plugin that
   says `keep-coding-instructions: false`, chosen by its namespaced name in `--settings` (a bare name is echoed and not applied, F16,
@@ -596,6 +598,13 @@ A step with an agent may write `skills:` too: skills this position asks of whoev
 where the agent's are, frozen with the step at `wf start`, and the session is given the agent's skills, then the step's, each once; a
 step never takes one of its agent's away, so naming a few of them changes nothing. `renderStep` writes the step's own line back as it
 wrote it, never its agent's, and the board's step form shows it as a plain list. The board's version digests each skill a step adds.
+
+A step with an agent may write `mcp:` as well: servers of its checkout's `.mcp.json` this position needs, added to its agent's, so
+an agent's file need name nothing of one repository. The session loads the agent's servers, then the step's, each once (frozen with
+the step at `wf start` as one list), and the line only adds: no step takes a server of its agent's away. Loading one allows none of
+its tools, so the line asks nothing of the fence. Refused at load as the agent's line is — no server, an empty name, a name twice, a
+step a remote agent runs — and on a step with no agent, which has no servers to add to. `renderStep` writes the step's own line
+back, a template carries it in the step's `overrides.mcp`, and the board's step form shows it as a plain list beside `skills:`.
 
 A subagent Claude Code's `/agents` wizard wrote into `.claude/agents/` runs as it is: its `name`, `description`, `tools` and `model`
 are the run's keys, and its `color` is read and ignored (`CLAUDE_CODE_IGNORED`) — it colours a name in Claude Code and holds nothing
@@ -639,7 +648,7 @@ Review the change in this workspace as a second engineer would.
 `tools:` is the harness's tool names, comma-separated, and they are the only tools the session has.
 Claude Code is given exactly the list as `--tools`, where a tool not on it does not exist for the
 session — not `--allowedTools`, where an unapproved one is still there to try. The list names Claude
-Code's built-in tools; the servers its agent names of the checkout's `.mcp.json` (`mcp:`) are not on it. Refused at load: a line
+Code's built-in tools; the servers its agent and its own line name of the checkout's `.mcp.json` (`mcp:`) are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
 `Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex, the orchestrator's own rule, since the runtime
 takes the list there and Codex ignores it. Codex has no tool list, only
@@ -692,6 +701,10 @@ disallowedTools: Bash(npm run build), Bash(npm run e2e)
 ---
 Review the change in this workspace as a second engineer would.
 ```
+
+A checker may still see the change in a browser: `npm run board:serve` builds outside the workspace and serves it on ports and a
+store of its own, and `npm run board:stop` ends it. A deny may also match one parameter of an MCP tool, `Tool(param:value)`, as
+`mcp__playwright__browser_navigate(url:*:8787*)` refuses the live board's port and no other address.
 
 `disallowedTools:` is Claude Code's permission rules, comma-separated: a tool, `SendMessage`, or a tool and what
 it may not run, `Bash(npm run build)`. The engine gives Claude Code the list as `--disallowedTools` on every
@@ -3150,15 +3163,20 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   The api serves its own process's at `GET /api/metrics`, with `api.poll.reads`: the files the runtime read for each request, by the
   route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's.
 - **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/meter.verb.ts`), recorded by the tick once a pass, off
-  what each run's full pass already read — no read of the store or the engine of their own. The pass that reads the engine's feed takes
-  the tasks it says settled since the read before (`settledIn`); a run with one is judged in full, and its pass reads each of its facts
-  (`settledFacts`, `src/meter/step.ts`): `step.cost` (USD, where measured), `step.tokens.input` and `step.tokens.output` (where
+  what each run's full pass already read — no read of the store or the engine of their own. A run's pass takes each of its tasks it
+  reads settled that the run's mark does not hold (`settlesCounted`, `settlesDue`), a task shared by tries once, and reads each of its
+  facts (`settledFacts`, `src/meter/step.ts`): `step.cost` (USD, where measured), `step.tokens.input` and `step.tokens.output` (where
   measured), and `step.duration` (ms, over a minute to two hours) of a session that settled; `step.tries` by how the session ended
   (`done`, `blocked`, `failed`, `stopped`); `step.checks` by the check's verdict (`passed`, `refused`, `unfinished`); `step.rounds`,
   `granted` on the pass that files a round and `exhausted` on the settle that leaves its loop out of rounds. Each is kept by `factory`, `workflow` (the folder's name), `step`, `agent` (`none` for none) and `outcome`,
-  and by nothing else: a fact that carries another key, a run's id or a task's, is refused (`boundedAttributes`). A run answered from the
-  memo of runs at rest records nothing again, and a daemon restarted reads the feed from its end, so a settle is counted once, and one
-  that happened while no daemon read the feed is not counted.
+  and by nothing else: a fact that carries another key, a run's id or a task's, is refused (`boundedAttributes`). The tasks counted are
+  marked on the run record by the pass that counts them, before the metrics are recorded: a settle is counted once, by whichever daemon
+  first reads it settled, one that happened while no daemon read included; a daemon that dies between the two loses that pass's facts,
+  and none is counted twice. A session held open and answered is one try, however many answers it took. A run started before the mark
+  existed is counted off the engine's feed (`settledIn`), which a daemon restarted reads from its end. Each series a pass's facts write
+  is first exported at zero, then at its value (`recordStepMetrics`, `exportedNow` in `src/telemetry/telemetry.store.ts`, each export
+  waited for 2 s at most): a collector that reads a counter by its increase counts a step's first try, and reads a series a daemon
+  restarted brings back as a reset.
 - **A call a harness denied a session is a span, `step.denied`, and no metric** (`DENIED_SPAN`, `deniedCalls` in `src/meter/step.ts`): one
   for each denial of each attempt that ended, a call denied twice being two, whatever the attempt's turn signed and whatever came of its
   try, as `nemia stats` counts them. It is a root of its own trace, at the moment its attempt ended, and carries `run`, `task` (the
@@ -3168,8 +3186,10 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   counts none twice, one that dies between the two loses that pass's, and a run started before the mark existed counts none.
 - **A finished run's timeline is spans, `run.timeline`, and no metric** (`TIMELINE_SPAN`, `timelineFacts` in `src/meter/step.ts`): one
   for each number of the timeline its page shows (`timelineRows` in `src/timeline/rows.ts`): a try's time queued, its time at work and
-  its cost, its check's two times, a step's tries, a round's wall time, and the run's wall time with its time queued, in its checks and
-  at its gates. Each is a root of its own trace, of no length, at the moment it is made, and carries `value`, `of`, `part` and `row` (a
+  its cost, its check's two times, a step's tries, a round's wall time, and the run's wall time with its time queued, in its checks,
+  at its gates and waiting on a person's answer to a step that signed off blocked (`answer`, `answerWaitOf` in `src/timeline/turns.ts`:
+  from the end of the turn that asked to the first spawn of the turn the answer started). A try that answered an earlier try's session
+  has no row of its own but in the step's tries: the session's time and cost are on the try that filed it. Each is a root of its own trace, of no length, at the moment it is made, and carries `value`, `of`, `part` and `row` (a
   step's place in the workflow and its name, so the rows sort into the workflow's order), its `run`, its `try` where it has one, and
   `factory`, `workflow` and `outcome` (`succeeded` or `cancelled`), with `step` and `agent` on a step's rows. They are made once, on the
   first pass that reads the run over with nothing in flight, off every try's view (`everyTryOf`, read on that pass alone), and the run

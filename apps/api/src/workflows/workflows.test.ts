@@ -97,6 +97,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   slot: null,
   agent: null,
   skills: [],
+  mcp: [],
   permissionMode: null,
   sandbox: null,
   tools: null,
@@ -813,4 +814,25 @@ test('REFUSED at shipped defaults: a start with `after` that another site could 
   assert.ok(((await type.json()) as { error: string }).error.includes('`"after": ["<runId>", …]`'), 'the shape it takes names `after`');
   assert.deepEqual(runFiles(), before);
   assert.deepEqual(filedTasks(), []);
+});
+
+test("a step that names a server its agent does not is listed with its own line in `spec.mcp`, and in `mcp` what its sessions load: the agent's, then its own", async (t) => {
+  const dir = path.join(repo, 'workflows', 'served');
+  write(path.join(dir, 'look.md'), '---\nplace: git\nagent: looker\nmcp: docs, browser\n---\nLook.\n');
+  write(path.join(dir, 'plain.md'), '---\nplace: git\nagent: looker\n---\nLook.\n');
+  write(path.join(repo, 'workflows', 'agents', 'looker.md'), '---\nharness: claude\nmcp: browser\n---\nYou look.\n');
+  t.after(() => {
+    fs.rmSync(dir, { recursive: true });
+    fs.rmSync(path.join(repo, 'workflows', 'agents', 'looker.md'));
+  });
+  const listed = ((await (await app.request('/api/workflows')).json()) as WorkflowListing[]).find((w) => w.name === 'served');
+  const of = (name: string) => listed?.steps.find((step) => step.name === name);
+  assert.deepEqual(
+    [of('look')?.spec.mcp, of('look')?.mcp],
+    [
+      ['docs', 'browser'],
+      ['browser', 'docs'],
+    ],
+  );
+  assert.deepEqual([of('plain')?.spec.mcp, of('plain')?.mcp], [[], ['browser']], "the agent's alone is no line of the step");
 });

@@ -26,7 +26,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '10';
 process.env.WF_MAX_CONCURRENT = '10';
-const { approveRun, cancelRun, runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../src/runner.ts');
+const { approveRun, cancelRun, retryRun, runWith: runEngine, gitPlaceLayer, startRun, tickRun } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun, rewriteRun, stepsOf } = await import('../src/record/record.store.ts');
@@ -84,9 +84,12 @@ const engine = plainEngine(
   }),
 );
 
-/** Attempt 1 of session `taskId` signed off done, having cost `costUsd`, its closeout carrying `more` beside the four fields. */
-const sign = (taskId: string, costUsd: number, more: Record<string, unknown> = {}) => {
-  const name = nameFor(taskId, 1);
+/**
+ * Attempt `n` of session `taskId`, the first unless given, signed off done, having cost `costUsd`, its closeout carrying `more` beside
+ * the four fields, and over them.
+ */
+const sign = (taskId: string, costUsd: number, more: Record<string, unknown> = {}, n = 1) => {
+  const name = nameFor(taskId, n);
   sessions.set(name, {
     ...sessions.get(name)!,
     state: 'completed',
@@ -354,6 +357,75 @@ test('a one-step gated run held open then approved, as an intake is, gives its q
     ],
   );
   assert.equal(spans.find((s) => s.row === 'run' && s.part === 'gate')?.value, 9 * MIN);
+});
+
+test("a gated step that signed off blocked, was answered and then approved gives its wait on the answer and its gate's, each its own", async (t) => {
+  const later = clockOf(t);
+  const run = await start(ALONE);
+  const intake = `${run.id}-intake`;
+  await tick();
+  later(1);
+  await tickUntil(() => sessions.has(nameFor(intake, 1)));
+  later(4);
+  sign(intake, 0.5, { outcome: 'blocked', needs: 'which flag: --dry-run or --force?' });
+  await tick(3);
+  assert.deepEqual(timelineSpans(run.id), [], 'none while it waits on an answer');
+  later(6);
+  await runWith(engine, retryRun(run.id, 'intake', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await tickUntil(() => sessions.has(nameFor(intake, 2)));
+  assert.equal(readRun(run.id).steps.intake.taskId, intake, 'the answer is a turn of the session that asked');
+  later(3);
+  sign(intake, 0.25, {}, 2);
+  await tick(3);
+  assert.deepEqual(readRun(run.id).gatesTimed, [], 'nothing timed while it waits at its gate');
+  later(9);
+  await runWith(engine, approveRun(run.id, 'intake'));
+  await tickUntil(() => readRun(run.id).runTimed === true);
+  const spans = timelineSpans(run.id);
+  assert.deepEqual(spans.map(lineOf).sort(), (await pageRows(run.id)).map(lineOf).sort(), "each span is a row of the page's timeline");
+  const value = (row: string, part: string) => spans.filter((s) => s.row === row && s.part === part).map((s) => s.value);
+  assert.deepEqual(
+    [value('run', 'answer'), value('run', 'gate'), value('01 intake', 'ran'), value('01 intake', 'tries'), value('run', 'wall')],
+    [[6 * MIN], [9 * MIN], [7 * MIN], [2], [14 * MIN]],
+    'the minutes the test let pass: the session ran its two turns, and waited between them on the answer',
+  );
+  assert.deepEqual(readRun(run.id).gatesTimed, [{ step: 'intake', try: 2 }], 'the gate of the try that answered is timed, once');
+  await tick(3);
+  assert.equal(timelineSpans(run.id).length, spans.length, 'never again on a later pass');
+});
+
+test('REFUSED: a gated step sent back from its gate with words waited on no answer, and its gate is timed from the turn it was sent back for', async (t) => {
+  const later = clockOf(t);
+  const run = await start(ALONE);
+  const intake = `${run.id}-intake`;
+  await tick();
+  later(1);
+  await tickUntil(() => sessions.has(nameFor(intake, 1)));
+  later(4);
+  sign(intake, 0.5);
+  await tick(3);
+  later(6);
+  await runWith(engine, retryRun(run.id, 'intake', { mode: 'nudge', message: 'smaller steps, please' }));
+  await tickUntil(() => sessions.has(nameFor(intake, 2)));
+  assert.deepEqual(
+    [readRun(run.id).steps.intake.taskId, readRun(run.id).steps.intake.tries?.map((x) => x.then)],
+    [intake, ['nudge']],
+    'the record an answer to a blocked sign-off leaves, but for what the first turn signed',
+  );
+  later(3);
+  sign(intake, 0.25, {}, 2);
+  await tick(3);
+  later(9);
+  await runWith(engine, approveRun(run.id, 'intake'));
+  await tickUntil(() => readRun(run.id).runTimed === true);
+  const spans = timelineSpans(run.id);
+  assert.deepEqual(spans.map(lineOf).sort(), (await pageRows(run.id)).map(lineOf).sort(), "each span is a row of the page's timeline");
+  const value = (row: string, part: string) => spans.filter((s) => s.row === row && s.part === part).map((s) => s.value);
+  assert.deepEqual(
+    [value('run', 'answer'), value('run', 'gate'), value('01 intake', 'ran'), value('01 intake', 'tries')],
+    [[0], [9 * MIN], [7 * MIN], [2]],
+    'the six minutes before the send-back were at its gate, unapproved, and are in no part',
+  );
 });
 
 test('a run called off is handed over once its tasks have stopped, as cancelled', async (t) => {

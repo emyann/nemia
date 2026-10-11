@@ -482,7 +482,7 @@ const placed = (lines: string): string => (/^(place:|workspace: folder)/m.test(l
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(lines)}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'background' | 'sandbox'>, string> = {
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'background' | 'sandbox'>, string> = {
     after: 'implement',
     resume: 'implement',
     input: 'implement',
@@ -519,7 +519,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(watching.slot, 'none', "slot: is read on a step of its own: it is a workflow of one step's");
   const attached = parseWorkflow(
     'build',
-    '---\nplace: git\nagent: implementer\nskills: look\n---\nBuild it.\n',
+    '---\nplace: git\nagent: implementer\nskills: look\nmcp: docs\n---\nBuild it.\n',
     undefined,
     new Map([['implementer', { name: 'implementer', keys: {}, body: '', read: () => undefined }]]),
   );
@@ -529,6 +529,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     'agent: names an agent the step is resolved with, and test/agents.test.ts reads it too',
   );
   assert.deepEqual(attached.skills, ['look'], 'skills: is read on a step with an agent, and test/step-skills.test.ts reads it too');
+  assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and test/agent-mcp.test.ts reads it too');
   const session = fm('supervise', 'background: true');
   assert.equal(session.background, true, "background: is read on a step of its own: it is Claude Code's alone, and keeps no budget:");
   const fenced = fm('review', 'harness: codex\nsandbox: read-only');
@@ -539,6 +540,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     slot: watching.slot,
     agent: attached.agent,
     skills: attached.skills,
+    mcp: attached.mcp,
     background: session.background,
     sandbox: fenced.sandbox,
   };
@@ -596,7 +598,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
   const list =
-    "A step's keys are: after, resume, input, place, workspace, writable, reads, slot, agent, skills, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
+    "A step's keys are: after, resume, input, place, workspace, writable, reads, slot, agent, skills, mcp, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
   assert.throws(
     () => fm('review', 'colour: red'),
     (e: unknown) => {
@@ -2122,6 +2124,18 @@ test("`disallowedBy`: the step's own deny rule that may have denied a call, whic
     'a directory names what is under it',
   );
   assert.equal(disallowedBy('Skill(look)', ['Skill(look)']), 'Skill(look)');
+  const live = 'mcp__playwright__browser_navigate(url:*:8787*)';
+  assert.equal(
+    disallowedBy('mcp__playwright__browser_navigate', ['Bash(cd:*)', live]),
+    live,
+    "an MCP call keeps its name alone, so its tool's parameter rule may be it",
+  );
+  assert.equal(disallowedBy('mcp__playwright__browser_click', [live]), undefined, 'not by a rule on another MCP tool');
+  assert.equal(
+    disallowedBy('SendMessage', ['SendMessage(to:*)']),
+    undefined,
+    'nor a bare call of a tool that is no MCP tool by a rule that names more',
+  );
   assert.equal(disallowedBy('Bash(pytest)', ['Bash(npm run build)', 'SendMessage']), undefined, 'not by a rule on another command');
   assert.equal(disallowedBy('Bash(npm)', ['Read']), undefined, 'nor on another tool');
   assert.equal(disallowedBy('Write(/tmp/x)', ['Edit(//etc/**)']), undefined, 'nor on another path');
@@ -2500,7 +2514,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
 
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'background' | 'sandbox'>, string> = {
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'background' | 'sandbox'>, string> = {
     after: 'implement',
     resume: 'implement',
     input: 'implement',
@@ -2536,11 +2550,11 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     read,
   );
   for (const key of STEP_KEYS)
-    if (!['workspace', 'slot', 'agent', 'skills', 'background', 'sandbox'].includes(key))
+    if (!['workspace', 'slot', 'agent', 'skills', 'mcp', 'background', 'sandbox'].includes(key))
       assert.notEqual(
         step[key],
         undefined,
-        `${key}: every key is set but workspace, slot, background and sandbox, each rendered below, agent, in test/agents.test.ts, and skills, which needs an agent, in test/step-skills.test.ts`,
+        `${key}: every key is set but workspace, slot, background and sandbox, each rendered below, agent, in test/agents.test.ts, skills, which needs an agent, in test/step-skills.test.ts, and mcp, which needs one too, in test/agent-mcp.test.ts`,
       );
   const text = renderStep(step);
   assert.equal(

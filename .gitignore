@@ -5,4 +5,5 @@ dist
 .env
 .env.local
 .e2e
+.observe
 .claude/settings.local.json

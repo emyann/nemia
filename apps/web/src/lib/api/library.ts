@@ -105,6 +105,8 @@ export type WorkflowStepSpec = {
   agent: string | null;
   /** The skills the step adds to its agent's (`skills:`): empty where it adds none. */
   skills: string[];
+  /** The MCP servers the step adds to its agent's (`mcp:`): empty where it adds none. */
+  mcp: string[];
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
   /**
@@ -156,6 +158,7 @@ export const StepKeySchema = Schema.Literals([
   'slot',
   'agent',
   'skills',
+  'mcp',
   'harness',
   'model',
   'effort',
@@ -195,6 +198,7 @@ export const WorkflowStepSpecSchema = Schema.Struct({
   slot: Schema.NullOr(Schema.Literal('none')),
   agent: Schema.NullOr(Schema.String),
   skills: Strings,
+  mcp: Strings,
   permissionMode: Schema.NullOr(Schema.String),
   sandbox: Schema.NullOr(Schema.String),
   tools: Schema.NullOr(Strings),

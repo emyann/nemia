@@ -42,6 +42,9 @@ holds what every change needs.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   A session never runs it whole but to measure it: implement's round check and the landing's run every page.
+- `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
+  stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
+  It needs `docker`, takes a minute and a half, and is never run by the suite.
 - Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
   weakening a test is a finding to report, not a fix.
 - Turbo does not see `workflows/`, nor a doc, though some tests read docs: a step's session runs the tests that read the doc or workflow
@@ -163,6 +166,10 @@ What the `create-an-agent` skill, being generic, does not say here:
   other roles, on its own `disallowedTools:`, beside each deny of its agent's; the checks it runs are allowed by exact name in
   `.claude/settings.json` (`npm run lint`, `npx turbo run typecheck --force`) and named in its note, where `CHECKERS` reads them in
   `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence.
+- A checking step given the browser (design, review) serves the change with `npm run board:serve` and ends it with `npm run board:stop`,
+  each allowed by exact name and named in its note (`BOARD_CHECKS`); its agent allows the browser's tools by name, never the server
+  whole, and the step denies the live board's ports by address on its own `disallowedTools:` (`LIVE_BOARD`, same test). Agent and
+  step both deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a relative one is written into the workspace.
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 
@@ -179,8 +186,9 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `docs/architecture.md` — the layers, what each owns and its public contract, and the rules that hold them.
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
-- `.claude/skills/` — the repository's skills. Ours: `look`, `effect` (how we write Effect 4), `create-an-agent` (how an agent is
-  made here) and `change-the-board` (shadcn's trigger, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+- `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
+  `effect` (how we write Effect 4), `create-an-agent` (how an agent is made here) and `change-the-board` (shadcn's trigger, for a
+  change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), and `grilling` and `grill-me` (Iris's interview).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
@@ -200,4 +208,7 @@ What the `create-an-agent` skill, being generic, does not say here:
   `agent-orchestrator/test/observe.test.ts`, and its timing of a step (the collector's command head and test scope, Tempo's span metrics and
   retention) by `observe-time.test.ts`. Its profiler preload, `tools/observe/profile/` (installed there alone), is off unless
   `PYROSCOPE_SERVER_ADDRESS` is set, held by `agent-orchestrator/test/profile.test.ts`.
+  `tools/observe/render/` draws a checkout's dashboards before they land: a throwaway stack under a name of its own, fake data, a
+  picture and the text of every panel (`tools/observe/README.md`, *See a change rendered*), held by
+  `agent-orchestrator/test/observe-render.test.ts` on a stub `docker`, its seed by `observe.test.ts`.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

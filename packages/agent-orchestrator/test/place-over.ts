@@ -63,11 +63,12 @@ export type HeldPlace<V extends PlaceVerb> = {
  */
 export function placeHeld<V extends PlaceVerb>(place: Place, verb: V): HeldPlace<V> {
   const rung = bell();
-  const requests: PlaceRequests[V][] = [];
+  const one: PlaceVerb = verb;
+  const requests: PlaceRequests[PlaceVerb][] = [];
   const held: Array<() => void> = [];
   let flying = 0;
   let most = 0;
-  const entered = (request: PlaceRequests[V]) =>
+  const entered = (request: PlaceRequests[PlaceVerb]) =>
     Effect.callback<void>((resume) => {
       requests.push(request);
       held.push(() => resume(Effect.void));
@@ -79,8 +80,8 @@ export function placeHeld<V extends PlaceVerb>(place: Place, verb: V): HeldPlace
     place: {
       declared: place.declared,
       ask: (asked, request, options) =>
-        (asked as PlaceVerb) === verb
-          ? entered(request as PlaceRequests[PlaceVerb] as PlaceRequests[V]).pipe(
+        asked === one
+          ? entered(request).pipe(
               Effect.andThen(place.ask(asked, request, options)),
               Effect.ensuring(Effect.sync(() => void (flying -= 1))),
             )
@@ -88,7 +89,7 @@ export function placeHeld<V extends PlaceVerb>(place: Place, verb: V): HeldPlace
       askNow: place.askNow,
     },
     bell: rung,
-    requests,
+    requests: requests as PlaceRequests[V][],
     waiting: () => held.length,
     most: () => most,
     letGo: () => held.pop()?.(),

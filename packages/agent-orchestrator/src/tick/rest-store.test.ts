@@ -197,7 +197,7 @@ const places = (c: PassCost) => c.phases.place.calls;
 const sizes: Array<{ finished: number; cost: PassCost; fresh?: PassCost }> = [];
 const ISOLATED_REPOS = [aRepo(), aRepo()];
 
-test('a pass costs as many journal reads, observes and place processes on 200 finished runs as on none: what is in flight sets it', async () => {
+test('a pass costs as many journal reads, observes and questions of its place on 200 finished runs as on none: what is in flight sets it', async () => {
   inFlight.push(...(await started(3)));
   sizes.push({ finished: 0, cost: await steady() });
 
@@ -225,7 +225,7 @@ test('a pass costs as many journal reads, observes and place processes on 200 fi
     assert.equal(
       places(c),
       places(none) + ISOLATED_REPOS.length,
-      `${at} finished runs: one for-each-ref a repository whose runs' tips are read (three runs on each of two), and no more`,
+      `${at} finished runs: one standing a repository whose runs' tips are read (three runs on each of two), and no more`,
     );
   }
   assert.equal(none.rested, 0);

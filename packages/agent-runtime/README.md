@@ -722,7 +722,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `checkoutMcp` that is not a list of server names or is on a harness that loads none (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -850,6 +850,8 @@ runner names:
 | no `mcp`, no `.mcp.json` in its `cwd` | nothing | no MCP server at all |
 | a `.mcp.json` in its `cwd` | `<cwd>/.mcp.json` — strict alone would drop it | the repository's servers |
 | `mcp: { … }` | that, and a file the runner writes under its root | the repository's and the task's |
+| `checkoutMcp: []` | the runner's file alone, when the task has an `mcp` | the task's, and none of the repository's |
+| `checkoutMcp: ["a"]` | the runner's file alone, holding `a` and the task's `mcp` | `a` of the repository's, and the task's |
 
 — and in no row the operator's. `mcp` maps a name (letters, digits, `-`, `_`) to a server in a
 `.mcp.json` entry's shape: `{ "command": "npx", "args": [...], "env": {...} }`, or
@@ -889,7 +891,21 @@ Codex has no strict flag. **A Codex task still has the operator's Codex servers*
 refused at spawn, `unstartable`: Codex would merge the two, and run the task's command with the
 operator's args and env.
 
-`ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
+**`checkoutMcp` says which of the checkout's servers a session loads**, as a Pod's volume gives a
+ConfigMap's `items`. Absent, the whole `.mcp.json` is named, as above. `[]` leaves the file out. Names
+are read from `<cwd>/.mcp.json` when the session is spawned, each entry as the file gives it, and
+written with the task's own `mcp` into the runner's one file; the checkout's file is then not named.
+Only the names are journalled, never an entry. A name the file does not declare, a checkout with no
+`.mcp.json`, and one that is not JSON each end the attempt `unstartable`, naming the name, the file
+and the fix. `file()` refuses a value that is not a list of server names, a name twice, and a name
+the task's `mcp` gives too. Claude Code holds it as a job and as a background session. Codex is
+handed the picked entries in its one `-c mcp_servers=` with the task's, and refuses at spawn an
+entry in a shape `mcp` does not take, an SSE server, and a name its operator's config has; `[]`
+adds nothing, and the operator's own servers still load. The `command` harness, which loads no
+server, refuses the argument (`HarnessSpec.checkoutMcp`), and a remote agent refuses it with every
+other argument.
+
+`ae start` has no `mcp` or `checkoutMcp` key: a brief's values are one line each, so both are the API's for now.
 
 ### Settings: the checkout's, never the operator's
 
@@ -2048,7 +2064,7 @@ reason `Runner` is a seam and not an import.
 | usage | turns, tool calls and tokens from the transcript, once the session is idle; its cost once the engine lets it go, from the `cost-state` Claude Code writes as the process exits | from the SDK's result, cost included |
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
 | a spend cap | refused: a `--bg` session keeps no `--max-budget-usd` (measured) — `claude-detached` keeps one | not wired |
-| MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
+| MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json`, or the entries `checkoutMcp` names of it, and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
 | one session by its name | `find`, from the session's registration | not wired: every read observes |
 | telling a running session something | `say`, a line on the session's inbox socket | not wired: no `say` |

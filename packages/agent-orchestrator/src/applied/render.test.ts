@@ -82,6 +82,24 @@ test("the tests' team, exported and rendered, loads as the team loads, its hires
   );
 });
 
+test("an agent's mcp: line has its place in a template: exported in the agent's spec, and rendered back as the line it was", () => {
+  const repo = scratch('wf-render-repo-');
+  fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+  const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
+  fs.writeFileSync(reviewer, fs.readFileSync(reviewer, 'utf8').replace('---\n', '---\nmcp: playwright, docs\n'));
+  const dir = path.join(scratch('wf-render-out-'), 'team');
+  exportTemplate({ dir, from: repo });
+  assert.deepEqual(parse(fs.readFileSync(path.join(dir, 'agents/reviewer/agent.yaml'), 'utf8')).spec.mcp, ['playwright', 'docs']);
+  assert.equal(Object.hasOwn(parse(fs.readFileSync(path.join(dir, 'agents/implementer/agent.yaml'), 'utf8')).spec, 'mcp'), false);
+  const { tree, out } = rendered(dir);
+  assert.deepEqual(out.refusals, []);
+  assert.match(fs.readFileSync(path.join(tree, 'workflows/agents/reviewer.md'), 'utf8'), /^mcp: playwright, docs$/m);
+  assert.doesNotMatch(fs.readFileSync(path.join(tree, 'workflows/agents/implementer.md'), 'utf8'), /^mcp:/m);
+  const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+  const review = loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills).find((step) => step.name === 'review');
+  assert.deepEqual(review?.agent?.mcp, ['playwright', 'docs']);
+});
+
 test('a file a render asks for that is no file of the template is refused, so a {path} cannot reach outside it', () => {
   const { dir } = exported();
   fs.writeFileSync(path.join(path.dirname(dir), 'outside.md'), 'not the template');

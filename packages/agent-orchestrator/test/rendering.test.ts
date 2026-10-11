@@ -387,7 +387,7 @@ test("an agent Claude Code's /agents wizard wrote into .claude/agents/ runs as i
 test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would drop — each named, with what does it in a run — and `model: inherit`, which a step has no parent to inherit from", () => {
   const cases: Array<[string, RegExp]> = [
     ['maxTurns: 20', /`budget:` and `deadlineSeconds:`/],
-    ['mcpServers: github', /`\.mcp\.json`/],
+    ['mcpServers: github', /name the servers of the repository's `\.mcp\.json` its sessions load on an `mcp:` line/],
     ['hooks: lint', /`\.claude\/settings\.json`/],
     ['memory: project', /no memory of an agent's own/],
     ['isolation: worktree', /`workspace:`/],

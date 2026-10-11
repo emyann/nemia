@@ -27,12 +27,13 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test("HARNESS_ARGS is the eighteen arguments a harness takes — the spend cap, the mounts, a call's admission, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
+test("HARNESS_ARGS is the nineteen arguments a harness takes — the spend cap, the mounts, a call's admission, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
     'allowedTools',
     'background',
     'budgetUsd',
     'callAdmission',
+    'checkoutMcp',
     'claude',
     'codex',
     'command',
@@ -65,7 +66,7 @@ test("remoteControl, one of Claude Code's own flags, is refused under config and
   assert.equal(argsRefusalOf({ ...task, config: { background: true, claude: { remoteControl: true } } }), undefined);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the eighteen — and the same value under config is taken', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the nineteen — and the same value under config is taken', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus',
     permissionMode: 'auto',
@@ -74,6 +75,7 @@ test('a harness argument filed beside config is refused, naming where it goes �
     allowedTools: ['Edit(**)'],
     disallowedTools: ['SendMessage'],
     mcp: {},
+    checkoutMcp: ['playwright'],
     contextTokens: 200000,
     background: true,
     worktree: true,
@@ -347,4 +349,24 @@ test('a niceness is a whole number from 0 to 19: anything else is refused, and s
     assert.ok(says.startsWith('`niceness: ') && says.includes('` is not a niceness. Give a whole number from 0 to 19'), String(bad));
   }
   for (const good of [0, 1, 10, 19]) assert.equal(argsRefusalOf({ ...task, config: { niceness: good } }), undefined, String(good));
+});
+
+test('checkoutMcp is a list of server names, none twice and none the task gives itself: anything else is refused, saying what one is', () => {
+  for (const bad of ['playwright', [''], ['a', 3], ['a b'], { a: true }, null]) {
+    const says = argsRefusalOf({ ...task, config: { checkoutMcp: bad } } as never) ?? '';
+    assert.match(
+      says,
+      /^`checkoutMcp: .*` is not a list of server names\. Give the names .*\[\] for none, or leave it out for the whole file\.$/,
+    );
+  }
+  assert.equal(
+    argsRefusalOf({ ...task, config: { checkoutMcp: ['a', 'b', 'a'] } }),
+    '`checkoutMcp` names `a` twice. Name each server once.',
+  );
+  assert.match(
+    argsRefusalOf({ ...task, config: { checkoutMcp: ['a'], mcp: { a: { command: 'x' } } } }) ?? '',
+    /^`checkoutMcp` names `a`, and `mcp.a` gives a server of that name too: one would hide the other\./,
+  );
+  assert.equal(argsRefusalOf({ ...task, config: { checkoutMcp: [] } }), undefined, 'none of the file');
+  assert.equal(argsRefusalOf({ ...task, config: { checkoutMcp: ['a'], mcp: { b: { command: 'x' } } } }), undefined);
 });

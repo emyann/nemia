@@ -191,6 +191,11 @@ export type ListedStep = {
    * it, and a save never writes it back. Null for a step with no agent, whose file is all of it.
    */
   layers: ToldLayers | null;
+  /**
+   * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, as its agent's `mcp:` line names them:
+   * empty where its agent names none, and for a step with no agent. No key of the step, so not in `spec`, and a save never writes it.
+   */
+  mcp: string[];
 };
 
 /**
@@ -347,6 +352,7 @@ const listedStep =
     own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
     hired: hires.get(step.name) ?? null,
     layers: step.agent ? toldLayers(step, null) : null,
+    mcp: step.agent?.mcp ?? [],
   });
 
 /**

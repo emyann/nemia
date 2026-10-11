@@ -80,6 +80,8 @@ export type AgentReading = {
    * for none, which is `keep`.
    */
   harnessPrompt: string | null;
+  /** The MCP servers its sessions load, as its `mcp:` line writes them: `playwright, docs`. Null for an agent that names none. */
+  mcp: string | null;
   source: string;
   version: string;
   usedBy: AgentUser[];
@@ -145,6 +147,7 @@ export const emptyReading = (
   cardError: null,
   skills: null,
   harnessPrompt: null,
+  mcp: null,
   source: '',
   version,
   usedBy,
@@ -195,6 +198,7 @@ export function unreadReading(
     schema: sidecarOf(keys.output),
     skills: skillsLineOf(source),
     harnessPrompt: harnessPromptOf(source),
+    mcp: frontmatterKey(source, 'mcp') ?? null,
     source,
     error: agent ? agent.message : `${AGENTS_FOLDER}/${base.name}.md does not read.`,
   };
@@ -214,6 +218,7 @@ function agentLines(agent: AgentReading): string[] {
     ...(agent.card ?? []).map((skill) => `   ${skill.id}  ${skill.name} — ${skill.description}`),
     ...(agent.skills ? [`   given the skills ${agent.skills}`] : []),
     ...(agent.harnessPrompt !== null && agent.harnessPrompt !== 'keep' ? [`   harness prompt: ${agent.harnessPrompt}`] : []),
+    ...(agent.mcp ? [`   loads the MCP servers ${agent.mcp}`] : []),
     ...(agent.custom !== null ? [`   custom instructions: ${agent.custom}`] : []),
     ...(agent.copied !== null ? [copiedLine(agent.copied)] : []),
   ];

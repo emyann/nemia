@@ -32,7 +32,7 @@ import {
   type Workflow,
   type WorkflowError,
 } from '../step/step.ts';
-import { composedRefusal, SKILL_NAME, skillNamesOf } from '../keys/index.ts';
+import { composedRefusal, serverNamesOf, serversRefusal, SKILL_NAME, skillNamesOf } from '../keys/index.ts';
 import {
   codexModeWritten,
   codexSandboxNamed,
@@ -51,7 +51,8 @@ import { isRemoteHarness } from '../harness/harness.ts';
 /**
  * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line;
  * the skills it is given (`skills:`), which are also what its card says it can do; what becomes of Claude Code's own prompt
- * (`harnessPrompt:`); and who does the work and how. A step that names the agent (`agent:`) takes the last of those as its own defaults,
+ * (`harnessPrompt:`); the MCP servers of the checkout its sessions load, by name (`mcp:`); and who does the work and how. A step that
+ * names the agent (`agent:`) takes the last of those as its own defaults,
  * and a key it sets itself wins, but a fence key (`tools`, `allowedTools`, `disallowedTools`, `permissionMode`, `sandbox`) may only narrow
  * the agent's, and `background: true` is refused over an agent in any mode but the widest (`fenceRefusal`). Everything else a step
  * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an
@@ -62,6 +63,7 @@ export const AGENT_KEYS = [
   'description',
   'skills',
   'harnessPrompt',
+  'mcp',
   'harness',
   'model',
   'effort',
@@ -76,12 +78,13 @@ export const AGENT_KEYS = [
 ] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given and its harness prompt. A
+ * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given, its harness prompt and
+ * the MCP servers its sessions load. A
  * step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
  * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
  * hand).
  */
-export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'harnessPrompt'] as const;
+export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'harnessPrompt', 'mcp'] as const;
 export type AgentOwnKey = (typeof AGENT_OWN_KEYS)[number];
 /** The keys a step takes from its agent: every agent key but its own (`AGENT_OWN_KEYS`). */
 export type RoleKey = Exclude<AgentKey, AgentOwnKey>;
@@ -93,6 +96,7 @@ const OWN_LINE: Record<AgentOwnKey, string> = {
   description: 'description',
   skills: 'skills',
   harnessPrompt: "Claude Code's prompt",
+  mcp: 'MCP servers',
 };
 
 /**
@@ -162,6 +166,11 @@ export type Agent = {
   skills?: string[];
   /** What becomes of Claude Code's own prompt (`HARNESS_PROMPTS`), a former line read as its word now; absent is `keep`. */
   harnessPrompt?: HarnessPrompt;
+  /**
+   * The MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them (`mcp:`). Absent, its sessions load none: a
+   * server is loaded only where an agent names it.
+   */
+  mcp?: string[];
   keys: Partial<Record<RoleKey, string>>;
   body: string;
   /**
@@ -200,7 +209,8 @@ export const CLAUDE_CODE_IGNORED: readonly string[] = ['color'];
  */
 const CLAUDE_CODE_REFUSED: Record<string, string> = {
   maxTurns: "a run bounds a session by the step's `budget:` and `deadlineSeconds:`, never by a count of turns",
-  mcpServers: "a run gives a session no MCP servers of an agent's own; the repository's `.mcp.json` is what its sessions load",
+  mcpServers:
+    "a run takes no MCP server defined in an agent's file; name the servers of the repository's `.mcp.json` its sessions load on an `mcp:` line, as `mcp: playwright`",
   hooks:
     "a run starts no hooks of an agent's own; hooks go in the repository's `.claude/settings.json`, which its sessions read in a checkout Claude Code trusts",
   memory:
@@ -233,13 +243,24 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
  * One agent, from its file's text: `name` is the file's, minus `.md`. Each value is judged as a step's would be, in the file's name, so a
  * line no step could run with is refused where it is written — a step that sets a key of its own is judged again with it. The body may be
  * empty: an agent that only sets how its steps run. `color` (`CLAUDE_CODE_IGNORED`) is read and dropped, a `skills:` line that names a
- * card file is refused (`cardRetired`), and the former `systemPrompt:` line is read as `harnessPrompt:` (`harnessPromptOf`).
+ * card file is refused (`cardRetired`), an `mcp:` line is read as the server names it lists (`serverNamesOf`), and the former
+ * `systemPrompt:` line is read as `harnessPrompt:` (`harnessPromptOf`).
  */
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
   const {
-    meta: { role, description, skills: listed, harnessPrompt: prompt, systemPrompt: former, name: said, color: _, ...written },
+    meta: {
+      role,
+      description,
+      skills: listed,
+      harnessPrompt: prompt,
+      mcp: servers,
+      systemPrompt: former,
+      name: said,
+      color: _,
+      ...written
+    },
     spelled,
   } =
     block === null
@@ -260,7 +281,8 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
       `${file}: \`${prompt === undefined ? `systemPrompt: ${former}` : 'harnessPrompt: replace'}\` puts the agent's instructions in place of Claude Code's own prompt, and this agent has none: its sessions would start with no prompt at all. Write its instructions below the frontmatter, or delete the line.`,
     );
   }
-  const composed = composedRefusal(file, skills, harnessPrompt, step);
+  const mcp = serverNamesOf(file, servers);
+  const composed = composedRefusal(file, skills, harnessPrompt, step) ?? serversRefusal(file, mcp, step);
   if (composed !== undefined) refuse(composed);
   return {
     name,
@@ -268,6 +290,7 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
     ...(description !== undefined && { description }),
     ...(skills !== undefined && { skills }),
     ...(harnessPrompt !== undefined && { harnessPrompt }),
+    ...(mcp !== undefined && { mcp }),
     keys,
     body,
     read: read ?? (() => undefined),
@@ -323,6 +346,8 @@ export type AgentDraft = {
   skills?: string | null;
   /** What becomes of Claude Code's own prompt, as written: `keep`, `no-coding` or `replace`. */
   harnessPrompt?: string | null;
+  /** The MCP servers its sessions load, as written: `playwright, docs`. */
+  mcp?: string | null;
   keys: Partial<Record<RoleKey, string | null>>;
   body: string;
 };
@@ -374,6 +399,7 @@ export function renderAgent(draft: AgentDraft): string {
     description: draft.description,
     skills: draft.skills,
     harnessPrompt: draft.harnessPrompt,
+    mcp: draft.mcp,
   };
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
   const lines = values.flatMap(([key, value]) => {
@@ -403,6 +429,7 @@ export function agentDraftOf(name: string, text: string, read?: (file: string) =
     description: agent.description ?? null,
     skills: agent.skills?.length ? agent.skills.join(', ') : null,
     harnessPrompt: agent.harnessPrompt ?? null,
+    mcp: agent.mcp?.length ? agent.mcp.join(', ') : null,
     keys: agent.keys,
     body: agent.body,
   };

@@ -454,11 +454,10 @@ harness thinks, `effort: high`. Both reach `e.file` on every filing of the step:
 
 What it leaves:
 
-- **`mcp:` on a step is the next question.** Every Claude step gets the checkout's `.mcp.json` (E4), readers
-  included. The engine's task `mcp` adds servers beside that file and cannot withhold it. A per-step `mcp:` that
-  narrows — a reader without a browser, or with only the servers it names — needs the engine to leave the
-  checkout's file out when a task asks it to. Until then an `mcp:` key could only add, and a step that named
-  none would still have every server in the file. So the key is not built.
+- **`mcp:` on a step is the next question.** An agent's file names the servers of the checkout's `.mcp.json`
+  its sessions load (`mcp:`), and the runtime leaves the rest of the file out (`checkoutMcp`): a session loads
+  what its agent names and no other. A step has no `mcp:` line of its own yet, one that adds to its agent's as
+  its `skills:` does, so a server only one step needs is named by the agent that fills it.
 - **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
   built-in set", and a `claude -p` with `--tools Read,Grep,Glob,Bash` and `.mcp.json` listed every `browser_*`
   tool (2026-09-13, *Shipped: looking is a skill*). What keeps a server's tool from such a step is its permission

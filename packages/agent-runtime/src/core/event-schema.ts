@@ -54,6 +54,7 @@ const harnessArgs = {
   allowedTools: Schema.optional(Strings),
   effort: Schema.optional(Schema.String),
   mcp: Schema.optional(Schema.Record(Schema.String, McpServerSchema)),
+  checkoutMcp: Schema.optional(Strings),
   contextTokens: Schema.optional(Schema.Finite),
   background: Schema.optional(Schema.Boolean),
   budgetUsd: Schema.optional(Schema.Finite),

@@ -172,6 +172,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
           own: null,
           hired: null,
           layers: null,
+          mcp: [],
         },
         {
           name: 'review',
@@ -189,6 +190,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
           /** Listed in the default factory, which hires no one. */
           hired: null,
           layers: null,
+          mcp: [],
         },
       ],
       /** `graphOf` the steps, as a run of it is drawn. */
@@ -221,6 +223,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
           own: null,
           hired: null,
           layers: null,
+          mcp: [],
         },
       ],
       graph: { roots: ['plan'], edges: [] },

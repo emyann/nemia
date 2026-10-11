@@ -34,6 +34,18 @@ closeout's `mutants`.
 
 Never build or run the e2e: implement's check ran it on this round's tree, and its log is in the check you are handed.
 
+**Say whether the branch holds the base** as it is when you review. The base is the branch the repository's own checkout is on, and
+from your workspace git names its tip `main-worktree/HEAD`, whatever that branch is called:
+`git merge-base --is-ancestor main-worktree/HEAD HEAD` answers by its exit code alone, and
+`git log --oneline HEAD..main-worktree/HEAD` lists what the branch lacks. Say in your summary the base's commit,
+`git rev-parse main-worktree/HEAD`, and that the branch holds it or how many commits it lacks. A branch that lacks some is a finding
+with `again: true` only where the base moved under the change: a file both changed, named by
+`git diff --name-only HEAD...main-worktree/HEAD` and by `git diff --name-only main-worktree/HEAD...HEAD`; a file the base changed that
+the change's code or tests read; or a measure the change wrote, a baseline or a count that only shrinks, over files the base changed.
+Name those files in the finding, its `kind` `other`. Any other branch behind is no finding: say so in your summary, and the landing's
+check runs the whole suite on the merged tree. Once implement has merged the base, the diff your brief names shows the base's landings
+with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.
+
 **Open the change when a picture cannot show it**: when it changes what a page does when pressed, typed into or hovered, or a state no
 picture shows. Run `npm run board:serve`, bare: it builds this round's board outside the workspace and serves it on ports of its own,
 against a store of its own that holds the e2e's seed, and prints where. Open that address with the `look` skill's browser tools, press

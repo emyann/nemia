@@ -65,7 +65,7 @@ type Allowance = { count: number; not: string };
  * package's tests, each no wait; a file not here has none. A count only shrinks.
  */
 const DEADLINES: Readonly<Record<string, Allowance>> = {
-  'test/git-skill.test.ts': { count: 1, not: 'a commit date a minute ahead' },
+  'test/git-skill.boundary.test.ts': { count: 1, not: 'a commit date a minute ahead' },
   'test/forget-engine.test.ts': { count: 1, not: "a fake closeout's timestamp" },
   'test/held.test.ts': { count: 1, not: 'a mocked clock set ten minutes ahead' },
   'test/tick-program.test.ts': { count: 1, not: 'a series read at a moment two minutes ahead' },

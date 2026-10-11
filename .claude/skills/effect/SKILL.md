@@ -79,8 +79,11 @@ version, and the version above must be the pin. An upgrade re-measures the table
   whose `make` joins the engine's layers with `Layer.mergeAll` and provides them to each verb.
 - A service changed in one verb is a layer over it: `Layer.effect(Tag, ...)` that reads the service and returns `Tag.of({ ...e, verb })`,
   `.pipe(Layer.provide(inner))` (`engineOf` in `packages/agent-orchestrator/src/runtime-client.ts`).
-- A test hands its own implementation as `Layer.succeed(Tag)(Tag.of({ ... }))`, a verb it does not keep an `Effect.die` naming
-  itself: `board` in `packages/agent-orchestrator/test/engine-board.ts`.
+- A test is given a stand-in as a layer, and hands no implementation of its own for what is outside the process: the place is
+  `testPlace()`'s layer (`packages/agent-orchestrator/place/memory`), and a new test file that makes an engine by hand
+  (`Layer.succeed(Tag)(Tag.of({ ... }))`, `promised`) is refused by `packages/agent-orchestrator/test/stand-ins.test.ts`. `board` in
+  `packages/agent-orchestrator/test/engine-board.ts` is the hand-made engine today's listed tests keep, a verb it does not keep an
+  `Effect.die` naming itself.
 
 ## Verbs
 
@@ -158,7 +161,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - A controller that asks where a run's work lives requires the place (`PlaceService` in
   `packages/agent-orchestrator/src/place/place.store.ts`, a service with no default): `startRun` requires it alone, `tickRun` beside the
   engine. `runWith` removes the engine's requirement only, so whoever runs the program gives the place by name
-  (`Effect.provide(gitPlaceLayer)`, `shipped(program)`), and a program given none does not compile.
+  (`Effect.provide(gitPlaceLayer)`, `shipped(program)`), and a program given none does not compile. A test gives the test place's
+  layer (`runOver(runEngine, () => stand().layer)`, `test/placed.ts`); the git place is named only in a `.boundary.test.ts` file.
 
 ## Logs and traces
 

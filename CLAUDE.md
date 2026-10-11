@@ -80,6 +80,11 @@ holds what every change needs.
   refusal says so with `as never` where it does.
 - **An optional field added to a returned type is dropped by every caller that rebuilds the answer field by field.** Grep for each
   place that spreads or rebuilds the type, and give the new fact one writer.
+- **A test is given a stand-in, and the real thing is asked by name.** A new test file writes `const stand = eachTest(testPlace);`
+  (`packages/agent-orchestrator/test/placed.ts`). A file whose whole subject is git, a process, the real place or the real engine, or
+  that needs what the stand-in does not model, is named `<what>.boundary.test.ts` (the suffix; `test/boundary.test.ts`, the layer
+  kinds, is another word). `packages/agent-orchestrator/test/stand-ins.test.ts` refuses the rest in the runtime, the orchestrator and
+  the api, against `test/stand-ins.baseline.ts`, which only shrinks, and refuses a stand-in whose contract no boundary test walks.
 
 ## Rules the code keeps
 

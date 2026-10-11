@@ -239,6 +239,21 @@ const MAKE: readonly Walk[] = [
     },
   },
   {
+    name: 'REFUSED: asked again once its directory was removed, it is not taken up, and its branch is there already',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area);
+      const first = cut(side, area, root, 'one');
+      fs.rmSync(first.at, { recursive: true, force: true });
+      const again = cut(side, area, root, 'one');
+      return { first: first.made, again: again.made, there: fs.existsSync(first.at) };
+    },
+    says: {
+      again: { refused: true },
+      first: { answer: { branch: 'wf/r/one', conflicts: [], notes: [], workspace: '<area>/ws/one' } },
+      there: false,
+    },
+  },
+  {
     name: 'a branch of `also` the repository lacks is a note, and the workspace is cut all the same',
     walk: (side, area) => {
       const { root } = repoIn(side, area);
@@ -757,6 +772,20 @@ const INVENTORY: readonly Walk[] = [
         ],
       },
     },
+  },
+  {
+    name: 'a new file in a folder the commit knows is its path, and a folder the commit does not know is named once, whatever it holds',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area, { 'a.txt': 'one\n', 'kept/a.txt': 'one\n' });
+      const { at } = cut(side, area, root, 'one');
+      fs.writeFileSync(path.join(at, 'kept', 'new.txt'), 'new\n');
+      fs.mkdirSync(path.join(at, 'fresh', 'deep'), { recursive: true });
+      fs.writeFileSync(path.join(at, 'fresh', 'deep', 'new.txt'), 'new\n');
+      fs.writeFileSync(path.join(at, 'fresh', 'other.txt'), 'new\n');
+      const outcome = side.place.askNow('inventory', { repo: root, under: path.join(area, 'ws'), prefix: 'wf/r/', base: 'main' });
+      return answerOf(outcome).workspaces.map((w) => w.changes);
+    },
+    says: [['fresh/', 'kept/new.txt']],
   },
   {
     name: 'a repository that is no directory left nothing: it answers empty',

@@ -49,6 +49,9 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   A package's program runs over the request's engine and the app's place with `runPlaced(placeService, e, …)`, a verb of the engine itself with `engineRead` (store.ts).
 - **A test imports the api and the package statically, after the harness**, which sets `WF_ROOT` and `CLAUDE_CONFIG_DIR` to scratch
   folders as it loads (`root`, `config`): the package fixes its store as its modules load. `harness.test.ts` refuses an `import()`.
+- **A new test file that runs git, starts a process, names the real place or engine (`shipped`, `engine`) or makes an engine by hand
+  is named `<what>.boundary.test.ts`**: `packages/agent-orchestrator/test/stand-ins.test.ts` refuses any other but those on its
+  baseline, which only shrinks. The `runWith` of `test/placed.ts` gives the git place, so a file that imports it reaches `place`.
 - **A folder's face (`index.ts`) is the door `app.ts` mounts**: an import between folders names the file where the face would close a
   value cycle (`detail/` ↔ `steps/`), which tsc passes and the load fails on (`test/layout.test.ts`). `body.ts` stays at the root:
   every folder decodes its bodies there.

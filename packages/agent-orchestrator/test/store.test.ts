@@ -5040,7 +5040,6 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
-  const files = artifactsDir(run, 'implement');
   const secret = path.join(path.dirname(run.repo), `secret-${run.id}.txt`);
   fs.writeFileSync(secret, "not a step's to name\n");
   fs.mkdirSync(path.join(run.repo, 'shots'));

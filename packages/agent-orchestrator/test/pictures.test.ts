@@ -1,6 +1,7 @@
 /**
  * The build workflow's pictures rule (`workflows/build/pictures.ts`): implement's check refuses a change under `apps/web/src` whose
- * closeout's `artifacts` names no picture, an image file that is there, and says the command that takes them. Driven as the check drives
+ * closeout's `artifacts` names no picture, an image file that is there, and says the command that takes them; and a change under
+ * `tools/observe` that a dashboard reads whose `artifacts` names no `dashboard-<name>.png` and `dashboard-<name>.txt` of it. Driven as the check drives
  * it, `node pictures.ts <closeout>` in a committed scratch repository whose base is `WF_BASE_REF`, a bounded subprocess; and the shipped
  * check of `workflows/build/implement.md` is run whole, as frozen, with `npm` stubbed, so the clause is proven wired and not only written.
  */
@@ -187,6 +188,90 @@ test('REFUSED: no closeout with a page touched, and a base git cannot read', () 
   assert.match(noBase.err, /WF_BASE_REF is not set/);
 });
 
+/** A dashboard of the side Grafana, changed, and the files a render writes of it into `files`: their paths. */
+const BOARD = { 'tools/observe/dashboards/steps.json': '{"uid":"nemia-steps"}\n' };
+const rendered = (files: string, name: string, ...kinds: string[]): string[] =>
+  kinds.map((kind) => {
+    fs.writeFileSync(path.join(files, `dashboard-${name}.${kind}`), kind);
+    return path.join(files, `dashboard-${name}.${kind}`);
+  });
+
+test('REFUSED: a dashboard changed whose closeout names no picture and text of it, with the command that renders it', () => {
+  const { repo, base } = workOn(BOARD);
+  const files = scratch('wf-pictures-files-');
+  const env = { WF_BASE_REF: base, WF_ARTIFACTS: files };
+  const none = pictures(repo, [closeoutFile([])], env);
+  assert.equal(none.code, 1, none.out);
+  assert.ok(none.err.includes(`node tools/observe/render/render.ts --out ${files} --dashboards steps`), none.err);
+  assert.ok(none.err.includes('tools/observe/dashboards/steps.json'), `names what the work touched:\n${none.err}`);
+  assert.ok(none.err.includes('steps (dashboard-steps.png, dashboard-steps.txt)'), none.err);
+  const pictureOnly = pictures(repo, [closeoutFile(rendered(files, 'steps', 'png'))], env);
+  assert.equal(pictureOnly.code, 1, 'a picture with no text of its panels');
+  const textOnly = pictures(repo, [closeoutFile([path.join(files, 'dashboard-steps.txt')])], {
+    ...env,
+    WF_ARTIFACTS: scratch('wf-pictures-files-'),
+  });
+  assert.equal(textOnly.code, 1, 'a text named outside the files directory');
+  const other = pictures(repo, [closeoutFile(rendered(files, 'time', 'png', 'txt'))], env);
+  assert.equal(other.code, 1, "another dashboard's pair");
+  fs.writeFileSync(path.join(files, 'dashboard-steps.txt'), '');
+  const empty = pictures(repo, [closeoutFile([path.join(files, 'dashboard-steps.png'), path.join(files, 'dashboard-steps.txt')])], env);
+  assert.equal(empty.code, 1, empty.out);
+  assert.ok(empty.err.includes(`  ${path.join(files, 'dashboard-steps.txt')}: empty, 0 bytes`), empty.err);
+});
+
+test("a dashboard changed with its picture and its text named passes, and asks no picture of the board's pages", () => {
+  const { repo, base } = workOn(BOARD);
+  const files = scratch('wf-pictures-files-');
+  const r = pictures(repo, [closeoutFile(rendered(files, 'steps', 'png', 'txt'))], { WF_BASE_REF: base, WF_ARTIFACTS: files });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /nothing under apps\/web\/src was touched/);
+  assert.match(r.out, /dashboards named, each with its picture and its text: steps/);
+});
+
+test('any other file a dashboard reads owes one pair at least, a removed dashboard too; the README and the profiler owe none', () => {
+  const files = scratch('wf-pictures-files-');
+  const pair = rendered(files, 'time', 'png', 'txt');
+  const others: [Record<string, string>, Record<string, string>][] = [
+    [{ 'tools/observe/compose.yaml': 'name: x\n' }, {}],
+    [{ 'tools/observe/render/seed.ts': 'export {};\n' }, {}],
+    [{ 'tools/observe/dashboards/NOTES.md': 'x\n' }, {}],
+  ];
+  for (const [work, before] of others) {
+    const { repo, base } = workOn(work, before);
+    const env = { WF_BASE_REF: base, WF_ARTIFACTS: files };
+    const refused = pictures(repo, [closeoutFile([])], env);
+    assert.equal(refused.code, 1, Object.keys(work).join());
+    assert.ok(refused.err.includes('names no picture and text of: any dashboard'), refused.err);
+    assert.ok(refused.err.includes(`node tools/observe/render/render.ts --out ${files}\n`), refused.err);
+    assert.equal(pictures(repo, [closeoutFile(pair)], env).code, 0, Object.keys(work).join());
+  }
+  const removed = workOn({ 'x.md': 'x\n' }, BOARD);
+  git(removed.repo, 'rm', '-q', 'tools/observe/dashboards/steps.json');
+  git(removed.repo, 'commit', '-qm', 'remove a dashboard');
+  const env = { WF_BASE_REF: removed.base, WF_ARTIFACTS: files };
+  assert.equal(pictures(removed.repo, [closeoutFile([])], env).code, 1, 'a removed dashboard owes a render of those left');
+  assert.equal(pictures(removed.repo, [closeoutFile(pair)], env).code, 0);
+  for (const work of [{ 'tools/observe/README.md': '# x\n' }, { 'tools/observe/profile/preload.ts': 'export {};\n' }]) {
+    const { repo, base } = workOn(work);
+    const r = pictures(repo, [closeoutFile([])], { WF_BASE_REF: base, WF_ARTIFACTS: files });
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /nothing a dashboard reads under tools\/observe was touched/);
+  }
+});
+
+test('REFUSED: a page and a dashboard both changed, with the pictures of one alone', () => {
+  const { repo, base } = workOn({ ...PAGE, ...BOARD });
+  const files = scratch('wf-pictures-files-');
+  const env = { WF_BASE_REF: base, WF_ARTIFACTS: files };
+  fs.writeFileSync(path.join(files, 'x-dark.png'), 'png');
+  const page = pictures(repo, [closeoutFile([path.join(files, 'x-dark.png')])], env);
+  assert.equal(page.code, 1, page.out);
+  assert.ok(page.err.includes('dashboard-steps.txt'), page.err);
+  const both = pictures(repo, [closeoutFile([path.join(files, 'x-dark.png'), ...rendered(files, 'steps', 'png', 'txt')])], env);
+  assert.equal(both.code, 0, both.err);
+});
+
 /** The shipped implement step's check, read from the folder as `nemia start` reads and freezes it. */
 const implementCheck = (): string => {
   const check = loadWorkflows(BUILD, placesOf(BUILD)).find((step) => step.name === 'implement')?.check;
@@ -235,6 +320,12 @@ test("REFUSED at shipped defaults: implement's check, as frozen, refuses a page 
   fs.writeFileSync(path.join(files, 'x-dark.png'), 'png');
   const passed = shipped(repo, env([path.join(files, 'x-dark.png')]));
   assert.equal(passed.status, 0, passed.out);
+  const board = workOn(BOARD, scripts);
+  const boardEnv = (artifacts: string[]) => ({ ...env(artifacts), WF_BASE_REF: board.base });
+  const unrendered = shipped(board.repo, boardEnv([]));
+  assert.notEqual(unrendered.status, 0, unrendered.out);
+  assert.match(unrendered.out, /node tools\/observe\/render\/render\.ts --out/);
+  assert.equal(shipped(board.repo, boardEnv(rendered(files, 'steps', 'png', 'txt'))).status, 0);
   const { repo: bare, base: without } = workOn(PAGE);
   const old = shipped(bare, { ...env([path.join(files, 'x-dark.png')]), WF_BASE_REF: without });
   assert.notEqual(old.status, 0, old.out);

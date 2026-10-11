@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Metric, Tracer } from 'effect';
+import { OtlpExporter } from 'effect/observability';
 import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpend } from '../status/status.ts';
@@ -20,7 +21,9 @@ import {
   queueWait,
   roundsGranted,
   settledFacts,
+  settledOnce,
   settledWaits,
+  settlesDue,
   stepAttributes,
   type FactReads,
   type DeniedFact,
@@ -133,6 +136,60 @@ test('a round exhausted once for a step one of its settled tasks leaves out of r
   );
 });
 
+test("a session held open and answered, the step's task and one of its tries', is one try fact with its cost once", () => {
+  const held = {
+    ...RUN,
+    steps: { work: { status: 'running', taskId: 'r-1-work-try2', tries: [{ taskId: 'r-1-work-try2' }] } },
+  } as unknown as Run;
+  const facts = settledFacts(held, [WORK], new Set(['r-1-work-try2']), reads());
+  assert.deepEqual(
+    facts.map((f) => [f.metric, 'costUsd' in f ? f.costUsd : undefined]),
+    [['try', 1.25]],
+  );
+  const recheck = {
+    ...RUN,
+    steps: { work: { status: 'running', taskId: 'r-1-work', check: { taskId: 'r-1-work-try2-check' }, tries: [{ taskId: 'r-1-work' }] } },
+  } as unknown as Run;
+  assert.deepEqual(
+    settledFacts(recheck, [WORK], new Set(['r-1-work', 'r-1-work-try2-check']), reads()).map((f) => f.metric),
+    ['try', 'check'],
+    "a recheck's session is counted once, and its check beside it",
+  );
+});
+
+test('a settle is due once: a task its view says settled that the mark does not hold, a check like a session', () => {
+  const marked = (settlesCounted: string[]) => ({ ...RUN, settlesCounted }) as Run;
+  const views = new Map<string, FactView>([
+    ['r-1-work-try2', view('succeeded')],
+    ['r-1-work-try2-check', view('failed', 1)],
+    ['r-1-work', view('stopped')],
+    ['r-1-review', { state: { brief: 'Do it.', settled: null, attempts: [] } }],
+    ['r-2-work', view('succeeded')],
+  ]);
+  assert.deepEqual([...settlesDue(marked([]), [WORK, REVIEW], views)!], ['r-1-work-try2', 'r-1-work-try2-check', 'r-1-work']);
+  assert.deepEqual([...settlesDue(marked(['r-1-work-try2', 'r-1-work']), [WORK, REVIEW], views)!], ['r-1-work-try2-check']);
+  assert.deepEqual([...settlesDue(marked([]), [WORK, REVIEW], new Map())!], [], 'REFUSED: a task the pass has no view of is not due');
+  assert.deepEqual([...settlesDue(marked([...views.keys()]), [WORK, REVIEW], views)!], [], 'REFUSED: a task the mark holds is not due');
+  assert.equal(settlesDue(RUN, [WORK, REVIEW], views), undefined, 'a record with no mark: the feed says which');
+  const once = settledOnce(marked(['r-1-work']), [WORK, REVIEW], new Set(['r-1-work']), reads({ views }));
+  assert.deepEqual(once.marks, { settlesCounted: ['r-1-work', 'r-1-work-try2', 'r-1-work-try2-check'] }, 'the mark, moved past them');
+  assert.deepEqual(
+    once.facts.map((f) => f.metric),
+    ['try', 'check', 'wait'],
+    'what the feed names is not asked of a marked record',
+  );
+  assert.deepEqual(settledOnce(marked([...views.keys()]), [WORK, REVIEW], new Set(['r-1-work']), reads({ views })), {
+    facts: [],
+    marks: {},
+  });
+  const fed = settledOnce(RUN, [WORK, REVIEW], new Set(['r-1-work']), reads({ views }));
+  assert.deepEqual(
+    [fed.facts.map((f) => f.metric), fed.marks],
+    [['try'], {}],
+    'a record with no mark is counted off the feed, and gets none',
+  );
+});
+
 /** `program` over a registry of its own, and what it holds after. */
 const recorded = async (facts: readonly StepFact[]) => {
   const registry = new Map();
@@ -159,6 +216,44 @@ test('a session that settled with a cost records its cost once, by the five attr
   assert.equal(count('step.tokens.input'), 1200);
   assert.equal(count('step.duration'), 1);
   assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {}))));
+});
+
+test('each series a fact writes is exported at zero, then at its value: two exports, and none where no fact writes a metric', async () => {
+  const registry = new Map();
+  const own = <A, E>(program: Effect.Effect<A, E>) =>
+    Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+  const exports: Record<string, number>[] = [];
+  const flusher = OtlpExporter.Flusher.of({
+    flush: Effect.map(Metric.snapshot, (snapshot) => {
+      exports.push(Object.fromEntries(snapshot.map((m) => [`${m.id} ${m.attributes?.outcome}`, (m.state as { count: number }).count])));
+    }),
+    register: () => Effect.void,
+  });
+  const exported = (facts: readonly StepFact[]) => own(recordStepMetrics(facts).pipe(Effect.provideService(OtlpExporter.Flusher, flusher)));
+  const wait: WaitFact = {
+    metric: 'wait',
+    wait: 'queue',
+    attributes: stepAttributes(RUN, WORK, 'blocked'),
+    run: 'r-1',
+    try: 2,
+    from: '2026-10-06T10:00:00.000Z',
+    to: '2026-10-06T10:00:02.000Z',
+    ms: 2000,
+  };
+  await exported([...settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check']), reads()), wait]);
+  const names = ['tries blocked', 'duration blocked', 'cost blocked', 'tokens.input blocked', 'tokens.output blocked', 'checks refused'];
+  const series = (values: number[], queue: number) =>
+    Object.fromEntries([...names.map((name, i) => [`step.${name}`, values[i]]), ['step.queue.duration blocked', queue]]);
+  assert.deepEqual(exports, [series([0, 0, 0, 0, 0, 0], 0), series([1, 1, 1.25, 1200, 300, 1], 1)]);
+
+  await exported([{ metric: 'check', attributes: stepAttributes(RUN, WORK, 'refused') }]);
+  assert.equal(exports.length, 4, 'a series that is there is exported as it stands, then with its value');
+  assert.deepEqual([exports[2]['step.checks refused'], exports[3]['step.checks refused']], [1, 2], 'born for nothing: it loses no count');
+
+  const [denial] = denied(DENIED_RUN);
+  assert.ok(denial, 'a denied call to hand over');
+  await exported(deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf));
+  assert.equal(exports.length, 4, 'REFUSED: facts that are spans alone ask for no export');
 });
 
 test("REFUSED: a fact whose attributes carry a run's id is recorded nowhere", async () => {

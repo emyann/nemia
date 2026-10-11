@@ -76,8 +76,11 @@ const TOLD: Told[] = [
       '**Name your mutants** in the closeout: one per rule or guard the change adds',
       'Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit.',
       'saying why in `noMutants`',
+      'When the change touches `tools/observe`',
+      '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
+      'the check refuses a changed dashboard whose picture and',
     ],
-    adds: ['shadcn', 'look'],
+    adds: ['shadcn', 'look', 'see-a-dashboard'],
     denies: [],
     declares: ['mutants', 'noMutants'],
   },
@@ -99,8 +102,10 @@ const TOLD: Told[] = [
       NO_LIVE_BOARD,
       NO_FILENAME,
       STOP_BOARD,
+      "When the change touches `tools/observe`, read each dashboard's picture and text the implement step named in its `artifacts`",
+      'You do not render one yourself: your fence refuses the command and Docker.',
     ],
-    adds: ['shadcn', 'look'],
+    adds: ['shadcn', 'look', 'see-a-dashboard'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'mutants', 'again'],
   },
@@ -169,9 +174,9 @@ test('each shipped step still says, adds, denies and declares what its agent and
 
 test('REFUSED: a step that adds a skill no more, or declares its closeout no more, is named', () => {
   const unskilled = shippedEdited('build', 'implement', (text) =>
-    text.replace('skills: effect, shadcn, change-the-board, look\n', 'skills: effect, shadcn, change-the-board\n'),
+    text.replace('skills: effect, shadcn, change-the-board, look, see-a-dashboard\n', 'skills: effect, shadcn, change-the-board, look\n'),
   );
-  assert.deepEqual(untold('build', unskilled), ['build/implement: skill look']);
+  assert.deepEqual(untold('build', unskilled), ['build/implement: skill see-a-dashboard']);
   const undeclared = shippedEdited('build', 'implement', (text) => text.replace('output: implement.schema.json\n', ''));
   assert.deepEqual(untold('build', undeclared), ['build/implement: declares mutants', 'build/implement: declares noMutants']);
 });

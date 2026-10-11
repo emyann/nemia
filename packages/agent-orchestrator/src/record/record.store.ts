@@ -78,6 +78,7 @@ const runBase = {
   slotHeldAt: Schema.optional(Schema.String),
   gatesTimed: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number })))),
   deniedCounted: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ task: Schema.String, attempts: Schema.Number })))),
+  settlesCounted: Schema.optional(Strings),
   runTimed: Schema.optional(Schema.Boolean),
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
@@ -152,8 +153,7 @@ export class UnreadableRecord extends Invalid {
 /** Each unreadable record said once a process: a daemon lists the runs every pass. */
 const saidAlready = new Set<string>();
 const sayOnce = (line: string): void => {
-  if (!saidAlready.has(line)) process.stderr.write(`${line}\n`);
-  saidAlready.add(line);
+  if (!saidAlready.has(line) && saidAlready.add(line)) process.stderr.write(`${line}\n`);
 };
 
 const isText = Schema.is(Schema.String);

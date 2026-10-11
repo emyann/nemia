@@ -28,5 +28,16 @@ export type {
   Reading,
   RecentPass,
 } from './meter.ts';
-export { checkWait, deniedCalls, gateWaits, onceFacts, queueWait, roundsGranted, settledFacts, settledWaits, stepKeys } from './step.ts';
-export type { DeniedFact, StepFact, StepKeys, Wait, WaitFact, Waited } from './step.ts';
+export {
+  checkWait,
+  deniedCalls,
+  gateWaits,
+  onceFacts,
+  queueWait,
+  roundsGranted,
+  settledFacts,
+  settledWaits,
+  stepKeys,
+  timelineFacts,
+} from './step.ts';
+export type { DeniedFact, StepFact, StepKeys, TimelineFact, Wait, WaitFact, Waited } from './step.ts';

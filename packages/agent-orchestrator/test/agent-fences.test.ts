@@ -947,6 +947,19 @@ test("REFUSED: a step or an agent that denies a browser tool its filename no mor
         (err: Error) => err.message.includes(`would lift \`${tool}(filename:*)\``),
         `${file} alone cannot drop what its agent denies`,
       );
+      const narrowed = shippedEdited(
+        agent,
+        workflow,
+        `a deny of a filename to ${tool}`,
+        (text) => text.replace(`${tool}(filename:*)`, `${tool}(filename:/tmp/*)`),
+        `agents/${agent}.md`,
+        file,
+      );
+      assert.deepEqual(
+        unfenced(narrowed, SETTINGS, NAMED_FILES),
+        open.filter((call) => !call.filename?.startsWith('/tmp/')).map((call) => `${narrowed.name}: ${shown(call)}`),
+        `${file} and agents/${agent}.md denying only a file under /tmp leave the workspace's open`,
+      );
     }
 });
 

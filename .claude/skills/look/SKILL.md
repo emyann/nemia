@@ -81,8 +81,9 @@ Then, for every page you are looking at, in the browser tools (`browser_*`, from
 - `browser_resize` to 1280 × 800, the e2e's window, once.
 - `browser_navigate` to the page. `browser_snapshot` says what is on it and what can be pressed, and
   `browser_console_messages` what went wrong.
-- `browser_take_screenshot` with `fullPage: true` and an absolute `filename` under `/tmp/playwright-mcp`,
-  then read the file.
+- `browser_take_screenshot` with `fullPage: true`: with an absolute `filename` under `/tmp/playwright-mcp`,
+  then read the file; or, in a design or a review step, with no `filename`, and judge the picture the
+  call answers with.
 - Use the page as a person would — `browser_click`, `browser_hover`, `browser_type`, `browser_press_key` on
   what the change is about — and photograph what it shows.
 

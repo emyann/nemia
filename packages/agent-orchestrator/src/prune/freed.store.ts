@@ -2,12 +2,12 @@
  * What removing folders frees on disk (`freedBytes`), read with Node and no process: a walk that follows no link and counts a file
  * hardlinked from elsewhere not at all, since its blocks stay while another name holds them. A store: it reads the disk and nothing else.
  */
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 
-/** The most folders the walk reads at once. */
-export const WALK_AT_ONCE = 16;
+/** The names the walk reads in one go before it lets the process's other work run: a burst of a few milliseconds. */
+export const WALK_BURST = 1024;
 
 /** The bytes a block of `lstat` counts, whatever the file system's own block is. */
 const BLOCK = 512n;
@@ -18,13 +18,16 @@ type Linked = { readonly links: bigint; met: bigint; readonly bytes: number };
 /** What the walk has counted so far: the bytes freed with each folder asked, and every inode with names still to meet. */
 type Walked = { readonly bytes: number[]; readonly linked: Map<string, Linked> };
 
+/** A folder still to read, of the folder asked `index`. */
+type Inside = { readonly dir: string; readonly index: number };
+
 /**
  * Count one name, `at`, into the folder `index`: a folder or a file of one name at once; a file of several names once every one of
  * them was met inside the folders walked, to the folder where the last was. Answers whether it is a folder, to be read in its turn. A
  * name that does not read counts nothing.
  */
-async function counted(at: string, index: number, walked: Walked): Promise<boolean> {
-  const stat = await fs.lstat(at, { bigint: true }).catch(() => undefined);
+function counted(at: string, index: number, walked: Walked): boolean {
+  const stat = fs.lstatSync(at, { bigint: true, throwIfNoEntry: false });
   if (!stat) return false;
   const bytes = Number(stat.blocks * BLOCK);
   if (stat.isDirectory() || stat.nlink <= 1n) {
@@ -39,15 +42,22 @@ async function counted(at: string, index: number, walked: Walked): Promise<boole
   return false;
 }
 
-/** Count every name in the folder `dir` of the folder asked `index`, and answer the folders among them. One that does not list has none. */
-async function read(dir: string, index: number, walked: Walked): Promise<Array<{ dir: string; index: number }>> {
-  const names = await fs.readdir(dir).catch(() => []);
-  const inside: Array<{ dir: string; index: number }> = [];
-  for (const name of names) {
-    const at = path.join(dir, name);
-    if (await counted(at, index, walked)) inside.push({ dir: at, index });
+/** The names in the folder `dir`, each as its path; none for one that does not list. */
+function namesIn(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir).map((name) => path.join(dir, name));
+  } catch {
+    return [];
   }
-  return inside;
+}
+
+/** `counted`, for a name whose `lstat` throws: it counts nothing. */
+function countedOrNot(at: string, index: number, walked: Walked): boolean {
+  try {
+    return counted(at, index, walked);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -57,18 +67,21 @@ async function read(dir: string, index: number, walked: Walked): Promise<Array<{
  * two of `dirs` counts once, for the folder its last name was met in. A floor: a path that does not read counts zero, and so does a
  * folder that is gone.
  *
+ * The walk reads `WALK_BURST` names at a time and yields between two bursts, so a caller in a daemon holds up nothing for longer.
+ *
  * @param dirs The folders that would be removed together, each an absolute path.
  * @returns The bytes each frees, in the order asked.
  */
 export const freedBytes = Effect.fn('freedBytes')(function* (dirs: readonly string[]) {
   const walked: Walked = { bytes: dirs.map(() => 0), linked: new Map() };
-  const roots = yield* Effect.forEach(dirs, (dir, index) =>
-    Effect.promise(async () => ((await counted(dir, index, walked)) ? [{ dir, index }] : [])),
-  );
-  let level = roots.flat();
-  while (level.length) {
-    const next = yield* Effect.forEach(level, (d) => Effect.promise(() => read(d.dir, d.index, walked)), { concurrency: WALK_AT_ONCE });
-    level = next.flat();
+  const inside: Inside[] = dirs.flatMap((dir, index) => (countedOrNot(dir, index, walked) ? [{ dir, index }] : []));
+  let read = 0;
+  for (let next = inside.pop(); next; next = inside.pop()) {
+    const { dir, index } = next;
+    for (const at of namesIn(dir)) {
+      if (countedOrNot(at, index, walked)) inside.push({ dir: at, index });
+      if (++read % WALK_BURST === 0) yield* Effect.yieldNow;
+    }
   }
   return walked.bytes;
 });

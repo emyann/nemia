@@ -53,7 +53,8 @@ test('a file shared by two folders asked together, with no name outside, is coun
   const a = path.join(ROOT, 'pair-a');
   const b = path.join(ROOT, 'pair-b');
   const shared = file(path.join(a, 'shared.bin'), 64);
-  fs.linkSync(shared, path.join(fs.mkdirSync(b, { recursive: true }) ?? b, 'shared.bin'));
+  fs.mkdirSync(b, { recursive: true });
+  fs.linkSync(shared, path.join(b, 'shared.bin'));
   const both = await freed(a, b);
   assert.equal(both[0] + both[1], held(a) + held(b) + held(shared), 'once in the sum');
   assert.ok(both[0] === held(a) || both[1] === held(b), `and for one folder alone: ${JSON.stringify(both)}`);
